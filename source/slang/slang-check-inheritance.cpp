@@ -97,6 +97,51 @@ namespace Slang
         return info;
     }
 
+    void SharedSemanticsContext::getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef)
+    {
+        auto mergeParent = [](DeclRef<GenericDecl>& currentParent, DeclRef<GenericDecl> newParent)
+            {
+                if (!currentParent)
+                {
+                    currentParent = newParent;
+                    return;
+                }
+                if (currentParent == newParent)
+                    return;
+                if (newParent.getDecl()->isChildOf(currentParent.getDecl()))
+                    currentParent = newParent;
+            };
+
+        if (declRef.as<GenericTypeParamDeclBase>())
+        {
+            if (!genericParent)
+                mergeParent(genericParent, declRef.getParent().as<GenericDecl>());
+            return;
+        }
+        else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+        {
+            if (auto lookupSourceDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource()))
+                getDependentGenericParentImpl(genericParent, lookupSourceDeclRef);
+        }
+        else if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
+        {
+            for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
+            {
+                if (auto argDeclRef = isDeclRefTypeOf<Decl>(genericAppDeclRef->getArg(i)))
+                {
+                    getDependentGenericParentImpl(genericParent, argDeclRef);
+                }
+            }
+        }
+    }
+
+    DeclRef<GenericDecl> SharedSemanticsContext::getDependentGenericParent(DeclRef<Decl> declRef)
+    {
+        DeclRef<GenericDecl> genericParent;
+        getDependentGenericParentImpl(genericParent, declRef);
+        return genericParent;
+    }
+
     InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* declRefType, InheritanceCircularityInfo* circularityInfo)
     {
         // This method is the main engine for computing linearized inheritance
@@ -305,39 +350,82 @@ namespace Slang
         // We now look at the structure of the declaration itself
         // to help us enumerate the direct bases.
         //
-        if (auto aggTypeDeclBaseRef = declRef.as<AggTypeDeclBase>())
+        auto currentDeclRef = declRef;
+        for (; currentDeclRef;)
         {
-            // In the case where we have an aggregate type or `extension`
-            // declaration, we can use the explicit list of direct bases.
-            //
-            for (auto typeConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(_getASTBuilder(), aggTypeDeclBaseRef))
+            if (auto aggTypeDeclBaseRef = currentDeclRef.as<AggTypeDeclBase>())
             {
-                visitor.ensureDecl(typeConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
-
-                // Note: In certain cases something takes the *syntactic* form of an inheritance
-                // clause, but it is not actually something that should be treated as implying
-                // a subtype relationship. For example, an `enum` declaration can use what looks
-                // like an inheritance clause to indicate its underlying "tag type."
+                // In the case where we have an aggregate type or `extension`
+                // declaration, we can use the explicit list of direct bases.
                 //
-                // We skip such pseudo-inheritance relationships for the purposes of determining
-                // the linearized list of bases.
-                //
-                if (typeConstraintDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
-                    continue;
+                for (auto typeConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(_getASTBuilder(), aggTypeDeclBaseRef))
+                {
+                    // Note: In certain cases something takes the *syntactic* form of an inheritance
+                    // clause, but it is not actually something that should be treated as implying
+                    // a subtype relationship. For example, an `enum` declaration can use what looks
+                    // like an inheritance clause to indicate its underlying "tag type."
+                    //
+                    // We skip such pseudo-inheritance relationships for the purposes of determining
+                    // the linearized list of bases.
+                    //
+                    if (typeConstraintDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
+                        continue;
 
-                // The base type and subtype witness can easily be determined
-                // using the `InheritanceDecl`.
-                //
-                auto baseType = getSup(astBuilder, typeConstraintDeclRef);
-                auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
-                    selfType,
-                    baseType,
-                    typeConstraintDeclRef);
+                    // The only case we will ever see a GenericTypeConstraintDecl inside a AggTypeDecl is when
+                    // AggTypeDecl is a associatedtype decl. In this case, we will only lookup the type constraint
+                    // if the constraint is on the associated type itself.
+                    //
+                    auto genericTypeConstraintDeclRef = typeConstraintDeclRef.as<GenericTypeConstraintDecl>();
+                    if (genericTypeConstraintDeclRef)
+                    {
+                        // If the base expr on the constraint isn't even a `VarExpr`, then it can't be referencing
+                        // the associated type itself and we can skip this constraint.
+                        if (!genericTypeConstraintDeclRef.getDecl()->sub.type
+                            && !as<VarExpr>(genericTypeConstraintDeclRef.getDecl()->sub.exp))
+                            continue;
+                    }
 
-                addDirectBaseType(baseType, satisfyingWitness);
+                    visitor.ensureDecl(typeConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
+
+                    // For generic type constraint decls, always make sure it is about the type being checked.
+                    //
+                    if (genericTypeConstraintDeclRef)
+                    {
+                        auto subType = getSub(astBuilder, genericTypeConstraintDeclRef);
+                        if (subType != selfType)
+                            continue;
+                    }
+                    else if (currentDeclRef != declRef)
+                    {
+                        continue;
+                    }
+                    // The base type and subtype witness can easily be determined
+                    // using the `InheritanceDecl`.
+                    //
+                    auto baseType = getSup(astBuilder, typeConstraintDeclRef);
+                    auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
+                        selfType,
+                        baseType,
+                        typeConstraintDeclRef);
+
+                    addDirectBaseType(baseType, satisfyingWitness);
+                }
             }
+            if (currentDeclRef.as<AssocTypeDecl>())
+            {
+                // If the current type is an associated type, continue inspecting the base/parent of the
+                // associatedtype to discover additional constraints defined on the parent associatedtype decls.
+                //
+                if (auto lookupDeclRef = as<LookupDeclRef>(currentDeclRef.declRefBase))
+                {
+                    currentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource()).as<AssocTypeDecl>();
+                    continue;
+                }
+            }
+            break;
         }
-        else if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDeclBase>())
+
+        if (auto genericDeclRef = getDependentGenericParent(declRef))
         {
             // The constraints placed on a generic type parameter are siblings of that
             // parameter in its parent `GenericDecl`, so we need to enumerate all of
@@ -349,13 +437,11 @@ namespace Slang
             // representation would need to take into account canonicalization of
             // constraints.
 
-            auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
-            SLANG_ASSERT(genericDeclRef);
             ensureDecl(&visitor, genericDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
 
             if (auto extensionDecl = as<ExtensionDecl>(genericDeclRef.getDecl()->inner))
             {
-                if (isDeclRefTypeOf<GenericTypeParamDecl>(extensionDecl->targetType.type) == genericTypeParamDeclRef)
+                if (isDeclRefTypeOf<GenericTypeParamDecl>(extensionDecl->targetType.type) == declRef)
                 {
                     // If `T` is a generic parameter where the same generic is an extension on `T`,
                     // then we need to add the extension itself as a facet.
@@ -377,12 +463,9 @@ namespace Slang
                 auto superType = getSup(astBuilder, constraintDeclRef);
 
                 // We only consider constraints where the type represented
-                // by `genericTypeParamDeclRef` is the subtype, since those
+                // by `declRef` is the subtype, since those
                 // constraints are the ones that give us information about
                 // the declared supertypes.
-                //
-                // TODO: consider whether other kinds of constraints could
-                // also apply here.
                 //
                 auto subDeclRefType = as<DeclRefType>(subType);
                 if (!subDeclRefType)
@@ -394,7 +477,7 @@ namespace Slang
                     if (!subDeclRefType)
                         continue;
                 }
-                if (subDeclRefType->getDeclRef() != genericTypeParamDeclRef)
+                if (subDeclRefType->getDeclRef() != declRef)
                     continue;
 
                 // Because the constraint is a declared inheritance relationship,
@@ -402,9 +485,9 @@ namespace Slang
                 // as in all the preceding cases.
                 //
                 auto satisfyingWitness = _getASTBuilder()->getDeclaredSubtypeWitness(
-                    selfType,
-                    superType,
-                    constraintDeclRef);
+                        selfType,
+                        superType,
+                        constraintDeclRef);
                 addDirectBaseType(superType, satisfyingWitness);
             }
         }
