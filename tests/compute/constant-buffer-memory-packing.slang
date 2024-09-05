@@ -19,7 +19,7 @@
 // {4,5,6}
 // {7,8,9}
 
-//TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 0.0  4.0 5.0 6.0 0.0  7.0 8.0 9.0 0]):name matrixTestCBuf1
+//TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 0.0  4.0 5.0 6.0 0.0  7.0 8.0 9.0 0.0]):name matrixTestCBuf1
 ConstantBuffer<row_major float3x3> matrixTestCBuf1;
 
 // CPP/Metal/CUDA due to not having memory packing will recieve the following COL matrix post-transpose:
@@ -27,7 +27,7 @@ ConstantBuffer<row_major float3x3> matrixTestCBuf1;
 // {2,4,0}
 // {3,5,7}
 
-//TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 0.0  4.0 5.0 6.0 0.0  7.0 8.0 9.0 0]):name matrixTestCBuf2
+//TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 0.0  4.0 5.0 6.0 0.0  7.0 8.0 9.0 0.0]):name matrixTestCBuf2
 ConstantBuffer<column_major float3x3> matrixTestCBuf2;
 
 //TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 0.0  4.0 5.0 6.0 0.0]):name NeedsPadding

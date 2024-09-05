@@ -606,6 +606,26 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
+{
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
+    {
+        const auto elementSize = elementInfo.size.getFiniteValue();
+        auto alignedElementCount = 1 << Math::Log2Ceil(elementCount);
+
+        // Metal aligns vectors to 2/4 element boundaries.
+        size_t size = elementSize * elementCount;
+        size_t alignment = alignedElementCount * elementSize;
+
+        SimpleLayoutInfo vectorInfo;
+        vectorInfo.kind = elementInfo.kind;
+        vectorInfo.size = size;
+        vectorInfo.alignment = alignment;
+     
+        return vectorInfo;
+    }
+};
+
 struct HLSLStructuredBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     // HLSL structured buffers drop the restrictions added for constant buffers,
@@ -1696,6 +1716,7 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
 
 static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
 static MetalArgumentBufferElementLayoutRulesImpl kMetalArgumentBufferElementLayoutRulesImpl;
+static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
 
 LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
@@ -1704,7 +1725,7 @@ LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
 };
 
 LayoutRulesImpl kMetalConstantBufferLayoutRulesImpl_ = {
-    &kMetalLayoutRulesFamilyImpl, & kCPULayoutRulesImpl, &kMetalObjectLayoutRulesImpl,
+    &kMetalLayoutRulesFamilyImpl, & kMetalLayoutRulesImpl, &kMetalObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kMetalParameterBlockLayoutRulesImpl_ = {
@@ -1712,7 +1733,7 @@ LayoutRulesImpl kMetalParameterBlockLayoutRulesImpl_ = {
 };
 
 LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
-    &kMetalLayoutRulesFamilyImpl, &kCPULayoutRulesImpl, & kMetalObjectLayoutRulesImpl,
+    &kMetalLayoutRulesFamilyImpl, &kMetalLayoutRulesImpl, & kMetalObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kMetalVaryingInputLayoutRulesImpl_ = {
