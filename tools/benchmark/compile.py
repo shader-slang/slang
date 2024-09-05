@@ -3,7 +3,6 @@ import shutil
 import glob
 import subprocess
 import argparse
-import halo
 import sys
 import prettytable
 import json
