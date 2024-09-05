@@ -9,12 +9,12 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-mtl -compute
 
-// CPP/Metal/CUDA due to natural layout rules will recieve the following ROW matrix:
+// CPP/CUDA due to natural layout rules will recieve the following ROW matrix:
 // {1,2,3}
 // {0,4,5}
 // {6,0,7}
 
-// GLSL/SPIRV/HLSL with cbuffer layout rules will recieve the following ROW/COL matrix:
+// GLSL/SPIRV/HLSL/Metal with cbuffer layout rules will recieve the following ROW/COL matrix:
 // {1,2,3}
 // {4,5,6}
 // {7,8,9}
