@@ -299,7 +299,6 @@ namespace Slang
         // coerce to type being switch on, and ensure that value is a compile-time constant
         // The Vals in the AST are pointer-unique, making them easy to check for duplicates
         // by addeing them to a HashSet.
-        auto exprVal = tryConstantFoldExpr(expr, ConstantFoldingKind::CompileTime, nullptr);
         auto switchStmt = FindOuterStmt<SwitchStmt>();
 
         if (!switchStmt)
@@ -308,9 +307,13 @@ namespace Slang
         }
         else
         {
-            // TODO: need to do some basic matching to ensure the type
-            // for the `case` is consistent with the type for the `switch`...
+            // Try to coerce the case expression to the same type as the condition
+            Expr* condition = switchStmt->condition;
+            expr = coerce(CoercionSite::General, condition->type, expr);
+            // Can't think of any cases where this would fail
+            SLANG_ASSERT(expr);
         }
+        auto exprVal = tryConstantFoldExpr(expr, ConstantFoldingKind::CompileTime, nullptr);
 
         stmt->expr = expr;
         stmt->exprVal = exprVal;
