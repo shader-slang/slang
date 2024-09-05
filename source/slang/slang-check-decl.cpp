@@ -2575,16 +2575,22 @@ namespace Slang
         return generatedCtor;
     }
 
+    /// TODO: cache result
     bool _structHasMemberWithValue(ASTBuilder* m_astBuilder, StructDecl* structDecl)
     {
         if (getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance).getFirstOrNull())
             return true;
         
-        for (auto i : getMembersOfType<InheritanceDecl>(m_astBuilder, structDecl, MemberFilterStyle::Instance))
+        for (auto inheritanceMember : getMembersOfType<InheritanceDecl>(m_astBuilder, structDecl, MemberFilterStyle::Instance))
         {
-            if (auto memberStruct = as<StructDecl>(i.getDecl()->base.type))
-                if (_structHasMemberWithValue(m_astBuilder, memberStruct))
-                    return true;
+            auto declRefType = as<DeclRefType>(inheritanceMember.getDecl()->base.type);
+            if (!declRefType)
+                continue;
+            auto baseStruct = as<StructDecl>(declRefType->getDeclRef().getDecl());
+            if (!baseStruct)
+                continue;
+            if (_structHasMemberWithValue(m_astBuilder, baseStruct))
+                return true;
         }
         return false;
     }
@@ -2610,9 +2616,10 @@ namespace Slang
             if (auto structDecl = as<StructDecl>(aggTypeDecl))
             {
                 // First part of auto-generating constructors/functions is inside `SemanticsDeclConformancesVisitor::visitAggTypeDecl` 
-                //  * Create declarations for constructors/functions.
+                //  * Create declarations for constructors/functions. This is important so Slang may use the declarations before
+                //    we have the chance to synthisize function bodies
                 // Second part of auto-generating constructors/functions is inside `SemanticsDeclBodyVisitor::visitAggTypeDecl`
-                //  * Add bodies to our declarations
+                //  * Add bodies to our declarations.
                 //
                 // These are split up so we can assign declarations before we finish definitions
                 //
@@ -2659,6 +2666,7 @@ namespace Slang
                     addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
                     structDecl->addMember(zeroInitFunc);
                 }
+
 
                 if (_structHasMemberWithValue(getASTBuilder(), structDecl))
                 {
@@ -8094,9 +8102,10 @@ namespace Slang
             return;
         
         // First part of auto-generating constructors/functions is inside `SemanticsDeclConformancesVisitor::visitAggTypeDecl` 
-        //  * Create declarations for constructors/functions.
+        //  * Create declarations for constructors/functions. This is important so Slang may use the declarations before
+        //    we have the chance to synthisize function bodies
         // Second part of auto-generating constructors/functions is inside `SemanticsDeclBodyVisitor::visitAggTypeDecl`
-        //  * Add bodies to our declarations
+        //  * Add bodies to our declarations.
         //
         // These are split up so we can assign declarations before we finish definitions
         //
