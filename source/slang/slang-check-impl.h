@@ -765,8 +765,12 @@ namespace Slang
         InheritanceInfo _getInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType, InheritanceCircularityInfo* circularityInfo);
         InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
         InheritanceInfo _calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType, InheritanceCircularityInfo* circularityInfo);
-        void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
+
+        // Get the inner most generic decl that a decl-ref is dependent on.
+        // For example, `Foo<T>` depends on the generic decl that defines `T`.
+        //
         DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
+        void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
 
         struct DirectBaseInfo
         {

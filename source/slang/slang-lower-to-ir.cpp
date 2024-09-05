@@ -5001,6 +5001,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // First, we check if the witness is a type equality witness.
         // If so, we can simply emit a bit cast to the target type that should eventually
         // fold out to a no-op.
+        // Note: if we are going to equivalent but not identical types in the future,
+        // then the cast between equivalent types shouldn't be as simple as a bit cast
+        // and will require actual coercion logic between the two types.
+        // For now, we don't support type equivalence witness so this is safe for
+        // equal types.
         if (isTypeEqualityWitness(expr->witnessArg))
         {
             return LoweredValInfo::simple(getBuilder()->emitBitCast(superType, getSimpleVal(context, value)));

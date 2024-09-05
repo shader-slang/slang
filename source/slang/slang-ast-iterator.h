@@ -479,6 +479,13 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
     {
         if (auto genericTypeConstraint = as<GenericTypeConstraintDecl>(typeConstraint))
         {
+            // A generic constraint decl has a left hand side and right hand side expression
+            // for the base and super type of the constraint.
+            // In the case of a folded-in constraint syntax as in `Foo<T:IBar>`,
+            // the left hand side of the constraint is represented by the same token
+            // as the parameter decl itself, so we don't need to traverse into it.
+            // In the case of `Foo<T> where T:IBar`, the left hand side is its own
+            // expression so we do want to traverse it.
             if (genericTypeConstraint->whereTokenLoc.isValid())
                 visitExpr(genericTypeConstraint->sub.exp);
         }
