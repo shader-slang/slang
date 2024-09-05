@@ -1564,7 +1564,7 @@ namespace Slang
                 {
                     if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
                     {
-                        if (inst->getTarget()->getValue() == SLANG_DXIL)
+                        if (inst->getTarget() == CodeGenTarget::DXIL)
                         {
                             auto slice = inst->getBlob()->getStringSlice();
                             ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);

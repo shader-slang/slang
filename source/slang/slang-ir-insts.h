@@ -435,7 +435,7 @@ IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
 struct IRAvailableInDownstreamIRDecoration : IRDecoration
 {
     IR_LEAF_ISA(AvailableInDownstreamIRDecoration)
-    IRIntLit* getTarget() { return cast<IRIntLit>(getOperand(0)); }
+    CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue()); }
 };
 
 struct IRGLSLLocationDecoration : IRDecoration
@@ -3345,8 +3345,8 @@ struct IRStaticAssert : IRInst
 
 struct IREmbeddedDownstreamIR : IRInst
 {
-    IR_LEAF_ISA(EmbeddeddDownstreamIR)
-    IRIntLit* getTarget() { return cast<IRIntLit>(getOperand(0)); }
+    IR_LEAF_ISA(EmbeddedDownstreamIR)
+    CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue()); }
     IRBlobLit* getBlob() { return cast<IRBlobLit>(getOperand(1)); }
 };
 

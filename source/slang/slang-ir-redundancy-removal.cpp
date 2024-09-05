@@ -171,8 +171,8 @@ void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule
         {
             if (auto dec = globalInst->findDecoration<IRAvailableInDownstreamIRDecoration>())
             {
-                if ((dec->getTarget()->getValue() == SLANG_DXIL && target == CodeGenTarget::HLSL) ||
-                    (dec->getTarget()->getValue() == SLANG_SPIRV && target == CodeGenTarget::SPIRV))
+                if ((dec->getTarget() == CodeGenTarget::DXIL && target == CodeGenTarget::HLSL) ||
+                    (dec->getTarget() == target))
                 {
                     // Gut the function definition, turning it into a declaration
                     for (auto inst : funcInst->getChildren())
