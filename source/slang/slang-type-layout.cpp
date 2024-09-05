@@ -611,9 +611,9 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
     SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
-        
+
         const auto elementSize = elementInfo.size.getFiniteValue();
-        auto alignedElementCount = 1 << Math::Log2Ceil(elementCount);
+        auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
         size_t size = elementSize * elementCount;
