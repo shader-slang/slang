@@ -2577,8 +2577,14 @@ namespace Slang
 
     bool _structHasMemberWithValue(ASTBuilder* m_astBuilder, StructDecl* structDecl)
     {
-        return getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance).getFirstOrNull()
-            || getMembersOfType<InheritanceDecl>(m_astBuilder, structDecl).getFirstOrNull();
+        if (getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance).getFirstOrNull())
+            return true;
+        
+        for (auto i : getMembersOfType<InheritanceDecl>(m_astBuilder, structDecl, MemberFilterStyle::Instance))
+        {
+            if (auto memberStruct = as<StructDecl>(i.getDecl()->base.type))
+                _structHasMemberWithValue(m_astBuilder, memberStruct);
+        }
     }
 
         // Concretize interface conformances so that we have witnesses as required for lookup.
