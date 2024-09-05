@@ -5806,25 +5806,21 @@ namespace Slang
         // requests will be handled further down. For now we include
         // lookup results that might be usable, but not as-is.
         //
-        LookupResult lookupResult;
-        if (!isWrapperTypeDecl(context->parentDecl))
-        {
-            lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
+        LookupResult lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions((uint8_t)LookupOptions::IgnoreBaseInterfaces | (uint8_t)LookupOptions::IgnoreInheritance));
 
-            if (!lookupResult.isValid())
+        if (!lookupResult.isValid())
+        {
+            // If we failed to look up a member with the name of the
+            // requirement, it may be possible that we can still synthesis the
+            // implementation if this is one of the known builtin requirements.
+            // Otherwise, report diagnostic now.
+            if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() &&
+                !(requiredMemberDeclRef.as<GenericDecl>() &&
+                    getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
             {
-                // If we failed to look up a member with the name of the
-                // requirement, it may be possible that we can still synthesis the
-                // implementation if this is one of the known builtin requirements.
-                // Otherwise, report diagnostic now.
-                if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() &&
-                    !(requiredMemberDeclRef.as<GenericDecl>() &&
-                        getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
-                {
-                    getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
-                    getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
-                    return false;
-                }
+                getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
+                getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
+                return false;
             }
         }
 

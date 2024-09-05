@@ -40,7 +40,7 @@ namespace Slang
             DeclRefType::create(m_astBuilder, structDecl),
             structDecl->ownedScope,
             LookupMask::Function,
-            (LookupOptions)((Index)LookupOptions::IgnoreInheritance | (Index)LookupOptions::IgnoreBaseInterfaces | (Index)LookupOptions::NoDeref));
+            (LookupOptions)((uint8_t)LookupOptions::IgnoreInheritance | (uint8_t)LookupOptions::IgnoreBaseInterfaces | (uint8_t)LookupOptions::NoDeref));
 
         if (!ctorLookupResult.isValid())
             return ctorList;
