@@ -17,6 +17,7 @@
 #ifdef _WIN32
 #   include <direct.h>
 #   include <windows.h>
+#   include <shellapi.h>
 #endif
 
 #if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY
@@ -27,6 +28,7 @@
 #   include <dirent.h>
 #   include <sys/stat.h>
 #   include <sys/file.h>
+#   include <ftw.h> // for nftw
 #endif
 
 #if SLANG_APPLE_FAMILY
@@ -775,6 +777,61 @@ namespace Slang
         }
         return SLANG_FAIL;
 #endif
+    }
+
+    /* static */SlangResult Path::removeNonEmpty(const String& path)
+    {
+        if (File::exists(path) == false)
+        {
+            return SLANG_OK;
+        }
+
+        StringBuilder msgBuilder;
+        // Path::remove() doesn't support remove a non-empty directory, so we need to implement
+        // a simple function to remove the directory recursively.
+#ifdef _WIN32
+        // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
+        // Note: the fromPath requires a double-null-terminated string.
+        String newPath = path;
+        newPath.append('\0');
+        SHFILEOPSTRUCTA file_op = {
+            NULL,
+            FO_DELETE,
+            newPath.begin(),
+            nullptr,
+            FOF_NOCONFIRMATION |
+            FOF_NOERRORUI |
+            FOF_SILENT,
+            false,
+            0,
+            nullptr };
+        int ret = SHFileOperationA(&file_op);
+        if (ret)
+        {
+            return SLANG_FAIL;
+        }
+#else
+        auto unlink_cb = [](const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) -> int
+        {
+            SLANG_UNUSED(sb)
+            SLANG_UNUSED(typeflag)
+            SLANG_UNUSED(ftwbuf)
+            int rv = ::remove(fpath);
+            if (rv)
+            {
+                perror(fpath);
+            }
+            return rv;
+        };
+        // https://linux.die.net/man/3/nftw
+        int ret = ::nftw(path.begin(), unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
+        if (ret)
+        {
+            return SLANG_FAIL;
+        }
+#endif
+
+        return SLANG_OK;
     }
 
 #if defined(_WIN32)

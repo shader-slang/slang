@@ -1219,10 +1219,11 @@ namespace Slang
         }
 
         DeclRefExpr* ConstructDeclRefExpr(
-            DeclRef<Decl>   declRef,
-            Expr*    baseExpr,
+            DeclRef<Decl> declRef,
+            Expr* baseExpr,
+            Name* name,
             SourceLoc loc,
-            Expr*    originalExpr);
+            Expr* originalExpr);
 
         Expr* ConstructDerefExpr(
             Expr*    base,
@@ -1236,16 +1237,17 @@ namespace Slang
 
         Expr* ConstructLookupResultExpr(
             LookupResultItem const& item,
-            Expr*            baseExpr,
+            Expr* baseExpr,
+            Name* name,
             SourceLoc loc,
             Expr* originalExpr);
 
         Expr* createLookupResultExpr(
-            Name*                   name,
-            LookupResult const&     lookupResult,
-            Expr*            baseExpr,
+            Name* name,
+            LookupResult const& lookupResult,
+            Expr* baseExpr,
             SourceLoc loc,
-            Expr*    originalExpr);
+            Expr* originalExpr);
 
         DeclVisibility getTypeVisibility(Type* type);
         bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);

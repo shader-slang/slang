@@ -248,7 +248,11 @@ struct ResourceOutputSpecializationPass
             newFunc->removeAndDeallocate();
             // Check if `oldFunc` is the reason for failing,
             // Otherwise don't add to 'unspecializableFuncs'
-            if(result == SpecializeFuncResult::ThisFuncFailed)
+            //
+            // Ensure oldFunc has uses, else, there is nothing to specialize here.
+            // If oldFunc has IRKeepAlive, this code should be assumed to have a 
+            // "dynamic" resource value.
+            if(result == SpecializeFuncResult::ThisFuncFailed && oldFunc->hasUses())
                 unspecializableFuncs->add(oldFunc);
             return false;
         }
@@ -315,6 +319,11 @@ struct ResourceOutputSpecializationPass
             specializeCallSite(oldCall, newFunc, funcInfo);
         }
         specializedFuncs.add(oldFunc);
+
+        // Since we can no longer fail and we are replacing all `Func` uses, 'KeepAlive'
+        // can be removed from the oldFunc so DCE can it clean-up.
+        if(auto keepAliveDecoration = oldFunc->findDecoration<IRKeepAliveDecoration>())
+            keepAliveDecoration->removeAndDeallocate();
         return true;
     }
 
