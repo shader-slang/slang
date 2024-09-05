@@ -338,7 +338,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         RefPtr<WitnessTable> result = new WitnessTable();
         result->baseType = as<Type>(newBaseType);
         result->witnessedType = as<Type>(newWitnessedType);
-        for (auto requirement : m_requirements)
+        for (auto requirement : m_requirementDictionary)
         {
             auto newRequirement = requirement.value.specialize(astBuilder, subst);
             result->add(requirement.key, newRequirement);
@@ -500,7 +500,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     void WitnessTable::add(Decl* decl, RequirementWitness const& witness)
     {
-        m_requirements.add(KeyValuePair<Decl*, RequirementWitness>(decl, witness));
         m_requirementDictionary.add(decl, witness);
     }
 

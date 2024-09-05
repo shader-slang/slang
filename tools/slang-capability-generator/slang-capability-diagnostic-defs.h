@@ -33,6 +33,7 @@ DIAGNOSTIC(    2, Error, cannotFindFile, "cannot find file '$0'.")
 DIAGNOSTIC(    4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
 DIAGNOSTIC(    5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 DIAGNOSTIC(    6, Error, tooManyOutputPathsSpecified, "$0 output paths specified, but only $1 entry points given")
+DIAGNOSTIC(    7, Warning, couldNotFindValidDocumentationOutputPath, "could not find valid documentation output path at $0")
 
 //
 // 2xxxx - Parsing
@@ -41,6 +42,8 @@ DIAGNOSTIC(    6, Error, tooManyOutputPathsSpecified, "$0 output paths specified
 DIAGNOSTIC(20003, Error, unexpectedToken, "unexpected $0")
 DIAGNOSTIC(20001, Error, unexpectedTokenExpectedTokenType, "unexpected $0, expected $1")
 DIAGNOSTIC(20001, Error, unexpectedTokenExpectedTokenName, "unexpected $0, expected '$1'")
+DIAGNOSTIC(20004, Warning, requiresDocComment, "'$0' requires a documentation comment \"///\"")
+DIAGNOSTIC(20004, Warning, invalidDocCommentHeader, "got documentation comment '[$0]', expected one of: [Target] [Stage] [EXT] [Version] [Compound] [Other]")
 
 DIAGNOSTIC(0, Error, tokenNameExpectedButEOF, "\"$0\" expected but end of file encountered.")
 DIAGNOSTIC(0, Error, tokenTypeExpectedButEOF, "$0 expected but end of file encountered.")

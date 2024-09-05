@@ -583,6 +583,11 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     TypeExp sub;
     TypeExp sup;
 
+    // If this decl is defined in a where clause, store the source location of the where token.
+    SourceLoc whereTokenLoc = SourceLoc();
+
+    bool isEqualityConstraint = false;
+
     // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return sup; }
 };
