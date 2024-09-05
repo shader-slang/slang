@@ -1863,7 +1863,6 @@ namespace Slang
         ctor->addOption(ConstructorTags::Synthesized);
 
         // kIROp_TorchTensorType must only refer to its own type through Host functions
-        // TODO: figure-out how to pass CudaHost for when we have a nested TorchTensor.
         if(auto intrinsicType = decl->findModifier<IntrinsicTypeModifier>())
             if(intrinsicType->irOp == kIROp_TorchTensorType)
                 addModifier(ctor, m_astBuilder->create<CudaHostAttribute>());
@@ -2563,6 +2562,12 @@ namespace Slang
         return generatedCtor;
     }
 
+    bool _structHasMemberWithValue(ASTBuilder* m_astBuilder, StructDecl* structDecl)
+    {
+        return getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance).getFirstOrNull()
+            || getMembersOfType<InheritanceDecl>(m_astBuilder, structDecl).getFirstOrNull();
+    }
+
         // Concretize interface conformances so that we have witnesses as required for lookup.
         // for lookup.
     struct SemanticsDeclConformancesVisitor
@@ -2583,9 +2588,23 @@ namespace Slang
         {
             if (auto structDecl = as<StructDecl>(aggTypeDecl))
             {
-                if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getFirstOrNull())
+                // Only generate declarations if we have something that should be taken into account (Inheritance/VarDecl)
+                if (_structHasMemberWithValue(getASTBuilder(), structDecl))
                 {
-                    // Add an empty default-ctor if missing a real default-ctor.
+                    // First part of auto-generating constructors/functions is inside `SemanticsDeclConformancesVisitor::visitAggTypeDecl` 
+                    //  * Create declarations for constructors/functions.
+                    // Second part of auto-generating constructors/functions is inside `SemanticsDeclBodyVisitor::visitAggTypeDecl`
+                    //  * Add bodies to our declarations
+                    //
+                    // These are split up so we can assign declarations before we finish definitions
+                    //
+                    //
+                    // Steps:
+                    // 1. Add an declaration for default-ctor if missing a real default-ctor.
+                    // 2. Generate $ZeroInit
+                    // 3. Generate 'member-wise' constructors
+
+                    // 1. Add an declaration for default-ctor if missing a real default-ctor.
                     ConstructorDecl* defaultCtor = nullptr;
                     List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, structDecl, &defaultCtor);
                     if (!defaultCtor)
@@ -2594,8 +2613,8 @@ namespace Slang
                         ctorList.add(defaultCtor);
                     }
 
-                    // Add auto-diff modifiers to $ZeroInit
-                    if (getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance).getFirstOrNull())
+                    // 2. Generate $ZeroInit
+                    if (_structHasMemberWithValue(getASTBuilder(), structDecl))
                     {
                         // $ZeroInit is a synthisized static-function only used In 2 cases:
                         //     1. if `{}` is used inside a `__init()`
@@ -2632,13 +2651,16 @@ namespace Slang
                         structDecl->addMember(zeroInitFunc);
                     }
 
+
+                    // 3. Generate 'member-wise' constructors
+                    //
                     // Add an empty constructor for all combinations of visibility and access
                     // which is possible:
-                    // 1. public constructor - usable *outside class scope* in a *different module*
+                    // public constructor - usable *outside class scope* in a *different module*
                     List<CreateCtorArg> publicCtorArgs;
-                    // 2. public-internal constructor - usable *outside class scope* in the *same module*
+                    // public-internal constructor - usable *outside class scope* in the *same module*
                     List<CreateCtorArg> publicInternalCtorArgs;
-                    // 3. public-private-internal constructor - usable *inside class scope* in the *same module*
+                    // public-private-internal constructor - usable *inside class scope* in the *same module*
                     List<CreateCtorArg> publicInternalPrivateCtorArgs;
 
                     // Harvest parameters which map to the base type ctor.
@@ -2690,10 +2712,12 @@ namespace Slang
                     }
 
 
-                    // If we have a internal field which is not default-initialized we cannot allow
-                    // a (1:1 element) ctor for public members (public member-wise ctor) to synthesize.
+                    // If we have an internal field which lacks an initExpr we cannot allow
+                    // a memberwise ctor to be synthesized for public members.
                     // This principal also applies for private members and internal/public member-wise ctor synthisis.
                     DeclVisibility maxVisibilityCtorToGenerate = getDeclVisibility(structDecl);
+
+                    // Here we collect all variables which will be apart of our member-wise ctor's.
                     for (auto varDeclRef : getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
                     {
                         auto varDecl = varDeclRef.getDecl();
@@ -8054,9 +8078,17 @@ namespace Slang
         if (!structDecl)
             return;
         
-        auto structDeclType = DeclRefType::create(m_astBuilder, structDecl);
+        // First part of auto-generating constructors/functions is inside `SemanticsDeclConformancesVisitor::visitAggTypeDecl` 
+        //  * Create declarations for constructors/functions.
+        // Second part of auto-generating constructors/functions is inside `SemanticsDeclBodyVisitor::visitAggTypeDecl`
+        //  * Add bodies to our declarations
+        //
+        // These are split up so we can assign declarations before we finish definitions
+        //
+        //
 
-        /// Collect ctor info
+        auto structDeclType = DeclRefType::create(m_astBuilder, structDecl);
+        // Collect ctor info
         struct DeclAndCtorInfo
         {
             AggTypeDecl* m_inheritanceBaseDecl;
@@ -8105,8 +8137,8 @@ namespace Slang
         }
         DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, nullptr, false);
 
-        /// ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
-        /// of members are to be synthisised, they are.
+        // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if init expressions 
+        // of members are to be synthisised, they are.
         bool isDefaultInitializableType = isSubtype(structDeclType, m_astBuilder->getDefaultInitializableType(), IsSubTypeOptions::None);
         for (auto m : structDecl->members)
         {
@@ -8122,7 +8154,13 @@ namespace Slang
 
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
 
-        /// Insert 'this->base->__init()' into 'this->__init()'.
+        // Insert 'this->base->__init()' into 'this->__init()'.
+        /*
+        __init()
+        {
+            super::__init(); // we add this call here
+        }
+        */
         for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
             auto ctor = ctorInfo.m_ctor;
@@ -8175,12 +8213,22 @@ namespace Slang
             seqStmt->stmts.insert(ctorInfo.m_insertOffset++, seqStmtChild);
         }
 
-        /// Collect all 'per instance' members of our struct
+        // Collect all 'per instance' members of our struct
         List<DeclRef<VarDeclBase>> membersOfStructDeclInstance;
         for (auto i : getMembersOfType<VarDeclBase>(m_astBuilder, structDecl, MemberFilterStyle::Instance))
             membersOfStructDeclInstance.add(i);
 
-        /// Assign member variable init expressions
+        // Assign member variable init expressions
+        /*
+        struct Foo
+        {
+            int a = 5;
+            __init()
+            {
+                a = 5; // we add this initExpr logic here.
+            }
+        }
+        */
         for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
             auto ctor = ctorInfo.m_ctor;
@@ -8236,9 +8284,9 @@ namespace Slang
             seqStmt->stmts.insert(ctorInfo.m_insertOffset++, seqStmtChild);
         }
 
-        /// Note: we assume only 1 inheritance decl currently.
-        /// Pre-calculate if we have a base-type and its associated ctor-list
-        /// We also must ensure inheritance-decl is checked, else we may not have up-to-date 'DerivativeMemberAttribute' modifiers
+        // Note: we assume only 1 inheritance decl currently.
+        // Pre-calculate if we have a base-type and its associated ctor-list
+        // We also must ensure inheritance-decl is checked, else we may not have up-to-date 'DerivativeMemberAttribute' modifiers
         DeclAndCtorInfo* baseStructInfo = nullptr;
         for(auto& i : inheritanceInfoList)
         {
@@ -8247,7 +8295,7 @@ namespace Slang
                 baseStructInfo = &i;
         }
 
-        /// pre-calculate any requirements of a CudaHostAttribute
+        // pre-calculate any requirements of a CudaHostAttribute
         HashSet<VarDeclBase*> requiresCudaHostModifier;
         for (auto member : membersOfStructDeclInstance)
             if (containsTargetType<TorchTensorType>(m_astBuilder, member.getDecl()->type.type))
@@ -8264,7 +8312,7 @@ namespace Slang
 
 
 
-        /// Insert parameters as values for member-wise init expression.
+        // Insert parameters as values for member-wise init expression.
         for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
             auto ctor = ctorInfo.m_ctor;
@@ -8292,6 +8340,14 @@ namespace Slang
             while (paramIndex < paramCount)
             {
                 auto param = paramList[paramIndex];
+                /*
+                2 parts:
+
+                1. Insert super::__init inside this->__init() 
+                2. Assign *parameters* to related *varDecl member of our struct*
+                */
+
+                // Part 1
                 // If we have a base type, the first arg is a 'base->__init(...)'. We need to find this 'base->__init(...)'
                 // and assign the parameters needed to call '__init(...)'
                 if (paramIndex == 0 && baseStructInfo && baseStructInfo->m_ctorInfoList.getCount() > 0)
@@ -8356,6 +8412,7 @@ namespace Slang
                     }
                 }
                 
+                // Part 2
                 // Regular assignment logic
                 paramIndex++;
                 auto paramType = param->getType();
@@ -8408,7 +8465,7 @@ namespace Slang
             seqStmt->stmts.insert(ctorInfo.m_insertOffset++, seqStmtChild);
         }
 
-        /// Compiler generated ctor may be destroyed
+        // Compiler generated ctor may be destroyed
         bool destroyedDefaultCtor = false; 
         if(structDeclInfo.m_defaultCtor
             && structDeclInfo.m_defaultCtor->containsOption(ConstructorTags::Synthesized))
@@ -8428,6 +8485,7 @@ namespace Slang
             }
         }
 
+        // Fill in our $ZeroInit
         if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
         {
             SLANG_ASSERT(zeroInitListFunc->getParameters().getCount() == 0);
@@ -8438,10 +8496,19 @@ namespace Slang
             SLANG_ASSERT(as<SeqStmt>(block->body));
             auto seqStmt = as<SeqStmt>(block->body);
 
+            /*
+            3 steps:
+            1. Assign DefaultConstructExpr to `this`
+            2. Insert `super::$ZeroInit()` into `this->$ZeroInit`
+            3. Assign initExpr to all members
+            */
+
             bool foundCudaHostModifier = false;
 
             auto defaultConstructExpr = createDefaultConstructExprForType(m_astBuilder, structDeclType, seqStmt->loc);
 
+            // Part 1
+            // Assign DefaultConstructExpr to `this`
             auto structVarDecl = m_astBuilder->create<VarDecl>();
             addModifier(structVarDecl, m_astBuilder->create<LocalTempVarModifier>());
             structVarDecl->type = TypeExp(structDeclType);
@@ -8466,12 +8533,14 @@ namespace Slang
             structAssignExprStmt->loc = seqStmt->loc;
             seqStmt->stmts.add(structAssignExprStmt);
 
-            // Assign $ZeroInit of inheritanceDecl
+            // Part 2
+            // Insert `super::$ZeroInit()` into `this->$ZeroInit`
+            // Only insert if we have values to insert for
             if (baseStructInfo)
             {
                 if (auto baseStructDecl = as<StructDecl>(baseStructInfo->m_inheritanceBaseDecl))
                 {
-                    if (getMembersOfType<VarDeclBase>(m_astBuilder, baseStructDecl, MemberFilterStyle::Instance).getFirstOrNull())
+                    if (_structHasMemberWithValue(getASTBuilder(), structDecl))
                     {
                         Expr* zeroInitFunc = constructZeroInitListFunc(this, baseStructDecl, baseStructInfo->m_inheritanceDecl->base.type, ConstructZeroInitListOptions::PreferZeroInitFunc);
                         auto assign = m_astBuilder->create<AssignExpr>();
@@ -8485,7 +8554,8 @@ namespace Slang
                 }
             }
 
-            // Assign initExpr to all members
+            // Part 3
+            // Assign initExpr to all members of structDecl
             for (auto memberRef : membersOfStructDeclInstance)
             {
 

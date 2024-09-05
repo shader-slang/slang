@@ -43,5 +43,5 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: 1
     outputBuffer[0] = i0.v;
     // CHECK: 5
-    outputBuffer[0] = i5.v;
+    outputBuffer[1] = i5.v;
 }

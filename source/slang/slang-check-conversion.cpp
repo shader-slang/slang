@@ -92,13 +92,10 @@ namespace Slang
         if(isEffectivelyScalarForInitializerLists(fromExpr->type))
             return false;
 
+        // If 2 types are equal, we know the types can be coerced directly
         if (toType->equals(fromExpr->type))
             return true;
 
-        // Once the above cases are handled, the main thing
-        // we want to check for is whether a direct initialization
-        // is possible (a type conversion exists).
-        //
         return false;
     }
 
@@ -445,15 +442,18 @@ namespace Slang
         else if(auto toDeclRefType = as<DeclRefType>(toType))
         {
             auto toTypeDeclRef = toDeclRefType->getDeclRef();
-            // Trying to initialize a `struct` type given an initializer list.
-            // We will try to coerce the initializer list into a constructor.
             if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
             {
-                auto toStructDecl = toStructDeclRef.getDecl();
+                // We will try to coerce the initializer list into a struct following these steps:
+                // 1. Ensure our `StructDecl` has declaratations created for all auto-generated constructors
+                // 2. We have a `{}` (0 arguments), try to coerce
+                // 3. We have a `{arg1, arg2...}`, try to coerce
 
+                auto toStructDecl = toStructDeclRef.getDecl();
+                // 1. Ensure our `StructDecl` has declaratations created for all auto-generated constructors
                 ensureDecl(toStructDecl, DeclCheckState::DefaultConstructorReadyForUse);
 
-                // Easy case of default constructor or equivalent
+                // 2. We have a `{}` (0 arguments), try to coerce
                 if (argCount == 0)
                 {
                     if (outToExpr)
@@ -464,10 +464,15 @@ namespace Slang
                     return true;
                 }
 
+                // 3. We have a `{arg1, arg2...}`, try to coerce
+                //
+                // For this situation we have more steps:
+                // a. Find constructor candidate for our particular init-list
+                // b. Collect and coerce init-list arguments into constructor parameters
+                // c. Create InvokeExpr for our valid ConstructorDecl 
                 List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, toStructDecl, nullptr);
                 bool allowCStyleInitList = checkIfCStyleStruct(this, toStructDecl);
 
-                // Non-default constructor case
                 List<Expr*> maybeArgList;
                 maybeArgList.reserve(argCount);
                 Index ioArgIndexMirror = ioArgIndex;
@@ -475,6 +480,8 @@ namespace Slang
 
                 for (auto& ctor : ctorList)
                 {
+                    // a. Find constructor candidate for our particular init-list
+
                     // Don't try to init default ctor with this logic
                     auto ctorParamCount = ctor->getParameters().getCount();
                     if (ctorParamCount == 0)
@@ -488,6 +495,7 @@ namespace Slang
                     if (!allowCStyleInitList && ctorParamCount != Index(argCount))
                         continue;
 
+                    // b. Collect and coerce init-list arguments into constructor parameters
                     List<ConstructorDecl*> maybeCandidate;
                     auto parameters = getParameters(m_astBuilder, ctor);
                     auto parametersCount = parameters.getCount();
@@ -530,6 +538,7 @@ namespace Slang
                         continue;
                     }
 
+                    // c. Create InvokeExpr for our valid ConstructorDecl 
                     // We cannot fail anymore, set ioArgIndex to the 'used up arg count'.
                     if (outToExpr)
                     {

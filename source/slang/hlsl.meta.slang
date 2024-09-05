@@ -19962,6 +19962,10 @@ ${
 
         case hlsl:
             uint isSingleLod = 0;
+            // Note: we cannot pass `Shape.dimensions`
+            // directly as a parameter into a Call, otherwise
+            // AST lookup fails (bug?), creating an intermediary works
+            // so we do this workaround.
             int shapeDim = Shape.dimensions;
             Footprint footprint =  {__queryFootprint$(CoarseOrFine)NVAPI(
                 shapeDim,

@@ -3738,6 +3738,14 @@ namespace Slang
 
     IRInst* IRBuilder::_emitDefaultConstruct(IRType* type, bool fallback, HashSet<IRType*> visitedTypes)
     {
+        // Slang generally detects recursive type-uses in IR,
+        // This means that DefaultConstruct may crash unless we 
+        // track visited types with `visitedTypes.contains(type)`
+        // to avoid infinite looping of type-checks
+        //
+        // Slang may be asked to default init a `RWTexture2D`. 
+        // If so, `isResourceType(type)` ensures we don't generate
+        // garbage/
         if (visitedTypes.contains(type) || isResourceType(type))
             return emitUndefined(type);
         visitedTypes.add(type);
@@ -3865,10 +3873,12 @@ namespace Slang
         }
         return nullptr;
     }
+    
     IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     {
         return _emitDefaultConstruct(type, fallback, {});
     }
+    
     IRInst* IRBuilder::emitEmbeddedDXIL(ISlangBlob *blob)
     {
         IRInst* args[] = { getBlobValue(blob) };
