@@ -8484,10 +8484,14 @@ namespace Slang
                     member = members[memberIndex++].getDecl();
                 }
 
-                // Check for differentiability of member. checking all 'InheritanceDecl's earlier in 'visitAggTypeDecl'
-                // propegates DerivativeMemberAtribute to derivative containing attributes.
-                if (!ctor->hasModifier<TreatAsDifferentiableAttribute>() && !member->hasModifier<DerivativeMemberAttribute>())
-                    addModifier(param, m_astBuilder->create<NoDiffModifier>());
+                // We need to ensure member is `no_diff` if it cannot be differentiated, `ctor` modifiers do not matter
+                // in this case since member-wise ctor is always differentiable or "treat as differentiable".
+                if (!isTypeDifferentiable(member->getType()) || member->hasModifier<NoDiffModifier>())
+                {
+                    auto noDiffMod = m_astBuilder->create<NoDiffModifier>();
+                    noDiffMod->loc = param->loc;
+                    addModifier(param, noDiffMod);
+                }
 
                 addCudaHostModifierIfRequired(ctor, member, foundCudaHostModifier);
 

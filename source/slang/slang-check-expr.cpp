@@ -2792,9 +2792,13 @@ namespace Slang
                             }
                             else
                             {
-                                getSink()->diagnose(
-                                    m_treatAsDifferentiableExpr,
-                                    Diagnostics::useOfNoDiffOnDifferentiableFunc);
+                                // We should only error if our TreatAsDifferentiableExpr::Flavor is NoDiff.
+                                if (m_treatAsDifferentiableExpr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
+                                {
+                                    getSink()->diagnose(
+                                        m_treatAsDifferentiableExpr,
+                                        Diagnostics::useOfNoDiffOnDifferentiableFunc);
+                                }
                             }
                         }
                     }
