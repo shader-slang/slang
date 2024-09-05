@@ -2328,7 +2328,14 @@ DeclRef<Decl> ComponentType::findDeclFromString(
     {
         result = declRefExpr->declRef;
     }
-
+    else if (auto overloadedExpr = as<OverloadedExpr>(checkedExpr))
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::ambiguousReference, name);
+        for (auto candidate : overloadedExpr->lookupResult2)
+        {
+            sink->diagnose(candidate.declRef.getDecl(), Diagnostics::overloadCandidate, candidate.declRef);
+        }
+    }
     m_decls[name] = result;
     return result;
 }
