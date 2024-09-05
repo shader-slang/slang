@@ -6,7 +6,12 @@ We propose to allow generic declarations in Slang to move the constraints on gen
 Status
 ------
 
-Unimplemented.
+Status: Partially implemented. The only unimplemented case is the canonicalization of generic constraints.
+
+Implementation: [PR 4986](https://github.com/shader-slang/slang/pull/4986)
+
+Reviewed by: Theresa Foley, Yong He
+
 
 Background
 ----------
@@ -24,18 +29,17 @@ Introducing `where` clauses allows a programmer to state the constraints *after*
 
     void resolve<T, U, V>(ResolutionContext<U> context, List<T> stuffToResolve, out V destination)
         where T : IResolvable,
-              U : IResolver<T>,
-              V : IResolveDestination<T>
+        where U : IResolver<T>,
+        where V : IResolveDestination<T>
     { ... }
 
 This latter form makes it easier to quickly glean the overall shape of the function signature.
 
-A second important benefit of `where` clauses is that they open the door to expressing more complicated constraints on and between type parameters.
-While this document does not propose to allow any new forms of constraints right away, we can imagine things like allowing constraints on *associated types*, e.g.:
+A second important benefit of `where` clauses is that they open the door to expressing more complicated constraints on and between type parameters, such as allowing constraints on *associated types*, e.g.:
 
     void writePackedData<T, U>(T src, out U dst)
         where T : IPackable,
-              T.Packed : IWritable<U>
+        where T.Packed : IWritable<U>
     { .. }
 
 Related Work
@@ -92,12 +96,13 @@ Proposed Approach
 
 For any kind of declaration that Slang allows to have generic parameters, we will allow a `where` clause to appear after the *header* of that declaration.
 A `where` clause consists of the (contextual) keyword `where`, following by a comma-separated list of *constraints*:
-
-    struct MyStuff<T> : Base, IFoo
-        where T : IFoo,
-              T : IBar
+```csharp
+    struct MyStuff<T, U> : IFoo
+        where T : IFoo, IBar
+        where T : IBaz
+        where U : IArray<T>
     { ... }
-
+```
 A `where` clause is only allowed after the header of a declaration that has one or more generic parameters.
 
 Each constraint must take the form of one of the type parameters from the immediately enclosing generic parameter list, followed by a colon (`:`), and then followed by a type expression that names an interface or a conjunction of interfaces.
@@ -105,32 +110,48 @@ Multiple constraints can be defined for the same parameter.
 
 We haven't previously defined what the header of a declaration is, so we briefly illustrate what we mean by showing where the split between the header and the *body* of a declaration is for each of the major kinds of declarations that are supported. In each case a comment `/****/` is placed between the header and body:
 
-    // variables:
-    let v : Int /****/ = 99;
-    var v : Int /****/ = 99;
-    Int v /****/ = 99;
+```csharp
+// variables:
+let v : Int /****/ = 99;
+var v : Int /****/ = 99;
+Int v /****/ = 99;
 
-    // simple type declarations:
-    typealias X : IFoo /****/ = Y;
-    associatedtype X : IFoo /****/;
+// simple type declarations:
+typealias X : IFoo /****/ = Y;
+associatedtype X : IFoo /****/;
 
-    // functions and other callables:
-    Int f(Float y) /****/ { ... }
-    func f(Float y) -> Int /****/ { ... }
-    init(Float y) /****/ { ... }
-    subscript(Int idx) -> Float /****/ { ... }
+// functions and other callables:
+Int f(Float y) /****/ { ... }
+func f(Float y) -> Int /****/ { ... }
+init(Float y) /****/ { ... }
+subscript(Int idx) -> Float /****/ { ... }
 
-    // properties
-    property p : Int /****/ { ... }
+// properties
+property p : Int /****/ { ... }
 
-    // aggregates
-    extension Int : IFoo /****/ { ... }
-    struct Thing : Base /****/ { ... }
-    class Thing : Base /****/ { ... }
-    interface IThing : IBase /****/ { ... }
-    enum Stuff : Int /****/ { ... }
-
+// aggregates
+extension Int : IFoo /****/ { ... }
+struct Thing : Base /****/ { ... }
+class Thing : Base /****/ { ... }
+interface IThing : IBase /****/ { ... }
+enum Stuff : Int /****/ { ... }
+```
 In practice, the body of a declaration starts at the `=` for declarations with an initial-value expression, at the opening `{` for declarations with a `{}`-enclosed body, or at the closing `;` for any other declarations.
+
+With introduction of `where` clauses, we can extend type system to allow more kinds of type constraints. In this proposal,
+we allow type constraints followed by `where` to be one of:
+- Type conformance constraint, in the form of `T : IBase`
+- Type equality constraint, in the form of `T == X`
+
+In both cases, the left hand side of a constraint can be a simple generic type parameter, or any types that are dependent on some
+generic type parameter. For example, the following is allowed:
+```csharp
+interface IFoo { associatedtype A; }
+struct S<T, U>
+    where T : IFoo
+    where T.A == U
+{}
+```
 
 Detailed Explanation
 --------------------
@@ -241,36 +262,17 @@ Alternatives Considered
 There really aren't any compelling alternatives to `where` clauses among the languages that Slang takes design influence from.
 We could try to design something to solve the same problems from first principles, but the hypothetical benefits of doing so are unclear.
 
-When it comes to the syntactic details, we could consider allowing for *multiple* `where` clauses (matching the C# syntax) as an alternative to the comma-separated list:
+When it comes to the syntactic details, we could consider disallow type lists in the right hand side of a conformance constraint, and return allow multiple constraints to be separated with comma and sharing with one `where` keyword:
 
     struct MyStuff<T> : Base, IFoo
-        where T : IFoo
-        where T : IBar
+        where T : IFoo,
+              T : IBar
     { ... }
 
-This alternative form may result in more compact and tidy diffs when editing the constraints on declarations, at the cost of repeating the `where` keyword many times.
+This alternative form may result in more compact code without needing duplicated `where` clause, but may be harder to achieve tidy diffs when editing the constraints on declarations.
 
 Future Directions
 -----------------
-
-### Allow more general types on the left-hand side of `:`
-
-There are many cases where it would be helpful to be able to introduce constraints on associated types.
-As a contrived example:
-
-    interface IPrintable { ... }
-    interface ISequence
-    {
-        associatedtype Element;
-        ...
-    }
-    extention<T> T : IPrintable
-        where T : ISequence,
-              T.Element : IPrintable
-    { ... }
-
-In this example, an `extension` is used to declare that sequences are printable if their elements are printable.
-
 
 ### Allow more general types on the right-hand side of `:`
 
@@ -283,30 +285,6 @@ In the context of `class`-based hierarchies, we can also consider having constra
     void f<T>( ... )
         where T : Base
     { ... }
-
-### Equality Constraints
-
-One future direction that we already intend to pursue is allowing exact equality constraints.
-The primary use case envisioned for equality constraints is to express restrictions on associated types of type parameters.
-As a contrived example:
-
-    interface IProducer
-    {
-        associatedtype Element;
-        // ...
-    }
-    interface IConsumer
-    {
-        associatedtype Element;
-        // ...
-    }
-    void runPipeline<P, C>(P producer, C consumer)
-        where P : IProducer,
-              C : IConsumer,
-              P.Element == C.Element
-    { ... }
-
-An equality constraint could either constrain an associated type to be equal to some concrete type, or to some other associated type.
 
 ### Allow `where` clauses on non-generic declarations
 
