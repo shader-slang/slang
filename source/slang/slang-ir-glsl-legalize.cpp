@@ -1787,7 +1787,7 @@ ScalarizedVal adaptType(
     }
     else if (auto fromArray = as<IRArrayTypeBase>(fromType))
     {
-        if (auto toScalar = as<IRBasicType>(toType))
+        if (as<IRBasicType>(toType))
         {
             val = builder->emitElementExtract(fromArray->getElementType(), val, builder->getIntValue(builder->getIntType(), 0));
         }
