@@ -283,17 +283,6 @@ static bool isInternalDef(RefPtr<CapabilityDef> def)
     return def->name.startsWith("_");
 }
 
-// Assumes markdown
-UnownedStringSlice getTabForTarget()
-{
-    return UnownedStringSlice("> ");
-}
-// Assumes markdown
-UnownedStringSlice getLineBreakForTarget()
-{
-    return UnownedStringSlice("<br>\n");
-}
-
 struct CapabilityDefParser
 {
     CapabilityDefParser(
@@ -502,9 +491,9 @@ struct CapabilityDefParser
                         }
                         // If we did not find a header this is a regular comment
                     }
-                    successiveComments.comment.append(getTabForTarget());
+                    successiveComments.comment.append("> ");
                     successiveComments.comment.append(commentContent);
-                    successiveComments.comment.append(getLineBreakForTarget());
+                    successiveComments.comment.append("\n");
                 }
                 continue;
             }
@@ -934,7 +923,6 @@ void printDocForCapabilityDef(StringBuilder& sbDoc, RefPtr<CapabilityDef> def, L
     auto& sbDocSection = sbDocSections[(UInt)def->docComment.headerGroup];
     sbDocSection << "\n" << "`" << def->name << "`\n";
     sbDocSection << def->docComment.comment;
-    sbDocSection << "\n";
 }
 
 List<StringBuilder> setupDocCommentHeaderStringBuilders()

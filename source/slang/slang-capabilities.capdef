@@ -1171,7 +1171,7 @@ alias SPIRV_1_6 = spirv_1_6;
 // HLSL profile capabilities
 //
 /// HLSL shader model 4.0 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_4_0_version = _sm_4_0
              | _GLSL_150
@@ -1183,7 +1183,7 @@ alias sm_4_0_version = _sm_4_0
 
 
 /// HLSL shader model 4.0 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_4_0 = sm_4_0_version
              | SPV_GOOGLE_user_type + spvMinLod
@@ -1191,7 +1191,7 @@ alias sm_4_0 = sm_4_0_version
              ;
 
 /// HLSL shader model 4.1 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_4_1_version = _sm_4_1
              | _GLSL_150
@@ -1201,7 +1201,7 @@ alias sm_4_1_version = _sm_4_1
              | cpp
              ;
 /// HLSL shader model 4.1 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_4_1 = sm_4_1_version
              | GL_ARB_texture_gather + GL_ARB_texture_query_levels + GL_ARB_shader_texture_image_samples
@@ -1210,7 +1210,7 @@ alias sm_4_1 = sm_4_1_version
              ;
 
 /// HLSL shader model 5.0 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_5_0_version = _sm_5_0 
              | _GLSL_330
@@ -1220,7 +1220,7 @@ alias sm_5_0_version = _sm_5_0
              | cpp
              ;
 /// HLSL shader model 5.0 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_5_0 = sm_5_0_version
              | GL_KHR_memory_scope_semantics + GL_ARB_gpu_shader5 + GL_ARB_derivative_control
@@ -1230,7 +1230,7 @@ alias sm_5_0 = sm_5_0_version
              ;
 
 /// HLSL shader model 5.1 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_5_1_version = _sm_5_1
              | _GLSL_330
@@ -1240,7 +1240,7 @@ alias sm_5_1_version = _sm_5_1
              | cpp
              ;
 /// HLSL shader model 5.1 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_5_1 = sm_5_1_version 
              | GL_EXT_nonuniform_qualifier + GL_ARB_gpu_shader5
@@ -1249,7 +1249,7 @@ alias sm_5_1 = sm_5_1_version
              ;
 
 /// HLSL shader model 6.0 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_0_version = _sm_6_0 
              | _GLSL_450
@@ -1259,7 +1259,7 @@ alias sm_6_0_version = _sm_6_0
              | cpp
              ;
 /// HLSL shader model 6.0 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_0 = sm_6_0_version 
              |  GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_shuffle + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
@@ -1268,7 +1268,7 @@ alias sm_6_0 = sm_6_0_version
              ;
 
 /// HLSL shader model 6.1 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_1_version = _sm_6_1 
              | _GLSL_450 
@@ -1278,7 +1278,7 @@ alias sm_6_1_version = _sm_6_1
              | cpp
              ;
 /// HLSL shader model 6.1 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_1 = sm_6_1_version 
              | GL_EXT_fragment_shader_barycentric 
@@ -1287,7 +1287,7 @@ alias sm_6_1 = sm_6_1_version
              ;
 
 /// HLSL shader model 6.2 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_2_version = _sm_6_2
              | _GLSL_450
@@ -1297,7 +1297,7 @@ alias sm_6_2_version = _sm_6_2
              | cpp
              ;
 /// HLSL shader model 6.2 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_2 = sm_6_2_version
              // previous
@@ -1305,7 +1305,7 @@ alias sm_6_2 = sm_6_2_version
              ;
 
 /// HLSL shader model 6.3 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_3_version = _sm_6_3
              | _GLSL_460 
@@ -1315,7 +1315,7 @@ alias sm_6_3_version = _sm_6_3
              | cpp
              ;
 /// HLSL shader model 6.3 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_3 = sm_6_3_version
              | GL_EXT_ray_tracing + GL_EXT_ray_tracing_position_fetch_ray_tracing
@@ -1324,7 +1324,7 @@ alias sm_6_3 = sm_6_3_version
              ;
 
 /// HLSL shader model 6.4 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_4_version = _sm_6_4
              | _GLSL_460
@@ -1334,7 +1334,7 @@ alias sm_6_4_version = _sm_6_4
              | cpp
              ;
 /// HLSL shader model 6.4 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_4 = sm_6_4_version
              // previous
@@ -1342,7 +1342,7 @@ alias sm_6_4 = sm_6_4_version
              ;
 
 /// HLSL shader model 6.5 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_5_version = _sm_6_5
              | _GLSL_460
@@ -1352,7 +1352,7 @@ alias sm_6_5_version = _sm_6_5
              | cpp
              ;
 /// HLSL shader model 6.5 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_5 = sm_6_5_version
              // also requires: GL_NV_shader_subgroup_partitioned
@@ -1362,7 +1362,7 @@ alias sm_6_5 = sm_6_5_version
              ;
 
 /// HLSL shader model 6.6 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_6_version = _sm_6_6
              | _GLSL_460
@@ -1372,7 +1372,7 @@ alias sm_6_6_version = _sm_6_6
              | cpp
              ;
 /// HLSL shader model 6.6 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_6 = sm_6_6_version
              | GL_EXT_shader_atomic_int64 + GL_EXT_shader_atomic_float2 + GL_EXT_shader_atomic_float + _GL_EXT_shader_atomic_float_min_max
@@ -1380,7 +1380,7 @@ alias sm_6_6 = sm_6_6_version
              ;
 
 /// HLSL shader model 6.7 and related capabilities of other targets.
-/// Without related GLSL/SPIRV extensions.
+/// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_7_version = _sm_6_7
              | _GLSL_460
@@ -1390,7 +1390,7 @@ alias sm_6_7_version = _sm_6_7
              | cpp
              ;
 /// HLSL shader model 6.7 and related capabilities of other targets.
-/// With related GLSL/SPIRV extensions.
+/// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_7 = sm_6_7_version
              | sm_6_6
@@ -1716,9 +1716,8 @@ alias texture_sm_4_1_samplerless = texture_sm_4_1
 
 // Supposedly only works for some shader stages, we support all stages for now since this
 // seems wrong.
-/// Capabilities required to use 'compute/fragment shader only' texture operations
-/// Note: we do not require 'compute'/'fragment' capabilities since this seems to be
-/// incorrect behavior.
+/// Capabilities required to use 'compute/fragment shader only' texture operations. 
+/// We do not require 'compute'/'fragment' shader capabilities since this seems to be incorrect behavior despite what official documentation says.
 /// [Compound]
 alias texture_sm_4_1_compute_fragment = texture_sm_4_1;
 /// Capabilities required to use 'fragment shader only' texture operations
