@@ -432,8 +432,13 @@ IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
 IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
 IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
-IR_SIMPLE_DECORATION(AvailableInDXILDecoration)
 IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
+
+struct IRAvailableInDownstreamIRDecoration : IRDecoration
+{
+    IR_LEAF_ISA(AvailableInDownstreamIRDecoration)
+    CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue()); }
+};
 
 struct IRGLSLLocationDecoration : IRDecoration
 {
@@ -3340,6 +3345,13 @@ struct IRStaticAssert : IRInst
     IR_LEAF_ISA(StaticAssert)
 };
 
+struct IREmbeddedDownstreamIR : IRInst
+{
+    IR_LEAF_ISA(EmbeddedDownstreamIR)
+    CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue()); }
+    IRBlobLit* getBlob() { return cast<IRBlobLit>(getOperand(1)); }
+};
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
@@ -4053,7 +4065,7 @@ public:
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value);
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value);
 
-    IRInst* emitEmbeddedDXIL(ISlangBlob* blob);
+    IRInst* emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob* blob);
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(

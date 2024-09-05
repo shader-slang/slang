@@ -2733,13 +2733,13 @@ namespace Slang
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
-        SlangResult emitPrecompiledDXIL(ComPtr<IArtifact>& outArtifact);
+        SlangResult emitPrecompiledDownstreamIR(ComPtr<IArtifact>& outArtifact);
 
         void maybeDumpIntermediate(IArtifact* artifact);
 
-        // Used to cause instructions available in precompiled DXIL to be
+        // Used to cause instructions available in precompiled blobs to be
         // removed between IR linking and target source generation.
-        bool removeAvailableInDXIL = false;
+        bool removeAvailableInDownstreamIR = false;
 
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
@@ -2816,7 +2816,7 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
-        virtual SLANG_NO_THROW void SLANG_MCALL setEmbedDXIL(bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDownstreamIR(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;

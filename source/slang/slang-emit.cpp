@@ -416,31 +416,47 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     return false;
 }
 
-static void unexportNonEmbeddableDXIL(IRModule* irModule)
+static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
 {
     for (auto inst : irModule->getGlobalInsts())
     {
         if (inst->getOp() == kIROp_Func)
         {
-            // DXIL does not permit HLSLStructureBufferType in exported functions
-            // or sadly Matrices (https://github.com/shader-slang/slang/issues/4880)
-            auto type = as<IRFuncType>(inst->getFullType());
-            auto argCount = type->getOperandCount();
-            for (UInt aa = 0; aa < argCount; ++aa)
+            bool remove = false;
+            if (target == CodeGenTarget::HLSL)
             {
-                auto operand = type->getOperand(aa);
-                if (operand->getOp() == kIROp_HLSLStructuredBufferType ||
-                    operand->getOp() == kIROp_MatrixType)
+                // DXIL does not permit HLSLStructureBufferType in exported functions
+                // or sadly Matrices (https://github.com/shader-slang/slang/issues/4880)
+                auto type = as<IRFuncType>(inst->getFullType());
+                auto argCount = type->getOperandCount();
+                for (UInt aa = 0; aa < argCount; ++aa)
                 {
-                    if (auto dec = inst->findDecoration<IRPublicDecoration>())
+                    auto operand = type->getOperand(aa);
+                    if (operand->getOp() == kIROp_HLSLStructuredBufferType ||
+                        operand->getOp() == kIROp_MatrixType)
                     {
-                        dec->removeAndDeallocate();
+                        remove = true;
+                        break;
                     }
-                    if (auto dec = inst->findDecoration<IRDownstreamModuleExportDecoration>())
-                    {
-                        dec->removeAndDeallocate();
-                    }
-                    break;
+                }
+            }
+            else if (target == CodeGenTarget::SPIRV)
+            {
+                // SPIR-V does not allow exporting entry points
+                if (inst->findDecoration<IREntryPointDecoration>())
+                {
+                    remove = true;
+                }
+            }
+            if (remove)
+            {
+                if (auto dec = inst->findDecoration<IRPublicDecoration>())
+                {
+                    dec->removeAndDeallocate();
+                }
+                if (auto dec = inst->findDecoration<IRDownstreamModuleExportDecoration>())
+                {
+                    dec->removeAndDeallocate();
                 }
             }
         }
@@ -778,9 +794,9 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    if (codeGenContext->removeAvailableInDXIL)
+    if (codeGenContext->removeAvailableInDownstreamIR)
     {
-        removeAvailableInDownstreamModuleDecorations(irModule);
+        removeAvailableInDownstreamModuleDecorations(target, irModule);
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
@@ -1490,11 +1506,9 @@ Result linkAndOptimizeIR(
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
-    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
     {
-        // We need to make sure that we don't try to export any functions that can't
-        // be part of a DXIL library interface, eg. with resources.
-        unexportNonEmbeddableDXIL(irModule);
+        unexportNonEmbeddableIR(target, irModule);
     }
 
     collectMetadata(irModule, *metadata);

@@ -54,7 +54,7 @@ namespace Slang
     * Precompile the module for the given target.
     *
     * This function creates a target program and emits the precompiled blob as
-    * an embedded blob in the module IR, e.g. DXIL.
+    * an embedded blob in the module IR, e.g. DXIL, SPIR-V.
     * Because the IR for the Slang Module may violate the restrictions of the
     * target language, the emitted target blob may not be able to include the
     * full module, but rather only the subset that can be precompiled. For
@@ -77,7 +77,7 @@ namespace Slang
     * in the linked IR which survived the additional pruning.
     *
     * Functions that are rejected after linking+legalization (inside
-    * emitPrecompiled*):
+    * emitPrecompiledDownstreamIR):
     * - (DXIL) Functions that return or take a HLSLStructuredBufferType
     * - (DXIL) Functions that return or take a Matrix type
     *
@@ -86,17 +86,13 @@ namespace Slang
     * phase of filtering.
     *
     * The original module IR functions matching those are then marked with
-    * "AvailableIn*" (e.g. AvailableInDXILDecoration) to indicate to future
+    * "AvailableInDownstreamIRDecoration" to indicate to future
     * module users which functions are present in the precompiled blob.
     */
     SLANG_NO_THROW SlangResult SLANG_MCALL Module::precompileForTarget(
         SlangCompileTarget target,
         slang::IBlob** outDiagnostics)
     {
-        if (target != SLANG_DXIL)
-        {
-            return SLANG_FAIL;
-        }
         CodeGenTarget targetEnum = CodeGenTarget(target);
 
         auto module = getIRModule();
@@ -130,9 +126,14 @@ namespace Slang
         {
         case CodeGenTarget::DXIL:
             tp.getOptionSet().add(CompilerOptionName::Profile, Profile::RawEnum::DX_Lib_6_6);
-            tp.getOptionSet().add(CompilerOptionName::EmbedDXIL, true);
             break;
+        case CodeGenTarget::SPIRV:
+            break;
+        default:
+            return SLANG_FAIL;
         }
+
+        tp.getOptionSet().add(CompilerOptionName::EmbedDownstreamIR, true);
 
         CodeGenContext::EntryPointIndices entryPointIndices;
 
@@ -166,7 +167,7 @@ namespace Slang
         }
 
         ComPtr<IArtifact> outArtifact;
-        SlangResult res = codeGenContext.emitPrecompiledDXIL(outArtifact);
+        SlangResult res = codeGenContext.emitPrecompiledDownstreamIR(outArtifact);
 
         sink.getBlobIfNeeded(outDiagnostics);
         if (res != SLANG_OK)
@@ -183,7 +184,8 @@ namespace Slang
         for (const auto& mangledName : metadata->getExportedFunctionMangledNames())
         {
             auto moduleInst = nameToFunction[mangledName];
-            builder.addDecoration(moduleInst, kIROp_AvailableInDXILDecoration);
+            builder.addDecoration(moduleInst, kIROp_AvailableInDownstreamIRDecoration,
+                builder.getIntValue(builder.getIntType(), (int)targetReq->getTarget()));
             auto moduleDec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>();
             moduleDec->removeAndDeallocate();
         }
@@ -207,12 +209,7 @@ namespace Slang
         // Add the precompiled blob to the module
         builder.setInsertInto(module);
 
-        switch (targetReq->getTarget())
-        {
-        case CodeGenTarget::DXIL:
-            builder.emitEmbeddedDXIL(blob);
-            break;
-        }
+        builder.emitEmbeddedDownstreamIR(targetReq->getTarget(), blob);
 
         return SLANG_OK;
     }

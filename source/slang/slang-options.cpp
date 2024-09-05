@@ -354,8 +354,6 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::DisableShortCircuit, "-disable-short-circuit", nullptr, "Disable short-circuiting for \"&&\" and \"||\" operations" },
         { OptionKind::UnscopedEnum, "-unscoped-enum", nullptr, "Treat enums types as unscoped by default."},
         { OptionKind::PreserveParameters, "-preserve-params", nullptr, "Preserve all resource parameters in the output code, even if they are not used by the shader."},
-        { OptionKind::EmbedDXIL, "-embed-dxil", nullptr,
-        "Embed DXIL into emitted slang-modules for faster linking" },
     };
 
     _addOptions(makeConstArrayView(generalOpts), options);
@@ -431,6 +429,7 @@ void initCommandOptions(CommandOptions& options)
         "A path to a specific spirv.core.grammar.json to use when generating SPIR-V output" },
         { OptionKind::IncompleteLibrary, "-incomplete-library", nullptr,
         "Allow generating code from incomplete libraries with unresolved external functions" },
+        { OptionKind::EmbedDownstreamIR, "-embed-downstream-ir", nullptr, "Embed downstream IR into emitted slang IR" },
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -1931,7 +1930,11 @@ SlangResult OptionsParser::_parse(
                 linkage->m_optionSet.set(optionKind, compressionType);
                 break;
             }
-            case OptionKind::EmbedDXIL: m_compileRequest->setEmbedDXIL(true); break;
+            case OptionKind::EmbedDownstreamIR:
+            {
+                getCurrentTarget()->optionSet.add(CompilerOptionName::EmbedDownstreamIR, true);
+                break;
+            }
             case OptionKind::Target:
             {
                 CommandLineArg name;
@@ -2778,6 +2781,12 @@ SlangResult OptionsParser::_parse(
             {
                 m_compileRequest->setTargetGenerateWholeProgram(targetID, true);
             }
+
+            if (rawTarget.optionSet.getBoolOption(CompilerOptionName::EmbedDownstreamIR))
+            {
+                m_compileRequest->setTargetEmbedDownstreamIR(targetID, true);
+            }
+
         }
 
         // Next we need to sort out the output files specified with `-o`, and
