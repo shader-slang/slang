@@ -50,7 +50,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             token.type != SemanticTokenType::NormalText)
             result.add(token);
     };
-    auto handleDeclRef = [&](DeclRef<Decl> declRef, Expr* originalExpr, SourceLoc loc)
+    auto handleDeclRef = [&](DeclRef<Decl> declRef, Expr* originalExpr, Name* name, SourceLoc loc)
     {
         if (!declRef)
             return;
@@ -59,7 +59,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             decl = genDecl->inner;
         if (!decl)
             return;
-        auto name = declRef.getDecl()->getName();
+        if (!name)
+            name = declRef.getDecl()->getName();
         if (!name)
             return;
         // Don't look at the expr if it is defined in a different file.
@@ -134,13 +135,13 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
         {
             if (auto declRefExpr = as<DeclRefExpr>(node))
             {
-                handleDeclRef(declRefExpr->declRef, declRefExpr->originalExpr, declRefExpr->loc);
+                handleDeclRef(declRefExpr->declRef, declRefExpr->originalExpr, declRefExpr->name, declRefExpr->loc);
             }
             else if (auto overloadedExpr = as<OverloadedExpr>(node))
             {
                 if (overloadedExpr->lookupResult2.items.getCount())
                 {
-                    handleDeclRef(overloadedExpr->lookupResult2.items[0].declRef, overloadedExpr->originalExpr, overloadedExpr->loc);
+                    handleDeclRef(overloadedExpr->lookupResult2.items[0].declRef, overloadedExpr->originalExpr, overloadedExpr->name, overloadedExpr->loc);
                 }
             }
             else if (auto accessorDecl = as<AccessorDecl>(node))

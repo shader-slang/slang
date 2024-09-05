@@ -291,6 +291,10 @@ INST(IndexedFieldKey, indexedFieldKey, 2, HOISTABLE)
 // A placeholder witness that ThisType implements the enclosing interface.
 // Used only in interface definitions.
 INST(ThisTypeWitness, thisTypeWitness, 1, 0)
+
+// A placeholder witness for the fact that two types are equal.
+INST(TypeEqualityWitness, TypeEqualityWitness, 2, HOISTABLE)
+
 INST(GlobalHashedStringLiterals, global_hashed_string_literals, 0, 0)
 
 INST(Module, module, 0, PARENT)
