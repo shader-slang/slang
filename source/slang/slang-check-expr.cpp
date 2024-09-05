@@ -326,10 +326,11 @@ namespace Slang
     }
 
     DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
-        DeclRef<Decl>   declRef,
-        Expr*    baseExpr,
+        DeclRef<Decl> declRef,
+        Expr* baseExpr,
+        Name* name,
         SourceLoc loc,
-        Expr*    originalExpr)
+        Expr* originalExpr)
     {
         // Compute the type that this declaration reference will have in context.
         //
@@ -382,7 +383,7 @@ namespace Slang
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseExpr;
-                expr->name = declRef.getName();
+                expr->name = name;
                 expr->declRef = declRef;
                 expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
                 return expr;
@@ -399,7 +400,7 @@ namespace Slang
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseTypeExpr;
-                expr->name = declRef.getName();
+                expr->name = name;
                 expr->declRef = declRef;
                 expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
                 return expr;
@@ -413,7 +414,7 @@ namespace Slang
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseExpr;
-                expr->name = declRef.getName();
+                expr->name = name;
                 expr->declRef = declRef;
                 expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
 
@@ -464,7 +465,7 @@ namespace Slang
             //
             auto expr = m_astBuilder->create<VarExpr>();
             expr->loc = loc;
-            expr->name = declRef.getName();
+            expr->name = name;
             expr->type = type;
             expr->declRef = declRef;
             // Keep a reference to the original expr if it was a genericApp/member.
@@ -666,13 +667,15 @@ namespace Slang
         return ConstructDeclRefExpr(
             synthDeclMemberRef,
             nullptr,
+            item.declRef.getName(),
             originalExpr ? originalExpr->loc : SourceLoc(),
             originalExpr);
     }
 
     Expr* SemanticsVisitor::ConstructLookupResultExpr(
         LookupResultItem const& item,
-        Expr*            baseExpr,
+        Expr* baseExpr,
+        Name* name,
         SourceLoc loc,
         Expr* originalExpr)
     {
@@ -696,7 +699,7 @@ namespace Slang
             switch (breadcrumb->kind)
             {
             case LookupResultItem::Breadcrumb::Kind::Member:
-                bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, loc, originalExpr);
+                bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, name, loc, originalExpr);
                 break;
 
             case LookupResultItem::Breadcrumb::Kind::Deref:
@@ -827,7 +830,7 @@ namespace Slang
             }
         }
 
-        return ConstructDeclRefExpr(item.declRef, bb, loc, originalExpr);
+        return ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
     }
 
     void SemanticsVisitor::suggestCompletionItems(
@@ -844,9 +847,9 @@ namespace Slang
 
 
     Expr* SemanticsVisitor::createLookupResultExpr(
-        Name*                   name,
-        LookupResult const&     lookupResult,
-        Expr*            baseExpr,
+        Name* name,
+        LookupResult const& lookupResult,
+        Expr* baseExpr,
         SourceLoc loc,
         Expr* originalExpr)
     {
@@ -864,7 +867,7 @@ namespace Slang
         }
         else
         {
-            return ConstructLookupResultExpr(lookupResult.item, baseExpr, loc, originalExpr);
+            return ConstructLookupResultExpr(lookupResult.item, baseExpr, name, loc, originalExpr);
         }
     }
 
@@ -1067,7 +1070,7 @@ namespace Slang
             // expression.
             //
             return ConstructLookupResultExpr(
-                lookupResult.item, overloadedExpr->base, overloadedExpr->loc, overloadedExpr);
+                lookupResult.item, overloadedExpr->base, overloadedExpr->name, overloadedExpr->loc, overloadedExpr);
         }
 
         // Otherwise, we weren't able to resolve the overloading given
@@ -1175,6 +1178,7 @@ namespace Slang
                     auto diffTypeExpr = ConstructLookupResultExpr(
                         diffTypeLookupResult.item,
                         baseTypeExpr,
+                        declRefType->getDeclRef().getName(),
                         declRefType->getDeclRef().getLoc(),
                         baseTypeExpr);
 
@@ -3154,6 +3158,7 @@ namespace Slang
             {
                 auto lookupResultExpr = semantics->ConstructLookupResultExpr(item,
                     nullptr,
+                    overloadedExpr->name,
                     overloadedExpr->loc,
                     nullptr);
                 auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);

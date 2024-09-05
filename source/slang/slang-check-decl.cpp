@@ -1931,6 +1931,85 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
+    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
+    {
+        // find groupshared modifier
+        if (varDecl->findModifier<HLSLGroupSharedModifier>())
+        {
+            if (sink && varDecl->initExpr)
+                sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool isDefaultInitializable(VarDeclBase* varDecl)
+    {
+        if (!DiagnoseIsAllowedInitExpr(varDecl, nullptr))
+            return false;
+
+        // Find struct and modifiers associated with varDecl
+        StructDecl* structDecl = as<StructDecl>(varDecl);
+        if (auto declRefType = as<DeclRefType>(varDecl->getType()))
+        {
+            if (auto genericAppRefDecl = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
+            {
+                auto baseGenericRefType = genericAppRefDecl->getBase()->getDecl();
+                if (auto baseTypeStruct = as<StructDecl>(baseGenericRefType))
+                {
+                    structDecl = baseTypeStruct;
+                }
+                else if (auto genericDecl = as<GenericDecl>(baseGenericRefType))
+                {
+                    if(auto innerTypeStruct = as<StructDecl>(genericDecl->inner))
+                        structDecl = innerTypeStruct;
+                }
+            }
+        }
+        if (structDecl)
+        {
+            // find if a type is non-copyable
+            if (structDecl->findModifier<NonCopyableTypeAttribute>())
+                return false;
+        }
+
+        return true;
+    }
+
+    static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+    {
+        if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+        
+        if (!isDefaultInitializable(varDecl))
+            return nullptr;
+
+        ConstructorDecl* defaultCtor = nullptr;
+        auto declRefType = as<DeclRefType>(varDecl->type.type);
+        if (declRefType)
+        {
+            if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+            {
+                defaultCtor = _getDefaultCtor(structDecl);
+            }
+        }
+
+        if (defaultCtor)
+        {
+            auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
+            auto member = visitor->getASTBuilder()->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->getName(), defaultCtor->loc, nullptr);
+            return invoke;
+        }
+        else
+        {
+            auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
+            defaultCall->type = QualType(varDecl->type);
+            return defaultCall;
+        }
+    }
+
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -4415,7 +4494,7 @@ namespace Slang
         //
         DiagnosticSink tempSink(getSourceManager(), nullptr);
         ExprLocalScope localScope;
-        SemanticsVisitor subVisitor(withSink(&tempSink).withExprLocalScope(&localScope));
+        SemanticsVisitor subVisitor(withSink(&tempSink).withParentFunc(synFuncDecl).withExprLocalScope(&localScope));
 
         // With our temporary diagnostic sink soaking up any messages
         // from overload resolution, we can now try to resolve
@@ -8868,7 +8947,12 @@ namespace Slang
         if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
         {
             // Attach our extension to that type as a candidate...
-            if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
+            if (targetDeclRefType->getDeclRef().as<InterfaceDecl>())
+            {
+                getSink()->diagnose(decl->targetType.exp, Diagnostics::invalidExtensionOnInterface, decl->targetType);
+                return;
+            }
+            else if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
             {
                 auto aggTypeDecl = aggTypeDeclRef.getDecl();
 
@@ -8925,6 +9009,7 @@ namespace Slang
         // to extend.
         //
         decl->targetType = CheckProperType(decl->targetType);
+
         _validateExtensionDeclTargetType(decl);
 
         _validateExtensionDeclMembers(decl);
@@ -9810,13 +9895,13 @@ namespace Slang
                 // look up extensions based on what would be visible to that
                 // module.
                 //
-                // We need to consider the extensions declared in the module itself,
+                // Extensions declared in the module itself should have already
+                // been registered when we check them, but we still need to bring
                 // along with everything the module imported.
                 //
                 // Note: there is an implicit assumption here that the `importedModules`
                 // member on the `SharedSemanticsContext` is accurate in this case.
                 //
-                _addCandidateExtensionsFromModule(m_module->getModuleDecl());
                 for( auto moduleDecl : this->importedModulesList )
                 {
                     _addCandidateExtensionsFromModule(moduleDecl);
@@ -10719,7 +10804,7 @@ namespace Slang
         // aggregate type, we want to form a full declref with default arguments.
         declRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, declRef);
 
-        auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, derivativeOfAttr->loc, nullptr);
+        auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, declRef.getName(), derivativeOfAttr->loc, nullptr);
         declRefExpr->type.type = nullptr;
         derivativeAttr->args.add(declRefExpr);
         derivativeAttr->funcExpr = declRefExpr;
