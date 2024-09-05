@@ -5814,7 +5814,7 @@ namespace Slang
         // requests will be handled further down. For now we include
         // lookup results that might be usable, but not as-is.
         //
-        LookupResult lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions((uint8_t)LookupOptions::IgnoreBaseInterfaces | (uint8_t)LookupOptions::IgnoreInheritance));
+        LookupResult lookupResult = lookUpMember(m_astBuilder, this, name, subType, nullptr, LookupMask::Default, LookupOptions((uint8_t)LookupOptions::IgnoreBaseInterfaces));
 
         if (!lookupResult.isValid())
         {
