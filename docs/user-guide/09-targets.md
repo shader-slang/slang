@@ -302,14 +302,14 @@ Metal
 > #### Note ####
 > Slang support for Metal is a work in progress.
 
-Metal is a shading language exclusive on Apple slicons. The functionality from Metal is similar to DX12 or Vulkan with more or less features.
+Metal is a shading language exclusive on Apple platforms. The functionality from Metal is similar to DX12 or Vulkan with more or less features.
 
 ### Pipelines
 
-Metal includes rasterization, compute, and ray tracing pipelines with the same set of stages as described for D3D12 above.
+Metal includes vertex, fragment, task, mesh and tessellation stages for rasterization, as well as compute, and ray tracing stages.
 
 > #### Note ####
-> Ray-tracing and Mesh support for Metal is a work in progress.
+> Ray-tracing support for Metal is a work in progress.
 
 ### Parameter Passing
 

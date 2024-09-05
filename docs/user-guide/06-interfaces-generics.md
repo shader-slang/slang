@@ -104,6 +104,22 @@ Generic value parameters can also be defined using the traditional C-style synta
 void g1<typename T, int n>() { ... }
 ```
 
+Slang allows multiple `where` clauses, and multiple interface types in a single `where` clause:
+```csharp
+struct MyType<T, U>
+    where T: IFoo, IBar
+    where U : IBaz<T>
+{
+}
+// equivalent to:
+struct MyType<T, U>
+    where T: IFoo
+    where T : IBar
+    where U : IBaz<T>
+{
+}
+```
+
 Supported Constructs in Interface Definitions
 -----------------------------------------------------
 
@@ -791,6 +807,61 @@ void main()
 
 ```
 See  [if-let syntax](convenience-features.html#if_let-syntax) for more details.
+
+
+Generic Interfaces
+------------------
+
+Slang allows interfaces themselves to be generic. A common use of generic interfaces is to define the `IEnumerable` type:
+```csharp
+interface IEnumerator<T>
+{
+    This moveNext();
+    bool isEnd();
+    T getValue();
+}
+
+interface IEnumerable<T>
+{
+    assoicatedtype Enumerator : IEnumerator<T>;
+    Enumerator getEnumerator();
+}
+```
+
+You can constrain a generic type parameter to conform to a generic interface:
+```csharp
+void traverse<TElement, TCollection>(TCollection c)
+    where TCollection : IEnumerable<TElement>
+{
+    ...
+}
+```
+
+
+Generic Extensions
+----------------------
+You can use generic extensions to extend a generic type. For example,
+```csharp
+interface IFoo { void foo(); }
+interface IBar { void bar(); }
+
+struct MyType<T : IFoo>
+{
+    void foo() { ... }
+}
+
+// Extend `MyType<T>` so it conforms to `IBar`.
+extension<T:IFoo> MyType<T> : IBar
+{
+    void bar() { ... }
+}
+// Equivalent to:
+__generic<T:IFoo>
+extension MyType<T> : IBar
+{
+    void bar() { ... }
+}
+```
 
 
 Extensions to Interfaces
