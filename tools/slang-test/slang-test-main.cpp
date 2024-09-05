@@ -1122,6 +1122,10 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
             passThru = SLANG_PASS_THROUGH_NVRTC;
             break;
+        case RenderApiType::WebGPU:
+            target = SLANG_WGSL;
+            SLANG_ASSERT(!usePassthru);
+            break;
     }
 
     SlangSourceLanguage sourceLanguage = nativeLanguage;
