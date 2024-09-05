@@ -576,7 +576,7 @@ SlangResult LanguageServer::hover(
         }
     };
 
-    auto fillDeclRefHoverInfo = [&](DeclRef<Decl> declRef)
+    auto fillDeclRefHoverInfo = [&](DeclRef<Decl> declRef, Name* name)
     {
         if (declRef.getDecl())
         {
@@ -664,7 +664,8 @@ SlangResult LanguageServer::hover(
                 hover.range.start.line,
                 hover.range.start.character);
             hover.range.end = hover.range.start;
-            auto name = declRef.getName();
+            if (!name)
+                name = declRef.getName();
             if (auto ctorDecl = declRef.as<ConstructorDecl>())
             {
                 auto parent = ctorDecl.getDecl()->parentDecl;
@@ -692,7 +693,7 @@ SlangResult LanguageServer::hover(
     auto fillExprHoverInfo = [&](Expr* expr)
     {
         if (auto declRefExpr = as<DeclRefExpr>(expr))
-            return fillDeclRefHoverInfo(declRefExpr->declRef);
+            return fillDeclRefHoverInfo(declRefExpr->declRef, declRefExpr->name);
         else if (as<ThisExpr>(expr))
         {
             if (expr->type)
@@ -751,12 +752,12 @@ SlangResult LanguageServer::hover(
     };
     if (auto declRefExpr = as<DeclRefExpr>(leafNode))
     {
-        fillDeclRefHoverInfo(declRefExpr->declRef);
+        fillDeclRefHoverInfo(declRefExpr->declRef, declRefExpr->name);
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(leafNode))
     {
         LookupResultItem& item = overloadedExpr->lookupResult2.item;
-        fillDeclRefHoverInfo(item.declRef);
+        fillDeclRefHoverInfo(item.declRef, overloadedExpr->name);
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(leafNode))
     {
@@ -826,11 +827,11 @@ SlangResult LanguageServer::hover(
     }
     else if (auto decl = as<Decl>(leafNode))
     {
-        fillDeclRefHoverInfo(makeDeclRef(decl));
+        fillDeclRefHoverInfo(makeDeclRef(decl), nullptr);
     }
     else if (auto attr = as<Attribute>(leafNode))
     {
-        fillDeclRefHoverInfo(makeDeclRef(attr->attributeDecl));
+        fillDeclRefHoverInfo(makeDeclRef(attr->attributeDecl), nullptr);
         hover.range.end.character = hover.range.start.character + (int)attr->originalIdentifierToken.getContentLength();
     }
     if (sb.getLength() == 0)
