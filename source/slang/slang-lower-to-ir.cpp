@@ -1753,6 +1753,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 lowerType(context, val->getSup())));
     }
 
+    LoweredValInfo visitTypeEqualityWitness(TypeEqualityWitness* val)
+    {
+        auto subType = lowerType(context, val->getSub());
+        auto supType = lowerType(context, val->getSup());
+        auto witnessType = context->irBuilder->getWitnessTableType(
+            lowerType(context, val->getSup()));
+        return LoweredValInfo::simple(context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
+    }
+
     LoweredValInfo visitTransitiveSubtypeWitness(
         TransitiveSubtypeWitness* val)
     {
@@ -4989,6 +4998,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto superType = lowerType(context, expr->type);
         auto value = lowerRValueExpr(context, expr->valueArg);
 
+        // First, we check if the witness is a type equality witness.
+        // If so, we can simply emit a bit cast to the target type that should eventually
+        // fold out to a no-op.
+        // Note: if we are going to equivalent but not identical types in the future,
+        // then the cast between equivalent types shouldn't be as simple as a bit cast
+        // and will require actual coercion logic between the two types.
+        // For now, we don't support type equivalence witness so this is safe for
+        // equal types.
+        if (isTypeEqualityWitness(expr->witnessArg))
+        {
+            return LoweredValInfo::simple(getBuilder()->emitBitCast(superType, getSimpleVal(context, value)));
+        }
+
         // The actual operation that we need to perform here
         // depends on the kind of subtype relationship we
         // are making use of.
@@ -5039,7 +5061,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 return emitCastToConcreteSuperTypeRec(value, superType, expr->witnessArg);
             }
         }
-
         SLANG_UNEXPECTED("unexpected case of subtype relationship");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
@@ -8400,8 +8421,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto constraintDecl : decl->getMembersOfType<GenericTypeConstraintDecl>())
         {
             auto baseType = lowerType(context, constraintDecl->sup.type);
-            SLANG_ASSERT(baseType && baseType->getOp() == kIROp_InterfaceType);
-            constraintInterfaces.add((IRInterfaceType*)baseType);
+            if (baseType && baseType->getOp() == kIROp_InterfaceType)
+                constraintInterfaces.add((IRInterfaceType*)baseType);
         }
         auto assocType = context->irBuilder->getAssociatedType(
             constraintInterfaces.getArrayView().arrayView);
@@ -10686,7 +10707,8 @@ LoweredValInfo emitDeclRef(
         for (auto argVal : genericSubst->getArgs())
         {
             auto irArgVal = lowerSimpleVal(context, argVal);
-            SLANG_ASSERT(irArgVal);
+            if (!irArgVal)
+                continue;
 
             // It is possible that some of the arguments to the generic
             // represent conformances to conjunction types like `A & B`.

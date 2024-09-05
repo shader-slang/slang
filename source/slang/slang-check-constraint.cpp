@@ -83,14 +83,20 @@ namespace Slang
         Type*                   interfaceType)
     {
         // The most basic test here should be: does the type declare conformance to the trait.
-        if (isSubtype(type, interfaceType, constraints->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching : IsSubTypeOptions::None))
-            return type;
-
-        // If additional subtype witnesses are provided for `type` in `constraints`,
-        // try to use them to see if the interface is satisfied.
+       
         if (constraints->subTypeForAdditionalWitnesses == type)
         {
+            // If additional subtype witnesses are provided for `type` in `constraints`,
+            // try to use them to see if the interface is satisfied.
             if (constraints->additionalSubtypeWitnesses->containsKey(interfaceType))
+                return type;
+        }
+        else
+        {
+            if (isSubtype(
+                type,
+                interfaceType,
+                constraints->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching : IsSubTypeOptions::None))
                 return type;
         }
 
@@ -642,7 +648,7 @@ namespace Slang
             else if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
                 constrainedGenericParams.add(as<DeclRefType>(subEachType->getElementType())->getDeclRef().getDecl());
 
-            if (sub->equals(sup))
+            if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
             {
                 // We are trying to use an interface type itself to conform to the
                 // type constraint. We can reach this case when the user code does
@@ -653,18 +659,30 @@ namespace Slang
             }
 
             // Search for a witness that shows the constraint is satisfied.
-            auto subTypeWitness = isSubtype(
-                sub,
-                sup,
-                system->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching : IsSubTypeOptions::None);
-            if (!subTypeWitness)
+            SubtypeWitness* subTypeWitness = nullptr;
+            if (sub == system->subTypeForAdditionalWitnesses)
             {
-                if (sub == system->subTypeForAdditionalWitnesses)
-                {
-                    // If no witness was found, try to find the witness from additional witness.
-                    system->additionalSubtypeWitnesses->tryGetValue(sup, subTypeWitness);
-                }
+                // If we are trying to find the subtype info for a type whose inheritance info is
+                // being calculated, use what we have already known about the type.
+                system->additionalSubtypeWitnesses->tryGetValue(sup, subTypeWitness);
             }
+            else
+            {
+                // The general case is to initiate a subtype query.
+                subTypeWitness = isSubtype(
+                    sub,
+                    sup,
+                    system->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching : IsSubTypeOptions::None);
+            }
+          
+            if (constraintDecl->isEqualityConstraint)
+            {
+                // If constraint is an equality constraint, we need to make sure
+                // the witness is equality witness.
+                if (!isTypeEqualityWitness(subTypeWitness))
+                    subTypeWitness = nullptr;
+            }
+
             if(subTypeWitness)
             {
                 // We found a witness, so it will become an (implicit) argument.
