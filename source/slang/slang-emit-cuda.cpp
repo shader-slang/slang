@@ -810,9 +810,9 @@ void CUDASourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
     Super::emitVarDecorationsImpl(varDecl);
 }
 
-void CUDASourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
+void CUDASourceEmitter::emitMatrixLayoutModifiersImpl(IRType* varType)
 {
-    Super::emitMatrixLayoutModifiersImpl(layout);
+    Super::emitMatrixLayoutModifiersImpl(varType);
 }
 
 bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)

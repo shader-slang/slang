@@ -93,7 +93,7 @@ namespace Slang
         void checkDerivativeMemberAttributeParent(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
         void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
         void checkMeshOutputDecl(VarDeclBase* varDecl);
-
+        void maybeApplyMatrixLayoutModifier(VarDeclBase* varDecl);
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
         void visitVarDecl(VarDecl* varDecl)
@@ -1516,6 +1516,22 @@ namespace Slang
             }
         }
     }
+    void SemanticsDeclHeaderVisitor::maybeApplyMatrixLayoutModifier(VarDeclBase* varDecl)
+    {
+        if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
+        {
+            if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
+            {
+                auto matrixLayout = as<ColumnMajorLayoutModifier>(matrixLayoutModifier) ? SLANG_MATRIX_LAYOUT_COLUMN_MAJOR : SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+                auto newMatrixType = getASTBuilder()->getMatrixType(
+                    matrixType->getElementType(),
+                    matrixType->getRowCount(),
+                    matrixType->getColumnCount(),
+                    getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
+                varDecl->type.type = newMatrixType;
+            }
+        }
+    }
 
     void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
@@ -1598,19 +1614,7 @@ namespace Slang
         }
 
         // If there is a matrix layout modifier, we will modify the matrix type now.
-        if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
-        {
-            if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
-            {
-                auto matrixLayout = as<ColumnMajorLayoutModifier>(matrixLayoutModifier) ? SLANG_MATRIX_LAYOUT_COLUMN_MAJOR : SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-                auto newMatrixType = getASTBuilder()->getMatrixType(
-                    matrixType->getElementType(),
-                    matrixType->getRowCount(),
-                    matrixType->getColumnCount(),
-                    getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
-                varDecl->type.type = newMatrixType;
-            }
-        }
+        maybeApplyMatrixLayoutModifier(varDecl);
 
         if (varDecl->initExpr)
         {
@@ -7691,6 +7695,8 @@ namespace Slang
                 addModifier(paramDecl, constModifier);
             }
         }
+
+        maybeApplyMatrixLayoutModifier(paramDecl);
 
         // Only texture types are allowed to have memory qualifiers on parameters
         if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)

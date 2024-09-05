@@ -3520,7 +3520,7 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     {
         type = constRefType->getValueType();
     }
-
+    emitParamTypeModifier(type);
     emitType(type, name);
 }
 
@@ -3862,7 +3862,7 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
     if (!layout)
         return;
 
-    emitMatrixLayoutModifiersImpl(layout);
+    emitMatrixLayoutModifiersImpl(varType);
 
     // Target specific modifier output
     emitImageFormatModifierImpl(varDecl, varType);
