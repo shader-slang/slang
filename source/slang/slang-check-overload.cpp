@@ -1189,6 +1189,16 @@ namespace Slang
         return CountParameters(parentGeneric).required;
     }
 
+    DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef)
+    {
+        auto parent = declRef.getParent();
+        while (parent.as<GenericDecl>())
+        {
+            parent = parent.getParent();
+        }
+        return parent;
+    }
+
     int SemanticsVisitor::CompareLookupResultItems(
         LookupResultItem const& left,
         LookupResultItem const& right)
@@ -1206,12 +1216,30 @@ namespace Slang
         // directly (it is only visible through the requirement witness
         // information for inheritance declarations).
         //
-        auto leftDeclRefParent = left.declRef.getParent();
-        auto rightDeclRefParent = right.declRef.getParent();
+        auto leftDeclRefParent = getParentDeclRef(left.declRef);
+        auto rightDeclRefParent = getParentDeclRef(right.declRef);
         bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
         bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
         if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
             return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+
+        // Prefer non-extension declarations over extension declarations.
+        bool leftIsExtension = as<ExtensionDecl>(leftDeclRefParent.getDecl()) != nullptr;
+        bool rightIsExtension = as<ExtensionDecl>(rightDeclRefParent.getDecl()) != nullptr;
+        if (leftIsExtension != rightIsExtension)
+        {
+            return int(leftIsExtension) - int(rightIsExtension);
+        }
+        else if (leftIsExtension)
+        {
+            // If both are declared in extensions, prefer the one that is least generic.
+            bool leftIsGeneric = leftDeclRefParent.getParent().as<GenericDecl>() != nullptr;
+            bool rightIsGeneric = rightDeclRefParent.getParent().as<GenericDecl>() != nullptr;
+            if (leftIsGeneric != rightIsGeneric)
+            {
+                return int(leftIsGeneric) - int(rightIsGeneric);
+            }
+        }
 
         // Any decl is strictly better than a module decl.
         bool leftIsModule = (as<ModuleDeclarationDecl>(left.declRef) != nullptr);
@@ -2240,7 +2268,6 @@ namespace Slang
 
         // Look at the base expression for the call, and figure out how to invoke it.
         auto funcExpr = expr->functionExpr;
-        auto funcExprType = funcExpr->type;
 
         // If we are trying to apply an erroneous expression, then just bail out now.
         if(IsErrorExpr(funcExpr))
@@ -2269,25 +2296,6 @@ namespace Slang
         for (auto& arg : expr->arguments)
         {
             arg = maybeOpenRef(arg);
-        }
-
-        auto funcType = as<FuncType>(funcExprType);
-        for (Index i = 0; i < expr->arguments.getCount(); i++)
-        {
-            auto& arg = expr->arguments[i];
-            if (funcType && i < funcType->getParamCount())
-            {
-                switch (funcType->getParamDirection(i))
-                {
-                case kParameterDirection_Out:
-                case kParameterDirection_InOut:
-                case kParameterDirection_Ref:
-                case kParameterDirection_ConstRef:
-                    continue;
-                default:
-                    break;
-                }
-            }
             arg = maybeOpenExistential(arg);
         }
 
@@ -2417,6 +2425,45 @@ namespace Slang
             // the user the most help we can.
             if (shouldAddToCache)
                 typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
+
+            // Now that we have resolved the overload candidate, we need to undo an `openExistential`
+            // operation that was applied to `out` arguments.
+            //
+            auto funcType = context.bestCandidate->funcType;
+            ShortList<ParameterDirection> paramDirections;
+            if (funcType)
+            {
+                for (Index i = 0; i < funcType->getParamCount(); i++)
+                {
+                    paramDirections.add(funcType->getParamDirection(i));
+                }
+            }
+            else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
+            {
+                for (auto param : callableDeclRef.getDecl()->getParameters())
+                {
+                    paramDirections.add(getParameterDirection(param));
+                }
+            }
+            for (Index i = 0; i < expr->arguments.getCount(); i++)
+            {
+                auto& arg = expr->arguments[i];
+                if (i < paramDirections.getCount())
+                {
+                    switch (paramDirections[i])
+                    {
+                    case kParameterDirection_Out:
+                    case kParameterDirection_InOut:
+                    case kParameterDirection_Ref:
+                    case kParameterDirection_ConstRef:
+                        break;
+                    default:
+                        continue;
+                    }
+                }
+                if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(arg))
+                    arg = extractExistentialExpr->originalExpr;
+            }
             return CompleteOverloadCandidate(context, *context.bestCandidate);
         }
 
@@ -2449,7 +2496,7 @@ namespace Slang
 
         // Nothing at all was found that we could even consider invoking.
         // In all other cases, this is an error.
-        getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExprType);
+        getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
         expr->type = QualType(m_astBuilder->getErrorType());
         return expr;
     }
