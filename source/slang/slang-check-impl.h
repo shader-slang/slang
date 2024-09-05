@@ -766,6 +766,12 @@ namespace Slang
         InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
         InheritanceInfo _calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType, InheritanceCircularityInfo* circularityInfo);
 
+        // Get the inner most generic decl that a decl-ref is dependent on.
+        // For example, `Foo<T>` depends on the generic decl that defines `T`.
+        //
+        DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
+        void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
+
         struct DirectBaseInfo
         {
             FacetList facets;
@@ -1219,10 +1225,11 @@ namespace Slang
         }
 
         DeclRefExpr* ConstructDeclRefExpr(
-            DeclRef<Decl>   declRef,
-            Expr*    baseExpr,
+            DeclRef<Decl> declRef,
+            Expr* baseExpr,
+            Name* name,
             SourceLoc loc,
-            Expr*    originalExpr);
+            Expr* originalExpr);
 
         Expr* ConstructDerefExpr(
             Expr*    base,
@@ -1236,16 +1243,17 @@ namespace Slang
 
         Expr* ConstructLookupResultExpr(
             LookupResultItem const& item,
-            Expr*            baseExpr,
+            Expr* baseExpr,
+            Name* name,
             SourceLoc loc,
             Expr* originalExpr);
 
         Expr* createLookupResultExpr(
-            Name*                   name,
-            LookupResult const&     lookupResult,
-            Expr*            baseExpr,
+            Name* name,
+            LookupResult const& lookupResult,
+            Expr* baseExpr,
             SourceLoc loc,
-            Expr*    originalExpr);
+            Expr* originalExpr);
 
         DeclVisibility getTypeVisibility(Type* type);
         bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);

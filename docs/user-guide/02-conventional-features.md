@@ -792,3 +792,362 @@ In this example, `globalUniform` is appended to the global root signature / pipe
 Compute entry points lack "local root signatures" in D3D12, and likewise Vulkan has no concept of "local" vs "global" compute pipeline layouts, so `localUniform1` is "pushed" to the stack of reserved global uniform parameters for use in `computeMain1`. 
 Leaving that entry point scope "pops" that global uniform parameter such that `localUniform2` can reuse the same binding location for `computeMain2`.
 However, local uniforms for ray tracing shaders map to the corresponding "local" hit records in the shader binding table, and so no "push" or "pop" to the global root signature / pipeline layouts occurs for these parameters. 
+
+Auto-Generated Constructors
+----------
+
+### Auto-Generated Constructors - Struct
+
+Slang has the following rules:
+1. Auto-generate a `__init()` if not already defined
+> Assume
+```c#
+struct DontGenerateCtor
+{
+    int a;
+    int b = 5;
+
+    // Since the user has explicitly defined a constructor
+    // here, Slang will not synthesize a conflicting 
+    // constructor.
+    __init()
+    {
+        // b = 5;
+        a = 5;
+        b = 6;
+    }
+};
+
+struct GenerateCtor
+{
+    int a;
+    int b = 5;
+
+    // Slang will automatically generate an implicit constructor:
+    // __init()
+    // {
+    //     b = 5;
+    // }
+};
+```
+
+2. If all members have equal visibility, auto-generate a 'member-wise constructor' if not conflicting with a user defined constructor.
+```c#
+struct GenerateCtorInner
+{
+    int a;
+
+    // Slang will automatically generate an implicit
+    // __init(int in_a)
+    // {
+    //     a = in_a;
+    // }
+};
+struct GenerateCtor : GenerateCtorInner
+{
+    int b;
+    int c = 5;
+
+    // Slang will automatically generate an implicit
+    // __init(int in_a, int in_b, int in_c)
+    // {
+    //     c = 5;
+    //
+    //     this = GenerateCtorInner(in_a);
+    //
+    //     b = in_b;
+    //     c = in_c;
+    // }
+};
+```
+3. If not all members have equal visibility, auto-generate a 'member-wise constructor' based on member visibility if not conflicting with a user defined constructor. 
+    * We generate 3 different visibilities of 'member-wise constructor's in order:
+        1. `public` 'member-wise constructor'
+            * Contains members of visibility: `public`
+            * Do not generate if `internal` or `private` member lacks an init expression
+        2. `internal` 'member-wise constructor'
+            * Contains members of visibility: `internal`, `public`
+            * Do not generate if `private` member lacks an init expression
+        3. `private` 'member-wise constructor'
+            * Contains members of visibility: `private`, `internal`, `public`
+```C#
+struct GenerateCtorInner1
+{
+    internal int a = 0;
+    
+    // Slang will automatically generate an implicit
+    // internal __init(int in_a)
+    // {
+    //     a = 0;
+    //
+    //     a = in_a;
+    // }
+};
+struct GenerateCtor1 : GenerateCtorInner1
+{
+    internal int b = 0;
+    public int c;
+
+    // Slang will automatically generate an implicit
+    // internal __init(int in_a, int in_b, int in_c)
+    // {
+    //     b = 0;
+    //
+    //     this = GenerateCtorInner1(in_a);
+    //
+    //     b = in_b;
+    //     c = in_c;
+    // }
+    //
+    // public __init(int in_c)
+    // {
+    //     b = 0;
+    //
+    //     this = GenerateCtorInner1();
+    //
+    //     c = in_c;
+    // }
+};
+
+struct GenerateCtorInner2
+{
+    internal int a;
+    // Slang will automatically generate an implicit
+    // internal __init(int in_a)
+    // {
+    //     a = in_a;
+    // }
+};
+struct GenerateCtor2 : GenerateCtorInner2
+{
+    internal int b;
+    public int c;
+
+    /// Note: `internal b` is missing init expression,
+    // Do not generate a `public` 'member-wise' constructor.
+
+    // Slang will automatically generate an implicit
+    // internal __init(int in_a, int in_b, int in_c)
+    // {
+    //     this = GenerateCtorInner2(in_a);
+    //
+    //     b = in_b;
+    //     c = in_c;
+    // }
+};
+```
+
+Initializer Lists
+----------
+Initializer List's are an expression of the form `{...}`.
+
+```c#
+int myFunc()
+{
+    int a = {}; // Initializer List
+}
+```
+
+### Initializer List's - Scalar
+
+```c#
+// Equivalent to `int a = 1`
+int a = {1};
+```
+
+### Initializer List's - Vectors
+
+```c#
+// Equivalent to `float3 a = float3(1,2,3)`
+float3 a = {1, 2, 3};
+```
+
+### Initializer List's - Arrays/Matrixes
+
+#### Array Of Scalar's
+
+```c#
+// Equivalent to `int[2] a; a[0] = 1; a[1] = 2;`
+int a[2] = {1, 2}
+```
+
+#### Array Of Aggregate's
+
+```c#
+// Equivlent to `float3 a[2]; a[0] = {1,2,3}; b[1] = {4,5,6};`
+float3 a[2] = {{1,2,3}, {4,5,6}};
+```
+#### Flattened Array Initializer
+
+```c#
+// Equivalent to `float3 a[2] = {{1,2,3}, {4,5,6}};`
+float3 a[3] = {1,2,3, 4,5,6}; 
+```
+
+### Initializer Lists - Struct
+
+In most scenarios, using an initializer list to create a struct typed value is equivalent to calling the struct's constructor using the elements in the initilaizer list as arguments for the constructor, for example:
+```c#
+struct GenerateCtorInner1
+{
+    internal int a = 0;
+    
+    // Slang will automatically generate an implicit
+    // internal __init(int in_a)
+    // {
+    //     a = 0;
+    //
+    //     a = in_a;
+    // }
+
+    static GenerateCtorInner1 callGenerateCtorInner1()
+    {
+        // Calls `GenerateCtorInner1::__init(1);`
+        return {1};
+    }
+};
+struct GenerateCtor1 : GenerateCtorInner1
+{
+    internal int b = 0;
+    public int c;
+
+    // Slang will automatically generate an implicit
+    // internal __init(int in_a, int in_b, int in_c)
+    // {
+    //     this = GenerateCtorInner1(in_a);
+    //
+    //     b = 0;
+    //
+    //     b = in_b;
+    //     c = in_c;
+    // }
+    //
+    // public __init(int in_c)
+    // {
+    //     this = GenerateCtorInner1();
+    //
+    //     b = 0;
+    //
+    //     c = in_c;
+    // }
+    static GenerateCtorInner1 callInternalGenerateCtor()
+    {
+        // Calls `GenerateCtor1::__init(1, 2, 3);`
+        return {1, 2, 3};
+    }
+    static GenerateCtorInner1 callPublicGenerateCtor()
+    {
+        // Calls `GenerateCtor1::__init(1);`
+        return {1}; 
+    }
+};
+
+...
+
+// Calls `{ GenerateCtor1::__init(3), GenerateCtor1::__init(2) }`
+GenerateCtor1 val[2] = {{ 3 }, { 2 }};
+```
+
+In addition, Slang also provides compatbility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-List's) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Struct)
+
+A struct is considered a C-style struct if:
+1. User never defines a custom constructor with **more than** 0 parameters
+2. All member variables in a `struct` have the same visibiliity (`public` or `internal` or `private`).
+
+#### Partial Initializer List's
+
+```c#
+struct Foo
+{
+    int a;
+    int b;
+    int c;
+};
+
+...
+
+// Equivalent to `Foo val; val.a = 1; val.b = 0; val.c = 0;`
+Foo val = {1}; 
+
+// Equivalent to `Foo val; val.a = 2; val.b = 3; val.c = 0;`
+Foo val = {2, 3};
+```
+
+#### Flattened Array Initializer With Struct's
+
+```c#
+struct Foo
+{
+    int a;
+    int b;
+    int c;
+};
+
+...
+
+// Equivalent to `Foo val[2] = {{0,1,2}, {3,4,5}};`
+Foo val[2] = {0,1,2, 3,4,5};
+```
+
+
+### Initializer Lists - Default Initializer
+
+`{}` will default initialize a value:
+
+#### Non-Struct Type
+
+Value will zero-initialize
+```c#
+// Equivalent to `int val1 = 0;`
+int val1 = {};
+
+// Equivalent to `float3 val2 = float3(0);`
+float3 val2 = {};
+```
+
+#### Struct Type
+
+1. Atempt to call default constructor (`__init()`) of a `struct`
+
+
+```c#
+struct Foo
+{
+    int a;
+    int b;
+    __init()
+    {
+        a = 5;
+        b = 5;
+    }
+};
+
+...
+
+// Equivalent to `Foo val = Foo();`
+Foo val = {};
+```
+2. As a fallback, zero-initialize the struct
+
+```c#
+struct Foo
+{
+    int a;
+    int b;
+};
+
+...
+
+// Equivalent to `Foo val; val.a = 0; val.b = 0;` 
+Foo val = {};
+```
+### Initializer Lists - Other features
+
+Slang allows calling a default-initializer inside a default-constructor.
+
+```c#
+__init()
+{
+    this = {}; //zero-initialize `this`
+}
+```

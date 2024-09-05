@@ -2850,28 +2850,28 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
 }
 
-void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
+void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* varType)
 {
     // When a variable has a matrix type, we want to emit an explicit
     // layout qualifier based on what the layout has been computed to be.
     //
 
-    auto typeLayout = layout->getTypeLayout()->unwrapArray();
+    auto matrixType = as<IRMatrixType>(unwrapArray(varType));
 
-    if (auto matrixTypeLayout = as<IRMatrixTypeLayout>(typeLayout))
+    if (matrixType)
     {
         // Reminder: the meaning of row/column major layout
         // in our semantics is the *opposite* of what GLSL
         // calls them, because what they call "columns"
         // are what we call "rows."
         //
-        switch (matrixTypeLayout->getMode())
+        switch (getIntVal(matrixType->getLayout()))
         {
-            case kMatrixLayoutMode_ColumnMajor:
+            case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
                 m_writer->emit("layout(row_major)\n");
                 break;
 
-            case kMatrixLayoutMode_RowMajor:
+            case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
                 m_writer->emit("layout(column_major)\n");
                 break;
         }
