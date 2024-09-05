@@ -3,10 +3,10 @@ implementing "bsdf-sample";
 
 struct ShadingData
 {
-    float3 V;
-    float3 N;
-    float3 T;
-    float3 B;
+    float3 V = {};
+    float3 N = {};
+    float3 T = {};
+    float3 B = {};
 
     float3 fromLocal(float3 v)
     {

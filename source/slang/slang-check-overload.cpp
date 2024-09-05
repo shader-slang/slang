@@ -2241,6 +2241,33 @@ namespace Slang
         return argsListBuilder.produceString();
     }
 
+
+    /// We allow a special case for when `funcExpr` is expected to be a Default initializer
+    /// but none exist. Note, we cannot just create a default initializer for every variable
+    /// since then we are introducing initialization to every variable through an indirect
+    /// init returning data. Instead we will call `$ZeroInit` through this logic below.
+    Expr* _tryToSpecialCaseOverloadDefaultConstructWithoutInit(SemanticsVisitor* visitor, SemanticsVisitor::OverloadResolveContext& context, Expr* expr, OverloadCandidate* bestCandidate)
+    {
+        if (context.argCount == 0)
+        {
+            auto oldMode = context.mode;
+            context.mode = SemanticsVisitor::OverloadResolveContext::Mode::JustTrying;
+            bool arityIsValid = visitor->TryCheckOverloadCandidateArity(context, *bestCandidate);
+            context.mode = oldMode;
+
+            if (!arityIsValid)
+            {
+                auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+                initListExpr->loc = expr->loc;
+                initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
+                Expr* outExpr = nullptr;
+                if (visitor->_coerceInitializerList(bestCandidate->resultType, &outExpr, initListExpr))
+                    return outExpr;
+            }
+        }
+        return nullptr;
+    }
+
     Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr * expr)
     {
         OverloadResolveContext context;
@@ -2364,6 +2391,9 @@ namespace Slang
 
             if (context.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
             {
+                if (auto specialCase = _tryToSpecialCaseOverloadDefaultConstructWithoutInit(this, context, expr, &context.bestCandidates[0]))
+                    return specialCase;
+
                 // There were multiple equally-good candidates, but none actually usable.
                 // We will construct a diagnostic message to help out.
 
@@ -2419,27 +2449,8 @@ namespace Slang
         }
         else if (context.bestCandidate)
         {
-            // We allow a special case for when `funcExpr` is expected to be a Default initializer
-            // but none exist. Note, we cannot just create a default initializer for every variable
-            // since then we are introducing initialization to every variable through an indirect
-            // init returning data. Instead we will call `$ZeroInit` through this logic below. 
-            if (context.argCount == 0)
-            {
-                auto oldMode = context.mode;
-                context.mode = OverloadResolveContext::Mode::JustTrying;
-                bool arityIsValid = TryCheckOverloadCandidateArity(context, *context.bestCandidate);
-                context.mode = oldMode;
-
-                if (!arityIsValid)
-                {
-                    auto initListExpr = m_astBuilder->create<InitializerListExpr>();
-                    initListExpr->loc = expr->loc;
-                    initListExpr->type = m_astBuilder->getInitializerListType();
-                    Expr* outExpr = nullptr;
-                    if (_coerceInitializerList(context.bestCandidate->resultType, &outExpr, initListExpr))
-                        return outExpr;
-                }
-            }
+            if (auto specialCase = _tryToSpecialCaseOverloadDefaultConstructWithoutInit(this, context, expr, context.bestCandidate))
+                return specialCase;
 
             // There was one best candidate, even if it might not have been
             // applicable in the end.

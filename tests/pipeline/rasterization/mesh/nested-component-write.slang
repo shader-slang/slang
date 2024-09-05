@@ -7,7 +7,7 @@
 
 struct Foo
 {
-    float4 pos : SV_Position;
+    float4 pos : SV_Position = {};
     Bar bar;
 };
 
@@ -18,7 +18,7 @@ struct Bar
 
 struct Baz
 {
-    float3 color;
+    float3 color = {};
 };
 
 struct Vertex

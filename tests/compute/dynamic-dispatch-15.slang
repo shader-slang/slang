@@ -18,7 +18,7 @@ RWStructuredBuffer<float> gOutputBuffer;
 RWStructuredBuffer<IInterface> gObj;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     // Test unpacking.
     float result = 0.0;
@@ -48,7 +48,7 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 // Type must be marked `public` to ensure it is visible in the generated DLL.
 export struct FloatVal : IInterface
 {
-    float val;
+    float val = {};
     float run()
     {
         return val;
@@ -58,7 +58,7 @@ interface ISomething{void g();}
 struct Float4Struct : ISomething { float4 val; void g() {} }
 export struct Float4Val : IInterface
 {
-    Float4Struct val;
+    Float4Struct val = {};
     float run()
     {
         return val.val.x;
@@ -66,7 +66,7 @@ export struct Float4Val : IInterface
 };
 export struct IntVal : IInterface
 {
-    int val;
+    int val = {};
     float run()
     {
         return val;
@@ -74,7 +74,7 @@ export struct IntVal : IInterface
 };
 export struct Int4Val : IInterface
 {
-    int4 val;
+    int4 val = {};
     float run()
     {
         return val.x;
