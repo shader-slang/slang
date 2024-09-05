@@ -5,7 +5,7 @@
 #include "core/slang-token-reader.h"
 #include "core/slang-type-text-util.h"
 
-#include "slang-gfx.h"
+#include <slang-rhi.h>
 
 namespace renderer_test
 {
@@ -21,7 +21,7 @@ namespace renderer_test
     {
 #define SLANG_FORMAT_CASE(name, blockSizeInBytes, pixelsPerBlock) if (slice == #name) return Format::name; else 
 
-        GFX_FORMAT(SLANG_FORMAT_CASE)
+        SLANG_RHI_FORMAT(SLANG_FORMAT_CASE)
         return Format::Unknown;
     }
 
@@ -1155,7 +1155,7 @@ namespace renderer_test
 
     // T for type to return, F for function pointer to operate on uint8->T
     template<typename T, typename F>
-    void generateTextureDataWithTargetTStorage(TextureData& output, const InputTextureDesc& desc, gfx::FormatInfo& formatInfo, F loadUint8ToT)
+    void generateTextureDataWithTargetTStorage(TextureData& output, const InputTextureDesc& desc, rhi::FormatInfo& formatInfo, F loadUint8ToT)
     {
         // the following function assumes input of 0 or 1 since our testing framework only tests with 0 or 1
         TextureData work;
@@ -1229,8 +1229,8 @@ namespace renderer_test
     }
     void generateTextureData(TextureData& output, const InputTextureDesc& desc)
     {
-        gfx::FormatInfo formatInfo;
-        gfxGetFormatInfo(desc.format, &formatInfo);
+        rhi::FormatInfo formatInfo;
+        rhiGetFormatInfo(desc.format, &formatInfo);
 
         switch (desc.format)
         {
@@ -1348,8 +1348,8 @@ namespace renderer_test
             kFloat,
         };
         SimpleScalarType type;
-        gfx::FormatInfo formatInfo;
-        gfxGetFormatInfo(inputDesc.format, &formatInfo);
+        rhi::FormatInfo formatInfo;
+        rhiGetFormatInfo(inputDesc.format, &formatInfo);
         switch (formatInfo.channelType)
         {
         case SLANG_SCALAR_TYPE_UINT64:

@@ -6,7 +6,7 @@
 
 namespace SlangRecord
 {
-    class OutputStream
+    class OutputStream: public Slang::RefObject
     {
     public:
         virtual ~OutputStream() {}

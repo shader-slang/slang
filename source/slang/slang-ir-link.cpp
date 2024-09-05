@@ -751,9 +751,9 @@ void cloneGlobalValueWithCodeCommon(
             IRParam* originalParam;
             IRParam* clonedParam;
         };
-        ShortList<ParamCloneInfo> paramCloneInfos;
         while (ob)
         {
+            ShortList<ParamCloneInfo> paramCloneInfos;
             SLANG_ASSERT(cb);
 
             builder->setInsertInto(cb);

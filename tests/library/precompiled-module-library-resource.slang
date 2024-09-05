@@ -11,6 +11,11 @@ module "precompiled-module-library-resource";
 
 public struct ResourceStruct {
     public StructuredBuffer<int> buffer;
+    
+    __init(StructuredBuffer<int> bufferIn)
+    {
+        buffer = bufferIn;
+    }
 };
 
 public int resource_in_parameter(StructuredBuffer<int> buffer)

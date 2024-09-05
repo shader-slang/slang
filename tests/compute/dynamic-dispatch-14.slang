@@ -2,7 +2,6 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -gl  -profile glsl_440
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -profile glsl_440
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
 
