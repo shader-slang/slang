@@ -4583,7 +4583,7 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    (as<IRVar>(inst) ? SpvDecorationAliasedPointer : SpvDecorationAliased)
+                    (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_Var ? SpvDecorationAliasedPointer : SpvDecorationAliased)
                 );
             }
         }

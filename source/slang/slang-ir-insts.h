@@ -4087,6 +4087,8 @@ public:
 
     IRInst* createThisTypeWitness(IRType* interfaceType);
 
+    IRInst* getTypeEqualityWitness(IRType* witnessType, IRType* type1, IRType* type2);
+
     IRInterfaceRequirementEntry* createInterfaceRequirementEntry(
         IRInst* requirementKey,
         IRInst* requirementVal);
