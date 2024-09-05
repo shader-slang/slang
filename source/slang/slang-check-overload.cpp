@@ -2391,9 +2391,6 @@ namespace Slang
 
             if (context.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
             {
-                if (auto specialCase = _tryToSpecialCaseOverloadDefaultConstructWithoutInit(this, context, expr, &context.bestCandidates[0]))
-                    return specialCase;
-
                 // There were multiple equally-good candidates, but none actually usable.
                 // We will construct a diagnostic message to help out.
 
