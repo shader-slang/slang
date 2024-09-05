@@ -2328,7 +2328,14 @@ DeclRef<Decl> ComponentType::findDeclFromString(
     {
         result = declRefExpr->declRef;
     }
-
+    else if (auto overloadedExpr = as<OverloadedExpr>(checkedExpr))
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::ambiguousReference, name);
+        for (auto candidate : overloadedExpr->lookupResult2)
+        {
+            sink->diagnose(candidate.declRef.getDecl(), Diagnostics::overloadCandidate, candidate.declRef);
+        }
+    }
     m_decls[name] = result;
     return result;
 }
@@ -3298,18 +3305,21 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_OK;
     }
 
-    // If requested, attempt to compile the translation unit all the way down to the target language
-    // and stash the result blob in an IR op.
-    if (getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+    // If requested, attempt to compile the translation unit all the way down to the target language(s)
+    // and stash the result blobs in IR.
+    for (auto target : getLinkage()->targets)
     {
-        auto frontEndReq = getFrontEndReq();
-
-        for (auto translationUnit : frontEndReq->translationUnits)
+        SlangCompileTarget targetEnum = SlangCompileTarget(target->getTarget());
+        if (target->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
         {
-            SlangCompileTarget target = SlangCompileTarget(SlangCompileTarget::SLANG_DXIL);
-            SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
-                target,
-                nullptr));
+            auto frontEndReq = getFrontEndReq();
+
+            for (auto translationUnit : frontEndReq->translationUnits)
+            {
+                SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
+                    targetEnum,
+                    nullptr));
+            }
         }
     }
 
@@ -5932,9 +5942,9 @@ void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
 }
 
-void EndToEndCompileRequest::setEmbedDXIL(bool value)
+void EndToEndCompileRequest::setTargetEmbedDownstreamIR(int targetIndex, bool value)
 {
-    getOptionSet().set(CompilerOptionName::EmbedDXIL, value);
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDownstreamIR, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

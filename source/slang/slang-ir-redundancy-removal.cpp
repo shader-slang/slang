@@ -159,26 +159,29 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     return result;
 }
 
-// Remove IR definitions from all [AvailableInDXIL] functions when compiling DXIL,
-// as these functions are already defined in the embedded precompiled DXIL library.
-void removeAvailableInDownstreamModuleDecorations(IRModule* module)
+// Remove IR definitions from all AvailableInDownstreamIR functions where the
+// languages match what we're currently targetting,  as these functions are
+// already defined in the embedded precompiled library.
+void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module)
 {
     List<IRInst*> toRemove;
     for (auto globalInst : module->getGlobalInsts())
     {
-        auto funcInst = as<IRFunc>(globalInst);
-        if (!funcInst)
+        if (auto funcInst = as<IRFunc>(globalInst))
         {
-            continue;
-        }
-        if (globalInst->findDecoration<IRAvailableInDXILDecoration>())
-        {
-            // Gut the function definition, turning it into a declaration
-            for (auto inst : funcInst->getChildren())
+            if (auto dec = globalInst->findDecoration<IRAvailableInDownstreamIRDecoration>())
             {
-                if (inst->getOp() == kIROp_Block)
+                if ((dec->getTarget() == CodeGenTarget::DXIL && target == CodeGenTarget::HLSL) ||
+                    (dec->getTarget() == target))
                 {
-                    toRemove.add(inst);
+                    // Gut the function definition, turning it into a declaration
+                    for (auto inst : funcInst->getChildren())
+                    {
+                        if (inst->getOp() == kIROp_Block)
+                        {
+                            toRemove.add(inst);
+                        }
+                    }
                 }
             }
         }

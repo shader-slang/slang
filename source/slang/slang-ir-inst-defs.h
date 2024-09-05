@@ -291,6 +291,10 @@ INST(IndexedFieldKey, indexedFieldKey, 2, HOISTABLE)
 // A placeholder witness that ThisType implements the enclosing interface.
 // Used only in interface definitions.
 INST(ThisTypeWitness, thisTypeWitness, 1, 0)
+
+// A placeholder witness for the fact that two types are equal.
+INST(TypeEqualityWitness, TypeEqualityWitness, 2, HOISTABLE)
+
 INST(GlobalHashedStringLiterals, global_hashed_string_literals, 0, 0)
 
 INST(Module, module, 0, PARENT)
@@ -802,7 +806,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
 
-    INST(AvailableInDXILDecoration,         availableInDXIL,        0, 0)
+    INST(AvailableInDownstreamIRDecoration, availableInDownstreamIR, 1, 0)
 
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
@@ -1240,7 +1244,7 @@ INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
 
 /* Embedded Precompiled Libraries */
-INST(EmbeddedDXIL, EmbeddedDXIL, 1, 0)
+INST(EmbeddedDownstreamIR, EmbeddedDownstreamIR, 2, 0)
 
 /* Inline assembly */
 

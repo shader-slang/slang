@@ -626,6 +626,13 @@ class DeclaredSubtypeWitness : public SubtypeWitness
         return as<DeclRefBase>(getOperand(2));
     }
 
+    bool isEquality()
+    {
+        if (auto declRef = getDeclRef().as<GenericTypeConstraintDecl>())
+            return declRef.getDecl()->isEqualityConstraint;
+        return false;
+    }
+
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -895,4 +902,31 @@ void SubstitutionSet::forEachSubstitutionArg(F func) const
         }
     }
 }
+
+inline bool isTypeEqualityWitness(Val* witness)
+{
+    if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        return declaredWitness->isEquality();
+    }
+    else if (as<TypeEqualityWitness>(witness))
+    {
+        return true;
+    }
+    else if (auto eachWitness = as<EachSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(eachWitness->getPatternTypeWitness());
+    }
+    else if (auto typePackWitness = as<TypePackSubtypeWitness>(witness))
+    {
+        for (Index i = 0; i < typePackWitness->getCount(); i++)
+        {
+            if (!isTypeEqualityWitness(typePackWitness->getWitness(i)))
+                return false;
+        }
+        return true;
+    }
+    return false;
+}
+
 } // namespace Slang

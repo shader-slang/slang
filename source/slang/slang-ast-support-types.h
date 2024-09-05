@@ -1511,14 +1511,6 @@ namespace Slang
 
         const RequirementDictionary& getRequirementDictionary()
         {
-            if (m_requirementDictionary.getCount() != m_requirements.getCount())
-            {
-                for (Index i = m_requirementDictionary.getCount(); i < m_requirements.getCount(); i++)
-                {
-                    auto& r = m_requirements[i];
-                    m_requirementDictionary.add(r.key, r.value);
-                }
-            }
             return m_requirementDictionary;
         }
 
@@ -1533,11 +1525,8 @@ namespace Slang
         // Whether or not this witness table is an extern declaration.
         bool isExtern = false;
 
-        // Satisfying values of each requirement.
-        List<KeyValuePair<Decl*, RequirementWitness>> m_requirements;
-
         // Cached dictionary for looking up satisfying values.
-        SLANG_UNREFLECTED RequirementDictionary m_requirementDictionary;
+        RequirementDictionary m_requirementDictionary;
 
         RefPtr<WitnessTable> specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
 

@@ -72,7 +72,7 @@ class DeclRefType : public Type
 };
 
 template<typename T>
-DeclRef<T> isDeclRefTypeOf(Type* type)
+DeclRef<T> isDeclRefTypeOf(Val* type)
 {
     if (auto declRefType = as<DeclRefType>(type))
     {

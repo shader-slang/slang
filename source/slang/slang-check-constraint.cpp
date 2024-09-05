@@ -648,7 +648,7 @@ namespace Slang
             else if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
                 constrainedGenericParams.add(as<DeclRefType>(subEachType->getElementType())->getDeclRef().getDecl());
 
-            if (sub->equals(sup))
+            if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
             {
                 // We are trying to use an interface type itself to conform to the
                 // type constraint. We can reach this case when the user code does
@@ -673,6 +673,14 @@ namespace Slang
                     sub,
                     sup,
                     system->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching : IsSubTypeOptions::None);
+            }
+          
+            if (constraintDecl->isEqualityConstraint)
+            {
+                // If constraint is an equality constraint, we need to make sure
+                // the witness is equality witness.
+                if (!isTypeEqualityWitness(subTypeWitness))
+                    subTypeWitness = nullptr;
             }
 
             if(subTypeWitness)

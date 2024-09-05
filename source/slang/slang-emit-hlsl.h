@@ -45,7 +45,8 @@ protected:
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
-    virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
+    virtual void emitMatrixLayoutModifiersImpl(IRType* varType) SLANG_OVERRIDE;
+    virtual void emitParamTypeModifier(IRType* type) SLANG_OVERRIDE { emitMatrixLayoutModifiersImpl(type); }
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;

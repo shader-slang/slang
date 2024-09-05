@@ -767,9 +767,9 @@ namespace Slang
 #   pragma warning(pop)
 #endif
 
-    SlangResult CodeGenContext::emitPrecompiledDXIL(ComPtr<IArtifact>& outArtifact)
+    SlangResult CodeGenContext::emitPrecompiledDownstreamIR(ComPtr<IArtifact>& outArtifact)
     {
-        return emitWithDownstreamForEntryPoints(outArtifact);
+        return _emitEntryPoints(outArtifact);
     }
 
     String GetHLSLProfileName(Profile profile)
@@ -1257,10 +1257,7 @@ namespace Slang
         {
             CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
 
-            if (target == CodeGenTarget::DXILAssembly || target == CodeGenTarget::DXIL)
-            {
-                sourceCodeGenContext.removeAvailableInDXIL = true;
-            }
+            sourceCodeGenContext.removeAvailableInDownstreamIR = true;
 
             SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
             sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
@@ -1561,20 +1558,23 @@ namespace Slang
         // Load embedded precompiled libraries from IR into library artifacts
         program->enumerateIRModules([&](IRModule* irModule)
         {
-            for (auto inst : irModule->getModuleInst()->getChildren())
+            for (auto globalInst : irModule->getModuleInst()->getChildren())
             {
                 if (target == CodeGenTarget::DXILAssembly || target == CodeGenTarget::DXIL)
                 {
-                    if (inst->getOp() == kIROp_EmbeddedDXIL)
+                    if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
                     {
-                        auto slice = static_cast<IRBlobLit*>(inst->getOperand(0))->getStringSlice();
-                        ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);
-                        desc.kind = ArtifactKind::Library;
+                        if (inst->getTarget() == CodeGenTarget::DXIL)
+                        {
+                            auto slice = inst->getBlob()->getStringSlice();
+                            ArtifactDesc desc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXIL);
+                            desc.kind = ArtifactKind::Library;
 
-                        auto library = ArtifactUtil::createArtifact(desc);
+                            auto library = ArtifactUtil::createArtifact(desc);
 
-                        library->addRepresentationUnknown(StringBlob::create(slice));
-                        libraries.add(library);
+                            library->addRepresentationUnknown(StringBlob::create(slice));
+                            libraries.add(library);
+                        }
                     }
                 }
             }
@@ -2030,7 +2030,7 @@ namespace Slang
             {                
                 if (auto artifact = targetProgram->getExistingWholeProgramResult())
                 {
-                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+                    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
                     {
                         artifacts.add(ComPtr<IArtifact>(artifact));
                     }
@@ -2285,6 +2285,9 @@ namespace Slang
         auto linkage = getLinkage();
         for (auto targetReq : linkage->targets)
         {
+            if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
+                continue;
+
             auto targetProgram = program->getTargetProgram(targetReq);
             generateOutput(targetProgram);
         }
@@ -2535,13 +2538,22 @@ namespace Slang
     {
         if (m_entryPoints.getCount() > 0)
             return;
-
-        for (auto globalDecl : m_moduleDecl->members)
+        _discoverEntryPointsImpl(m_moduleDecl, sink, targets);
+    }
+    void Module::_discoverEntryPointsImpl(ContainerDecl* containerDecl, DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets)
+    {
+        for (auto globalDecl : containerDecl->members)
         {
             auto maybeFuncDecl = globalDecl;
             if (auto genericDecl = as<GenericDecl>(maybeFuncDecl))
             {
                 maybeFuncDecl = genericDecl->inner;
+            }
+
+            if (as<NamespaceDeclBase>(globalDecl) || as<FileDecl>(globalDecl) || as<StructDecl>(globalDecl))
+            {
+                _discoverEntryPointsImpl(as<ContainerDecl>(globalDecl), sink, targets);
+                continue;
             }
 
             auto funcDecl = as<FuncDecl>(maybeFuncDecl);
@@ -2550,7 +2562,7 @@ namespace Slang
 
             Profile profile;
             bool resolvedStageOfProfileWithEntryPoint = resolveStageOfProfileWithEntryPoint(profile, getLinkage()->m_optionSet, targets, funcDecl, sink);
-            if(!resolvedStageOfProfileWithEntryPoint)
+            if (!resolvedStageOfProfileWithEntryPoint)
             {
                 // If there isn't a [shader] attribute, look for a [numthreads] attribute
                 // since that implicitly means a compute shader. We'll not do this when compiling for
@@ -2560,7 +2572,7 @@ namespace Slang
                 bool allTargetsCUDARelated = true;
                 for (auto target : targets)
                 {
-                    if (!isCUDATarget(target) && 
+                    if (!isCUDATarget(target) &&
                         target->getTarget() != CodeGenTarget::PyTorchCppBinding)
                     {
                         allTargetsCUDARelated = false;
@@ -2614,6 +2626,5 @@ namespace Slang
             _addEntryPoint(entryPoint);
         }
     }
-
 }
 

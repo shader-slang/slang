@@ -3933,6 +3933,17 @@ struct SPIRVEmitContext
             }
             break;
         }
+        case kIROp_DownstreamModuleExportDecoration:
+        {
+            requireSPIRVCapability(SpvCapabilityLinkage);
+            auto name = decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+            emitInst(getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                SpvOpDecorate,
+                dstID,
+            SpvDecorationLinkageAttributes, name, SpvLinkageTypeExport);
+            break;
+        }
         // ...
         }
 
@@ -4572,7 +4583,7 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    (as<IRVar>(inst) ? SpvDecorationAliasedPointer : SpvDecorationAliased)
+                    (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_Var ? SpvDecorationAliasedPointer : SpvDecorationAliased)
                 );
             }
         }
@@ -6847,12 +6858,27 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
+    auto generateWholeProgram = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram);
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
+        {
             context.ensureInst(inst);
+        }
         if (shouldPreserveParams && as<IRGlobalParam>(inst))
+        {
             context.ensureInst(inst);
+        }
+        if (generateWholeProgram)
+        {
+            if (auto func = as<IRFunc>(inst))
+            {
+                if (func->findDecoration<IRDownstreamModuleExportDecoration>())
+                {
+                    context.ensureInst(inst);
+                }
+            }
+        }
     }
 
     // Emit source language info.
