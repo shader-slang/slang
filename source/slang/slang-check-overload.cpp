@@ -1401,6 +1401,11 @@ namespace Slang
         OverloadCandidate*	left,
         OverloadCandidate*	right)
     {
+        // If candidates are equal (which is possible if we have an overload from `AssocType` and `StructDecl`)
+        // We need to pick 1 to keep. Overlapping lookups with `__init()` are common with auto-diff.
+        if (left->item.declRef == right->item.declRef)
+            return -1;
+
         // If one candidate got further along in validation, pick it
         if (left->status != right->status)
             return int(right->status) - int(left->status);
