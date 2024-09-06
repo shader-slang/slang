@@ -1,11 +1,12 @@
-name: "first"
+name: Preflight
 
 on:
-  pull_request:
-    branches: [master]
+  - pull_request
+  - push
 
 jobs:
-  build:
+  preflight-job:
+    name: Preflight Step
     runs-on: ubuntu-latest
     steps:
-      - run: echo "First workflow running"
+      - run: env

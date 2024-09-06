@@ -1,13 +1,16 @@
-name: "second"
+name: Test
 
 on:
   workflow_run:
-    workflows: [first]
+    workflows:
+      - Preflight
     types:
       - completed
 
 jobs:
-  build:
+  test-job:
+    name: Test Step
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Second workflow running"
+      - run: env
+
