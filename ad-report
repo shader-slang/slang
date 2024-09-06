@@ -1,0 +1,1306 @@
+BACKWARD DIFFERENTIATE
+
+
+transcribing an original instruction: 154 (1)
+ >
+result:
+BACKWARD DIFFERENTIATE
+BACKWARD DIFFERENTIATE PRIMAL
+BACKWARD DIFFERENTIATE PROPOGATE
+
+
+transcribing an original instruction: 154 (1)
+ >
+result:
+(primalFunc)===============================
+[backwardDiffPropagateReference(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop)]
+[backwardDiffPrimalReference(%sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop)]
+[primalInstDecoration]
+[backwardDiffReference(%sx5Fbwdx5Ftestx5Fsimplex5Floop)]
+[readNone]
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[export("_SR15reverse_2Dxloop16test_simple_loopp1pi_ffb")]
+[nameHint("test_simple_loop")]
+func %testx5Fsimplex5Floop	: Func(Float, Float)
+{
+block %1(
+		[nameHint("y")]
+		param %y	: Float):
+	[loopMaxIters(3 : Int)]
+	loop(%2, %3, %4, %y, 0 : Int)
+
+block %2(
+		[nameHint("t")]
+		param %t	: Float,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %5	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%5, %6, %3, %6)
+
+block %6:
+	let  %7	: Float	= mul(%t, %t)
+	unconditionalBranch(%4)
+
+block %4:
+	let  %8	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%2, %7, %8)
+
+block %3:
+	return_val(%t)
+}
+
+inst with location: 1514954 (1)
+[nameHint("y")]
+let  %y	: Float	= param
+
+tests/autodiff/reverse-loop.slang(12): note: see declaration of 'y'
+float test_simple_loop(float y)
+      ^~~~~~~~~~~~~~~~
+inst with location: 1515008 (1)
+[loopMaxIters(3 : Int)]
+loop(%1, %2, %3, %y, 0 : Int)
+
+tests/autodiff/reverse-loop.slang(16): note: see declaration of ''
+    for (int i = 0; i < 3; i++)
+    ^~~
+inst with location: 1514994 (1)
+[nameHint("t")]
+let  %t	: Float	= param
+
+tests/autodiff/reverse-loop.slang(14): note: see declaration of 't'
+    float t = y;
+          ^
+inst with location: 1515017 (1)
+[nameHint("i")]
+let  %i	: Int	= param
+
+tests/autodiff/reverse-loop.slang(16): note: see declaration of 'i'
+    for (int i = 0; i < 3; i++)
+             ^
+inst with location: 1515026 (1)
+let  %1	: Bool	= cmpLT(%i, 3 : Int)
+
+tests/autodiff/reverse-loop.slang(16): note: see declaration of ''
+    for (int i = 0; i < 3; i++)
+                      ^
+inst with location: 1515008 (1)
+ifElse(%1, %2, %3, %2)
+
+tests/autodiff/reverse-loop.slang(16): note: see declaration of ''
+    for (int i = 0; i < 3; i++)
+    ^~~
+inst with location: 1515058 (1)
+let  %1	: Float	= mul(%t, %t)
+
+tests/autodiff/reverse-loop.slang(18): note: see declaration of ''
+        t = t * t;
+              ^
+inst with location: 1515008 (1)
+unconditionalBranch(%1)
+
+tests/autodiff/reverse-loop.slang(16): note: see declaration of ''
+    for (int i = 0; i < 3; i++)
+    ^~~
+inst with location: 1515032 (1)
+let  %1	: Int	= add(%i, 1 : Int)
+
+tests/autodiff/reverse-loop.slang(16): note: see declaration of ''
+    for (int i = 0; i < 3; i++)
+                            ^~
+inst with location: 1515008 (1)
+unconditionalBranch(%1, %2, %3)
+
+tests/autodiff/reverse-loop.slang(16): note: see declaration of ''
+    for (int i = 0; i < 3; i++)
+    ^~~
+inst with location: 1515077 (1)
+return_val(%t)
+
+tests/autodiff/reverse-loop.slang(21): note: see declaration of ''
+    return t;
+    ^~~~~~
+(result from cloneInst)===============================
+inst with location: 1514954 (1)
+[nameHint("y")]
+let  %y	: Float	= param
+
+inst with location: 1515008 (1)
+[loopMaxIters(3 : Int)]
+loop(%1, %2, %3, %y, 0 : Int)
+
+inst with location: 1514994 (1)
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 1515017 (1)
+[nameHint("i")]
+let  %i	: Int	= param
+
+inst with location: 1515026 (1)
+let  %1	: Bool	= cmpLT(%i, 3 : Int)
+
+inst with location: 1515008 (1)
+ifElse(%1, %2, %3, %2)
+
+inst with location: 1515058 (1)
+let  %1	: Float	= mul(%t, %t)
+
+inst with location: 1515008 (1)
+unconditionalBranch(%1)
+
+inst with location: 1515032 (1)
+let  %1	: Int	= add(%i, 1 : Int)
+
+inst with location: 1515008 (1)
+unconditionalBranch(%1, %2, %3)
+
+inst with location: 1515077 (1)
+return_val(%t)
+
+
+
+transcribing an original instruction: 154 (1)
+ >
+result:
+(result from prepareFuncForForwardDiff)===============================
+inst with location: 1514954 (1)
+[nameHint("y")]
+let  %y	: Float	= param
+
+inst with location: 0 (0)
+[loopMaxIters(4 : Int)]
+loop(%1, %2, %1, true, %y, 0 : Int)
+
+inst with location: 0 (0)
+[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+inst with location: 0 (0)
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 0 (0)
+[nameHint("i")]
+let  %i	: Int	= param
+
+inst with location: 0 (0)
+let  %1	: Bool	= logicalAnd(true, %x5Fbflag)
+
+inst with location: 0 (0)
+ifElse(%1, %2, %3, %2)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 1515077 (1)
+return_val(%t)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 1515026 (1)
+let  %1	: Bool	= cmpLT(%i, 3 : Int)
+
+inst with location: 0 (0)
+let  %1	: Int	= undefined
+
+inst with location: 1515008 (1)
+ifElse(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, true, %2)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, false, 0 : Int)
+
+inst with location: 0 (0)
+[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+inst with location: 0 (0)
+let  %1	: Int	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+ifElse(%x5Fbflag, %1, %2, %3)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2, 0 : Float)
+
+inst with location: 1515058 (1)
+let  %1	: Float	= mul(%t, %t)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, 1 : Int, %2)
+
+inst with location: 0 (0)
+let  %1	: Int	= param
+
+inst with location: 0 (0)
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+let  %1	: Bool	= cmpNE(%2, 1 : Int)
+
+inst with location: 0 (0)
+ifElse(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %x5Fbflag)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, false)
+
+inst with location: 0 (0)
+[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+ifElse(%x5Fbflag, %1, %2, %3)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %t, %i)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 1515032 (1)
+let  %1	: Int	= add(%i, 1 : Int)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2, %3)
+
+inst with location: 0 (0)
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 0 (0)
+[nameHint("i")]
+let  %i	: Int	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %x5Fbflag, %t, %i)
+
+inst with location: 0 (0)
+unreachable
+
+(result from forward diff transcribe blocks)===============================
+
+
+transcribing an original instruction: 1514954 (1)
+ >[nameHint("y")]
+let  %y	: Float	= param
+
+result:
+ >let  %1	: Float	= GetPrimal(%dpy)
+
+  [P] source loc: 1514954 (1)
+ >let  %1	: Float	= GetDifferential(%dpy)
+
+  [D] source loc: 1514954 (1)
+
+
+transcribing an original instruction: 0 (0)
+ >[loopMaxIters(4 : Int)]
+loop(%1, %2, %1, true, %y, 0 : Int)
+
+
+
+transcribing an original instruction: 3068 (1)
+ >
+result:
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >[mixedDiffInstDecoration(<null>)]
+[loopMaxIters(4 : Int)]
+loop(%1, %2, %1, true, %3, %4, 0 : Int)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+[loopMaxIters(4 : Int)]
+loop(%1, %2, %1, true, %3, %4, 0 : Int)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+
+
+transcribing an original instruction: 3068 (1)
+ >
+result:
+result:
+ >[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+  [P] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >[nameHint("t")]
+let  %t	: Float	= param
+
+result:
+ >[nameHint("t")]
+let  %t	: Float	= param
+
+  [P] source loc: 0 (0)
+ >let  %1	: Float	= param
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >[nameHint("i")]
+let  %i	: Int	= param
+
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >[nameHint("i")]
+let  %i	: Int	= param
+
+  [P] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >ifElse(%x5Fbflag, %1, %2, %1)
+
+result:
+ >[mixedDiffInstDecoration(<null>)]
+ifElse(%x5Fbflag, %1, %2, %1)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+ifElse(%x5Fbflag, %1, %2, %1)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1)
+
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 1515077 (1)
+ >return_val(%t)
+
+result:
+ >[mixedDiffInstDecoration(DiffPair(Float, %1))]
+return_val(%2)
+
+  [P] source loc: 1515077 (1)
+ >[mixedDiffInstDecoration(DiffPair(Float, %1))]
+return_val(%2)
+
+  [D] source loc: 1515077 (1)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1)
+
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 1515026 (1)
+ >let  %1	: Bool	= cmpLT(%i, 3 : Int)
+
+result:
+ >let  %1	: Bool	= cmpLT(%i, 3 : Int)
+
+  [P] source loc: 1515026 (1)
+
+
+transcribing an original instruction: 0 (0)
+ >ifElse(%1, %2, %3, %4)
+
+result:
+ >[mixedDiffInstDecoration(<null>)]
+ifElse(%1, %2, %3, %4)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+ifElse(%1, %2, %3, %4)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1, 0 : Int, 0 : Float)
+
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, 0 : Int, 0 : Float, %2)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, 0 : Int, 0 : Float, %2)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 1515058 (1)
+ >let  %1	: Float	= mul(%t, %t)
+
+result:
+ >let  %1	: Float	= mul(%t, %t)
+
+  [P] source loc: 1515058 (1)
+ >[diffInstDecoration(Float)]
+let  %1	: Float	= add(%2, %3)
+
+  [D] source loc: 1515058 (1)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1, 1 : Int, %2)
+
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, 1 : Int, %2, %3)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, 1 : Int, %2, %3)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >let  %1	: Int	= param
+
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >let  %1	: Int	= param
+
+  [P] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >let  %1	: Float	= param
+
+result:
+ >let  %1	: Float	= param
+
+  [P] source loc: 0 (0)
+ >let  %1	: Float	= param
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1)
+
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >let  %1	: Bool	= cmpNE(%2, 1 : Int)
+
+result:
+ >let  %1	: Bool	= cmpNE(%2, 1 : Int)
+
+  [P] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >ifElse(%1, %2, %3, %4)
+
+result:
+ >[mixedDiffInstDecoration(<null>)]
+ifElse(%1, %2, %3, %4)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+ifElse(%1, %2, %3, %4)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1, %x5Fbflag)
+
+
+
+transcribing an original instruction: 3068 (1)
+ >
+result:
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %x5Fbflag)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %x5Fbflag)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1, false)
+
+
+
+transcribing an original instruction: 3068 (1)
+ >
+result:
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, false)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, false)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+
+
+transcribing an original instruction: 3068 (1)
+ >
+result:
+result:
+ >[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+  [P] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1)
+
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >ifElse(%x5Fbflag, %1, %2, %3)
+
+result:
+ >[mixedDiffInstDecoration(<null>)]
+ifElse(%x5Fbflag, %1, %2, %3)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+ifElse(%x5Fbflag, %1, %2, %3)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1, %t, %i)
+
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %t, %sx5Fdiffx5Ft, %i)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %t, %sx5Fdiffx5Ft, %i)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 1515032 (1)
+ >let  %1	: Int	= add(%i, 1 : Int)
+
+result:
+ >let  %1	: Int	= add(%i, 1 : Int)
+
+  [P] source loc: 1515032 (1)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1, %2, %3)
+
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %2, %3, %4)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %2, %3, %4)
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >[nameHint("t")]
+let  %t	: Float	= param
+
+result:
+ >[nameHint("t")]
+let  %t	: Float	= param
+
+  [P] source loc: 0 (0)
+ >let  %1	: Float	= param
+
+  [D] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >[nameHint("i")]
+let  %i	: Int	= param
+
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >[nameHint("i")]
+let  %i	: Int	= param
+
+  [P] source loc: 0 (0)
+
+
+transcribing an original instruction: 0 (0)
+ >unconditionalBranch(%1, %x5Fbflag, %t, %i)
+
+
+
+transcribing an original instruction: 3068 (1)
+ >
+result:
+
+
+transcribing an original instruction: 204 (1)
+ >
+result:
+result:
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %x5Fbflag, %t, %sx5Fdiffx5Ft, %i)
+
+  [P] source loc: 0 (0)
+ >[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %x5Fbflag, %t, %sx5Fdiffx5Ft, %i)
+
+  [D] source loc: 0 (0)
+(fwdDiffFunc)===============================
+inst with location: 0 (0)
+[nameHint("dpy")]
+let  %dpy	: DiffPair(Float, %1)	= param
+
+inst with location: 1514954 (1)
+[diffInstDecoration(Float)]
+let  %1	: Float	= GetDifferential(%dpy)
+
+inst with location: 1514954 (1)
+[primalInstDecoration]
+let  %1	: Float	= GetPrimal(%dpy)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+[loopMaxIters(4 : Int)]
+loop(%1, %2, %1, true, %3, %4, 0 : Int)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 0 (0)
+[diffInstDecoration(Float)]
+[nameHint("s_diff_t")]
+let  %sx5Fdiffx5Ft	: Float	= param
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("i")]
+let  %i	: Int	= param
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+ifElse(%x5Fbflag, %1, %2, %1)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(DiffPair(Float, %1))]
+let  %2	: DiffPair(Float, %1)	= MakeDiffPair(%t, %sx5Fdiffx5Ft)
+
+inst with location: 1515077 (1)
+[mixedDiffInstDecoration(DiffPair(Float, %1))]
+return_val(%2)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+inst with location: 1515026 (1)
+[primalInstDecoration]
+let  %1	: Bool	= cmpLT(%i, 3 : Int)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+ifElse(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+[diffInstDecoration(Float)]
+let  %1	: Float	= call %floatx5Fdzero()
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, 0 : Int, 0 : Float, %2)
+
+inst with location: 1515058 (1)
+[primalInstDecoration]
+let  %1	: Float	= mul(%t, %t)
+
+inst with location: 0 (0)
+[diffInstDecoration(Float)]
+let  %1	: Float	= mul(%sx5Fdiffx5Ft, %t)
+
+inst with location: 0 (0)
+[diffInstDecoration(Float)]
+let  %1	: Float	= mul(%sx5Fdiffx5Ft, %t)
+
+inst with location: 1515058 (1)
+[diffInstDecoration(Float)]
+let  %1	: Float	= add(%2, %3)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, 1 : Int, %2, %3)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+let  %1	: Int	= param
+
+inst with location: 0 (0)
+[primalInstDecoration]
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+[diffInstDecoration(Float)]
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+let  %1	: Bool	= cmpNE(%2, 1 : Int)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+ifElse(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %x5Fbflag)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, false)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+ifElse(%x5Fbflag, %1, %2, %3)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %t, %sx5Fdiffx5Ft, %i)
+
+inst with location: 1515032 (1)
+[primalInstDecoration]
+let  %1	: Int	= add(%i, 1 : Int)
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 0 (0)
+[diffInstDecoration(Float)]
+[nameHint("s_diff_t")]
+let  %sx5Fdiffx5Ft	: Float	= param
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("i")]
+let  %i	: Int	= param
+
+inst with location: 0 (0)
+[mixedDiffInstDecoration(<null>)]
+unconditionalBranch(%1, %x5Fbflag, %t, %sx5Fdiffx5Ft, %i)
+
+(checkpoint policy, got) ===============================
+inst with location: 0 (0)
+[nameHint("dpy")]
+let  %dpy	: Float	= param
+
+inst with location: 0 (0)
+[nameHint("dpy")]
+let  %dpy	: InOut(DiffPair(Float, %1))	= param
+
+inst with location: 0 (0)
+[nameHint("_s_dOut")]
+let  %x5Fsx5FdOut	: Float	= param
+
+inst with location: 0 (0)
+[nameHint("_s_diff_ctx")]
+let  %x5Fsx5Fdiffx5Fctx	: BwdDiffIntermediateCtxType(%testx5Fsimplex5Floop)	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+let  %1	: DiffPair(Float, %2)	= load(%dpy)
+
+inst with location: 0 (0)
+[keepAlive]
+let  %1	: Float	= GetPrimal(%2)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+[loopMaxIters(4 : Int)]
+let  %1	: _	= loop(%2, %3, %2, true, %dpy, 0 : Int)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("i")]
+let  %i	: Int	= param
+
+inst with location: 0 (0)
+ifElse(%x5Fbflag, %1, %2, %1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+[BackwardDerivativePrimalReturnDecoration(%t)]
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdzero()
+
+inst with location: 0 (0)
+let  %1	: Ptr(Float)	= var
+
+inst with location: 0 (0)
+store(%1, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdzero()
+
+inst with location: 0 (0)
+let  %1	: Ptr(Float)	= var
+
+inst with location: 0 (0)
+store(%1, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= load(%2)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdadd(%x5Fsx5FdOut, %2)
+
+inst with location: 0 (0)
+store(%1, %2)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+[diffInstDecoration(Void, %1)]
+[loopMaxIters(4 : Int)]
+loop(%2, %3, %4)
+
+inst with location: 0 (0)
+let  %1	: Float	= load(%2)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdzero()
+
+inst with location: 0 (0)
+store(%1, %2)
+
+inst with location: 0 (0)
+ifElse(%x5Fbflag, %1, %2, %1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+let  %1	: DiffPair(Float, %2)	= load(%dpy)
+
+inst with location: 0 (0)
+let  %1	: Float	= GetPrimal(%2)
+
+inst with location: 0 (0)
+let  %1	: DiffPair(Float, %2)	= MakeDiffPair(%3, %4)
+
+inst with location: 0 (0)
+store(%dpy, %1)
+
+inst with location: 0 (0)
+return_val(void_constant)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+ifElse(%x5Fbflag, %1, %2, %3)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+let  %1	: Float	= load(%2)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdadd(%2, %3)
+
+inst with location: 0 (0)
+store(%1, %2)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+let  %1	: Float	= load(%2)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdadd(%2, %3)
+
+inst with location: 0 (0)
+store(%1, %2)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+ifElse(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+let  %1	: Float	= load(%2)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdzero()
+
+inst with location: 0 (0)
+store(%1, %2)
+
+inst with location: 0 (0)
+ifElse(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+let  %1	: Float	= mul(%t, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= mul(%t, %2)
+
+inst with location: 0 (0)
+let  %1	: Float	= load(%2)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdadd(%2, %3)
+
+inst with location: 0 (0)
+let  %1	: Float	= call %floatx5Fdadd(%2, %3)
+
+inst with location: 0 (0)
+store(%1, %2)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 1515026 (1)
+[primalInstDecoration]
+let  %1	: Bool	= cmpLT(%i, 3 : Int)
+
+inst with location: 0 (0)
+ifElse(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, 0 : Int, 0 : Float)
+
+inst with location: 1515058 (1)
+[primalInstDecoration]
+let  %1	: Float	= mul(%t, %t)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, 1 : Int, %2)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+let  %1	: Int	= param
+
+inst with location: 0 (0)
+[primalInstDecoration]
+let  %1	: Float	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+let  %1	: Bool	= cmpNE(%2, 1 : Int)
+
+inst with location: 0 (0)
+ifElse(%1, %2, %3, %4)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %x5Fbflag)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, false)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("_bflag")]
+let  %x5Fbflag	: Bool	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1)
+
+inst with location: 0 (0)
+ifElse(%x5Fbflag, %1, %2, %3)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %t, %i)
+
+inst with location: 1515032 (1)
+[primalInstDecoration]
+let  %1	: Int	= add(%i, 1 : Int)
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %2, %3)
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 0 (0)
+[primalInstDecoration]
+[nameHint("i")]
+let  %i	: Int	= param
+
+inst with location: 0 (0)
+unconditionalBranch(%1, %x5Fbflag, %t, %i)
+
+### Slang::AutodiffCheckpointPolicyBase::processFunc
+
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001F7DF4D8590 to storeSet
+[primalInstDecoration]
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 0 (0)
+
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001F7DF4D8590 to storeSet
+[primalInstDecoration]
+[nameHint("t")]
+let  %t	: Float	= param
+
+inst with location: 0 (0)
+
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001F7DC39DB40 to storeSet
+0
+inst with location: 0 (0)
+
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001F7DC39D710 to storeSet
+1
+inst with location: 0 (0)
+
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001F7DF4D5760 to storeSet
+
+inst with location: 0 (0)
+
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001F7DF4C3858 to storeSet
+[primalInstDecoration]
+[nameHint("_pc")]
+[loopCounterDecoration]
+let  %x5Fpc	: Int	= param
+
+inst with location: 0 (0)
+****** (before legalization) # of elements in the store set for hoistInfo: 2
+source loc recorded: 0 (0)
+[primalInstDecoration]
+[nameHint("t")]
+let  %t	: Float	= param
+
+source loc recorded: 0 (0)
+[primalInstDecoration]
+[nameHint("_pc")]
+[loopCounterDecoration]
+let  %x5Fpc	: Int	= param
+
+****** (after legalization) # of elements in the store set for hoistInfo: 2
+source loc recorded: 0 (0)
+let  %1	: Ptr(Int)	= var
+
+(0): note: also see pipeline definition
+source loc recorded: 0 (0)
+let  %1	: Ptr(Array(Float, 5 : Int))	= var
+
+(0): note: also see pipeline definition

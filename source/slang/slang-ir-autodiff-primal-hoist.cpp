@@ -316,6 +316,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         }
     };
 
+    printf("### %s\n", __FUNCTION__);
+
     // Populate recompute/store/invert sets with insts, by applying the policy
     // to them.
     // 
@@ -371,6 +373,13 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         if (result.mode == HoistResult::Mode::Store)
         {
             SLANG_ASSERT(!checkpointInfo->recomputeSet.contains(result.instToStore));
+            printf("\n[#] %s, adding %p to storeSet\n", __FUNCTION__, result.instToStore);
+            result.instToStore->dump();
+            IRInst* inst = result.instToStore;
+            printf("inst with location: %d (%d)\n",
+                inst->sourceLoc.getRaw(),
+                inst->sourceLoc.isValid());
+
             checkpointInfo->storeSet.add(result.instToStore);
         }
         else if (result.mode == HoistResult::Mode::Recompute)
@@ -465,6 +474,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 {
                     checkpointInfo->recomputeSet.add(callUser);
                     checkpointInfo->storeSet.remove(callUser);
+                    printf("storeSet removing %p\n", callUser);
                     if (instWorkListSet.add(callUser))
                         instWorkList.add(callUser);
                 }
@@ -472,6 +482,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 {
                     checkpointInfo->recomputeSet.add(storeUser);
                     checkpointInfo->storeSet.remove(storeUser);
+                    printf("storeSet removing %p\n", storeUser);
                     if (instWorkListSet.add(callUser))
                         instWorkList.add(callUser);
                 }
@@ -485,6 +496,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 {
                     checkpointInfo->recomputeSet.add(varArg);
                     checkpointInfo->storeSet.remove(varArg);
+                    printf("storeSet removing %p\n", varArg);
                     if (instWorkListSet.add(varArg))
                         instWorkList.add(varArg);
                 }
@@ -1875,6 +1887,17 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
 {
     sortBlocksInFunc(func);
 
+    printf("(checkpoint policy, got) ===============================\n");
+    for (auto block : func->getBlocks()) {
+        for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+            printf("inst with location: %d (%d)\n",
+                inst->sourceLoc.getRaw(),
+                inst->sourceLoc.isValid());
+
+            inst->dump();
+        }
+    }
+
     // Insert loop counters and establish loop regions.
     // Also makes the reverse loops counting downwards from the final iteration count.
     //
@@ -1896,10 +1919,20 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     chkPolicy->preparePolicy(func);
     auto primalsInfo = chkPolicy->processFunc(func, recomputeBlockMap, cloneCtx, indexedBlockInfo);
 
+    // NOTE: (Mostly) original instructions are here...
+    printf("****** (before legalization) # of elements in the store set for hoistInfo: %d\n", primalsInfo->storeSet.getCount());
+    for (auto stored : primalsInfo->storeSet) {
+        printf("source loc recorded: %d (%d)\n",
+            stored->sourceLoc.getRaw(),
+            stored->sourceLoc.isValid());
+        stored->dump();
+    }
+
     // Legalize the primal inst accesses by introducing local variables / arrays and emitting
     // necessary load/store logic.
     //
     primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
+
     return primalsInfo;
 }
 

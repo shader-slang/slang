@@ -573,6 +573,16 @@ namespace Slang
         IRCloneEnv originalCloneEnv;
         primalOuterParent = cloneInst(&originalCloneEnv, builder, primalOuterParent);
         auto primalFunc = as<IRFunc>(getGenericReturnVal(primalOuterParent));
+        printf("(result from cloneInst)===============================\n");
+        for (auto block : primalFunc->getBlocks()) {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+                printf("inst with location: %d (%d)\n",
+                    inst->sourceLoc.getRaw(),
+                    inst->sourceLoc.isValid());
+
+                inst->dump();
+            }
+        }
 
         // Strip any existing derivative decorations off the clone.
         stripDerivativeDecorations(primalFunc);
@@ -588,6 +598,7 @@ namespace Slang
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
         auto oldCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
         IRFunc* fwdDiffFunc = as<IRFunc>(getGenericReturnVal(fwdTranscriber.transcribe(builder, primalOuterParent)));
+
         SLANG_ASSERT(fwdDiffFunc);
         auto newCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
         for (auto i = oldCount; i < newCount; i++)
@@ -666,6 +677,21 @@ namespace Slang
     // Transcribe a function definition.
     void BackwardDiffTranscriberBase::transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc)
     {
+        printf("(primalFunc)===============================\n");
+        primalFunc->dump();
+
+        for (auto block : primalFunc->getBlocks()) {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+                printf("inst with location: %d (%d)\n",
+                    inst->sourceLoc.getRaw(),
+                    inst->sourceLoc.isValid());
+                inst->dump();
+
+                if (inst->sourceLoc.isValid())
+                    getSink()->diagnose(inst->sourceLoc, Diagnostics::seeDeclarationOf, inst);
+            }
+        }
+
         SLANG_ASSERT(primalFunc);
         SLANG_ASSERT(diffPropagateFunc);
         // Reverse-mode transcription uses 4 separate steps:
@@ -685,6 +711,17 @@ namespace Slang
         auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, primalFunc, diffPropagateFunc);
         if (!fwdDiffFunc)
             return;
+
+        printf("(fwdDiffFunc)===============================\n");
+        for (auto block : fwdDiffFunc->getBlocks()) {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+                printf("inst with location: %d (%d)\n",
+                    inst->sourceLoc.getRaw(),
+                    inst->sourceLoc.isValid());
+
+                inst->dump();
+            }
+        }
 
         bool isResultDifferentiable = as<IRDifferentialPairType>(fwdDiffFunc->getResultType());
 
@@ -732,6 +769,17 @@ namespace Slang
         auto primalsInfo = applyCheckpointPolicy(diffPropagateFunc);
 
         eliminateDeadCode(diffPropagateFunc);
+    
+        printf("****** (after legalization) # of elements in the store set for hoistInfo: %d\n", primalsInfo->storeSet.getCount());
+        for (auto stored : primalsInfo->storeSet) {
+            printf("source loc recorded: %d (%d)\n",
+                stored->sourceLoc.getRaw(),
+                stored->sourceLoc.isValid());
+            stored->dump();
+            getSink()->diagnose(stored->sourceLoc, Diagnostics::alsoSeePipelineDefinition);
+
+            IRType* type = stored->getFullType();
+        }
 
         // Extracts the primal computations into its own func, turn all accesses to stored primal insts into
         // explicit intermediate data structure reads and writes.

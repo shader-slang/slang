@@ -757,6 +757,34 @@ Result linkAndOptimizeIR(
         if (requiredLoweringPassSet.autodiff)
         {
             dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
+
+            //printf("Module (bwd diff functions) before autodiff pass:\n");
+            ////irModule->getModuleInst()->dump();
+            //IRModuleInst* module = irModule->getModuleInst();
+            //for (auto inst : module->getGlobalInsts()) {
+            //    auto func = as<IRFunc>(inst);
+            //    if (!func)
+            //        continue;
+
+            //    if (!isBackwardDifferentiableFunc(func))
+            //        continue;
+
+            //    printf("=============================================\n");
+            //    func->dump();
+        
+            //    for (auto block : func->getBlocks()) {
+            //        for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+            //            printf("inst with location: %d (%d)\n",
+            //                inst->sourceLoc.getRaw(),
+            //                inst->sourceLoc.isValid());
+            //            inst->dump();
+
+            //            if (inst->sourceLoc.isValid())
+            //                sink->diagnose(inst->sourceLoc, Diagnostics::seeDeclarationOf, inst);
+            //        }
+            //    }
+            //}
+
             enableIRValidationAtInsert();
             changed |= processAutodiffCalls(targetProgram, irModule, sink);
             disableIRValidationAtInsert();

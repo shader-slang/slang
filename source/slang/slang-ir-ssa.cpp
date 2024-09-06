@@ -431,6 +431,7 @@ PhiInfo* addPhi(
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
     context->phiInfos.add(phi, phiInfo);
 
+    phi->sourceLoc = var->sourceLoc;
     phiInfo->phi = phi;
     phiInfo->var = var;
 
@@ -1107,6 +1108,24 @@ bool constructSSA(ConstructSSAContext* context)
     // and stores of promotable variables with simple values.
 
     auto globalVal = context->globalVal;
+
+    auto func = as<IRFunc>(globalVal);
+    bool dump = func->findDecoration <IRExportDecoration>();
+
+    //if (dump) {
+    //    printf("(globalVal)===============================\n");
+    //    func->dump();
+
+    //    //for (auto block : func->getBlocks()) {
+    //    //    for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+    //    //        printf("inst with location: %d (%d)\n",
+    //    //            inst->sourceLoc.getRaw(),
+    //    //            inst->sourceLoc.isValid());
+    //    //        inst->dump();
+    //    //    }
+    //    //}
+    //}
+
     for(auto bb : globalVal->getBlocks())
     {
         auto blockInfo = new SSABlockInfo();
@@ -1135,9 +1154,21 @@ bool constructSSA(ConstructSSAContext* context)
         auto blockInfo = *context->blockInfos.tryGetValue(bb);
 
         // First remove phis from their parent blocks.
-        for (auto phiInfo : blockInfo->phis)
+        for (auto phiInfo : blockInfo->phis) {
+            //if (dump) {
+            //    printf("phiInfo:\n");
+            //    phiInfo->var->dump();
+            //    phiInfo->phi->dump();
+            //    printf(">> locations: %d (%d) & %d (%d)\n",
+            //        phiInfo->var->sourceLoc.getRaw(),
+            //        phiInfo->var->sourceLoc.isValid(),
+            //        phiInfo->phi->sourceLoc.getRaw(),
+            //        phiInfo->phi->sourceLoc.isValid());
+            //}
+
             if (!phiInfo->replacement)
                 phiInfo->phi->removeFromParent();
+        }
 
         // Then, add them back in a consistent order, and add predecessor
         // args in the same order.
@@ -1237,7 +1268,13 @@ bool constructSSA(ConstructSSAContext* context)
         // TODO: do we need to be careful here in case one
         // of thes operations still has uses, as part of
         // another to-be-remvoed instruction?
-
+        //if (dump) {
+        //    printf("removing instruction:\n");
+        //    printf("inst with location: %d (%d)\n",
+        //        inst->sourceLoc.getRaw(),
+        //        inst->sourceLoc.isValid());
+        //    inst->dump();
+        //}
         inst->removeAndDeallocate();
     }
 
@@ -1245,8 +1282,30 @@ bool constructSSA(ConstructSSAContext* context)
     // of of the variables
     for (auto var : context->promotableVars)
     {
+        //if (dump) {
+        //    printf("removing variable:\n");
+        //    printf("inst with location: %d (%d)\n",
+        //        var->sourceLoc.getRaw(),
+        //        var->sourceLoc.isValid());
+        //    var->dump();
+        //}
         var->removeAndDeallocate();
     }
+   
+    //if (dump) {
+    //    printf("<<<< (globalVal-END)===============================\n");
+    //    func->dump();
+
+    //    for (auto block : func->getBlocks()) {
+    //        for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+    //            printf("inst with location: %d (%d)\n",
+    //                inst->sourceLoc.getRaw(),
+    //                inst->sourceLoc.isValid());
+    //            inst->dump();
+    //        }
+    //    }
+    //}
+
     return true;
 }
 

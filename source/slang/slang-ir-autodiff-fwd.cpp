@@ -1607,6 +1607,9 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
         auto tempVar = builder.emitVar(ptrType->getValueType());
         param->replaceUsesWith(tempVar);
         mapParamToTempVar[param] = tempVar;
+        // TODO: link source locations for this?
+        printf("%s -> param:\n", __FUNCTION__);
+        param->dump();
         if (ptrType->getOp() != kIROp_OutType)
         {
             builder.emitStore(tempVar, builder.emitLoad(param));
@@ -1716,6 +1719,18 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
     // Create a clone for original func and run additional transformations on the clone.
     IRCloneEnv env;
     auto primalFuncClone = as<IRFunc>(cloneInst(&env, &builder, primalFunc));
+        
+    printf("(result from prepareFuncForForwardDiff)===============================\n");
+    for (auto block : primalFuncClone->getBlocks()) {
+        for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+            printf("inst with location: %d (%d)\n",
+                inst->sourceLoc.getRaw(),
+                inst->sourceLoc.isValid());
+
+            inst->dump();
+        }
+    }
+    
     prepareFuncForForwardDiff(primalFuncClone);
 
     builder.setInsertInto(diffFunc);
@@ -1731,6 +1746,8 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
         mapPrimalInst(block, diffBlock);
         mapDifferentialInst(block, diffBlock);
     }
+    
+    printf("(result from forward diff transcribe blocks)===============================\n");
 
     // Now actually transcribe the content of each block.
     for (auto block = primalFuncClone->getFirstBlock(); block; block = block->getNextBlock())
