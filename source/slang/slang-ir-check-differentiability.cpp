@@ -207,7 +207,7 @@ public:
         }
     }
 
-    bool checkType(IRInst* type)
+    bool checkType(IRType* type)
     {
         type = unwrapAttributedType(type);
         if (as<IRTorchTensorType>(type))

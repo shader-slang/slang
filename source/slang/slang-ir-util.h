@@ -166,7 +166,7 @@ inline bool isGenericParam(IRInst* param)
     return false;
 }
 
-inline IRInst* unwrapAttributedType(IRInst* type)
+inline IRType* unwrapAttributedType(IRType* type)
 {
     for (;;)
     {

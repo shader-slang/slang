@@ -2054,7 +2054,7 @@ struct SPIRVEmitContext
 
     SpvInst* ensureTextureType(IRInst* assignee, IRTextureTypeBase* inst)
     {
-        IRInst* sampledType = inst->getElementType();
+        IRType* sampledType = inst->getElementType();
         SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
         switch(inst->GetBaseShape())
         {

@@ -736,8 +736,6 @@ struct IRInst
 
     IRType* getDataType();
 
-    IRType* getUnratedAndUnattributedType();
-
     // After the type, we have data that is specific to
     // the subtype of `IRInst`. In most cases, this is
     // just a series of `IRUse` values representing
@@ -2036,7 +2034,7 @@ struct IRAnyValueType : IRType
 
 struct IRWitnessTableTypeBase : IRType
 {
-    IRInst* getConformanceType() { return getOperand(0); }
+    IRType* getConformanceType() { return (IRType*)getOperand(0); }
     IR_PARENT_ISA(WitnessTableTypeBase);
 };
 

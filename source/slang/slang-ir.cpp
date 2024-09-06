@@ -5195,7 +5195,7 @@ namespace Slang
         IRInst* index)
     {
         AddressSpace addrSpace = AddressSpace::Generic;
-        IRInst* valueType = nullptr;
+        IRType* valueType = nullptr;
         auto basePtrType = unwrapAttributedType(basePtr->getDataType());
         if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
         {
@@ -7867,21 +7867,6 @@ namespace Slang
             return rateQualifiedType->getValueType();
 
         return type;
-    }
-
-    IRType* IRInst::getUnratedAndUnattributedType()
-    {
-        auto type = getFullType();
-
-        while(true)
-        {
-            if (auto attr = as<IRAttributedType>(type))
-                type = attr->getBaseType();
-            else if (auto rateQualified = as<IRRateQualifiedType>(type))
-                type = rateQualified->getValueType();
-            else
-                return type;
-        }
     }
 
     void validateIRInstOperands(IRInst*);
