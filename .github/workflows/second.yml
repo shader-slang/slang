@@ -2,7 +2,7 @@ name: "second"
 
 on:
   workflow_run:
-    workflows: ["second"]
+    workflows: ["first"]
     types:
       - completed
 
