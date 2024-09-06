@@ -165,6 +165,7 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
 void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module)
 {
     List<IRInst*> toRemove;
+    auto builder = IRBuilder(module);
     for (auto globalInst : module->getGlobalInsts())
     {
         if (auto funcInst = as<IRFunc>(globalInst))
@@ -177,11 +178,29 @@ void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule
                     // Gut the function definition, turning it into a declaration
                     for (auto inst : funcInst->getChildren())
                     {
+                        // For HLSL, we can delete the whole block
+                        // but for SPIR-V we have to keep the block with only the
+                        // parameters inside, no other instructions.
                         if (inst->getOp() == kIROp_Block)
                         {
-                            toRemove.add(inst);
+                            if (target == CodeGenTarget::HLSL)
+                            {
+                                toRemove.add(inst);
+                            }
+                            else if (target == CodeGenTarget::SPIRV)
+                            {
+                                for (auto blockInst : inst->getChildren())
+                                {
+                                    if (blockInst->getOp() != kIROp_Param &&
+                                        blockInst != inst->getLastDecorationOrChild())
+                                    {
+                                        toRemove.add(blockInst);
+                                    }
+                                }
+                            }
                         }
                     }
+                    builder.addDecoration(funcInst, kIROp_DownstreamModuleImportDecoration);
                 }
             }
         }
