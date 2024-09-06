@@ -517,6 +517,10 @@ public:
 
     virtual void emitFuncDecorationsImpl(IRFunc* func);
 
+    bool tryEmitUnsignedEquivalent(IRType* type);
+    virtual void emitBitfieldExtractImpl(IRInst* inst);
+    virtual void emitBitfieldInsertImpl(IRInst* inst);
+
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
 

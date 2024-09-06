@@ -1247,6 +1247,25 @@ public uint bitfieldInsert(uint base, uint insert, int offset, int bits)
     }
 }
 
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+public int bitfieldInsert(int base, int insert, int offset, int bits)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "bitfieldInsert";
+    case spirv: return spirv_asm {
+        result:$$int = OpBitFieldInsert $base $insert $offset $bits
+    };
+    default:
+        uint clearMask = ~(((1u << bits) - 1u) << offset);
+        uint clearedBase = base & clearMask;
+        uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
+        return clearedBase | maskedInsert;
+    }
+}
+
 __generic<let N:int>
 [__readNone]
 [ForceInline]
@@ -1270,24 +1289,7 @@ public vector<uint,N> bitfieldInsert(vector<uint,N> base, vector<uint,N> insert,
     }
 }
 
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public int bitfieldInsert(int base, int insert, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldInsert";
-    case spirv: return spirv_asm {
-        result:$$int = OpBitFieldInsert $base $insert $offset $bits
-    };
-    default:
-        uint clearMask = ~(((1u << bits) - 1u) << offset);
-        uint clearedBase = base & clearMask;
-        uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
-        return clearedBase | maskedInsert;
-    }
-}
+
 
 __generic<let N:int>
 [__readNone]

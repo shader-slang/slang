@@ -2193,6 +2193,19 @@ __generic<T, U>
 __intrinsic_op($(kIROp_Reinterpret))
 T reinterpret(U value);
 
+// Bitfield extract / insert
+__generic<T>
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitfieldInsert))
+    T bitfieldInsert(T base, T insert, int offset, int bits);
+
+__generic<T>
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitfieldExtract))
+    T bitfieldExtract(T value, int offset, int bits);
+
 // Use an otherwise unused value
 //
 // This can be used to silence the warning about returning before initializing an out paramter.

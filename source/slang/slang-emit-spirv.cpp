@@ -2971,6 +2971,12 @@ struct SPIRVEmitContext
                 inst->getOperand(0)
             );
             break;
+        case kIROp_BitfieldExtract:
+            result = emitBitfieldExtract(parent, inst);
+            break;
+        case kIROp_BitfieldInsert:
+            result = emitBitfieldInsert(parent, inst);
+            break;
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
@@ -5592,6 +5598,48 @@ struct SPIRVEmitContext
     SpvInst* emitCastIntToPtr(SpvInstParent* parent, IRInst* inst)
     {
         return emitInst(parent, inst, SpvOpConvertUToPtr, inst->getFullType(), kResultID, inst->getOperand(0));
+    }
+
+    SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst) {
+        auto dataType = inst->getDataType();
+        IRVectorType* vectorType = as<IRVectorType>(dataType);
+        if (vectorType) 
+        {
+            dataType = vectorType->getElementType();
+        }
+
+        switch (dataType->getOp())
+        {
+            case kIROp_UIntType:
+                return emitInst(parent, inst, SpvOpBitFieldUExtract, inst->getFullType(), kResultID, 
+                    inst->getOperand(0), inst->getOperand(1), inst->getOperand(2));
+            case kIROp_IntType:
+                return emitInst(parent, inst, SpvOpBitFieldSExtract, inst->getFullType(), kResultID, 
+                    inst->getOperand(0), inst->getOperand(1), inst->getOperand(2));
+            default:
+                SLANG_UNEXPECTED("type given to bitfieldExtract in SPIR-V emit");
+        }
+        UNREACHABLE_RETURN(nullptr);
+    }
+
+    SpvInst* emitBitfieldInsert(SpvInstParent* parent, IRInst* inst) {
+        auto dataType = inst->getDataType();
+        IRVectorType* vectorType = as<IRVectorType>(dataType);
+        if (vectorType) 
+        {
+            dataType = vectorType->getElementType();
+        }
+        
+        switch (dataType->getOp())
+        {
+            case kIROp_UIntType:
+            case kIROp_IntType:
+                return emitInst(parent, inst, SpvOpBitFieldInsert, inst->getFullType(), kResultID, 
+                    inst->getOperand(0), inst->getOperand(1), inst->getOperand(2), inst->getOperand(3));
+            default:
+                SLANG_UNEXPECTED("type given to bitfieldInsert in SPIR-V emit");
+        }
+        UNREACHABLE_RETURN(nullptr);
     }
 
     template<typename T, typename Ts>

@@ -2762,6 +2762,16 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(")");
         break;
     }
+    case kIROp_BitfieldExtract:
+    {
+        emitBitfieldExtractImpl(inst);
+        break;
+    }
+    case kIROp_BitfieldInsert:
+    {
+        emitBitfieldInsertImpl(inst);
+        break;
+    }
     case kIROp_PackAnyValue:
     {
         m_writer->emit("packAnyValue<");
@@ -3665,6 +3675,167 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
     {
         emitFuncDecorationImpl(decoration);
     }
+}
+
+bool CLikeSourceEmitter::tryEmitUnsignedEquivalent(IRType* dataType)
+{
+    IRVectorType* vectorType = as<IRVectorType>(dataType);
+    if (vectorType) 
+    {
+        dataType = vectorType->getElementType();
+        m_writer->emit("vector<");
+    }
+
+    Slang::IROp uType;
+    switch (dataType->getOp())
+    {
+        case kIROp_UInt8Type:
+        case kIROp_Int8Type:
+            uType = kIROp_UInt8Type;
+            break;
+        case kIROp_UInt16Type:
+        case kIROp_Int16Type:
+            uType = kIROp_UInt16Type;
+            break;
+        case kIROp_UInt64Type:
+        case kIROp_Int64Type:
+            uType = kIROp_UInt64Type;
+            break;
+        case kIROp_UIntType:
+        case kIROp_IntType:
+            uType = kIROp_UIntType;
+            break;
+        default:
+            return false;
+    }
+
+    m_writer->emit(getDefaultBuiltinTypeName(uType));
+    
+    if (vectorType) 
+    {
+        m_writer->emit(",");
+        emitSimpleValueImpl(vectorType->getElementCount());
+        m_writer->emit(">");
+    }
+    return true;
+}
+
+void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst) 
+{
+    // BitfieldExtraction := T(uint(val>>off)&((1u<<bts)-1))
+    Slang::IRType* dataType = inst->getDataType();
+    Slang::IRInst* val = inst->getOperand(0);
+    Slang::IRInst* off = inst->getOperand(1);
+    Slang::IRInst* bts = inst->getOperand(2);
+    
+    // cast to the target type for optional sign extension
+    emitType(inst->getDataType()); 
+    m_writer->emit("(");
+    {
+        // emit uint(val>>off)
+        if (!tryEmitUnsignedEquivalent(dataType))
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldExtract");
+            return;
+        }
+        m_writer->emit("(");
+        {
+            emitOperand(val, getInfo(EmitOp::General));
+            m_writer->emit(">>");
+            emitOperand(off, getInfo(EmitOp::General));
+        }
+        m_writer->emit(")");
+
+        m_writer->emit("&");
+
+        // emit "((1u<<bts)-1)"
+        m_writer->emit("(");
+        {
+            // emit "(1u << bts) - 1"
+            m_writer->emit("(1u <<");
+            emitOperand(bts, getInfo(EmitOp::General));
+            m_writer->emit(") - 1");
+        }
+        m_writer->emit(")");
+    }
+    m_writer->emit(")");
+}
+
+void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst) {
+    // uint clearMask = ~(((1u << bits) - 1u) << offset);
+    // uint clearedBase = base & clearMask;
+    // uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
+    // BitfieldInsert := T(uint(clearedBase) | uint(maskedInsert)); 
+    Slang::IRType* dataType = inst->getDataType();
+    Slang::IRInst* bse = inst->getOperand(0);
+    Slang::IRInst* ins = inst->getOperand(1);
+    Slang::IRInst* off = inst->getOperand(2);
+    Slang::IRInst* bts = inst->getOperand(3);
+
+    // cast back to the target type
+    emitType(inst->getDataType()); 
+    m_writer->emit("(");
+    {
+        // emit clearedBase := uint(base & clearMask)
+        if (!tryEmitUnsignedEquivalent(dataType))
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldInsert");
+            return;
+        }
+        m_writer->emit("(");
+        {   
+            // emit base
+            emitOperand(bse, getInfo(EmitOp::General));
+            m_writer->emit("&");
+
+            // emit clearMask := ~(((1u<<bts)-1u)<<off)
+            m_writer->emit("(");
+            {
+                m_writer->emit("~(((1u<<");
+                emitOperand(bts, getInfo(EmitOp::General));
+                m_writer->emit(")-1u)<<");
+                emitOperand(off, getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            m_writer->emit(")");
+        }
+        m_writer->emit(")");
+
+        // bitwise or clearedBase with maskedInsert
+        m_writer->emit("|");
+
+        // Emit maskedInsert := uint((insert & ((1u << bits) - 1u)) << offset);
+        if (!tryEmitUnsignedEquivalent(dataType))
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldInsert");
+            return;
+        }
+        m_writer->emit("(");
+        {
+            // Emit mask := (insert & ((1u << bits) - 1u))
+            m_writer->emit("(");
+            {
+                // emit "insert & ((1u << bits) - 1u)"
+                emitOperand(ins, getInfo(EmitOp::General));
+                m_writer->emit("&");
+                m_writer->emit("(");
+                {
+                    // emit "(1u << bits) - 1u"
+                    m_writer->emit("(1u<<");
+                    emitOperand(bts, getInfo(EmitOp::General));
+                    m_writer->emit(")-1u");
+                }
+                m_writer->emit(")");
+            }
+            m_writer->emit(")");
+
+            // Emit shift := << offset
+            m_writer->emit("<<");
+            emitOperand(off, getInfo(EmitOp::General));
+        }
+        m_writer->emit(")");
+    }
+    m_writer->emit(")");
 }
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
