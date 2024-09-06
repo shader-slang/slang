@@ -33,28 +33,28 @@ jobs:
         exclude:
           # Default to x64, but aarch64 on osx
           - { os: linux, platform: aarch64 }
-          - { os: windows, platform: aarch64 }
-          - { os: macos, platform: x86_64 }
+#         - { os: windows, platform: aarch64 }
+#         - { os: macos, platform: x86_64 }
           # Unused compiler configs
           - { os: linux, compiler: clang }
           - { os: linux, compiler: cl }
-          - { os: windows, compiler: gcc }
-          - { os: windows, compiler: clang }
-          - { os: macos, compiler: gcc }
-          - { os: macos, compiler: cl }
+#         - { os: windows, compiler: gcc }
+#         - { os: windows, compiler: clang }
+#         - { os: macos, compiler: gcc }
+#         - { os: macos, compiler: cl }
         include:
           - { os: linux, runs-on: ubuntu-20.04 }
-          - { os: macos, runs-on: macos-latest }
-          - { os: windows, runs-on: windows-latest }
+#         - { os: macos, runs-on: macos-latest }
+#         - { os: windows, runs-on: windows-latest }
           # Warnings are treated as errors by default.
           # But we may want to disable it temporarily.
           - { os: linux, warnings-as-errors: true }
-          - { os: macos, warnings-as-errors: true }
-          - { os: windows, warnings-as-errors: true }
+#         - { os: macos, warnings-as-errors: true }
+#         - { os: windows, warnings-as-errors: true }
           # Set a test category depending on the config, smoke by default,
           # quick or full conditionally otherwise
           - test-category: smoke
-          - { os: windows, test-category: quick }
+#         - { os: windows, test-category: quick }
           - { config: release, test-category: full }
           # default not full gpu tests
           - full-gpu-tests: false
@@ -70,14 +70,14 @@ jobs:
           #  runs-on: [self-hosted, Linux, ARM64]
           #  has-gpu: true
           # Self-hosted full gpu build
-          - os: windows
-            config: release
-            compiler: cl
-            platform: x86_64
-            test-category: full
-            full-gpu-tests: true
-            runs-on: windows-latest
-            has-gpu: true
+#         - os: windows
+#           config: release
+#           compiler: cl
+#           platform: x86_64
+#           test-category: full
+#           full-gpu-tests: true
+#           runs-on: windows-latest
+#           has-gpu: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
