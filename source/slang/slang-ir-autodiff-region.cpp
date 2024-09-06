@@ -50,7 +50,7 @@ namespace Slang{
                 workList.add(successor);
             }
         }
-        
+
         return regionMap;
     }
 };

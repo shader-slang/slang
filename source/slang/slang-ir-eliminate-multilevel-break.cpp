@@ -327,7 +327,7 @@ struct EliminateMultiLevelBreakContext
         }
         
         printf("(result before eliminating phis)===============================\n");
-        func->dump();
+        //func->dump();
         for (auto block : func->getBlocks()) {
             for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
                 printf("inst with location: %d (%d)\n",
@@ -340,18 +340,6 @@ struct EliminateMultiLevelBreakContext
 
         // To make things easy, eliminate Phis before perform transformations.
         eliminatePhisInFunc(LivenessMode::Disabled, irModule, func, PhiEliminationOptions::getFast());
-        
-        printf("(result after eliminating phis)===============================\n");
-        func->dump();
-        for (auto block : func->getBlocks()) {
-            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-                printf("inst with location: %d (%d)\n",
-                    inst->sourceLoc.getRaw(),
-                    inst->sourceLoc.isValid());
-
-                inst->dump();
-            }
-        }
 
         // Before modifying the cfg, we gather all required info from the existing cfg.
         FuncContext funcInfo;

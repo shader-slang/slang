@@ -1720,16 +1720,17 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
     IRCloneEnv env;
     auto primalFuncClone = as<IRFunc>(cloneInst(&env, &builder, primalFunc));
         
-    printf("(result from prepareFuncForForwardDiff)===============================\n");
-    for (auto block : primalFuncClone->getBlocks()) {
-        for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-            printf("inst with location: %d (%d)\n",
-                inst->sourceLoc.getRaw(),
-                inst->sourceLoc.isValid());
+    // printf("(prepareFuncForForwardDiff)===============================\n");
+    // primalFuncClone->dump();
+    // for (auto block : primalFuncClone->getBlocks()) {
+    //     for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+    //         printf("inst with location: %d (%d)\n",
+    //             inst->sourceLoc.getRaw(),
+    //             inst->sourceLoc.isValid());
 
-            inst->dump();
-        }
-    }
+    //         inst->dump();
+    //     }
+    // }
     
     prepareFuncForForwardDiff(primalFuncClone);
 
@@ -1746,8 +1747,6 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
         mapPrimalInst(block, diffBlock);
         mapDifferentialInst(block, diffBlock);
     }
-    
-    printf("(result from forward diff transcribe blocks)===============================\n");
 
     // Now actually transcribe the content of each block.
     for (auto block = primalFuncClone->getFirstBlock(); block; block = block->getNextBlock())
@@ -1794,6 +1793,18 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
 #if _DEBUG
     checkAutodiffInstDecorations(diffFunc);
 #endif
+    
+    // printf("(diffFunc at prepareFuncForForwardDiff)===============================\n");
+    // diffFunc->dump();
+    // for (auto block : diffFunc->getBlocks()) {
+    //     for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+    //         printf("inst with location: %d (%d)\n",
+    //             inst->sourceLoc.getRaw(),
+    //             inst->sourceLoc.isValid());
+
+    //         inst->dump();
+    //     }
+    // }
 
     return InstPair(primalFunc, diffFunc);
 }

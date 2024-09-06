@@ -553,18 +553,6 @@ namespace Slang
         eliminateContinueBlocksInFunc(func->getModule(), func);
 
         eliminateMultiLevelBreakForFunc(func->getModule(), func);
-        
-        printf("(result before normalizeCFG)===============================\n");
-        func->dump();
-        for (auto block : func->getBlocks()) {
-            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-                printf("inst with location: %d (%d)\n",
-                    inst->sourceLoc.getRaw(),
-                    inst->sourceLoc.isValid());
-
-                inst->dump();
-            }
-        }
 
         IRCFGNormalizationPass cfgPass = {this->getSink()};
         normalizeCFG(autoDiffSharedContext->moduleInst->getModule(), func, cfgPass);
@@ -589,34 +577,23 @@ namespace Slang
         // Strip any existing derivative decorations off the clone.
         stripDerivativeDecorations(primalFunc);
         eliminateDeadCode(primalOuterParent);
-        
-        printf("(result before prepareFuncForBackwardDiff)===============================\n");
-        primalFunc->dump();
-        for (auto block : primalFunc->getBlocks()) {
-            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-                printf("inst with location: %d (%d)\n",
-                    inst->sourceLoc.getRaw(),
-                    inst->sourceLoc.isValid());
-
-                inst->dump();
-            }
-        }
 
         // Perform required transformations and simplifications on the original func to make it
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
         
-        printf("(result after prepareFuncForBackwardDiff)===============================\n");
-        for (auto block : primalFunc->getBlocks()) {
-            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-                printf("inst with location: %d (%d)\n",
-                    inst->sourceLoc.getRaw(),
-                    inst->sourceLoc.isValid());
+        // printf("(result after prepareFuncForBackwardDiff)===============================\n");
+        // //primalFunc->dump();
+        // for (auto block : primalFunc->getBlocks()) {
+        //     for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+        //         printf("inst with location: %d (%d)\n",
+        //             inst->sourceLoc.getRaw(),
+        //             inst->sourceLoc.isValid());
 
-                inst->dump();
-            }
-        }
+        //         inst->dump();
+        //     }
+        // }
 
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
@@ -628,7 +605,7 @@ namespace Slang
         auto newCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
         for (auto i = oldCount; i < newCount; i++)
         {
-            printf("transcribing function with fwd mode: %d (%d, %d)\n", i, oldCount, newCount);
+            // printf("transcribing function with fwd mode: %d (%d, %d)\n", i, oldCount, newCount);
             auto pendingTask = autoDiffSharedContext->followUpFunctionsToTranscribe.getLast();
             autoDiffSharedContext->followUpFunctionsToTranscribe.removeLast();
             SLANG_RELEASE_ASSERT(pendingTask.type == FuncBodyTranscriptionTaskType::Forward);
@@ -703,21 +680,6 @@ namespace Slang
     // Transcribe a function definition.
     void BackwardDiffTranscriberBase::transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc)
     {
-        printf("(primalFunc)===============================\n");
-        primalFunc->dump();
-
-        for (auto block : primalFunc->getBlocks()) {
-            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-                printf("inst with location: %d (%d)\n",
-                    inst->sourceLoc.getRaw(),
-                    inst->sourceLoc.isValid());
-                inst->dump();
-
-                if (inst->sourceLoc.isValid())
-                    getSink()->diagnose(inst->sourceLoc, Diagnostics::seeDeclarationOf, inst);
-            }
-        }
-
         SLANG_ASSERT(primalFunc);
         SLANG_ASSERT(diffPropagateFunc);
         // Reverse-mode transcription uses 4 separate steps:
@@ -738,15 +700,16 @@ namespace Slang
         if (!fwdDiffFunc)
             return;
 
-        printf("(fwdDiffFunc)===============================\n");
+        printf("(fwdDiffFunc from generateNewForwardDerivative)===============================\n");
+        fwdDiffFunc->dump();
         for (auto block : fwdDiffFunc->getBlocks()) {
-            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-                printf("inst with location: %d (%d)\n",
-                    inst->sourceLoc.getRaw(),
-                    inst->sourceLoc.isValid());
+           for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+               printf("inst with location: %d (%d)\n",
+                   inst->sourceLoc.getRaw(),
+                   inst->sourceLoc.isValid());
 
-                inst->dump();
-            }
+               inst->dump();
+           }
         }
 
         bool isResultDifferentiable = as<IRDifferentialPairType>(fwdDiffFunc->getResultType());
@@ -762,6 +725,20 @@ namespace Slang
 
         diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
         IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
+        
+        printf("(diffPropagateFunc after unzipping)===============================\n");
+        diffPropagateFunc->dump();
+        
+        printf("(unzipDiffInsts)===============================\n");
+        for (auto block : unzippedFwdDiffFunc->getBlocks()) {
+           for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+               printf("inst with location: %d (%d)\n",
+                   inst->sourceLoc.getRaw(),
+                   inst->sourceLoc.isValid());
+
+               inst->dump();
+           }
+        }
 
         // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
         builder->setInsertInto(diffPropagateFunc->getParent());
@@ -772,6 +749,18 @@ namespace Slang
             
             for (auto block : workList)
                 block->insertAtEnd(diffPropagateFunc);
+        }
+        
+        printf("(diffPropagateFunc moving blocks)===============================\n");
+        diffPropagateFunc->dump();
+        for (auto block : diffPropagateFunc->getBlocks()) {
+           for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+               printf("inst with location: %d (%d)\n",
+                   inst->sourceLoc.getRaw(),
+                   inst->sourceLoc.isValid());
+
+               inst->dump();
+           }
         }
 
         // Transpose the first block (parameter block)

@@ -20,7 +20,7 @@ ModuleDecl:0 {
     }
     closingSourceLoc : SourceLoc(1515508) tests/autodiff/reverse-loop.slang:41
     ownedScope : ::?::reverse-loop
-    module : Unknown@0x000001a479aaa050
+    module : Unknown@0x0000020c43be4040
     mapDeclToAssociatedDecls :  { 
     }
     isInLegacyLanguage : 1

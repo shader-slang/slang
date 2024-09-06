@@ -281,6 +281,18 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     IROutOfOrderCloneContext* cloneCtx,
     Dictionary<IRBlock*, List<IndexTrackingInfo>>& blockIndexInfo)
 {
+    // printf("(Checkpoint policy)==========================================\n");
+    // func->dump();
+    // for (auto block : func->getBlocks()) {
+    //     for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+    //         printf("inst with location: %d (%d)\n",
+    //             inst->sourceLoc.getRaw(),
+    //             inst->sourceLoc.isValid());
+
+    //         inst->dump();
+    //     }
+    // }
+
     collectInductionValues(func);
 
     RefPtr<CheckpointSetInfo> checkpointInfo = new CheckpointSetInfo();
@@ -358,6 +370,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         addPrimalOperandsToWorkList(block->getTerminator());
     }
     
+    printf("processing workList\n");
     while (workList.getCount() > 0)
     {
         auto use = workList.getLast();
@@ -365,6 +378,9 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
         if (processedUses.contains(use))
             continue;
+
+        printf("use with usedVal:\n");
+        use.usedVal->dump();
 
         processedUses.add(use);
 
@@ -1761,6 +1777,13 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
             primalInitBlock->getTerminator())->getTargetBlock();
         builder.setInsertBefore(primalInitBlock->getTerminator());
 
+        printf("Adding counter for primalLoop:\n");
+        primalLoop->dump();
+        printf("  > sourceLoc: %d (%d)\n",
+            primalLoop->sourceLoc.getRaw(),
+            primalLoop->sourceLoc.isValid());
+        SourceLoc loc = primalLoop->sourceLoc;
+
         auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
             &builder,
             primalInitBlock,
@@ -1776,6 +1799,13 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
         builder.addLoopCounterDecoration(primalCountParam);
         builder.addNameHintDecoration(primalCountParam, UnownedStringSlice("_pc"));
         builder.markInstAsPrimal(primalCountParam);
+        primalCountParam->sourceLoc = loc;
+        
+        printf(">> Counter for primalLoop:\n");
+        primalCountParam->dump();
+        printf("  > sourceLoc: %d (%d)\n",
+            primalCountParam->sourceLoc.getRaw(),
+            primalCountParam->sourceLoc.isValid());
 
         IRBlock* primalUpdateBlock = getUpdateBlock(primalLoop);
         IRInst* terminator = primalUpdateBlock->getTerminator();
@@ -1827,6 +1857,7 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
             diffCountParam,
             builder.getIntValue(builder.getIntType(), 1));
         builder.markInstAsPrimal(decCounterVal);
+        // TODO: sourceLoc for _dc here?
 
         auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, diffUpdateBlock, terminator, decCounterVal);
 
@@ -1898,7 +1929,8 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
 {
     sortBlocksInFunc(func);
 
-    printf("(checkpoint policy, got) ===============================\n");
+    printf("(applyCheckpointPolicy) ===============================\n");
+    // func->dump();
     for (auto block : func->getBlocks()) {
         for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
             printf("inst with location: %d (%d)\n",

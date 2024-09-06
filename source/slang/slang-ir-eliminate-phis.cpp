@@ -120,7 +120,7 @@ struct PhiEliminationContext
         // for Phi parameters and other insts that benefit from
         // converting to memory.
         initializePerFuncState(func);
-
+        
         // First, we eliminate all the phi instructions (params)
         // using the result of register allocation.
         // The first block in a function is always the entry block,
@@ -138,7 +138,7 @@ struct PhiEliminationContext
 
             eliminatePhisInBlock(block);
         }
-
+        
         // Next, convert the definition of other ordinary insts to assignments.
         convertInstDefToRegisterAssignment();
 
@@ -551,6 +551,7 @@ struct PhiEliminationContext
                 auto user = use->getUser();
                 m_builder.setInsertBefore(user);
                 auto newVal = m_builder.emitLoad(temp);
+                newVal->sourceLoc = param->sourceLoc;
                 m_builder.replaceOperand(use, newVal);
             }
 
@@ -939,6 +940,7 @@ struct PhiEliminationContext
             newOperands.getCount(),
             newOperands.getArrayView().getBuffer());
         oldBranch->transferDecorationsTo(newBranch);
+        newBranch->sourceLoc = oldBranch->sourceLoc;
 
         // TODO: We could consider just modifying `branch` in-place by clearing
         // the relevant operands for the phi arguments and setting its operand
