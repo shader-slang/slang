@@ -15,7 +15,7 @@ namespace Slang
     ConversionCost SemanticsVisitor::getImplicitConversionCost(
         Decl* decl)
     {
-        if(auto modifier = decl->findModifier<ImplicitConversionModifier>())
+        if (auto modifier = decl->findModifier<ImplicitConversionModifier>())
         {
             return modifier->cost;
         }
@@ -35,33 +35,33 @@ namespace Slang
     }
 
     bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(
-        Type*    type)
+        Type* type)
     {
-        if(as<ArrayExpressionType>(type)) return false;
-        if(as<VectorExpressionType>(type)) return false;
-        if(as<MatrixExpressionType>(type)) return false;
+        if (as<ArrayExpressionType>(type)) return false;
+        if (as<VectorExpressionType>(type)) return false;
+        if (as<MatrixExpressionType>(type)) return false;
 
-        if(as<BasicExpressionType>(type))
-        {
-            return true;
-        }
-
-        if(as<ResourceType>(type))
-        {
-            return true;
-        }
-        if(as<UntypedBufferResourceType>(type))
-        {
-            return true;
-        }
-        if(as<SamplerStateType>(type))
+        if (as<BasicExpressionType>(type))
         {
             return true;
         }
 
-        if(auto declRefType = as<DeclRefType>(type))
+        if (as<ResourceType>(type))
         {
-            if(as<StructDecl>(declRefType->getDeclRef()))
+            return true;
+        }
+        if (as<UntypedBufferResourceType>(type))
+        {
+            return true;
+        }
+        if (as<SamplerStateType>(type))
+        {
+            return true;
+        }
+
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (as<StructDecl>(declRefType->getDeclRef()))
                 return false;
         }
 
@@ -78,12 +78,12 @@ namespace Slang
     }
 
     bool SemanticsVisitor::shouldUseInitializerDirectly(
-        Type*    toType,
-        Expr*    fromExpr)
+        Type* toType,
+        Expr* fromExpr)
     {
         // A nested initializer list should always be used directly.
         //
-        if(as<InitializerListExpr>(fromExpr))
+        if (as<InitializerListExpr>(fromExpr))
         {
             return true;
         }
@@ -91,14 +91,14 @@ namespace Slang
         // If the desired type is a scalar, then we should always initialize
         // directly, since it isn't an aggregate.
         //
-        if(isEffectivelyScalarForInitializerLists(toType))
+        if (isEffectivelyScalarForInitializerLists(toType))
             return true;
 
         // If the type we are initializing isn't effectively scalar,
         // but the initialization expression *is*, then it doesn't
         // seem like direct initialization is intended.
         //
-        if(isEffectivelyScalarForInitializerLists(fromExpr->type))
+        if (isEffectivelyScalarForInitializerLists(fromExpr->type))
             return false;
 
         // If 2 types are "broadly equal" we know the types can be coerced directly
@@ -120,16 +120,16 @@ namespace Slang
 
     template<bool UseLegacyLogic>
     bool SemanticsVisitor::_readValueFromInitializerList(
-        Type*                toType,
-        Expr**               outToExpr,
+        Type* toType,
+        Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr,
-        UInt                       &ioInitArgIndex)
+        UInt& ioInitArgIndex)
     {
         // First, we will check if we have run out of arguments
         // on the initializer list.
         //
         UInt initArgCount = fromInitializerListExpr->args.getCount();
-        if(ioInitArgIndex >= initArgCount)
+        if (ioInitArgIndex >= initArgCount)
         {
             // If we are at the end of the initializer list,
             // then our ability to read an argument depends
@@ -148,7 +148,7 @@ namespace Slang
         // for aggregate initialization.
         //
         auto firstInitExpr = fromInitializerListExpr->args[ioInitArgIndex];
-        if(shouldUseInitializerDirectly(toType, firstInitExpr) && canCoerce(toType, firstInitExpr->type, firstInitExpr))
+        if (shouldUseInitializerDirectly(toType, firstInitExpr) && canCoerce(toType, firstInitExpr->type, firstInitExpr))
         {
             ioInitArgIndex++;
             return _coerce(
@@ -164,7 +164,7 @@ namespace Slang
         // expressions, then everything could be thrown off and we
         // shouldn't keep trying to read arguments.
         //
-        if( IsErrorExpr(firstInitExpr) )
+        if (IsErrorExpr(firstInitExpr))
         {
             // Stop reading arguments, as if we'd reached
             // the end of the list.
@@ -186,17 +186,17 @@ namespace Slang
     DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef)
     {
         auto inheritanceDecl = getMembersOfType<InheritanceDecl>(astBuilder, structTypeDeclRef).getFirstOrNull();
-        if(!inheritanceDecl)
+        if (!inheritanceDecl)
             return nullptr;
 
         auto baseType = getBaseType(astBuilder, inheritanceDecl);
         auto baseDeclRefType = as<DeclRefType>(baseType);
-        if(!baseDeclRefType)
+        if (!baseDeclRefType)
             return nullptr;
 
         auto baseDeclRef = baseDeclRefType->getDeclRef();
         auto baseStructDeclRef = baseDeclRef.as<StructDecl>();
-        if(!baseStructDeclRef)
+        if (!baseStructDeclRef)
             return nullptr;
 
         return baseDeclRefType;
@@ -235,10 +235,10 @@ namespace Slang
 
     template<bool UseLegacyLogic>
     bool SemanticsVisitor::_readAggregateValueFromInitializerList(
-        Type*                inToType,
-        Expr**               outToExpr,
+        Type* inToType,
+        Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr,
-        UInt                       &ioArgIndex)
+        UInt& ioArgIndex)
     {
         auto toType = inToType;
         UInt argCount = fromInitializerListExpr->args.getCount();
@@ -247,18 +247,18 @@ namespace Slang
         // we will collect the new arguments here
         List<Expr*> coercedArgs;
 
-        if(isEffectivelyScalarForInitializerLists(toType))
+        if (isEffectivelyScalarForInitializerLists(toType))
         {
             // For any type that is effectively a non-aggregate,
             // we expect to read a single value from the initializer list
             //
-            if(ioArgIndex < argCount)
+            if (ioArgIndex < argCount)
             {
                 auto arg = fromInitializerListExpr->args[ioArgIndex++];
 
                 if (!canCoerce(toType, arg->type, nullptr))
                 {
-                    if(outToExpr)
+                    if (outToExpr)
                         *outToExpr = arg;
                     return true;
                 }
@@ -291,21 +291,21 @@ namespace Slang
             UInt elementCount = 0;
             if (auto constElementCount = as<ConstantIntVal>(toElementCount))
             {
-                elementCount = (UInt) constElementCount->getValue();
+                elementCount = (UInt)constElementCount->getValue();
             }
             else
             {
                 // We don't know the element count statically,
                 // so what are we supposed to be doing?
                 //
-                if(outToExpr)
+                if (outToExpr)
                 {
                     getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForVectorOfUnknownSize, toElementCount);
                 }
                 return false;
             }
 
-            for(UInt ee = 0; ee < elementCount; ++ee)
+            for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 Expr* coercedArg = nullptr;
                 bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
@@ -315,22 +315,22 @@ namespace Slang
                     ioArgIndex);
 
                 // No point in trying further if any argument fails
-                if(!argResult)
+                if (!argResult)
                     return false;
 
-                if( coercedArg )
+                if (coercedArg)
                 {
                     coercedArgs.add(coercedArg);
                 }
             }
         }
-        else if(auto toArrayType = as<ArrayExpressionType>(toType))
+        else if (auto toArrayType = as<ArrayExpressionType>(toType))
         {
             // TODO(tfoley): If we can compute the size of the array statically,
             // then we want to check that there aren't too many initializers present
 
             auto toElementType = toArrayType->getElementType();
-            if(!toArrayType->isUnsized())
+            if (!toArrayType->isUnsized())
             {
                 auto toElementCount = toArrayType->getElementCount();
 
@@ -340,21 +340,21 @@ namespace Slang
                 UInt elementCount = 0;
                 if (auto constElementCount = as<ConstantIntVal>(toElementCount))
                 {
-                    elementCount = (UInt) constElementCount->getValue();
+                    elementCount = (UInt)constElementCount->getValue();
                 }
                 else
                 {
                     // We don't know the element count statically,
                     // so what are we supposed to be doing?
                     //
-                    if(outToExpr)
+                    if (outToExpr)
                     {
                         getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForArrayOfUnknownSize, toElementCount);
                     }
                     return false;
                 }
 
-                for(UInt ee = 0; ee < elementCount; ++ee)
+                for (UInt ee = 0; ee < elementCount; ++ee)
                 {
                     Expr* coercedArg = nullptr;
                     bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
@@ -364,10 +364,10 @@ namespace Slang
                         ioArgIndex);
 
                     // No point in trying further if any argument fails
-                    if(!argResult)
+                    if (!argResult)
                         return false;
 
-                    if( coercedArg )
+                    if (coercedArg)
                     {
                         coercedArgs.add(coercedArg);
                     }
@@ -380,7 +380,7 @@ namespace Slang
                 // the element count.
                 //
                 UInt elementCount = 0;
-                while(ioArgIndex < argCount)
+                while (ioArgIndex < argCount)
                 {
                     Expr* coercedArg = nullptr;
                     bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
@@ -390,12 +390,12 @@ namespace Slang
                         ioArgIndex);
 
                     // No point in trying further if any argument fails
-                    if(!argResult)
+                    if (!argResult)
                         return false;
 
                     elementCount++;
 
-                    if( coercedArg )
+                    if (coercedArg)
                     {
                         coercedArgs.add(coercedArg);
                     }
@@ -407,7 +407,7 @@ namespace Slang
                     m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount));
             }
         }
-        else if(auto toMatrixType = as<MatrixExpressionType>(toType))
+        else if (auto toMatrixType = as<MatrixExpressionType>(toType))
         {
             // In the general case, the initializer list might comprise
             // both vectors and scalars.
@@ -429,21 +429,21 @@ namespace Slang
 
             if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
             {
-                rowCount = (UInt) constRowCount->getValue();
+                rowCount = (UInt)constRowCount->getValue();
             }
             else
             {
                 // We don't know the element count statically,
                 // so what are we supposed to be doing?
                 //
-                if(outToExpr)
+                if (outToExpr)
                 {
                     getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForMatrixOfUnknownSize, toMatrixType->getRowCount());
                 }
                 return false;
             }
 
-            for(UInt rr = 0; rr < rowCount; ++rr)
+            for (UInt rr = 0; rr < rowCount; ++rr)
             {
                 Expr* coercedArg = nullptr;
                 bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
@@ -453,16 +453,16 @@ namespace Slang
                     ioArgIndex);
 
                 // No point in trying further if any argument fails
-                if(!argResult)
+                if (!argResult)
                     return false;
 
-                if( coercedArg )
+                if (coercedArg)
                 {
                     coercedArgs.add(coercedArg);
                 }
             }
         }
-        else if(auto toDeclRefType = as<DeclRefType>(toType))
+        else if (auto toDeclRefType = as<DeclRefType>(toType))
         {
             // We allow using legacy "init list" logic as a backup if something fails
             if constexpr (UseLegacyLogic)
@@ -517,7 +517,7 @@ namespace Slang
                         }
                     }
                 }
-            }  
+            }
             else
             {
                 auto toTypeDeclRef = toDeclRefType->getDeclRef();
@@ -680,7 +680,7 @@ namespace Slang
             // list invalid if we are trying to read something
             // off of it that wasn't handled by the cases above.
             //
-            if(outToExpr)
+            if (outToExpr)
             {
                 getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForType, inToType);
             }
@@ -690,7 +690,7 @@ namespace Slang
         // We were able to coerce all the arguments given, and so
         // we need to construct a suitable expression to remember the result
         //
-        if(outToExpr)
+        if (outToExpr)
         {
             auto toInitializerListExpr = m_astBuilder->create<InitializerListExpr>();
             toInitializerListExpr->loc = fromInitializerListExpr->loc;
@@ -702,10 +702,10 @@ namespace Slang
             // 
             if (auto func = getParentFuncOfVisitor())
             {
-                if (func->findModifier<DifferentiableAttribute>() && 
+                if (func->findModifier<DifferentiableAttribute>() &&
                     !isTypeDifferentiable(toType))
                 {
-                    for (auto &arg : toInitializerListExpr->args)
+                    for (auto& arg : toInitializerListExpr->args)
                     {
                         if (isTypeDifferentiable(arg->type.type))
                         {
@@ -724,9 +724,32 @@ namespace Slang
         return true;
     }
 
+    void _maybeRunLegacyLogic(
+        SemanticsVisitor* visitor,
+        Type* toType,
+        Expr** outToExpr,
+        InitializerListExpr* fromInitializerListExpr,
+        bool& result,
+        UInt& argIndex,
+        bool& ranLegacyLogic
+        )
+    {
+        // Try to use legacy struct logic if we have a 'struct' toType for Slang backwards compatability
+        // Note: if we remove this entire `if` block, "LegacyLogic" will be no-longer be enabled 
+        if (auto declRefType = as<DeclRefType>(toType))
+        {
+            if (declRefType->getDeclRef().as<StructDecl>())
+            {
+                argIndex = 0;
+                ranLegacyLogic = true;
+                result = visitor->_readAggregateValueFromInitializerList<true>(toType, outToExpr, fromInitializerListExpr, argIndex);
+            }
+        }
+    }
+
     bool SemanticsVisitor::_coerceInitializerList(
-        Type*                toType,
-        Expr**               outToExpr,
+        Type* toType,
+        Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr)
     {
         UInt argCount = fromInitializerListExpr->args.getCount();
@@ -742,38 +765,37 @@ namespace Slang
         // If this isn't prohibited, then we can proceed to try and coerce from
         // the initializer list itself; assuming that coercion is closed under
         // composition this shouldn't fail.
-        if(!as<InitializerListType>(fromInitializerListExpr->type) &&
-           !canCoerce(toType, fromInitializerListExpr->type, nullptr))
+        if (!as<InitializerListType>(fromInitializerListExpr->type) &&
+            !canCoerce(toType, fromInitializerListExpr->type, nullptr))
             return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
 
-        if(!_readAggregateValueFromInitializerList<false>(toType, outToExpr, fromInitializerListExpr, argIndex))
-            return false;
+        // If we fail, try to run legacy logic.
+        bool usedLegacy = false;
+        bool result = _readAggregateValueFromInitializerList<false>(toType, outToExpr, fromInitializerListExpr, argIndex);
+        // Note: if we remove this entire `if` block for a `return false`, "LegacyLogic" will be no-longer be enabled for "failed" case
+        if(!result)
+        {
+            _maybeRunLegacyLogic(this, toType, outToExpr, fromInitializerListExpr, result, argIndex, usedLegacy);
+            if (!result)
+                return false;
+        }
 
         if(argIndex != argCount)
         {
             if( outToExpr )
             {
-                // Try to use legacy struct logic if we have a 'struct' toType for Slang backwards compatability
-                // Note: if we remove this entire `if` block, "LegacyLogic" will be no-longer be enabled 
-                if (auto declRefType = as<DeclRefType>(toType))
-                {
-                    if (declRefType->getDeclRef().as<StructDecl>())
-                    {
-                        // If we fail, pretend as if we never called this logic by throwing a regular error
-                        // If we pass, warn
-                        argIndex = 0;
-                        _readAggregateValueFromInitializerList<true>(toType, outToExpr, fromInitializerListExpr, argIndex);   
-                        if (argIndex == argCount)
-                        {
-                            getSink()->diagnose(fromInitializerListExpr, Diagnostics::usingLegacyInitListStructLogic);
-                            return true;
-                        }
-                    }
-                }
-                // If we fail with legacy logic, error
-                getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotFindMatchingInitListToConstructorCount, argCount, toType);
+                // Note: if we remove this entire `if` block, "LegacyLogic" will be no-longer be enabled for "too-many-arg" case
+                if (!usedLegacy)
+                    _maybeRunLegacyLogic(this, toType, outToExpr, fromInitializerListExpr, result, argIndex, usedLegacy);
+                // If we fail without/with legacy logic, error as usual
+                if (argIndex != argCount)
+                    getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotFindMatchingInitListToConstructorCount, argCount, toType);
             }
         }
+
+        // Warn that legacy logic is the reason for code to compile
+        if (usedLegacy)
+            getSink()->diagnose(fromInitializerListExpr, Diagnostics::usingLegacyInitListStructLogic);
 
         return true;
     }
