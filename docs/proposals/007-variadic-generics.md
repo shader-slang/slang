@@ -222,6 +222,14 @@ Similarly, when using `expand` and `each` on values, we require that:
 - The pattern expression of an `expand` expression must capture at least one value whose type is a generic type pack parameter.
 - The expression after `each` must refer to a value whose type is a generic type pack parameter, and the `each` expression can only appear inside an `expand` expression.
 
+Combined with type euqality constriants, variadic generic type pack can be used to define homogeneously typed parameter pack:
+```
+void calcInts<each T>(expand each T values) where T == int
+{
+    ...
+}
+```
+
 Detailed Explanation
 --------------------
 
@@ -536,6 +544,9 @@ For example, the type `expand vector<each T, each U>`, where `T` and `U` are gen
 %v = IRVectorType(%et, %eu)
 %expandType = IRExpandType(%v, %T, %U) // v is pattern; T,U are captured type packs.
 ```
+
+Note that this kind of type hierarchy representation is only used during IR lowering in order to benefit from IR global deduplication of type definitions. The representation in this form isn't convenient for specialization.
+Once lowered to IR step is complete, we will convert all type representation to the same form as value represenataion described in the following section.
 
 #### Expressing Values
 
