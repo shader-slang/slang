@@ -31,6 +31,9 @@ jobs:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: macos, runs-on: macos-latest }
           - { os: windows, runs-on: windows-latest }
+          - os: windows
+            config: release
+            runs-on: [Windows, self-hosted]
     
     steps:
       - uses: actions/checkout@v3
