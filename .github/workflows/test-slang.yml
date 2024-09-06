@@ -44,7 +44,7 @@ jobs:
       - name: Download Slang executables
         uses: actions/download-artifact@v4
         with:
-          name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
+          name: test-slang-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           path: |
             build/*/bin
             build/test-slang.sh
