@@ -1,4 +1,4 @@
-name: Build Slang
+name: "CI [1/2]"
 
 on:
   push:

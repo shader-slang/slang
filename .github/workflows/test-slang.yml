@@ -1,8 +1,8 @@
-name: Test Slang
+name: "CI [2/2]"
 
 on:
   workflow_run:
-    workflows: ["Build Slang"]
+    workflows: ["CI [1/2]"]
     types:
       - completed
 
