@@ -3022,6 +3022,17 @@ namespace Slang
             operands);
     }
 
+    IRDifferentialPtrPairType* IRBuilder::getDifferentialPtrPairType(
+        IRType* valueType,
+        IRInst* witnessTable)
+    {
+        IRInst* operands[] = { valueType, witnessTable };
+        return (IRDifferentialPtrPairType*)getType(
+            kIROp_DifferentialPtrPairType,
+            sizeof(operands) / sizeof(operands[0]),
+            operands);
+    }
+
     IRDifferentialPairUserCodeType* IRBuilder::getDifferentialPairUserCodeType(
         IRType* valueType,
         IRInst* witnessTable)
@@ -3511,6 +3522,18 @@ namespace Slang
         IRInst* args[] = {primal, differential};
         auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
             this, kIROp_MakeDifferentialPair, type, 2, args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitMakeDifferentialPtrPair(IRType* type, IRInst* primal, IRInst* differential)
+    {
+        SLANG_RELEASE_ASSERT(as<IRDifferentialPtrPairType>(type));
+        SLANG_RELEASE_ASSERT(as<IRDifferentialPtrPairType>(type)->getValueType() != nullptr);
+
+        IRInst* args[] = {primal, differential};
+        auto inst = createInstWithTrailingArgs<IRMakeDifferentialPtrPair>(
+            this, kIROp_MakeDifferentialPtrPair, type, 2, args);
         addInst(inst);
         return inst;
     }
@@ -4230,6 +4253,17 @@ namespace Slang
             &diffPair);
     }
 
+    
+    IRInst* IRBuilder::emitDifferentialPtrPairGetDifferential(IRType* diffType, IRInst* diffPair)
+    {
+        SLANG_ASSERT(as<IRDifferentialPtrPairType>(diffPair->getDataType()));
+        return emitIntrinsicInst(
+            diffType,
+            kIROp_DifferentialPtrPairGetDifferential,
+            1,
+            &diffPair);
+    }
+
     IRInst* IRBuilder::emitDifferentialPairGetPrimal(IRInst* diffPair)
     {
         auto valueType = cast<IRDifferentialPairTypeBase>(diffPair->getDataType())->getValueType();
@@ -4245,6 +4279,25 @@ namespace Slang
         return emitIntrinsicInst(
             primalType,
             kIROp_DifferentialPairGetPrimal,
+            1,
+            &diffPair);
+    }
+
+    IRInst* IRBuilder::emitDifferentialPtrPairGetPrimal(IRInst* diffPair)
+    {
+        auto valueType = cast<IRDifferentialPairTypeBase>(diffPair->getDataType())->getValueType();
+        return emitIntrinsicInst(
+            valueType,
+            kIROp_DifferentialPtrPairGetPrimal,
+            1,
+            &diffPair);
+    }
+
+    IRInst* IRBuilder::emitDifferentialPtrPairGetPrimal(IRType* primalType, IRInst* diffPair)
+    {
+        return emitIntrinsicInst(
+            primalType,
+            kIROp_DifferentialPtrPairGetPrimal,
             1,
             &diffPair);
     }

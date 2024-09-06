@@ -141,7 +141,10 @@ struct ExtractPrimalFuncContext
         }
         auto structField = genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
       
-        if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(&genTypeBuilder, (IRType*)fieldType))
+        if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(
+                &genTypeBuilder,
+                (IRType*)fieldType,
+                DiffConformanceKind::Value))
         {
             genTypeBuilder.addIntermediateContextFieldDifferentialTypeDecoration(structField, witness);
         }

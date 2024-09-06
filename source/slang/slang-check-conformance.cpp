@@ -276,7 +276,8 @@ namespace Slang
 
     bool SemanticsVisitor::isTypeDifferentiable(Type* type)
     {
-        return isSubtype(type, m_astBuilder->getDiffInterfaceType(), IsSubTypeOptions::None);
+        return isSubtype(type, m_astBuilder->getDiffInterfaceType(), IsSubTypeOptions::None) || 
+               isSubtype(type, m_astBuilder->getDifferentiableRefInterfaceType(), IsSubTypeOptions::None);
     }
 
     bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)

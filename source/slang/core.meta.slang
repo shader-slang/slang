@@ -285,12 +285,12 @@ interface IDifferentiable
     static Differential dmul(T, Differential);
 };
 
-__magic_type(DifferentiableRefType)
-interface IDifferentiableRefType
+__magic_type(DifferentiablePtrType)
+interface IDifferentiablePtrType
 {
-    __builtin_requirement($((int)BuiltinRequirementKind::DifferentialRefType))
-    associatedtype Differential : IDifferentiableRefType;
-}
+    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
+    associatedtype Differential : IDifferentiablePtrType;
+};
 
 
 /// Pair type that serves to wrap the primal and
@@ -364,35 +364,35 @@ struct DifferentialPair : IDifferentiable
     }
 };
 
-__generic<T : IDifferentiableRefType>
-__magic_type(DifferentialRefPairType)
-__intrinsic_type($(kIROp_DifferentialRefPairType))
-struct DifferentialRefPair : IDifferentiableRefType
+__generic<T : IDifferentiablePtrType>
+__magic_type(DifferentialPtrPairType)
+__intrinsic_type($(kIROp_DifferentialPtrPairType))
+struct DifferentialPtrPair : IDifferentiablePtrType
 {
-    typedef DifferentialRefPair<T.Differential> Differential;
+    typedef DifferentialPtrPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
 
-    __intrinsic_op($(kIROp_MakeDifferentialRefPairUserCode))
+    __intrinsic_op($(kIROp_MakeDifferentialPtrPair))
     __init(T _primal, T.Differential _differential);
 
     property p : T
     {
-        __intrinsic_op($(kIROp_DifferentialRefPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetPrimal))
         get;
     }
 
     property v : T
     {
-        __intrinsic_op($(kIROp_DifferentialRefPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetPrimal))
         get;
     }
 
     property d : T.Differential
     {
-        __intrinsic_op($(kIROp_DifferentialRefPairGetDifferentialUserCode))
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetDifferential))
         get;
     }
-}
+};
 
 
 /// A type that uses a floating-point representation
