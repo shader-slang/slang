@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target dxil -entry computeMain -stage compute -profile sm_6_5
 
 //CHECK: computeMain
 

@@ -34,6 +34,16 @@ namespace Slang
         return kBuiltinConversion_Unknown;
     }
 
+    bool isSimpleType(Type* type)
+    {
+        if (as<ArrayExpressionType>(type)) return true;
+        if (as<VectorExpressionType>(type)) return true;
+        if (as<MatrixExpressionType>(type)) return true;
+        if (as<BasicExpressionType>(type))
+        {
+            return true;
+        }
+    }
     bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(
         Type*    type)
     {
@@ -92,7 +102,12 @@ namespace Slang
         if(isEffectivelyScalarForInitializerLists(fromExpr->type))
             return false;
 
-        // If 2 types are equal, we know the types can be coerced directly
+        // If 2 types are "broadly equal" we know the types can be coerced directly
+        // since otherwise trying to solve `float3 tmp[2] = {float3(val), float3(val)};` will break down into searching for `float`
+        // (which we don't have in our init-list argument list, this will error).
+        // 
+        // This logic should be completly cleaned up at some point by only using constructors for `{...}` and attempting to use 
+        // constructors before fallback coerce logic is tried.
         if (toType->equals(fromExpr->type))
             return true;
 
@@ -128,7 +143,7 @@ namespace Slang
         // for aggregate initialization.
         //
         auto firstInitExpr = fromInitializerListExpr->args[ioInitArgIndex];
-        if(canCoerce(toType, firstInitExpr->type, firstInitExpr) && (shouldUseInitializerDirectly(toType, firstInitExpr)))
+        if(shouldUseInitializerDirectly(toType, firstInitExpr) && canCoerce(toType, firstInitExpr->type, firstInitExpr))
         {
             ioInitArgIndex++;
             return _coerce(
