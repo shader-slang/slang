@@ -544,13 +544,15 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     moveParams(innerBreakableRegionHeader, targetBlock);
 
     builder.setInsertInto(innerBreakableRegionHeader);
-    builder.emitLoop(targetBlock, innerBreakableRegionBreakBlock, targetBlock);
+    auto innerLoop = builder.emitLoop(targetBlock, innerBreakableRegionBreakBlock, targetBlock);
+    innerLoop->sourceLoc = loopInst->sourceLoc;
 
     continueBlock->replaceUsesWith(innerBreakableRegionBreakBlock);
     
     builder.setInsertInto(innerBreakableRegionBreakBlock);
     moveParams(innerBreakableRegionBreakBlock, continueBlock);
-    builder.emitBranch(continueBlock);
+    auto unconditionalBranch = builder.emitBranch(continueBlock);
+    unconditionalBranch->sourceLoc = loopInst->sourceLoc;
 
     // If the original loop can be executed up to N times, the new loop may be executed
     // upto N+1 times (although most insts are skipped in the last traversal)

@@ -985,7 +985,8 @@ void IRBuilder::insertBlockAlongEdge(
     // The edge block should branch (unconditionally)
     // to the successor block.
     builder.setInsertInto(edgeBlock);
-    builder.emitBranch(succ);
+    auto unconditionalBranch = builder.emitBranch(succ);
+    unconditionalBranch->sourceLoc = edgeUse->getUser()->sourceLoc;
 
     // Insert the new block into the block list
     // for the function.

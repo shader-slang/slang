@@ -1463,6 +1463,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
     OrderedHashSet<IRInst*> processedStoreSet;
 
+    printf("****** ensureInstAvailable\n");
+
     auto ensureInstAvailable = [&](OrderedHashSet<IRInst*>& instSet, bool isRecomputeInst)
     {
         SLANG_ASSERT(!isDifferentialBlock(defaultVarBlock));
@@ -1476,6 +1478,9 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
         {
             auto instToStore = workList.getLast();
             workList.removeLast();
+            
+            printf("ensureInstAvailable, worklist element:\n");
+            instToStore->dump();
 
             if (seenInstSet.contains(instToStore))
                 continue;
@@ -1544,6 +1549,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
             if (outOfScopeUses.getCount() == 0)
             {
+                printf(">> NO OUT OF SCOPE USES\n");
                 if (!isRecomputeInst)
                     processedStoreSet.add(instToStore);
                 seenInstSet.add(instToStore);
@@ -1645,6 +1651,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 bool isLoopCounter = (instToStore->findDecoration<IRLoopCounterDecoration>() != nullptr);
                 if (isLoopCounter)
                 {
+                    printf(">> LOOP COUNTER!\n");
                     defBlockIndices.removeAt(0);
                 }
                 else
@@ -1655,6 +1662,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
                 setInsertAfterOrdinaryInst(&builder, instToStore);
                 auto localVar = storeIndexedValue(&builder, varBlock, instToStore, defBlockIndices);
+                localVar->sourceLoc = instToStore->sourceLoc;
 
                 for (auto use : outOfScopeUses)
                 {
@@ -1665,8 +1673,11 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                         loadIndexedValue(&builder, localVar, defBlock, defBlockIndices, useBlockIndices));
                 }
 
-                if (!isRecomputeInst)
+                if (!isRecomputeInst) {
+                    printf("%% localVar:\n");
+                    localVar->dump();
                     processedStoreSet.add(localVar);
+                }
             }
 
             seenInstSet.add(instToStore);

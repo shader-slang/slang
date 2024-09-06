@@ -303,6 +303,18 @@ struct EliminateMultiLevelBreakContext
     
     void processFunc(IRGlobalValueWithCode* func)
     {
+        //printf("(result before branch normalization)===============================\n");
+        //func->dump();
+        //for (auto block : func->getBlocks()) {
+        //    for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+        //        printf("inst with location: %d (%d)\n",
+        //            inst->sourceLoc.getRaw(),
+        //            inst->sourceLoc.isValid());
+
+        //        inst->dump();
+        //    }
+        //}
+
         normalizeBranchesIntoBreakBlocks(func);
         
         // If func does not have any multi-level breaks, return.
@@ -313,9 +325,33 @@ struct EliminateMultiLevelBreakContext
             if (funcInfo.multiLevelBreaks.getCount() == 0)
                 return;
         }
+        
+        printf("(result before eliminating phis)===============================\n");
+        func->dump();
+        for (auto block : func->getBlocks()) {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+                printf("inst with location: %d (%d)\n",
+                    inst->sourceLoc.getRaw(),
+                    inst->sourceLoc.isValid());
+
+                inst->dump();
+            }
+        }
 
         // To make things easy, eliminate Phis before perform transformations.
         eliminatePhisInFunc(LivenessMode::Disabled, irModule, func, PhiEliminationOptions::getFast());
+        
+        printf("(result after eliminating phis)===============================\n");
+        func->dump();
+        for (auto block : func->getBlocks()) {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+                printf("inst with location: %d (%d)\n",
+                    inst->sourceLoc.getRaw(),
+                    inst->sourceLoc.isValid());
+
+                inst->dump();
+            }
+        }
 
         // Before modifying the cfg, we gather all required info from the existing cfg.
         FuncContext funcInfo;

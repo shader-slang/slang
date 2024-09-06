@@ -462,6 +462,7 @@ struct PhiEliminationContext
                 // to the temporary that will replace it.
                 //
                 param->transferDecorationsTo(temp);
+                temp->sourceLoc = param->sourceLoc;
             }
 
             // The other main auxilliary sxtructure is used to track
