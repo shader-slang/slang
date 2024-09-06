@@ -152,7 +152,7 @@ jobs:
           fi
 
       - name: Upload Slang executables
-      - uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           path: |
@@ -161,7 +161,7 @@ jobs:
             build/test-slang-via-glsl.sh
 
       - name: Upload slang-LLVM
-      - uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         if: ${{ ! matrix.full-gpu-tests }}
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
