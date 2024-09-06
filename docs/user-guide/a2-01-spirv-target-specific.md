@@ -134,7 +134,7 @@ SPIR-V 1.5 with [SPV_EXT_shader_atomic_float16_add](https://github.com/KhronosGr
 ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)ByteAddressBuffer
 -----------------------------------------------------------------------------------------------
 
-Each member in a `ConstantBuffer` will be emitted as `uniform` parameter.
+Each member in a `ConstantBuffer` will be emitted as `uniform` parameter in a uniform block.
 StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer with `readonly` layout.
 RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` layout.
 RasterizerOrderedStructuredBuffer and RasterizerOrderedByteAddressBuffer will use an extension, `SPV_EXT_fragment_shader_interlock`.
@@ -155,6 +155,34 @@ It is similar to `ConstantBuffer` in HLSL, and `ParameterBlock` can include not 
 
 When both ordinary data fields and resource typed fields exist in a parameter block, all ordinary data fields will be grouped together into a uniform buffer and appear as a binding 0 of the resulting descriptor set.
 
+
+Push Constants
+---------------------
+
+By default, a `uniform` parameter defined in the parameter list of an entrypoint function is translated to a push constant in SPIRV, if the type of the parameter is ordinary data type (no resources/textures).
+All `uniform` parameter defined in global scope are grouped together and placed in a default constant bbuffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
+on the uniform parameter.
+
+Specialization Constants
+------------------------
+
+You can specify a global constant to translate into a SPIRV specialization constant with the `[SpecializationConstant]` attribute.
+For example:
+```csharp
+[SpecializationConstant]
+const int myConst = 1; // Maps to a SPIRV specialization constant
+```
+
+By default, Slang will automatically assign `constant_id` number for specialization constants. If you wish to explicitly specify them, use `[vk::constant_id]` attribute:
+```csharp
+[vk::constant_id(1)]
+const int myConst = 1;
+```
+
+Alternatively, the GLSL `layout` syntax is also supported by Slang:
+```glsl
+layout(constant_id = 1) const int MyConst = 1;
+```
 
 SPIR-V specific Compiler options
 --------------------------------
