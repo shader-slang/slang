@@ -755,6 +755,7 @@ namespace Slang
             {
                 bool error = true;
                 // Try to use legacy struct logic if we have a 'struct' toType for Slang backwards compatability
+                // Note: if we remove this entire `if` block, "LegacyLogic" will be no-longer be enabled 
                 if (auto declRefType = as<DeclRefType>(toType))
                 {
                     if (declRefType->getDeclRef().as<StructDecl>())

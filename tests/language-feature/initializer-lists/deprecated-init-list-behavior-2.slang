@@ -1,15 +1,19 @@
 //TEST:SIMPLE(filecheck=ERROR): -target hlsl -entry computeMain -stage compute
 
-public struct Test
+struct Test
 {
-    // note: we need an initExpr here for an error because else Slang will disallow
-    // synthisis of a 'public' constructor, meaning nothing has to fail.
-    internal uint a = 5;
-	public uint b;
+    uint a;
+	uint b;
+    __init(int a_in, int b_in)
+    {
+        a_in = 0;
+        b_in = 0;
+    }
 };
 
 
-//ERROR: error 30500
+//CHECK: warning 30505
+//CHECK: computeMain
 
 RWStructuredBuffer<uint> outputBuffer;
 
