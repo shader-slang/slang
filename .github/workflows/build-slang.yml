@@ -1,4 +1,4 @@
-name: "CI [1/2]"
+name: CI
 
 on:
   push:
@@ -91,6 +91,7 @@ jobs:
         with:
           submodules: 'recursive'
           fetch-depth: '0'
+
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
@@ -99,6 +100,7 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: true
+
       - name: Build Slang
         run: |
           if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" ]]; then
@@ -172,6 +174,7 @@ jobs:
           path: build/dist-${{matrix.config}}/**/ZIP/slang/*
 
   test:
+    name: Test
     needs: Build
     runs-on: ${{ matrix.runs-on }}
 
@@ -180,7 +183,16 @@ jobs:
         with:
           submodules: 'recursive'
           fetch-depth: '0'
-      
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{matrix.os}}
+          compiler: ${{matrix.compiler}}
+          platform: ${{matrix.platform}}
+          config: ${{matrix.config}}
+          build-llvm: true
+
       - name: Download Slang executables
         uses: actions/download-artifact@v4
         with:
