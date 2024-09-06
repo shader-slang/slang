@@ -521,11 +521,12 @@ DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without a
 DIAGNOSTIC(30401, Error, invalidTypeForConstraint, "type '$0' cannot be used as a constraint.")
 
 // 305xx: initializer lists
-DIAGNOSTIC(30500, Error, tooManyInitializers, "cannot find matching constructor to call with arguments count of '$0' for '$1'")
+DIAGNOSTIC(30500, Error, cannotFindMatchingInitListToConstructorCount, "cannot find matching constructor to call with arguments count of '$0' for '$1'")
 DIAGNOSTIC(30501, Error, cannotUseInitializerListForArrayOfUnknownSize, "cannot use initializer list for array of statically unknown size '$0'")
 DIAGNOSTIC(30502, Error, cannotUseInitializerListForVectorOfUnknownSize, "cannot use initializer list for vector of statically unknown size '$0'")
 DIAGNOSTIC(30503, Error, cannotUseInitializerListForMatrixOfUnknownSize, "cannot use initializer list for matrix of statically unknown size '$0' rows")
 DIAGNOSTIC(30504, Error, cannotUseInitializerListForType, "cannot use initializer list for type '$0'")
+DIAGNOSTIC(30505, Warning, usingLegacyInitListStructLogic, "detected deprecated legacy initializer-list (`{...}`) resolution logic, we advise following proper initializer-list rules as per Slang's user-guide")
 
 // 3062x: variables
 DIAGNOSTIC(30620, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")

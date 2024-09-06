@@ -1506,6 +1506,7 @@ namespace Slang
             /// If the routine fails and `outToExpr` is non-null,
             /// then a suitable diagnostic will be emitted.
             ///
+        template<bool UseLegacyLogic>
         bool _readValueFromInitializerList(
             Type*                toType,
             Expr**               outToExpr,
@@ -1531,6 +1532,7 @@ namespace Slang
             /// If the routine fails and `outToExpr` is non-null,
             /// then a suitable diagnostic will be emitted.
             ///
+        template<bool UseLegacyLogic>
         bool _readAggregateValueFromInitializerList(
             Type*                inToType,
             Expr**               outToExpr,
