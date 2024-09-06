@@ -68,6 +68,16 @@ namespace Slang
         return true;
     }
 
+    // 
+    bool isSameSimpleExprType(Type* type1, Type* type2)
+    {
+        if (as<BasicExpressionType>(type1) && as<BasicExpressionType>(type2)) return true;
+        if (as<ArrayExpressionType>(type1) && as<ArrayExpressionType>(type2)) return true;
+        if (as<VectorExpressionType>(type1) && as<VectorExpressionType>(type2)) return true;
+        if (as<MatrixExpressionType>(type1) && as<MatrixExpressionType>(type2)) return true;
+        return false;
+    }
+
     bool SemanticsVisitor::shouldUseInitializerDirectly(
         Type*    toType,
         Expr*    fromExpr)
@@ -99,6 +109,11 @@ namespace Slang
         // This logic should be completly cleaned up at some point by only using constructors for `{...}` and attempting to use 
         // constructors before fallback coerce logic is tried.
         if (toType->equals(fromExpr->type))
+            return true;
+
+        // `vector<T,N>` and `vector<T,U>` may not be copyable, but, we have no choice in this senario but to assume coerce logic
+        // can resolve such situations
+        if (isSameSimpleExprType(toType, fromExpr->type))
             return true;
 
         return false;
