@@ -379,7 +379,7 @@ enum class ConstructorTags : int
     MemberwiseCtorForPublicVisibility = 1 << 1,    
 
     /// Derived classes will call this ctor if they need a memberwise ctor for public and internal members.
-    /// This ctor may be equal to 'isMemberwiseCtorForPublicVisibility'
+    /// A ctor with `MemberwiseCtorForInternalVisibility` may also contain 'isMemberwiseCtorForPublicVisibility'
     MemberwiseCtorForInternalVisibility = 1 << 2,
 };
 

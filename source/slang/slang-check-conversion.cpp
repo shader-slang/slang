@@ -68,7 +68,6 @@ namespace Slang
         return true;
     }
 
-    // 
     bool isSameSimpleExprType(Type* type1, Type* type2)
     {
         if (as<BasicExpressionType>(type1) && as<BasicExpressionType>(type2)) return true;
@@ -111,8 +110,8 @@ namespace Slang
         if (toType->equals(fromExpr->type))
             return true;
 
-        // `vector<T,N>` and `vector<T,U>` may not be copyable, but, we have no choice in this senario but to assume coerce logic
-        // can resolve such situations
+        // `vector<T,N>` and `vector<T,U>` may not be equal types, but, we have no choice in this senario but to assume coerce logic
+        // can resolve such situations, otherwise we need to fail
         if (isSameSimpleExprType(toType, fromExpr->type))
             return true;
 
@@ -329,6 +328,7 @@ namespace Slang
         {
             // TODO(tfoley): If we can compute the size of the array statically,
             // then we want to check that there aren't too many initializers present
+
             auto toElementType = toArrayType->getElementType();
             if(!toArrayType->isUnsized())
             {
@@ -618,7 +618,7 @@ namespace Slang
                         }
 
                         // c. Create InvokeExpr for our valid ConstructorDecl 
-                        // We cannot fail anymore, set ioArgIndex to the 'used up arg count'.
+                        // We cannot fail anymore, set `ioArgIndex` to the 'used up arg count'.
                         if (outToExpr)
                         {
                             ioArgIndex = ioArgIndexCandidate;
@@ -646,12 +646,12 @@ namespace Slang
                     // If we have a generic being compared to another generic (with different generic arguments) 
                     // coerce logic will fail regardless of if generics are valid together. Example is below:
                     //
-                    // MyStruct<T> tmp = {MyStructBase<U>(), 1}; // assume 'U' is unresolved at this point in time but equal to T 
+                    // MyStruct<T> tmp = {MyStructBase<U>(), 1}; // Assume 'U' is unresolved at this point in time but equal to T 
                     //
                     // To handle this since this is not verifiable coerce logic:
                     // 1. We need to ensure we don't have any matching constructors
-                    // 2. if '1.' is true we can assign the possibly compatible generics and let generic resolution diagnose 
-                    // if something makes zero sense.
+                    // 2. if '1.' is true we can assign the possibly compatible generics and let generic resolution 
+                    //    diagnose an error down the line if types are in-compatible
 
                     if (auto toGenericType = _getGenericAppDeclRefType(toType))
                     {

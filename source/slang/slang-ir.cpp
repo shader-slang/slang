@@ -3741,11 +3741,11 @@ namespace Slang
         // Slang generally detects recursive type-uses in IR,
         // This means that DefaultConstruct may crash unless we 
         // track visited types with `visitedTypes.contains(type)`
-        // to avoid infinite looping of type-checks
+        // to avoid infinite looping of type-checks.
         //
-        // Slang may be asked to default init a `RWTexture2D`. 
-        // If so, `isResourceType(type)` ensures we don't generate
-        // garbage/
+        // Slang may be asked to default init a `RWTexture2D`,
+        // if so, adding `isResourceType(type)` ensures we don't
+        // generate garbage for resource types.
         if (visitedTypes.contains(type) || isResourceType(type))
             return emitUndefined(type);
         visitedTypes.add(type);

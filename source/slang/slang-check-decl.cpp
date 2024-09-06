@@ -1866,7 +1866,7 @@ namespace Slang
         addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
         ctor->addOption(ConstructorTags::Synthesized);
 
-        // kIROp_TorchTensorType must only refer to its own type through Host functions
+        // kIROp_TorchTensorType can only be used in host-callable functions
         if(auto intrinsicType = decl->findModifier<IntrinsicTypeModifier>())
             if(intrinsicType->irOp == kIROp_TorchTensorType)
                 addModifier(ctor, m_astBuilder->create<CudaHostAttribute>());
@@ -1961,8 +1961,6 @@ namespace Slang
             varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl->type, varDecl);
         }
         
-        auto type = varDecl->getType();
-
         if (auto initExpr = varDecl->initExpr)
         {
             // Disable the short-circuiting for static const variable init expression
@@ -2010,12 +2008,12 @@ namespace Slang
             // and filtering them to ones that are applicable
             // to our "call site" with zero arguments.
             //
-            
             OverloadResolveContext overloadContext;
             overloadContext.loc = varDecl->nameAndLoc.loc;
             overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
             overloadContext.sourceScope = m_outerScope;
 
+            auto type = varDecl->getType();
             ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
             auto ctorMethod = getShared()->tryGetImplicitCastMethod(key);
             if (ctorMethod)
@@ -2513,7 +2511,6 @@ namespace Slang
         }
     }
 
-
     // Annotate ctor as a memberwise ctor. A non synthisized function may be annotated as a memberwise ctor
     // if it has a compatible parameter list with a memberwise ctor.
     void _annotateMemberwiseCtorWithVisibility(ConstructorDecl* ctor, DeclVisibility visibility)
@@ -2644,6 +2641,7 @@ namespace Slang
                     // $ZeroInit is a synthisized static-function only used In 2 cases:
                     //     1. if `{}` is used inside a `__init()`
                     //     2. if `{}` is used and a user has a 'synthisized __init()` 
+                    //
                     // Use of $ZeroInit is only for functionality of `{}` to avoid hacks.
                     {
                         auto zeroInitFunc = m_astBuilder->create<FuncDecl>();
@@ -8136,6 +8134,7 @@ namespace Slang
         //
 
         auto structDeclType = DeclRefType::create(m_astBuilder, structDecl);
+
         // Collect ctor info
         struct DeclAndCtorInfo
         {
