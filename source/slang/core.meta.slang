@@ -2198,13 +2198,13 @@ __generic<T>
 [__readNone]
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitfieldInsert))
-    T bitfieldInsert(T base, T insert, int offset, int bits);
+T bitfieldInsert(T base, T insert, int offset, int bits);
 
 __generic<T>
 [__readNone]
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitfieldExtract))
-    T bitfieldExtract(T value, int offset, int bits);
+T bitfieldExtract(T value, int offset, int bits);
 
 // Use an otherwise unused value
 //

@@ -3761,7 +3761,8 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
     m_writer->emit(")");
 }
 
-void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst) {
+void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst) 
+{
     // uint clearMask = ~(((1u << bits) - 1u) << offset);
     // uint clearedBase = base & clearMask;
     // uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
