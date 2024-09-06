@@ -1,4 +1,4 @@
-Proposal Template
+SP #000: Proposal Template
 =================
 
 This document provides a starting point for a larger feature proposal.
