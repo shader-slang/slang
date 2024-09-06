@@ -40,6 +40,10 @@ jobs:
           - { os: windows, compiler: clang }
           - { os: macos, compiler: gcc }
           - { os: macos, compiler: cl }
+          # temporary
+          - { os: linux, compiler: gcc }
+          - { os: macos, compiler: clang }
+          - { os: windows, config: debug }
         include:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: macos, runs-on: macos-latest }
