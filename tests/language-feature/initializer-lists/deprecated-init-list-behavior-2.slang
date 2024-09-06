@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=ERROR): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
 
 struct Test
 {
