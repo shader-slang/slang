@@ -1,4 +1,4 @@
-name: CI
+name: Build Slang
 
 on:
   push:
@@ -15,9 +15,11 @@ on:
       - 'LICENCE'
       - 'CONTRIBUTION.md'
       - 'README.md'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   build:
     strategy:
@@ -115,45 +117,54 @@ jobs:
               -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
             cmake --workflow --preset "${{matrix.config}}"
           fi
-      - name: Test Slang
+
+      - name: Generate testing command
         run: |
-          export SLANG_RUN_SPIRV_VALIDATION=1
-          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          echo "export SLANG_RUN_SPIRV_VALIDATION=1" > build/test-slang.sh
+          echo "export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1" >> build/test-slang.sh
+          cp build/test-slang.sh build/test-slang-via-glsl.sh
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -server-count 8 \
-              -category ${{ matrix.test-category }} \
-              -api all-cpu
+            echo "\"$bin_dir/slang-test\"
+              -use-test-server
+              -server-count 8
+              -category ${{ matrix.test-category }}
+              -api all-cpu" >> build/test-slang.sh
+            echo "\"$bin_dir/slang-test\"
+              -use-test-server
+              -server-count 8
+              -category ${{ matrix.test-category }}
+              -emit-spirv-via-glsl
+              -api vk
+              -expected-failure-list tests/expected-failure.txt" >> build/test-slang-via-glsl.sh
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -category ${{ matrix.test-category }} \
-              -api all-dx12 \
-              -expected-failure-list tests/expected-failure-github.txt
+            echo "\"$bin_dir/slang-test\"
+              -use-test-server
+              -category ${{ matrix.test-category }}
+              -api all-dx12
+              -expected-failure-list tests/expected-failure-github.txt" >> build/test-slang.sh
           else
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -category ${{ matrix.test-category }} \
-              -api all-dx12 \
-              -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt
+            echo "\"$bin_dir/slang-test\"
+              -use-test-server
+              -category ${{ matrix.test-category }}
+              -api all-dx12
+              -expected-failure-list tests/expected-failure-github.txt
+              -expected-failure-list tests/expected-failure-record-replay-tests.txt" >> build/test-slang.sh
           fi
-      - name: Test Slang via glsl
-        if: ${{matrix.full-gpu-tests}}
-        run: |
-          export SLANG_RUN_SPIRV_VALIDATION=1
-          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          "$bin_dir/slang-test" \
-            -use-test-server \
-            -server-count 8 \
-            -category ${{ matrix.test-category }} \
-            -emit-spirv-via-glsl \
-            -api vk \
-            -expected-failure-list tests/expected-failure.txt
-      - uses: actions/upload-artifact@v3
+
+      - name: Upload Slang executables
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
+          path: |
+            build/*/bin
+            build/test-slang.sh
+            build/test-slang-via-glsl.sh
+
+      - name: Upload slang-LLVM
+      - uses: actions/upload-artifact@v4
         if: ${{ ! matrix.full-gpu-tests }}
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           # The install directory used in the packaging step
           path: build/dist-${{matrix.config}}/**/ZIP/slang/*
+
