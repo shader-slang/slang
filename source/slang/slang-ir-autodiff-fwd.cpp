@@ -423,14 +423,14 @@ InstPair ForwardDiffTranscriber::transcribeLoad(IRBuilder* builder, IRLoad* orig
                 (IRType*)differentiableTypeConformanceContext.getDiffTypeFromPairType(builder, diffPairType), load);
             return InstPair(primalElement, diffElement);
         }
-        else if (auto diffRefPairType = as<IRDifferentialPtrPairType>(primalPtrType->getValueType()))
+        else if (auto diffPtrPairType = as<IRDifferentialPtrPairType>(primalPtrType->getValueType()))
         {
             auto load = builder->emitLoad(primalPtr);
             builder->markInstAsPrimal(load);
 
             auto primalElement = builder->emitDifferentialPtrPairGetPrimal(load);
             auto diffElement = builder->emitDifferentialPtrPairGetDifferential(
-                (IRType*)differentiableTypeConformanceContext.getDiffTypeFromPairType(builder, diffPairType), load);
+                (IRType*)differentiableTypeConformanceContext.getDiffTypeFromPairType(builder, diffPtrPairType), load);
             builder->markInstAsPrimal(primalElement);
             builder->markInstAsPrimal(diffElement);
             return InstPair(primalElement, diffElement);
@@ -789,20 +789,6 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
                 auto pairValType = as<IRDifferentialPairTypeBase>(
                     pairPtrType ? pairPtrType->getValueType() : pairType);
-                
-                DiffConformanceKind kind = DiffConformanceKind::Any;
-                if (as<IRDifferentialPtrPairType>(pairValType))
-                {
-                    kind = DiffConformanceKind::Ptr;
-                }
-                else if (as<IRDifferentialPairType>(pairValType))
-                {
-                    kind = DiffConformanceKind::Value;
-                }
-                else
-                {
-                    SLANG_ASSERT(!"unreachable");
-                }
                 
                 auto diffType = differentiableTypeConformanceContext.getDiffTypeFromPairType(&argBuilder, pairValType);
                 if (auto ptrParamType = as<IRPtrTypeBase>(diffParamType))

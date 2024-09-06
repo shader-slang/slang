@@ -1167,7 +1167,7 @@ void AutoDiffTranscriberBase::markDiffPairTypeInst(IRBuilder* builder, IRInst* d
     SLANG_ASSERT(pairType);
     SLANG_ASSERT(as<IRDifferentialPairTypeBase>(pairType));
 
-    if (auto diffPairType = as<IRDifferentialPairType>(pairType))
+    if (as<IRDifferentialPairType>(pairType))
     {
         builder->markInstAsMixedDifferential(diffPairInst, pairType);
     }

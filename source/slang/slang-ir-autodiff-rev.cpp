@@ -156,7 +156,7 @@ namespace Slang
         // Unwrap any ref pairs. We need this special case for trivial funcs.
         for (Int i = 0; i < params.getCount(); i++)
         {
-            if (auto diffPairType = as<IRDifferentialPtrPairType>(params[i]->getDataType()))
+            if (as<IRDifferentialPtrPairType>(params[i]->getDataType()))
             {
                 params[i] = builder->emitDifferentialPtrPairGetPrimal(params[i]);
             }
