@@ -65,7 +65,6 @@ jobs:
             platform: aarch64
             test-category: smoke
             full-gpu-tests: false
-            runs-on: [self-hosted, Linux, ARM64]
             has-gpu: true
           # Self-hosted full gpu build
           - os: windows
