@@ -9,7 +9,6 @@ on:
 jobs:
   #on-success:
   test:
-    runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
         os: [linux, macos, windows]
@@ -35,6 +34,7 @@ jobs:
           - os: windows
             config: release
             runs-on: [Windows, self-hosted]
+    runs-on: ${{ matrix.runs-on }}
     
     steps:
       - uses: actions/checkout@v3
