@@ -24,8 +24,10 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [linux, macos, windows]
-        config: [debug, release]
+        #os: [linux, macos, windows]
+        os: [linux]
+        #config: [debug, release]
+        config: [release]
         compiler: [gcc, clang, cl]
         platform: [x86_64, aarch64]
         exclude:
@@ -40,10 +42,6 @@ jobs:
           - { os: windows, compiler: clang }
           - { os: macos, compiler: gcc }
           - { os: macos, compiler: cl }
-          # temporary
-          - { os: linux, compiler: gcc }
-          - { os: macos, compiler: clang }
-          - { os: windows, config: debug }
         include:
           - { os: linux, runs-on: ubuntu-20.04 }
           - { os: macos, runs-on: macos-latest }
