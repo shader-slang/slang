@@ -237,7 +237,8 @@ namespace Slang
 
                 if (!canCoerce(toType, arg->type, nullptr))
                 {
-                    *outToExpr = arg;
+                    if(outToExpr)
+                        *outToExpr = arg;
                     return true;
                 }
 
