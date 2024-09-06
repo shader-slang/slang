@@ -1,0 +1,13 @@
+name: "second"
+
+on:
+  workflow_run:
+    workflows: ["second"]
+    types:
+      - completed
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Second workflow running"
