@@ -736,6 +736,8 @@ struct IRInst
 
     IRType* getDataType();
 
+    IRType* getUnratedAndUnattributedType();
+
     // After the type, we have data that is specific to
     // the subtype of `IRInst`. In most cases, this is
     // just a series of `IRUse` values representing

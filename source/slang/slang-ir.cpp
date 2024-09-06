@@ -7869,6 +7869,21 @@ namespace Slang
         return type;
     }
 
+    IRType* IRInst::getUnratedAndUnattributedType()
+    {
+        auto type = getFullType();
+
+        while(true)
+        {
+            if (auto attr = as<IRAttributedType>(type))
+                type = attr->getBaseType();
+            else if (auto rateQualified = as<IRRateQualifiedType>(type))
+                type = rateQualified->getValueType();
+            else
+                return type;
+        }
+    }
+
     void validateIRInstOperands(IRInst*);
 
     
