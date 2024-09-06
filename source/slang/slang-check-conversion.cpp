@@ -34,16 +34,6 @@ namespace Slang
         return kBuiltinConversion_Unknown;
     }
 
-    bool isSimpleType(Type* type)
-    {
-        if (as<ArrayExpressionType>(type)) return true;
-        if (as<VectorExpressionType>(type)) return true;
-        if (as<MatrixExpressionType>(type)) return true;
-        if (as<BasicExpressionType>(type))
-        {
-            return true;
-        }
-    }
     bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(
         Type*    type)
     {
