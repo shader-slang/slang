@@ -327,12 +327,8 @@ namespace Slang
                 }
                 case kIROp_Int8Type:
                 case kIROp_UInt8Type:
-                    SLANG_UNIMPLEMENTED_X("AnyValue type packing for 8-bit elements");
-                    break;
                 case kIROp_UInt64Type:
                 case kIROp_Int64Type:
-                    SLANG_UNIMPLEMENTED_X("AnyValue type packing for 64-bit elements");
-                    break;
                 case kIROp_DoubleType:
 #if SLANG_PTR_IS_64
                 case kIROp_UIntPtrType:
@@ -518,13 +514,9 @@ namespace Slang
                 case kIROp_UInt64Type:
                 case kIROp_Int64Type:
                 case kIROp_DoubleType:
-                {
-                    SLANG_UNIMPLEMENTED_X("AnyValue type unpacking for 64-bit elements");
-                    break;
-                }
                 case kIROp_Int8Type:
                 case kIROp_UInt8Type:
-                    SLANG_UNIMPLEMENTED_X("AnyValue type unpacking for 8-bit elements");
+                    SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
                     break;
                 default:
                     SLANG_UNREACHABLE("unknown basic type");
@@ -706,7 +698,6 @@ namespace Slang
             return alignUp(offset, 4) + 4;
         case kIROp_UInt64Type:
         case kIROp_Int64Type:
-            return alignUp(offset, 8) + 8;
         case kIROp_DoubleType:
             return -1;
         case kIROp_Int16Type:
@@ -715,7 +706,7 @@ namespace Slang
             return alignUp(offset, 2) + 2;
         case kIROp_UInt8Type:
         case kIROp_Int8Type:
-            return alignUp(offset, 1) + 1;
+            return -1;
         case kIROp_VectorType:
         {
             auto vectorType = static_cast<IRVectorType*>(type);
