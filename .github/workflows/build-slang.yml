@@ -59,13 +59,14 @@ jobs:
           # The runners don't have a GPU by default except for the self-hosted ones
           - has-gpu: false
           # Self-hosted aarch64 build
-          - os: linux
-            config: release
-            compiler: gcc
-            platform: aarch64
-            test-category: smoke
-            full-gpu-tests: false
-            has-gpu: true
+          #- os: linux
+          #  config: release
+          #  compiler: gcc
+          #  platform: aarch64
+          #  test-category: smoke
+          #  full-gpu-tests: false
+          #  runs-on: [self-hosted, Linux, ARM64]
+          #  has-gpu: true
           # Self-hosted full gpu build
           - os: windows
             config: release
