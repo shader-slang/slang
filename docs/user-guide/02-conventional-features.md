@@ -801,7 +801,7 @@ Auto-Generated Constructors
 Slang has the following rules:
 1. Auto-generate a `__init()` if not already defined
 > Assume
-```c#
+```csharp
 struct DontGenerateCtor
 {
     int a;
@@ -832,7 +832,7 @@ struct GenerateCtor
 ```
 
 2. If all members have equal visibility, auto-generate a 'member-wise constructor' if not conflicting with a user defined constructor.
-```c#
+```csharp
 struct GenerateCtorInner
 {
     int a;
@@ -870,7 +870,7 @@ struct GenerateCtor : GenerateCtorInner
             * Do not generate if `private` member lacks an init expression
         3. `private` 'member-wise constructor'
             * Contains members of visibility: `private`, `internal`, `public`
-```C#
+```csharp
 struct GenerateCtorInner1
 {
     internal int a = 0;
@@ -941,7 +941,7 @@ Initializer Lists
 ----------
 Initializer List's are an expression of the form `{...}`.
 
-```c#
+```csharp
 int myFunc()
 {
     int a = {}; // Initializer List
@@ -950,14 +950,14 @@ int myFunc()
 
 ### Initializer List's - Scalar
 
-```c#
+```csharp
 // Equivalent to `int a = 1`
 int a = {1};
 ```
 
 ### Initializer List's - Vectors
 
-```c#
+```csharp
 // Equivalent to `float3 a = float3(1,2,3)`
 float3 a = {1, 2, 3};
 ```
@@ -966,28 +966,28 @@ float3 a = {1, 2, 3};
 
 #### Array Of Scalar's
 
-```c#
+```csharp
 // Equivalent to `int[2] a; a[0] = 1; a[1] = 2;`
 int a[2] = {1, 2}
 ```
 
 #### Array Of Aggregate's
 
-```c#
+```csharp
 // Equivlent to `float3 a[2]; a[0] = {1,2,3}; b[1] = {4,5,6};`
-float3 a[2] = {{1,2,3}, {4,5,6}};
+float3 a[2] = { {1,2,3}, {4,5,6} };
 ```
 #### Flattened Array Initializer
 
-```c#
-// Equivalent to `float3 a[2] = {{1,2,3}, {4,5,6}};`
+```csharp
+// Equivalent to `float3 a[2] = { {1,2,3}, {4,5,6} };`
 float3 a[3] = {1,2,3, 4,5,6}; 
 ```
 
 ### Initializer Lists - Struct
 
 In most scenarios, using an initializer list to create a struct typed value is equivalent to calling the struct's constructor using the elements in the initilaizer list as arguments for the constructor, for example:
-```c#
+```csharp
 struct GenerateCtorInner1
 {
     internal int a = 0;
@@ -1045,7 +1045,7 @@ struct GenerateCtor1 : GenerateCtorInner1
 ...
 
 // Calls `{ GenerateCtor1::__init(3), GenerateCtor1::__init(2) }`
-GenerateCtor1 val[2] = {{ 3 }, { 2 }};
+GenerateCtor1 val[2] = { { 3 }, { 2 } };
 ```
 
 In addition, Slang also provides compatbility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-List's) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Struct)
@@ -1056,7 +1056,7 @@ A struct is considered a C-style struct if:
 
 #### Partial Initializer List's
 
-```c#
+```csharp
 struct Foo
 {
     int a;
@@ -1075,7 +1075,7 @@ Foo val = {2, 3};
 
 #### Flattened Array Initializer With Struct's
 
-```c#
+```csharp
 struct Foo
 {
     int a;
@@ -1085,7 +1085,7 @@ struct Foo
 
 ...
 
-// Equivalent to `Foo val[2] = {{0,1,2}, {3,4,5}};`
+// Equivalent to `Foo val[2] = { {0,1,2}, {3,4,5} };`
 Foo val[2] = {0,1,2, 3,4,5};
 ```
 
@@ -1097,7 +1097,7 @@ Foo val[2] = {0,1,2, 3,4,5};
 #### Non-Struct Type
 
 Value will zero-initialize
-```c#
+```csharp
 // Equivalent to `int val1 = 0;`
 int val1 = {};
 
@@ -1110,7 +1110,7 @@ float3 val2 = {};
 1. Atempt to call default constructor (`__init()`) of a `struct`
 
 
-```c#
+```csharp
 struct Foo
 {
     int a;
@@ -1129,7 +1129,7 @@ Foo val = {};
 ```
 2. As a fallback, zero-initialize the struct
 
-```c#
+```csharp
 struct Foo
 {
     int a;
