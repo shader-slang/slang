@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - id: set-matrix
-        run: echo "matrix=$(cat matrix.json | jq -c .)" >> $GITHUB_OUTPUT
+        run: echo "matrix=$(cat .github/workflow/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
 
   build:
     name: Build
