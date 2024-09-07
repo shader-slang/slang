@@ -26,14 +26,14 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
 
-    defaults:
-      run:
-        shell: bash
-
     steps:
       - uses: actions/checkout@v3
       - id: set-matrix
-        run: echo "matrix=$(cat .github/workflow/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
+        shell: bash
+        run: |
+          ls .github/workflow
+          cat .github/workflow/matrix.json
+          echo "matrix=$(cat .github/workflow/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
 
   build:
     needs: setup
