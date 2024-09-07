@@ -36,7 +36,7 @@ jobs:
         run: echo "matrix=$(cat .github/workflow/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
 
   build:
-    name: Build
+    needs: setup
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
@@ -134,8 +134,7 @@ jobs:
           path: build/dist-${{matrix.config}}/**/ZIP/slang/*
 
   test:
-    name: Test
-    needs: Build
+    needs: [setup, build]
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
