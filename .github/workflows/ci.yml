@@ -21,25 +21,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  setup:
+  load_matrix:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - id: set-matrix
         shell: bash
-        run: |
-          ls .github/workflows
-          cat .github/workflows/matrix.json
-          echo "matrix=$(cat .github/workflows/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
+        run: echo "matrix=$(cat .github/workflows/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
 
   build:
-    needs: setup
+    needs: load_matrix
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.load_matrix.outputs.matrix) }}
     runs-on: ${{ matrix.runs-on }}
 
     defaults:
@@ -47,7 +44,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
           fetch-depth: '0'
@@ -134,14 +131,14 @@ jobs:
           path: build/dist-${{matrix.config}}/**/ZIP/slang/*
 
   test:
-    needs: [setup, build]
+    needs: [load_matrix, build]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.load_matrix.outputs.matrix) }}
     runs-on: ${{ matrix.runs-on }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
           fetch-depth: '0'
