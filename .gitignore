@@ -12,6 +12,7 @@
 *.zip
 *.ini
 *.DS_store
+.*.swp
 .clang-format
 .gdb_history
 .vimspector

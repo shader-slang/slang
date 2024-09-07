@@ -21,65 +21,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v3
+      - id: set-matrix
+        run: echo "matrix=$(cat matrix.json | jq -c .)" >> $GITHUB_OUTPUT
+
   build:
     name: Build
     strategy:
-      matrix:
-        #os: [linux, macos, windows]
-        os: [linux]
-        #config: [debug, release]
-        config: [release]
-        compiler: [gcc, clang, cl]
-        platform: [x86_64, aarch64]
-        exclude:
-          # Default to x64, but aarch64 on osx
-          - { os: linux, platform: aarch64 }
-#         - { os: windows, platform: aarch64 }
-#         - { os: macos, platform: x86_64 }
-          # Unused compiler configs
-          - { os: linux, compiler: clang }
-          - { os: linux, compiler: cl }
-#         - { os: windows, compiler: gcc }
-#         - { os: windows, compiler: clang }
-#         - { os: macos, compiler: gcc }
-#         - { os: macos, compiler: cl }
-        include:
-          - { os: linux, runs-on: ubuntu-20.04 }
-#         - { os: macos, runs-on: macos-latest }
-#         - { os: windows, runs-on: windows-latest }
-          # Warnings are treated as errors by default.
-          # But we may want to disable it temporarily.
-          - { os: linux, warnings-as-errors: true }
-#         - { os: macos, warnings-as-errors: true }
-#         - { os: windows, warnings-as-errors: true }
-          # Set a test category depending on the config, smoke by default,
-          # quick or full conditionally otherwise
-          - test-category: smoke
-#         - { os: windows, test-category: quick }
-          - { config: release, test-category: full }
-          # default not full gpu tests
-          - full-gpu-tests: false
-          # The runners don't have a GPU by default except for the self-hosted ones
-          - has-gpu: false
-          # Self-hosted aarch64 build
-          #- os: linux
-          #  config: release
-          #  compiler: gcc
-          #  platform: aarch64
-          #  test-category: smoke
-          #  full-gpu-tests: false
-          #  runs-on: [self-hosted, Linux, ARM64]
-          #  has-gpu: true
-          # Self-hosted full gpu build
-#         - os: windows
-#           config: release
-#           compiler: cl
-#           platform: x86_64
-#           test-category: full
-#           full-gpu-tests: true
-#           runs-on: windows-latest
-#           has-gpu: true
       fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     runs-on: ${{ matrix.runs-on }}
 
     defaults:
@@ -123,7 +83,7 @@ jobs:
             cmake --workflow --preset "${{matrix.config}}"
           fi
 
-      - name: Generate testing command
+      - name: Generate testing commands
         run: |
           echo "export SLANG_RUN_SPIRV_VALIDATION=1" > build/test-slang.sh
           echo "export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1" >> build/test-slang.sh
@@ -176,6 +136,9 @@ jobs:
   test:
     name: Test
     needs: Build
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     runs-on: ${{ matrix.runs-on }}
 
     steps:
