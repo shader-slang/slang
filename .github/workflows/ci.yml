@@ -31,9 +31,9 @@ jobs:
       - id: set-matrix
         shell: bash
         run: |
-          ls .github/workflow
-          cat .github/workflow/matrix.json
-          echo "matrix=$(cat .github/workflow/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
+          ls .github/workflows
+          cat .github/workflows/matrix.json
+          echo "matrix=$(cat .github/workflows/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
 
   build:
     needs: setup
