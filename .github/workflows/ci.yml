@@ -80,19 +80,20 @@ jobs:
           fi
 
       - name: Set capitalized config
-        run: echo "CONFIG_CAP=$(echo ${{ matrix.config }} | sed 's/^./\\U&/')" >> $GITHUB_ENV
+        run: |
+          CONFIG_LOWER=${{ matrix.config }}
+          echo "CONFIG_UPPER=${CONFIG_LOWER^}" >> $GITHUB_ENV
 
       - name: Upload Slang
         uses: actions/upload-artifact@v4
         with:
           name: test-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           path: |
-            build/${{ env.CONFIG_CAP }}/bin
-            build/${{ env.CONFIG_CAP }}/lib
-          exclude: |
-            **/*.pdb
-            **/*.ilk
-            **/*.a
+            build/${{ env.CONFIG_UPPER }}/bin
+            build/${{ env.CONFIG_UPPER }}/lib
+            !**/*.pdb
+            !**/*.ilk
+            !**/*.a
 
       - name: Upload slang-LLVM
         uses: actions/upload-artifact@v4
