@@ -49,8 +49,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: '0'
 
-      - name: Setup
-        uses: ./.github/actions/common-setup
+      - uses: .github/actions/common-setup
         with:
           os: ${{matrix.os}}
           compiler: ${{matrix.compiler}}
@@ -80,17 +79,13 @@ jobs:
             cmake --workflow --preset "${{matrix.config}}"
           fi
 
-      - name: List binaries
-        run: ls -R build
-
-      - name: Upload Slang executables
+      - name: Upload Slang
         uses: actions/upload-artifact@v4
         with:
           name: test-slang-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           path: |
             build/*/bin
             build/*/lib
-            build/llvm-project-install
 
       - name: Upload slang-LLVM
         uses: actions/upload-artifact@v4
@@ -117,16 +112,14 @@ jobs:
           submodules: 'recursive'
           fetch-depth: '0'
 
-      - name: Setup
-        uses: ./.github/actions/common-setup
+      - uses: .github/actions/common-setup
         with:
           os: ${{matrix.os}}
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
-          build-llvm: true
 
-      - name: Download Slang executables
+      - name: Download artifacts from build job
         uses: actions/download-artifact@v4
         with:
           name: test-slang-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
