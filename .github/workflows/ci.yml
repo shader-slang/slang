@@ -90,6 +90,7 @@ jobs:
           path: |
             build/*/bin
             build/*/lib
+            build/llvm-project-install
 
       - name: Upload slang-LLVM
         uses: actions/upload-artifact@v4
