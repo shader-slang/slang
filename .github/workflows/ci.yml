@@ -79,9 +79,6 @@ jobs:
             cmake --workflow --preset "${{matrix.config}}"
           fi
 
-      - name: Set capitalized config
-        run: echo "CONFIG_CAMEL=$(echo ${{ matrix.config }} | tr '[:lower:]' '[:upper:]' | cut -c 1)$(echo ${{ matrix.config }} | cut -c 2-)" >> $GITHUB_ENV
-
       - name: Upload Slang
         uses: actions/upload-artifact@v4
         with:
@@ -89,8 +86,8 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           path: |
-            build/${{ env.CONFIG_CAMEL }}/bin
-            build/${{ env.CONFIG_CAMEL }}/lib
+            ${{ env.bin_dir }}
+            ${{ env.lib_dir }}
             !**/*.pdb
             !**/*.ilk
             !**/*.a
@@ -127,11 +124,14 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
 
+      - name: Set capitalized config
+        run: echo "CONFIG_CAMEL=$(echo ${{ matrix.config }} | sed 's/debug/Debug/;s/release/Release/')" >> $GITHUB_ENV
+
       - name: Download artifacts from build job
         uses: actions/download-artifact@v4
         with:
           name: test-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
-          path: build
+          path: build/${{ env.CONFIG_CAMEL }}
 
       - name: "[Debug] list files"
         run: ls -R build
