@@ -163,8 +163,8 @@ jobs:
           name: test-slang-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           path: build
       
-      - name: find
-        run: find build
+      - name: Verify downloaded artifact
+        run: ls -R build
 
       - name: Test Slang
         run: |
