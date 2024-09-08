@@ -123,6 +123,7 @@ jobs:
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
+          build-llvm: true
 
       - name: Download Slang executables
         uses: actions/download-artifact@v4
