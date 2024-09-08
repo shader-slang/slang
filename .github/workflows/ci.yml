@@ -80,6 +80,9 @@ jobs:
             cmake --workflow --preset "${{matrix.config}}"
           fi
 
+      - name: List binaries
+        run: ls -R build
+
       - name: Upload Slang executables
         uses: actions/upload-artifact@v4
         with:
