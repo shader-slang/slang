@@ -86,6 +86,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
+          if-no-files-found: error
+          retention-days: 1
           path: |
             build/${{ env.CONFIG_CAMEL }}/bin
             build/${{ env.CONFIG_CAMEL }}/lib
