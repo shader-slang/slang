@@ -49,7 +49,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: '0'
 
-      - uses: .github/actions/common-setup
+      - uses: ./.github/actions/common-setup
         with:
           os: ${{matrix.os}}
           compiler: ${{matrix.compiler}}
@@ -112,7 +112,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: '0'
 
-      - uses: .github/actions/common-setup
+      - uses: ./.github/actions/common-setup
         with:
           os: ${{matrix.os}}
           compiler: ${{matrix.compiler}}
@@ -124,6 +124,9 @@ jobs:
         with:
           name: test-slang-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           path: build
+
+      - name: [Debug] list files
+        run: ls -R build
       
       - name: Test Slang
         run: |
