@@ -79,6 +79,9 @@ jobs:
             cmake --workflow --preset "${{matrix.config}}"
           fi
 
+      - name: Set capitalized config
+        run: echo "CONFIG_CAMEL=$(echo ${{ matrix.config }} | sed 's/debug/Debug/;s/release/Release/')" >> $GITHUB_ENV
+
       - name: Upload Slang
         uses: actions/upload-artifact@v4
         with:
@@ -86,8 +89,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           path: |
-            ${{ env.bin_dir }}
-            ${{ env.lib_dir }}
+            build/${{ env.CONFIG_CAMEL }}
             !**/*.pdb
             !**/*.ilk
             !**/*.a
