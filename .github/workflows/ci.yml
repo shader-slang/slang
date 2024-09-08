@@ -92,6 +92,8 @@ jobs:
             build/${{ env.CONFIG_CAMEL }}
             !**/*.pdb
             !**/*.ilk
+            !**/*.lib
+            !**/*.exp
             !**/*.a
 
       - name: Upload slang-LLVM
@@ -140,7 +142,7 @@ jobs:
       
       - name: Test Slang
         run: |
-          chmod a+x "$bin_dir/slang-test"
+          chmod a+x "$bin_dir/"*
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
