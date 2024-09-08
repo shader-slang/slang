@@ -80,7 +80,7 @@ jobs:
           fi
 
       - name: Set capitalized config
-        run: echo "CONFIG_CAP=$(echo ${{ matrix.config }} | sed 's/./\U&/')" >> $GITHUB_ENV
+        run: echo "CONFIG_CAP=$(echo ${{ matrix.config }} | sed 's/^./\\U&/')" >> $GITHUB_ENV
 
       - name: Upload Slang
         uses: actions/upload-artifact@v4
