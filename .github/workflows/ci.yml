@@ -125,7 +125,7 @@ jobs:
           name: test-slang-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           path: build
 
-      - name: [Debug] list files
+      - name: "[Debug] list files"
         run: ls -R build
       
       - name: Test Slang
