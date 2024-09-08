@@ -135,8 +135,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.load_matrix.outputs.matrix) }}
-      exclude: 
-        - { os: macos, config: debug }
     runs-on: ${{ matrix.runs-on }}
 
     defaults:
