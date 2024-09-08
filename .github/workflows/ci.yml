@@ -157,18 +157,15 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
 
-      - name: find
-        run: find build
-
       - name: Download Slang executables
         uses: actions/download-artifact@v4
         with:
           name: test-slang-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
-          path: |
-            build/*/bin
-            build/test-slang.sh
-            build/test-slang-via-glsl.sh
+          path: build
       
+      - name: find
+        run: find build
+
       - name: Test Slang
         run: |
           . build/test-slang.sh
