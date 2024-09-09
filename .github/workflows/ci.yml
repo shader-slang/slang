@@ -30,13 +30,15 @@ jobs:
       - uses: actions/checkout@v4
       - id: set-matrix
         shell: bash
-        run: echo "matrix=$(cat .github/workflows/matrix.json | jq -c .)" >> $GITHUB_OUTPUT
+        run: |
+          echo "matrix_build=$(cat .github/workflows/matrix.build.json | jq -c .)" >> $GITHUB_OUTPUT
+          echo "matrix_test=$(cat .github/workflows/matrix.test.json | jq -c .)" >> $GITHUB_OUTPUT
 
   build:
     needs: load_matrix
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.load_matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.load_matrix.outputs.matrix_build) }}
     runs-on: ${{ matrix.runs-on }}
 
     defaults:
@@ -108,7 +110,7 @@ jobs:
     needs: [load_matrix, build]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.load_matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.load_matrix.outputs.matrix_test) }}
     runs-on: ${{ matrix.runs-on }}
 
     defaults:
