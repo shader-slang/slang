@@ -4,7 +4,6 @@
   "compiler": ["gcc", "clang", "cl"],
   "platform": ["x86_64", "aarch64"],
   "exclude": [
-    { "os": "linux", "platform": "aarch64" },
     { "os": "windows", "platform": "aarch64" },
     { "os": "macos", "platform": "x86_64" },
     { "os": "linux", "compiler": "clang" },
