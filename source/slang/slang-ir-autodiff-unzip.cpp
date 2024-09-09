@@ -228,6 +228,13 @@ struct ExtractPrimalFuncContext
                             auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
                             field->sourceLoc = inst->sourceLoc;
 
+                            if (inst->findDecoration<IRLoopCounterDecoration>())
+                                builder.addLoopCounterDecoration(field);
+
+                            printf("ADDING FIELD:\n");
+                            inst->dump();
+                            field->dump();
+
                             builder.setInsertBefore(inst);
                             auto fieldAddr = builder.emitFieldAddress(
                                 inst->getFullType(), outIntermediary, field->getKey());

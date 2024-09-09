@@ -796,11 +796,78 @@ Result linkAndOptimizeIR(
             break;
     }
 
+    // Report checkpointing information
+    EndToEndCompileRequest *compileRequest = codeGenContext->isEndToEndCompile();
+    CompilerOptionSet &optionSet = compileRequest->getOptionSet();
+    SLANG_ASSERT(compileRequest);
+
+    SourceManager *sourceManager = sink->getSourceManager();
+    auto getHumanLoc = [&](const SourceLoc &sourceLoc) {
+        SourceView *sourceView = sourceManager->findSourceViewRecursively(sourceLoc);
+        if (sourceView)
+            return sourceView->getHumaneLoc(sourceLoc);
+        return HumaneSourceLoc();
+    };
+
+    for (auto inst : irModule->getGlobalInsts()) {
+        IRStructType *structType = as<IRStructType>(inst);
+        if (!structType)
+            continue;
+
+        auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
+        if (checkpointDecoration) {
+            String nameOrLocation;
+            
+            auto func = checkpointDecoration->getSourceFunction();
+            if (!func)
+                nameOrLocation = "(?)";
+            else if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+                nameOrLocation = nameHint->getName();
+
+            IRSizeAndAlignment sizeInfo;
+            getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
+
+            HumaneSourceLoc hloc = getHumanLoc(structType->sourceLoc);
+            printf("checkpointing context generated for function %s\n", nameOrLocation.getBuffer());
+            printf("\tdefined at %s:%d\n", hloc.pathInfo.foundPath.getBuffer(), hloc.line);
+            printf("\tsize of context: %d bytes\n\n", sizeInfo.size);
+
+            for (auto field : structType->getFields()) {
+                IRType *fieldType = field->getFieldType();
+                IRSizeAndAlignment sizeInfo;
+                getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
+                
+                HumaneSourceLoc hloc = getHumanLoc(field->sourceLoc);
+
+                if (field->findDecoration<IRLoopCounterDecoration>()) {
+                    printf("\t%d bytes used for a loop counter at %s:%d\n",
+                        sizeInfo.size,
+                        hloc.pathInfo.foundPath.getBuffer(),
+                        hloc.line);
+                } else {
+                    printf("\t%d bytes used for the variable defined at %s:%d\n",
+                        sizeInfo.size,
+                        hloc.pathInfo.foundPath.getBuffer(),
+                        hloc.line);
+                }
+
+                StringBuilder builder;
+        
+                SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
+                _sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
+                printf("%s\n", builder.getBuffer());
+            }
+        }
+
+        fflush(stdout);
+    }
+
     if (requiredLoweringPassSet.autodiff)
         finalizeAutoDiffPass(targetProgram, irModule);
 
     // Remove auto-diff related decorations.
     // We may have an autodiff decoration regardless of if autodiff is being used.
+    // TODO: strip checkpoint decorations
     stripAutoDiffDecorations(irModule);
 
     finalizeSpecialization(irModule);
@@ -1531,62 +1598,6 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "OPTIMIZED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
-
-    // Report checkpointing information
-    EndToEndCompileRequest *compileRequest = codeGenContext->isEndToEndCompile();
-    CompilerOptionSet &optionSet = compileRequest->getOptionSet();
-    SLANG_ASSERT(compileRequest);
-
-    SourceManager *sourceManager = sink->getSourceManager();
-    auto getHumanLoc = [&](const SourceLoc &sourceLoc) {
-        SourceView *sourceView = sourceManager->findSourceViewRecursively(sourceLoc);
-        if (sourceView)
-            return sourceView->getHumaneLoc(sourceLoc);
-        return HumaneSourceLoc();
-    };
-
-    for (auto inst : irModule->getGlobalInsts()) {
-        IRStructType *structType = as<IRStructType>(inst);
-        if (!structType)
-            continue;
-
-        auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
-        if (checkpointDecoration) {
-            String nameOrLocation;
-            
-            auto func = checkpointDecoration->getSourceFunction();
-            if (!func)
-                nameOrLocation = "<ftn:?>";
-            else if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
-                nameOrLocation = nameHint->getName();
-
-            IRSizeAndAlignment sizeInfo;
-            getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
-
-            HumaneSourceLoc hloc = getHumanLoc(structType->sourceLoc);
-            printf("checkpointing context generated for function %s\n", nameOrLocation.getBuffer());
-            printf("\tdefined at %s:%d\n", hloc.pathInfo.foundPath.getBuffer(), hloc.line);
-            printf("\tsize of context: %d bytes\n\n", sizeInfo.size);
-
-            for (auto field : structType->getFields()) {
-                IRType *fieldType = field->getFieldType();
-                IRSizeAndAlignment sizeInfo;
-                getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
-                
-                HumaneSourceLoc hloc = getHumanLoc(field->sourceLoc);
-                printf("\t%d bytes used at %s:%d\n",
-                    sizeInfo.size,
-                    hloc.pathInfo.foundPath.getBuffer(),
-                    hloc.line);
-
-                StringBuilder builder;
-        
-                SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
-                _sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
-                printf("%s\n", builder.getBuffer());
-            }
-        }
-    }
 
     if ( (target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly) )
     {

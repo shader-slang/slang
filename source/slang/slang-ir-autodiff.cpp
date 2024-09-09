@@ -1203,6 +1203,7 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_AutoDiffOriginalValueDecoration:
             case kIROp_UserDefinedBackwardDerivativeDecoration:
             case kIROp_IntermediateContextFieldDifferentialTypeDecoration:
+            case kIROp_CheckpointIntermediateDecoration:
                 decor->removeAndDeallocate();
                 break;
             case kIROp_AutoDiffBuiltinDecoration:

@@ -3539,7 +3539,7 @@ use with usedVal:
 let  %t	: Float	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7D622580 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2685A0 to storeSet
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
@@ -3551,7 +3551,7 @@ use with usedVal:
 let  %t	: Float	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7D622580 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2685A0 to storeSet
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
@@ -3577,13 +3577,13 @@ let  %1	: Int	= param
 use with usedVal:
 0
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7A2E3BC0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE245AD0 to storeSet
 0
 inst with location: 0 (0)
 use with usedVal:
 1
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7A2E3790 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2456A0 to storeSet
 1
 inst with location: 0 (0)
 use with usedVal:
@@ -3599,7 +3599,7 @@ let  %x5Fbflag	: Bool	= param
 use with usedVal:
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7D617730 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2817E0 to storeSet
 
 inst with location: 0 (0)
 use with usedVal:
@@ -3617,7 +3617,7 @@ use with usedVal:
 let  %x5Fpc	: Int	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7D62D8C8 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2778F8 to storeSet
 [primalInstDecoration]
 [nameHint("_pc")]
 [loopCounterDecoration]
@@ -3649,6 +3649,7 @@ let  %x5Fpc	: Int	= param
 
 >> LOOP COUNTER!
 % localVar:
+[loopCounterDecoration]
 let  %1	: Ptr(Int)	= var
 
 ensureInstAvailable, worklist element:
@@ -3682,6 +3683,7 @@ let  %1	: Bool	= cmpLT(%2, 3 : Int)
 >> NO OUT OF SCOPE USES
 ****** (after legalization) # of elements in the store set for hoistInfo: 2
 source loc recorded: 1515420 (1)
+[loopCounterDecoration]
 let  %1	: Ptr(Int)	= var
 
 tests/autodiff/reverse-loop.slang(16): note: also see pipeline definition
@@ -3699,6 +3701,19 @@ createIntermediate type:
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type;
 
+
+ADDING FIELD:
+let  %1	: Ptr(Array(Float, 5 : Int))	= var
+
+[IntermediateContextFieldDifferentialTypeDecoration(%1)]
+field(%2, Array(Float, 5 : Int))
+
+ADDING FIELD:
+[loopCounterDecoration]
+let  %1	: Ptr(Int)	= var
+
+[loopCounterDecoration]
+field(%1, Int)
 
 ### AFTER-AUTODIFF:
 undefined
@@ -4117,6 +4132,7 @@ block %116:
 	let  %122	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
 	store(%118, %122)
 	let  %123	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %124)
+	[loopCounterDecoration]
 	let  %125	: Ptr(Int)	= var
 	store(%125, 0 : Int)
 	store(%123, 0 : Int)
@@ -4351,6 +4367,7 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
 	[IntermediateContextFieldDifferentialTypeDecoration(%193)]
 	field(%119, Array(Float, 5 : Int))
+	[loopCounterDecoration]
 	field(%124, Int)
 }
 
@@ -5135,6 +5152,7 @@ block %116:
 	let  %122	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
 	store(%118, %122)
 	let  %123	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %124)
+	[loopCounterDecoration]
 	let  %125	: Ptr(Int)	= var
 	store(%125, 0 : Int)
 	store(%123, 0 : Int)
@@ -5369,6 +5387,7 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
 	[IntermediateContextFieldDifferentialTypeDecoration(%193)]
 	field(%119, Array(Float, 5 : Int))
+	[loopCounterDecoration]
 	field(%124, Int)
 }
 
@@ -6152,6 +6171,7 @@ block %116:
 	let  %122	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
 	store(%118, %122)
 	let  %123	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %124)
+	[loopCounterDecoration]
 	let  %125	: Ptr(Int)	= var
 	store(%125, 0 : Int)
 	store(%123, 0 : Int)
@@ -6386,6 +6406,7 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
 	[IntermediateContextFieldDifferentialTypeDecoration(%193)]
 	field(%119, Array(Float, 5 : Int))
+	[loopCounterDecoration]
 	field(%124, Int)
 }
 
@@ -7172,6 +7193,7 @@ block %116:
 	let  %122	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
 	store(%118, %122)
 	let  %123	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %124)
+	[loopCounterDecoration]
 	let  %125	: Ptr(Int)	= var
 	store(%125, 0 : Int)
 	store(%123, 0 : Int)
@@ -7326,6 +7348,7 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
 	[IntermediateContextFieldDifferentialTypeDecoration(%169)]
 	field(%119, Array(Float, 5 : Int))
+	[loopCounterDecoration]
 	field(%124, Int)
 }
 
@@ -8107,6 +8130,7 @@ block %116:
 	let  %122	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
 	store(%118, %122)
 	let  %123	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %124)
+	[loopCounterDecoration]
 	let  %125	: Ptr(Int)	= var
 	store(%125, 0 : Int)
 	store(%123, 0 : Int)
@@ -8261,6 +8285,7 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
 	[IntermediateContextFieldDifferentialTypeDecoration(%169)]
 	field(%119, Array(Float, 5 : Int))
+	[loopCounterDecoration]
 	field(%124, Int)
 }
 
@@ -8626,6 +8651,18 @@ GenericSpecializationDictionary
 ExistentialFuncSpecializationDictionary
 ExistentialTypeSpecializationDictionary
 ###
+checkpointing context generated for function test_simple_loop
+	defined at tests/autodiff/reverse-loop.slang:12
+	size of context: 24 bytes
+
+	20 bytes used for the variable defined at tests/autodiff/reverse-loop.slang:14
+    float t = y;
+          ^
+
+	4 bytes used for a loop counter at tests/autodiff/reverse-loop.slang:16
+    for (int i = 0; i < 3; i++)
+    ^~~
+
 ### BEFORE-LOWER-GENERICS:
 undefined
 let  %1	: Void	= varLayout(%2, %3)
@@ -8653,47 +8690,16 @@ let  %10	: Void	= typeLayout
 [keepAlive]
 global_hashed_string_literals("HLSL supports only float and half type textures", "Unsupported \'Load\' of \'texture cube array\' for \'metal\' target", "Unsupported \'Load\' of \'texture\' for \'metal\' target", "Unsupported \'Store\' of \'texture cube array\' for \'metal\' target", "Unable to use float with Atomicadd", "Atomic must be applied to a scalar texture or non-texture", "__metalImageInterlocked only allows \'int\'/\'uint\' textures", "__metalImageInterlocked implementation only allows \'uint\' coordinates", "Atomic must be applied to scalar texture or non-texture", "Unable to use float with Atomicand", "Unable to use float with Atomicexchange", "Metal atomic texture operations only allow \'int\'/\'uint\' textures", "Unable to use float with Atomicmax", "Unable to use float with Atomicmin", "Unable to use float with Atomicor", "Unable to use float with Atomicxor", "GL_EXT_shader_atomic_int64", "float atomic texture operations are disallowed with Metal target\'s", "\'float\' atomic texture operations are disallowed with Metal target\'s", "GL_EXT_shader_subgroup_extended_types_float16")
 let  %13	: _	= key
-[readNone]
-[backwardDifferentiable]
-[export("_SR15reverse_2Dxloop16test_simple_loopp1pi_ffb")]
-[nameHint("test_simple_loop")]
-func %testx5Fsimplex5Floop	: Func(Float, Float)
-{
-block %17(
-		[nameHint("y")]
-		param %y	: Float):
-	[loopMaxIters(3 : Int)]
-	loop(%18, %19, %20, %y, 0 : Int)
-
-block %18(
-		[nameHint("t")]
-		param %t	: Float,
-		[nameHint("i")]
-		param %i	: Int):
-	let  %21	: Bool	= cmpLT(%i, 3 : Int)
-	ifElse(%21, %22, %19, %22)
-
-block %19:
-	return_val(%t)
-
-block %22:
-	let  %23	: Float	= mul(%t, %t)
-	unconditionalBranch(%20)
-
-block %20:
-	let  %24	: Int	= add(%i, 1 : Int)
-	unconditionalBranch(%18, %23, %24)
-}
 [export("_ST4core17IBufferDataLayout")]
 [nameHint("IBufferDataLayout")]
 let  %IBufferDataLayout	: Type	= interface
 [export("_SW4core17DefaultDataLayout4core17IBufferDataLayout")]
-witness_table %25	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
+witness_table %17	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
 
 [nameHint("outputBuffer")]
 [export("_SVR15reverse_2Dxloop12outputBuffer")]
 [layout(%1)]
-let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %25)	= global_param
+let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %17)	= global_param
 [keepAlive]
 [entryPoint(6 : Int, "computeMain", "reverse-loop")]
 [numThreads(1 : Int, 1 : Int, 1 : Int)]
@@ -8702,29 +8708,29 @@ let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %25)	= global_para
 [layout(%7)]
 func %computeMain	: Func(Void, Vec(UInt, 3 : Int))
 {
-block %26(
+block %18(
 		[layout(%14)]
 		[nameHint("dispatchThreadID")]
 		[semantic("SV_DispatchThreadID", 0 : Int)]
 		param %dispatchThreadID	: Vec(UInt, 3 : Int)):
 	[nameHint("dpa")]
 	let  %dpa	: Ptr(%DiffPairx5Ffloat)	= var
-	let  %27	: %DiffPairx5Ffloat	= makeStruct(1 : Float, 0 : Float)
-	store(%dpa, %27)
+	let  %19	: %DiffPairx5Ffloat	= makeStruct(1 : Float, 0 : Float)
+	store(%dpa, %19)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa, 1 : Float)
-	let  %28	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
-	let  %29	: %DiffPairx5Ffloat	= load(%dpa)
-	let  %30	: Float	= get_field(%29, %differential)
-	store(%28, %30)
+	let  %20	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
+	let  %21	: %DiffPairx5Ffloat	= load(%dpa)
+	let  %22	: Float	= get_field(%21, %differential)
+	store(%20, %22)
 	[nameHint("dpa")]
 	let  %dpa1	: Ptr(%DiffPairx5Ffloat)	= var
-	let  %31	: %DiffPairx5Ffloat	= makeStruct(0.4 : Float, 0 : Float)
-	store(%dpa1, %31)
+	let  %23	: %DiffPairx5Ffloat	= makeStruct(0.4 : Float, 0 : Float)
+	store(%dpa1, %23)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa1, 1 : Float)
-	let  %32	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
-	let  %33	: %DiffPairx5Ffloat	= load(%dpa1)
-	let  %34	: Float	= get_field(%33, %differential)
-	store(%32, %34)
+	let  %24	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
+	let  %25	: %DiffPairx5Ffloat	= load(%dpa1)
+	let  %26	: Float	= get_field(%25, %differential)
+	store(%24, %26)
 	return_val(void_constant)
 }
 [readNone]
@@ -8733,15 +8739,15 @@ block %26(
 [nameHint("s_bwd_test_simple_loop")]
 func %sx5Fbwdx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(%DiffPairx5Ffloat), Float)
 {
-block %35(
-		param %36	: InOut(%DiffPairx5Ffloat),
-		param %37	: Float):
-	let  %38	: %DiffPairx5Ffloat	= load(%36)
-	let  %39	: Float	= get_field(%38, %primal)
-	let  %40	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
-	let  %41	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%39, %40)
-	let  %42	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%40)
-	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%36, %37, %42)
+block %27(
+		param %28	: InOut(%DiffPairx5Ffloat),
+		param %29	: Float):
+	let  %30	: %DiffPairx5Ffloat	= load(%28)
+	let  %31	: Float	= get_field(%30, %primal)
+	let  %32	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
+	let  %33	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%31, %32)
+	let  %34	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%32)
+	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%28, %29, %34)
 	return_val(void_constant)
 }
 [readNone]
@@ -8750,102 +8756,104 @@ block %35(
 [backwardDifferentiable]
 func %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop	: Func(Float, Float, Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates))
 {
-block %43(
+block %35(
 		[nameHint("dpy")]
 		param %dpy	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx	: Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)):
-	let  %44	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	let  %45	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= makeStruct(%44, 0 : Int)
-	store(%x5Fsx5Fdiffx5Fctx, %45)
-	let  %46	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %47)
-	let  %48	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	store(%46, %48)
-	let  %49	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %50)
-	store(%49, 0 : Int)
+	let  %36	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	let  %37	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= makeStruct(%36, 0 : Int)
+	store(%x5Fsx5Fdiffx5Fctx, %37)
+	let  %38	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %39)
+	let  %40	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	store(%38, %40)
+	let  %41	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %42)
+	store(%41, 0 : Int)
 	[loopMaxIters(4 : Int)]
-	loop(%51, %52, %51, true, %dpy, 0 : Int, 0 : Int)
+	loop(%43, %44, %43, true, %dpy, 0 : Int, 0 : Int)
 
-block %51(
+block %43(
 		[nameHint("_bflag")]
 		param %x5Fbflag	: Bool,
 		[nameHint("t")]
-		param %t1	: Float,
+		param %t	: Float,
 		[nameHint("i")]
-		param %i1	: Int,
+		param %i	: Int,
 		[nameHint("_pc")]
 		param %x5Fpc	: Int):
-	let  %53	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%46, %x5Fpc)
-	store(%53, %t1)
-	store(%49, %x5Fpc)
-	ifElse(%x5Fbflag, %54, %55, %54)
+	let  %45	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%38, %x5Fpc)
+	store(%45, %t)
+	store(%41, %x5Fpc)
+	ifElse(%x5Fbflag, %46, %47, %46)
 
-block %55:
-	unconditionalBranch(%52)
+block %47:
+	unconditionalBranch(%44)
 
-block %52:
-	return_val(%t1)
+block %44:
+	return_val(%t)
 
-block %54:
+block %46:
+	unconditionalBranch(%48)
+
+block %48:
+	let  %49	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%49, %50, %51, %52)
+
+block %51:
+	unconditionalBranch(%52, 0 : Int, 0 : Float)
+
+block %50:
+	let  %53	: Float	= mul(%t, %t)
+	unconditionalBranch(%52, 1 : Int, %53)
+
+block %52(
+		param %54	: Int,
+		param %55	: Float):
 	unconditionalBranch(%56)
 
 block %56:
-	let  %57	: Bool	= cmpLT(%i1, 3 : Int)
+	let  %57	: Bool	= cmpNE(%54, 1 : Int)
 	ifElse(%57, %58, %59, %60)
 
 block %59:
-	unconditionalBranch(%60, 0 : Int, 0 : Float)
+	unconditionalBranch(%60, %x5Fbflag)
 
 block %58:
-	let  %61	: Float	= mul(%t1, %t1)
-	unconditionalBranch(%60, 1 : Int, %61)
+	unconditionalBranch(%60, false)
 
 block %60(
-		param %62	: Int,
-		param %63	: Float):
-	unconditionalBranch(%64)
-
-block %64:
-	let  %65	: Bool	= cmpNE(%62, 1 : Int)
-	ifElse(%65, %66, %67, %68)
-
-block %67:
-	unconditionalBranch(%68, %x5Fbflag)
-
-block %66:
-	unconditionalBranch(%68, false)
-
-block %68(
 		[nameHint("_bflag")]
 		param %x5Fbflag1	: Bool):
-	unconditionalBranch(%69)
+	unconditionalBranch(%61)
 
-block %69:
-	ifElse(%x5Fbflag1, %70, %71, %72)
+block %61:
+	ifElse(%x5Fbflag1, %62, %63, %64)
 
-block %71:
-	unconditionalBranch(%72, %t1, %i1)
+block %63:
+	unconditionalBranch(%64, %t, %i)
 
-block %70:
-	let  %73	: Int	= add(%i1, 1 : Int)
-	unconditionalBranch(%72, %63, %73)
+block %62:
+	let  %65	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%64, %55, %65)
 
-block %72(
+block %64(
 		[nameHint("t")]
-		param %t2	: Float,
+		param %t1	: Float,
 		[nameHint("i")]
-		param %i2	: Int):
-	let  %74	: Int	= add(%x5Fpc, 1 : Int)
-	unconditionalBranch(%51, %x5Fbflag1, %t2, %i2, %74)
+		param %i1	: Int):
+	let  %66	: Int	= add(%x5Fpc, 1 : Int)
+	unconditionalBranch(%43, %x5Fbflag1, %t1, %i1, %66)
 }
-let  %47	: _	= key
-let  %50	: _	= key
-[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
+let  %39	: _	= key
+let  %42	: _	= key
+[SizeAndAlignment(0 : Int, 24 : Int64, 4 : Int)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
-	field(%47, Array(Float, 5 : Int))
-	field(%50, Int)
+	[Offset(0 : Int, 0 : Int)]
+	field(%39, Array(Float, 5 : Int))
+	[Offset(0 : Int, 20 : Int)]
+	field(%42, Int)
 }
 
 [readNone]
@@ -8854,172 +8862,172 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 [nameHint("s_bwd_prop_test_simple_loop")]
 func %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(%DiffPairx5Ffloat), Float, %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
 {
-block %75(
+block %67(
 		[nameHint("dpy")]
 		param %dpy1	: InOut(%DiffPairx5Ffloat),
 		[nameHint("_s_dOut")]
 		param %x5Fsx5FdOut	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx1	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates):
-	let  %76	: %DiffPairx5Ffloat	= load(%dpy1)
-	let  %77	: Float	= get_field(%76, %primal)
+	let  %68	: %DiffPairx5Ffloat	= load(%dpy1)
+	let  %69	: Float	= get_field(%68, %primal)
 	[loopMaxIters(4 : Int)]
-	loop(%78, %79, %78, true, %77, 0 : Int, 0 : Int)
+	loop(%70, %71, %70, true, %69, 0 : Int, 0 : Int)
 
-block %78(
+block %70(
 		[nameHint("_bflag")]
 		param %x5Fbflag2	: Bool,
 		[nameHint("t")]
-		param %t3	: Float,
+		param %t2	: Float,
 		[nameHint("i")]
-		param %i3	: Int,
+		param %i2	: Int,
 		[nameHint("_pc")]
 		param %x5Fpc1	: Int):
-	let  %80	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %47)
-	let  %81	: Ptr(Array(Float, 5 : Int))	= var
-	store(%81, %80)
-	let  %82	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%81, %x5Fpc1)
-	store(%82, %t3)
-	ifElse(%x5Fbflag2, %83, %84, %83)
+	let  %72	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %39)
+	let  %73	: Ptr(Array(Float, 5 : Int))	= var
+	store(%73, %72)
+	let  %74	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%73, %x5Fpc1)
+	store(%74, %t2)
+	ifElse(%x5Fbflag2, %75, %76, %75)
 
-block %84:
-	unconditionalBranch(%79)
+block %76:
+	unconditionalBranch(%71)
 
-block %79:
-	unconditionalBranch(%85)
+block %71:
+	unconditionalBranch(%77)
 
-block %85:
-	let  %86	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %50)
-	let  %87	: Int	= sub(%86, 1 : Int)
+block %77:
+	let  %78	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %42)
+	let  %79	: Int	= sub(%78, 1 : Int)
 	[loopMaxIters(4 : Int)]
-	loop(%88, %89, %90, %87, %x5Fsx5FdOut)
+	loop(%80, %81, %82, %79, %x5Fsx5FdOut)
 
-block %88(
+block %80(
 		[nameHint("_dc")]
 		param %x5Fdc	: Int,
-		param %91	: Float):
-	let  %92	: Bool	= cmpGE(%x5Fdc, 0 : Int)
-	ifElse(%92, %93, %94, %93)
+		param %83	: Float):
+	let  %84	: Bool	= cmpGE(%x5Fdc, 0 : Int)
+	ifElse(%84, %85, %86, %85)
 
-block %94:
-	unconditionalBranch(%89)
+block %86:
+	unconditionalBranch(%81)
 
-block %89:
-	let  %95	: %DiffPairx5Ffloat	= load(%dpy1)
-	let  %96	: Float	= get_field(%95, %primal)
-	let  %97	: %DiffPairx5Ffloat	= makeStruct(%96, %91)
-	store(%dpy1, %97)
+block %81:
+	let  %87	: %DiffPairx5Ffloat	= load(%dpy1)
+	let  %88	: Float	= get_field(%87, %primal)
+	let  %89	: %DiffPairx5Ffloat	= makeStruct(%88, %83)
+	store(%dpy1, %89)
 	return_val(void_constant)
 
-block %93:
-	unconditionalBranch(%98)
-
-block %98:
-	let  %99	: Bool	= cmpLT(%x5Fdc, 3 : Int)
-	ifElse(%99, %100, %101, %102)
-
-block %101:
-	unconditionalBranch(%102, 0 : Int)
-
-block %100:
-	unconditionalBranch(%102, 1 : Int)
-
-block %102(
-		param %103	: Int):
-	unconditionalBranch(%104)
-
-block %104:
-	let  %105	: Bool	= cmpNE(%103, 1 : Int)
-	let  %106	: Bool	= not(%105)
-	ifElse(%106, %107, %108, %109)
-
-block %108:
-	unconditionalBranch(%109, 0 : Float, %91)
-
-block %107:
-	unconditionalBranch(%109, %91, 0 : Float)
-
-block %109(
-		param %110	: Float,
-		param %111	: Float):
-	unconditionalBranch(%112)
-
-block %112:
-	ifElse(%99, %113, %114, %115)
-
-block %114:
-	unconditionalBranch(%115, %111)
-
-block %113:
-	let  %116	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %47)
-	let  %117	: Float	= getElement(%116, %x5Fdc)
-	let  %118	: Float	= mul(%117, %110)
-	let  %119	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %47)
-	let  %120	: Float	= getElement(%119, %x5Fdc)
-	let  %121	: Float	= mul(%120, %110)
-	let  %122	: Float	= add(%118, %121)
-	let  %123	: Float	= add(%122, %111)
-	unconditionalBranch(%115, %123)
-
-block %115(
-		param %124	: Float):
+block %85:
 	unconditionalBranch(%90)
 
 block %90:
-	let  %125	: Int	= sub(%x5Fdc, 1 : Int)
-	unconditionalBranch(%88, %125, %124)
+	let  %91	: Bool	= cmpLT(%x5Fdc, 3 : Int)
+	ifElse(%91, %92, %93, %94)
 
-block %83:
+block %93:
+	unconditionalBranch(%94, 0 : Int)
+
+block %92:
+	unconditionalBranch(%94, 1 : Int)
+
+block %94(
+		param %95	: Int):
+	unconditionalBranch(%96)
+
+block %96:
+	let  %97	: Bool	= cmpNE(%95, 1 : Int)
+	let  %98	: Bool	= not(%97)
+	ifElse(%98, %99, %100, %101)
+
+block %100:
+	unconditionalBranch(%101, 0 : Float, %83)
+
+block %99:
+	unconditionalBranch(%101, %83, 0 : Float)
+
+block %101(
+		param %102	: Float,
+		param %103	: Float):
+	unconditionalBranch(%104)
+
+block %104:
+	ifElse(%91, %105, %106, %107)
+
+block %106:
+	unconditionalBranch(%107, %103)
+
+block %105:
+	let  %108	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %39)
+	let  %109	: Float	= getElement(%108, %x5Fdc)
+	let  %110	: Float	= mul(%109, %102)
+	let  %111	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %39)
+	let  %112	: Float	= getElement(%111, %x5Fdc)
+	let  %113	: Float	= mul(%112, %102)
+	let  %114	: Float	= add(%110, %113)
+	let  %115	: Float	= add(%114, %103)
+	unconditionalBranch(%107, %115)
+
+block %107(
+		param %116	: Float):
+	unconditionalBranch(%82)
+
+block %82:
+	let  %117	: Int	= sub(%x5Fdc, 1 : Int)
+	unconditionalBranch(%80, %117, %116)
+
+block %75:
+	unconditionalBranch(%118)
+
+block %118:
+	let  %119	: Bool	= cmpLT(%i2, 3 : Int)
+	ifElse(%119, %120, %121, %122)
+
+block %121:
+	unconditionalBranch(%122, 0 : Int, 0 : Float)
+
+block %120:
+	let  %123	: Float	= mul(%t2, %t2)
+	unconditionalBranch(%122, 1 : Int, %123)
+
+block %122(
+		param %124	: Int,
+		param %125	: Float):
 	unconditionalBranch(%126)
 
 block %126:
-	let  %127	: Bool	= cmpLT(%i3, 3 : Int)
+	let  %127	: Bool	= cmpNE(%124, 1 : Int)
 	ifElse(%127, %128, %129, %130)
 
 block %129:
-	unconditionalBranch(%130, 0 : Int, 0 : Float)
+	unconditionalBranch(%130, %x5Fbflag2)
 
 block %128:
-	let  %131	: Float	= mul(%t3, %t3)
-	unconditionalBranch(%130, 1 : Int, %131)
+	unconditionalBranch(%130, false)
 
 block %130(
-		param %132	: Int,
-		param %133	: Float):
-	unconditionalBranch(%134)
-
-block %134:
-	let  %135	: Bool	= cmpNE(%132, 1 : Int)
-	ifElse(%135, %136, %137, %138)
-
-block %137:
-	unconditionalBranch(%138, %x5Fbflag2)
-
-block %136:
-	unconditionalBranch(%138, false)
-
-block %138(
 		[nameHint("_bflag")]
 		param %x5Fbflag3	: Bool):
-	unconditionalBranch(%139)
+	unconditionalBranch(%131)
 
-block %139:
-	ifElse(%x5Fbflag3, %140, %141, %142)
+block %131:
+	ifElse(%x5Fbflag3, %132, %133, %134)
 
-block %141:
-	unconditionalBranch(%142, %t3, %i3)
+block %133:
+	unconditionalBranch(%134, %t2, %i2)
 
-block %140:
-	let  %143	: Int	= add(%i3, 1 : Int)
-	unconditionalBranch(%142, %133, %143)
+block %132:
+	let  %135	: Int	= add(%i2, 1 : Int)
+	unconditionalBranch(%134, %125, %135)
 
-block %142(
+block %134(
 		[nameHint("t")]
-		param %t4	: Float,
+		param %t3	: Float,
 		[nameHint("i")]
-		param %i4	: Int):
-	let  %144	: Int	= add(%x5Fpc1, 1 : Int)
-	unconditionalBranch(%78, %x5Fbflag3, %t4, %i4, %144)
+		param %i3	: Int):
+	let  %136	: Int	= add(%x5Fpc1, 1 : Int)
+	unconditionalBranch(%70, %x5Fbflag3, %t3, %i3, %136)
 }
 [nameHint("primal")]
 let  %primal	: _	= key
@@ -9054,40 +9062,9 @@ let  %11	: Void	= typeLayout
 [keepAlive]
 global_hashed_string_literals("HLSL supports only float and half type textures", "Unsupported \'Load\' of \'texture cube array\' for \'metal\' target", "Unsupported \'Load\' of \'texture\' for \'metal\' target", "Unsupported \'Store\' of \'texture cube array\' for \'metal\' target", "Unable to use float with Atomicadd", "Atomic must be applied to a scalar texture or non-texture", "__metalImageInterlocked only allows \'int\'/\'uint\' textures", "__metalImageInterlocked implementation only allows \'uint\' coordinates", "Atomic must be applied to scalar texture or non-texture", "Unable to use float with Atomicand", "Unable to use float with Atomicexchange", "Metal atomic texture operations only allow \'int\'/\'uint\' textures", "Unable to use float with Atomicmax", "Unable to use float with Atomicmin", "Unable to use float with Atomicor", "Unable to use float with Atomicxor", "GL_EXT_shader_atomic_int64", "float atomic texture operations are disallowed with Metal target\'s", "\'float\' atomic texture operations are disallowed with Metal target\'s", "GL_EXT_shader_subgroup_extended_types_float16")
 let  %14	: _	= key
-[readNone]
-[backwardDifferentiable]
-[export("_SR15reverse_2Dxloop16test_simple_loopp1pi_ffb")]
-[nameHint("test_simple_loop")]
-func %testx5Fsimplex5Floop	: Func(Float, Float)
-{
-block %18(
-		[nameHint("y")]
-		param %y	: Float):
-	[loopMaxIters(3 : Int)]
-	loop(%19, %20, %21, %y, 0 : Int)
-
-block %19(
-		[nameHint("t")]
-		param %t	: Float,
-		[nameHint("i")]
-		param %i	: Int):
-	let  %22	: Bool	= cmpLT(%i, 3 : Int)
-	ifElse(%22, %23, %20, %23)
-
-block %20:
-	return_val(%t)
-
-block %23:
-	let  %24	: Float	= mul(%t, %t)
-	unconditionalBranch(%21)
-
-block %21:
-	let  %25	: Int	= add(%i, 1 : Int)
-	unconditionalBranch(%19, %24, %25)
-}
 [SequentialIDDecoration(0 : UInt)]
 [export("_SW4core17DefaultDataLayout4core17IBufferDataLayout")]
-witness_table %26	: witness_table_t(0 : Int)(DefaultLayout);
+witness_table %18	: witness_table_t(0 : Int)(DefaultLayout);
 
 [nameHint("outputBuffer")]
 [export("_SVR15reverse_2Dxloop12outputBuffer")]
@@ -9101,29 +9078,29 @@ let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %7)	= global_param
 [layout(%8)]
 func %computeMain	: Func(Void, Vec(UInt, 3 : Int))
 {
-block %27(
+block %19(
 		[layout(%15)]
 		[nameHint("dispatchThreadID")]
 		[semantic("SV_DispatchThreadID", 0 : Int)]
 		param %dispatchThreadID	: Vec(UInt, 3 : Int)):
 	[nameHint("dpa")]
 	let  %dpa	: Ptr(%DiffPairx5Ffloat)	= var
-	let  %28	: %DiffPairx5Ffloat	= makeStruct(1 : Float, 0 : Float)
-	store(%dpa, %28)
+	let  %20	: %DiffPairx5Ffloat	= makeStruct(1 : Float, 0 : Float)
+	store(%dpa, %20)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa, 1 : Float)
-	let  %29	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
-	let  %30	: %DiffPairx5Ffloat	= load(%dpa)
-	let  %31	: Float	= get_field(%30, %differential)
-	store(%29, %31)
+	let  %21	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
+	let  %22	: %DiffPairx5Ffloat	= load(%dpa)
+	let  %23	: Float	= get_field(%22, %differential)
+	store(%21, %23)
 	[nameHint("dpa")]
 	let  %dpa1	: Ptr(%DiffPairx5Ffloat)	= var
-	let  %32	: %DiffPairx5Ffloat	= makeStruct(0.4 : Float, 0 : Float)
-	store(%dpa1, %32)
+	let  %24	: %DiffPairx5Ffloat	= makeStruct(0.4 : Float, 0 : Float)
+	store(%dpa1, %24)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa1, 1 : Float)
-	let  %33	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
-	let  %34	: %DiffPairx5Ffloat	= load(%dpa1)
-	let  %35	: Float	= get_field(%34, %differential)
-	store(%33, %35)
+	let  %25	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
+	let  %26	: %DiffPairx5Ffloat	= load(%dpa1)
+	let  %27	: Float	= get_field(%26, %differential)
+	store(%25, %27)
 	return_val(void_constant)
 }
 [readNone]
@@ -9132,15 +9109,15 @@ block %27(
 [nameHint("s_bwd_test_simple_loop")]
 func %sx5Fbwdx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(%DiffPairx5Ffloat), Float)
 {
-block %36(
-		param %37	: InOut(%DiffPairx5Ffloat),
-		param %38	: Float):
-	let  %39	: %DiffPairx5Ffloat	= load(%37)
-	let  %40	: Float	= get_field(%39, %primal)
-	let  %41	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
-	let  %42	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%40, %41)
-	let  %43	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%41)
-	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%37, %38, %43)
+block %28(
+		param %29	: InOut(%DiffPairx5Ffloat),
+		param %30	: Float):
+	let  %31	: %DiffPairx5Ffloat	= load(%29)
+	let  %32	: Float	= get_field(%31, %primal)
+	let  %33	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
+	let  %34	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%32, %33)
+	let  %35	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%33)
+	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%29, %30, %35)
 	return_val(void_constant)
 }
 [readNone]
@@ -9149,102 +9126,104 @@ block %36(
 [backwardDifferentiable]
 func %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop	: Func(Float, Float, Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates))
 {
-block %44(
+block %36(
 		[nameHint("dpy")]
 		param %dpy	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx	: Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)):
-	let  %45	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	let  %46	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= makeStruct(%45, 0 : Int)
-	store(%x5Fsx5Fdiffx5Fctx, %46)
-	let  %47	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %48)
-	let  %49	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	store(%47, %49)
-	let  %50	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %51)
-	store(%50, 0 : Int)
+	let  %37	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	let  %38	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= makeStruct(%37, 0 : Int)
+	store(%x5Fsx5Fdiffx5Fctx, %38)
+	let  %39	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %40)
+	let  %41	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	store(%39, %41)
+	let  %42	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %43)
+	store(%42, 0 : Int)
 	[loopMaxIters(4 : Int)]
-	loop(%52, %53, %52, true, %dpy, 0 : Int, 0 : Int)
+	loop(%44, %45, %44, true, %dpy, 0 : Int, 0 : Int)
 
-block %52(
+block %44(
 		[nameHint("_bflag")]
 		param %x5Fbflag	: Bool,
 		[nameHint("t")]
-		param %t1	: Float,
+		param %t	: Float,
 		[nameHint("i")]
-		param %i1	: Int,
+		param %i	: Int,
 		[nameHint("_pc")]
 		param %x5Fpc	: Int):
-	let  %54	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%47, %x5Fpc)
-	store(%54, %t1)
-	store(%50, %x5Fpc)
-	ifElse(%x5Fbflag, %55, %56, %55)
+	let  %46	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%39, %x5Fpc)
+	store(%46, %t)
+	store(%42, %x5Fpc)
+	ifElse(%x5Fbflag, %47, %48, %47)
 
-block %56:
-	unconditionalBranch(%53)
+block %48:
+	unconditionalBranch(%45)
 
-block %53:
-	return_val(%t1)
+block %45:
+	return_val(%t)
 
-block %55:
+block %47:
+	unconditionalBranch(%49)
+
+block %49:
+	let  %50	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%50, %51, %52, %53)
+
+block %52:
+	unconditionalBranch(%53, 0 : Int, 0 : Float)
+
+block %51:
+	let  %54	: Float	= mul(%t, %t)
+	unconditionalBranch(%53, 1 : Int, %54)
+
+block %53(
+		param %55	: Int,
+		param %56	: Float):
 	unconditionalBranch(%57)
 
 block %57:
-	let  %58	: Bool	= cmpLT(%i1, 3 : Int)
+	let  %58	: Bool	= cmpNE(%55, 1 : Int)
 	ifElse(%58, %59, %60, %61)
 
 block %60:
-	unconditionalBranch(%61, 0 : Int, 0 : Float)
+	unconditionalBranch(%61, %x5Fbflag)
 
 block %59:
-	let  %62	: Float	= mul(%t1, %t1)
-	unconditionalBranch(%61, 1 : Int, %62)
+	unconditionalBranch(%61, false)
 
 block %61(
-		param %63	: Int,
-		param %64	: Float):
-	unconditionalBranch(%65)
-
-block %65:
-	let  %66	: Bool	= cmpNE(%63, 1 : Int)
-	ifElse(%66, %67, %68, %69)
-
-block %68:
-	unconditionalBranch(%69, %x5Fbflag)
-
-block %67:
-	unconditionalBranch(%69, false)
-
-block %69(
 		[nameHint("_bflag")]
 		param %x5Fbflag1	: Bool):
-	unconditionalBranch(%70)
+	unconditionalBranch(%62)
 
-block %70:
-	ifElse(%x5Fbflag1, %71, %72, %73)
+block %62:
+	ifElse(%x5Fbflag1, %63, %64, %65)
 
-block %72:
-	unconditionalBranch(%73, %t1, %i1)
+block %64:
+	unconditionalBranch(%65, %t, %i)
 
-block %71:
-	let  %74	: Int	= add(%i1, 1 : Int)
-	unconditionalBranch(%73, %64, %74)
+block %63:
+	let  %66	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%65, %56, %66)
 
-block %73(
+block %65(
 		[nameHint("t")]
-		param %t2	: Float,
+		param %t1	: Float,
 		[nameHint("i")]
-		param %i2	: Int):
-	let  %75	: Int	= add(%x5Fpc, 1 : Int)
-	unconditionalBranch(%52, %x5Fbflag1, %t2, %i2, %75)
+		param %i1	: Int):
+	let  %67	: Int	= add(%x5Fpc, 1 : Int)
+	unconditionalBranch(%44, %x5Fbflag1, %t1, %i1, %67)
 }
-let  %48	: _	= key
-let  %51	: _	= key
-[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
+let  %40	: _	= key
+let  %43	: _	= key
+[SizeAndAlignment(0 : Int, 24 : Int64, 4 : Int)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
-	field(%48, Array(Float, 5 : Int))
-	field(%51, Int)
+	[Offset(0 : Int, 0 : Int)]
+	field(%40, Array(Float, 5 : Int))
+	[Offset(0 : Int, 20 : Int)]
+	field(%43, Int)
 }
 
 [readNone]
@@ -9253,187 +9232,175 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 [nameHint("s_bwd_prop_test_simple_loop")]
 func %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(%DiffPairx5Ffloat), Float, %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
 {
-block %76(
+block %68(
 		[nameHint("dpy")]
 		param %dpy1	: InOut(%DiffPairx5Ffloat),
 		[nameHint("_s_dOut")]
 		param %x5Fsx5FdOut	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx1	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates):
-	let  %77	: %DiffPairx5Ffloat	= load(%dpy1)
-	let  %78	: Float	= get_field(%77, %primal)
+	let  %69	: %DiffPairx5Ffloat	= load(%dpy1)
+	let  %70	: Float	= get_field(%69, %primal)
 	[loopMaxIters(4 : Int)]
-	loop(%79, %80, %79, true, %78, 0 : Int, 0 : Int)
+	loop(%71, %72, %71, true, %70, 0 : Int, 0 : Int)
 
-block %79(
+block %71(
 		[nameHint("_bflag")]
 		param %x5Fbflag2	: Bool,
 		[nameHint("t")]
-		param %t3	: Float,
+		param %t2	: Float,
 		[nameHint("i")]
-		param %i3	: Int,
+		param %i2	: Int,
 		[nameHint("_pc")]
 		param %x5Fpc1	: Int):
-	let  %81	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %48)
-	let  %82	: Ptr(Array(Float, 5 : Int))	= var
-	store(%82, %81)
-	let  %83	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%82, %x5Fpc1)
-	store(%83, %t3)
-	ifElse(%x5Fbflag2, %84, %85, %84)
+	let  %73	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %40)
+	let  %74	: Ptr(Array(Float, 5 : Int))	= var
+	store(%74, %73)
+	let  %75	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%74, %x5Fpc1)
+	store(%75, %t2)
+	ifElse(%x5Fbflag2, %76, %77, %76)
 
-block %85:
-	unconditionalBranch(%80)
+block %77:
+	unconditionalBranch(%72)
 
-block %80:
-	unconditionalBranch(%86)
+block %72:
+	unconditionalBranch(%78)
 
-block %86:
-	let  %87	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %51)
-	let  %88	: Int	= sub(%87, 1 : Int)
+block %78:
+	let  %79	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %43)
+	let  %80	: Int	= sub(%79, 1 : Int)
 	[loopMaxIters(4 : Int)]
-	loop(%89, %90, %91, %88, %x5Fsx5FdOut)
+	loop(%81, %82, %83, %80, %x5Fsx5FdOut)
 
-block %89(
+block %81(
 		[nameHint("_dc")]
 		param %x5Fdc	: Int,
-		param %92	: Float):
-	let  %93	: Bool	= cmpGE(%x5Fdc, 0 : Int)
-	ifElse(%93, %94, %95, %94)
+		param %84	: Float):
+	let  %85	: Bool	= cmpGE(%x5Fdc, 0 : Int)
+	ifElse(%85, %86, %87, %86)
 
-block %95:
-	unconditionalBranch(%90)
+block %87:
+	unconditionalBranch(%82)
 
-block %90:
-	let  %96	: %DiffPairx5Ffloat	= load(%dpy1)
-	let  %97	: Float	= get_field(%96, %primal)
-	let  %98	: %DiffPairx5Ffloat	= makeStruct(%97, %92)
-	store(%dpy1, %98)
+block %82:
+	let  %88	: %DiffPairx5Ffloat	= load(%dpy1)
+	let  %89	: Float	= get_field(%88, %primal)
+	let  %90	: %DiffPairx5Ffloat	= makeStruct(%89, %84)
+	store(%dpy1, %90)
 	return_val(void_constant)
 
-block %94:
-	unconditionalBranch(%99)
-
-block %99:
-	let  %100	: Bool	= cmpLT(%x5Fdc, 3 : Int)
-	ifElse(%100, %101, %102, %103)
-
-block %102:
-	unconditionalBranch(%103, 0 : Int)
-
-block %101:
-	unconditionalBranch(%103, 1 : Int)
-
-block %103(
-		param %104	: Int):
-	unconditionalBranch(%105)
-
-block %105:
-	let  %106	: Bool	= cmpNE(%104, 1 : Int)
-	let  %107	: Bool	= not(%106)
-	ifElse(%107, %108, %109, %110)
-
-block %109:
-	unconditionalBranch(%110, 0 : Float, %92)
-
-block %108:
-	unconditionalBranch(%110, %92, 0 : Float)
-
-block %110(
-		param %111	: Float,
-		param %112	: Float):
-	unconditionalBranch(%113)
-
-block %113:
-	ifElse(%100, %114, %115, %116)
-
-block %115:
-	unconditionalBranch(%116, %112)
-
-block %114:
-	let  %117	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %48)
-	let  %118	: Float	= getElement(%117, %x5Fdc)
-	let  %119	: Float	= mul(%118, %111)
-	let  %120	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %48)
-	let  %121	: Float	= getElement(%120, %x5Fdc)
-	let  %122	: Float	= mul(%121, %111)
-	let  %123	: Float	= add(%119, %122)
-	let  %124	: Float	= add(%123, %112)
-	unconditionalBranch(%116, %124)
-
-block %116(
-		param %125	: Float):
+block %86:
 	unconditionalBranch(%91)
 
 block %91:
-	let  %126	: Int	= sub(%x5Fdc, 1 : Int)
-	unconditionalBranch(%89, %126, %125)
+	let  %92	: Bool	= cmpLT(%x5Fdc, 3 : Int)
+	ifElse(%92, %93, %94, %95)
 
-block %84:
+block %94:
+	unconditionalBranch(%95, 0 : Int)
+
+block %93:
+	unconditionalBranch(%95, 1 : Int)
+
+block %95(
+		param %96	: Int):
+	unconditionalBranch(%97)
+
+block %97:
+	let  %98	: Bool	= cmpNE(%96, 1 : Int)
+	let  %99	: Bool	= not(%98)
+	ifElse(%99, %100, %101, %102)
+
+block %101:
+	unconditionalBranch(%102, 0 : Float, %84)
+
+block %100:
+	unconditionalBranch(%102, %84, 0 : Float)
+
+block %102(
+		param %103	: Float,
+		param %104	: Float):
+	unconditionalBranch(%105)
+
+block %105:
+	ifElse(%92, %106, %107, %108)
+
+block %107:
+	unconditionalBranch(%108, %104)
+
+block %106:
+	let  %109	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %40)
+	let  %110	: Float	= getElement(%109, %x5Fdc)
+	let  %111	: Float	= mul(%110, %103)
+	let  %112	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %40)
+	let  %113	: Float	= getElement(%112, %x5Fdc)
+	let  %114	: Float	= mul(%113, %103)
+	let  %115	: Float	= add(%111, %114)
+	let  %116	: Float	= add(%115, %104)
+	unconditionalBranch(%108, %116)
+
+block %108(
+		param %117	: Float):
+	unconditionalBranch(%83)
+
+block %83:
+	let  %118	: Int	= sub(%x5Fdc, 1 : Int)
+	unconditionalBranch(%81, %118, %117)
+
+block %76:
+	unconditionalBranch(%119)
+
+block %119:
+	let  %120	: Bool	= cmpLT(%i2, 3 : Int)
+	ifElse(%120, %121, %122, %123)
+
+block %122:
+	unconditionalBranch(%123, 0 : Int, 0 : Float)
+
+block %121:
+	let  %124	: Float	= mul(%t2, %t2)
+	unconditionalBranch(%123, 1 : Int, %124)
+
+block %123(
+		param %125	: Int,
+		param %126	: Float):
 	unconditionalBranch(%127)
 
 block %127:
-	let  %128	: Bool	= cmpLT(%i3, 3 : Int)
+	let  %128	: Bool	= cmpNE(%125, 1 : Int)
 	ifElse(%128, %129, %130, %131)
 
 block %130:
-	unconditionalBranch(%131, 0 : Int, 0 : Float)
+	unconditionalBranch(%131, %x5Fbflag2)
 
 block %129:
-	let  %132	: Float	= mul(%t3, %t3)
-	unconditionalBranch(%131, 1 : Int, %132)
+	unconditionalBranch(%131, false)
 
 block %131(
-		param %133	: Int,
-		param %134	: Float):
-	unconditionalBranch(%135)
-
-block %135:
-	let  %136	: Bool	= cmpNE(%133, 1 : Int)
-	ifElse(%136, %137, %138, %139)
-
-block %138:
-	unconditionalBranch(%139, %x5Fbflag2)
-
-block %137:
-	unconditionalBranch(%139, false)
-
-block %139(
 		[nameHint("_bflag")]
 		param %x5Fbflag3	: Bool):
-	unconditionalBranch(%140)
+	unconditionalBranch(%132)
 
-block %140:
-	ifElse(%x5Fbflag3, %141, %142, %143)
+block %132:
+	ifElse(%x5Fbflag3, %133, %134, %135)
 
-block %142:
-	unconditionalBranch(%143, %t3, %i3)
+block %134:
+	unconditionalBranch(%135, %t2, %i2)
 
-block %141:
-	let  %144	: Int	= add(%i3, 1 : Int)
-	unconditionalBranch(%143, %134, %144)
+block %133:
+	let  %136	: Int	= add(%i2, 1 : Int)
+	unconditionalBranch(%135, %126, %136)
 
-block %143(
+block %135(
 		[nameHint("t")]
-		param %t4	: Float,
+		param %t3	: Float,
 		[nameHint("i")]
-		param %i4	: Int):
-	let  %145	: Int	= add(%x5Fpc1, 1 : Int)
-	unconditionalBranch(%79, %x5Fbflag3, %t4, %i4, %145)
+		param %i3	: Int):
+	let  %137	: Int	= add(%x5Fpc1, 1 : Int)
+	unconditionalBranch(%71, %x5Fbflag3, %t3, %i3, %137)
 }
 [nameHint("primal")]
 let  %primal	: _	= key
 [nameHint("differential")]
 let  %differential	: _	= key
 ###
-checkpointing context generated for function test_simple_loop
-	defined at tests/autodiff/reverse-loop.slang:12
-	size of context: 24 bytes
-
-	20 bytes used at tests/autodiff/reverse-loop.slang:14
-    float t = y;
-          ^
-
-	4 bytes used at tests/autodiff/reverse-loop.slang:16
-    for (int i = 0; i < 3; i++)
-    ^~~
-

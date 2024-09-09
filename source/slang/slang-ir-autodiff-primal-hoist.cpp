@@ -1679,6 +1679,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 setInsertAfterOrdinaryInst(&builder, instToStore);
                 auto localVar = storeIndexedValue(&builder, varBlock, instToStore, defBlockIndices);
                 localVar->sourceLoc = instToStore->sourceLoc;
+                if (isLoopCounter)
+                    builder.addLoopCounterDecoration(localVar);
 
                 for (auto use : outOfScopeUses)
                 {
