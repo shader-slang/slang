@@ -231,6 +231,14 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
         return HumaneSourceLoc();
     };
 
+    SourceWriter typeWriter(sourceManager, LineDirectiveMode::None, nullptr);
+
+    CLikeSourceEmitter::Desc description;
+    description.codeGenContext = codeGenContext;
+    description.sourceWriter = &typeWriter;
+
+    GLSLSourceEmitter emitter(description);
+
     StringBuilder builder;
     for (auto inst : irModule->getGlobalInsts()) {
         IRStructType *structType = as<IRStructType>(inst);
@@ -253,18 +261,25 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
             HumaneSourceLoc hloc = getHumanLoc(structType->sourceLoc);
             
             builder << "\n";
-            builder << "\tdefined at " << hloc.pathInfo.foundPath << ":" << hloc.line << "\n";
-            builder << "\tsize of context: " << sizeInfo.size << " bytes\n";
+            builder << "    defined at " << hloc.pathInfo.foundPath << ":" << hloc.line << "\n";
+            builder << "    size of context: " << sizeInfo.size << " bytes\n";
             builder << "\n";
 
             for (auto field : structType->getFields()) {
                 IRType *fieldType = field->getFieldType();
                 IRSizeAndAlignment sizeInfo;
                 getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
+
+                emitter.emitType(fieldType);
                 
                 HumaneSourceLoc hloc = getHumanLoc(field->sourceLoc);
 
-                builder << "\t" << sizeInfo.size << " bytes used for ";
+                builder << "    " << sizeInfo.size;
+                builder << " bytes used for field of type: ";
+                builder << typeWriter.getContent() << "\n";
+                typeWriter.clearContent();
+
+                builder << "    generated to checkpoint ";
                 if (field->findDecoration<IRLoopCounterDecoration>())
                     builder << "loop counter created for loop at ";
                 else
