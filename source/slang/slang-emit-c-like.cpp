@@ -3677,88 +3677,140 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
     }
 }
 
-bool CLikeSourceEmitter::tryEmitUnsignedEquivalent(IRType* dataType)
+bool CLikeSourceEmitter::tryGetIntInfo(IRType* elementType, bool &isSigned, int &bitWidth)
 {
-    IRVectorType* vectorType = as<IRVectorType>(dataType);
-    if (vectorType) 
-    {
-        dataType = vectorType->getElementType();
-        m_writer->emit("vector<");
-    }
+    Slang::IROp type = elementType->getOp();
+    if (!(type >= kIROp_Int8Type && type <= kIROp_UInt64Type)) return false;
+    isSigned = (type >= kIROp_Int8Type && type <= kIROp_Int64Type);
 
-    Slang::IROp uType;
-    switch (dataType->getOp())
-    {
-        case kIROp_UInt8Type:
-        case kIROp_Int8Type:
-            uType = kIROp_UInt8Type;
-            break;
-        case kIROp_UInt16Type:
-        case kIROp_Int16Type:
-            uType = kIROp_UInt16Type;
-            break;
-        case kIROp_UInt64Type:
-        case kIROp_Int64Type:
-            uType = kIROp_UInt64Type;
-            break;
-        case kIROp_UIntType:
-        case kIROp_IntType:
-            uType = kIROp_UIntType;
-            break;
-        default:
-            return false;
-    }
-
-    m_writer->emit(getDefaultBuiltinTypeName(uType));
-    
-    if (vectorType) 
-    {
-        m_writer->emit(",");
-        emitSimpleValueImpl(vectorType->getElementCount());
-        m_writer->emit(">");
-    }
+    Slang::IROp stype = (isSigned) ? type : Slang::IROp(type - 4);
+    bitWidth = 8 << (stype - kIROp_Int8Type);
     return true;
+}
+
+void CLikeSourceEmitter::emitVecNOrScalar(IRVectorType* vectorType, std::function<void()> emitComponentLogic)
+{
+    if (vectorType)
+    {
+        // Special handling required for CUDA target
+        if (isCUDATarget(getTargetReq()))
+        {
+            m_writer->emit("make_");
+            Slang::IRType *elementType = vectorType->getElementType();
+
+            switch(elementType->getOp()) 
+            {
+                case kIROp_Int8Type:   m_writer->emit("char"); break;
+                case kIROp_Int16Type:  m_writer->emit("short"); break;
+                case kIROp_IntType:    m_writer->emit("int"); break;
+                case kIROp_Int64Type:  m_writer->emit("longlong"); break;
+                case kIROp_UInt8Type:  m_writer->emit("uchar"); break;
+                case kIROp_UInt16Type: m_writer->emit("ushort"); break;
+                case kIROp_UIntType:   m_writer->emit("uint"); break;
+                case kIROp_UInt64Type: m_writer->emit("ulonglong"); break;
+                default: SLANG_ABORT_COMPILATION("Unhandled type emitting CUDA vector");
+            }
+
+            int N = int(getIntVal(vectorType->getElementCount()));
+            m_writer->emitRawText(std::to_string(N).c_str());
+            m_writer->emit("(");
+            for (int i = 0; i < N; ++i) 
+            {
+                emitType(elementType);
+                m_writer->emit("(");
+                emitComponentLogic();
+                m_writer->emit(")");
+                if (i != N - 1)
+                    m_writer->emit(", ");
+            }
+            m_writer->emit(")");
+        }
+        else 
+        {
+            emitType(vectorType);
+            m_writer->emit("(");
+            emitComponentLogic();
+            m_writer->emit(")");
+        }
+    }
+    else
+    {
+        m_writer->emit("(");
+        emitComponentLogic();
+        m_writer->emit(")");
+    }
 }
 
 void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst) 
 {
-    // BitfieldExtraction := T(uint(val>>off)&((1u<<bts)-1))
+    // If unsigned, bfue := ((val>>off)&((1u<<bts)-1))
+    // Else signed, bfse := (((val>>off)&((1u<<bts)-1))<<(nbts-bts)>>(nbts-bts));
     Slang::IRType* dataType = inst->getDataType();
     Slang::IRInst* val = inst->getOperand(0);
     Slang::IRInst* off = inst->getOperand(1);
     Slang::IRInst* bts = inst->getOperand(2);
-    
-    // cast to the target type for optional sign extension
-    emitType(inst->getDataType()); 
-    m_writer->emit("(");
+
+    Slang::IRType* elementType = dataType;
+    IRVectorType* vectorType = as<IRVectorType>(elementType);
+    if (vectorType)
+        elementType = vectorType->getElementType();
+
+    bool isSigned; 
+    int bitWidth;
+    if (!tryGetIntInfo(elementType, isSigned, bitWidth)) 
     {
-        // emit uint(val>>off)
-        if (!tryEmitUnsignedEquivalent(dataType))
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldExtract");
-            return;
-        }
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldExtract");
+        return;
+    }
+    
+    // Emit open paren and type cast for later sign extension
+    if (isSigned) 
+    {
         m_writer->emit("(");
-        {
-            emitOperand(val, getInfo(EmitOp::General));
-            m_writer->emit(">>");
-            emitOperand(off, getInfo(EmitOp::General));
-        }
-        m_writer->emit(")");
+        emitType(inst->getDataType());
+    }
 
-        m_writer->emit("&");
+    // Emit bitfield extraction ((val>>off)&((1u<<bts)-1))
+    m_writer->emit("((");
+    emitOperand(val, getInfo(EmitOp::General));
+    m_writer->emit(">>");
+    emitVecNOrScalar(vectorType, [&]() {
+        emitOperand(off, getInfo(EmitOp::General));
+    });
+    m_writer->emit(")&(");
+    emitVecNOrScalar(vectorType, [&]() {
+        if (bitWidth <= 32) m_writer->emit("((1u<<");
+        else m_writer->emit("((1ull<<");
+        emitOperand(bts, getInfo(EmitOp::General));
+        m_writer->emit(")-1)");
+    });
+    m_writer->emit("))");
 
-        // emit "((1u<<bts)-1)"
-        m_writer->emit("(");
+    // Emit sign extension logic
+    // (bitfield<<(numBits-bts)>>(numBits-bts))
+    //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    if (isSigned) 
+    {
+        m_writer->emit("<<");
+        emitVecNOrScalar(vectorType, [&]() 
         {
-            // emit "(1u << bts) - 1"
-            m_writer->emit("(1u <<");
+            m_writer->emit("(");
+            m_writer->emit(bitWidth);
+            m_writer->emit("-");
             emitOperand(bts, getInfo(EmitOp::General));
-            m_writer->emit(") - 1");
-        }
+            m_writer->emit(")");
+        });
+        m_writer->emit(">>");
+        emitVecNOrScalar(vectorType, [&]() 
+        {
+            m_writer->emit("(");
+            m_writer->emit(bitWidth);
+            m_writer->emit("-");
+            emitOperand(bts, getInfo(EmitOp::General));
+            m_writer->emit(")");
+        });
         m_writer->emit(")");
     }
-    m_writer->emit(")");
 }
 
 void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst) 
@@ -3773,66 +3825,67 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
     Slang::IRInst* off = inst->getOperand(2);
     Slang::IRInst* bts = inst->getOperand(3);
 
-    // cast back to the target type
-    emitType(inst->getDataType()); 
+    Slang::IRType* elementType = dataType;
+    IRVectorType* vectorType = as<IRVectorType>(elementType);
+    if (vectorType)
+        elementType = vectorType->getElementType();
+
+    bool isSigned;
+    int bitWidth;
+    if (!tryGetIntInfo(elementType, isSigned, bitWidth))
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldInsert");
+        return;
+    }
+
     m_writer->emit("(");
     {
         // emit clearedBase := uint(base & clearMask)
-        if (!tryEmitUnsignedEquivalent(dataType))
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldInsert");
-            return;
-        }
         m_writer->emit("(");
-        {   
+        {
             // emit base
             emitOperand(bse, getInfo(EmitOp::General));
             m_writer->emit("&");
-
+            
             // emit clearMask := ~(((1u<<bts)-1u)<<off)
-            m_writer->emit("(");
+            emitVecNOrScalar(vectorType, [&]()
             {
-                m_writer->emit("~(((1u<<");
+                if (bitWidth <= 32) m_writer->emit("~(((1u<<");
+                else m_writer->emit("~(((1ull<<");
                 emitOperand(bts, getInfo(EmitOp::General));
-                m_writer->emit(")-1u)<<");
+                if (bitWidth <= 32) m_writer->emit(")-1u)<<");
+                else m_writer->emit(")-1ull)<<");
                 emitOperand(off, getInfo(EmitOp::General));
                 m_writer->emit(")");
-            }
-            m_writer->emit(")");
+            });
         }
         m_writer->emit(")");
 
         // bitwise or clearedBase with maskedInsert
         m_writer->emit("|");
 
-        // Emit maskedInsert := uint((insert & ((1u << bits) - 1u)) << offset);
-        if (!tryEmitUnsignedEquivalent(dataType))
-        {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldInsert");
-            return;
-        }
+        // Emit maskedInsert := ((insert & ((1u << bits) - 1u)) << offset);
         m_writer->emit("(");
         {
             // Emit mask := (insert & ((1u << bits) - 1u))
             m_writer->emit("(");
-            {
-                // emit "insert & ((1u << bits) - 1u)"
-                emitOperand(ins, getInfo(EmitOp::General));
-                m_writer->emit("&");
-                m_writer->emit("(");
-                {
-                    // emit "(1u << bits) - 1u"
-                    m_writer->emit("(1u<<");
-                    emitOperand(bts, getInfo(EmitOp::General));
-                    m_writer->emit(")-1u");
-                }
-                m_writer->emit(")");
-            }
+            emitOperand(ins, getInfo(EmitOp::General));
+            m_writer->emit("&");
+            emitVecNOrScalar(vectorType, [&](){
+                if (bitWidth <= 32) m_writer->emit("(1u<<");
+                else m_writer->emit("(1ull<<");
+                emitOperand(bts, getInfo(EmitOp::General));
+                if (bitWidth <= 32) m_writer->emit(")-1u");
+                else m_writer->emit(")-1ull");
+            });
             m_writer->emit(")");
-
+            
             // Emit shift := << offset
             m_writer->emit("<<");
-            emitOperand(off, getInfo(EmitOp::General));
+
+            emitVecNOrScalar(vectorType, [&](){
+                emitOperand(off, getInfo(EmitOp::General));
+            });
         }
         m_writer->emit(")");
     }
