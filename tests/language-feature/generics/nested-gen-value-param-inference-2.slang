@@ -13,10 +13,19 @@ void acceptor<let D : int, S : IValueGeneric<D>>(NestedValueGeneric<D, S> x)
 {
     outputBuffer[0] = D + x.x;
 }
-void test(NestedValueGeneric<2, ValGenericImpl<2>> x)
+
+extension<let D : int, S : IValueGeneric<D>> NestedValueGeneric<D, S>
 {
-    // Test that we can correctly infer acceptor.D and acceptor.S from `x`.
-    acceptor(x);
+    void foo()
+    {
+        acceptor(this);
+    }
+}
+void test2(NestedValueGeneric<2, ValGenericImpl<2>> x)
+{
+    // 'foo' should be a member of 'NestedValueGeneric<2, ValGenericImpl<2>>' through
+    // the extension above.
+    x.foo();
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -27,6 +36,6 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     NestedValueGeneric<2, ValGenericImpl<2>> x;
     x.x = 1;
-    test(x);
+    test2(x);
     // CHECK: 3
 }
