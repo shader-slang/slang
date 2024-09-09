@@ -34,6 +34,7 @@
 #include "slang-ir-wgsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-varying-params.h"
@@ -1530,6 +1531,48 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "OPTIMIZED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    EndToEndCompileRequest *compileRequest = codeGenContext->isEndToEndCompile();
+    CompilerOptionSet &optionSet = compileRequest->getOptionSet();
+    SLANG_ASSERT(compileRequest);
+
+    printf("checking for checkpointing structures:\n");
+    for (auto inst : irModule->getGlobalInsts()) {
+        IRStructType *structType = as<IRStructType>(inst);
+        if (!structType)
+            continue;
+
+        if (structType->findDecoration<IRCheckpointIntermediateDecoration>()) {
+            printf("checkpoint intermediate struct\n");
+            printf("sourceLocs: %d (%d)\n",
+                structType->sourceLoc.getRaw(),
+                structType->sourceLoc.isValid());
+            inst->dump();
+
+            IRSizeAndAlignment sizeInfo;
+            getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
+            printf("size of struct: %d (%d)\n", sizeInfo.size, sizeInfo.alignment);
+
+            sink->diagnose(structType, Diagnostics::alsoSeePipelineDefinition);
+
+            printf("fields:");
+            for (auto field : structType->getFields()) {
+                printf("\tsourceLocs: %d (%d)\n",
+                    field->sourceLoc.getRaw(),
+                    field->sourceLoc.isValid());
+                printf("\t");
+                field->dump();
+
+                IRType *fieldType = field->getFieldType();
+                printf("field type: %p\n", fieldType);
+                IRSizeAndAlignment sizeInfo;
+                getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
+                printf("\tsize of struct: %d (%d)\n", sizeInfo.size, sizeInfo.alignment);
+
+                sink->diagnose(field, Diagnostics::alsoSeePipelineDefinition);
+            }
+        }
+    }
 
     if ( (target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly) )
     {

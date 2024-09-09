@@ -947,6 +947,14 @@ struct IRPreferCheckpointDecoration : IRCheckpointHintDecoration
     IR_LEAF_ISA(PreferCheckpointDecoration)
 };
 
+struct IRCheckpointIntermediateDecoration : IRCheckpointHintDecoration
+{
+    enum
+    {
+        kOp = kIROp_CheckpointIntermediateDecoration
+    };
+    IR_LEAF_ISA(CheckpointIntermediateDecoration)
+};
 
 struct IRLoopCounterDecoration : IRDecoration
 {
