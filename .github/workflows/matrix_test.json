@@ -12,7 +12,6 @@
     { "os": "windows", "compiler": "clang" },
     { "os": "macos", "compiler": "gcc" },
     { "os": "macos", "compiler": "cl" },
-    { "os": "macos", "config": "debug" },
     { "os": "linux", "config": "debug", "platform": "aarch64" }
   ],
   "include": [
