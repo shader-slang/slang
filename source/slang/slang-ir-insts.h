@@ -799,6 +799,17 @@ struct IRSequentialIDDecoration : IRDecoration
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
+struct IRResultWitnessDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_ResultWitnessDecoration
+    };
+    IR_LEAF_ISA(ResultWitnessDecoration)
+
+    IRInst* getWitness() { return getOperand(0); }
+};
+
 struct IRDynamicDispatchWitnessDecoration : IRDecoration
 {
     IR_LEAF_ISA(DynamicDispatchWitnessDecoration)
@@ -4539,6 +4550,11 @@ public:
     }
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
+
+    IRDecoration* addResultWitnessDecoration(IRInst* value, IRInst* witness)
+    {
+        return addDecoration(value, kIROp_ResultWitnessDecoration, witness);
+    }
 
     IRDecoration* addTargetSystemValueDecoration(IRInst* value, UnownedStringSlice sysValName, UInt index = 0)
     {

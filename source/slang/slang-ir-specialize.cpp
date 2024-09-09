@@ -1243,24 +1243,31 @@ struct SpecializationContext
             return false;
 
         // We shouldn't bother specializing unless the callee has at least
-        // one parameter that has an existential/interface type.
+        // one parameter/return type that has an existential/interface type.
         //
         bool shouldSpecialize = false;
         UInt argCounter = 0;
-        for (auto param : calleeFunc->getParams())
+        if (as<IRInterfaceType>(calleeFunc->getResultType()))
         {
-            auto arg = inst->getArg(argCounter++);
-            if (!isExistentialType(param->getDataType()))
-                continue;
-
             shouldSpecialize = true;
+        }
+        else
+        {
+            for (auto param : calleeFunc->getParams())
+            {
+                auto arg = inst->getArg(argCounter++);
+                if (!isExistentialType(param->getDataType()))
+                    continue;
 
-            // We *cannot* specialize unless the argument value corresponding
-            // to such a parameter is one we can specialize.
-            //
-            if (!canSpecializeExistentialArg(arg))
-                return false;
+                shouldSpecialize = true;
 
+                // We *cannot* specialize unless the argument value corresponding
+                // to such a parameter is one we can specialize.
+                //
+                if (!canSpecializeExistentialArg(arg))
+                    return false;
+
+            }
         }
         // If we never found a parameter worth specializing, we should bail out.
         //
@@ -1409,8 +1416,20 @@ struct SpecializationContext
         auto builder = &builderStorage;
 
         builder->setInsertBefore(inst);
-        auto newCall = builder->emitCallInst(
-            inst->getFullType(), specializedCallee, (UInt)newArgs.getCount(), newArgs.getArrayView().getBuffer());
+        auto callResultType = specializedCallee->getResultType();
+        IRInst* newCall = builder->emitCallInst(
+            callResultType, specializedCallee, (UInt)newArgs.getCount(), newArgs.getArrayView().getBuffer());
+
+        if (as<IRInterfaceType>(inst->getDataType()))
+        {
+            // If the result of the original call is specialized to a concrete type,
+            // we need to wrap it back into an existential type.
+            //
+            if (auto resultWitnessDecor = specializedCallee->findDecoration<IRResultWitnessDecoration>())
+            {
+                newCall = builder->emitMakeExistential(inst->getDataType(), newCall, resultWitnessDecor->getWitness());
+            }
+        }
 
         // We will completely replace the old `call` instruction with the
         // new one, and will go so far as to transfer any decorations
@@ -1764,6 +1783,57 @@ struct SpecializationContext
         addToWorkList(newFunc);
 
         simplifyFunc(targetProgram, newFunc, IRSimplificationOptions::getFast(targetProgram));
+
+        if (as<IRInterfaceType>(newFunc->getResultType()))
+        {
+            // If th result type is an interface type, and all return values are of the same
+            // concrete type, we can simplify the function to return the concrete type.
+            // We also need to mark the simplfiied function with a result witness decoration
+            // so we can rewrite all the callsites into IRMakeExistential using the witness.
+            // This is effectively pushing the MakeExistential to the call sites, so optimizations
+            // can happen across the function call boundaries.
+            IRInst* witnessTable = nullptr;
+            IRInst* concreteType = nullptr;
+            for (auto block : newFunc->getBlocks())
+            {
+                if (auto returnInst = as<IRReturn>(block->getTerminator()))
+                {
+                    if (auto makeExistential = as<IRMakeExistential>(returnInst->getVal()))
+                    {
+                        if (!concreteType)
+                        {
+                            concreteType = makeExistential->getWrappedValue()->getDataType();
+                            witnessTable = makeExistential->getWitnessTable();
+                        }
+                        else if (concreteType != makeExistential->getWrappedValue()->getDataType())
+                        {
+                            concreteType = nullptr;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        concreteType = nullptr;
+                        break;
+                    }
+                }
+            }
+            if (concreteType)
+            {
+                for (auto block : newFunc->getBlocks())
+                {
+                    if (auto returnInst = as<IRReturn>(block->getTerminator()))
+                    {
+                        if (auto makeExistential = as<IRMakeExistential>(returnInst->getVal()))
+                        {
+                            returnInst->setOperand(0, makeExistential->getWrappedValue());
+                        }
+                    }
+                }
+                builder->addResultWitnessDecoration(newFunc, witnessTable);
+                fixUpFuncType(newFunc, (IRType*)concreteType);
+            }
+        }
 
         return newFunc;
     }
@@ -2758,12 +2828,14 @@ void finalizeSpecialization(IRModule* module)
             break;
 
         case kIROp_StructKey:
+        case kIROp_Func:
             for (auto decor = inst->getFirstDecoration(); decor; )
             {
                 auto nextDecor = decor->getNextDecoration();
                 switch (decor->getOp())
                 {
                 case kIROp_DispatchFuncDecoration:
+                case kIROp_ResultWitnessDecoration:
                     decor->removeAndDeallocate();
                     break;
                 default:
