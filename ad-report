@@ -3,281 +3,295 @@ undefined
 let  %1	: Void	= no_diff
 let  %2	: witness_table_t(%IDifferentiable)	= lookupWitness(%3, %4)
 let  %3	: witness_table_t(%IFloat)	= lookupWitness(%5, %6)
-let  %7	: CapabilitySet	= capabilityDisjunction(%8, %9, %10, %11, %12, %13, %14, %15, %16, %17, %18, %19, %20, %21, %22, %23, %24, %25, %26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39, %40, %41, %42, %43, %44, %45, %46, %47, %48, %49, %50, %51, %52, %53, %54, %55, %56, %57, %58, %59, %60, %61, %62, %63, %64, %65, %66, %67, %68, %69, %70, %71, %72, %73, %74, %75, %76, %77, %78, %79, %80, %81, %82, %83, %84, %85, %86, %87, %88, %89, %90, %91, %92, %93, %94, %95, %96, %97, %98, %99, %100, %101, %102, %103, %104, %105)
-let  %105	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 74 : Int)
-let  %104	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 73 : Int)
-let  %103	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 72 : Int)
-let  %102	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 71 : Int)
-let  %101	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 70 : Int)
-let  %100	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 69 : Int)
-let  %99	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 68 : Int)
-let  %98	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 67 : Int)
-let  %97	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 66 : Int)
-let  %96	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 65 : Int)
-let  %95	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 64 : Int)
-let  %94	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 63 : Int)
-let  %93	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 62 : Int)
-let  %92	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 61 : Int)
-let  %91	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 74 : Int)
-let  %90	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 73 : Int)
-let  %89	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 72 : Int)
-let  %88	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 71 : Int)
-let  %87	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 70 : Int)
-let  %86	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 69 : Int)
-let  %85	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 68 : Int)
-let  %84	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 67 : Int)
-let  %83	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 66 : Int)
-let  %82	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 65 : Int)
-let  %81	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 64 : Int)
-let  %80	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 63 : Int)
-let  %79	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 62 : Int)
-let  %78	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 61 : Int)
-let  %77	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 74 : Int)
-let  %76	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 73 : Int)
-let  %75	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 72 : Int)
-let  %74	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 71 : Int)
-let  %73	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 70 : Int)
-let  %72	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 69 : Int)
-let  %71	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 68 : Int)
-let  %70	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 67 : Int)
-let  %69	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 66 : Int)
-let  %68	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 65 : Int)
-let  %67	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 64 : Int)
-let  %66	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 63 : Int)
-let  %65	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 62 : Int)
-let  %64	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 61 : Int)
-let  %63	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 74 : Int)
-let  %62	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 73 : Int)
-let  %61	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 72 : Int)
-let  %60	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 71 : Int)
-let  %59	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 70 : Int)
-let  %58	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 69 : Int)
-let  %57	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 68 : Int)
-let  %56	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 67 : Int)
-let  %55	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 66 : Int)
-let  %54	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 65 : Int)
-let  %53	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 64 : Int)
-let  %52	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 63 : Int)
-let  %51	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 62 : Int)
-let  %50	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 61 : Int)
-let  %49	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 74 : Int)
-let  %48	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 73 : Int)
-let  %47	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 72 : Int)
-let  %46	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 71 : Int)
-let  %45	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 70 : Int)
-let  %44	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 69 : Int)
-let  %43	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 68 : Int)
-let  %42	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 67 : Int)
-let  %41	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 66 : Int)
-let  %40	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 65 : Int)
-let  %39	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 64 : Int)
-let  %38	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 63 : Int)
-let  %37	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 62 : Int)
-let  %36	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 61 : Int)
-let  %35	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 74 : Int)
-let  %34	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 73 : Int)
-let  %33	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 72 : Int)
-let  %32	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 71 : Int)
-let  %31	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 70 : Int)
-let  %30	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 69 : Int)
-let  %29	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 68 : Int)
-let  %28	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 67 : Int)
-let  %27	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 66 : Int)
-let  %26	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 65 : Int)
-let  %25	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 64 : Int)
-let  %24	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 63 : Int)
-let  %23	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 62 : Int)
-let  %22	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 61 : Int)
-let  %21	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 74 : Int)
-let  %20	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 73 : Int)
-let  %19	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 72 : Int)
-let  %18	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 71 : Int)
-let  %17	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 70 : Int)
-let  %16	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 69 : Int)
-let  %15	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 68 : Int)
-let  %14	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 67 : Int)
-let  %13	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 66 : Int)
-let  %12	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 65 : Int)
-let  %11	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 64 : Int)
-let  %10	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 63 : Int)
-let  %9	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 62 : Int)
-let  %8	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 61 : Int)
+let  %7	: CapabilitySet	= capabilityDisjunction(%8, %9, %10, %11, %12, %13, %14, %15, %16, %17, %18, %19, %20, %21, %22, %23, %24, %25, %26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39, %40, %41, %42, %43, %44, %45, %46, %47, %48, %49, %50, %51, %52, %53, %54, %55, %56, %57, %58, %59, %60, %61, %62, %63, %64, %65, %66, %67, %68, %69, %70, %71, %72, %73, %74, %75, %76, %77, %78, %79, %80, %81, %82, %83, %84, %85, %86, %87, %88, %89, %90, %91, %92, %93, %94, %95, %96, %97, %98, %99, %100, %101, %102, %103, %104, %105, %106, %107, %108, %109, %110, %111, %112, %113, %114, %115, %116, %117, %118, %119)
+let  %119	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 75 : Int)
+let  %118	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 74 : Int)
+let  %117	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 73 : Int)
+let  %116	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 72 : Int)
+let  %115	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 71 : Int)
+let  %114	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 70 : Int)
+let  %113	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 69 : Int)
+let  %112	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 68 : Int)
+let  %111	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 67 : Int)
+let  %110	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 66 : Int)
+let  %109	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 65 : Int)
+let  %108	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 64 : Int)
+let  %107	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 63 : Int)
+let  %106	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 62 : Int)
+let  %105	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 75 : Int)
+let  %104	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 74 : Int)
+let  %103	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 73 : Int)
+let  %102	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 72 : Int)
+let  %101	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 71 : Int)
+let  %100	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 70 : Int)
+let  %99	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 69 : Int)
+let  %98	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 68 : Int)
+let  %97	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 67 : Int)
+let  %96	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 66 : Int)
+let  %95	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 65 : Int)
+let  %94	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 64 : Int)
+let  %93	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 63 : Int)
+let  %92	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 62 : Int)
+let  %91	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 75 : Int)
+let  %90	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 74 : Int)
+let  %89	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 73 : Int)
+let  %88	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 72 : Int)
+let  %87	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 71 : Int)
+let  %86	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 70 : Int)
+let  %85	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 69 : Int)
+let  %84	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 68 : Int)
+let  %83	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 67 : Int)
+let  %82	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 66 : Int)
+let  %81	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 65 : Int)
+let  %80	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 64 : Int)
+let  %79	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 63 : Int)
+let  %78	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 62 : Int)
+let  %77	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 75 : Int)
+let  %76	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 74 : Int)
+let  %75	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 73 : Int)
+let  %74	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 72 : Int)
+let  %73	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 71 : Int)
+let  %72	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 70 : Int)
+let  %71	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 69 : Int)
+let  %70	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 68 : Int)
+let  %69	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 67 : Int)
+let  %68	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 66 : Int)
+let  %67	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 65 : Int)
+let  %66	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 64 : Int)
+let  %65	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 63 : Int)
+let  %64	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 62 : Int)
+let  %63	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 75 : Int)
+let  %62	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 74 : Int)
+let  %61	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 73 : Int)
+let  %60	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 72 : Int)
+let  %59	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 71 : Int)
+let  %58	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 70 : Int)
+let  %57	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 69 : Int)
+let  %56	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 68 : Int)
+let  %55	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 67 : Int)
+let  %54	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 66 : Int)
+let  %53	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 65 : Int)
+let  %52	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 64 : Int)
+let  %51	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 63 : Int)
+let  %50	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 62 : Int)
+let  %49	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 75 : Int)
+let  %48	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 74 : Int)
+let  %47	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 73 : Int)
+let  %46	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 72 : Int)
+let  %45	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 71 : Int)
+let  %44	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 70 : Int)
+let  %43	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 69 : Int)
+let  %42	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 68 : Int)
+let  %41	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 67 : Int)
+let  %40	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 66 : Int)
+let  %39	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 65 : Int)
+let  %38	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 64 : Int)
+let  %37	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 63 : Int)
+let  %36	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 62 : Int)
+let  %35	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 75 : Int)
+let  %34	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 74 : Int)
+let  %33	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 73 : Int)
+let  %32	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 72 : Int)
+let  %31	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 71 : Int)
+let  %30	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 70 : Int)
+let  %29	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 69 : Int)
+let  %28	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 68 : Int)
+let  %27	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 67 : Int)
+let  %26	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 66 : Int)
+let  %25	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 65 : Int)
+let  %24	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 64 : Int)
+let  %23	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 63 : Int)
+let  %22	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 62 : Int)
+let  %21	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 75 : Int)
+let  %20	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 74 : Int)
+let  %19	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 73 : Int)
+let  %18	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 72 : Int)
+let  %17	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 71 : Int)
+let  %16	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 70 : Int)
+let  %15	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 69 : Int)
+let  %14	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 68 : Int)
+let  %13	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 67 : Int)
+let  %12	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 66 : Int)
+let  %11	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 65 : Int)
+let  %10	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 64 : Int)
+let  %9	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 63 : Int)
+let  %8	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 62 : Int)
 let  %5	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)	= thisTypeWitness
-let  %106	: _	= interface_req_entry(%107, witness_table_t(%x5Fx5FBuiltinRealType))
-let  %108	: _	= interface_req_entry(%6, witness_table_t(%IFloat))
-let  %109	: _	= interface_req_entry(%110, Func(this_type(%x5Fx5FBuiltinFloatingPointType)))
-let  %111	: _	= interface_req_entry(%112, Func(DiffPairUserCode(this_type(%x5Fx5FBuiltinFloatingPointType), %2)))
-let  %113	: _	= interface_req_entry(%114, Func(Void, associated_type(%IDifferentiable)))
+let  %120	: _	= interface_req_entry(%121, witness_table_t(%x5Fx5FBuiltinRealType))
+let  %122	: _	= interface_req_entry(%6, witness_table_t(%IFloat))
+let  %123	: _	= interface_req_entry(%124, Func(this_type(%x5Fx5FBuiltinFloatingPointType)))
+let  %125	: _	= interface_req_entry(%126, Func(DiffPairUserCode(this_type(%x5Fx5FBuiltinFloatingPointType), %2)))
+let  %127	: _	= interface_req_entry(%128, Func(Void, associated_type(%IDifferentiable)))
 [treatAsDifferentiableDecoration]
 [BuiltinDecoration]
 [import("_ST4core26__BuiltinFloatingPointType")]
 [nameHint("__BuiltinFloatingPointType")]
-let  %x5Fx5FBuiltinFloatingPointType	: Type	= interface(%106, %108, %109, %111, %113)
+let  %x5Fx5FBuiltinFloatingPointType	: Type	= interface(%120, %122, %123, %125, %127)
 [import("_S4core26__BuiltinFloatingPointTypeI4core17__BuiltinRealType")]
-let  %107	: _	= key
-let  %115	: _	= interface_req_entry(%116, witness_table_t(%x5Fx5FBuiltinSignedArithmeticType))
+let  %121	: _	= key
+let  %129	: _	= interface_req_entry(%130, witness_table_t(%x5Fx5FBuiltinSignedArithmeticType))
 [BuiltinDecoration]
 [import("_ST4core17__BuiltinRealType")]
 [nameHint("__BuiltinRealType")]
-let  %x5Fx5FBuiltinRealType	: Type	= interface(%115)
+let  %x5Fx5FBuiltinRealType	: Type	= interface(%129)
 [import("_S4core17__BuiltinRealTypeI4core29__BuiltinSignedArithmeticType")]
-let  %116	: _	= key
-let  %117	: _	= interface_req_entry(%118, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+let  %130	: _	= key
+let  %131	: _	= interface_req_entry(%132, witness_table_t(%x5Fx5FBuiltinArithmeticType))
 [BuiltinDecoration]
 [import("_ST4core29__BuiltinSignedArithmeticType")]
 [nameHint("__BuiltinSignedArithmeticType")]
-let  %x5Fx5FBuiltinSignedArithmeticType	: Type	= interface(%117)
+let  %x5Fx5FBuiltinSignedArithmeticType	: Type	= interface(%131)
 [import("_S4core29__BuiltinSignedArithmeticTypeI4core23__BuiltinArithmeticType")]
-let  %118	: _	= key
-let  %119	: _	= interface_req_entry(%120, witness_table_t(%x5Fx5FBuiltinType))
-let  %121	: _	= interface_req_entry(%122, witness_table_t(%IArithmetic))
+let  %132	: _	= key
+let  %133	: _	= interface_req_entry(%134, witness_table_t(%x5Fx5FBuiltinType))
+let  %135	: _	= interface_req_entry(%136, witness_table_t(%IArithmetic))
 [BuiltinDecoration]
 [import("_ST4core23__BuiltinArithmeticType")]
 [nameHint("__BuiltinArithmeticType")]
-let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%119, %121)
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%133, %135)
 [import("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinType")]
-let  %120	: _	= key
+let  %134	: _	= key
 [BuiltinDecoration]
 [import("_ST4core13__BuiltinType")]
 [nameHint("__BuiltinType")]
 let  %x5Fx5FBuiltinType	: Type	= interface
 [import("_S4core23__BuiltinArithmeticTypeI4core11IArithmetic")]
-let  %122	: _	= key
-let  %123	: _	= interface_req_entry(%124, witness_table_t(%IComparable))
-let  %125	: _	= interface_req_entry(%126, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
-let  %127	: _	= interface_req_entry(%128, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
-let  %129	: _	= interface_req_entry(%130, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
-let  %131	: _	= interface_req_entry(%132, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
-let  %133	: _	= interface_req_entry(%134, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
-let  %135	: _	= interface_req_entry(%136, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
-let  %137	: _	= interface_req_entry(%138, Func(this_type(%IArithmetic), Int))
-let  %139	: _	= interface_req_entry(%140, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %136	: _	= key
+let  %137	: _	= interface_req_entry(%138, witness_table_t(%IComparable))
+let  %139	: _	= interface_req_entry(%140, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %141	: _	= interface_req_entry(%142, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %143	: _	= interface_req_entry(%144, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %145	: _	= interface_req_entry(%146, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %147	: _	= interface_req_entry(%148, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %149	: _	= interface_req_entry(%150, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %151	: _	= interface_req_entry(%152, Func(this_type(%IArithmetic), Int))
+let  %153	: _	= interface_req_entry(%154, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
 [import("_ST4core11IArithmetic")]
 [nameHint("IArithmetic")]
-let  %IArithmetic	: Type	= interface(%123, %125, %127, %129, %131, %133, %135, %137, %139)
+let  %IArithmetic	: Type	= interface(%137, %139, %141, %143, %145, %147, %149, %151, %153)
 [import("_S4core11IArithmeticI4core11IComparable")]
-let  %124	: _	= key
-let  %141	: _	= interface_req_entry(%142, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
-let  %143	: _	= interface_req_entry(%144, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
-let  %145	: _	= interface_req_entry(%146, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %138	: _	= key
+let  %155	: _	= interface_req_entry(%156, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %157	: _	= interface_req_entry(%158, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %159	: _	= interface_req_entry(%160, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
 [import("_ST4core11IComparable")]
 [nameHint("IComparable")]
-let  %IComparable	: Type	= interface(%141, %143, %145)
+let  %IComparable	: Type	= interface(%155, %157, %159)
 [import("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
-let  %142	: _	= key
+let  %156	: _	= key
 [import("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
-let  %144	: _	= key
+let  %158	: _	= key
 [import("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
-let  %146	: _	= key
+let  %160	: _	= key
 [import("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
-let  %126	: _	= key
-[import("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
-let  %128	: _	= key
-[import("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
-let  %130	: _	= key
-[import("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
-let  %132	: _	= key
-[import("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
-let  %134	: _	= key
-[import("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
-let  %136	: _	= key
-[import("_S4core11IArithmeticR8_24xinitp1pi_i")]
-let  %138	: _	= key
-[import("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
 let  %140	: _	= key
+[import("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %142	: _	= key
+[import("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %144	: _	= key
+[import("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %146	: _	= key
+[import("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %148	: _	= key
+[import("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %150	: _	= key
+[import("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %152	: _	= key
+[import("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %154	: _	= key
 [import("_S4core26__BuiltinFloatingPointTypeI4core6IFloat")]
 let  %6	: _	= key
-let  %147	: _	= interface_req_entry(%148, witness_table_t(%IArithmetic))
-let  %149	: _	= interface_req_entry(%4, witness_table_t(%IDifferentiable))
-let  %150	: _	= interface_req_entry(%151, Func(this_type(%IFloat), Float))
-let  %152	: _	= interface_req_entry(%153, Func(Float, this_type(%IFloat)))
-let  %154	: _	= interface_req_entry(%155, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
-let  %156	: _	= interface_req_entry(%157, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
-let  %158	: _	= interface_req_entry(%159, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
-let  %160	: _	= interface_req_entry(%161, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
-let  %162	: _	= interface_req_entry(%163, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
-let  %164	: _	= interface_req_entry(%165, Func(this_type(%IFloat), this_type(%IFloat)))
-let  %166	: _	= interface_req_entry(%167, Func(this_type(%IFloat), this_type(%IFloat)))
-let  %168	: _	= interface_req_entry(%169, %170)
+let  %161	: _	= interface_req_entry(%162, witness_table_t(%IArithmetic))
+let  %163	: _	= interface_req_entry(%4, witness_table_t(%IDifferentiable))
+let  %164	: _	= interface_req_entry(%165, Func(this_type(%IFloat), Float))
+let  %166	: _	= interface_req_entry(%167, Func(Float, this_type(%IFloat)))
+let  %168	: _	= interface_req_entry(%169, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %170	: _	= interface_req_entry(%171, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %172	: _	= interface_req_entry(%173, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %174	: _	= interface_req_entry(%175, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %176	: _	= interface_req_entry(%177, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %178	: _	= interface_req_entry(%179, Func(this_type(%IFloat), this_type(%IFloat)))
+let  %180	: _	= interface_req_entry(%181, Func(this_type(%IFloat), this_type(%IFloat)))
+let  %182	: _	= interface_req_entry(%183, %184)
 [import("_ST4core6IFloat")]
 [nameHint("IFloat")]
-let  %IFloat	: Type	= interface(%147, %149, %150, %152, %154, %156, %158, %160, %162, %164, %166, %168)
+let  %IFloat	: Type	= interface(%161, %163, %164, %166, %168, %170, %172, %174, %176, %178, %180, %182)
 [import("_S4core6IFloatI4core11IArithmetic")]
-let  %148	: _	= key
+let  %162	: _	= key
 [import("_S4core6IFloatI4core15IDifferentiable")]
 let  %4	: _	= key
-let  %171	: _	= interface_req_entry(%172, associated_type(%IDifferentiable))
-let  %173	: _	= interface_req_entry(%174, witness_table_t(%IDifferentiable))
-let  %175	: _	= interface_req_entry(%176, Func(associated_type(%IDifferentiable)))
-let  %177	: _	= interface_req_entry(%178, Func(associated_type(%IDifferentiable), associated_type(%IDifferentiable), associated_type(%IDifferentiable)))
-let  %179	: _	= interface_req_entry(%180, %181)
+let  %185	: _	= interface_req_entry(%186, associated_type(%IDifferentiable))
+let  %187	: _	= interface_req_entry(%188, witness_table_t(%IDifferentiable))
+let  %189	: _	= interface_req_entry(%190, Func(associated_type(%IDifferentiable)))
+let  %191	: _	= interface_req_entry(%192, Func(associated_type(%IDifferentiable), associated_type(%IDifferentiable), associated_type(%IDifferentiable)))
+let  %193	: _	= interface_req_entry(%194, %195)
 [import("_ST4core15IDifferentiable")]
 [nameHint("IDifferentiable")]
-let  %IDifferentiable	: Type	= interface(%171, %173, %175, %177, %179)
+let  %IDifferentiable	: Type	= interface(%185, %187, %189, %191, %193)
 [import("_ST4core15IDifferentiable12Differential")]
-let  %172	: _	= key
+let  %186	: _	= key
 [import("_S4core15IDifferentiable12DifferentialI4core15IDifferentiable")]
-let  %174	: _	= key
+let  %188	: _	= key
 [StaticRequirementDecoration]
 [import("_S4core15IDifferentiable5dzerop0p4core15IDifferentiable12Differential")]
-let  %176	: _	= key
+let  %190	: _	= key
 [StaticRequirementDecoration]
 [import("_S4core15IDifferentiable4daddp2pi_4core15IDifferentiable12Differentiali_4core15IDifferentiable12Differential4core15IDifferentiable12Differential")]
-let  %178	: _	= key
+let  %192	: _	= key
 [StaticRequirementDecoration]
 [import("_S4core15IDifferentiable4dmulg2TC4core15IDifferentiable1T4core17__BuiltinRealTypep2pi_4core15IDifferentiable1Ti_4core15IDifferentiable12Differential4core15IDifferentiable12Differential")]
-let  %180	: _	= key
-generic %181	: Generic
+let  %194	: _	= key
+generic %195	: Generic
 {
-block %182(
+block %196(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
 		[nameHint("IDifferentiable.T")]
 		param %IDifferentiablex5FT	: type_t,
-		param %183	: witness_table_t(%x5Fx5FBuiltinRealType)):
+		param %197	: witness_table_t(%x5Fx5FBuiltinRealType)):
 	return_val(Func(associated_type(%IDifferentiable), %IDifferentiablex5FT, associated_type(%IDifferentiable)))
 }
 [import("_S4core6IFloatR8_24xinitp1pi_f")]
-let  %151	: _	= key
-[import("_S4core6IFloat7toFloatp0pf")]
-let  %153	: _	= key
-[import("_S4core6IFloat3addp1pi_4core6IFloat4This4core6IFloat4This")]
-let  %155	: _	= key
-[import("_S4core6IFloat3subp1pi_4core6IFloat4This4core6IFloat4This")]
-let  %157	: _	= key
-[import("_S4core6IFloat3mulp1pi_4core6IFloat4This4core6IFloat4This")]
-let  %159	: _	= key
-[import("_S4core6IFloat3divp1pi_4core6IFloat4This4core6IFloat4This")]
-let  %161	: _	= key
-[import("_S4core6IFloat3modp1pi_4core6IFloat4This4core6IFloat4This")]
-let  %163	: _	= key
-[import("_S4core6IFloat3negp0p4core6IFloat4This")]
 let  %165	: _	= key
-[import("_S4core6IFloatR8_24xinitp1pi_4core6IFloat4This")]
+[import("_S4core6IFloat7toFloatp0pf")]
 let  %167	: _	= key
-[import("_S4core6IFloat5scaleg2TC4core6IFloat1T4core26__BuiltinFloatingPointTypep1pi_4core6IFloat1T4core6IFloat4This")]
+[import("_S4core6IFloat3addp1pi_4core6IFloat4This4core6IFloat4This")]
 let  %169	: _	= key
-generic %170	: Generic
+[import("_S4core6IFloat3subp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %171	: _	= key
+[import("_S4core6IFloat3mulp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %173	: _	= key
+[import("_S4core6IFloat3divp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %175	: _	= key
+[import("_S4core6IFloat3modp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %177	: _	= key
+[import("_S4core6IFloat3negp0p4core6IFloat4This")]
+let  %179	: _	= key
+[import("_S4core6IFloatR8_24xinitp1pi_4core6IFloat4This")]
+let  %181	: _	= key
+[import("_S4core6IFloat5scaleg2TC4core6IFloat1T4core26__BuiltinFloatingPointTypep1pi_4core6IFloat1T4core6IFloat4This")]
+let  %183	: _	= key
+generic %184	: Generic
 {
-block %184(
+block %198(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinFloatingPointType)]
 		[nameHint("IFloat.T")]
 		param %IFloatx5FT	: type_t,
-		param %185	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
+		param %199	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
 	return_val(Func(this_type(%IFloat), this_type(%IFloat), %IFloatx5FT))
 }
-[backwardDiffReference(%114)]
-[fwdDerivative(%112)]
+[backwardDiffReference(%128)]
+[fwdDerivative(%126)]
 [StaticRequirementDecoration]
 [import("_S4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4Thisb")]
-let  %110	: _	= key
+let  %124	: _	= key
 [StaticRequirementDecoration]
 [import("_SFwdReq_4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4Thisb")]
-let  %112	: _	= key
+let  %126	: _	= key
 [StaticRequirementDecoration]
 [import("_SBwdReq_4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4Thisb")]
-let  %114	: _	= key
+let  %128	: _	= key
 [export("_SWf4core13__BuiltinType")]
-witness_table %186	: witness_table_t(%x5Fx5FBuiltinType)(Float);
+witness_table %200	: witness_table_t(%x5Fx5FBuiltinType)(Float);
 
 [intrinsicOp(272 : Int)]
 [method]
@@ -298,13 +312,13 @@ func %floatx5FlessThan	: Func(Bool, Float, Float);
 func %floatx5FlessThanOrEquals	: Func(Bool, Float, Float);
 
 [export("_SWf4core11IComparable")]
-witness_table %187	: witness_table_t(%IComparable)(Float)
+witness_table %201	: witness_table_t(%IComparable)(Float)
 {
-	witness_table_entry(%142,%floatx5Fequals)
+	witness_table_entry(%156,%floatx5Fequals)
 
-	witness_table_entry(%144,%floatx5FlessThan)
+	witness_table_entry(%158,%floatx5FlessThan)
 
-	witness_table_entry(%146,%floatx5FlessThanOrEquals)
+	witness_table_entry(%160,%floatx5FlessThanOrEquals)
 
 }
 
@@ -358,82 +372,82 @@ func %floatx5Fx24init	: Func(Float, Int);
 func %floatx5Fx24init1	: Func(Float, Float);
 
 [export("_SWf4core11IArithmetic")]
-witness_table %188	: witness_table_t(%IArithmetic)(Float)
+witness_table %202	: witness_table_t(%IArithmetic)(Float)
 {
-	witness_table_entry(%124,%187)
+	witness_table_entry(%138,%201)
 
-	witness_table_entry(%126,%floatx5Fadd)
+	witness_table_entry(%140,%floatx5Fadd)
 
-	witness_table_entry(%128,%floatx5Fsub)
+	witness_table_entry(%142,%floatx5Fsub)
 
-	witness_table_entry(%130,%floatx5Fmul)
+	witness_table_entry(%144,%floatx5Fmul)
 
-	witness_table_entry(%132,%floatx5Fdiv)
+	witness_table_entry(%146,%floatx5Fdiv)
 
-	witness_table_entry(%134,%floatx5Fmod)
+	witness_table_entry(%148,%floatx5Fmod)
 
-	witness_table_entry(%136,%floatx5Fneg)
+	witness_table_entry(%150,%floatx5Fneg)
 
-	witness_table_entry(%138,%floatx5Fx24init)
+	witness_table_entry(%152,%floatx5Fx24init)
 
-	witness_table_entry(%140,%floatx5Fx24init1)
+	witness_table_entry(%154,%floatx5Fx24init1)
 
 }
 
 [export("_SWf4core23__BuiltinArithmeticType")]
-witness_table %189	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(Float)
+witness_table %203	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(Float)
 {
-	witness_table_entry(%120,%186)
+	witness_table_entry(%134,%200)
 
-	witness_table_entry(%122,%188)
+	witness_table_entry(%136,%202)
 
 }
 
 [export("_SWf4core29__BuiltinSignedArithmeticType")]
-witness_table %190	: witness_table_t(%x5Fx5FBuiltinSignedArithmeticType)(Float)
+witness_table %204	: witness_table_t(%x5Fx5FBuiltinSignedArithmeticType)(Float)
 {
-	witness_table_entry(%118,%189)
+	witness_table_entry(%132,%203)
 
 }
 
 [export("_SWf4core17__BuiltinRealType")]
-witness_table %191	: witness_table_t(%x5Fx5FBuiltinRealType)(Float)
+witness_table %205	: witness_table_t(%x5Fx5FBuiltinRealType)(Float)
 {
-	witness_table_entry(%116,%190)
+	witness_table_entry(%130,%204)
 
 }
 
 [export("_SWf4core11IComparable")]
-witness_table %192	: witness_table_t(%IComparable)(Float)
+witness_table %206	: witness_table_t(%IComparable)(Float)
 {
-	witness_table_entry(%142,%floatx5Fequals)
+	witness_table_entry(%156,%floatx5Fequals)
 
-	witness_table_entry(%144,%floatx5FlessThan)
+	witness_table_entry(%158,%floatx5FlessThan)
 
-	witness_table_entry(%146,%floatx5FlessThanOrEquals)
+	witness_table_entry(%160,%floatx5FlessThanOrEquals)
 
 }
 
 [export("_SWf4core11IArithmetic")]
-witness_table %193	: witness_table_t(%IArithmetic)(Float)
+witness_table %207	: witness_table_t(%IArithmetic)(Float)
 {
-	witness_table_entry(%124,%192)
+	witness_table_entry(%138,%206)
 
-	witness_table_entry(%126,%floatx5Fadd)
+	witness_table_entry(%140,%floatx5Fadd)
 
-	witness_table_entry(%128,%floatx5Fsub)
+	witness_table_entry(%142,%floatx5Fsub)
 
-	witness_table_entry(%130,%floatx5Fmul)
+	witness_table_entry(%144,%floatx5Fmul)
 
-	witness_table_entry(%132,%floatx5Fdiv)
+	witness_table_entry(%146,%floatx5Fdiv)
 
-	witness_table_entry(%134,%floatx5Fmod)
+	witness_table_entry(%148,%floatx5Fmod)
 
-	witness_table_entry(%136,%floatx5Fneg)
+	witness_table_entry(%150,%floatx5Fneg)
 
-	witness_table_entry(%138,%floatx5Fx24init)
+	witness_table_entry(%152,%floatx5Fx24init)
 
-	witness_table_entry(%140,%floatx5Fx24init1)
+	witness_table_entry(%154,%floatx5Fx24init1)
 
 }
 
@@ -445,7 +459,7 @@ witness_table %193	: witness_table_t(%IArithmetic)(Float)
 [nameHint("float.dzero")]
 func %floatx5Fdzero	: Func(Float)
 {
-block %194:
+block %208:
 	return_val(0 : Float)
 }
 [DifferentiableTypeDictionaryDecoration]
@@ -456,60 +470,60 @@ block %194:
 [nameHint("float.dadd")]
 func %floatx5Fdadd	: Func(Float, Float, Float)
 {
-block %195(
+block %209(
 		[nameHint("a")]
 		param %a	: Float,
 		[nameHint("b")]
 		param %b	: Float):
-	let  %196	: Float	= add(%a, %b)
-	return_val(%196)
+	let  %210	: Float	= add(%a, %b)
+	return_val(%210)
 }
-generic %197	: Generic
+generic %211	: Generic
 {
-block %198(
+block %212(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
 		[nameHint("float.U")]
 		param %floatx5FU	: type_t,
-		param %199	: witness_table_t(%x5Fx5FBuiltinRealType)):
+		param %213	: witness_table_t(%x5Fx5FBuiltinRealType)):
 	return_val(Func(Float, Attributed(%floatx5FU, %1), Float))
 }
 [import("_S4core5float4dmulg2TC4core5float1U4core17__BuiltinRealTypep2pi_4core5float1Ui_ffb")]
-generic %200	: %197
+generic %214	: %211
 {
-block %201(
+block %215(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
 		[nameHint("float.U")]
 		param %floatx5FU1	: type_t,
-		param %202	: witness_table_t(%x5Fx5FBuiltinRealType)):
+		param %216	: witness_table_t(%x5Fx5FBuiltinRealType)):
 	[DifferentiableTypeDictionaryDecoration]
 	[backwardDifferentiable]
 	[unsafeForceInlineEarly]
 	[nameHint("float.dmul")]
 		func %floatx5Fdmul	: Func(Float, Attributed(%floatx5FU1, %1), Float)
 	{
-block %203(
+block %217(
 			[nameHint("a")]
 			param %a1	: Attributed(%floatx5FU1, %1),
 			[nameHint("b")]
 			param %b1	: Float):
-		let  %204	: Float	= floatCast(%a1)
-		let  %205	: Float	= mul(%204, %b1)
-		return_val(%205)
+		let  %218	: Float	= floatCast(%a1)
+		let  %219	: Float	= mul(%218, %b1)
+		return_val(%219)
 }
 	return_val(%floatx5Fdmul)
 }
 [export("_SWf4core15IDifferentiable")]
-witness_table %206	: witness_table_t(%IDifferentiable)(Float)
+witness_table %220	: witness_table_t(%IDifferentiable)(Float)
 {
-	witness_table_entry(%172,Float)
+	witness_table_entry(%186,Float)
 
-	witness_table_entry(%174,%206)
+	witness_table_entry(%188,%220)
 
-	witness_table_entry(%176,%floatx5Fdzero)
+	witness_table_entry(%190,%floatx5Fdzero)
 
-	witness_table_entry(%178,%floatx5Fdadd)
+	witness_table_entry(%192,%floatx5Fdadd)
 
-	witness_table_entry(%180,%200)
+	witness_table_entry(%194,%214)
 
 }
 
@@ -519,23 +533,23 @@ witness_table %206	: witness_table_t(%IDifferentiable)(Float)
 [nameHint("float.toFloat")]
 func %floatx5FtoFloat	: Func(Float, Float);
 
-generic %207	: Generic
+generic %221	: Generic
 {
-block %208(
+block %222(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinFloatingPointType)]
 		[nameHint("float.T")]
 		param %floatx5FT	: type_t,
-		param %209	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
+		param %223	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
 	return_val(Func(Float, Float, %floatx5FT))
 }
 [import("_S4core5float5scaleg2TC4core5float1T4core26__BuiltinFloatingPointTypep1pi_4core5float1Tf")]
-generic %210	: %207
+generic %224	: %221
 {
-block %211(
+block %225(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinFloatingPointType)]
 		[nameHint("float.T")]
 		param %floatx5FT1	: type_t,
-		param %212	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
+		param %226	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
 	[intrinsicOp(266 : Int)]
 	[nameHint("float.scale")]
 		func %floatx5Fscale	: Func(Float, Float, %floatx5FT1);
@@ -543,36 +557,36 @@ block %211(
 	return_val(%floatx5Fscale)
 }
 [export("_SWf4core6IFloat")]
-witness_table %213	: witness_table_t(%IFloat)(Float)
+witness_table %227	: witness_table_t(%IFloat)(Float)
 {
-	witness_table_entry(%148,%193)
+	witness_table_entry(%162,%207)
 
-	witness_table_entry(%4,%206)
+	witness_table_entry(%4,%220)
 
-	witness_table_entry(%151,%floatx5Fx24init1)
+	witness_table_entry(%165,%floatx5Fx24init1)
 
-	witness_table_entry(%153,%floatx5FtoFloat)
+	witness_table_entry(%167,%floatx5FtoFloat)
 
-	witness_table_entry(%155,%floatx5Fadd)
+	witness_table_entry(%169,%floatx5Fadd)
 
-	witness_table_entry(%157,%floatx5Fsub)
+	witness_table_entry(%171,%floatx5Fsub)
 
-	witness_table_entry(%159,%floatx5Fmul)
+	witness_table_entry(%173,%floatx5Fmul)
 
-	witness_table_entry(%161,%floatx5Fdiv)
+	witness_table_entry(%175,%floatx5Fdiv)
 
-	witness_table_entry(%163,%floatx5Fmod)
+	witness_table_entry(%177,%floatx5Fmod)
 
-	witness_table_entry(%165,%floatx5Fneg)
+	witness_table_entry(%179,%floatx5Fneg)
 
-	witness_table_entry(%167,%floatx5Fx24init1)
+	witness_table_entry(%181,%floatx5Fx24init1)
 
-	witness_table_entry(%169,%210)
+	witness_table_entry(%183,%224)
 
 }
 
 [export("_SWi4core13__BuiltinType")]
-witness_table %214	: witness_table_t(%x5Fx5FBuiltinType)(Int);
+witness_table %228	: witness_table_t(%x5Fx5FBuiltinType)(Int);
 
 [intrinsicOp(272 : Int)]
 [method]
@@ -593,13 +607,13 @@ func %intx5FlessThan	: Func(Bool, Int, Int);
 func %intx5FlessThanOrEquals	: Func(Bool, Int, Int);
 
 [export("_SWi4core11IComparable")]
-witness_table %215	: witness_table_t(%IComparable)(Int)
+witness_table %229	: witness_table_t(%IComparable)(Int)
 {
-	witness_table_entry(%142,%intx5Fequals)
+	witness_table_entry(%156,%intx5Fequals)
 
-	witness_table_entry(%144,%intx5FlessThan)
+	witness_table_entry(%158,%intx5FlessThan)
 
-	witness_table_entry(%146,%intx5FlessThanOrEquals)
+	witness_table_entry(%160,%intx5FlessThanOrEquals)
 
 }
 
@@ -627,7 +641,7 @@ func %intx5Fmul	: Func(Int, Int, Int);
 [nameHint("int.div")]
 func %intx5Fdiv	: Func(Int, Int, Int);
 
-[intrinsicOp(269 : Int)]
+[intrinsicOp(268 : Int)]
 [method]
 [import("_S4core3int3modp1pi_ii")]
 [nameHint("int.mod")]
@@ -646,34 +660,34 @@ func %intx5Fneg	: Func(Int, Int);
 func %intx5Fx24init	: Func(Int, Int);
 
 [export("_SWi4core11IArithmetic")]
-witness_table %216	: witness_table_t(%IArithmetic)(Int)
+witness_table %230	: witness_table_t(%IArithmetic)(Int)
 {
-	witness_table_entry(%124,%215)
+	witness_table_entry(%138,%229)
 
-	witness_table_entry(%126,%intx5Fadd)
+	witness_table_entry(%140,%intx5Fadd)
 
-	witness_table_entry(%128,%intx5Fsub)
+	witness_table_entry(%142,%intx5Fsub)
 
-	witness_table_entry(%130,%intx5Fmul)
+	witness_table_entry(%144,%intx5Fmul)
 
-	witness_table_entry(%132,%intx5Fdiv)
+	witness_table_entry(%146,%intx5Fdiv)
 
-	witness_table_entry(%134,%intx5Fmod)
+	witness_table_entry(%148,%intx5Fmod)
 
-	witness_table_entry(%136,%intx5Fneg)
+	witness_table_entry(%150,%intx5Fneg)
 
-	witness_table_entry(%138,%intx5Fx24init)
+	witness_table_entry(%152,%intx5Fx24init)
 
-	witness_table_entry(%140,%intx5Fx24init)
+	witness_table_entry(%154,%intx5Fx24init)
 
 }
 
 [export("_SWi4core23__BuiltinArithmeticType")]
-witness_table %217	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(Int)
+witness_table %231	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(Int)
 {
-	witness_table_entry(%120,%214)
+	witness_table_entry(%134,%228)
 
-	witness_table_entry(%122,%216)
+	witness_table_entry(%136,%230)
 
 }
 
@@ -683,70 +697,70 @@ witness_table %217	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(Int)
 [nameHint("test_simple_loop")]
 func %testx5Fsimplex5Floop	: Func(Float, Float)
 {
-block %218(
+block %232(
 		[nameHint("y")]
 		param %y	: Float):
 	[loopMaxIters(3 : Int)]
-	loop(%219, %220, %221, %y, 0 : Int)
+	loop(%233, %234, %235, %y, 0 : Int)
 
-block %219(
+block %233(
 		[nameHint("t")]
 		param %t	: Float,
 		[nameHint("i")]
 		param %i	: Int):
-	let  %222	: Bool	= cmpLT(%i, 3 : Int)
-	ifElse(%222, %223, %220, %223)
+	let  %236	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%236, %237, %234, %237)
 
-block %223:
-	let  %224	: Float	= mul(%t, %t)
-	unconditionalBranch(%221)
+block %237:
+	let  %238	: Float	= mul(%t, %t)
+	unconditionalBranch(%235)
 
-block %221:
-	let  %225	: Int	= add(%i, 1 : Int)
-	unconditionalBranch(%219, %224, %225)
+block %235:
+	let  %239	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%233, %238, %239)
 
-block %220:
+block %234:
 	return_val(%t)
 }
 [import("_ST4core17IBufferDataLayout")]
 [nameHint("IBufferDataLayout")]
 let  %IBufferDataLayout	: Type	= interface
 [import("_SW4core17DefaultDataLayout4core17IBufferDataLayout")]
-witness_table %226	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
+witness_table %240	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
 
 [nameHint("outputBuffer")]
 [export("_SVR15reverse_2Dxloop12outputBuffer")]
-let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %226)	= global_param
+let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %240)	= global_param
 [entryPoint(6 : Int, "computeMain", "reverse-loop")]
 [numThreads(1 : Int, 1 : Int, 1 : Int)]
 [export("_SR15reverse_2Dxloop11computeMainp1pi_v3uV")]
 [nameHint("computeMain")]
 func %computeMain	: Func(Void, Vec(UInt, 3 : Int))
 {
-block %227(
+block %241(
 		[nameHint("dispatchThreadID")]
 		[semantic("SV_DispatchThreadID", 0 : Int)]
 		param %dispatchThreadID	: Vec(UInt, 3 : Int)):
 	[nameHint("dpa")]
-	let  %dpa	: Ptr(DiffPairUserCode(Float, %206))	= var
-	let  %228	: DiffPairUserCode(Float, %206)	= MakeDiffPairUserCode(1 : Float, 0 : Float)
-	store(%dpa, %228)
-	let  %229	: Func(Void, InOut(DiffPairUserCode(Float, %206)), Float)	= BackwardDifferentiate(%testx5Fsimplex5Floop)
-	call %229(%dpa, 1 : Float)
-	let  %230	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
-	let  %231	: DiffPairUserCode(Float, %206)	= load(%dpa)
-	let  %232	: Float	= GetDifferentialUserCode(%231)
-	store(%230, %232)
+	let  %dpa	: Ptr(DiffPairUserCode(Float, %220))	= var
+	let  %242	: DiffPairUserCode(Float, %220)	= MakeDiffPairUserCode(1 : Float, 0 : Float)
+	store(%dpa, %242)
+	let  %243	: Func(Void, InOut(DiffPairUserCode(Float, %220)), Float)	= BackwardDifferentiate(%testx5Fsimplex5Floop)
+	call %243(%dpa, 1 : Float)
+	let  %244	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
+	let  %245	: DiffPairUserCode(Float, %220)	= load(%dpa)
+	let  %246	: Float	= GetDifferentialUserCode(%245)
+	store(%244, %246)
 	[nameHint("dpa")]
-	let  %dpa1	: Ptr(DiffPairUserCode(Float, %206))	= var
-	let  %233	: DiffPairUserCode(Float, %206)	= MakeDiffPairUserCode(0.4 : Float, 0 : Float)
-	store(%dpa1, %233)
-	let  %234	: Func(Void, InOut(DiffPairUserCode(Float, %206)), Float)	= BackwardDifferentiate(%testx5Fsimplex5Floop)
-	call %234(%dpa1, 1 : Float)
-	let  %235	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
-	let  %236	: DiffPairUserCode(Float, %206)	= load(%dpa1)
-	let  %237	: Float	= GetDifferentialUserCode(%236)
-	store(%235, %237)
+	let  %dpa1	: Ptr(DiffPairUserCode(Float, %220))	= var
+	let  %247	: DiffPairUserCode(Float, %220)	= MakeDiffPairUserCode(0.4 : Float, 0 : Float)
+	store(%dpa1, %247)
+	let  %248	: Func(Void, InOut(DiffPairUserCode(Float, %220)), Float)	= BackwardDifferentiate(%testx5Fsimplex5Floop)
+	call %248(%dpa1, 1 : Float)
+	let  %249	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
+	let  %250	: DiffPairUserCode(Float, %220)	= load(%dpa1)
+	let  %251	: Float	= GetDifferentialUserCode(%250)
+	store(%249, %251)
 	return_val(void_constant)
 }
 ###
@@ -2244,50 +2258,50 @@ BACKWARD DIFFERENTIATE
 BACKWARD DIFFERENTIATE PRIMAL
 BACKWARD DIFFERENTIATE PROPOGATE
 (result before eliminating phis)===============================
-inst with location: 1514954 (1)
+inst with location: 1515366 (1)
 [nameHint("y")]
 let  %y	: Float	= param
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 [loopMaxIters(4 : Int)]
 loop(%1, %2, %1, %y, 0 : Int)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [nameHint("i")]
 let  %i	: Int	= param
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 loop(%1, %2, %1)
 
-inst with location: 1515026 (1)
+inst with location: 1515438 (1)
 let  %1	: Bool	= cmpLT(%i, 3 : Int)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 ifElse(%1, %2, %3, %2)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 unconditionalBranch(%1)
 
-inst with location: 1515058 (1)
+inst with location: 1515470 (1)
 let  %1	: Float	= mul(%t, %t)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 unconditionalBranch(%1)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 unconditionalBranch(%1)
 
-inst with location: 1515032 (1)
+inst with location: 1515444 (1)
 let  %1	: Int	= add(%i, 1 : Int)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 unconditionalBranch(%1, %2, %3)
 
-inst with location: 1515077 (1)
+inst with location: 1515489 (1)
 return_val(%t)
 
 (fwdDiffFunc from generateNewForwardDerivative)===============================
@@ -2426,15 +2440,15 @@ inst with location: 0 (0)
 [nameHint("dpy")]
 let  %dpy	: DiffPair(Float, %1)	= param
 
-inst with location: 1514954 (1)
+inst with location: 1515366 (1)
 [diffInstDecoration(Float)]
 let  %1	: Float	= GetDifferential(%dpy)
 
-inst with location: 1514954 (1)
+inst with location: 1515366 (1)
 [primalInstDecoration]
 let  %1	: Float	= GetPrimal(%dpy)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 [mixedDiffInstDecoration(<null>)]
 [loopMaxIters(4 : Int)]
 loop(%1, %2, %1, true, %3, %4, 0 : Int)
@@ -2444,17 +2458,17 @@ inst with location: 0 (0)
 [nameHint("_bflag")]
 let  %x5Fbflag	: Bool	= param
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [diffInstDecoration(Float)]
 [nameHint("s_diff_t")]
 let  %sx5Fdiffx5Ft	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [primalInstDecoration]
 [nameHint("i")]
 let  %i	: Int	= param
@@ -2471,7 +2485,7 @@ inst with location: 0 (0)
 [mixedDiffInstDecoration(DiffPair(Float, %1))]
 let  %2	: DiffPair(Float, %1)	= MakeDiffPair(%t, %sx5Fdiffx5Ft)
 
-inst with location: 1515077 (1)
+inst with location: 1515489 (1)
 [mixedDiffInstDecoration(DiffPair(Float, %1))]
 return_val(%2)
 
@@ -2479,7 +2493,7 @@ inst with location: 0 (0)
 [mixedDiffInstDecoration(<null>)]
 unconditionalBranch(%1)
 
-inst with location: 1515026 (1)
+inst with location: 1515438 (1)
 [primalInstDecoration]
 let  %1	: Bool	= cmpLT(%i, 3 : Int)
 
@@ -2495,7 +2509,7 @@ inst with location: 0 (0)
 [mixedDiffInstDecoration(<null>)]
 unconditionalBranch(%1, 0 : Int, 0 : Float, %2)
 
-inst with location: 1515058 (1)
+inst with location: 1515470 (1)
 [primalInstDecoration]
 let  %1	: Float	= mul(%t, %t)
 
@@ -2507,7 +2521,7 @@ inst with location: 0 (0)
 [diffInstDecoration(Float)]
 let  %1	: Float	= mul(%sx5Fdiffx5Ft, %t)
 
-inst with location: 1515058 (1)
+inst with location: 1515470 (1)
 [diffInstDecoration(Float)]
 let  %1	: Float	= add(%2, %3)
 
@@ -2564,7 +2578,7 @@ inst with location: 0 (0)
 [mixedDiffInstDecoration(<null>)]
 unconditionalBranch(%1, %t, %sx5Fdiffx5Ft, %i)
 
-inst with location: 1515032 (1)
+inst with location: 1515444 (1)
 [primalInstDecoration]
 let  %1	: Int	= add(%i, 1 : Int)
 
@@ -2572,17 +2586,17 @@ inst with location: 0 (0)
 [mixedDiffInstDecoration(<null>)]
 unconditionalBranch(%1, %2, %3, %4)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [diffInstDecoration(Float)]
 [nameHint("s_diff_t")]
 let  %sx5Fdiffx5Ft	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [primalInstDecoration]
 [nameHint("i")]
 let  %i	: Int	= param
@@ -2614,7 +2628,7 @@ let  %1	: Float	= DiffParamRef(%dpy)
 inst with location: 0 (0)
 unconditionalBranch(%1)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 [loopMaxIters(4 : Int)]
 loop(%1, %2, %1, true, %3, 0 : Int)
 
@@ -2623,12 +2637,12 @@ inst with location: 0 (0)
 [nameHint("_bflag")]
 let  %x5Fbflag	: Bool	= param
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [primalInstDecoration]
 [nameHint("i")]
 let  %i	: Int	= param
@@ -2646,7 +2660,7 @@ unconditionalBranch(%1)
 inst with location: 0 (0)
 unconditionalBranch(%1)
 
-inst with location: 1515026 (1)
+inst with location: 1515438 (1)
 [primalInstDecoration]
 let  %1	: Bool	= cmpLT(%i, 3 : Int)
 
@@ -2656,7 +2670,7 @@ ifElse(%1, %2, %3, %4)
 inst with location: 0 (0)
 unconditionalBranch(%1, 0 : Int, 0 : Float)
 
-inst with location: 1515058 (1)
+inst with location: 1515470 (1)
 [primalInstDecoration]
 let  %1	: Float	= mul(%t, %t)
 
@@ -2701,19 +2715,19 @@ ifElse(%x5Fbflag, %1, %2, %3)
 inst with location: 0 (0)
 unconditionalBranch(%1, %t, %i)
 
-inst with location: 1515032 (1)
+inst with location: 1515444 (1)
 [primalInstDecoration]
 let  %1	: Int	= add(%i, 1 : Int)
 
 inst with location: 0 (0)
 unconditionalBranch(%1, %2, %3)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [primalInstDecoration]
 [nameHint("i")]
 let  %i	: Int	= param
@@ -2721,11 +2735,11 @@ let  %i	: Int	= param
 inst with location: 0 (0)
 unconditionalBranch(%1, %x5Fbflag, %t, %i)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 [loopMaxIters(4 : Int)]
 loop(%1, %2, %1, %3)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [diffInstDecoration(Float)]
 [nameHint("s_diff_t")]
 let  %sx5Fdiffx5Ft	: Float	= param
@@ -2765,7 +2779,7 @@ inst with location: 0 (0)
 [diffInstDecoration(Float)]
 let  %1	: Float	= mul(%sx5Fdiffx5Ft, %t)
 
-inst with location: 1515058 (1)
+inst with location: 1515470 (1)
 [diffInstDecoration(Float)]
 let  %1	: Float	= add(%2, %3)
 
@@ -2800,7 +2814,7 @@ unconditionalBranch(%1, %sx5Fdiffx5Ft)
 inst with location: 0 (0)
 unconditionalBranch(%1, %2)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [diffInstDecoration(Float)]
 [nameHint("s_diff_t")]
 let  %sx5Fdiffx5Ft	: Float	= param
@@ -2992,7 +3006,7 @@ let  %1	: Float	= DiffParamRef(%dpy)
 inst with location: 0 (0)
 unconditionalBranch(%1)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 [loopMaxIters(4 : Int)]
 loop(%1, %2, %1, true, %3, 0 : Int)
 
@@ -3001,12 +3015,12 @@ inst with location: 0 (0)
 [nameHint("_bflag")]
 let  %x5Fbflag	: Bool	= param
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [primalInstDecoration]
 [nameHint("i")]
 let  %i	: Int	= param
@@ -3024,7 +3038,7 @@ unconditionalBranch(%1)
 inst with location: 0 (0)
 unconditionalBranch(%1)
 
-inst with location: 1515026 (1)
+inst with location: 1515438 (1)
 [primalInstDecoration]
 let  %1	: Bool	= cmpLT(%i, 3 : Int)
 
@@ -3034,7 +3048,7 @@ ifElse(%1, %2, %3, %4)
 inst with location: 0 (0)
 unconditionalBranch(%1, 0 : Int, 0 : Float)
 
-inst with location: 1515058 (1)
+inst with location: 1515470 (1)
 [primalInstDecoration]
 let  %1	: Float	= mul(%t, %t)
 
@@ -3079,19 +3093,19 @@ ifElse(%x5Fbflag, %1, %2, %3)
 inst with location: 0 (0)
 unconditionalBranch(%1, %t, %i)
 
-inst with location: 1515032 (1)
+inst with location: 1515444 (1)
 [primalInstDecoration]
 let  %1	: Int	= add(%i, 1 : Int)
 
 inst with location: 0 (0)
 unconditionalBranch(%1, %2, %3)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [primalInstDecoration]
 [nameHint("i")]
 let  %i	: Int	= param
@@ -3099,11 +3113,11 @@ let  %i	: Int	= param
 inst with location: 0 (0)
 unconditionalBranch(%1, %x5Fbflag, %t, %i)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 [loopMaxIters(4 : Int)]
 loop(%1, %2, %1, %3)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [diffInstDecoration(Float)]
 [nameHint("s_diff_t")]
 let  %sx5Fdiffx5Ft	: Float	= param
@@ -3143,7 +3157,7 @@ inst with location: 0 (0)
 [diffInstDecoration(Float)]
 let  %1	: Float	= mul(%sx5Fdiffx5Ft, %t)
 
-inst with location: 1515058 (1)
+inst with location: 1515470 (1)
 [diffInstDecoration(Float)]
 let  %1	: Float	= add(%2, %3)
 
@@ -3178,7 +3192,7 @@ unconditionalBranch(%1, %sx5Fdiffx5Ft)
 inst with location: 0 (0)
 unconditionalBranch(%1, %2)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [diffInstDecoration(Float)]
 [nameHint("s_diff_t")]
 let  %sx5Fdiffx5Ft	: Float	= param
@@ -3216,7 +3230,7 @@ let  %1	: Float	= GetPrimal(%2)
 inst with location: 0 (0)
 unconditionalBranch(%1)
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 [loopMaxIters(4 : Int)]
 let  %1	: _	= loop(%2, %3, %2, true, %dpy, 0 : Int)
 
@@ -3225,12 +3239,12 @@ inst with location: 0 (0)
 [nameHint("_bflag")]
 let  %x5Fbflag	: Bool	= param
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [primalInstDecoration]
 [nameHint("i")]
 let  %i	: Int	= param
@@ -3430,7 +3444,7 @@ unconditionalBranch(%1)
 inst with location: 0 (0)
 unconditionalBranch(%1)
 
-inst with location: 1515026 (1)
+inst with location: 1515438 (1)
 [primalInstDecoration]
 let  %1	: Bool	= cmpLT(%i, 3 : Int)
 
@@ -3440,7 +3454,7 @@ ifElse(%1, %2, %3, %4)
 inst with location: 0 (0)
 unconditionalBranch(%1, 0 : Int, 0 : Float)
 
-inst with location: 1515058 (1)
+inst with location: 1515470 (1)
 [primalInstDecoration]
 let  %1	: Float	= mul(%t, %t)
 
@@ -3485,19 +3499,19 @@ ifElse(%x5Fbflag, %1, %2, %3)
 inst with location: 0 (0)
 unconditionalBranch(%1, %t, %i)
 
-inst with location: 1515032 (1)
+inst with location: 1515444 (1)
 [primalInstDecoration]
 let  %1	: Int	= add(%i, 1 : Int)
 
 inst with location: 0 (0)
 unconditionalBranch(%1, %2, %3)
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1515017 (1)
+inst with location: 1515429 (1)
 [primalInstDecoration]
 [nameHint("i")]
 let  %i	: Int	= param
@@ -3509,14 +3523,14 @@ Adding counter for primalLoop:
 [loopMaxIters(4 : Int)]
 let  %1	: _	= loop(%2, %3, %2, true, %dpy, 0 : Int)
 
-  > sourceLoc: 1515008 (1)
+  > sourceLoc: 1515420 (1)
 >> Counter for primalLoop:
 [primalInstDecoration]
 [nameHint("_pc")]
 [loopCounterDecoration]
 let  %x5Fpc	: Int	= param
 
-  > sourceLoc: 1515008 (1)
+  > sourceLoc: 1515420 (1)
 ### Slang::AutodiffCheckpointPolicyBase::processFunc
 processing workList
 use with usedVal:
@@ -3525,24 +3539,24 @@ use with usedVal:
 let  %t	: Float	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001B72F3CC5E0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7D622580 to storeSet
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 use with usedVal:
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001B72F3CC5E0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7D622580 to storeSet
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-inst with location: 1514994 (1)
+inst with location: 1515406 (1)
 use with usedVal:
 [primalInstDecoration]
 let  %1	: Bool	= cmpLT(%i, 3 : Int)
@@ -3563,13 +3577,13 @@ let  %1	: Int	= param
 use with usedVal:
 0
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001B72F3BDB60 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7A2E3BC0 to storeSet
 0
 inst with location: 0 (0)
 use with usedVal:
 1
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001B72F3BD730 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7A2E3790 to storeSet
 1
 inst with location: 0 (0)
 use with usedVal:
@@ -3585,7 +3599,7 @@ let  %x5Fbflag	: Bool	= param
 use with usedVal:
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001B72F3C97B0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7D617730 to storeSet
 
 inst with location: 0 (0)
 use with usedVal:
@@ -3603,24 +3617,24 @@ use with usedVal:
 let  %x5Fpc	: Int	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 000001B72F3E5848 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 0000013A7D62D8C8 to storeSet
 [primalInstDecoration]
 [nameHint("_pc")]
 [loopCounterDecoration]
 let  %x5Fpc	: Int	= param
 
-inst with location: 1515008 (1)
+inst with location: 1515420 (1)
 use with usedVal:
 [nameHint("_s_dOut")]
 let  %x5Fsx5FdOut	: Float	= param
 
 ****** (before legalization) # of elements in the store set for hoistInfo: 2
-source loc recorded: 1514994 (1)
+source loc recorded: 1515406 (1)
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
 
-source loc recorded: 1515008 (1)
+source loc recorded: 1515420 (1)
 [primalInstDecoration]
 [nameHint("_pc")]
 [loopCounterDecoration]
@@ -3667,13 +3681,13 @@ let  %1	: Bool	= cmpLT(%2, 3 : Int)
 
 >> NO OUT OF SCOPE USES
 ****** (after legalization) # of elements in the store set for hoistInfo: 2
-source loc recorded: 1515008 (1)
+source loc recorded: 1515420 (1)
 let  %1	: Ptr(Int)	= var
 
 tests/autodiff/reverse-loop.slang(16): note: also see pipeline definition
     for (int i = 0; i < 3; i++)
     ^~~
-source loc recorded: 1514994 (1)
+source loc recorded: 1515406 (1)
 let  %1	: Ptr(Array(Float, 5 : Int))	= var
 
 tests/autodiff/reverse-loop.slang(14): note: also see pipeline definition
@@ -3681,23 +3695,10 @@ tests/autodiff/reverse-loop.slang(14): note: also see pipeline definition
           ^
 in unzipping function:
 createIntermediate type:
+[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type;
 
-
-adding field to outIntermediatery
-inst: 1514994 (1)
-let  %1	: Ptr(Array(Float, 5 : Int))	= var
-
-[IntermediateContextFieldDifferentialTypeDecoration(%1)]
-field(%2, Array(Float, 5 : Int))
-
-adding field to outIntermediatery
-inst: 1515008 (1)
-let  %1	: Ptr(Int)	= var
-
-field(%1, Int)
 
 ### AFTER-AUTODIFF:
 undefined
@@ -4344,8 +4345,8 @@ witness_table %192	: witness_table_t(%IDifferentiable)(%sx5Fbwdx5Fpropx5Ftestx5F
 
 [derivativeMemberDecoration(%175)]
 let  %175	: _	= key
+[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
 	[IntermediateContextFieldDifferentialTypeDecoration(%193)]
@@ -5362,8 +5363,8 @@ witness_table %192	: witness_table_t(%IDifferentiable)(%sx5Fbwdx5Fpropx5Ftestx5F
 
 [derivativeMemberDecoration(%175)]
 let  %175	: _	= key
+[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
 	[IntermediateContextFieldDifferentialTypeDecoration(%193)]
@@ -6379,8 +6380,8 @@ witness_table %192	: witness_table_t(%IDifferentiable)(%sx5Fbwdx5Fpropx5Ftestx5F
 
 [derivativeMemberDecoration(%175)]
 let  %175	: _	= key
+[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
 	[IntermediateContextFieldDifferentialTypeDecoration(%193)]
@@ -6955,16 +6956,53 @@ witness_table %75	: witness_table_t(%IDifferentiable)(Float)
 
 }
 
+[backwardDiffIntermediateTypeReference(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)]
+[backwardDiffPropagateReference(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop)]
+[backwardDiffPrimalReference(%sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop)]
+[primalInstDecoration]
+[backwardDiffReference(%sx5Fbwdx5Ftestx5Fsimplex5Floop)]
+[readNone]
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[export("_SR15reverse_2Dxloop16test_simple_loopp1pi_ffb")]
+[nameHint("test_simple_loop")]
+func %testx5Fsimplex5Floop	: Func(Float, Float)
+{
+block %76(
+		[nameHint("y")]
+		param %y	: Float):
+	[loopMaxIters(3 : Int)]
+	loop(%77, %78, %79, %y, 0 : Int)
+
+block %77(
+		[nameHint("t")]
+		param %t	: Float,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %80	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%80, %81, %78, %81)
+
+block %78:
+	return_val(%t)
+
+block %81:
+	let  %82	: Float	= mul(%t, %t)
+	unconditionalBranch(%79)
+
+block %79:
+	let  %83	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%77, %82, %83)
+}
 [export("_ST4core17IBufferDataLayout")]
 [nameHint("IBufferDataLayout")]
 let  %IBufferDataLayout	: Type	= interface
 [export("_SW4core17DefaultDataLayout4core17IBufferDataLayout")]
-witness_table %76	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
+witness_table %84	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
 
 [nameHint("outputBuffer")]
 [export("_SVR15reverse_2Dxloop12outputBuffer")]
 [layout(%1)]
-let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %76)	= global_param
+let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %84)	= global_param
 [keepAlive]
 [entryPoint(6 : Int, "computeMain", "reverse-loop")]
 [numThreads(1 : Int, 1 : Int, 1 : Int)]
@@ -6973,29 +7011,29 @@ let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %76)	= global_para
 [layout(%8)]
 func %computeMain	: Func(Void, Vec(UInt, 3 : Int))
 {
-block %77(
+block %85(
 		[layout(%15)]
 		[nameHint("dispatchThreadID")]
 		[semantic("SV_DispatchThreadID", 0 : Int)]
 		param %dispatchThreadID	: Vec(UInt, 3 : Int)):
 	[nameHint("dpa")]
 	let  %dpa	: Ptr(DiffPairUserCode(Float, %75))	= var
-	let  %78	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(1 : Float, 0 : Float)
-	store(%dpa, %78)
+	let  %86	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(1 : Float, 0 : Float)
+	store(%dpa, %86)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa, 1 : Float)
-	let  %79	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
-	let  %80	: DiffPairUserCode(Float, %75)	= load(%dpa)
-	let  %81	: Float	= GetDifferentialUserCode(%80)
-	store(%79, %81)
+	let  %87	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
+	let  %88	: DiffPairUserCode(Float, %75)	= load(%dpa)
+	let  %89	: Float	= GetDifferentialUserCode(%88)
+	store(%87, %89)
 	[nameHint("dpa")]
 	let  %dpa1	: Ptr(DiffPairUserCode(Float, %75))	= var
-	let  %82	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(0.4 : Float, 0 : Float)
-	store(%dpa1, %82)
+	let  %90	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(0.4 : Float, 0 : Float)
+	store(%dpa1, %90)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa1, 1 : Float)
-	let  %83	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
-	let  %84	: DiffPairUserCode(Float, %75)	= load(%dpa1)
-	let  %85	: Float	= GetDifferentialUserCode(%84)
-	store(%83, %85)
+	let  %91	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
+	let  %92	: DiffPairUserCode(Float, %75)	= load(%dpa1)
+	let  %93	: Float	= GetDifferentialUserCode(%92)
+	store(%91, %93)
 	return_val(void_constant)
 }
 [export("_SV16NullDifferential5dummy")]
@@ -7020,9 +7058,9 @@ struct %NullDifferential	: Type
 [nameHint("NullDifferential.dzero")]
 func %NullDifferentialx5Fdzero	: Func(%NullDifferential)
 {
-block %86:
-	let  %87	: %NullDifferential	= makeStruct(0 : UInt)
-	return_val(%87)
+block %94:
+	let  %95	: %NullDifferential	= makeStruct(0 : UInt)
+	return_val(%95)
 }
 [readNone]
 [DifferentiableTypeDictionaryDecoration]
@@ -7033,31 +7071,31 @@ block %86:
 [nameHint("NullDifferential.dadd")]
 func %NullDifferentialx5Fdadd	: Func(%NullDifferential, %NullDifferential, %NullDifferential)
 {
-block %88(
+block %96(
 		[nameHint("SLANG_anonymous_8")]
 		param %SLANGx5Fanonymousx5F8_	: %NullDifferential,
 		[nameHint("SLANG_anonymous_9")]
 		param %SLANGx5Fanonymousx5F9_	: %NullDifferential):
-	let  %89	: %NullDifferential	= makeStruct(0 : UInt)
-	return_val(%89)
+	let  %97	: %NullDifferential	= makeStruct(0 : UInt)
+	return_val(%97)
 }
-generic %90	: Generic
+generic %98	: Generic
 {
-block %91(
+block %99(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
 		[nameHint("NullDifferential.T")]
 		param %NullDifferentialx5FT	: type_t,
-		param %92	: witness_table_t(%x5Fx5FBuiltinRealType)):
+		param %100	: witness_table_t(%x5Fx5FBuiltinRealType)):
 	return_val(Func(%NullDifferential, Attributed(%NullDifferentialx5FT, %7), %NullDifferential))
 }
 [export("_S16NullDifferential4dmulg2TC16NullDifferential1T4core17__BuiltinRealTypep2pi_16NullDifferential1Ti_16NullDifferential16NullDifferentialb")]
-generic %93	: %90
+generic %101	: %98
 {
-block %94(
+block %102(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
 		[nameHint("NullDifferential.T")]
 		param %NullDifferentialx5FT1	: type_t,
-		param %95	: witness_table_t(%x5Fx5FBuiltinRealType)):
+		param %103	: witness_table_t(%x5Fx5FBuiltinRealType)):
 	[readNone]
 	[DifferentiableTypeDictionaryDecoration]
 	[ForceInline]
@@ -7065,30 +7103,30 @@ block %94(
 	[nameHint("NullDifferential.dmul")]
 		func %NullDifferentialx5Fdmul	: Func(%NullDifferential, Attributed(%NullDifferentialx5FT1, %7), %NullDifferential)
 	{
-block %96(
+block %104(
 			[nameHint("SLANG_anonymous_10")]
 			param %SLANGx5Fanonymousx5F10_	: Attributed(%NullDifferentialx5FT1, %7),
 			[nameHint("SLANG_anonymous_11")]
 			param %SLANGx5Fanonymousx5F11_	: %NullDifferential):
-		let  %97	: %NullDifferential	= makeStruct(0 : UInt)
-		return_val(%97)
+		let  %105	: %NullDifferential	= makeStruct(0 : UInt)
+		return_val(%105)
 }
 	return_val(%NullDifferentialx5Fdmul)
 }
 [keepAlive]
 [hlslExport]
 [export("_SW16NullDifferential4core15IDifferentiable")]
-witness_table %98	: witness_table_t(%IDifferentiable)(%NullDifferential)
+witness_table %106	: witness_table_t(%IDifferentiable)(%NullDifferential)
 {
 	witness_table_entry(%18,%NullDifferential)
 
-	witness_table_entry(%20,%98)
+	witness_table_entry(%20,%106)
 
 	witness_table_entry(%22,%NullDifferentialx5Fdzero)
 
 	witness_table_entry(%24,%NullDifferentialx5Fdadd)
 
-	witness_table_entry(%26,%93)
+	witness_table_entry(%26,%101)
 
 }
 
@@ -7100,15 +7138,15 @@ ExistentialTypeSpecializationDictionary
 [nameHint("s_bwd_test_simple_loop")]
 func %sx5Fbwdx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(DiffPairUserCode(Float, %75)), Float)
 {
-block %99(
-		param %100	: InOut(DiffPairUserCode(Float, %75)),
-		param %101	: Float):
-	let  %102	: DiffPairUserCode(Float, %75)	= load(%100)
-	let  %103	: Float	= GetPrimalUserCode(%102)
-	let  %104	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
-	let  %105	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%103, %104)
-	let  %106	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%104)
-	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%100, %101, %106)
+block %107(
+		param %108	: InOut(DiffPairUserCode(Float, %75)),
+		param %109	: Float):
+	let  %110	: DiffPairUserCode(Float, %75)	= load(%108)
+	let  %111	: Float	= GetPrimalUserCode(%110)
+	let  %112	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
+	let  %113	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%111, %112)
+	let  %114	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%112)
+	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%108, %109, %114)
 	return_val(void_constant)
 }
 [nameHint("s_primal_ctx_test_simple_loop")]
@@ -7117,178 +7155,178 @@ block %99(
 [backwardDifferentiable]
 func %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop	: Func(Float, Float, Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates))
 {
-block %107(
+block %115(
 		[nameHint("dpy")]
 		param %dpy	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx	: Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)):
-	unconditionalBranch(%108)
+	unconditionalBranch(%116)
 
-block %108:
-	let  %109	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= defaultConstruct
-	store(%x5Fsx5Fdiffx5Fctx, %109)
-	let  %110	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %111)
-	let  %112	: Ptr(Array(Float, 5 : Int))	= var
-	let  %113	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	store(%112, %113)
-	let  %114	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	store(%110, %114)
-	let  %115	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %116)
-	let  %117	: Ptr(Int)	= var
-	store(%117, 0 : Int)
-	store(%115, 0 : Int)
-	unconditionalBranch(%118)
+block %116:
+	let  %117	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= defaultConstruct
+	store(%x5Fsx5Fdiffx5Fctx, %117)
+	let  %118	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %119)
+	let  %120	: Ptr(Array(Float, 5 : Int))	= var
+	let  %121	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	store(%120, %121)
+	let  %122	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	store(%118, %122)
+	let  %123	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %124)
+	let  %125	: Ptr(Int)	= var
+	store(%125, 0 : Int)
+	store(%123, 0 : Int)
+	unconditionalBranch(%126)
 
-block %118:
+block %126:
 	[loopMaxIters(4 : Int)]
-	loop(%119, %120, %119, true, %dpy, 0 : Int, 0 : Int)
+	loop(%127, %128, %127, true, %dpy, 0 : Int, 0 : Int)
 
-block %119(
+block %127(
 		[primalInstDecoration]
 		[nameHint("_bflag")]
 		param %x5Fbflag	: Bool,
 		[primalInstDecoration]
 		[nameHint("t")]
-		param %t	: Float,
+		param %t1	: Float,
 		[primalInstDecoration]
 		[nameHint("i")]
-		param %i	: Int,
+		param %i1	: Int,
 		[primalInstDecoration]
 		[nameHint("_pc")]
 		[loopCounterDecoration]
 		param %x5Fpc	: Int):
-	let  %121	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%110, %x5Fpc)
-	store(%121, %t)
-	store(%115, %x5Fpc)
-	ifElse(%x5Fbflag, %122, %123, %122)
+	let  %129	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%118, %x5Fpc)
+	store(%129, %t1)
+	store(%123, %x5Fpc)
+	ifElse(%x5Fbflag, %130, %131, %130)
 
-block %123:
-	unconditionalBranch(%120)
+block %131:
+	unconditionalBranch(%128)
 
-block %120:
-	return_val(%t)
+block %128:
+	return_val(%t1)
 
-block %122:
-	unconditionalBranch(%124)
-
-block %124:
-	[primalInstDecoration]
-	let  %125	: Bool	= cmpLT(%i, 3 : Int)
-	ifElse(%125, %126, %127, %128)
-
-block %127:
-	unconditionalBranch(%128, 0 : Int, 0 : Float)
-
-block %126:
-	[primalInstDecoration]
-	let  %129	: Float	= mul(%t, %t)
-	unconditionalBranch(%128, 1 : Int, %129)
-
-block %128(
-		[primalInstDecoration]
-		param %130	: Int,
-		[primalInstDecoration]
-		param %131	: Float):
+block %130:
 	unconditionalBranch(%132)
 
 block %132:
 	[primalInstDecoration]
-	let  %133	: Bool	= cmpNE(%130, 1 : Int)
+	let  %133	: Bool	= cmpLT(%i1, 3 : Int)
 	ifElse(%133, %134, %135, %136)
 
 block %135:
-	unconditionalBranch(%136, %x5Fbflag)
+	unconditionalBranch(%136, 0 : Int, 0 : Float)
 
 block %134:
-	unconditionalBranch(%136, false)
+	[primalInstDecoration]
+	let  %137	: Float	= mul(%t1, %t1)
+	unconditionalBranch(%136, 1 : Int, %137)
 
 block %136(
 		[primalInstDecoration]
+		param %138	: Int,
+		[primalInstDecoration]
+		param %139	: Float):
+	unconditionalBranch(%140)
+
+block %140:
+	[primalInstDecoration]
+	let  %141	: Bool	= cmpNE(%138, 1 : Int)
+	ifElse(%141, %142, %143, %144)
+
+block %143:
+	unconditionalBranch(%144, %x5Fbflag)
+
+block %142:
+	unconditionalBranch(%144, false)
+
+block %144(
+		[primalInstDecoration]
 		[nameHint("_bflag")]
 		param %x5Fbflag1	: Bool):
-	unconditionalBranch(%137)
+	unconditionalBranch(%145)
 
-block %137:
-	ifElse(%x5Fbflag1, %138, %139, %140)
+block %145:
+	ifElse(%x5Fbflag1, %146, %147, %148)
 
-block %139:
-	unconditionalBranch(%140, %t, %i)
+block %147:
+	unconditionalBranch(%148, %t1, %i1)
 
-block %138:
+block %146:
 	[primalInstDecoration]
-	let  %141	: Int	= add(%i, 1 : Int)
-	unconditionalBranch(%140, %131, %141)
+	let  %149	: Int	= add(%i1, 1 : Int)
+	unconditionalBranch(%148, %139, %149)
 
-block %140(
+block %148(
 		[primalInstDecoration]
 		[nameHint("t")]
-		param %t1	: Float,
+		param %t2	: Float,
 		[primalInstDecoration]
 		[nameHint("i")]
-		param %i1	: Int):
+		param %i2	: Int):
 	[primalInstDecoration]
-	let  %142	: Int	= add(%x5Fpc, 1 : Int)
-	unconditionalBranch(%119, %x5Fbflag1, %t1, %i1, %142)
+	let  %150	: Int	= add(%x5Fpc, 1 : Int)
+	unconditionalBranch(%127, %x5Fbflag1, %t2, %i2, %150)
 }
-[derivativeMemberDecoration(%143)]
-let  %111	: _	= key
-let  %116	: _	= key
-struct %144	: Type
+[derivativeMemberDecoration(%151)]
+let  %119	: _	= key
+let  %124	: _	= key
+struct %152	: Type
 {
-	field(%143, Array(Float, 5 : Int))
+	field(%151, Array(Float, 5 : Int))
 }
 
-func %145	: Func(%144)
+func %153	: Func(%152)
 {
-block %146:
-	let  %147	: Array(Float, 5 : Int)	= call %148()
-	let  %149	: %144	= makeStruct(%147)
-	return_val(%149)
+block %154:
+	let  %155	: Array(Float, 5 : Int)	= call %156()
+	let  %157	: %152	= makeStruct(%155)
+	return_val(%157)
 }
-func %150	: Func(%144)
+func %158	: Func(%152)
 {
-block %151(
-		param %152	: %144,
-		param %153	: %144):
-	let  %154	: Array(Float, 5 : Int)	= get_field(%152, %143)
-	let  %155	: Array(Float, 5 : Int)	= get_field(%153, %143)
-	let  %156	: Array(Float, 5 : Int)	= call %157(%154, %155)
-	let  %158	: %144	= makeStruct(%156)
-	return_val(%158)
+block %159(
+		param %160	: %152,
+		param %161	: %152):
+	let  %162	: Array(Float, 5 : Int)	= get_field(%160, %151)
+	let  %163	: Array(Float, 5 : Int)	= get_field(%161, %151)
+	let  %164	: Array(Float, 5 : Int)	= call %165(%162, %163)
+	let  %166	: %152	= makeStruct(%164)
+	return_val(%166)
 }
-witness_table %159	: witness_table_t(%IDifferentiable)(%144)
+witness_table %167	: witness_table_t(%IDifferentiable)(%152)
 {
-	witness_table_entry(%18,%144)
+	witness_table_entry(%18,%152)
 
-	witness_table_entry(%20,%159)
+	witness_table_entry(%20,%167)
 
-	witness_table_entry(%22,%145)
+	witness_table_entry(%22,%153)
 
-	witness_table_entry(%24,%150)
+	witness_table_entry(%24,%158)
 
 }
 
-witness_table %160	: witness_table_t(%IDifferentiable)(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
+witness_table %168	: witness_table_t(%IDifferentiable)(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
 {
-	witness_table_entry(%18,%144)
+	witness_table_entry(%18,%152)
 
-	witness_table_entry(%20,%159)
+	witness_table_entry(%20,%167)
 
-	witness_table_entry(%22,%145)
+	witness_table_entry(%22,%153)
 
-	witness_table_entry(%24,%150)
+	witness_table_entry(%24,%158)
 
 }
 
-[derivativeMemberDecoration(%143)]
-let  %143	: _	= key
+[derivativeMemberDecoration(%151)]
+let  %151	: _	= key
+[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
-	[IntermediateContextFieldDifferentialTypeDecoration(%161)]
-	field(%111, Array(Float, 5 : Int))
-	field(%116, Int)
+	[IntermediateContextFieldDifferentialTypeDecoration(%169)]
+	field(%119, Array(Float, 5 : Int))
+	field(%124, Int)
 }
 
 [FloatingPointModeOverride(1 : Int)]
@@ -7297,355 +7335,355 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 [nameHint("s_bwd_prop_test_simple_loop")]
 func %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(DiffPairUserCode(Float, %75)), Float, %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
 {
-block %162(
+block %170(
 		[nameHint("dpy")]
 		param %dpy1	: InOut(DiffPairUserCode(Float, %75)),
 		[nameHint("_s_dOut")]
 		param %x5Fsx5FdOut	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx1	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates):
-	unconditionalBranch(%163)
-
-block %163:
-	let  %164	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	let  %165	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %111)
-	let  %166	: Ptr(Array(Float, 5 : Int))	= var
-	store(%166, %165)
-	store(%166, %164)
-	let  %167	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %116)
-	let  %168	: Ptr(Int)	= var
-	store(%168, %167)
-	store(%168, 0 : Int)
-	let  %169	: DiffPairUserCode(Float, %75)	= load(%dpy1)
-	let  %170	: Float	= GetPrimalUserCode(%169)
 	unconditionalBranch(%171)
 
 block %171:
-	[loopMaxIters(4 : Int)]
-	loop(%172, %173, %172, true, %170, 0 : Int, 0 : Int)
+	let  %172	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	let  %173	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %119)
+	let  %174	: Ptr(Array(Float, 5 : Int))	= var
+	store(%174, %173)
+	store(%174, %172)
+	let  %175	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %124)
+	let  %176	: Ptr(Int)	= var
+	store(%176, %175)
+	store(%176, 0 : Int)
+	let  %177	: DiffPairUserCode(Float, %75)	= load(%dpy1)
+	let  %178	: Float	= GetPrimalUserCode(%177)
+	unconditionalBranch(%179)
 
-block %172(
+block %179:
+	[loopMaxIters(4 : Int)]
+	loop(%180, %181, %180, true, %178, 0 : Int, 0 : Int)
+
+block %180(
 		[primalInstDecoration]
 		[nameHint("_bflag")]
 		param %x5Fbflag2	: Bool,
 		[primalInstDecoration]
 		[nameHint("t")]
-		param %t2	: Float,
+		param %t3	: Float,
 		[primalInstDecoration]
 		[nameHint("i")]
-		param %i2	: Int,
+		param %i3	: Int,
 		[primalInstDecoration]
 		[nameHint("_pc")]
 		[loopCounterDecoration]
 		param %x5Fpc1	: Int):
-	let  %174	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %111)
-	let  %175	: Ptr(Array(Float, 5 : Int))	= var
-	store(%175, %174)
-	let  %176	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%175, %x5Fpc1)
-	store(%176, %t2)
-	let  %177	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %116)
-	let  %178	: Ptr(Int)	= var
-	store(%178, %177)
-	store(%178, %x5Fpc1)
-	ifElse(%x5Fbflag2, %179, %180, %179)
+	let  %182	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %119)
+	let  %183	: Ptr(Array(Float, 5 : Int))	= var
+	store(%183, %182)
+	let  %184	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%183, %x5Fpc1)
+	store(%184, %t3)
+	let  %185	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %124)
+	let  %186	: Ptr(Int)	= var
+	store(%186, %185)
+	store(%186, %x5Fpc1)
+	ifElse(%x5Fbflag2, %187, %188, %187)
 
-block %180:
-	unconditionalBranch(%173)
-
-block %173:
+block %188:
 	unconditionalBranch(%181)
 
 block %181:
-	unconditionalBranch(%182)
+	unconditionalBranch(%189)
 
-block %182:
-	unconditionalBranch(%183)
-
-block %183:
-	unconditionalBranch(%184)
-
-block %184:
-	unconditionalBranch(%185)
-
-block %185:
-	let  %186	: Ptr(Float)	= var
-	store(%186, 0 : Float)
-	let  %187	: Ptr(Float)	= var
-	store(%187, 0 : Float)
-	let  %188	: Float	= load(%186)
-	let  %189	: Float	= add(%x5Fsx5FdOut, %188)
-	store(%186, %189)
+block %189:
 	unconditionalBranch(%190)
 
 block %190:
-	let  %191	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %116)
-	let  %192	: Int	= sub(%191, 1 : Int)
-	[loopMaxIters(4 : Int)]
-	loop(%193, %194, %195, %192)
+	unconditionalBranch(%191)
 
-block %193(
+block %191:
+	unconditionalBranch(%192)
+
+block %192:
+	unconditionalBranch(%193)
+
+block %193:
+	let  %194	: Ptr(Float)	= var
+	store(%194, 0 : Float)
+	let  %195	: Ptr(Float)	= var
+	store(%195, 0 : Float)
+	let  %196	: Float	= load(%194)
+	let  %197	: Float	= add(%x5Fsx5FdOut, %196)
+	store(%194, %197)
+	unconditionalBranch(%198)
+
+block %198:
+	let  %199	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %124)
+	let  %200	: Int	= sub(%199, 1 : Int)
+	[loopMaxIters(4 : Int)]
+	loop(%201, %202, %203, %200)
+
+block %201(
 		[primalInstDecoration]
 		[nameHint("_dc")]
 		param %x5Fdc	: Int):
-	let  %196	: Int	= add(%x5Fdc, 0 : Int)
-	let  %197	: Float	= load(%186)
-	store(%186, 0 : Float)
-	let  %198	: Bool	= cmpGE(%x5Fdc, 0 : Int)
-	ifElse(%198, %199, %200, %199)
-
-block %200:
-	unconditionalBranch(%194, %197)
-
-block %194(
-		param %201	: Float):
-	let  %202	: DiffPairUserCode(Float, %75)	= load(%dpy1)
-	let  %203	: Float	= GetPrimalUserCode(%202)
-	let  %204	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(%203, %201)
-	store(%dpy1, %204)
-	return_val(void_constant)
-
-block %199:
-	unconditionalBranch(%205)
-
-block %205:
-	[primalInstDecoration]
-	let  %206	: Bool	= cmpLT(%196, 3 : Int)
-	ifElse(%206, %207, %208, %209)
+	let  %204	: Int	= add(%x5Fdc, 0 : Int)
+	let  %205	: Float	= load(%194)
+	store(%194, 0 : Float)
+	let  %206	: Bool	= cmpGE(%x5Fdc, 0 : Int)
+	ifElse(%206, %207, %208, %207)
 
 block %208:
-	unconditionalBranch(%209, 0 : Int)
+	unconditionalBranch(%202, %205)
+
+block %202(
+		param %209	: Float):
+	let  %210	: DiffPairUserCode(Float, %75)	= load(%dpy1)
+	let  %211	: Float	= GetPrimalUserCode(%210)
+	let  %212	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(%211, %209)
+	store(%dpy1, %212)
+	return_val(void_constant)
 
 block %207:
-	unconditionalBranch(%209, 1 : Int)
-
-block %209(
-		[primalInstDecoration]
-		param %210	: Int):
-	unconditionalBranch(%211)
-
-block %211:
-	[primalInstDecoration]
-	let  %212	: Bool	= cmpNE(%210, 1 : Int)
-	ifElse(%212, %213, %214, %215)
-
-block %214:
-	unconditionalBranch(%215, true)
+	unconditionalBranch(%213)
 
 block %213:
-	unconditionalBranch(%215, false)
-
-block %215(
-		[primalInstDecoration]
-		[nameHint("_bflag")]
-		param %x5Fbflag3	: Bool):
-	unconditionalBranch(%216)
+	[primalInstDecoration]
+	let  %214	: Bool	= cmpLT(%204, 3 : Int)
+	ifElse(%214, %215, %216, %217)
 
 block %216:
-	ifElse(%x5Fbflag3, %217, %218, %219)
+	unconditionalBranch(%217, 0 : Int)
 
-block %218:
-	unconditionalBranch(%219)
+block %215:
+	unconditionalBranch(%217, 1 : Int)
 
-block %217:
+block %217(
+		[primalInstDecoration]
+		param %218	: Int):
 	unconditionalBranch(%219)
 
 block %219:
-	unconditionalBranch(%220)
+	[primalInstDecoration]
+	let  %220	: Bool	= cmpNE(%218, 1 : Int)
+	ifElse(%220, %221, %222, %223)
 
-block %220:
-	unconditionalBranch(%221, %197)
+block %222:
+	unconditionalBranch(%223, true)
 
-block %221(
-		param %222	: Float):
-	ifElse(%x5Fbflag3, %223, %224, %225)
+block %221:
+	unconditionalBranch(%223, false)
+
+block %223(
+		[primalInstDecoration]
+		[nameHint("_bflag")]
+		param %x5Fbflag3	: Bool):
+	unconditionalBranch(%224)
 
 block %224:
-	unconditionalBranch(%226, %222)
+	ifElse(%x5Fbflag3, %225, %226, %227)
 
-block %226(
-		param %227	: Float):
-	let  %228	: Float	= load(%186)
-	let  %229	: Float	= add(%227, %228)
-	store(%186, %229)
-	unconditionalBranch(%225)
-
-block %223:
-	unconditionalBranch(%230, %222)
-
-block %230(
-		param %231	: Float):
-	let  %232	: Float	= load(%187)
-	let  %233	: Float	= add(%231, %232)
-	store(%187, %233)
-	unconditionalBranch(%225)
+block %226:
+	unconditionalBranch(%227)
 
 block %225:
-	unconditionalBranch(%234)
+	unconditionalBranch(%227)
 
-block %234:
-	ifElse(%212, %235, %236, %237)
+block %227:
+	unconditionalBranch(%228)
 
-block %236:
-	unconditionalBranch(%237)
+block %228:
+	unconditionalBranch(%229, %205)
 
-block %235:
-	unconditionalBranch(%237)
+block %229(
+		param %230	: Float):
+	ifElse(%x5Fbflag3, %231, %232, %233)
 
-block %237:
-	unconditionalBranch(%238)
+block %232:
+	unconditionalBranch(%234, %230)
 
-block %238:
-	let  %239	: Float	= load(%187)
-	store(%187, 0 : Float)
-	ifElse(%206, %240, %241, %242)
+block %234(
+		param %235	: Float):
+	let  %236	: Float	= load(%194)
+	let  %237	: Float	= add(%235, %236)
+	store(%194, %237)
+	unconditionalBranch(%233)
 
-block %241:
-	unconditionalBranch(%243)
+block %231:
+	unconditionalBranch(%238, %230)
 
-block %243:
-	unconditionalBranch(%242)
+block %238(
+		param %239	: Float):
+	let  %240	: Float	= load(%195)
+	let  %241	: Float	= add(%239, %240)
+	store(%195, %241)
+	unconditionalBranch(%233)
 
-block %240:
-	unconditionalBranch(%244, %239)
-
-block %244(
-		param %245	: Float):
-	let  %246	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %111)
-	let  %247	: Ptr(Array(Float, 5 : Int))	= var
-	store(%247, %246)
-	let  %248	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%247, %x5Fdc)
-	let  %249	: Float	= load(%248)
-	let  %250	: Float	= mul(%249, %245)
-	let  %251	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %111)
-	let  %252	: Ptr(Array(Float, 5 : Int))	= var
-	store(%252, %251)
-	let  %253	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%252, %x5Fdc)
-	let  %254	: Float	= load(%253)
-	let  %255	: Float	= mul(%254, %245)
-	let  %256	: Float	= load(%186)
-	let  %257	: Float	= add(%250, %255)
-	let  %258	: Float	= add(%257, %256)
-	store(%186, %258)
+block %233:
 	unconditionalBranch(%242)
 
 block %242:
-	unconditionalBranch(%195)
+	ifElse(%220, %243, %244, %245)
 
-block %195:
+block %244:
+	unconditionalBranch(%245)
+
+block %243:
+	unconditionalBranch(%245)
+
+block %245:
+	unconditionalBranch(%246)
+
+block %246:
+	let  %247	: Float	= load(%195)
+	store(%195, 0 : Float)
+	ifElse(%214, %248, %249, %250)
+
+block %249:
+	unconditionalBranch(%251)
+
+block %251:
+	unconditionalBranch(%250)
+
+block %248:
+	unconditionalBranch(%252, %247)
+
+block %252(
+		param %253	: Float):
+	let  %254	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %119)
+	let  %255	: Ptr(Array(Float, 5 : Int))	= var
+	store(%255, %254)
+	let  %256	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%255, %x5Fdc)
+	let  %257	: Float	= load(%256)
+	let  %258	: Float	= mul(%257, %253)
+	let  %259	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %119)
+	let  %260	: Ptr(Array(Float, 5 : Int))	= var
+	store(%260, %259)
+	let  %261	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%260, %x5Fdc)
+	let  %262	: Float	= load(%261)
+	let  %263	: Float	= mul(%262, %253)
+	let  %264	: Float	= load(%194)
+	let  %265	: Float	= add(%258, %263)
+	let  %266	: Float	= add(%265, %264)
+	store(%194, %266)
+	unconditionalBranch(%250)
+
+block %250:
+	unconditionalBranch(%203)
+
+block %203:
 	[primalInstDecoration]
-	let  %259	: Int	= sub(%x5Fdc, 1 : Int)
-	unconditionalBranch(%193, %259)
+	let  %267	: Int	= sub(%x5Fdc, 1 : Int)
+	unconditionalBranch(%201, %267)
 
-block %179:
-	unconditionalBranch(%260)
-
-block %260:
-	[primalInstDecoration]
-	let  %261	: Bool	= cmpLT(%i2, 3 : Int)
-	ifElse(%261, %262, %263, %264)
-
-block %263:
-	unconditionalBranch(%264, 0 : Int, 0 : Float)
-
-block %262:
-	[primalInstDecoration]
-	let  %265	: Float	= mul(%t2, %t2)
-	unconditionalBranch(%264, 1 : Int, %265)
-
-block %264(
-		[primalInstDecoration]
-		param %266	: Int,
-		[primalInstDecoration]
-		param %267	: Float):
+block %187:
 	unconditionalBranch(%268)
 
 block %268:
 	[primalInstDecoration]
-	let  %269	: Bool	= cmpNE(%266, 1 : Int)
+	let  %269	: Bool	= cmpLT(%i3, 3 : Int)
 	ifElse(%269, %270, %271, %272)
 
 block %271:
-	unconditionalBranch(%272, %x5Fbflag2)
+	unconditionalBranch(%272, 0 : Int, 0 : Float)
 
 block %270:
-	unconditionalBranch(%272, false)
+	[primalInstDecoration]
+	let  %273	: Float	= mul(%t3, %t3)
+	unconditionalBranch(%272, 1 : Int, %273)
 
 block %272(
 		[primalInstDecoration]
+		param %274	: Int,
+		[primalInstDecoration]
+		param %275	: Float):
+	unconditionalBranch(%276)
+
+block %276:
+	[primalInstDecoration]
+	let  %277	: Bool	= cmpNE(%274, 1 : Int)
+	ifElse(%277, %278, %279, %280)
+
+block %279:
+	unconditionalBranch(%280, %x5Fbflag2)
+
+block %278:
+	unconditionalBranch(%280, false)
+
+block %280(
+		[primalInstDecoration]
 		[nameHint("_bflag")]
 		param %x5Fbflag4	: Bool):
-	unconditionalBranch(%273)
+	unconditionalBranch(%281)
 
-block %273:
-	ifElse(%x5Fbflag4, %274, %275, %276)
+block %281:
+	ifElse(%x5Fbflag4, %282, %283, %284)
 
-block %275:
-	unconditionalBranch(%276, %t2, %i2)
+block %283:
+	unconditionalBranch(%284, %t3, %i3)
 
-block %274:
+block %282:
 	[primalInstDecoration]
-	let  %277	: Int	= add(%i2, 1 : Int)
-	unconditionalBranch(%276, %267, %277)
+	let  %285	: Int	= add(%i3, 1 : Int)
+	unconditionalBranch(%284, %275, %285)
 
-block %276(
+block %284(
 		[primalInstDecoration]
 		[nameHint("t")]
-		param %t3	: Float,
+		param %t4	: Float,
 		[primalInstDecoration]
 		[nameHint("i")]
-		param %i3	: Int):
+		param %i4	: Int):
 	[primalInstDecoration]
-	let  %278	: Int	= add(%x5Fpc1, 1 : Int)
-	unconditionalBranch(%172, %x5Fbflag4, %t3, %i3, %278)
+	let  %286	: Int	= add(%x5Fpc1, 1 : Int)
+	unconditionalBranch(%180, %x5Fbflag4, %t4, %i4, %286)
 }
 [backwardDifferentiable]
-func %157	: Func(Array(Float, 5 : Int), Array(Float, 5 : Int), Array(Float, 5 : Int))
+func %165	: Func(Array(Float, 5 : Int), Array(Float, 5 : Int), Array(Float, 5 : Int))
 {
-block %279(
-		param %280	: Array(Float, 5 : Int),
-		param %281	: Array(Float, 5 : Int)):
-	let  %282	: Ptr(Array(Float, 5 : Int))	= var
-	loop(%283, %284, %283, 0 : Int)
+block %287(
+		param %288	: Array(Float, 5 : Int),
+		param %289	: Array(Float, 5 : Int)):
+	let  %290	: Ptr(Array(Float, 5 : Int))	= var
+	loop(%291, %292, %291, 0 : Int)
 
-block %283(
-		param %285	: Int):
-	let  %286	: Bool	= cmpLT(%285, 5 : Int)
-	ifElse(%286, %287, %288, %288)
+block %291(
+		param %293	: Int):
+	let  %294	: Bool	= cmpLT(%293, 5 : Int)
+	ifElse(%294, %295, %296, %296)
 
-block %287:
-	let  %289	: Float	= getElement(%280, %285)
-	let  %290	: Float	= getElement(%281, %285)
-	let  %291	: Float	= add(%289, %290)
-	let  %292	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%282, %285)
-	store(%292, %291)
-	unconditionalBranch(%293)
+block %295:
+	let  %297	: Float	= getElement(%288, %293)
+	let  %298	: Float	= getElement(%289, %293)
+	let  %299	: Float	= add(%297, %298)
+	let  %300	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%290, %293)
+	store(%300, %299)
+	unconditionalBranch(%301)
 
-block %288:
-	unconditionalBranch(%284)
-
-block %284:
-	let  %294	: Array(Float, 5 : Int)	= load(%282)
-	return_val(%294)
-
-block %293:
-	let  %295	: Int	= add(%285, 1 : Int)
-	unconditionalBranch(%283, %295)
-}
-func %148	: Func(Array(Float, 5 : Int))
-{
 block %296:
-	let  %297	: Array(Float, 5 : Int)	= makeArrayFromElement(0 : Float)
-	return_val(%297)
+	unconditionalBranch(%292)
+
+block %292:
+	let  %302	: Array(Float, 5 : Int)	= load(%290)
+	return_val(%302)
+
+block %301:
+	let  %303	: Int	= add(%293, 1 : Int)
+	unconditionalBranch(%291, %303)
 }
-witness_table %161	: witness_table_t(%IDifferentiable)(Array(Float, 5 : Int))
+func %156	: Func(Array(Float, 5 : Int))
+{
+block %304:
+	let  %305	: Array(Float, 5 : Int)	= makeArrayFromElement(0 : Float)
+	return_val(%305)
+}
+witness_table %169	: witness_table_t(%IDifferentiable)(Array(Float, 5 : Int))
 {
 	witness_table_entry(%18,Array(Float, 5 : Int))
 
-	witness_table_entry(%20,%161)
+	witness_table_entry(%20,%169)
 
-	witness_table_entry(%24,%157)
+	witness_table_entry(%24,%165)
 
-	witness_table_entry(%22,%148)
+	witness_table_entry(%22,%156)
 
 }
 
@@ -7853,16 +7891,53 @@ witness_table %75	: witness_table_t(%IDifferentiable)(Float)
 
 }
 
+[backwardDiffIntermediateTypeReference(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)]
+[backwardDiffPropagateReference(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop)]
+[backwardDiffPrimalReference(%sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop)]
+[primalInstDecoration]
+[backwardDiffReference(%sx5Fbwdx5Ftestx5Fsimplex5Floop)]
+[readNone]
+[DifferentiableTypeDictionaryDecoration]
+[backwardDifferentiable]
+[export("_SR15reverse_2Dxloop16test_simple_loopp1pi_ffb")]
+[nameHint("test_simple_loop")]
+func %testx5Fsimplex5Floop	: Func(Float, Float)
+{
+block %76(
+		[nameHint("y")]
+		param %y	: Float):
+	[loopMaxIters(3 : Int)]
+	loop(%77, %78, %79, %y, 0 : Int)
+
+block %77(
+		[nameHint("t")]
+		param %t	: Float,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %80	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%80, %81, %78, %81)
+
+block %78:
+	return_val(%t)
+
+block %81:
+	let  %82	: Float	= mul(%t, %t)
+	unconditionalBranch(%79)
+
+block %79:
+	let  %83	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%77, %82, %83)
+}
 [export("_ST4core17IBufferDataLayout")]
 [nameHint("IBufferDataLayout")]
 let  %IBufferDataLayout	: Type	= interface
 [export("_SW4core17DefaultDataLayout4core17IBufferDataLayout")]
-witness_table %76	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
+witness_table %84	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
 
 [nameHint("outputBuffer")]
 [export("_SVR15reverse_2Dxloop12outputBuffer")]
 [layout(%1)]
-let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %76)	= global_param
+let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %84)	= global_param
 [keepAlive]
 [entryPoint(6 : Int, "computeMain", "reverse-loop")]
 [numThreads(1 : Int, 1 : Int, 1 : Int)]
@@ -7871,29 +7946,29 @@ let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %76)	= global_para
 [layout(%8)]
 func %computeMain	: Func(Void, Vec(UInt, 3 : Int))
 {
-block %77(
+block %85(
 		[layout(%15)]
 		[nameHint("dispatchThreadID")]
 		[semantic("SV_DispatchThreadID", 0 : Int)]
 		param %dispatchThreadID	: Vec(UInt, 3 : Int)):
 	[nameHint("dpa")]
 	let  %dpa	: Ptr(DiffPairUserCode(Float, %75))	= var
-	let  %78	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(1 : Float, 0 : Float)
-	store(%dpa, %78)
+	let  %86	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(1 : Float, 0 : Float)
+	store(%dpa, %86)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa, 1 : Float)
-	let  %79	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
-	let  %80	: DiffPairUserCode(Float, %75)	= load(%dpa)
-	let  %81	: Float	= GetDifferentialUserCode(%80)
-	store(%79, %81)
+	let  %87	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
+	let  %88	: DiffPairUserCode(Float, %75)	= load(%dpa)
+	let  %89	: Float	= GetDifferentialUserCode(%88)
+	store(%87, %89)
 	[nameHint("dpa")]
 	let  %dpa1	: Ptr(DiffPairUserCode(Float, %75))	= var
-	let  %82	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(0.4 : Float, 0 : Float)
-	store(%dpa1, %82)
+	let  %90	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(0.4 : Float, 0 : Float)
+	store(%dpa1, %90)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa1, 1 : Float)
-	let  %83	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
-	let  %84	: DiffPairUserCode(Float, %75)	= load(%dpa1)
-	let  %85	: Float	= GetDifferentialUserCode(%84)
-	store(%83, %85)
+	let  %91	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
+	let  %92	: DiffPairUserCode(Float, %75)	= load(%dpa1)
+	let  %93	: Float	= GetDifferentialUserCode(%92)
+	store(%91, %93)
 	return_val(void_constant)
 }
 [export("_SV16NullDifferential5dummy")]
@@ -7918,9 +7993,9 @@ struct %NullDifferential	: Type
 [nameHint("NullDifferential.dzero")]
 func %NullDifferentialx5Fdzero	: Func(%NullDifferential)
 {
-block %86:
-	let  %87	: %NullDifferential	= makeStruct(0 : UInt)
-	return_val(%87)
+block %94:
+	let  %95	: %NullDifferential	= makeStruct(0 : UInt)
+	return_val(%95)
 }
 [readNone]
 [DifferentiableTypeDictionaryDecoration]
@@ -7931,31 +8006,31 @@ block %86:
 [nameHint("NullDifferential.dadd")]
 func %NullDifferentialx5Fdadd	: Func(%NullDifferential, %NullDifferential, %NullDifferential)
 {
-block %88(
+block %96(
 		[nameHint("SLANG_anonymous_8")]
 		param %SLANGx5Fanonymousx5F8_	: %NullDifferential,
 		[nameHint("SLANG_anonymous_9")]
 		param %SLANGx5Fanonymousx5F9_	: %NullDifferential):
-	let  %89	: %NullDifferential	= makeStruct(0 : UInt)
-	return_val(%89)
+	let  %97	: %NullDifferential	= makeStruct(0 : UInt)
+	return_val(%97)
 }
-generic %90	: Generic
+generic %98	: Generic
 {
-block %91(
+block %99(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
 		[nameHint("NullDifferential.T")]
 		param %NullDifferentialx5FT	: type_t,
-		param %92	: witness_table_t(%x5Fx5FBuiltinRealType)):
+		param %100	: witness_table_t(%x5Fx5FBuiltinRealType)):
 	return_val(Func(%NullDifferential, Attributed(%NullDifferentialx5FT, %7), %NullDifferential))
 }
 [export("_S16NullDifferential4dmulg2TC16NullDifferential1T4core17__BuiltinRealTypep2pi_16NullDifferential1Ti_16NullDifferential16NullDifferentialb")]
-generic %93	: %90
+generic %101	: %98
 {
-block %94(
+block %102(
 		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
 		[nameHint("NullDifferential.T")]
 		param %NullDifferentialx5FT1	: type_t,
-		param %95	: witness_table_t(%x5Fx5FBuiltinRealType)):
+		param %103	: witness_table_t(%x5Fx5FBuiltinRealType)):
 	[readNone]
 	[DifferentiableTypeDictionaryDecoration]
 	[ForceInline]
@@ -7963,30 +8038,30 @@ block %94(
 	[nameHint("NullDifferential.dmul")]
 		func %NullDifferentialx5Fdmul	: Func(%NullDifferential, Attributed(%NullDifferentialx5FT1, %7), %NullDifferential)
 	{
-block %96(
+block %104(
 			[nameHint("SLANG_anonymous_10")]
 			param %SLANGx5Fanonymousx5F10_	: Attributed(%NullDifferentialx5FT1, %7),
 			[nameHint("SLANG_anonymous_11")]
 			param %SLANGx5Fanonymousx5F11_	: %NullDifferential):
-		let  %97	: %NullDifferential	= makeStruct(0 : UInt)
-		return_val(%97)
+		let  %105	: %NullDifferential	= makeStruct(0 : UInt)
+		return_val(%105)
 }
 	return_val(%NullDifferentialx5Fdmul)
 }
 [keepAlive]
 [hlslExport]
 [export("_SW16NullDifferential4core15IDifferentiable")]
-witness_table %98	: witness_table_t(%IDifferentiable)(%NullDifferential)
+witness_table %106	: witness_table_t(%IDifferentiable)(%NullDifferential)
 {
 	witness_table_entry(%18,%NullDifferential)
 
-	witness_table_entry(%20,%98)
+	witness_table_entry(%20,%106)
 
 	witness_table_entry(%22,%NullDifferentialx5Fdzero)
 
 	witness_table_entry(%24,%NullDifferentialx5Fdadd)
 
-	witness_table_entry(%26,%93)
+	witness_table_entry(%26,%101)
 
 }
 
@@ -7998,15 +8073,15 @@ ExistentialTypeSpecializationDictionary
 [nameHint("s_bwd_test_simple_loop")]
 func %sx5Fbwdx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(DiffPairUserCode(Float, %75)), Float)
 {
-block %99(
-		param %100	: InOut(DiffPairUserCode(Float, %75)),
-		param %101	: Float):
-	let  %102	: DiffPairUserCode(Float, %75)	= load(%100)
-	let  %103	: Float	= GetPrimalUserCode(%102)
-	let  %104	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
-	let  %105	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%103, %104)
-	let  %106	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%104)
-	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%100, %101, %106)
+block %107(
+		param %108	: InOut(DiffPairUserCode(Float, %75)),
+		param %109	: Float):
+	let  %110	: DiffPairUserCode(Float, %75)	= load(%108)
+	let  %111	: Float	= GetPrimalUserCode(%110)
+	let  %112	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
+	let  %113	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%111, %112)
+	let  %114	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%112)
+	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%108, %109, %114)
 	return_val(void_constant)
 }
 [nameHint("s_primal_ctx_test_simple_loop")]
@@ -8015,178 +8090,178 @@ block %99(
 [backwardDifferentiable]
 func %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop	: Func(Float, Float, Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates))
 {
-block %107(
+block %115(
 		[nameHint("dpy")]
 		param %dpy	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx	: Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)):
-	unconditionalBranch(%108)
+	unconditionalBranch(%116)
 
-block %108:
-	let  %109	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= defaultConstruct
-	store(%x5Fsx5Fdiffx5Fctx, %109)
-	let  %110	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %111)
-	let  %112	: Ptr(Array(Float, 5 : Int))	= var
-	let  %113	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	store(%112, %113)
-	let  %114	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	store(%110, %114)
-	let  %115	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %116)
-	let  %117	: Ptr(Int)	= var
-	store(%117, 0 : Int)
-	store(%115, 0 : Int)
-	unconditionalBranch(%118)
+block %116:
+	let  %117	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= defaultConstruct
+	store(%x5Fsx5Fdiffx5Fctx, %117)
+	let  %118	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %119)
+	let  %120	: Ptr(Array(Float, 5 : Int))	= var
+	let  %121	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	store(%120, %121)
+	let  %122	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	store(%118, %122)
+	let  %123	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %124)
+	let  %125	: Ptr(Int)	= var
+	store(%125, 0 : Int)
+	store(%123, 0 : Int)
+	unconditionalBranch(%126)
 
-block %118:
+block %126:
 	[loopMaxIters(4 : Int)]
-	loop(%119, %120, %119, true, %dpy, 0 : Int, 0 : Int)
+	loop(%127, %128, %127, true, %dpy, 0 : Int, 0 : Int)
 
-block %119(
+block %127(
 		[primalInstDecoration]
 		[nameHint("_bflag")]
 		param %x5Fbflag	: Bool,
 		[primalInstDecoration]
 		[nameHint("t")]
-		param %t	: Float,
+		param %t1	: Float,
 		[primalInstDecoration]
 		[nameHint("i")]
-		param %i	: Int,
+		param %i1	: Int,
 		[primalInstDecoration]
 		[nameHint("_pc")]
 		[loopCounterDecoration]
 		param %x5Fpc	: Int):
-	let  %121	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%110, %x5Fpc)
-	store(%121, %t)
-	store(%115, %x5Fpc)
-	ifElse(%x5Fbflag, %122, %123, %122)
+	let  %129	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%118, %x5Fpc)
+	store(%129, %t1)
+	store(%123, %x5Fpc)
+	ifElse(%x5Fbflag, %130, %131, %130)
 
-block %123:
-	unconditionalBranch(%120)
+block %131:
+	unconditionalBranch(%128)
 
-block %120:
-	return_val(%t)
+block %128:
+	return_val(%t1)
 
-block %122:
-	unconditionalBranch(%124)
-
-block %124:
-	[primalInstDecoration]
-	let  %125	: Bool	= cmpLT(%i, 3 : Int)
-	ifElse(%125, %126, %127, %128)
-
-block %127:
-	unconditionalBranch(%128, 0 : Int, 0 : Float)
-
-block %126:
-	[primalInstDecoration]
-	let  %129	: Float	= mul(%t, %t)
-	unconditionalBranch(%128, 1 : Int, %129)
-
-block %128(
-		[primalInstDecoration]
-		param %130	: Int,
-		[primalInstDecoration]
-		param %131	: Float):
+block %130:
 	unconditionalBranch(%132)
 
 block %132:
 	[primalInstDecoration]
-	let  %133	: Bool	= cmpNE(%130, 1 : Int)
+	let  %133	: Bool	= cmpLT(%i1, 3 : Int)
 	ifElse(%133, %134, %135, %136)
 
 block %135:
-	unconditionalBranch(%136, %x5Fbflag)
+	unconditionalBranch(%136, 0 : Int, 0 : Float)
 
 block %134:
-	unconditionalBranch(%136, false)
+	[primalInstDecoration]
+	let  %137	: Float	= mul(%t1, %t1)
+	unconditionalBranch(%136, 1 : Int, %137)
 
 block %136(
 		[primalInstDecoration]
+		param %138	: Int,
+		[primalInstDecoration]
+		param %139	: Float):
+	unconditionalBranch(%140)
+
+block %140:
+	[primalInstDecoration]
+	let  %141	: Bool	= cmpNE(%138, 1 : Int)
+	ifElse(%141, %142, %143, %144)
+
+block %143:
+	unconditionalBranch(%144, %x5Fbflag)
+
+block %142:
+	unconditionalBranch(%144, false)
+
+block %144(
+		[primalInstDecoration]
 		[nameHint("_bflag")]
 		param %x5Fbflag1	: Bool):
-	unconditionalBranch(%137)
+	unconditionalBranch(%145)
 
-block %137:
-	ifElse(%x5Fbflag1, %138, %139, %140)
+block %145:
+	ifElse(%x5Fbflag1, %146, %147, %148)
 
-block %139:
-	unconditionalBranch(%140, %t, %i)
+block %147:
+	unconditionalBranch(%148, %t1, %i1)
 
-block %138:
+block %146:
 	[primalInstDecoration]
-	let  %141	: Int	= add(%i, 1 : Int)
-	unconditionalBranch(%140, %131, %141)
+	let  %149	: Int	= add(%i1, 1 : Int)
+	unconditionalBranch(%148, %139, %149)
 
-block %140(
+block %148(
 		[primalInstDecoration]
 		[nameHint("t")]
-		param %t1	: Float,
+		param %t2	: Float,
 		[primalInstDecoration]
 		[nameHint("i")]
-		param %i1	: Int):
+		param %i2	: Int):
 	[primalInstDecoration]
-	let  %142	: Int	= add(%x5Fpc, 1 : Int)
-	unconditionalBranch(%119, %x5Fbflag1, %t1, %i1, %142)
+	let  %150	: Int	= add(%x5Fpc, 1 : Int)
+	unconditionalBranch(%127, %x5Fbflag1, %t2, %i2, %150)
 }
-[derivativeMemberDecoration(%143)]
-let  %111	: _	= key
-let  %116	: _	= key
-struct %144	: Type
+[derivativeMemberDecoration(%151)]
+let  %119	: _	= key
+let  %124	: _	= key
+struct %152	: Type
 {
-	field(%143, Array(Float, 5 : Int))
+	field(%151, Array(Float, 5 : Int))
 }
 
-func %145	: Func(%144)
+func %153	: Func(%152)
 {
-block %146:
-	let  %147	: Array(Float, 5 : Int)	= call %148()
-	let  %149	: %144	= makeStruct(%147)
-	return_val(%149)
+block %154:
+	let  %155	: Array(Float, 5 : Int)	= call %156()
+	let  %157	: %152	= makeStruct(%155)
+	return_val(%157)
 }
-func %150	: Func(%144)
+func %158	: Func(%152)
 {
-block %151(
-		param %152	: %144,
-		param %153	: %144):
-	let  %154	: Array(Float, 5 : Int)	= get_field(%152, %143)
-	let  %155	: Array(Float, 5 : Int)	= get_field(%153, %143)
-	let  %156	: Array(Float, 5 : Int)	= call %157(%154, %155)
-	let  %158	: %144	= makeStruct(%156)
-	return_val(%158)
+block %159(
+		param %160	: %152,
+		param %161	: %152):
+	let  %162	: Array(Float, 5 : Int)	= get_field(%160, %151)
+	let  %163	: Array(Float, 5 : Int)	= get_field(%161, %151)
+	let  %164	: Array(Float, 5 : Int)	= call %165(%162, %163)
+	let  %166	: %152	= makeStruct(%164)
+	return_val(%166)
 }
-witness_table %159	: witness_table_t(%IDifferentiable)(%144)
+witness_table %167	: witness_table_t(%IDifferentiable)(%152)
 {
-	witness_table_entry(%18,%144)
+	witness_table_entry(%18,%152)
 
-	witness_table_entry(%20,%159)
+	witness_table_entry(%20,%167)
 
-	witness_table_entry(%22,%145)
+	witness_table_entry(%22,%153)
 
-	witness_table_entry(%24,%150)
+	witness_table_entry(%24,%158)
 
 }
 
-witness_table %160	: witness_table_t(%IDifferentiable)(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
+witness_table %168	: witness_table_t(%IDifferentiable)(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
 {
-	witness_table_entry(%18,%144)
+	witness_table_entry(%18,%152)
 
-	witness_table_entry(%20,%159)
+	witness_table_entry(%20,%167)
 
-	witness_table_entry(%22,%145)
+	witness_table_entry(%22,%153)
 
-	witness_table_entry(%24,%150)
+	witness_table_entry(%24,%158)
 
 }
 
-[derivativeMemberDecoration(%143)]
-let  %143	: _	= key
+[derivativeMemberDecoration(%151)]
+let  %151	: _	= key
+[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
-	[IntermediateContextFieldDifferentialTypeDecoration(%161)]
-	field(%111, Array(Float, 5 : Int))
-	field(%116, Int)
+	[IntermediateContextFieldDifferentialTypeDecoration(%169)]
+	field(%119, Array(Float, 5 : Int))
+	field(%124, Int)
 }
 
 [FloatingPointModeOverride(1 : Int)]
@@ -8195,355 +8270,355 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 [nameHint("s_bwd_prop_test_simple_loop")]
 func %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(DiffPairUserCode(Float, %75)), Float, %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
 {
-block %162(
+block %170(
 		[nameHint("dpy")]
 		param %dpy1	: InOut(DiffPairUserCode(Float, %75)),
 		[nameHint("_s_dOut")]
 		param %x5Fsx5FdOut	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx1	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates):
-	unconditionalBranch(%163)
-
-block %163:
-	let  %164	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	let  %165	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %111)
-	let  %166	: Ptr(Array(Float, 5 : Int))	= var
-	store(%166, %165)
-	store(%166, %164)
-	let  %167	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %116)
-	let  %168	: Ptr(Int)	= var
-	store(%168, %167)
-	store(%168, 0 : Int)
-	let  %169	: DiffPairUserCode(Float, %75)	= load(%dpy1)
-	let  %170	: Float	= GetPrimalUserCode(%169)
 	unconditionalBranch(%171)
 
 block %171:
-	[loopMaxIters(4 : Int)]
-	loop(%172, %173, %172, true, %170, 0 : Int, 0 : Int)
+	let  %172	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	let  %173	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %119)
+	let  %174	: Ptr(Array(Float, 5 : Int))	= var
+	store(%174, %173)
+	store(%174, %172)
+	let  %175	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %124)
+	let  %176	: Ptr(Int)	= var
+	store(%176, %175)
+	store(%176, 0 : Int)
+	let  %177	: DiffPairUserCode(Float, %75)	= load(%dpy1)
+	let  %178	: Float	= GetPrimalUserCode(%177)
+	unconditionalBranch(%179)
 
-block %172(
+block %179:
+	[loopMaxIters(4 : Int)]
+	loop(%180, %181, %180, true, %178, 0 : Int, 0 : Int)
+
+block %180(
 		[primalInstDecoration]
 		[nameHint("_bflag")]
 		param %x5Fbflag2	: Bool,
 		[primalInstDecoration]
 		[nameHint("t")]
-		param %t2	: Float,
+		param %t3	: Float,
 		[primalInstDecoration]
 		[nameHint("i")]
-		param %i2	: Int,
+		param %i3	: Int,
 		[primalInstDecoration]
 		[nameHint("_pc")]
 		[loopCounterDecoration]
 		param %x5Fpc1	: Int):
-	let  %174	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %111)
-	let  %175	: Ptr(Array(Float, 5 : Int))	= var
-	store(%175, %174)
-	let  %176	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%175, %x5Fpc1)
-	store(%176, %t2)
-	let  %177	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %116)
-	let  %178	: Ptr(Int)	= var
-	store(%178, %177)
-	store(%178, %x5Fpc1)
-	ifElse(%x5Fbflag2, %179, %180, %179)
+	let  %182	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %119)
+	let  %183	: Ptr(Array(Float, 5 : Int))	= var
+	store(%183, %182)
+	let  %184	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%183, %x5Fpc1)
+	store(%184, %t3)
+	let  %185	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %124)
+	let  %186	: Ptr(Int)	= var
+	store(%186, %185)
+	store(%186, %x5Fpc1)
+	ifElse(%x5Fbflag2, %187, %188, %187)
 
-block %180:
-	unconditionalBranch(%173)
-
-block %173:
+block %188:
 	unconditionalBranch(%181)
 
 block %181:
-	unconditionalBranch(%182)
+	unconditionalBranch(%189)
 
-block %182:
-	unconditionalBranch(%183)
-
-block %183:
-	unconditionalBranch(%184)
-
-block %184:
-	unconditionalBranch(%185)
-
-block %185:
-	let  %186	: Ptr(Float)	= var
-	store(%186, 0 : Float)
-	let  %187	: Ptr(Float)	= var
-	store(%187, 0 : Float)
-	let  %188	: Float	= load(%186)
-	let  %189	: Float	= add(%x5Fsx5FdOut, %188)
-	store(%186, %189)
+block %189:
 	unconditionalBranch(%190)
 
 block %190:
-	let  %191	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %116)
-	let  %192	: Int	= sub(%191, 1 : Int)
-	[loopMaxIters(4 : Int)]
-	loop(%193, %194, %195, %192)
+	unconditionalBranch(%191)
 
-block %193(
+block %191:
+	unconditionalBranch(%192)
+
+block %192:
+	unconditionalBranch(%193)
+
+block %193:
+	let  %194	: Ptr(Float)	= var
+	store(%194, 0 : Float)
+	let  %195	: Ptr(Float)	= var
+	store(%195, 0 : Float)
+	let  %196	: Float	= load(%194)
+	let  %197	: Float	= add(%x5Fsx5FdOut, %196)
+	store(%194, %197)
+	unconditionalBranch(%198)
+
+block %198:
+	let  %199	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %124)
+	let  %200	: Int	= sub(%199, 1 : Int)
+	[loopMaxIters(4 : Int)]
+	loop(%201, %202, %203, %200)
+
+block %201(
 		[primalInstDecoration]
 		[nameHint("_dc")]
 		param %x5Fdc	: Int):
-	let  %196	: Int	= add(%x5Fdc, 0 : Int)
-	let  %197	: Float	= load(%186)
-	store(%186, 0 : Float)
-	let  %198	: Bool	= cmpGE(%x5Fdc, 0 : Int)
-	ifElse(%198, %199, %200, %199)
-
-block %200:
-	unconditionalBranch(%194, %197)
-
-block %194(
-		param %201	: Float):
-	let  %202	: DiffPairUserCode(Float, %75)	= load(%dpy1)
-	let  %203	: Float	= GetPrimalUserCode(%202)
-	let  %204	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(%203, %201)
-	store(%dpy1, %204)
-	return_val(void_constant)
-
-block %199:
-	unconditionalBranch(%205)
-
-block %205:
-	[primalInstDecoration]
-	let  %206	: Bool	= cmpLT(%196, 3 : Int)
-	ifElse(%206, %207, %208, %209)
+	let  %204	: Int	= add(%x5Fdc, 0 : Int)
+	let  %205	: Float	= load(%194)
+	store(%194, 0 : Float)
+	let  %206	: Bool	= cmpGE(%x5Fdc, 0 : Int)
+	ifElse(%206, %207, %208, %207)
 
 block %208:
-	unconditionalBranch(%209, 0 : Int)
+	unconditionalBranch(%202, %205)
+
+block %202(
+		param %209	: Float):
+	let  %210	: DiffPairUserCode(Float, %75)	= load(%dpy1)
+	let  %211	: Float	= GetPrimalUserCode(%210)
+	let  %212	: DiffPairUserCode(Float, %75)	= MakeDiffPairUserCode(%211, %209)
+	store(%dpy1, %212)
+	return_val(void_constant)
 
 block %207:
-	unconditionalBranch(%209, 1 : Int)
-
-block %209(
-		[primalInstDecoration]
-		param %210	: Int):
-	unconditionalBranch(%211)
-
-block %211:
-	[primalInstDecoration]
-	let  %212	: Bool	= cmpNE(%210, 1 : Int)
-	ifElse(%212, %213, %214, %215)
-
-block %214:
-	unconditionalBranch(%215, true)
+	unconditionalBranch(%213)
 
 block %213:
-	unconditionalBranch(%215, false)
-
-block %215(
-		[primalInstDecoration]
-		[nameHint("_bflag")]
-		param %x5Fbflag3	: Bool):
-	unconditionalBranch(%216)
+	[primalInstDecoration]
+	let  %214	: Bool	= cmpLT(%204, 3 : Int)
+	ifElse(%214, %215, %216, %217)
 
 block %216:
-	ifElse(%x5Fbflag3, %217, %218, %219)
+	unconditionalBranch(%217, 0 : Int)
 
-block %218:
-	unconditionalBranch(%219)
+block %215:
+	unconditionalBranch(%217, 1 : Int)
 
-block %217:
+block %217(
+		[primalInstDecoration]
+		param %218	: Int):
 	unconditionalBranch(%219)
 
 block %219:
-	unconditionalBranch(%220)
+	[primalInstDecoration]
+	let  %220	: Bool	= cmpNE(%218, 1 : Int)
+	ifElse(%220, %221, %222, %223)
 
-block %220:
-	unconditionalBranch(%221, %197)
+block %222:
+	unconditionalBranch(%223, true)
 
-block %221(
-		param %222	: Float):
-	ifElse(%x5Fbflag3, %223, %224, %225)
+block %221:
+	unconditionalBranch(%223, false)
+
+block %223(
+		[primalInstDecoration]
+		[nameHint("_bflag")]
+		param %x5Fbflag3	: Bool):
+	unconditionalBranch(%224)
 
 block %224:
-	unconditionalBranch(%226, %222)
+	ifElse(%x5Fbflag3, %225, %226, %227)
 
-block %226(
-		param %227	: Float):
-	let  %228	: Float	= load(%186)
-	let  %229	: Float	= add(%227, %228)
-	store(%186, %229)
-	unconditionalBranch(%225)
-
-block %223:
-	unconditionalBranch(%230, %222)
-
-block %230(
-		param %231	: Float):
-	let  %232	: Float	= load(%187)
-	let  %233	: Float	= add(%231, %232)
-	store(%187, %233)
-	unconditionalBranch(%225)
+block %226:
+	unconditionalBranch(%227)
 
 block %225:
-	unconditionalBranch(%234)
+	unconditionalBranch(%227)
 
-block %234:
-	ifElse(%212, %235, %236, %237)
+block %227:
+	unconditionalBranch(%228)
 
-block %236:
-	unconditionalBranch(%237)
+block %228:
+	unconditionalBranch(%229, %205)
 
-block %235:
-	unconditionalBranch(%237)
+block %229(
+		param %230	: Float):
+	ifElse(%x5Fbflag3, %231, %232, %233)
 
-block %237:
-	unconditionalBranch(%238)
+block %232:
+	unconditionalBranch(%234, %230)
 
-block %238:
-	let  %239	: Float	= load(%187)
-	store(%187, 0 : Float)
-	ifElse(%206, %240, %241, %242)
+block %234(
+		param %235	: Float):
+	let  %236	: Float	= load(%194)
+	let  %237	: Float	= add(%235, %236)
+	store(%194, %237)
+	unconditionalBranch(%233)
 
-block %241:
-	unconditionalBranch(%243)
+block %231:
+	unconditionalBranch(%238, %230)
 
-block %243:
-	unconditionalBranch(%242)
+block %238(
+		param %239	: Float):
+	let  %240	: Float	= load(%195)
+	let  %241	: Float	= add(%239, %240)
+	store(%195, %241)
+	unconditionalBranch(%233)
 
-block %240:
-	unconditionalBranch(%244, %239)
-
-block %244(
-		param %245	: Float):
-	let  %246	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %111)
-	let  %247	: Ptr(Array(Float, 5 : Int))	= var
-	store(%247, %246)
-	let  %248	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%247, %x5Fdc)
-	let  %249	: Float	= load(%248)
-	let  %250	: Float	= mul(%249, %245)
-	let  %251	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %111)
-	let  %252	: Ptr(Array(Float, 5 : Int))	= var
-	store(%252, %251)
-	let  %253	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%252, %x5Fdc)
-	let  %254	: Float	= load(%253)
-	let  %255	: Float	= mul(%254, %245)
-	let  %256	: Float	= load(%186)
-	let  %257	: Float	= add(%250, %255)
-	let  %258	: Float	= add(%257, %256)
-	store(%186, %258)
+block %233:
 	unconditionalBranch(%242)
 
 block %242:
-	unconditionalBranch(%195)
+	ifElse(%220, %243, %244, %245)
 
-block %195:
+block %244:
+	unconditionalBranch(%245)
+
+block %243:
+	unconditionalBranch(%245)
+
+block %245:
+	unconditionalBranch(%246)
+
+block %246:
+	let  %247	: Float	= load(%195)
+	store(%195, 0 : Float)
+	ifElse(%214, %248, %249, %250)
+
+block %249:
+	unconditionalBranch(%251)
+
+block %251:
+	unconditionalBranch(%250)
+
+block %248:
+	unconditionalBranch(%252, %247)
+
+block %252(
+		param %253	: Float):
+	let  %254	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %119)
+	let  %255	: Ptr(Array(Float, 5 : Int))	= var
+	store(%255, %254)
+	let  %256	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%255, %x5Fdc)
+	let  %257	: Float	= load(%256)
+	let  %258	: Float	= mul(%257, %253)
+	let  %259	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %119)
+	let  %260	: Ptr(Array(Float, 5 : Int))	= var
+	store(%260, %259)
+	let  %261	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%260, %x5Fdc)
+	let  %262	: Float	= load(%261)
+	let  %263	: Float	= mul(%262, %253)
+	let  %264	: Float	= load(%194)
+	let  %265	: Float	= add(%258, %263)
+	let  %266	: Float	= add(%265, %264)
+	store(%194, %266)
+	unconditionalBranch(%250)
+
+block %250:
+	unconditionalBranch(%203)
+
+block %203:
 	[primalInstDecoration]
-	let  %259	: Int	= sub(%x5Fdc, 1 : Int)
-	unconditionalBranch(%193, %259)
+	let  %267	: Int	= sub(%x5Fdc, 1 : Int)
+	unconditionalBranch(%201, %267)
 
-block %179:
-	unconditionalBranch(%260)
-
-block %260:
-	[primalInstDecoration]
-	let  %261	: Bool	= cmpLT(%i2, 3 : Int)
-	ifElse(%261, %262, %263, %264)
-
-block %263:
-	unconditionalBranch(%264, 0 : Int, 0 : Float)
-
-block %262:
-	[primalInstDecoration]
-	let  %265	: Float	= mul(%t2, %t2)
-	unconditionalBranch(%264, 1 : Int, %265)
-
-block %264(
-		[primalInstDecoration]
-		param %266	: Int,
-		[primalInstDecoration]
-		param %267	: Float):
+block %187:
 	unconditionalBranch(%268)
 
 block %268:
 	[primalInstDecoration]
-	let  %269	: Bool	= cmpNE(%266, 1 : Int)
+	let  %269	: Bool	= cmpLT(%i3, 3 : Int)
 	ifElse(%269, %270, %271, %272)
 
 block %271:
-	unconditionalBranch(%272, %x5Fbflag2)
+	unconditionalBranch(%272, 0 : Int, 0 : Float)
 
 block %270:
-	unconditionalBranch(%272, false)
+	[primalInstDecoration]
+	let  %273	: Float	= mul(%t3, %t3)
+	unconditionalBranch(%272, 1 : Int, %273)
 
 block %272(
 		[primalInstDecoration]
+		param %274	: Int,
+		[primalInstDecoration]
+		param %275	: Float):
+	unconditionalBranch(%276)
+
+block %276:
+	[primalInstDecoration]
+	let  %277	: Bool	= cmpNE(%274, 1 : Int)
+	ifElse(%277, %278, %279, %280)
+
+block %279:
+	unconditionalBranch(%280, %x5Fbflag2)
+
+block %278:
+	unconditionalBranch(%280, false)
+
+block %280(
+		[primalInstDecoration]
 		[nameHint("_bflag")]
 		param %x5Fbflag4	: Bool):
-	unconditionalBranch(%273)
+	unconditionalBranch(%281)
 
-block %273:
-	ifElse(%x5Fbflag4, %274, %275, %276)
+block %281:
+	ifElse(%x5Fbflag4, %282, %283, %284)
 
-block %275:
-	unconditionalBranch(%276, %t2, %i2)
+block %283:
+	unconditionalBranch(%284, %t3, %i3)
 
-block %274:
+block %282:
 	[primalInstDecoration]
-	let  %277	: Int	= add(%i2, 1 : Int)
-	unconditionalBranch(%276, %267, %277)
+	let  %285	: Int	= add(%i3, 1 : Int)
+	unconditionalBranch(%284, %275, %285)
 
-block %276(
+block %284(
 		[primalInstDecoration]
 		[nameHint("t")]
-		param %t3	: Float,
+		param %t4	: Float,
 		[primalInstDecoration]
 		[nameHint("i")]
-		param %i3	: Int):
+		param %i4	: Int):
 	[primalInstDecoration]
-	let  %278	: Int	= add(%x5Fpc1, 1 : Int)
-	unconditionalBranch(%172, %x5Fbflag4, %t3, %i3, %278)
+	let  %286	: Int	= add(%x5Fpc1, 1 : Int)
+	unconditionalBranch(%180, %x5Fbflag4, %t4, %i4, %286)
 }
 [backwardDifferentiable]
-func %157	: Func(Array(Float, 5 : Int), Array(Float, 5 : Int), Array(Float, 5 : Int))
+func %165	: Func(Array(Float, 5 : Int), Array(Float, 5 : Int), Array(Float, 5 : Int))
 {
-block %279(
-		param %280	: Array(Float, 5 : Int),
-		param %281	: Array(Float, 5 : Int)):
-	let  %282	: Ptr(Array(Float, 5 : Int))	= var
-	loop(%283, %284, %283, 0 : Int)
+block %287(
+		param %288	: Array(Float, 5 : Int),
+		param %289	: Array(Float, 5 : Int)):
+	let  %290	: Ptr(Array(Float, 5 : Int))	= var
+	loop(%291, %292, %291, 0 : Int)
 
-block %283(
-		param %285	: Int):
-	let  %286	: Bool	= cmpLT(%285, 5 : Int)
-	ifElse(%286, %287, %288, %288)
+block %291(
+		param %293	: Int):
+	let  %294	: Bool	= cmpLT(%293, 5 : Int)
+	ifElse(%294, %295, %296, %296)
 
-block %287:
-	let  %289	: Float	= getElement(%280, %285)
-	let  %290	: Float	= getElement(%281, %285)
-	let  %291	: Float	= add(%289, %290)
-	let  %292	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%282, %285)
-	store(%292, %291)
-	unconditionalBranch(%293)
+block %295:
+	let  %297	: Float	= getElement(%288, %293)
+	let  %298	: Float	= getElement(%289, %293)
+	let  %299	: Float	= add(%297, %298)
+	let  %300	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%290, %293)
+	store(%300, %299)
+	unconditionalBranch(%301)
 
-block %288:
-	unconditionalBranch(%284)
-
-block %284:
-	let  %294	: Array(Float, 5 : Int)	= load(%282)
-	return_val(%294)
-
-block %293:
-	let  %295	: Int	= add(%285, 1 : Int)
-	unconditionalBranch(%283, %295)
-}
-func %148	: Func(Array(Float, 5 : Int))
-{
 block %296:
-	let  %297	: Array(Float, 5 : Int)	= makeArrayFromElement(0 : Float)
-	return_val(%297)
+	unconditionalBranch(%292)
+
+block %292:
+	let  %302	: Array(Float, 5 : Int)	= load(%290)
+	return_val(%302)
+
+block %301:
+	let  %303	: Int	= add(%293, 1 : Int)
+	unconditionalBranch(%291, %303)
 }
-witness_table %161	: witness_table_t(%IDifferentiable)(Array(Float, 5 : Int))
+func %156	: Func(Array(Float, 5 : Int))
+{
+block %304:
+	let  %305	: Array(Float, 5 : Int)	= makeArrayFromElement(0 : Float)
+	return_val(%305)
+}
+witness_table %169	: witness_table_t(%IDifferentiable)(Array(Float, 5 : Int))
 {
 	witness_table_entry(%18,Array(Float, 5 : Int))
 
-	witness_table_entry(%20,%161)
+	witness_table_entry(%20,%169)
 
-	witness_table_entry(%24,%157)
+	witness_table_entry(%24,%165)
 
-	witness_table_entry(%22,%148)
+	witness_table_entry(%22,%156)
 
 }
 
@@ -8578,16 +8653,47 @@ let  %10	: Void	= typeLayout
 [keepAlive]
 global_hashed_string_literals("HLSL supports only float and half type textures", "Unsupported \'Load\' of \'texture cube array\' for \'metal\' target", "Unsupported \'Load\' of \'texture\' for \'metal\' target", "Unsupported \'Store\' of \'texture cube array\' for \'metal\' target", "Unable to use float with Atomicadd", "Atomic must be applied to a scalar texture or non-texture", "__metalImageInterlocked only allows \'int\'/\'uint\' textures", "__metalImageInterlocked implementation only allows \'uint\' coordinates", "Atomic must be applied to scalar texture or non-texture", "Unable to use float with Atomicand", "Unable to use float with Atomicexchange", "Metal atomic texture operations only allow \'int\'/\'uint\' textures", "Unable to use float with Atomicmax", "Unable to use float with Atomicmin", "Unable to use float with Atomicor", "Unable to use float with Atomicxor", "GL_EXT_shader_atomic_int64", "float atomic texture operations are disallowed with Metal target\'s", "\'float\' atomic texture operations are disallowed with Metal target\'s", "GL_EXT_shader_subgroup_extended_types_float16")
 let  %13	: _	= key
+[readNone]
+[backwardDifferentiable]
+[export("_SR15reverse_2Dxloop16test_simple_loopp1pi_ffb")]
+[nameHint("test_simple_loop")]
+func %testx5Fsimplex5Floop	: Func(Float, Float)
+{
+block %17(
+		[nameHint("y")]
+		param %y	: Float):
+	[loopMaxIters(3 : Int)]
+	loop(%18, %19, %20, %y, 0 : Int)
+
+block %18(
+		[nameHint("t")]
+		param %t	: Float,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %21	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%21, %22, %19, %22)
+
+block %19:
+	return_val(%t)
+
+block %22:
+	let  %23	: Float	= mul(%t, %t)
+	unconditionalBranch(%20)
+
+block %20:
+	let  %24	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%18, %23, %24)
+}
 [export("_ST4core17IBufferDataLayout")]
 [nameHint("IBufferDataLayout")]
 let  %IBufferDataLayout	: Type	= interface
 [export("_SW4core17DefaultDataLayout4core17IBufferDataLayout")]
-witness_table %17	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
+witness_table %25	: witness_table_t(%IBufferDataLayout)(DefaultLayout);
 
 [nameHint("outputBuffer")]
 [export("_SVR15reverse_2Dxloop12outputBuffer")]
 [layout(%1)]
-let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %17)	= global_param
+let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %25)	= global_param
 [keepAlive]
 [entryPoint(6 : Int, "computeMain", "reverse-loop")]
 [numThreads(1 : Int, 1 : Int, 1 : Int)]
@@ -8596,29 +8702,29 @@ let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %17)	= global_para
 [layout(%7)]
 func %computeMain	: Func(Void, Vec(UInt, 3 : Int))
 {
-block %18(
+block %26(
 		[layout(%14)]
 		[nameHint("dispatchThreadID")]
 		[semantic("SV_DispatchThreadID", 0 : Int)]
 		param %dispatchThreadID	: Vec(UInt, 3 : Int)):
 	[nameHint("dpa")]
 	let  %dpa	: Ptr(%DiffPairx5Ffloat)	= var
-	let  %19	: %DiffPairx5Ffloat	= makeStruct(1 : Float, 0 : Float)
-	store(%dpa, %19)
+	let  %27	: %DiffPairx5Ffloat	= makeStruct(1 : Float, 0 : Float)
+	store(%dpa, %27)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa, 1 : Float)
-	let  %20	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
-	let  %21	: %DiffPairx5Ffloat	= load(%dpa)
-	let  %22	: Float	= get_field(%21, %differential)
-	store(%20, %22)
+	let  %28	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
+	let  %29	: %DiffPairx5Ffloat	= load(%dpa)
+	let  %30	: Float	= get_field(%29, %differential)
+	store(%28, %30)
 	[nameHint("dpa")]
 	let  %dpa1	: Ptr(%DiffPairx5Ffloat)	= var
-	let  %23	: %DiffPairx5Ffloat	= makeStruct(0.4 : Float, 0 : Float)
-	store(%dpa1, %23)
+	let  %31	: %DiffPairx5Ffloat	= makeStruct(0.4 : Float, 0 : Float)
+	store(%dpa1, %31)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa1, 1 : Float)
-	let  %24	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
-	let  %25	: %DiffPairx5Ffloat	= load(%dpa1)
-	let  %26	: Float	= get_field(%25, %differential)
-	store(%24, %26)
+	let  %32	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
+	let  %33	: %DiffPairx5Ffloat	= load(%dpa1)
+	let  %34	: Float	= get_field(%33, %differential)
+	store(%32, %34)
 	return_val(void_constant)
 }
 [readNone]
@@ -8627,15 +8733,15 @@ block %18(
 [nameHint("s_bwd_test_simple_loop")]
 func %sx5Fbwdx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(%DiffPairx5Ffloat), Float)
 {
-block %27(
-		param %28	: InOut(%DiffPairx5Ffloat),
-		param %29	: Float):
-	let  %30	: %DiffPairx5Ffloat	= load(%28)
-	let  %31	: Float	= get_field(%30, %primal)
-	let  %32	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
-	let  %33	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%31, %32)
-	let  %34	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%32)
-	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%28, %29, %34)
+block %35(
+		param %36	: InOut(%DiffPairx5Ffloat),
+		param %37	: Float):
+	let  %38	: %DiffPairx5Ffloat	= load(%36)
+	let  %39	: Float	= get_field(%38, %primal)
+	let  %40	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
+	let  %41	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%39, %40)
+	let  %42	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%40)
+	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%36, %37, %42)
 	return_val(void_constant)
 }
 [readNone]
@@ -8644,102 +8750,102 @@ block %27(
 [backwardDifferentiable]
 func %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop	: Func(Float, Float, Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates))
 {
-block %35(
+block %43(
 		[nameHint("dpy")]
 		param %dpy	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx	: Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)):
-	let  %36	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	let  %37	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= makeStruct(%36, 0 : Int)
-	store(%x5Fsx5Fdiffx5Fctx, %37)
-	let  %38	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %39)
-	let  %40	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	store(%38, %40)
-	let  %41	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %42)
-	store(%41, 0 : Int)
+	let  %44	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	let  %45	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= makeStruct(%44, 0 : Int)
+	store(%x5Fsx5Fdiffx5Fctx, %45)
+	let  %46	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %47)
+	let  %48	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	store(%46, %48)
+	let  %49	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %50)
+	store(%49, 0 : Int)
 	[loopMaxIters(4 : Int)]
-	loop(%43, %44, %43, true, %dpy, 0 : Int, 0 : Int)
+	loop(%51, %52, %51, true, %dpy, 0 : Int, 0 : Int)
 
-block %43(
+block %51(
 		[nameHint("_bflag")]
 		param %x5Fbflag	: Bool,
 		[nameHint("t")]
-		param %t	: Float,
+		param %t1	: Float,
 		[nameHint("i")]
-		param %i	: Int,
+		param %i1	: Int,
 		[nameHint("_pc")]
 		param %x5Fpc	: Int):
-	let  %45	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%38, %x5Fpc)
-	store(%45, %t)
-	store(%41, %x5Fpc)
-	ifElse(%x5Fbflag, %46, %47, %46)
+	let  %53	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%46, %x5Fpc)
+	store(%53, %t1)
+	store(%49, %x5Fpc)
+	ifElse(%x5Fbflag, %54, %55, %54)
 
-block %47:
-	unconditionalBranch(%44)
+block %55:
+	unconditionalBranch(%52)
 
-block %44:
-	return_val(%t)
+block %52:
+	return_val(%t1)
 
-block %46:
-	unconditionalBranch(%48)
-
-block %48:
-	let  %49	: Bool	= cmpLT(%i, 3 : Int)
-	ifElse(%49, %50, %51, %52)
-
-block %51:
-	unconditionalBranch(%52, 0 : Int, 0 : Float)
-
-block %50:
-	let  %53	: Float	= mul(%t, %t)
-	unconditionalBranch(%52, 1 : Int, %53)
-
-block %52(
-		param %54	: Int,
-		param %55	: Float):
+block %54:
 	unconditionalBranch(%56)
 
 block %56:
-	let  %57	: Bool	= cmpNE(%54, 1 : Int)
+	let  %57	: Bool	= cmpLT(%i1, 3 : Int)
 	ifElse(%57, %58, %59, %60)
 
 block %59:
-	unconditionalBranch(%60, %x5Fbflag)
+	unconditionalBranch(%60, 0 : Int, 0 : Float)
 
 block %58:
-	unconditionalBranch(%60, false)
+	let  %61	: Float	= mul(%t1, %t1)
+	unconditionalBranch(%60, 1 : Int, %61)
 
 block %60(
+		param %62	: Int,
+		param %63	: Float):
+	unconditionalBranch(%64)
+
+block %64:
+	let  %65	: Bool	= cmpNE(%62, 1 : Int)
+	ifElse(%65, %66, %67, %68)
+
+block %67:
+	unconditionalBranch(%68, %x5Fbflag)
+
+block %66:
+	unconditionalBranch(%68, false)
+
+block %68(
 		[nameHint("_bflag")]
 		param %x5Fbflag1	: Bool):
-	unconditionalBranch(%61)
+	unconditionalBranch(%69)
 
-block %61:
-	ifElse(%x5Fbflag1, %62, %63, %64)
+block %69:
+	ifElse(%x5Fbflag1, %70, %71, %72)
 
-block %63:
-	unconditionalBranch(%64, %t, %i)
+block %71:
+	unconditionalBranch(%72, %t1, %i1)
 
-block %62:
-	let  %65	: Int	= add(%i, 1 : Int)
-	unconditionalBranch(%64, %55, %65)
+block %70:
+	let  %73	: Int	= add(%i1, 1 : Int)
+	unconditionalBranch(%72, %63, %73)
 
-block %64(
+block %72(
 		[nameHint("t")]
-		param %t1	: Float,
+		param %t2	: Float,
 		[nameHint("i")]
-		param %i1	: Int):
-	let  %66	: Int	= add(%x5Fpc, 1 : Int)
-	unconditionalBranch(%43, %x5Fbflag1, %t1, %i1, %66)
+		param %i2	: Int):
+	let  %74	: Int	= add(%x5Fpc, 1 : Int)
+	unconditionalBranch(%51, %x5Fbflag1, %t2, %i2, %74)
 }
-let  %39	: _	= key
-let  %42	: _	= key
+let  %47	: _	= key
+let  %50	: _	= key
+[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
-	field(%39, Array(Float, 5 : Int))
-	field(%42, Int)
+	field(%47, Array(Float, 5 : Int))
+	field(%50, Int)
 }
 
 [readNone]
@@ -8748,172 +8854,172 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 [nameHint("s_bwd_prop_test_simple_loop")]
 func %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(%DiffPairx5Ffloat), Float, %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
 {
-block %67(
+block %75(
 		[nameHint("dpy")]
 		param %dpy1	: InOut(%DiffPairx5Ffloat),
 		[nameHint("_s_dOut")]
 		param %x5Fsx5FdOut	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx1	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates):
-	let  %68	: %DiffPairx5Ffloat	= load(%dpy1)
-	let  %69	: Float	= get_field(%68, %primal)
+	let  %76	: %DiffPairx5Ffloat	= load(%dpy1)
+	let  %77	: Float	= get_field(%76, %primal)
 	[loopMaxIters(4 : Int)]
-	loop(%70, %71, %70, true, %69, 0 : Int, 0 : Int)
+	loop(%78, %79, %78, true, %77, 0 : Int, 0 : Int)
 
-block %70(
+block %78(
 		[nameHint("_bflag")]
 		param %x5Fbflag2	: Bool,
 		[nameHint("t")]
-		param %t2	: Float,
+		param %t3	: Float,
 		[nameHint("i")]
-		param %i2	: Int,
+		param %i3	: Int,
 		[nameHint("_pc")]
 		param %x5Fpc1	: Int):
-	let  %72	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %39)
-	let  %73	: Ptr(Array(Float, 5 : Int))	= var
-	store(%73, %72)
-	let  %74	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%73, %x5Fpc1)
-	store(%74, %t2)
-	ifElse(%x5Fbflag2, %75, %76, %75)
+	let  %80	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %47)
+	let  %81	: Ptr(Array(Float, 5 : Int))	= var
+	store(%81, %80)
+	let  %82	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%81, %x5Fpc1)
+	store(%82, %t3)
+	ifElse(%x5Fbflag2, %83, %84, %83)
 
-block %76:
-	unconditionalBranch(%71)
+block %84:
+	unconditionalBranch(%79)
 
-block %71:
-	unconditionalBranch(%77)
-
-block %77:
-	let  %78	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %42)
-	let  %79	: Int	= sub(%78, 1 : Int)
-	[loopMaxIters(4 : Int)]
-	loop(%80, %81, %82, %79, %x5Fsx5FdOut)
-
-block %80(
-		[nameHint("_dc")]
-		param %x5Fdc	: Int,
-		param %83	: Float):
-	let  %84	: Bool	= cmpGE(%x5Fdc, 0 : Int)
-	ifElse(%84, %85, %86, %85)
-
-block %86:
-	unconditionalBranch(%81)
-
-block %81:
-	let  %87	: %DiffPairx5Ffloat	= load(%dpy1)
-	let  %88	: Float	= get_field(%87, %primal)
-	let  %89	: %DiffPairx5Ffloat	= makeStruct(%88, %83)
-	store(%dpy1, %89)
-	return_val(void_constant)
+block %79:
+	unconditionalBranch(%85)
 
 block %85:
-	unconditionalBranch(%90)
+	let  %86	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %50)
+	let  %87	: Int	= sub(%86, 1 : Int)
+	[loopMaxIters(4 : Int)]
+	loop(%88, %89, %90, %87, %x5Fsx5FdOut)
 
-block %90:
-	let  %91	: Bool	= cmpLT(%x5Fdc, 3 : Int)
-	ifElse(%91, %92, %93, %94)
+block %88(
+		[nameHint("_dc")]
+		param %x5Fdc	: Int,
+		param %91	: Float):
+	let  %92	: Bool	= cmpGE(%x5Fdc, 0 : Int)
+	ifElse(%92, %93, %94, %93)
+
+block %94:
+	unconditionalBranch(%89)
+
+block %89:
+	let  %95	: %DiffPairx5Ffloat	= load(%dpy1)
+	let  %96	: Float	= get_field(%95, %primal)
+	let  %97	: %DiffPairx5Ffloat	= makeStruct(%96, %91)
+	store(%dpy1, %97)
+	return_val(void_constant)
 
 block %93:
-	unconditionalBranch(%94, 0 : Int)
+	unconditionalBranch(%98)
 
-block %92:
-	unconditionalBranch(%94, 1 : Int)
+block %98:
+	let  %99	: Bool	= cmpLT(%x5Fdc, 3 : Int)
+	ifElse(%99, %100, %101, %102)
 
-block %94(
-		param %95	: Int):
-	unconditionalBranch(%96)
-
-block %96:
-	let  %97	: Bool	= cmpNE(%95, 1 : Int)
-	let  %98	: Bool	= not(%97)
-	ifElse(%98, %99, %100, %101)
+block %101:
+	unconditionalBranch(%102, 0 : Int)
 
 block %100:
-	unconditionalBranch(%101, 0 : Float, %83)
+	unconditionalBranch(%102, 1 : Int)
 
-block %99:
-	unconditionalBranch(%101, %83, 0 : Float)
-
-block %101(
-		param %102	: Float,
-		param %103	: Float):
+block %102(
+		param %103	: Int):
 	unconditionalBranch(%104)
 
 block %104:
-	ifElse(%91, %105, %106, %107)
+	let  %105	: Bool	= cmpNE(%103, 1 : Int)
+	let  %106	: Bool	= not(%105)
+	ifElse(%106, %107, %108, %109)
 
-block %106:
-	unconditionalBranch(%107, %103)
+block %108:
+	unconditionalBranch(%109, 0 : Float, %91)
 
-block %105:
-	let  %108	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %39)
-	let  %109	: Float	= getElement(%108, %x5Fdc)
-	let  %110	: Float	= mul(%109, %102)
-	let  %111	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %39)
-	let  %112	: Float	= getElement(%111, %x5Fdc)
-	let  %113	: Float	= mul(%112, %102)
-	let  %114	: Float	= add(%110, %113)
-	let  %115	: Float	= add(%114, %103)
-	unconditionalBranch(%107, %115)
+block %107:
+	unconditionalBranch(%109, %91, 0 : Float)
 
-block %107(
-		param %116	: Float):
-	unconditionalBranch(%82)
+block %109(
+		param %110	: Float,
+		param %111	: Float):
+	unconditionalBranch(%112)
 
-block %82:
-	let  %117	: Int	= sub(%x5Fdc, 1 : Int)
-	unconditionalBranch(%80, %117, %116)
+block %112:
+	ifElse(%99, %113, %114, %115)
 
-block %75:
-	unconditionalBranch(%118)
+block %114:
+	unconditionalBranch(%115, %111)
 
-block %118:
-	let  %119	: Bool	= cmpLT(%i2, 3 : Int)
-	ifElse(%119, %120, %121, %122)
+block %113:
+	let  %116	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %47)
+	let  %117	: Float	= getElement(%116, %x5Fdc)
+	let  %118	: Float	= mul(%117, %110)
+	let  %119	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %47)
+	let  %120	: Float	= getElement(%119, %x5Fdc)
+	let  %121	: Float	= mul(%120, %110)
+	let  %122	: Float	= add(%118, %121)
+	let  %123	: Float	= add(%122, %111)
+	unconditionalBranch(%115, %123)
 
-block %121:
-	unconditionalBranch(%122, 0 : Int, 0 : Float)
+block %115(
+		param %124	: Float):
+	unconditionalBranch(%90)
 
-block %120:
-	let  %123	: Float	= mul(%t2, %t2)
-	unconditionalBranch(%122, 1 : Int, %123)
+block %90:
+	let  %125	: Int	= sub(%x5Fdc, 1 : Int)
+	unconditionalBranch(%88, %125, %124)
 
-block %122(
-		param %124	: Int,
-		param %125	: Float):
+block %83:
 	unconditionalBranch(%126)
 
 block %126:
-	let  %127	: Bool	= cmpNE(%124, 1 : Int)
+	let  %127	: Bool	= cmpLT(%i3, 3 : Int)
 	ifElse(%127, %128, %129, %130)
 
 block %129:
-	unconditionalBranch(%130, %x5Fbflag2)
+	unconditionalBranch(%130, 0 : Int, 0 : Float)
 
 block %128:
-	unconditionalBranch(%130, false)
+	let  %131	: Float	= mul(%t3, %t3)
+	unconditionalBranch(%130, 1 : Int, %131)
 
 block %130(
+		param %132	: Int,
+		param %133	: Float):
+	unconditionalBranch(%134)
+
+block %134:
+	let  %135	: Bool	= cmpNE(%132, 1 : Int)
+	ifElse(%135, %136, %137, %138)
+
+block %137:
+	unconditionalBranch(%138, %x5Fbflag2)
+
+block %136:
+	unconditionalBranch(%138, false)
+
+block %138(
 		[nameHint("_bflag")]
 		param %x5Fbflag3	: Bool):
-	unconditionalBranch(%131)
+	unconditionalBranch(%139)
 
-block %131:
-	ifElse(%x5Fbflag3, %132, %133, %134)
+block %139:
+	ifElse(%x5Fbflag3, %140, %141, %142)
 
-block %133:
-	unconditionalBranch(%134, %t2, %i2)
+block %141:
+	unconditionalBranch(%142, %t3, %i3)
 
-block %132:
-	let  %135	: Int	= add(%i2, 1 : Int)
-	unconditionalBranch(%134, %125, %135)
+block %140:
+	let  %143	: Int	= add(%i3, 1 : Int)
+	unconditionalBranch(%142, %133, %143)
 
-block %134(
+block %142(
 		[nameHint("t")]
-		param %t3	: Float,
+		param %t4	: Float,
 		[nameHint("i")]
-		param %i3	: Int):
-	let  %136	: Int	= add(%x5Fpc1, 1 : Int)
-	unconditionalBranch(%70, %x5Fbflag3, %t3, %i3, %136)
+		param %i4	: Int):
+	let  %144	: Int	= add(%x5Fpc1, 1 : Int)
+	unconditionalBranch(%78, %x5Fbflag3, %t4, %i4, %144)
 }
 [nameHint("primal")]
 let  %primal	: _	= key
@@ -8948,9 +9054,40 @@ let  %11	: Void	= typeLayout
 [keepAlive]
 global_hashed_string_literals("HLSL supports only float and half type textures", "Unsupported \'Load\' of \'texture cube array\' for \'metal\' target", "Unsupported \'Load\' of \'texture\' for \'metal\' target", "Unsupported \'Store\' of \'texture cube array\' for \'metal\' target", "Unable to use float with Atomicadd", "Atomic must be applied to a scalar texture or non-texture", "__metalImageInterlocked only allows \'int\'/\'uint\' textures", "__metalImageInterlocked implementation only allows \'uint\' coordinates", "Atomic must be applied to scalar texture or non-texture", "Unable to use float with Atomicand", "Unable to use float with Atomicexchange", "Metal atomic texture operations only allow \'int\'/\'uint\' textures", "Unable to use float with Atomicmax", "Unable to use float with Atomicmin", "Unable to use float with Atomicor", "Unable to use float with Atomicxor", "GL_EXT_shader_atomic_int64", "float atomic texture operations are disallowed with Metal target\'s", "\'float\' atomic texture operations are disallowed with Metal target\'s", "GL_EXT_shader_subgroup_extended_types_float16")
 let  %14	: _	= key
+[readNone]
+[backwardDifferentiable]
+[export("_SR15reverse_2Dxloop16test_simple_loopp1pi_ffb")]
+[nameHint("test_simple_loop")]
+func %testx5Fsimplex5Floop	: Func(Float, Float)
+{
+block %18(
+		[nameHint("y")]
+		param %y	: Float):
+	[loopMaxIters(3 : Int)]
+	loop(%19, %20, %21, %y, 0 : Int)
+
+block %19(
+		[nameHint("t")]
+		param %t	: Float,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %22	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%22, %23, %20, %23)
+
+block %20:
+	return_val(%t)
+
+block %23:
+	let  %24	: Float	= mul(%t, %t)
+	unconditionalBranch(%21)
+
+block %21:
+	let  %25	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%19, %24, %25)
+}
 [SequentialIDDecoration(0 : UInt)]
 [export("_SW4core17DefaultDataLayout4core17IBufferDataLayout")]
-witness_table %18	: witness_table_t(0 : Int)(DefaultLayout);
+witness_table %26	: witness_table_t(0 : Int)(DefaultLayout);
 
 [nameHint("outputBuffer")]
 [export("_SVR15reverse_2Dxloop12outputBuffer")]
@@ -8964,29 +9101,29 @@ let  %outputBuffer	: RWStructuredBuffer(Float, DefaultLayout, %7)	= global_param
 [layout(%8)]
 func %computeMain	: Func(Void, Vec(UInt, 3 : Int))
 {
-block %19(
+block %27(
 		[layout(%15)]
 		[nameHint("dispatchThreadID")]
 		[semantic("SV_DispatchThreadID", 0 : Int)]
 		param %dispatchThreadID	: Vec(UInt, 3 : Int)):
 	[nameHint("dpa")]
 	let  %dpa	: Ptr(%DiffPairx5Ffloat)	= var
-	let  %20	: %DiffPairx5Ffloat	= makeStruct(1 : Float, 0 : Float)
-	store(%dpa, %20)
+	let  %28	: %DiffPairx5Ffloat	= makeStruct(1 : Float, 0 : Float)
+	store(%dpa, %28)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa, 1 : Float)
-	let  %21	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
-	let  %22	: %DiffPairx5Ffloat	= load(%dpa)
-	let  %23	: Float	= get_field(%22, %differential)
-	store(%21, %23)
+	let  %29	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 0 : Int)
+	let  %30	: %DiffPairx5Ffloat	= load(%dpa)
+	let  %31	: Float	= get_field(%30, %differential)
+	store(%29, %31)
 	[nameHint("dpa")]
 	let  %dpa1	: Ptr(%DiffPairx5Ffloat)	= var
-	let  %24	: %DiffPairx5Ffloat	= makeStruct(0.4 : Float, 0 : Float)
-	store(%dpa1, %24)
+	let  %32	: %DiffPairx5Ffloat	= makeStruct(0.4 : Float, 0 : Float)
+	store(%dpa1, %32)
 	call %sx5Fbwdx5Ftestx5Fsimplex5Floop(%dpa1, 1 : Float)
-	let  %25	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
-	let  %26	: %DiffPairx5Ffloat	= load(%dpa1)
-	let  %27	: Float	= get_field(%26, %differential)
-	store(%25, %27)
+	let  %33	: Ptr(Float)	= rwstructuredBufferGetElementPtr(%outputBuffer, 1 : Int)
+	let  %34	: %DiffPairx5Ffloat	= load(%dpa1)
+	let  %35	: Float	= get_field(%34, %differential)
+	store(%33, %35)
 	return_val(void_constant)
 }
 [readNone]
@@ -8995,15 +9132,15 @@ block %19(
 [nameHint("s_bwd_test_simple_loop")]
 func %sx5Fbwdx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(%DiffPairx5Ffloat), Float)
 {
-block %28(
-		param %29	: InOut(%DiffPairx5Ffloat),
-		param %30	: Float):
-	let  %31	: %DiffPairx5Ffloat	= load(%29)
-	let  %32	: Float	= get_field(%31, %primal)
-	let  %33	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
-	let  %34	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%32, %33)
-	let  %35	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%33)
-	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%29, %30, %35)
+block %36(
+		param %37	: InOut(%DiffPairx5Ffloat),
+		param %38	: Float):
+	let  %39	: %DiffPairx5Ffloat	= load(%37)
+	let  %40	: Float	= get_field(%39, %primal)
+	let  %41	: Ptr(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)	= var
+	let  %42	: Float	= call %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop(%40, %41)
+	let  %43	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= load(%41)
+	call %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop(%37, %38, %43)
 	return_val(void_constant)
 }
 [readNone]
@@ -9012,102 +9149,102 @@ block %28(
 [backwardDifferentiable]
 func %sx5Fprimalx5Fctxx5Ftestx5Fsimplex5Floop	: Func(Float, Float, Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates))
 {
-block %36(
+block %44(
 		[nameHint("dpy")]
 		param %dpy	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx	: Out(%sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)):
-	let  %37	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	let  %38	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= makeStruct(%37, 0 : Int)
-	store(%x5Fsx5Fdiffx5Fctx, %38)
-	let  %39	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %40)
-	let  %41	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
-	store(%39, %41)
-	let  %42	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %43)
-	store(%42, 0 : Int)
+	let  %45	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	let  %46	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	= makeStruct(%45, 0 : Int)
+	store(%x5Fsx5Fdiffx5Fctx, %46)
+	let  %47	: Ptr(Array(Float, 5 : Int))	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %48)
+	let  %49	: Array(Float, 5 : Int)	= makeArray(0 : Float, 0 : Float, 0 : Float, 0 : Float, 0 : Float)
+	store(%47, %49)
+	let  %50	: Ptr(Int)	= get_field_addr(%x5Fsx5Fdiffx5Fctx, %51)
+	store(%50, 0 : Int)
 	[loopMaxIters(4 : Int)]
-	loop(%44, %45, %44, true, %dpy, 0 : Int, 0 : Int)
+	loop(%52, %53, %52, true, %dpy, 0 : Int, 0 : Int)
 
-block %44(
+block %52(
 		[nameHint("_bflag")]
 		param %x5Fbflag	: Bool,
 		[nameHint("t")]
-		param %t	: Float,
+		param %t1	: Float,
 		[nameHint("i")]
-		param %i	: Int,
+		param %i1	: Int,
 		[nameHint("_pc")]
 		param %x5Fpc	: Int):
-	let  %46	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%39, %x5Fpc)
-	store(%46, %t)
-	store(%42, %x5Fpc)
-	ifElse(%x5Fbflag, %47, %48, %47)
+	let  %54	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%47, %x5Fpc)
+	store(%54, %t1)
+	store(%50, %x5Fpc)
+	ifElse(%x5Fbflag, %55, %56, %55)
 
-block %48:
-	unconditionalBranch(%45)
+block %56:
+	unconditionalBranch(%53)
 
-block %45:
-	return_val(%t)
+block %53:
+	return_val(%t1)
 
-block %47:
-	unconditionalBranch(%49)
-
-block %49:
-	let  %50	: Bool	= cmpLT(%i, 3 : Int)
-	ifElse(%50, %51, %52, %53)
-
-block %52:
-	unconditionalBranch(%53, 0 : Int, 0 : Float)
-
-block %51:
-	let  %54	: Float	= mul(%t, %t)
-	unconditionalBranch(%53, 1 : Int, %54)
-
-block %53(
-		param %55	: Int,
-		param %56	: Float):
+block %55:
 	unconditionalBranch(%57)
 
 block %57:
-	let  %58	: Bool	= cmpNE(%55, 1 : Int)
+	let  %58	: Bool	= cmpLT(%i1, 3 : Int)
 	ifElse(%58, %59, %60, %61)
 
 block %60:
-	unconditionalBranch(%61, %x5Fbflag)
+	unconditionalBranch(%61, 0 : Int, 0 : Float)
 
 block %59:
-	unconditionalBranch(%61, false)
+	let  %62	: Float	= mul(%t1, %t1)
+	unconditionalBranch(%61, 1 : Int, %62)
 
 block %61(
+		param %63	: Int,
+		param %64	: Float):
+	unconditionalBranch(%65)
+
+block %65:
+	let  %66	: Bool	= cmpNE(%63, 1 : Int)
+	ifElse(%66, %67, %68, %69)
+
+block %68:
+	unconditionalBranch(%69, %x5Fbflag)
+
+block %67:
+	unconditionalBranch(%69, false)
+
+block %69(
 		[nameHint("_bflag")]
 		param %x5Fbflag1	: Bool):
-	unconditionalBranch(%62)
+	unconditionalBranch(%70)
 
-block %62:
-	ifElse(%x5Fbflag1, %63, %64, %65)
+block %70:
+	ifElse(%x5Fbflag1, %71, %72, %73)
 
-block %64:
-	unconditionalBranch(%65, %t, %i)
+block %72:
+	unconditionalBranch(%73, %t1, %i1)
 
-block %63:
-	let  %66	: Int	= add(%i, 1 : Int)
-	unconditionalBranch(%65, %56, %66)
+block %71:
+	let  %74	: Int	= add(%i1, 1 : Int)
+	unconditionalBranch(%73, %64, %74)
 
-block %65(
+block %73(
 		[nameHint("t")]
-		param %t1	: Float,
+		param %t2	: Float,
 		[nameHint("i")]
-		param %i1	: Int):
-	let  %67	: Int	= add(%x5Fpc, 1 : Int)
-	unconditionalBranch(%44, %x5Fbflag1, %t1, %i1, %67)
+		param %i2	: Int):
+	let  %75	: Int	= add(%x5Fpc, 1 : Int)
+	unconditionalBranch(%52, %x5Fbflag1, %t2, %i2, %75)
 }
-let  %40	: _	= key
-let  %43	: _	= key
+let  %48	: _	= key
+let  %51	: _	= key
+[CheckpointIntermediateDecoration(%testx5Fsimplex5Floop)]
 [nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
 struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 {
-	field(%40, Array(Float, 5 : Int))
-	field(%43, Int)
+	field(%48, Array(Float, 5 : Int))
+	field(%51, Int)
 }
 
 [readNone]
@@ -9116,195 +9253,187 @@ struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
 [nameHint("s_bwd_prop_test_simple_loop")]
 func %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floop	: Func(Void, InOut(%DiffPairx5Ffloat), Float, %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates)
 {
-block %68(
+block %76(
 		[nameHint("dpy")]
 		param %dpy1	: InOut(%DiffPairx5Ffloat),
 		[nameHint("_s_dOut")]
 		param %x5Fsx5FdOut	: Float,
 		[nameHint("_s_diff_ctx")]
 		param %x5Fsx5Fdiffx5Fctx1	: %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates):
-	let  %69	: %DiffPairx5Ffloat	= load(%dpy1)
-	let  %70	: Float	= get_field(%69, %primal)
+	let  %77	: %DiffPairx5Ffloat	= load(%dpy1)
+	let  %78	: Float	= get_field(%77, %primal)
 	[loopMaxIters(4 : Int)]
-	loop(%71, %72, %71, true, %70, 0 : Int, 0 : Int)
+	loop(%79, %80, %79, true, %78, 0 : Int, 0 : Int)
 
-block %71(
+block %79(
 		[nameHint("_bflag")]
 		param %x5Fbflag2	: Bool,
 		[nameHint("t")]
-		param %t2	: Float,
+		param %t3	: Float,
 		[nameHint("i")]
-		param %i2	: Int,
+		param %i3	: Int,
 		[nameHint("_pc")]
 		param %x5Fpc1	: Int):
-	let  %73	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %40)
-	let  %74	: Ptr(Array(Float, 5 : Int))	= var
-	store(%74, %73)
-	let  %75	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%74, %x5Fpc1)
-	store(%75, %t2)
-	ifElse(%x5Fbflag2, %76, %77, %76)
+	let  %81	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %48)
+	let  %82	: Ptr(Array(Float, 5 : Int))	= var
+	store(%82, %81)
+	let  %83	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%82, %x5Fpc1)
+	store(%83, %t3)
+	ifElse(%x5Fbflag2, %84, %85, %84)
 
-block %77:
-	unconditionalBranch(%72)
+block %85:
+	unconditionalBranch(%80)
 
-block %72:
-	unconditionalBranch(%78)
-
-block %78:
-	let  %79	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %43)
-	let  %80	: Int	= sub(%79, 1 : Int)
-	[loopMaxIters(4 : Int)]
-	loop(%81, %82, %83, %80, %x5Fsx5FdOut)
-
-block %81(
-		[nameHint("_dc")]
-		param %x5Fdc	: Int,
-		param %84	: Float):
-	let  %85	: Bool	= cmpGE(%x5Fdc, 0 : Int)
-	ifElse(%85, %86, %87, %86)
-
-block %87:
-	unconditionalBranch(%82)
-
-block %82:
-	let  %88	: %DiffPairx5Ffloat	= load(%dpy1)
-	let  %89	: Float	= get_field(%88, %primal)
-	let  %90	: %DiffPairx5Ffloat	= makeStruct(%89, %84)
-	store(%dpy1, %90)
-	return_val(void_constant)
+block %80:
+	unconditionalBranch(%86)
 
 block %86:
-	unconditionalBranch(%91)
+	let  %87	: Int	= get_field(%x5Fsx5Fdiffx5Fctx1, %51)
+	let  %88	: Int	= sub(%87, 1 : Int)
+	[loopMaxIters(4 : Int)]
+	loop(%89, %90, %91, %88, %x5Fsx5FdOut)
 
-block %91:
-	let  %92	: Bool	= cmpLT(%x5Fdc, 3 : Int)
-	ifElse(%92, %93, %94, %95)
+block %89(
+		[nameHint("_dc")]
+		param %x5Fdc	: Int,
+		param %92	: Float):
+	let  %93	: Bool	= cmpGE(%x5Fdc, 0 : Int)
+	ifElse(%93, %94, %95, %94)
+
+block %95:
+	unconditionalBranch(%90)
+
+block %90:
+	let  %96	: %DiffPairx5Ffloat	= load(%dpy1)
+	let  %97	: Float	= get_field(%96, %primal)
+	let  %98	: %DiffPairx5Ffloat	= makeStruct(%97, %92)
+	store(%dpy1, %98)
+	return_val(void_constant)
 
 block %94:
-	unconditionalBranch(%95, 0 : Int)
+	unconditionalBranch(%99)
 
-block %93:
-	unconditionalBranch(%95, 1 : Int)
+block %99:
+	let  %100	: Bool	= cmpLT(%x5Fdc, 3 : Int)
+	ifElse(%100, %101, %102, %103)
 
-block %95(
-		param %96	: Int):
-	unconditionalBranch(%97)
-
-block %97:
-	let  %98	: Bool	= cmpNE(%96, 1 : Int)
-	let  %99	: Bool	= not(%98)
-	ifElse(%99, %100, %101, %102)
+block %102:
+	unconditionalBranch(%103, 0 : Int)
 
 block %101:
-	unconditionalBranch(%102, 0 : Float, %84)
+	unconditionalBranch(%103, 1 : Int)
 
-block %100:
-	unconditionalBranch(%102, %84, 0 : Float)
-
-block %102(
-		param %103	: Float,
-		param %104	: Float):
+block %103(
+		param %104	: Int):
 	unconditionalBranch(%105)
 
 block %105:
-	ifElse(%92, %106, %107, %108)
+	let  %106	: Bool	= cmpNE(%104, 1 : Int)
+	let  %107	: Bool	= not(%106)
+	ifElse(%107, %108, %109, %110)
 
-block %107:
-	unconditionalBranch(%108, %104)
+block %109:
+	unconditionalBranch(%110, 0 : Float, %92)
 
-block %106:
-	let  %109	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %40)
-	let  %110	: Float	= getElement(%109, %x5Fdc)
-	let  %111	: Float	= mul(%110, %103)
-	let  %112	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %40)
-	let  %113	: Float	= getElement(%112, %x5Fdc)
-	let  %114	: Float	= mul(%113, %103)
-	let  %115	: Float	= add(%111, %114)
-	let  %116	: Float	= add(%115, %104)
-	unconditionalBranch(%108, %116)
+block %108:
+	unconditionalBranch(%110, %92, 0 : Float)
 
-block %108(
-		param %117	: Float):
-	unconditionalBranch(%83)
+block %110(
+		param %111	: Float,
+		param %112	: Float):
+	unconditionalBranch(%113)
 
-block %83:
-	let  %118	: Int	= sub(%x5Fdc, 1 : Int)
-	unconditionalBranch(%81, %118, %117)
+block %113:
+	ifElse(%100, %114, %115, %116)
 
-block %76:
-	unconditionalBranch(%119)
+block %115:
+	unconditionalBranch(%116, %112)
 
-block %119:
-	let  %120	: Bool	= cmpLT(%i2, 3 : Int)
-	ifElse(%120, %121, %122, %123)
+block %114:
+	let  %117	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %48)
+	let  %118	: Float	= getElement(%117, %x5Fdc)
+	let  %119	: Float	= mul(%118, %111)
+	let  %120	: Array(Float, 5 : Int)	= get_field(%x5Fsx5Fdiffx5Fctx1, %48)
+	let  %121	: Float	= getElement(%120, %x5Fdc)
+	let  %122	: Float	= mul(%121, %111)
+	let  %123	: Float	= add(%119, %122)
+	let  %124	: Float	= add(%123, %112)
+	unconditionalBranch(%116, %124)
 
-block %122:
-	unconditionalBranch(%123, 0 : Int, 0 : Float)
+block %116(
+		param %125	: Float):
+	unconditionalBranch(%91)
 
-block %121:
-	let  %124	: Float	= mul(%t2, %t2)
-	unconditionalBranch(%123, 1 : Int, %124)
+block %91:
+	let  %126	: Int	= sub(%x5Fdc, 1 : Int)
+	unconditionalBranch(%89, %126, %125)
 
-block %123(
-		param %125	: Int,
-		param %126	: Float):
+block %84:
 	unconditionalBranch(%127)
 
 block %127:
-	let  %128	: Bool	= cmpNE(%125, 1 : Int)
+	let  %128	: Bool	= cmpLT(%i3, 3 : Int)
 	ifElse(%128, %129, %130, %131)
 
 block %130:
-	unconditionalBranch(%131, %x5Fbflag2)
+	unconditionalBranch(%131, 0 : Int, 0 : Float)
 
 block %129:
-	unconditionalBranch(%131, false)
+	let  %132	: Float	= mul(%t3, %t3)
+	unconditionalBranch(%131, 1 : Int, %132)
 
 block %131(
+		param %133	: Int,
+		param %134	: Float):
+	unconditionalBranch(%135)
+
+block %135:
+	let  %136	: Bool	= cmpNE(%133, 1 : Int)
+	ifElse(%136, %137, %138, %139)
+
+block %138:
+	unconditionalBranch(%139, %x5Fbflag2)
+
+block %137:
+	unconditionalBranch(%139, false)
+
+block %139(
 		[nameHint("_bflag")]
 		param %x5Fbflag3	: Bool):
-	unconditionalBranch(%132)
+	unconditionalBranch(%140)
 
-block %132:
-	ifElse(%x5Fbflag3, %133, %134, %135)
+block %140:
+	ifElse(%x5Fbflag3, %141, %142, %143)
 
-block %134:
-	unconditionalBranch(%135, %t2, %i2)
+block %142:
+	unconditionalBranch(%143, %t3, %i3)
 
-block %133:
-	let  %136	: Int	= add(%i2, 1 : Int)
-	unconditionalBranch(%135, %126, %136)
+block %141:
+	let  %144	: Int	= add(%i3, 1 : Int)
+	unconditionalBranch(%143, %134, %144)
 
-block %135(
+block %143(
 		[nameHint("t")]
-		param %t3	: Float,
+		param %t4	: Float,
 		[nameHint("i")]
-		param %i3	: Int):
-	let  %137	: Int	= add(%x5Fpc1, 1 : Int)
-	unconditionalBranch(%71, %x5Fbflag3, %t3, %i3, %137)
+		param %i4	: Int):
+	let  %145	: Int	= add(%x5Fpc1, 1 : Int)
+	unconditionalBranch(%79, %x5Fbflag3, %t4, %i4, %145)
 }
 [nameHint("primal")]
 let  %primal	: _	= key
 [nameHint("differential")]
 let  %differential	: _	= key
 ###
-checking for checkpointing structures:
-checkpoint intermediate struct
-sourceLocs: 1514954 (1)
-[nameHint("s_bwd_prop_test_simple_loop_Intermediates")]
-[CheckpointIntermediateDecoration]
-struct %sx5Fbwdx5Fpropx5Ftestx5Fsimplex5Floopx5FIntermediates	: Type
-{
-	field(%1, Array(Float, 5 : Int))
-	field(%2, Int)
-}
+checkpointing context generated for function test_simple_loop
+	defined at tests/autodiff/reverse-loop.slang:12
+	size of context: 24 bytes
 
+	20 bytes used at tests/autodiff/reverse-loop.slang:14
+    float t = y;
+          ^
 
-tests/autodiff/reverse-loop.slang(12): note: also see pipeline definition
-float test_simple_loop(float y)
-      ^~~~~~~~~~~~~~~~
-size of struct: 24 (4)
-fields:	sourceLocs: 1514994 (1)
-	[Offset(0 : Int, 0 : Int)]
-field(%1, Array(Float, 5 : Int))
+	4 bytes used at tests/autodiff/reverse-loop.slang:16
+    for (int i = 0; i < 3; i++)
+    ^~~
 

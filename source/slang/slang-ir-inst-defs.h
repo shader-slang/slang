@@ -1057,7 +1057,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(PreferRecomputeDecoration, PreferRecomputeDecoration, 0, 0)
 
         /// Hint that a struct is used for reverse mode checkpointing
-    INST(CheckpointIntermediateDecoration, CheckpointIntermediateDecoration, 0, 0)
+    INST(CheckpointIntermediateDecoration, CheckpointIntermediateDecoration, 1, 0)
 
     INST_RANGE(CheckpointHintDecoration, PreferCheckpointDecoration, PreferRecomputeDecoration)
 

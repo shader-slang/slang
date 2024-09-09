@@ -1532,44 +1532,58 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Report checkpointing information
     EndToEndCompileRequest *compileRequest = codeGenContext->isEndToEndCompile();
     CompilerOptionSet &optionSet = compileRequest->getOptionSet();
     SLANG_ASSERT(compileRequest);
 
-    printf("checking for checkpointing structures:\n");
+    SourceManager *sourceManager = sink->getSourceManager();
+    auto getHumanLoc = [&](const SourceLoc &sourceLoc) {
+        SourceView *sourceView = sourceManager->findSourceViewRecursively(sourceLoc);
+        if (sourceView)
+            return sourceView->getHumaneLoc(sourceLoc);
+        return HumaneSourceLoc();
+    };
+
     for (auto inst : irModule->getGlobalInsts()) {
         IRStructType *structType = as<IRStructType>(inst);
         if (!structType)
             continue;
 
-        if (structType->findDecoration<IRCheckpointIntermediateDecoration>()) {
-            printf("checkpoint intermediate struct\n");
-            printf("sourceLocs: %d (%d)\n",
-                structType->sourceLoc.getRaw(),
-                structType->sourceLoc.isValid());
-            inst->dump();
+        auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
+        if (checkpointDecoration) {
+            String nameOrLocation;
+            
+            auto func = checkpointDecoration->getSourceFunction();
+            if (!func)
+                nameOrLocation = "<ftn:?>";
+            else if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+                nameOrLocation = nameHint->getName();
 
             IRSizeAndAlignment sizeInfo;
             getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
-            printf("size of struct: %d (%d)\n", sizeInfo.size, sizeInfo.alignment);
 
-            sink->diagnose(structType, Diagnostics::alsoSeePipelineDefinition);
+            HumaneSourceLoc hloc = getHumanLoc(structType->sourceLoc);
+            printf("checkpointing context generated for function %s\n", nameOrLocation.getBuffer());
+            printf("\tdefined at %s:%d\n", hloc.pathInfo.foundPath.getBuffer(), hloc.line);
+            printf("\tsize of context: %d bytes\n\n", sizeInfo.size);
 
-            printf("fields:");
             for (auto field : structType->getFields()) {
-                printf("\tsourceLocs: %d (%d)\n",
-                    field->sourceLoc.getRaw(),
-                    field->sourceLoc.isValid());
-                printf("\t");
-                field->dump();
-
                 IRType *fieldType = field->getFieldType();
-                printf("field type: %p\n", fieldType);
                 IRSizeAndAlignment sizeInfo;
                 getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
-                printf("\tsize of struct: %d (%d)\n", sizeInfo.size, sizeInfo.alignment);
+                
+                HumaneSourceLoc hloc = getHumanLoc(field->sourceLoc);
+                printf("\t%d bytes used at %s:%d\n",
+                    sizeInfo.size,
+                    hloc.pathInfo.foundPath.getBuffer(),
+                    hloc.line);
 
-                sink->diagnose(field, Diagnostics::alsoSeePipelineDefinition);
+                StringBuilder builder;
+        
+                SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
+                _sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
+                printf("%s\n", builder.getBuffer());
             }
         }
     }

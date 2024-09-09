@@ -58,7 +58,6 @@ struct ExtractPrimalFuncContext
         IRBuilder builder(module);
         builder.setInsertBefore(func);
         auto intermediateType = builder.createStructType();
-        builder.addDecoration(intermediateType, kIROp_CheckpointIntermediateDecoration);
         if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
         {
             StringBuilder newName;
@@ -76,6 +75,8 @@ struct ExtractPrimalFuncContext
         builder.setInsertBefore(destFunc);
         IRFuncType* originalFuncType = nullptr;
         outIntermediateType = createIntermediateType(destFunc);
+        
+        builder.addCheckpointIntermediateDecoration(outIntermediateType, originalFunc);
         outIntermediateType->sourceLoc = originalFunc->sourceLoc;
 
         GenericChildrenMigrationContext migrationContext;
@@ -224,12 +225,9 @@ struct ExtractPrimalFuncContext
                     {
                         if (inst->hasUses())
                         {
-                            printf("adding field to outIntermediatery\n");
-                            printf("inst: %d (%d)\n", inst->sourceLoc.getRaw(), inst->sourceLoc.isValid());
-                            inst->dump();
                             auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
                             field->sourceLoc = inst->sourceLoc;
-                            field->dump();
+
                             builder.setInsertBefore(inst);
                             auto fieldAddr = builder.emitFieldAddress(
                                 inst->getFullType(), outIntermediary, field->getKey());

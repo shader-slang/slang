@@ -251,7 +251,7 @@ static void _reduceLength(Index startIndex, const UnownedStringSlice& prefix, St
     ioBuf = buf;
 }
 
-static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb)
+void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
     if (!sourceFile)
