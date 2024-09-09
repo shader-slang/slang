@@ -837,7 +837,8 @@ Result linkAndOptimizeIR(
     }
 
     // Report checkpointing information
-    reportCheckpointIntermediates(codeGenContext, sink, irModule);
+    if (codeGenContext->shouldReportCheckpointIntermediates())
+        reportCheckpointIntermediates(codeGenContext, sink, irModule);
 
     if (requiredLoweringPassSet.autodiff)
         finalizeAutoDiffPass(targetProgram, irModule);
