@@ -1,4 +1,8 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
 
 // CHECK:      1
 // CHECK-NEXT: 2
@@ -8,16 +12,16 @@
 // CHECK-NEXT: 6
 // CHECK-NEXT: 7
 // CHECK-NEXT: 8
-// CHECK-NEXT: 33
-// CHECK-NEXT: 122
-// CHECK-NEXT: -6
-// CHECK-NEXT: 10
-// CHECK-NEXT: 103
-// CHECK-NEXT: -17
-// CHECK-NEXT: 50
-// CHECK-NEXT: -87
+// CHECK-NEXT: 21
+// CHECK-NEXT: 7A
+// CHECK-NEXT: FFFFFFFA
+// CHECK-NEXT: A
+// CHECK-NEXT: 67
+// CHECK-NEXT: FFFFFFEF
+// CHECK-NEXT: 32
+// CHECK-NEXT: FFFFFFA9
 
-//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]

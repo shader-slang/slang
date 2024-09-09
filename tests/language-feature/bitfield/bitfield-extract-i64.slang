@@ -1,23 +1,43 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
 
-// CHECK:      0
+// CHECK: 0
+// CHECK-NEXT: 0
 // CHECK-NEXT: 2
+// CHECK-NEXT: 0
 // CHECK-NEXT: 4
+// CHECK-NEXT: 0
 // CHECK-NEXT: 6
+// CHECK-NEXT: 0
 // CHECK-NEXT: 8
-// CHECK-NEXT: 13
-// CHECK-NEXT: 11
-// CHECK-NEXT: 10
-// CHECK-NEXT: 444691369455
-// CHECK-NEXT: 10560325
-// CHECK-NEXT: 18446744073709551610
-// CHECK-NEXT: 10
-// CHECK-NEXT: 86
-// CHECK-NEXT: 18446744073709551582
+// CHECK-NEXT: 0
+// CHECK-NEXT: D
+// CHECK-NEXT: 0
+// CHECK-NEXT: B
+// CHECK-NEXT: 0
+// CHECK-NEXT: A
+// CHECK-NEXT: 0
+// CHECK-NEXT: 89ABCDEF
 // CHECK-NEXT: 67
-// CHECK-NEXT: 18446744073709551546
+// CHECK-NEXT: A12345
+// CHECK-NEXT: 0
+// CHECK-NEXT: FFFFFFFA
+// CHECK-NEXT: FFFFFFFF
+// CHECK-NEXT: A
+// CHECK-NEXT: 0
+// CHECK-NEXT: 56
+// CHECK-NEXT: 0
+// CHECK-NEXT: FFFFFFDE
+// CHECK-NEXT: FFFFFFFF
+// CHECK-NEXT: 43
+// CHECK-NEXT: 0
+// CHECK-NEXT: FFFFFFBA
+// CHECK-NEXT: FFFFFFFF
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=8):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint64_t> outputBuffer;
 
 [numthreads(1, 1, 1)]

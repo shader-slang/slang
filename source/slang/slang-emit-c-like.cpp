@@ -3692,11 +3692,13 @@ void CLikeSourceEmitter::emitVecNOrScalar(IRVectorType* vectorType, std::functio
 {
     if (vectorType)
     {
+        int N = int(getIntVal(vectorType->getElementCount()));
+        Slang::IRType *elementType = vectorType->getElementType();
+
         // Special handling required for CUDA target
         if (isCUDATarget(getTargetReq()))
         {
             m_writer->emit("make_");
-            Slang::IRType *elementType = vectorType->getElementType();
 
             switch(elementType->getOp()) 
             {
@@ -3711,27 +3713,20 @@ void CLikeSourceEmitter::emitVecNOrScalar(IRVectorType* vectorType, std::functio
                 default: SLANG_ABORT_COMPILATION("Unhandled type emitting CUDA vector");
             }
 
-            int N = int(getIntVal(vectorType->getElementCount()));
             m_writer->emitRawText(std::to_string(N).c_str());
-            m_writer->emit("(");
-            for (int i = 0; i < N; ++i) 
-            {
-                emitType(elementType);
-                m_writer->emit("(");
-                emitComponentLogic();
-                m_writer->emit(")");
-                if (i != N - 1)
-                    m_writer->emit(", ");
-            }
-            m_writer->emit(")");
         }
-        else 
+
+        m_writer->emit("(");
+        for (int i = 0; i < N; ++i) 
         {
-            emitType(vectorType);
+            emitType(elementType);
             m_writer->emit("(");
             emitComponentLogic();
             m_writer->emit(")");
+            if (i != N - 1)
+                m_writer->emit(", ");
         }
+        m_writer->emit(")");
     }
     else
     {
