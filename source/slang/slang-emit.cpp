@@ -215,6 +215,74 @@ static void dumpIRIfEnabled(
     }
 }
 
+static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, DiagnosticSink* sink, IRModule* irModule)
+{
+    // Report checkpointing information
+    EndToEndCompileRequest *compileRequest = codeGenContext->isEndToEndCompile();
+    CompilerOptionSet &optionSet = compileRequest->getOptionSet();
+    SLANG_ASSERT(compileRequest);
+
+    SourceManager* sourceManager = sink->getSourceManager();
+    auto getHumanLoc = [&](const SourceLoc &sourceLoc)
+    {
+        SourceView *sourceView = sourceManager->findSourceViewRecursively(sourceLoc);
+        if (sourceView)
+            return sourceView->getHumaneLoc(sourceLoc);
+        return HumaneSourceLoc();
+    };
+
+    StringBuilder builder;
+    for (auto inst : irModule->getGlobalInsts()) {
+        IRStructType *structType = as<IRStructType>(inst);
+        if (!structType)
+            continue;
+
+        auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
+        if (checkpointDecoration) {
+            builder << "checkpointing context generated for function: ";
+            
+            auto func = checkpointDecoration->getSourceFunction();
+            if (!func)
+                builder << "(?)";
+            else if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+                builder << nameHint->getName();
+
+            IRSizeAndAlignment sizeInfo;
+            getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
+
+            HumaneSourceLoc hloc = getHumanLoc(structType->sourceLoc);
+            
+            builder << "\n";
+            builder << "\tdefined at " << hloc.pathInfo.foundPath << ":" << hloc.line << "\n";
+            builder << "\tsize of context: " << sizeInfo.size << " bytes\n";
+            builder << "\n";
+
+            for (auto field : structType->getFields()) {
+                IRType *fieldType = field->getFieldType();
+                IRSizeAndAlignment sizeInfo;
+                getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
+                
+                HumaneSourceLoc hloc = getHumanLoc(field->sourceLoc);
+
+                builder << "\t" << sizeInfo.size << " bytes used for ";
+                if (field->findDecoration<IRLoopCounterDecoration>())
+                    builder << "loop counter created for loop at ";
+                else
+                    builder << "variable defined at ";
+                builder << hloc.pathInfo.foundPath << ":" << hloc.line << "\n";
+
+                SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
+                sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
+            }
+        }
+    }
+
+    SourceWriter writer(sourceManager, LineDirectiveMode::None, nullptr);
+    writer.emit(builder);
+
+    File::writeAllText("checkpoint-report.txt", writer.getContent());
+}
+
 struct LinkingAndOptimizationOptions
 {
     bool shouldLegalizeExistentialAndResourceTypes = true;
@@ -758,34 +826,6 @@ Result linkAndOptimizeIR(
         if (requiredLoweringPassSet.autodiff)
         {
             dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
-
-            //printf("Module (bwd diff functions) before autodiff pass:\n");
-            ////irModule->getModuleInst()->dump();
-            //IRModuleInst* module = irModule->getModuleInst();
-            //for (auto inst : module->getGlobalInsts()) {
-            //    auto func = as<IRFunc>(inst);
-            //    if (!func)
-            //        continue;
-
-            //    if (!isBackwardDifferentiableFunc(func))
-            //        continue;
-
-            //    printf("=============================================\n");
-            //    func->dump();
-        
-            //    for (auto block : func->getBlocks()) {
-            //        for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-            //            printf("inst with location: %d (%d)\n",
-            //                inst->sourceLoc.getRaw(),
-            //                inst->sourceLoc.isValid());
-            //            inst->dump();
-
-            //            if (inst->sourceLoc.isValid())
-            //                sink->diagnose(inst->sourceLoc, Diagnostics::seeDeclarationOf, inst);
-            //        }
-            //    }
-            //}
-
             enableIRValidationAtInsert();
             changed |= processAutodiffCalls(targetProgram, irModule, sink);
             disableIRValidationAtInsert();
@@ -797,70 +837,7 @@ Result linkAndOptimizeIR(
     }
 
     // Report checkpointing information
-    EndToEndCompileRequest *compileRequest = codeGenContext->isEndToEndCompile();
-    CompilerOptionSet &optionSet = compileRequest->getOptionSet();
-    SLANG_ASSERT(compileRequest);
-
-    SourceManager *sourceManager = sink->getSourceManager();
-    auto getHumanLoc = [&](const SourceLoc &sourceLoc) {
-        SourceView *sourceView = sourceManager->findSourceViewRecursively(sourceLoc);
-        if (sourceView)
-            return sourceView->getHumaneLoc(sourceLoc);
-        return HumaneSourceLoc();
-    };
-
-    for (auto inst : irModule->getGlobalInsts()) {
-        IRStructType *structType = as<IRStructType>(inst);
-        if (!structType)
-            continue;
-
-        auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
-        if (checkpointDecoration) {
-            String nameOrLocation;
-            
-            auto func = checkpointDecoration->getSourceFunction();
-            if (!func)
-                nameOrLocation = "(?)";
-            else if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
-                nameOrLocation = nameHint->getName();
-
-            IRSizeAndAlignment sizeInfo;
-            getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
-
-            HumaneSourceLoc hloc = getHumanLoc(structType->sourceLoc);
-            printf("checkpointing context generated for function %s\n", nameOrLocation.getBuffer());
-            printf("\tdefined at %s:%d\n", hloc.pathInfo.foundPath.getBuffer(), hloc.line);
-            printf("\tsize of context: %d bytes\n\n", sizeInfo.size);
-
-            for (auto field : structType->getFields()) {
-                IRType *fieldType = field->getFieldType();
-                IRSizeAndAlignment sizeInfo;
-                getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
-                
-                HumaneSourceLoc hloc = getHumanLoc(field->sourceLoc);
-
-                if (field->findDecoration<IRLoopCounterDecoration>()) {
-                    printf("\t%d bytes used for a loop counter at %s:%d\n",
-                        sizeInfo.size,
-                        hloc.pathInfo.foundPath.getBuffer(),
-                        hloc.line);
-                } else {
-                    printf("\t%d bytes used for the variable defined at %s:%d\n",
-                        sizeInfo.size,
-                        hloc.pathInfo.foundPath.getBuffer(),
-                        hloc.line);
-                }
-
-                StringBuilder builder;
-        
-                SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
-                _sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
-                printf("%s\n", builder.getBuffer());
-            }
-        }
-
-        fflush(stdout);
-    }
+    reportCheckpointIntermediates(codeGenContext, sink, irModule);
 
     if (requiredLoweringPassSet.autodiff)
         finalizeAutoDiffPass(targetProgram, irModule);

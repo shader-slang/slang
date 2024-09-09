@@ -3539,7 +3539,7 @@ use with usedVal:
 let  %t	: Float	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2685A0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000244E59785E0 to storeSet
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
@@ -3551,7 +3551,7 @@ use with usedVal:
 let  %t	: Float	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2685A0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000244E59785E0 to storeSet
 [primalInstDecoration]
 [nameHint("t")]
 let  %t	: Float	= param
@@ -3577,13 +3577,13 @@ let  %1	: Int	= param
 use with usedVal:
 0
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE245AD0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000244E5969B60 to storeSet
 0
 inst with location: 0 (0)
 use with usedVal:
 1
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2456A0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000244E5969730 to storeSet
 1
 inst with location: 0 (0)
 use with usedVal:
@@ -3599,7 +3599,7 @@ let  %x5Fbflag	: Bool	= param
 use with usedVal:
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2817E0 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000244E5955730 to storeSet
 
 inst with location: 0 (0)
 use with usedVal:
@@ -3617,7 +3617,7 @@ use with usedVal:
 let  %x5Fpc	: Int	= param
 
 
-[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000223FE2778F8 to storeSet
+[#] Slang::AutodiffCheckpointPolicyBase::processFunc, adding 00000244E5983928 to storeSet
 [primalInstDecoration]
 [nameHint("_pc")]
 [loopCounterDecoration]
@@ -8651,18 +8651,6 @@ GenericSpecializationDictionary
 ExistentialFuncSpecializationDictionary
 ExistentialTypeSpecializationDictionary
 ###
-checkpointing context generated for function test_simple_loop
-	defined at tests/autodiff/reverse-loop.slang:12
-	size of context: 24 bytes
-
-	20 bytes used for the variable defined at tests/autodiff/reverse-loop.slang:14
-    float t = y;
-          ^
-
-	4 bytes used for a loop counter at tests/autodiff/reverse-loop.slang:16
-    for (int i = 0; i < 3; i++)
-    ^~~
-
 ### BEFORE-LOWER-GENERICS:
 undefined
 let  %1	: Void	= varLayout(%2, %3)

@@ -1,0 +1,10 @@
+checkpointing context generated for function: test_simple_loop
+	defined at tests/autodiff/reverse-loop.slang:12
+	size of context: 24 bytes
+
+	20 bytes used for variable defined at tests/autodiff/reverse-loop.slang:14
+    float t = y;
+          ^
+	4 bytes used for loop counter created for loop at tests/autodiff/reverse-loop.slang:16
+    for (int i = 0; i < 3; i++)
+    ^~~
