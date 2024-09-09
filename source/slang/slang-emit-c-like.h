@@ -248,7 +248,8 @@ public:
     //
 
     void ensureTypePrelude(IRType* type);
-    void emitDeclarator(DeclaratorInfo* declarator);
+    void emitDeclarator(DeclaratorInfo* declarator) {emitDeclaratorImpl(declarator);}
+    virtual void emitDeclaratorImpl(DeclaratorInfo* declarator);
 
     void emitType(IRType* type, const StringSliceLoc* nameLoc) { emitTypeImpl(type, nameLoc); }
     void emitType(IRType* type, Name* name);
@@ -256,6 +257,7 @@ public:
     void emitType(IRType* type);
     void emitType(IRType* type, Name* name, SourceLoc const& nameLoc);
     void emitType(IRType* type, NameLoc const& nameAndLoc);
+    virtual void emitGlobalParamType(IRType* type, String const& name) {emitType(type, name);}
     bool hasExplicitConstantBufferOffset(IRInst* cbufferType);
     bool isSingleElementConstantBuffer(IRInst* cbufferType);
     bool shouldForceUnpackConstantBufferElements(IRInst* cbufferType);
@@ -368,7 +370,10 @@ public:
         /// Emit high-level statements for the body of a function.
     void emitFunctionBody(IRGlobalValueWithCode* code);
 
+    void emitFuncHeader(IRFunc* func) { emitFuncHeaderImpl(func); }
     void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
+
+    void emitSwitchCaseSelectors(IRBasicType *const switchConditionType, const SwitchRegion::Case *const currentCase, const bool isDefault) {emitSwitchCaseSelectorsImpl(switchConditionType, currentCase, isDefault);}
 
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
@@ -394,10 +399,14 @@ public:
     void emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout);
     void emitClass(IRClassType* structType);
 
+    void emitStructDeclarationSeparator() {emitStructDeclarationSeparatorImpl();}
+    virtual void emitStructDeclarationSeparatorImpl();
+
         /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
     virtual void emitMemoryQualifiers(IRInst* /*varInst*/) {};
+    virtual void emitStructFieldAttributes(IRStructType * /* structType */, IRStructField * /* field */) {};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(IRInst* /*varInst*/, IRType* /*valueType*/, IRPackOffsetDecoration* /*decoration*/) {};
@@ -421,6 +430,7 @@ public:
 
     void emitGlobalInst(IRInst* inst);
     virtual void emitGlobalInstImpl(IRInst* inst);
+    virtual bool isPointerSyntaxRequiredImpl(IRInst* inst);
 
     void ensureInstOperand(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel = EmitAction::Level::Definition);
 
@@ -486,6 +496,11 @@ public:
     virtual void emitPreModuleImpl();
     virtual void emitPostModuleImpl();
 
+    virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator);
+    void emitSimpleTypeAndDeclarator(IRType* type, DeclaratorInfo* declarator) {emitSimpleTypeAndDeclaratorImpl(type, declarator);};
+    virtual void emitVarKeywordImpl(IRType * type, bool isConstant);
+    void emitVarKeyword(IRType * type, bool isConstant) {emitVarKeywordImpl(type, isConstant);}
+
     virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
 
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
@@ -501,6 +516,7 @@ public:
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
     virtual void emitSimpleValueImpl(IRInst* inst);
     virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink);
+    virtual void emitFuncHeaderImpl(IRFunc* func);
     virtual void emitSimpleFuncImpl(IRFunc* func);
     virtual void emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
@@ -511,6 +527,7 @@ public:
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) { SLANG_UNUSED(decl); }
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) { SLANG_UNUSED(switchInst); }
+    virtual void emitSwitchCaseSelectorsImpl(IRBasicType *const switchConditionType, const SwitchRegion::Case *const currentCase, const bool isDefault);
     
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
     virtual void emitLivenessImpl(IRInst* inst);

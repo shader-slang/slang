@@ -1831,6 +1831,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::WGSL:
         return &kGLSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::HostHostCallable:
@@ -2140,6 +2141,10 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         case CodeGenTarget::MetalLibAssembly:
         {
             return SourceLanguage::Metal;
+        }
+        case CodeGenTarget::WGSL:
+        {
+            return SourceLanguage::WGSL;
         }
         case CodeGenTarget::CSource:
         {
