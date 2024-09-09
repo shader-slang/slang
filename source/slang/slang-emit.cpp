@@ -240,13 +240,16 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
     GLSLSourceEmitter emitter(description);
 
     StringBuilder builder;
+    int nonEmptyCount = 0;
+
     for (auto inst : irModule->getGlobalInsts()) {
         IRStructType *structType = as<IRStructType>(inst);
         if (!structType)
             continue;
 
         auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
-        if (checkpointDecoration) {
+        bool nonEmpty = structType->getChildren().getFirst();
+        if (checkpointDecoration && nonEmpty) {
             builder << "checkpointing context generated for function: ";
             
             auto func = checkpointDecoration->getSourceFunction();
@@ -288,9 +291,14 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
 
                 SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
                 sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
+
+                nonEmptyCount++;
             }
         }
     }
+
+    if (nonEmptyCount == 0)
+        builder << "no checkpointing contexts were generated\n";
 
     SourceWriter writer(sourceManager, LineDirectiveMode::None, nullptr);
     writer.emit(builder);
