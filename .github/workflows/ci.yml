@@ -24,8 +24,8 @@ jobs:
   load_matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix_build }}
-      matrix: ${{ steps.set-matrix.outputs.matrix_test }}
+      matrix_build: ${{ steps.set-matrix.outputs.matrix_build }}
+      matrix_test: ${{ steps.set-matrix.outputs.matrix_test }}
 
     steps:
       - uses: actions/checkout@v4
