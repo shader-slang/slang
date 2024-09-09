@@ -24,15 +24,16 @@ jobs:
   load_matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      matrix: ${{ steps.set-matrix.outputs.matrix_build }}
+      matrix: ${{ steps.set-matrix.outputs.matrix_test }}
 
     steps:
       - uses: actions/checkout@v4
       - id: set-matrix
         shell: bash
         run: |
-          echo "matrix_build=$(cat .github/workflows/matrix.build.json | jq -c .)" >> $GITHUB_OUTPUT
-          echo "matrix_test=$(cat .github/workflows/matrix.test.json | jq -c .)" >> $GITHUB_OUTPUT
+          echo "matrix_build=$(cat .github/workflows/matrix_build.json | jq -c .)" >> $GITHUB_OUTPUT
+          echo "matrix_test=$(cat .github/workflows/matrix_test.json | jq -c .)" >> $GITHUB_OUTPUT
 
   build:
     needs: load_matrix
