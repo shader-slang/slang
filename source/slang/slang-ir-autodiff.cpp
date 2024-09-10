@@ -514,6 +514,13 @@ IRInterfaceType* DifferentiableTypeConformanceContext::getConformanceTypeFromWit
         auto innerWitnessTableType = cast<IRWitnessTableType>(interfaceRequirementEntry->getRequirementVal());
         diffInterfaceType = cast<IRInterfaceType>(innerWitnessTableType->getConformanceType());
     }
+    else if (auto tupleType = as<IRTupleType>(witness->getDataType()))
+    {
+        SLANG_ASSERT(tupleType->getOperandCount() >= 1);
+        auto operand = tupleType->getOperand(0);
+        auto innerWitnessTableType = cast<IRWitnessTableType>(operand);
+        return cast<IRInterfaceType>(innerWitnessTableType->getConformanceType());
+    }
     else
     {
         SLANG_UNEXPECTED("Unexpected witness type");
@@ -571,11 +578,11 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                             if (diffInterfaceType == sharedContext->differentiableInterfaceType)
                                 addTypeToDictionary(
                                     (IRType*)element,
-                                    _lookupWitness(&subBuilder, elementWitness, sharedContext->differentialAssocTypeStructKey, subBuilder.getTypeKind()));
+                                    elementWitness);
                             else if (diffInterfaceType == sharedContext->differentiableRefInterfaceType)
                                 addTypeToDictionary(
                                     (IRType*)element,
-                                    _lookupWitness(&subBuilder, elementWitness, sharedContext->differentialAssocRefTypeStructKey, subBuilder.getTypeKind()));
+                                    elementWitness);
                         }
                         return;
                     }
