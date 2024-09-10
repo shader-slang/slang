@@ -881,7 +881,6 @@ Result linkAndOptimizeIR(
 
     // Remove auto-diff related decorations.
     // We may have an autodiff decoration regardless of if autodiff is being used.
-    // TODO: strip checkpoint decorations
     stripAutoDiffDecorations(irModule);
 
     finalizeSpecialization(irModule);

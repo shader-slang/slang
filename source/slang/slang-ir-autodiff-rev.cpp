@@ -582,18 +582,6 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
-        
-        // printf("(result after prepareFuncForBackwardDiff)===============================\n");
-        // //primalFunc->dump();
-        // for (auto block : primalFunc->getBlocks()) {
-        //     for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-        //         printf("inst with location: %d (%d)\n",
-        //             inst->sourceLoc.getRaw(),
-        //             inst->sourceLoc.isValid());
-
-        //         inst->dump();
-        //     }
-        // }
 
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
@@ -605,7 +593,6 @@ namespace Slang
         auto newCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
         for (auto i = oldCount; i < newCount; i++)
         {
-            // printf("transcribing function with fwd mode: %d (%d, %d)\n", i, oldCount, newCount);
             auto pendingTask = autoDiffSharedContext->followUpFunctionsToTranscribe.getLast();
             autoDiffSharedContext->followUpFunctionsToTranscribe.removeLast();
             SLANG_RELEASE_ASSERT(pendingTask.type == FuncBodyTranscriptionTaskType::Forward);
@@ -695,35 +682,10 @@ namespace Slang
         {
             tempBuilder.setInsertBefore(diffPropagateFunc);
         }
-        
-        printf("(primalFunc from generateNewForwardDerivative)===============================\n");
-        primalFunc->dump();
-        for (auto block : primalFunc->getBlocks()) {
-           for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-               printf("inst with location: %d (%d)\n",
-                   inst->sourceLoc.getRaw(),
-                   inst->sourceLoc.isValid());
-
-               inst->dump();
-           }
-        }
-
 
         auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, primalFunc, diffPropagateFunc);
         if (!fwdDiffFunc)
             return;
-
-        printf("(fwdDiffFunc from generateNewForwardDerivative)===============================\n");
-        fwdDiffFunc->dump();
-        for (auto block : fwdDiffFunc->getBlocks()) {
-           for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-               printf("inst with location: %d (%d)\n",
-                   inst->sourceLoc.getRaw(),
-                   inst->sourceLoc.isValid());
-
-               inst->dump();
-           }
-        }
 
         bool isResultDifferentiable = as<IRDifferentialPairType>(fwdDiffFunc->getResultType());
 
@@ -738,20 +700,6 @@ namespace Slang
 
         diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
         IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
-        
-        printf("(diffPropagateFunc after unzipping)===============================\n");
-        diffPropagateFunc->dump();
-        
-        printf("(unzipDiffInsts)===============================\n");
-        for (auto block : unzippedFwdDiffFunc->getBlocks()) {
-           for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-               printf("inst with location: %d (%d)\n",
-                   inst->sourceLoc.getRaw(),
-                   inst->sourceLoc.isValid());
-
-               inst->dump();
-           }
-        }
 
         // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
         builder->setInsertInto(diffPropagateFunc->getParent());
@@ -762,18 +710,6 @@ namespace Slang
             
             for (auto block : workList)
                 block->insertAtEnd(diffPropagateFunc);
-        }
-        
-        printf("(diffPropagateFunc moving blocks)===============================\n");
-        diffPropagateFunc->dump();
-        for (auto block : diffPropagateFunc->getBlocks()) {
-           for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-               printf("inst with location: %d (%d)\n",
-                   inst->sourceLoc.getRaw(),
-                   inst->sourceLoc.isValid());
-
-               inst->dump();
-           }
         }
 
         // Transpose the first block (parameter block)
@@ -797,17 +733,6 @@ namespace Slang
         auto primalsInfo = applyCheckpointPolicy(diffPropagateFunc);
 
         eliminateDeadCode(diffPropagateFunc);
-    
-        printf("****** (after legalization) # of elements in the store set for hoistInfo: %d\n", primalsInfo->storeSet.getCount());
-        for (auto stored : primalsInfo->storeSet) {
-            printf("source loc recorded: %d (%d)\n",
-                stored->sourceLoc.getRaw(),
-                stored->sourceLoc.isValid());
-            stored->dump();
-            getSink()->diagnose(stored->sourceLoc, Diagnostics::alsoSeePipelineDefinition);
-
-            IRType* type = stored->getFullType();
-        }
 
         // Extracts the primal computations into its own func, turn all accesses to stored primal insts into
         // explicit intermediate data structure reads and writes.

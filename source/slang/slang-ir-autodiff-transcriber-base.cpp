@@ -713,9 +713,6 @@ InstPair AutoDiffTranscriberBase::transcribeBlockImpl(IRBuilder* builder, IRBloc
     //
     for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
     {
-        printf("transcribing instruction with op: %s\n", getIROpInfo(child->m_op).name);
-        child->dump();
-
         if (instsToSkip.contains(child))
         {
             continue;
@@ -947,21 +944,12 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
     // 
     instsInProgress.add(origInst);
     auto actualInstToTranscribe = getActualInstToTranscribe(origInst);
-    printf("transcribing actual instruction:\n");
-    printf("sourceloc info: %d (%d)\n", actualInstToTranscribe->sourceLoc.getRaw(), actualInstToTranscribe->sourceLoc.isValid());
-    printf("> ");
-    actualInstToTranscribe->dump();
     InstPair pair = transcribeInst(builder, actualInstToTranscribe);
 
     instsInProgress.remove(origInst);
 
     if (pair.primal)
     {
-        printf("\tresult:\n");
-        printf("sourceloc info: %d (%d)\n", pair.primal->sourceLoc.getRaw(), pair.primal->sourceLoc.isValid());
-        printf("\t> ");
-        pair.primal->dump();
-
         mapPrimalInst(origInst, pair.primal);
         mapDifferentialInst(origInst, pair.differential);
 
@@ -1044,32 +1032,12 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
     // 
     if (as<IRModuleInst>(origInst->getParent()) && !as<IRType>(origInst))
         return InstPair(origInst, nullptr);
-    
-    //printf("\n\ntranscribing an original instruction: %d (%d)\n",
-    //    origInst->sourceLoc.getRaw(), origInst->sourceLoc.isValid());
-    //printf(" >");
-    //origInst->dump();
 
     auto result = transcribeInstImpl(builder, origInst);
-
-    //printf("result:\n");
-    if (result.primal) {
-        //printf(" >");
-        //result.primal->dump();
+    if (result.primal)
         result.primal->sourceLoc = origInst->sourceLoc;
-        //printf("  [P] source loc: %d (%d)\n",
-        //    result.primal->sourceLoc.getRaw(),
-        //    result.primal->sourceLoc.isValid());
-    }
-    
-    if (result.differential) {
-        //printf(" >");
-        //result.differential->dump();
+    if (result.differential)
         result.differential->sourceLoc = origInst->sourceLoc;
-        //printf("  [D] source loc: %d (%d)\n",
-        //    result.differential->sourceLoc.getRaw(),
-        //    result.differential->sourceLoc.isValid());
-    }
 
     if (result.primal == nullptr && result.differential == nullptr)
     {

@@ -120,7 +120,7 @@ struct PhiEliminationContext
         // for Phi parameters and other insts that benefit from
         // converting to memory.
         initializePerFuncState(func);
-        
+
         // First, we eliminate all the phi instructions (params)
         // using the result of register allocation.
         // The first block in a function is always the entry block,
@@ -138,7 +138,7 @@ struct PhiEliminationContext
 
             eliminatePhisInBlock(block);
         }
-        
+
         // Next, convert the definition of other ordinary insts to assignments.
         convertInstDefToRegisterAssignment();
 

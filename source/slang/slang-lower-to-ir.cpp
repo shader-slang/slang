@@ -10318,21 +10318,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // of global values.
         irFunc->moveToEnd();
 
-        //printf("(lowered function) =============================================\n");
-        //irFunc->dump();
-
-        //for (auto block : irFunc->getBlocks()) {
-        //    for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-        //        printf("inst with location: %d (%d)\n",
-        //            inst->sourceLoc.getRaw(),
-        //            inst->sourceLoc.isValid());
-        //        inst->dump();
-
-        //        if (inst->sourceLoc.isValid())
-        //            getSink()->diagnose(inst->sourceLoc, Diagnostics::seeDeclarationOf, inst);
-        //    }
-        //}
-
         // If this function is defined inside an interface, add a reference to the IRFunc from
         // the interface's type definition.
         auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);

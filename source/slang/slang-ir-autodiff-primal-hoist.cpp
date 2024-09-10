@@ -281,18 +281,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     IROutOfOrderCloneContext* cloneCtx,
     Dictionary<IRBlock*, List<IndexTrackingInfo>>& blockIndexInfo)
 {
-    // printf("(Checkpoint policy)==========================================\n");
-    // func->dump();
-    // for (auto block : func->getBlocks()) {
-    //     for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-    //         printf("inst with location: %d (%d)\n",
-    //             inst->sourceLoc.getRaw(),
-    //             inst->sourceLoc.isValid());
-
-    //         inst->dump();
-    //     }
-    // }
-
     collectInductionValues(func);
 
     RefPtr<CheckpointSetInfo> checkpointInfo = new CheckpointSetInfo();
@@ -327,8 +315,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 workList.add(&inst->typeUse);
         }
     };
-
-    printf("### %s\n", __FUNCTION__);
 
     // Populate recompute/store/invert sets with insts, by applying the policy
     // to them.
@@ -370,7 +356,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         addPrimalOperandsToWorkList(block->getTerminator());
     }
     
-    printf("processing workList\n");
     while (workList.getCount() > 0)
     {
         auto use = workList.getLast();
@@ -379,9 +364,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         if (processedUses.contains(use))
             continue;
 
-        printf("\n----use with usedVal:\n");
-        use.usedVal->dump();
-
         processedUses.add(use);
 
         HoistResult result = this->classify(use);
@@ -389,13 +371,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         if (result.mode == HoistResult::Mode::Store)
         {
             SLANG_ASSERT(!checkpointInfo->recomputeSet.contains(result.instToStore));
-            printf("\n[#] %s, adding %p to storeSet\n", __FUNCTION__, result.instToStore);
-            result.instToStore->dump();
-            IRInst* inst = result.instToStore;
-            printf("inst with location: %d (%d)\n",
-                inst->sourceLoc.getRaw(),
-                inst->sourceLoc.isValid());
-
             checkpointInfo->storeSet.add(result.instToStore);
         }
         else if (result.mode == HoistResult::Mode::Recompute)
@@ -490,7 +465,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 {
                     checkpointInfo->recomputeSet.add(callUser);
                     checkpointInfo->storeSet.remove(callUser);
-                    printf("storeSet removing %p\n", callUser);
                     if (instWorkListSet.add(callUser))
                         instWorkList.add(callUser);
                 }
@@ -498,7 +472,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 {
                     checkpointInfo->recomputeSet.add(storeUser);
                     checkpointInfo->storeSet.remove(storeUser);
-                    printf("storeSet removing %p\n", storeUser);
                     if (instWorkListSet.add(callUser))
                         instWorkList.add(callUser);
                 }
@@ -512,7 +485,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 {
                     checkpointInfo->recomputeSet.add(varArg);
                     checkpointInfo->storeSet.remove(varArg);
-                    printf("storeSet removing %p\n", varArg);
                     if (instWorkListSet.add(varArg))
                         instWorkList.add(varArg);
                 }
@@ -1479,8 +1451,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
     OrderedHashSet<IRInst*> processedStoreSet;
 
-    printf("****** ensureInstAvailable\n");
-
     auto ensureInstAvailable = [&](OrderedHashSet<IRInst*>& instSet, bool isRecomputeInst)
     {
         SLANG_ASSERT(!isDifferentialBlock(defaultVarBlock));
@@ -1494,9 +1464,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
         {
             auto instToStore = workList.getLast();
             workList.removeLast();
-            
-            printf("ensureInstAvailable, worklist element:\n");
-            instToStore->dump();
 
             if (seenInstSet.contains(instToStore))
                 continue;
@@ -1565,7 +1532,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
             if (outOfScopeUses.getCount() == 0)
             {
-                printf(">> NO OUT OF SCOPE USES\n");
                 if (!isRecomputeInst)
                     processedStoreSet.add(instToStore);
                 seenInstSet.add(instToStore);
@@ -1667,7 +1633,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 bool isLoopCounter = (instToStore->findDecoration<IRLoopCounterDecoration>() != nullptr);
                 if (isLoopCounter)
                 {
-                    printf(">> LOOP COUNTER!\n");
                     defBlockIndices.removeAt(0);
                 }
                 else
@@ -1691,11 +1656,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                         loadIndexedValue(&builder, localVar, defBlock, defBlockIndices, useBlockIndices));
                 }
 
-                if (!isRecomputeInst) {
-                    printf("%% localVar:\n");
-                    localVar->dump();
+                if (!isRecomputeInst)
                     processedStoreSet.add(localVar);
-                }
             }
 
             seenInstSet.add(instToStore);
@@ -1779,13 +1741,7 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
             primalInitBlock->getTerminator())->getTargetBlock();
         builder.setInsertBefore(primalInitBlock->getTerminator());
 
-        printf("Adding counter for primalLoop:\n");
-        primalLoop->dump();
-        printf("  > sourceLoc: %d (%d)\n",
-            primalLoop->sourceLoc.getRaw(),
-            primalLoop->sourceLoc.isValid());
         SourceLoc loc = primalLoop->sourceLoc;
-
         auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
             &builder,
             primalInitBlock,
@@ -1802,12 +1758,6 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
         builder.addNameHintDecoration(primalCountParam, UnownedStringSlice("_pc"));
         builder.markInstAsPrimal(primalCountParam);
         primalCountParam->sourceLoc = loc;
-        
-        printf(">> Counter for primalLoop:\n");
-        primalCountParam->dump();
-        printf("  > sourceLoc: %d (%d)\n",
-            primalCountParam->sourceLoc.getRaw(),
-            primalCountParam->sourceLoc.isValid());
 
         IRBlock* primalUpdateBlock = getUpdateBlock(primalLoop);
         IRInst* terminator = primalUpdateBlock->getTerminator();
@@ -1931,18 +1881,6 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
 {
     sortBlocksInFunc(func);
 
-    printf("(applyCheckpointPolicy) ===============================\n");
-    func->dump();
-    for (auto block : func->getBlocks()) {
-        for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-            printf("inst with location: %d (%d)\n",
-                inst->sourceLoc.getRaw(),
-                inst->sourceLoc.isValid());
-
-            inst->dump();
-        }
-    }
-
     // Insert loop counters and establish loop regions.
     // Also makes the reverse loops counting downwards from the final iteration count.
     //
@@ -1964,21 +1902,10 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     chkPolicy->preparePolicy(func);
     auto primalsInfo = chkPolicy->processFunc(func, recomputeBlockMap, cloneCtx, indexedBlockInfo);
 
-    // NOTE: (Mostly) original instructions are here...
-    printf("****** (before legalization) # of elements in the store set for hoistInfo: %d\n", primalsInfo->storeSet.getCount());
-    for (auto stored : primalsInfo->storeSet) {
-        printf("source loc recorded: %d (%d)\n",
-            stored->sourceLoc.getRaw(),
-            stored->sourceLoc.isValid());
-        stored->dump();
-    }
-
     // Legalize the primal inst accesses by introducing local variables / arrays and emitting
     // necessary load/store logic.
     //
-    primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
-
-    return primalsInfo;
+    return ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
 }
 
 void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)

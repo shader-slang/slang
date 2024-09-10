@@ -1952,21 +1952,18 @@ struct AutoDiffPass : public InstPassBase
                     break;
                 case kIROp_BackwardDifferentiatePrimal:
                     {
-                        printf("BACKWARD DIFFERENTIATE PRIMAL\n");
                         auto baseFunc = differentiateInst->getOperand(0);
                         diffFunc = backwardPrimalTranscriber.transcribe(&subBuilder, baseFunc);
                     }
                     break;
                 case kIROp_BackwardDifferentiatePropagate:
                     {
-                        printf("BACKWARD DIFFERENTIATE PROPOGATE\n");
                         auto baseFunc = differentiateInst->getOperand(0);
                         diffFunc = backwardPropagateTranscriber.transcribe(&subBuilder, baseFunc);
                     }
                     break;
                 case kIROp_BackwardDifferentiate:
                     {
-                        printf("BACKWARD DIFFERENTIATE\n");
                         auto baseFunc = differentiateInst->getOperand(0);
                         diffFunc = backwardTranscriber.transcribe(&subBuilder, baseFunc);
                     }

@@ -604,9 +604,6 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     
     IRInst* origCallee = origCall->getCallee();
 
-    printf("transcribing call (%d):\n", origCall->sourceLoc.getRaw());
-    origCall->dump();
-
     if (!origCallee)
     {
         // Note that this can only happen if the callee is a result
@@ -674,7 +671,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     IRBuilder argBuilder = *builder;
     IRBuilder afterBuilder = argBuilder;
     afterBuilder.setInsertAfter(placeholderCall);
-    
+
     List<IRInst*> args;
     // Go over the parameter list and create pairs for each input (if required)
     for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
@@ -1612,9 +1609,6 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
         auto tempVar = builder.emitVar(ptrType->getValueType());
         param->replaceUsesWith(tempVar);
         mapParamToTempVar[param] = tempVar;
-        // TODO: link source locations for this?
-        printf("%s -> param:\n", __FUNCTION__);
-        param->dump();
         if (ptrType->getOp() != kIROp_OutType)
         {
             builder.emitStore(tempVar, builder.emitLoad(param));
@@ -1724,19 +1718,6 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
     // Create a clone for original func and run additional transformations on the clone.
     IRCloneEnv env;
     auto primalFuncClone = as<IRFunc>(cloneInst(&env, &builder, primalFunc));
-        
-    // printf("(prepareFuncForForwardDiff)===============================\n");
-    // primalFuncClone->dump();
-    // for (auto block : primalFuncClone->getBlocks()) {
-    //     for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-    //         printf("inst with location: %d (%d)\n",
-    //             inst->sourceLoc.getRaw(),
-    //             inst->sourceLoc.isValid());
-
-    //         inst->dump();
-    //     }
-    // }
-    
     prepareFuncForForwardDiff(primalFuncClone);
 
     builder.setInsertInto(diffFunc);
@@ -1798,25 +1779,12 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
 #if _DEBUG
     checkAutodiffInstDecorations(diffFunc);
 #endif
-    
-    // printf("(diffFunc at prepareFuncForForwardDiff)===============================\n");
-    // diffFunc->dump();
-    // for (auto block : diffFunc->getBlocks()) {
-    //     for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
-    //         printf("inst with location: %d (%d)\n",
-    //             inst->sourceLoc.getRaw(),
-    //             inst->sourceLoc.isValid());
-
-    //         inst->dump();
-    //     }
-    // }
 
     return InstPair(primalFunc, diffFunc);
 }
 
 InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* origInst)
 {
-    printf("%s: instruction operation is: %s\n", __FUNCTION__, getIROpInfo(origInst->m_op).name);
     // Handle common SSA-style operations
     switch (origInst->getOp())
     {

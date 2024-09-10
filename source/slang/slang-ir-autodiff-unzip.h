@@ -201,7 +201,6 @@ struct DiffUnzipPass
 
     InstPair splitCall(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRCall* mixedCall)
     {
-        printf("splitCall: %d\n", mixedCall->sourceLoc.getRaw());
         mixedCall->dump();
 
         IRBuilder globalBuilder(autodiffContext->moduleInst->getModule());
@@ -250,9 +249,6 @@ struct DiffUnzipPass
         {
             intermediateVar = primalBuilder->emitVar((IRType*)intermediateType);
             intermediateVar->sourceLoc = mixedCall->sourceLoc;
-            printf("creating intermediate var for mixed call (splitCall):\n");
-            printf("intermediate var: %d\n", intermediateVar->sourceLoc.getRaw());
-            intermediateVar->dump();
             primalBuilder->markInstAsPrimal(intermediateVar);
         }
 
@@ -419,9 +415,6 @@ struct DiffUnzipPass
             diffArgs);
 
         callInst->sourceLoc = mixedCall->sourceLoc;
-        printf("created callInst for diffBuilder: %d\n", callInst->sourceLoc.getRaw());
-        callInst->dump();
-
         diffBuilder->markInstAsDifferential(callInst, primalType);
 
         if (intermediateVar)
@@ -746,13 +739,9 @@ struct DiffUnzipPass
         IRBuilder diffBuilder(autodiffContext->moduleInst->getModule());
         diffBuilder.setInsertInto(diffBlock);
 
-        printf("@@@@@@@@ splitting block:\n");
-
         List<IRInst*> splitInsts;
         for (auto child : block->getModifiableChildren())
         {
-            printf("\tchild: (%d)\n", child->sourceLoc.getRaw());
-            child->dump();
             if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(child))
             {
                 // Replace GetDiff(A) with A.d

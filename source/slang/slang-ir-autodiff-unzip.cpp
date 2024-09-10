@@ -181,10 +181,6 @@ struct ExtractPrimalFuncContext
         auto newFuncType = generatePrimalFuncType(unzippedFunc, originalFunc, intermediateType);
         outIntermediateType = intermediateType;
         func->setFullType((IRType*)newFuncType);
-            
-        printf("in unzipping function:\n");
-        printf("createIntermediate type:\n");
-        intermediateType->dump();
 
         auto paramBlock = func->getFirstBlock();
         builder.setInsertInto(paramBlock);
@@ -227,13 +223,8 @@ struct ExtractPrimalFuncContext
                         {
                             auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
                             field->sourceLoc = inst->sourceLoc;
-
                             if (inst->findDecoration<IRLoopCounterDecoration>())
                                 builder.addLoopCounterDecoration(field);
-
-                            printf("ADDING FIELD:\n");
-                            inst->dump();
-                            field->dump();
 
                             builder.setInsertBefore(inst);
                             auto fieldAddr = builder.emitFieldAddress(
