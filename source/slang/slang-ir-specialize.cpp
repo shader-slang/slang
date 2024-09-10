@@ -1204,6 +1204,36 @@ struct SpecializationContext
         return false;
     }
 
+    // Is the function's actual return type statically known?
+    // If so can we specialize the function even if it has no existential parameters.
+    //
+    bool isExistentialReturnTypeSpecializable(IRFunc* callee)
+    {
+        if (!as<IRInterfaceType>(callee->getResultType()))
+            return false;
+
+        IRInst* witness = nullptr;
+
+        for (auto block : callee->getBlocks())
+        {
+            if (auto returnInst = as<IRReturn>(block->getTerminator()))
+            {
+                if (auto makeExistential = as<IRMakeExistential>(returnInst->getVal()))
+                {
+                    if (witness == nullptr)
+                        witness = makeExistential->getWitnessTable();
+                    else if (witness != makeExistential->getWitnessTable())
+                        return false;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     // Given a `call` instruction in the IR, we need to detect the case
     // where the callee has some interface-type parameter(s) and at the
     // call site it is statically clear what concrete type(s) the arguments
@@ -1245,33 +1275,27 @@ struct SpecializationContext
         // We shouldn't bother specializing unless the callee has at least
         // one parameter/return type that has an existential/interface type.
         //
-        bool shouldSpecialize = false;
+        bool returnTypeNeedSpecialization = isExistentialReturnTypeSpecializable(calleeFunc);
+        bool argumentNeedSpecialization = false;
         UInt argCounter = 0;
-        if (as<IRInterfaceType>(calleeFunc->getResultType()))
+        for (auto param : calleeFunc->getParams())
         {
-            shouldSpecialize = true;
+            auto arg = inst->getArg(argCounter++);
+            if (!isExistentialType(param->getDataType()))
+                continue;
+
+            // We *cannot* specialize unless the argument value corresponding
+            // to such a parameter is one we can specialize.
+            //
+            if (!canSpecializeExistentialArg(arg))
+                return false;
+
+            argumentNeedSpecialization = true;
         }
-        else
-        {
-            for (auto param : calleeFunc->getParams())
-            {
-                auto arg = inst->getArg(argCounter++);
-                if (!isExistentialType(param->getDataType()))
-                    continue;
 
-                shouldSpecialize = true;
-
-                // We *cannot* specialize unless the argument value corresponding
-                // to such a parameter is one we can specialize.
-                //
-                if (!canSpecializeExistentialArg(arg))
-                    return false;
-
-            }
-        }
-        // If we never found a parameter worth specializing, we should bail out.
+        // If we never found a parameter or return type worth specializing, we should bail out.
         //
-        if (!shouldSpecialize)
+        if (!returnTypeNeedSpecialization && !argumentNeedSpecialization)
             return false;
 
         // At this point, we believe we *should* and *can* specialize.
@@ -1348,9 +1372,7 @@ struct SpecializationContext
             }
             else
             {
-                // We encountered an existential argument that we don't know how to handle,
-                // bail out.
-                return false;
+                SLANG_UNEXPECTED("unhandled existential argument");
             }
         }
 
