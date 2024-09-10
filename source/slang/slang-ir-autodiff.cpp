@@ -626,9 +626,12 @@ IRInst* DifferentiableTypeConformanceContext::lookUpConformanceForType(IRInst* t
     switch (kind)
     {
     case DiffConformanceKind::Any:
+    {
         differentiableValueTypeWitnessDictionary.tryGetValue(type, foundResult);
         if (!foundResult)
             differentiablePtrTypeWitnessDictionary.tryGetValue(type, foundResult);
+        break;
+    }
     case DiffConformanceKind::Value:
         differentiableValueTypeWitnessDictionary.tryGetValue(type, foundResult);
         break;
