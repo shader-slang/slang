@@ -46,9 +46,9 @@ void computeMain()
     outputBuffer[5] = bitfieldInsert(base, insert, 40, 4); // 0xF000000000 -> 10477124133360
 
     // Test with a vector
-    uint64_t4 base4 = uint64_t4(base, base, base, base);
-    uint64_t4 insert4 = uint64_t4(insert, insert, insert, insert);
-    uint64_t4 output4 = bitfieldInsert(base4, insert4, 4, 40);
+    vector<uint64_t, 4> base4 = vector<uint64_t, 4>(base, base, base, base);
+    vector<uint64_t, 4> insert4 = vector<uint64_t, 4>(insert, insert, insert, insert);
+    vector<uint64_t, 4> output4 = bitfieldInsert(base4, insert4, 4, 40);
     outputBuffer[6] = output4.x;
     outputBuffer[7] = output4.y;
     outputBuffer[8] = output4.z;

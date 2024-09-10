@@ -67,8 +67,8 @@ void computeMain()
     outputBuffer[11] = bitfieldExtract(0b1010111ull, 3, 4); // 0b1010 -> 0b00000000000000000000000000001010
 
     // Component-wise extraction
-    int64_t4 val4 = int64_t4(0x123456789abcdef0ll, 0x9abcdef012345678ll, 0x87654321fedcba98ll, 0xfedcba9876543210ll);
-    int64_t4 ext4 = bitfieldExtract(val4, 40, 8);
+    vector<int64_t, 4> val4 = vector<int64_t, 4>(0x123456789abcdef0ll, 0x9abcdef012345678ll, 0x87654321fedcba98ll, 0xfedcba9876543210ll);
+    vector<int64_t, 4> ext4 = bitfieldExtract(val4, 40, 8);
     outputBuffer[12] = ext4.x;
     outputBuffer[13] = ext4.y;
     outputBuffer[14] = ext4.z;

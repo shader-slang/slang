@@ -5600,46 +5600,54 @@ struct SPIRVEmitContext
         return emitInst(parent, inst, SpvOpConvertUToPtr, inst->getFullType(), kResultID, inst->getOperand(0));
     }
 
+    bool tryGetIntInfo(IRType* elementType, bool &isSigned, int &bitWidth)
+    {
+        Slang::IROp type = elementType->getOp();
+        if (!(type >= kIROp_Int8Type && type <= kIROp_UInt64Type)) return false;
+        isSigned = (type >= kIROp_Int8Type && type <= kIROp_Int64Type);
+
+        Slang::IROp stype = (isSigned) ? type : Slang::IROp(type - 4);
+        bitWidth = 8 << (stype - kIROp_Int8Type);
+        return true;
+    }
+
     SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst) {
         auto dataType = inst->getDataType();
         IRVectorType* vectorType = as<IRVectorType>(dataType);
+        Slang::IRType* elementType = dataType;
         if (vectorType) 
+            elementType = vectorType->getElementType();
+        
+        bool isSigned; 
+        int bitWidth;
+        if (!tryGetIntInfo(elementType, isSigned, bitWidth)) 
         {
-            dataType = vectorType->getElementType();
+            SLANG_UNEXPECTED("non-integer element type given to bitfieldExtract in SPIR-V emit");
+            UNREACHABLE_RETURN(nullptr);
         }
 
-        switch (dataType->getOp())
-        {
-            case kIROp_UIntType:
-                return emitInst(parent, inst, SpvOpBitFieldUExtract, inst->getFullType(), kResultID, 
-                    inst->getOperand(0), inst->getOperand(1), inst->getOperand(2));
-            case kIROp_IntType:
-                return emitInst(parent, inst, SpvOpBitFieldSExtract, inst->getFullType(), kResultID, 
-                    inst->getOperand(0), inst->getOperand(1), inst->getOperand(2));
-            default:
-                SLANG_UNEXPECTED("type given to bitfieldExtract in SPIR-V emit");
-        }
-        UNREACHABLE_RETURN(nullptr);
+        SpvOp opcode = isSigned ? SpvOpBitFieldSExtract : SpvOpBitFieldUExtract;
+        return emitInst(parent, inst, opcode, inst->getFullType(), kResultID, 
+                inst->getOperand(0), inst->getOperand(1), inst->getOperand(2));
     }
 
     SpvInst* emitBitfieldInsert(SpvInstParent* parent, IRInst* inst) {
         auto dataType = inst->getDataType();
         IRVectorType* vectorType = as<IRVectorType>(dataType);
+        Slang::IRType* elementType = dataType;
         if (vectorType) 
-        {
-            dataType = vectorType->getElementType();
-        }
+            elementType = vectorType->getElementType();
         
-        switch (dataType->getOp())
+        bool isSigned; 
+        int bitWidth;
+        if (!tryGetIntInfo(elementType, isSigned, bitWidth)) 
         {
-            case kIROp_UIntType:
-            case kIROp_IntType:
-                return emitInst(parent, inst, SpvOpBitFieldInsert, inst->getFullType(), kResultID, 
-                    inst->getOperand(0), inst->getOperand(1), inst->getOperand(2), inst->getOperand(3));
-            default:
-                SLANG_UNEXPECTED("type given to bitfieldInsert in SPIR-V emit");
+            SLANG_UNEXPECTED("non-integer element type given to bitfieldInsert in SPIR-V emit");
+            UNREACHABLE_RETURN(nullptr);
         }
-        UNREACHABLE_RETURN(nullptr);
+
+        return emitInst(parent, inst, SpvOpBitFieldInsert, inst->getFullType(), kResultID, 
+                inst->getOperand(0), inst->getOperand(1), inst->getOperand(2), inst->getOperand(3));
     }
 
     template<typename T, typename Ts>
