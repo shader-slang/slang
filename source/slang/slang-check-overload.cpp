@@ -1199,6 +1199,8 @@ namespace Slang
         return parent;
     }
 
+    // Returns -1 if left is preferred, 1 if right is preferred, and 0 if they are equal.
+    //
     int SemanticsVisitor::CompareLookupResultItems(
         LookupResultItem const& left,
         LookupResultItem const& right)
@@ -1281,6 +1283,45 @@ namespace Slang
             for (auto facet : inheritanceInfo.facets)
                 if (facet.getImpl()->getDeclRef().equals(rightDeclRefParent))
                     return -1;
+        }
+
+        // If both are subscript decls, prefer the one that provides more
+        // accessors.
+        if (auto leftSubscriptDecl = left.declRef.as<SubscriptDecl>())
+        {
+            if (auto rightSubscriptDecl = right.declRef.as<SubscriptDecl>())
+            {
+                auto leftAccessorCount = leftSubscriptDecl.getDecl()->getMembersOfType<AccessorDecl>().getCount();
+                auto rightAccessorCount = rightSubscriptDecl.getDecl()->getMembersOfType<AccessorDecl>().getCount();
+                auto decl1IsSubsetOfDecl2 = [=](SubscriptDecl* decl1, SubscriptDecl* decl2)
+                    {
+                        for (auto accessorDecl1 : decl1->getMembersOfType<AccessorDecl>())
+                        {
+                            bool found = false;
+                            for (auto accessorDecl2 : decl2->getMembersOfType<AccessorDecl>())
+                            {
+                                if (accessorDecl1->astNodeType == accessorDecl2->astNodeType)
+                                {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found)
+                                return false;
+                        }
+                        return true;
+                    };
+                if (leftAccessorCount > rightAccessorCount
+                    && decl1IsSubsetOfDecl2(rightSubscriptDecl.getDecl(), leftSubscriptDecl.getDecl()))
+                {
+                    return -1;
+                }
+                else if (rightAccessorCount > leftAccessorCount
+                    && decl1IsSubsetOfDecl2(leftSubscriptDecl.getDecl(), rightSubscriptDecl.getDecl()))
+                {
+                    return 1;
+                }
+            }
         }
 
         // TODO: We should generalize above rules such that in a tie a declaration
