@@ -379,7 +379,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         if (processedUses.contains(use))
             continue;
 
-        printf("use with usedVal:\n");
+        printf("\n----use with usedVal:\n");
         use.usedVal->dump();
 
         processedUses.add(use);
@@ -1932,7 +1932,7 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     sortBlocksInFunc(func);
 
     printf("(applyCheckpointPolicy) ===============================\n");
-    // func->dump();
+    func->dump();
     for (auto block : func->getBlocks()) {
         for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
             printf("inst with location: %d (%d)\n",

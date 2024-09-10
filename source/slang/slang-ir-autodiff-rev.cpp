@@ -695,6 +695,19 @@ namespace Slang
         {
             tempBuilder.setInsertBefore(diffPropagateFunc);
         }
+        
+        printf("(primalFunc from generateNewForwardDerivative)===============================\n");
+        primalFunc->dump();
+        for (auto block : primalFunc->getBlocks()) {
+           for (auto inst = block->getFirstInst(); inst; inst = inst->next) {
+               printf("inst with location: %d (%d)\n",
+                   inst->sourceLoc.getRaw(),
+                   inst->sourceLoc.isValid());
+
+               inst->dump();
+           }
+        }
+
 
         auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, primalFunc, diffPropagateFunc);
         if (!fwdDiffFunc)

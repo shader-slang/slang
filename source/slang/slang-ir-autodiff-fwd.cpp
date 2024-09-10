@@ -604,6 +604,9 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     
     IRInst* origCallee = origCall->getCallee();
 
+    printf("transcribing call (%d):\n", origCall->sourceLoc.getRaw());
+    origCall->dump();
+
     if (!origCallee)
     {
         // Note that this can only happen if the callee is a result
@@ -671,7 +674,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     IRBuilder argBuilder = *builder;
     IRBuilder afterBuilder = argBuilder;
     afterBuilder.setInsertAfter(placeholderCall);
-
+    
     List<IRInst*> args;
     // Go over the parameter list and create pairs for each input (if required)
     for (UIndex ii = 0; ii < origCall->getArgCount(); ii++)
@@ -778,6 +781,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         diffReturnType,
         diffCallee,
         args);
+
+    callInst->sourceLoc = origCall->sourceLoc;
     placeholderCall->removeAndDeallocate();
     argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
     argBuilder.addAutoDiffOriginalValueDecoration(callInst, primalCallee);
@@ -1811,6 +1816,7 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
 
 InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* origInst)
 {
+    printf("%s: instruction operation is: %s\n", __FUNCTION__, getIROpInfo(origInst->m_op).name);
     // Handle common SSA-style operations
     switch (origInst->getOp())
     {

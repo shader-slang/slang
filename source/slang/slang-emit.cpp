@@ -242,14 +242,24 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
     StringBuilder builder;
     int nonEmptyCount = 0;
 
-    for (auto inst : irModule->getGlobalInsts()) {
+    for (auto inst : irModule->getGlobalInsts())
+    {
         IRStructType *structType = as<IRStructType>(inst);
         if (!structType)
             continue;
 
         auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
-        bool nonEmpty = structType->getChildren().getFirst();
-        if (checkpointDecoration && nonEmpty) {
+        if (checkpointDecoration)
+        {
+            IRSizeAndAlignment sizeInfo;
+            getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
+
+            // Reporting happens before empty structs are optimized out
+            // and we still want to keep the checkpointing decorations,
+            // so we end up needing to check for non-zero-ness
+            if (sizeInfo.size == 0)
+                continue;
+
             builder << "checkpointing context generated for function: ";
             
             auto func = checkpointDecoration->getSourceFunction();
@@ -258,9 +268,6 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
             else if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
                 builder << nameHint->getName();
 
-            IRSizeAndAlignment sizeInfo;
-            getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
-
             HumaneSourceLoc hloc = getHumanLoc(structType->sourceLoc);
             
             builder << "\n";
@@ -268,10 +275,13 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
             builder << "    size of context: " << sizeInfo.size << " bytes\n";
             builder << "\n";
 
-            for (auto field : structType->getFields()) {
+            for (auto field : structType->getFields())
+            {
                 IRType *fieldType = field->getFieldType();
                 IRSizeAndAlignment sizeInfo;
                 getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
+                if (sizeInfo.size == 0)
+                    continue;
 
                 emitter.emitType(fieldType);
                 
@@ -286,11 +296,14 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
                 if (field->findDecoration<IRLoopCounterDecoration>())
                     builder << "loop counter created for loop at ";
                 else
-                    builder << "variable defined at ";
+                    builder << "the following item defined at ";
                 builder << hloc.pathInfo.foundPath << ":" << hloc.line << "\n";
 
                 SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
-                sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
+                if (sourceView)
+                    sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
+                else
+                    builder << "    no source view found for field\n";
 
                 nonEmptyCount++;
             }

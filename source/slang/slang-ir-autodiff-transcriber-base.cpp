@@ -713,6 +713,9 @@ InstPair AutoDiffTranscriberBase::transcribeBlockImpl(IRBuilder* builder, IRBloc
     //
     for (auto child = origBlock->getFirstOrdinaryInst(); child; child = child->getNextInst())
     {
+        printf("transcribing instruction with op: %s\n", getIROpInfo(child->m_op).name);
+        child->dump();
+
         if (instsToSkip.contains(child))
         {
             continue;
@@ -944,12 +947,21 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
     // 
     instsInProgress.add(origInst);
     auto actualInstToTranscribe = getActualInstToTranscribe(origInst);
+    printf("transcribing actual instruction:\n");
+    printf("sourceloc info: %d (%d)\n", actualInstToTranscribe->sourceLoc.getRaw(), actualInstToTranscribe->sourceLoc.isValid());
+    printf("> ");
+    actualInstToTranscribe->dump();
     InstPair pair = transcribeInst(builder, actualInstToTranscribe);
 
     instsInProgress.remove(origInst);
 
     if (pair.primal)
     {
+        printf("\tresult:\n");
+        printf("sourceloc info: %d (%d)\n", pair.primal->sourceLoc.getRaw(), pair.primal->sourceLoc.isValid());
+        printf("\t> ");
+        pair.primal->dump();
+
         mapPrimalInst(origInst, pair.primal);
         mapDifferentialInst(origInst, pair.differential);
 
