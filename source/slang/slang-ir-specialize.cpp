@@ -1348,7 +1348,9 @@ struct SpecializationContext
             }
             else
             {
-                SLANG_UNEXPECTED("missing case for existential argument");
+                // We encountered an existential argument that we don't know how to handle,
+                // bail out.
+                return false;
             }
         }
 
