@@ -841,6 +841,10 @@ Result linkAndOptimizeIR(
     {
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
     }
+    else if (requiredLoweringPassSet.generics)
+    {
+        eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+    }
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
