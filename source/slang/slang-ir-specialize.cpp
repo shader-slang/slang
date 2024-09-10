@@ -1224,6 +1224,8 @@ struct SpecializationContext
                         witness = makeExistential->getWitnessTable();
                     else if (witness != makeExistential->getWitnessTable())
                         return false;
+                    if (isChildInstOf(witness, callee))
+                        return false;
                 }
                 else
                 {
@@ -1830,6 +1832,11 @@ struct SpecializationContext
                             witnessTable = makeExistential->getWitnessTable();
                         }
                         else if (concreteType != makeExistential->getWrappedValue()->getDataType())
+                        {
+                            concreteType = nullptr;
+                            break;
+                        }
+                        if (isChildInstOf(witnessTable, newFunc))
                         {
                             concreteType = nullptr;
                             break;
