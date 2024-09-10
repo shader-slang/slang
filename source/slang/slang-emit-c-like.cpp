@@ -3715,6 +3715,9 @@ void CLikeSourceEmitter::emitVecNOrScalar(IRVectorType* vectorType, std::functio
 
             m_writer->emitRawText(std::to_string(N).c_str());
         }
+        else {
+            emitType(vectorType);
+        }
 
         m_writer->emit("(");
         for (int i = 0; i < N; ++i) 
