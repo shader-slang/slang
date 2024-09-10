@@ -1432,11 +1432,15 @@ HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block)
         currBlock = dom->getImmediateDominator(currBlock))
     {
         if (auto loopInst = as<IRLoop>(currBlock->getTerminator()))
+        {
             if (!dom->dominates(loopInst->getBreakBlock(), block))
                 parentBreakBlocksSet.add(loopInst->getBreakBlock());
+        }
         else if (auto switchInst = as<IRSwitch>(currBlock->getTerminator()))
+        {
             if (!dom->dominates(switchInst->getBreakLabel(), block))
                 parentBreakBlocksSet.add(switchInst->getBreakLabel());
+        }
     }
 
     return parentBreakBlocksSet;

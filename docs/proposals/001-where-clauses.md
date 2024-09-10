@@ -1,4 +1,4 @@
-`where` Clauses
+SP #001: `where` Clauses
 ===============
 
 We propose to allow generic declarations in Slang to move the constraints on generic type parameters outside of the `<>` and onto distinct `where` clauses.

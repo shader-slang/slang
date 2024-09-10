@@ -1838,6 +1838,10 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::metal);
         break;
 
+    case CodeGenTarget::WGSL:
+        atoms.add(CapabilityName::wgsl);
+        break;        
+        
     default:
         break;
     }
