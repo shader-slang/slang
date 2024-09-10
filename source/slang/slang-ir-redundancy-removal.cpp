@@ -176,26 +176,23 @@ void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule
                     (dec->getTarget() == target))
                 {
                     // Gut the function definition, turning it into a declaration
-                    for (auto inst : funcInst->getChildren())
+                    for (auto block : funcInst->getBlocks())
                     {
                         // For HLSL, we can delete the whole block
                         // but for SPIR-V we have to keep the block with only the
                         // parameters inside, no other instructions.
-                        if (inst->getOp() == kIROp_Block)
+                        if (target == CodeGenTarget::HLSL)
                         {
-                            if (target == CodeGenTarget::HLSL)
+                            toRemove.add(block);
+                        }
+                        else if (target == CodeGenTarget::SPIRV)
+                        {
+                            for (auto blockInst : block->getChildren())
                             {
-                                toRemove.add(inst);
-                            }
-                            else if (target == CodeGenTarget::SPIRV)
-                            {
-                                for (auto blockInst : inst->getChildren())
+                                if (blockInst->getOp() != kIROp_Param &&
+                                    blockInst != block->getLastDecorationOrChild())
                                 {
-                                    if (blockInst->getOp() != kIROp_Param &&
-                                        blockInst != inst->getLastDecorationOrChild())
-                                    {
-                                        toRemove.add(blockInst);
-                                    }
+                                    toRemove.add(blockInst);
                                 }
                             }
                         }
