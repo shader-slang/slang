@@ -3715,6 +3715,17 @@ void CLikeSourceEmitter::emitVecNOrScalar(IRVectorType* vectorType, std::functio
 
             m_writer->emitRawText(std::to_string(N).c_str());
         }
+        // Special handling required for Metal target
+        else if (isMetalTarget(getTargetReq()))
+        {
+            m_writer->emit("vec<");
+            emitType(elementType);
+            m_writer->emit(", ");
+            m_writer->emit(N);
+            m_writer->emit(">");
+        }
+
+        // In other languages, we can output the Slang vector type directly
         else {
             emitType(vectorType);
         }
@@ -3760,6 +3771,8 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "non-integer element type given to bitfieldExtract");
         return;
     }
+
+    String one = bitWidth <= 32 ? "1u" : "1ull";
     
     // Emit open paren and type cast for later sign extension
     if (isSigned) 
@@ -3777,10 +3790,9 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
     });
     m_writer->emit(")&(");
     emitVecNOrScalar(vectorType, [&]() {
-        if (bitWidth <= 32) m_writer->emit("((1u<<");
-        else m_writer->emit("((1ull<<");
+        m_writer->emit("((" + one + "<<");
         emitOperand(bts, getInfo(EmitOp::General));
-        m_writer->emit(")-1)");
+        m_writer->emit(")-" + one + ")");
     });
     m_writer->emit("))");
 
@@ -3836,58 +3848,45 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
         return;
     }
 
-    m_writer->emit("(");
+    String one = bitWidth <= 32 ? "1u" : "1ull";
+
+    m_writer->emit("((");
+    
+    // emit clearedBase := uint(bse & ~(((1u<<bts)-1u)<<off))
+    emitOperand(bse, getInfo(EmitOp::General));
+    m_writer->emit("&");
+    emitVecNOrScalar(vectorType, [&]()
     {
-        // emit clearedBase := uint(base & clearMask)
-        m_writer->emit("(");
-        {
-            // emit base
-            emitOperand(bse, getInfo(EmitOp::General));
-            m_writer->emit("&");
-            
-            // emit clearMask := ~(((1u<<bts)-1u)<<off)
-            emitVecNOrScalar(vectorType, [&]()
-            {
-                if (bitWidth <= 32) m_writer->emit("~(((1u<<");
-                else m_writer->emit("~(((1ull<<");
-                emitOperand(bts, getInfo(EmitOp::General));
-                if (bitWidth <= 32) m_writer->emit(")-1u)<<");
-                else m_writer->emit(")-1ull)<<");
-                emitOperand(off, getInfo(EmitOp::General));
-                m_writer->emit(")");
-            });
-        }
+        m_writer->emit("~(((" + one + "<<");
+        emitOperand(bts, getInfo(EmitOp::General));
+        m_writer->emit(")-" + one + ")<<");
+        emitOperand(off, getInfo(EmitOp::General));
         m_writer->emit(")");
+    });
+    
+    
+    // bitwise or clearedBase with maskedInsert
+    m_writer->emit(")|(");
 
-        // bitwise or clearedBase with maskedInsert
-        m_writer->emit("|");
-
-        // Emit maskedInsert := ((insert & ((1u << bits) - 1u)) << offset);
-        m_writer->emit("(");
-        {
-            // Emit mask := (insert & ((1u << bits) - 1u))
-            m_writer->emit("(");
-            emitOperand(ins, getInfo(EmitOp::General));
-            m_writer->emit("&");
-            emitVecNOrScalar(vectorType, [&](){
-                if (bitWidth <= 32) m_writer->emit("(1u<<");
-                else m_writer->emit("(1ull<<");
-                emitOperand(bts, getInfo(EmitOp::General));
-                if (bitWidth <= 32) m_writer->emit(")-1u");
-                else m_writer->emit(")-1ull");
-            });
-            m_writer->emit(")");
-            
-            // Emit shift := << offset
-            m_writer->emit("<<");
-
-            emitVecNOrScalar(vectorType, [&](){
-                emitOperand(off, getInfo(EmitOp::General));
-            });
-        }
-        m_writer->emit(")");
-    }
+    // Emit maskedInsert := ((insert & ((1u << bits) - 1u)) << offset);
+    
+    // - first emit mask := (insert & ((1u << bits) - 1u))
+    m_writer->emit("(");
+    emitOperand(ins, getInfo(EmitOp::General));
+    m_writer->emit("&");
+    emitVecNOrScalar(vectorType, [&](){
+        m_writer->emit("(" + one + "<<");
+        emitOperand(bts, getInfo(EmitOp::General));
+        m_writer->emit(")-" + one);
+    });
     m_writer->emit(")");
+
+    // then emit shift := << offset
+    m_writer->emit("<<");
+    emitVecNOrScalar(vectorType, [&](){
+        emitOperand(off, getInfo(EmitOp::General));
+    });
+    m_writer->emit("))");
 }
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)

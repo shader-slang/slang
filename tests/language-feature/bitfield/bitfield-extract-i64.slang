@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
