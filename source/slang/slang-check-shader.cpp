@@ -235,75 +235,17 @@ namespace Slang
         Name*                   name,
         DiagnosticSink*         sink)
     {
-        auto translationUnitSyntax = translationUnit->getModuleDecl();
-        FuncDecl* entryPointFuncDecl = nullptr;
+        auto declRef = translationUnit->findDeclFromString(getText(name), sink);
+        FuncDecl* entryPointFuncDecl = declRef.as<FuncDecl>().getDecl();
 
-        for (auto globalScope = translationUnit->getModuleDecl()->ownedScope; globalScope; globalScope = globalScope->nextSibling)
-        {
-            if (globalScope->containerDecl != translationUnitSyntax && globalScope->containerDecl->parentDecl != translationUnitSyntax)
-                continue; // Skip scopes that aren't part of the current module.
-
-            // We will look up any global-scope declarations in the translation
-            // unit that match the name of our entry point.
-            Decl* firstDeclWithName = nullptr;
-            if (!globalScope->containerDecl->getMemberDictionary().tryGetValue(name, firstDeclWithName))
-            {
-                // If there doesn't appear to be any such declaration, then we are done with this scope.
-                continue;
-            }
-
-            // We found at least one global-scope declaration with the right name,
-            // but (1) it might not be a function, and (2) there might be
-            // more than one function.
-            //
-            // We'll walk the linked list of declarations with the same name,
-            // to see what we find. Along the way we'll keep track of the
-            // first function declaration we find, if any:
-            for (auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
-            {
-                // Is this declaration a function?
-                if (auto funcDecl = as<FuncDecl>(ee))
-                {
-                    // Skip non-primary declarations, so that
-                    // we don't give an error when an entry
-                    // point is forward-declared.
-                    if (!isPrimaryDecl(funcDecl))
-                        continue;
-
-                    // is this the first one we've seen?
-                    if (!entryPointFuncDecl)
-                    {
-                        // If so, this is a candidate to be
-                        // the entry point function.
-                        entryPointFuncDecl = funcDecl;
-                    }
-                    else
-                    {
-                        // Uh-oh! We've already seen a function declaration with this
-                        // name before, so the whole thing is ambiguous. We need
-                        // to diagnose and bail out.
-
-                        sink->diagnose(translationUnitSyntax, Diagnostics::ambiguousEntryPoint, name);
-
-                        // List all of the declarations that the user *might* mean
-                        for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
-                        {
-                            if (auto candidate = as<FuncDecl>(ff))
-                            {
-                                sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
-                            }
-                        }
-
-                        // Bail out.
-                        return nullptr;
-                    }
-                }
-            }
-        }
+        if (entryPointFuncDecl && getModule(entryPointFuncDecl) != translationUnit)
+            entryPointFuncDecl = nullptr;
 
         if (!entryPointFuncDecl)
+        {
+            auto translationUnitSyntax = translationUnit->getModuleDecl();
             sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, name);
-
+        }
         return entryPointFuncDecl;
     }
 

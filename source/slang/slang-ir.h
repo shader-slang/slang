@@ -2389,9 +2389,6 @@ public:
     {
         return m_containerPool;
     }
-
-    // TODO: make a map with lookup by target?
-    ComPtr<ISlangBlob> precompiledDXIL;
 private:
     IRModule() = delete;
 

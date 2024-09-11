@@ -1,3 +1,4 @@
+#include <memory>
 #include <stdio.h>
 
 #include <replay/recordFile-processor.h>
@@ -79,14 +80,15 @@ int main(int argc, char *argv[])
     SlangRecord::RecordFileProcessor recordFileProcessor(options.recordFileName);
 
     Slang::String jsonPath = Slang::Path::replaceExt(options.recordFileName, "json");
-    SlangRecord::JsonConsumer jsonConsumer(jsonPath);
+    Slang::RefPtr<SlangRecord::JsonConsumer> jsonConsumer;
     SlangRecord::ReplayConsumer replayConsumer;
 
     SlangRecord::SlangDecoder decoder;
 
     if (options.convertToJson)
     {
-        decoder.addConsumer(&jsonConsumer);
+        jsonConsumer = new SlangRecord::JsonConsumer(jsonPath);
+        decoder.addConsumer(jsonConsumer.get());
     }
     else
     {

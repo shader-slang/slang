@@ -1879,6 +1879,10 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::metal);
         break;
 
+    case CodeGenTarget::WGSL:
+        atoms.add(CapabilityName::wgsl);
+        break;        
+        
     default:
         break;
     }
@@ -2369,7 +2373,14 @@ DeclRef<Decl> ComponentType::findDeclFromString(
     {
         result = declRefExpr->declRef;
     }
-
+    else if (auto overloadedExpr = as<OverloadedExpr>(checkedExpr))
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::ambiguousReference, name);
+        for (auto candidate : overloadedExpr->lookupResult2)
+        {
+            sink->diagnose(candidate.declRef.getDecl(), Diagnostics::overloadCandidate, candidate.declRef);
+        }
+    }
     m_decls[name] = result;
     return result;
 }
@@ -3339,20 +3350,20 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_OK;
     }
 
-    // If requested, attempt to compile the translation unit all the way down to the target language
-    // and stash the result blob in an IR op.
-    for (auto targetReq : getLinkage()->targets)
+    // If requested, attempt to compile the translation unit all the way down to the target language(s)
+    // and stash the result blobs in IR.
+    for (auto target : getLinkage()->targets)
     {
-        if (targetReq->getOptionSet().getBoolOption(CompilerOptionName::EmbedDXIL))
+        SlangCompileTarget targetEnum = SlangCompileTarget(target->getTarget());
+        if (target->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
         {
             auto frontEndReq = getFrontEndReq();
 
             for (auto translationUnit : frontEndReq->translationUnits)
             {
-                SlangCompileTarget target = SlangCompileTarget(targetReq->getTarget());
-                translationUnit->getModule()->precompileForTarget(
-                    target,
-                    nullptr);
+                SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
+                    targetEnum,
+                    nullptr));
             }
         }
     }
@@ -5976,9 +5987,9 @@ void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
 }
 
-void EndToEndCompileRequest::setTargetEmbedDXIL(int targetIndex, bool value)
+void EndToEndCompileRequest::setTargetEmbedDownstreamIR(int targetIndex, bool value)
 {
-    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDXIL, value);
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDownstreamIR, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(

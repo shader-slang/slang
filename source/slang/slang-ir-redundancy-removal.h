@@ -1,5 +1,6 @@
 // slang-ir-redundancy-removal.h
 #pragma once
+#include "slang-compiler.h"
 
 namespace Slang
 {
@@ -10,4 +11,6 @@ namespace Slang
     bool removeRedundancyInFunc(IRGlobalValueWithCode* func);
 
     bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func);
+
+    void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module);
 }

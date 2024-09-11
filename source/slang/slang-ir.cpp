@@ -3863,11 +3863,11 @@ namespace Slang
         return nullptr;
     }
 
-    IRInst* IRBuilder::emitEmbeddedDXIL(ISlangBlob *blob)
+    IRInst* IRBuilder::emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob *blob)
     {
-        IRInst* args[] = { getBlobValue(blob) };
+        IRInst* args[] = { getIntValue(getIntType(), (int)target), getBlobValue(blob) };
 
-        return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedDXIL, 1, args);
+        return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedDownstreamIR, 2, args);
     }
 
     enum class TypeCastStyle
@@ -4614,6 +4614,15 @@ namespace Slang
         return witness;
     }
 
+    IRInst* IRBuilder::getTypeEqualityWitness(IRType* witnessType, IRType* type1, IRType* type2)
+    {
+        IRInst* operands[2] = { type1, type2 };
+        return (IRType*)createIntrinsicInst(
+            witnessType,
+            kIROp_TypeEqualityWitness,
+            2,
+            operands);
+    }
 
     IRStructType* IRBuilder::createStructType()
     {
@@ -8347,6 +8356,7 @@ namespace Slang
         case kIROp_InterfaceRequirementEntry:
         case kIROp_Block:
         case kIROp_Each:
+        case kIROp_TypeEqualityWitness:
             return false;
 
             /// Liveness markers have no side effects
