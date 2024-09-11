@@ -1,4 +1,5 @@
 // slang-check-overload.cpp
+#include "slang-ast-base.h"
 #include "slang-check-impl.h"
 
 #include "slang-lookup.h"
@@ -1199,6 +1200,28 @@ namespace Slang
         return parent;
     }
 
+    void countDistanceToGloablScope(DeclRef<Slang::Decl> const& leftDecl,
+                                    DeclRef<Slang::Decl> const& rightDecl,
+                                    int& leftDistance, int& rightDistance)
+    {
+        leftDistance = 0;
+        rightDistance = 0;
+
+        DeclRef<Decl> decl = leftDecl;
+        while(decl)
+        {
+            leftDistance++;
+            decl = decl.getParent();
+        }
+
+        decl = rightDecl;
+        while(decl)
+        {
+            rightDistance++;
+            decl = decl.getParent();
+        }
+    }
+
     // Returns -1 if left is preferred, 1 if right is preferred, and 0 if they are equal.
     //
     int SemanticsVisitor::CompareLookupResultItems(
@@ -1323,6 +1346,24 @@ namespace Slang
                 }
             }
         }
+
+        // We need to consider the distance of the declarations from the global scope to resolve this case:
+        //      float f(float x);
+        //      struct S
+        //      {
+        //          float f(float x);
+        //          float g(float y) { return f(y); }   // will call S::f
+        //      }
+        // We don't need to know the call site of 'f(y)', but only need to count the two candidates' distance to the global scope,
+        // because this function will only choose the valid candidates. So if there is situation like this:
+        //  void main() {  S s; s.f(1.0);} or
+        //  struct T { float g(y) { f(y); } }, there won't be ambiguity.
+        //  So we just need to count which declaration is farther from the global scope and favor the farther one.
+        int leftDistance = 0;
+        int rightDistance = 0;
+        countDistanceToGloablScope(left.declRef, right.declRef, leftDistance, rightDistance);
+        if (leftDistance != rightDistance)
+            return leftDistance < rightDistance ? -1 : 1;
 
         // TODO: We should generalize above rules such that in a tie a declaration
         // A::m is better than B::m when all other factors are equal and
