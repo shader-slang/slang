@@ -1347,12 +1347,12 @@ namespace Slang
             }
         }
 
-        // We need to consider the distance of the declarations from the global scope to resolve this case:
+        // We need to consider the distance of the declarations to the global scope to resolve this case:
         //      float f(float x);
         //      struct S
         //      {
         //          float f(float x);
-        //          float g(float y) { return f(y); }   // will call S::f
+        //          float g(float y) { return f(y); }   // will call S::f() instead of ::f()
         //      }
         // We don't need to know the call site of 'f(y)', but only need to count the two candidates' distance to the global scope,
         // because this function will only choose the valid candidates. So if there is situation like this:
@@ -1363,7 +1363,7 @@ namespace Slang
         int rightDistance = 0;
         countDistanceToGloablScope(left.declRef, right.declRef, leftDistance, rightDistance);
         if (leftDistance != rightDistance)
-            return leftDistance < rightDistance ? -1 : 1;
+            return leftDistance > rightDistance ? -1 : 1;
 
         // TODO: We should generalize above rules such that in a tie a declaration
         // A::m is better than B::m when all other factors are equal and
