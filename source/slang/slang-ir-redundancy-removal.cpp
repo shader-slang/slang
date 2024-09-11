@@ -159,6 +159,39 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     return result;
 }
 
+// Remove IR definitions from all AvailableInDownstreamIR functions where the
+// languages match what we're currently targetting,  as these functions are
+// already defined in the embedded precompiled library.
+void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module)
+{
+    List<IRInst*> toRemove;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto funcInst = as<IRFunc>(globalInst))
+        {
+            if (auto dec = globalInst->findDecoration<IRAvailableInDownstreamIRDecoration>())
+            {
+                if ((dec->getTarget() == CodeGenTarget::DXIL && target == CodeGenTarget::HLSL) ||
+                    (dec->getTarget() == target))
+                {
+                    // Gut the function definition, turning it into a declaration
+                    for (auto inst : funcInst->getChildren())
+                    {
+                        if (inst->getOp() == kIROp_Block)
+                        {
+                            toRemove.add(inst);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (auto inst : toRemove)
+    {
+        inst->removeAndDeallocate();
+    }
+}
+
 static IRInst* _getRootVar(IRInst* inst)
 {
     while (inst)

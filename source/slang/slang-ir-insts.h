@@ -330,6 +330,8 @@ IR_SIMPLE_DECORATION(PerVertexDecoration)
 
 IR_SIMPLE_DECORATION(SPIRVBlockDecoration)
 
+IR_SIMPLE_DECORATION(DefaultValueDecoration)
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -430,6 +432,13 @@ IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
 IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
 IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
+IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
+
+struct IRAvailableInDownstreamIRDecoration : IRDecoration
+{
+    IR_LEAF_ISA(AvailableInDownstreamIRDecoration)
+    CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue()); }
+};
 
 struct IRGLSLLocationDecoration : IRDecoration
 {
@@ -788,6 +797,17 @@ struct IRSequentialIDDecoration : IRDecoration
 
     IRIntLit* getSequentialIDOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
+};
+
+struct IRResultWitnessDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_ResultWitnessDecoration
+    };
+    IR_LEAF_ISA(ResultWitnessDecoration)
+
+    IRInst* getWitness() { return getOperand(0); }
 };
 
 struct IRDynamicDispatchWitnessDecoration : IRDecoration
@@ -3336,6 +3356,13 @@ struct IRStaticAssert : IRInst
     IR_LEAF_ISA(StaticAssert)
 };
 
+struct IREmbeddedDownstreamIR : IRInst
+{
+    IR_LEAF_ISA(EmbeddedDownstreamIR)
+    CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue()); }
+    IRBlobLit* getBlob() { return cast<IRBlobLit>(getOperand(1)); }
+};
+
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
@@ -4049,7 +4076,7 @@ public:
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* value);
     IRInst* emitByteAddressBufferStore(IRInst* byteAddressBuffer, IRInst* offset, IRInst* alignment, IRInst* value);
 
-    IRInst* emitEmbeddedDXIL(ISlangBlob* blob);
+    IRInst* emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob* blob);
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
@@ -4070,6 +4097,8 @@ public:
         IRInst*        satisfyingVal);
 
     IRInst* createThisTypeWitness(IRType* interfaceType);
+
+    IRInst* getTypeEqualityWitness(IRType* witnessType, IRType* type1, IRType* type2);
 
     IRInterfaceRequirementEntry* createInterfaceRequirementEntry(
         IRInst* requirementKey,
@@ -4522,6 +4551,11 @@ public:
 
     void addHighLevelDeclDecoration(IRInst* value, Decl* decl);
 
+    IRDecoration* addResultWitnessDecoration(IRInst* value, IRInst* witness)
+    {
+        return addDecoration(value, kIROp_ResultWitnessDecoration, witness);
+    }
+
     IRDecoration* addTargetSystemValueDecoration(IRInst* value, UnownedStringSlice sysValName, UInt index = 0)
     {
         IRInst* operands[] = { getStringValue(sysValName), getIntValue(getIntType(), index)};
@@ -4971,6 +5005,10 @@ public:
     void addHasExplicitHLSLBindingDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_HasExplicitHLSLBindingDecoration);
+    }
+    void addDefaultValueDecoration(IRInst* value, IRInst* defaultValue)
+    {
+        addDecoration(value, kIROp_DefaultValueDecoration, defaultValue);
     }
     void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)
     {

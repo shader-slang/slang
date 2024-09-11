@@ -139,6 +139,33 @@ namespace SlangRecord
         return res;
     }
 
+    SlangResult CommonInterfaceReplayer::specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
+                                        SlangInt specializationArgCount, ObjectID outSpecializedComponentTypeId, ObjectID outDiagnosticsId)
+    {
+        InputObjectSanityCheck(objectId);
+
+        for (SlangInt i = 0; i < specializationArgCount; i++)
+        {
+            if (specializationArgs[i].type != nullptr)
+            {
+                slangRecordLog(LogLevel::Error, "We only support nullptr for 'type' as reflection is not supported yet, %s:%d\n", objectId, __PRETTY_FUNCTION__, __LINE__);
+                return SLANG_FAIL;
+            }
+        }
+
+        slang::IComponentType* pObj = getObjectPointer(objectId);
+        slang::IComponentType* outSpecializedComponentType {};
+        slang::IBlob* outDiagnostics {};
+
+        SlangResult res = pObj->specialize(specializationArgs, specializationArgCount, &outSpecializedComponentType, &outDiagnostics);
+        if (outSpecializedComponentType && SLANG_SUCCEEDED(res))
+        {
+            m_objectMap.addIfNotExists(outSpecializedComponentTypeId, outSpecializedComponentType);
+        }
+
+        ReplayConsumer::printDiagnosticMessage(outDiagnostics);
+        return res;
+    }
 
     SlangResult CommonInterfaceReplayer::link(ObjectID objectId, ObjectID outLinkedComponentTypeId, ObjectID outDiagnosticsId)
     {
@@ -683,7 +710,8 @@ namespace SlangRecord
             InputObjectSanityCheck(componentTypeIds[i]);
         }
 
-        OutputObjectSanityCheck(outCompositeComponentTypeId);
+        // We don't need to check existence of outCompositeComponentTypeId, because it could be the same object
+        // as the input one
 
         slang::ISession* session = getObjectPointer<slang::ISession>(objectId);
 
@@ -702,7 +730,7 @@ namespace SlangRecord
 
         if (outCompositeComponentType && SLANG_SUCCEEDED(res))
         {
-            m_objectMap.add(outCompositeComponentTypeId, outCompositeComponentType);
+            m_objectMap.addIfNotExists(outCompositeComponentTypeId, outCompositeComponentType);
         }
         else
         {
@@ -936,9 +964,9 @@ namespace SlangRecord
     void ReplayConsumer::IModule_specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
         SlangInt specializationArgCount, ObjectID outSpecializedComponentTypeId, ObjectID outDiagnosticsId)
     {
-        // TODO: Cannot replay this function because of the TypeReflection is not recorded.
+        SlangResult res = m_commonReplayer.specialize(objectId, specializationArgs, specializationArgCount, outSpecializedComponentTypeId, outDiagnosticsId);
+        FAIL_WITH_LOG(IModule::specialize);
     }
-
 
 
     void ReplayConsumer::IModule_link(ObjectID objectId, ObjectID outLinkedComponentTypeId, ObjectID outDiagnosticsId)
@@ -1015,7 +1043,8 @@ namespace SlangRecord
     void ReplayConsumer::IEntryPoint_specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
         SlangInt specializationArgCount, ObjectID outSpecializedComponentTypeId, ObjectID outDiagnosticsId)
     {
-
+        SlangResult res = m_commonReplayer.specialize(objectId, specializationArgs, specializationArgCount, outSpecializedComponentTypeId, outDiagnosticsId);
+        FAIL_WITH_LOG(IModule::specialize);
     }
 
 
@@ -1093,6 +1122,8 @@ namespace SlangRecord
     void ReplayConsumer::ICompositeComponentType_specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
         SlangInt specializationArgCount, ObjectID outSpecializedComponentTypeId, ObjectID outDiagnosticsId)
     {
+        SlangResult res = m_commonReplayer.specialize(objectId, specializationArgs, specializationArgCount, outSpecializedComponentTypeId, outDiagnosticsId);
+        FAIL_WITH_LOG(IModule::specialize);
     }
 
 
@@ -1170,6 +1201,8 @@ namespace SlangRecord
     void ReplayConsumer::ITypeConformance_specialize(ObjectID objectId, slang::SpecializationArg const* specializationArgs,
         SlangInt specializationArgCount, ObjectID outSpecializedComponentTypeId, ObjectID outDiagnosticsId)
     {
+        SlangResult res = m_commonReplayer.specialize(objectId, specializationArgs, specializationArgCount, outSpecializedComponentTypeId, outDiagnosticsId);
+        FAIL_WITH_LOG(IModule::specialize);
     }
 
 

@@ -244,6 +244,14 @@ bool isSimpleDataType(IRType* type)
     }
 }
 
+bool isSimpleHLSLDataType(IRInst* inst)
+{
+    // TODO: Add criteria
+    // https://github.com/shader-slang/slang/issues/4792
+    SLANG_UNUSED(inst);
+    return true;
+}
+
 SourceLoc findFirstUseLoc(IRInst* inst)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -1422,11 +1430,15 @@ HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block)
         currBlock = dom->getImmediateDominator(currBlock))
     {
         if (auto loopInst = as<IRLoop>(currBlock->getTerminator()))
+        {
             if (!dom->dominates(loopInst->getBreakBlock(), block))
                 parentBreakBlocksSet.add(loopInst->getBreakBlock());
+        }
         else if (auto switchInst = as<IRSwitch>(currBlock->getTerminator()))
+        {
             if (!dom->dominates(switchInst->getBreakLabel(), block))
                 parentBreakBlocksSet.add(switchInst->getBreakLabel());
+        }
     }
 
     return parentBreakBlocksSet;

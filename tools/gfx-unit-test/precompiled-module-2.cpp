@@ -43,6 +43,9 @@ namespace gfx_test
             case gfx::DeviceType::DirectX12:
                 target = SLANG_DXIL;
                 break;
+            case gfx::DeviceType::Vulkan:
+                target = SLANG_SPIRV;
+                break;
             default:
                 return SLANG_FAIL;
             }
@@ -206,6 +209,11 @@ namespace gfx_test
     SLANG_UNIT_TEST(precompiledModule2Vulkan)
     {
         runTestImpl(precompiledModule2TestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)
+    {
+        runTestImpl(precompiledTargetModule2TestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
 }

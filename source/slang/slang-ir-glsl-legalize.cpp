@@ -1197,13 +1197,15 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
     IRType* type = inType;
     IRType* peeledRequiredType = nullptr;
-
+    ShortList<IRInst*> peeledRequiredArraySizes;
+    bool peeledRequiredArrayLevelMatchesUserDeclaredType = false;
     // A system-value semantic might end up needing to override the type
     // that the user specified.
     if( systemValueInfo && systemValueInfo->requiredType )
     {
         type = systemValueInfo->requiredType;
         peeledRequiredType = type;
+        peeledRequiredArrayLevelMatchesUserDeclaredType = true;
         // Unpeel `type` using declarators so that it matches `inType`.
         for (auto dd = declarator; dd; dd = dd->next)
         {
@@ -1214,7 +1216,12 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                     if (auto arrayType = as<IRArrayTypeBase>(type))
                     {
                         type = arrayType->getElementType();
+                        peeledRequiredArraySizes.add(arrayType->getElementCount());
                         peeledRequiredType = type;
+                    }
+                    else
+                    {
+                        peeledRequiredArrayLevelMatchesUserDeclaredType = false;
                     }
                     break;
                 }
@@ -1305,15 +1312,20 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // Construct the actual type and type-layout for the global variable
     //
     IRTypeLayout* typeLayout = inTypeLayout;
+    Index requiredArraySizeIndex = peeledRequiredArraySizes.getCount() - 1;
     for( auto dd = declarator; dd; dd = dd->next )
     {
         switch(dd->flavor)
         {
         case GlobalVaryingDeclarator::Flavor::array:
         {
+            auto elementCount = peeledRequiredArrayLevelMatchesUserDeclaredType
+                ? peeledRequiredArraySizes[requiredArraySizeIndex] : dd->elementCount;
+
             auto arrayType = builder->getArrayType(
                 type,
-                dd->elementCount);
+                elementCount);
+            requiredArraySizeIndex--;
 
             IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
             if( auto resInfo = inTypeLayout->findSizeAttr(kind) )
@@ -1321,10 +1333,9 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                 // TODO: it is kind of gross to be re-running some
                 // of the type layout logic here.
 
-                UInt elementCount = (UInt) getIntVal(dd->elementCount);
                 arrayTypeLayoutBuilder.addResourceUsage(
                     kind,
-                    resInfo->getSize() * elementCount);
+                    resInfo->getSize() * getIntVal(elementCount));
             }
             auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
 
@@ -1772,6 +1783,13 @@ ScalarizedVal adaptType(
         {
             UInt index = 0;
             val = builder->emitSwizzle(fromVector->getElementType(), val, 1, &index);
+        }
+    }
+    else if (auto fromArray = as<IRArrayTypeBase>(fromType))
+    {
+        if (as<IRBasicType>(toType))
+        {
+            val = builder->emitElementExtract(fromArray->getElementType(), val, builder->getIntValue(builder->getIntType(), 0));
         }
     }
     // TODO: actually consider what needs to go on here...

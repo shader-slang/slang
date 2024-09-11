@@ -31,6 +31,7 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-metal-legalize.h"
+#include "slang-ir-wgsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-array-return-type.h"
@@ -58,6 +59,7 @@
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-redundancy-removal.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-sccp.h"
@@ -100,6 +102,7 @@
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
 #include "slang-emit-metal.h"
+#include "slang-emit-wgsl.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
 #include "slang-emit-torch.h"
@@ -413,6 +416,53 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     }
 
     return false;
+}
+
+static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
+{
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_Func)
+        {
+            bool remove = false;
+            if (target == CodeGenTarget::HLSL)
+            {
+                // DXIL does not permit HLSLStructureBufferType in exported functions
+                // or sadly Matrices (https://github.com/shader-slang/slang/issues/4880)
+                auto type = as<IRFuncType>(inst->getFullType());
+                auto argCount = type->getOperandCount();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    auto operand = type->getOperand(aa);
+                    if (operand->getOp() == kIROp_HLSLStructuredBufferType ||
+                        operand->getOp() == kIROp_MatrixType)
+                    {
+                        remove = true;
+                        break;
+                    }
+                }
+            }
+            else if (target == CodeGenTarget::SPIRV)
+            {
+                // SPIR-V does not allow exporting entry points
+                if (inst->findDecoration<IREntryPointDecoration>())
+                {
+                    remove = true;
+                }
+            }
+            if (remove)
+            {
+                if (auto dec = inst->findDecoration<IRPublicDecoration>())
+                {
+                    dec->removeAndDeallocate();
+                }
+                if (auto dec = inst->findDecoration<IRDownstreamModuleExportDecoration>())
+                {
+                    dec->removeAndDeallocate();
+                }
+            }
+        }
+    }
 }
 
 Result linkAndOptimizeIR(
@@ -746,6 +796,11 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    if (codeGenContext->removeAvailableInDownstreamIR)
+    {
+        removeAvailableInDownstreamModuleDecorations(target, irModule);
+    }
+
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
         checkForRecursiveTypes(irModule, sink);
@@ -785,6 +840,10 @@ Result linkAndOptimizeIR(
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+    }
+    else if (requiredLoweringPassSet.generics)
+    {
+        eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
     }
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
@@ -1181,6 +1240,12 @@ Result linkAndOptimizeIR(
         }
         break;
 
+    case CodeGenTarget::WGSL:
+    {
+        legalizeIRForWGSL(irModule, sink);
+    }
+    break;
+
     default:
         break;
     }
@@ -1453,6 +1518,11 @@ Result linkAndOptimizeIR(
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
+    {
+        unexportNonEmbeddableIR(target, irModule);
+    }
+
     collectMetadata(irModule, *metadata);
 
     outLinkedIR.metadata = metadata;
@@ -1477,15 +1547,28 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto targetProgram = getTargetProgram();
 
     auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(CompilerOptionName::LineDirectiveMode);
-    // To try to make the default behavior reasonable, we will
-    // always use C-style line directives (to give the user
-    // good source locations on error messages from downstream
-    // compilers) *unless* they requested raw GLSL as the
-    // output (in which case we want to maximize compatibility
-    // with downstream tools).
-    if (lineDirectiveMode ==  LineDirectiveMode::Default && targetRequest->getTarget() == CodeGenTarget::GLSL)
+    // We will generally use C-style line directives in order to give the user good
+    // source locations on error messages from downstream compilers, but there are
+    // a few exceptions.
+    if (lineDirectiveMode == LineDirectiveMode::Default)
     {
-        lineDirectiveMode = LineDirectiveMode::GLSL;
+
+        switch(targetRequest->getTarget())
+        {
+
+        case CodeGenTarget::GLSL:
+            // We want to maximize compatibility with downstream tools.
+            lineDirectiveMode = LineDirectiveMode::GLSL;
+            break;
+
+        case CodeGenTarget::WGSL:
+            // WGSL doesn't support line directives.
+            // See https://github.com/gpuweb/gpuweb/issues/606.
+            lineDirectiveMode = LineDirectiveMode::None;
+            break;
+
+        }
+
     }
 
     ComPtr<IBoxValue<SourceMap>> sourceMap;
@@ -1550,6 +1633,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             case SourceLanguage::Metal:
             {
                 sourceEmitter = new MetalSourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::WGSL:
+            {
+                sourceEmitter = new WGSLSourceEmitter(desc);
                 break;
             }
             default: break;
