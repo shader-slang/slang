@@ -251,13 +251,13 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
         auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
         if (checkpointDecoration)
         {
-            IRSizeAndAlignment sizeInfo;
-            getNaturalSizeAndAlignment(optionSet, structType, &sizeInfo);
+            IRSizeAndAlignment structSize;
+            getNaturalSizeAndAlignment(optionSet, structType, &structSize);
 
             // Reporting happens before empty structs are optimized out
             // and we still want to keep the checkpointing decorations,
             // so we end up needing to check for non-zero-ness
-            if (sizeInfo.size == 0)
+            if (structSize.size == 0)
                 continue;
 
             builder << "checkpointing context generated for function: ";
@@ -268,26 +268,26 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
             else if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
                 builder << nameHint->getName();
 
-            HumaneSourceLoc hloc = getHumanLoc(structType->sourceLoc);
+            HumaneSourceLoc structLocation = getHumanLoc(structType->sourceLoc);
             
             builder << "\n";
-            builder << "    defined at " << hloc.pathInfo.foundPath << ":" << hloc.line << "\n";
-            builder << "    size of context: " << sizeInfo.size << " bytes\n";
+            builder << "    defined at " << structLocation.pathInfo.foundPath << ":" << structLocation.line << "\n";
+            builder << "    size of context: " << structSize.size << " bytes\n";
             builder << "\n";
 
             for (auto field : structType->getFields())
             {
                 IRType *fieldType = field->getFieldType();
-                IRSizeAndAlignment sizeInfo;
-                getNaturalSizeAndAlignment(optionSet, fieldType, &sizeInfo);
-                if (sizeInfo.size == 0)
+                IRSizeAndAlignment fieldSize;
+                getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
+                if (fieldSize.size == 0)
                     continue;
 
                 emitter.emitType(fieldType);
                 
-                HumaneSourceLoc hloc = getHumanLoc(field->sourceLoc);
+                HumaneSourceLoc fieldLocation = getHumanLoc(field->sourceLoc);
 
-                builder << "    " << sizeInfo.size;
+                builder << "    " << fieldSize.size;
                 builder << " bytes used for field of type: ";
                 builder << typeWriter.getContent() << "\n";
                 typeWriter.clearContent();
@@ -297,7 +297,7 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
                     builder << "loop counter created for loop at ";
                 else
                     builder << "the following item defined at ";
-                builder << hloc.pathInfo.foundPath << ":" << hloc.line << "\n";
+                builder << fieldLocation.pathInfo.foundPath << ":" << fieldLocation.line << "\n";
 
                 SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
                 if (sourceView)
