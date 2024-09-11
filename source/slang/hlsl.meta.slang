@@ -5668,7 +5668,7 @@ vector<T,N> acosh(vector<T,N> x)
 // Test if all components are non-zero (HLSL SM 1.0)
 __generic<T : __BuiltinType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool all(T x)
 {
     __target_switch
@@ -5678,6 +5678,8 @@ bool all(T x)
     case hlsl:
         __intrinsic_asm "all";
     case metal:
+        __intrinsic_asm "all";
+    case wgsl:
         __intrinsic_asm "all";
     case spirv:
         let zero = __default<T>();
@@ -5806,7 +5808,7 @@ int3 WorkgroupSize();
 
 __generic<T : __BuiltinType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool any(T x)
 {
     __target_switch
@@ -5816,6 +5818,8 @@ bool any(T x)
     case hlsl:
         __intrinsic_asm "any";
     case metal:
+        __intrinsic_asm "any";
+    case wgsl:
         __intrinsic_asm "any";
     case spirv:
         let zero = __default<T>();
@@ -6142,7 +6146,7 @@ vector<T,N> asinh(vector<T,N> x)
 // Reinterpret bits as an int (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 int asint(float x)
 {
     __target_switch
@@ -6152,6 +6156,7 @@ int asint(float x)
     case glsl: __intrinsic_asm "floatBitsToInt";
     case hlsl: __intrinsic_asm "asint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
@@ -6285,7 +6290,7 @@ void asuint(double value, out uint lowbits, out uint highbits)
 // Reinterpret bits as a uint (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 uint asuint(float x)
 {
     __target_switch
@@ -6295,6 +6300,7 @@ uint asuint(float x)
     case glsl: __intrinsic_asm "floatBitsToUint";
     case hlsl: __intrinsic_asm "asuint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
@@ -7025,7 +7031,7 @@ void clip(matrix<T,N,M> x)
 // Cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T cos(T x)
 {
     __target_switch
@@ -7035,6 +7041,7 @@ T cos(T x)
     case glsl: __intrinsic_asm "cos";
     case hlsl: __intrinsic_asm "cos";
     case metal: __intrinsic_asm "cos";
+    case wgsl: __intrinsic_asm "cos";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Cos $x
     };
@@ -10427,7 +10434,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 // maximum
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T max(T x, T y)
 {
     // Note: a stdlib implementation of `max` (or `min`) will require splitting
@@ -10440,6 +10447,7 @@ T max(T x, T y)
     case hlsl: __intrinsic_asm "max";
     case glsl: __intrinsic_asm "max";
     case metal: __intrinsic_asm "max";
+    case wgsl: __intrinsic_asm "max";
     case cuda: __intrinsic_asm "$P_max($0, $1)";
     case cpp: __intrinsic_asm "$P_max($0, $1)";
     case spirv:
@@ -10656,7 +10664,7 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 // minimum
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T min(T x, T y)
 {
     __target_switch
@@ -10664,6 +10672,7 @@ T min(T x, T y)
     case hlsl:
     case glsl:
     case metal:
+    case wgsl:
         __intrinsic_asm "min";
     case cuda:
     case cpp:
@@ -11103,13 +11112,14 @@ T mul(vector<T, N> x, vector<T, N> y)
 // vector-matrix
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "($1 * $0)";
     case metal: __intrinsic_asm "($1 * $0)";
+    case wgsl: __intrinsic_asm "($1 * $0)";
     case hlsl: __intrinsic_asm "mul";
     case spirv: return spirv_asm {
         OpMatrixTimesVector $$vector<T, M> result $right $left
@@ -12166,7 +12176,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T sin(T x)
 {
     __target_switch
@@ -12176,6 +12186,7 @@ T sin(T x)
     case glsl: __intrinsic_asm "sin";
     case hlsl: __intrinsic_asm "sin";
     case metal: __intrinsic_asm "sin";
+    case wgsl: __intrinsic_asm "sin";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Sin $x
     };

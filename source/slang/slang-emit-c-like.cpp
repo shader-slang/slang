@@ -95,6 +95,10 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         {
             return SourceLanguage::Metal;
         }
+        case CodeGenTarget::WGSL:
+        {
+            return SourceLanguage::WGSL;
+        }
     }
 }
 
@@ -151,7 +155,7 @@ void CLikeSourceEmitter::ensureTypePrelude(IRType* type)
     }
 }
 
-void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
+void CLikeSourceEmitter::emitDeclaratorImpl(DeclaratorInfo* declarator)
 {
     if (!declarator) return;
 
@@ -341,13 +345,18 @@ void CLikeSourceEmitter::_emitPostfixTypeAttr(IRAttr* attr)
     // we may need to handle it here.
 }
 
+void CLikeSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator)
+{
+    emitSimpleType(type);
+    emitDeclarator(declarator);
+}
+
 void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
     switch (type->getOp())
     {
     default:
-        emitSimpleType(type);
-        emitDeclarator(declarator);
+        emitSimpleTypeAndDeclarator(type, declarator);
         break;
 
     case kIROp_RateQualifiedType:
@@ -648,7 +657,7 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence)
         || (prec.rightPrecedence <= outerPrec.rightPrecedence);
 
-    // While Slang correctly removes some of parentheses, DXC prints warnings
+    // While Slang correctly removes some of parentheses, many compilers print warnings
     // for common mistakes when parentheses are not used with certain combinations
     // of the operations. We emit parentheses to avoid the warnings.
     //
@@ -673,6 +682,12 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     // a + b << c => (a + b) << c
     else if (prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right
         && outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Shift_Left)
+    {
+        needParens = true;
+    }
+    // a + b & c => (a + b) & c
+    else if (prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right
+        && outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Left)
     {
         needParens = true;
     }
@@ -1657,11 +1672,16 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     return true;
 }
 
+bool CLikeSourceEmitter::isPointerSyntaxRequiredImpl(IRInst* /* inst */)
+{
+    return doesTargetSupportPtrTypes();
+}
+
 void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec)
 {
     EmitOpInfo newOuterPrec = outerPrec;
 
-    if (doesTargetSupportPtrTypes())
+    if (isPointerSyntaxRequiredImpl(inst))
     {
         switch (inst->getOp())
         {
@@ -1760,7 +1780,7 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
 
 void CLikeSourceEmitter::emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec)
 {
-    if (doesTargetSupportPtrTypes())
+    if (isPointerSyntaxRequiredImpl(inst))
     {
         auto prec = getInfo(EmitOp::Prefix);
         auto newOuterPrec = outerPrec;
@@ -1842,7 +1862,8 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     emitRateQualifiers(inst);
 
-    if(as<IRModuleInst>(inst->getParent()))
+    bool isConstant(as<IRModuleInst>(inst->getParent()));
+    if(isConstant)
     {
         // "Ordinary" instructions at module scope are constants
 
@@ -1857,12 +1878,17 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
         case SourceLanguage::Metal:
             m_writer->emit("constant ");
             break;
+        case SourceLanguage::WGSL:
+            // This is handled by emitVarKeyword, below
+            break;
         default:
             m_writer->emit("const ");
             break;
         }
 
     }
+
+    emitVarKeyword(type, isConstant);
 
     emitType(type, getName(inst));
     m_writer->emit(" = ");
@@ -2297,7 +2323,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
         IRFieldAddress* ii = (IRFieldAddress*) inst;
 
-        if (doesTargetSupportPtrTypes())
+        if (isPointerSyntaxRequiredImpl(inst))
         {
             auto prec = getInfo(EmitOp::Prefix);
             needClose = maybeEmitParens(outerPrec, prec);
@@ -3127,6 +3153,8 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
 
 void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* type)
 {
+    emitVarKeyword(type, /* isConstant */ false);
+
     emitType(type, getName(inst));
 
     // On targets that support empty initializers, we will emit it.
@@ -3186,6 +3214,20 @@ void CLikeSourceEmitter::emitDecorationLayoutSemantics(IRInst* inst, char const*
 void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
 {
     emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, EmitLayoutSemanticOption::kPostType);
+}
+
+void CLikeSourceEmitter::emitSwitchCaseSelectorsImpl(IRBasicType *const /* switchCondition */, const SwitchRegion::Case *const currentCase, const bool isDefault)
+{
+    for(auto caseVal : currentCase->values)
+    {
+        m_writer->emit("case ");
+        emitOperand(caseVal, getInfo(EmitOp::General));
+        m_writer->emit(":\n");
+    }
+    if(isDefault)
+    {
+        m_writer->emit("default:\n");
+    }
 }
 
 void CLikeSourceEmitter::emitRegion(Region* inRegion)
@@ -3343,17 +3385,9 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 auto defaultCase = switchRegion->defaultCase;
                 for(auto currentCase : switchRegion->cases)
                 {
-                    for(auto caseVal : currentCase->values)
-                    {
-                        m_writer->emit("case ");
-                        emitOperand(caseVal, getInfo(EmitOp::General));
-                        m_writer->emit(":\n");
-                    }
-                    if(currentCase.Ptr() == defaultCase)
-                    {
-                        m_writer->emit("default:\n");
-                    }
-
+                    const bool isDefault {currentCase.Ptr() == defaultCase};
+                    IRBasicType *const switchConditionType {as<IRBasicType>(switchRegion->getCondition()->getDataType())};
+                    emitSwitchCaseSelectors(switchConditionType, currentCase.Ptr(), isDefault);
                     m_writer->indent();
                     m_writer->emit("{\n");
                     m_writer->indent();
@@ -3459,9 +3493,16 @@ void CLikeSourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
     m_writer->emit(")");
 }
 
-void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
+void CLikeSourceEmitter::emitFuncHeaderImpl(IRFunc* func)
 {
     auto resultType = func->getResultType();
+    auto name = getName(func);
+    emitType(resultType, name);
+    emitSimpleFuncParamsImpl(func);
+}
+
+void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
+{
 
     // Deal with decorations that need
     // to be emitted as attributes
@@ -3477,12 +3518,8 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
     emitFunctionPreambleImpl(func);
 
-    auto name = getName(func);
-
     emitFuncDecorations(func);
-
-    emitType(resultType, name);
-    emitSimpleFuncParamsImpl(func);
+    emitFuncHeader(func);
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition
@@ -3910,6 +3947,11 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     m_writer->emit(";\n\n");
 }
 
+void CLikeSourceEmitter::emitStructDeclarationSeparatorImpl()
+{
+    m_writer->emit(";");
+}
+
 void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout)
 {
     m_writer->emit("\n{\n");
@@ -3938,11 +3980,13 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(IRStructType* structType, b
                 emitPackOffsetModifier(fieldKey, fieldType, packOffsetDecoration);
             }
         }
+        emitStructFieldAttributes(structType, ff);
         emitMemoryQualifiers(fieldKey);
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey, allowOffsetLayout);
         emitPostDeclarationAttributesForType(fieldType);
-        m_writer->emit(";\n");
+        emitStructDeclarationSeparator();
+        m_writer->emit("\n");
     }
 
     m_writer->dedent();
@@ -4153,6 +4197,8 @@ void CLikeSourceEmitter::emitParameterGroup(IRGlobalParam* varDecl, IRUniformPar
     emitParameterGroupImpl(varDecl, type);
 }
 
+void CLikeSourceEmitter::emitVarKeywordImpl(IRType * /* type */, bool /* isConstant */) {}
+
 void CLikeSourceEmitter::emitVar(IRVar* varDecl)
 {
     auto allocatedType = varDecl->getDataType();
@@ -4190,6 +4236,8 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
     }
 #endif
     emitRateQualifiersAndAddressSpace(varDecl);
+
+    emitVarKeyword(varType, /* isConstant */ false);
 
     emitType(varType, getName(varDecl));
 
@@ -4321,6 +4369,7 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     emitVarModifiers(layout, varDecl, varType);
 
     emitRateQualifiersAndAddressSpace(varDecl);
+    emitVarKeyword(varType, /* isConstant */ true);
     emitType(varType, getName(varDecl));
 
     // TODO: These shouldn't be needed for ordinary
@@ -4394,7 +4443,8 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     emitDecorationLayoutSemantics(varDecl, "register");
 
     emitRateQualifiersAndAddressSpace(varDecl);
-    emitType(varType, getName(varDecl));
+    emitVarKeyword(varType, /* isConstant */ false);
+    emitGlobalParamType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
 

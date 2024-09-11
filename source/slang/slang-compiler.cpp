@@ -1715,6 +1715,7 @@ namespace Slang
         case CodeGenTarget::PyTorchCppBinding:
         case CodeGenTarget::CSource:
         case CodeGenTarget::Metal:
+        case CodeGenTarget::WGSL:
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
                 
