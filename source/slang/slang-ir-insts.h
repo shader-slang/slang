@@ -2488,13 +2488,17 @@ struct IRImageStore : IRInst
     IRInst* getValue() { return getOperand(2); }
 
     /// If GLSL/SPIR-V, Sample coord
-    /// If Metal, Array or Sample coord
     bool hasAuxCoord1() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
     IRInst* getAuxCoord1() { return getOperand(3); }
-
-    /// If Metal, Sample coord
-    bool hasAuxCoord2() { return getOperandCount() > 4 && getOperand(4) != nullptr; }
-    IRInst* getAuxCoord2() { return getOperand(4); }
+};
+/// swizzle is not supported for the location to separate the array channel
+struct IRImageStoreArray : IRInst
+{
+    IR_LEAF_ISA(ImageStoreArray);
+    IRInst* getImage() { return getOperand(0); }
+    // array index is last component of coord
+    IRInst* getCoord() { return getOperand(1); }
+    IRInst* getValue() { return getOperand(2); }
 };
 // Terminators
 

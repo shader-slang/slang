@@ -1740,6 +1740,44 @@ namespace Slang
         }
     };
 
+    // metal textures only support writing 4-component values, even if the texture is only 1, 2, or 3-component
+    // in this case the other channels get ignored, but the signature still doesnt match
+    // so now we have to replace the value being written with a 4-component vector where 
+    // the new components get ignored, nice
+    IRInst* legalizeImageStoreValue(IRBuilder& builder, IRInst* originalValue)
+    {
+        auto valueBaseType = originalValue->getDataType();
+        IRType* elementType = nullptr;
+        List<IRInst*> components;
+        if(auto valueVectorType = as<IRVectorType>(valueBaseType))
+        {
+            if(auto originalElementCount = as<IRIntLit>(valueVectorType->getElementCount()))
+            {
+                if(originalElementCount->getValue() == 4)
+                {
+                    return originalValue;
+                }
+            }
+            elementType = valueVectorType->getElementType();
+            auto vectorValue = as<IRMakeVector>(originalValue);
+            for(uint i = 0; i < vectorValue->getOperandCount(); i++)
+            {
+                components.add(vectorValue->getOperand(i));
+            }
+        }
+        else
+        {
+            elementType = valueBaseType;
+            components.add(originalValue);
+        }
+        for(uint i = components.getCount(); i < 4; i++)
+        {
+            components.add(builder.getIntValue(builder.getIntType(), 0));
+        }
+        auto fourComponentVectorType = builder.getVectorType(elementType, 4);
+        return builder.emitMakeVector(fourComponentVectorType, components);
+    }
+
     void legalizeFuncBody(IRFunc* func)
     {
         IRBuilder builder(func);
@@ -1796,20 +1834,15 @@ namespace Slang
                         arg->set(temp);
                     }
                 }
-            }
-            for(auto inst : block->getChildren())
-            {
                 if(auto write = as<IRImageStore>(inst))
                 {
-                    auto originalValue = write->getValue();
-                    auto valueBaseType = originalValue->getDataType();
-                    auto valueVectorType = as<IRVectorType>(valueBaseType);
-                    auto fourComponentVectorType = builder.getVectorType(valueVectorType->getElementType(), 4);
-                    List<IRInst*> components;
-                    
                     builder.setInsertBefore(write);
-                    builder.emitMakeVector(fourComponentVectorType, components);
-                    assert(valueVectorType);
+                    write->setOperand(2, legalizeImageStoreValue(builder, write->getValue()));
+                }
+                if(auto write = as<IRImageStoreArray>(inst))
+                {
+                    builder.setInsertBefore(write);
+                    write->setOperand(2, legalizeImageStoreValue(builder, write->getValue()));
                 }
             }
         }
