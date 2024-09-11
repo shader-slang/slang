@@ -1,4 +1,3 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -9,10 +8,11 @@ struct MyPtrType : IDifferentiablePtrType
 {
     typealias Differential = MyPtrType;
 
+    RWStructuredBuffer<float> buffer;
     uint offset;
 
-    float load(uint idx) { return outputBuffer[offset + idx]; }
-    void accumulate(uint idx, float value) { outputBuffer[offset + idx] += value; }
+    float load(uint idx) { return buffer[offset + idx]; }
+    void accumulate(uint idx, float value) { buffer[offset + idx] += value; }
 }
 
 [BackwardDerivative(load_bwd)]
@@ -54,7 +54,7 @@ void computeMain(uint id : SV_DispatchThreadID)
     outputBuffer[1] = 2; // CHECK: 2
 
     // Denote the first two elements in the buffer as the primal buffer and the last two elements for the derivative.
-    var b = DifferentialPtrPair<MyPtrType>( { 0 }, { 2 } );
+    var b = DifferentialPtrPair<MyPtrType>( { outputBuffer, 0 }, { outputBuffer, 2 } );
 
     bwd_diff(test)(b, 2, 1.5f);
 

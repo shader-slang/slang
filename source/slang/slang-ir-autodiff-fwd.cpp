@@ -25,6 +25,18 @@ IRInst* emitMakeDifferentialPair(IRBuilder* builder, IRType* pairType, IRInst* p
     }
     else if (as<IRDifferentialPtrPairType>(pairType))
     {
+        // Quick optimization:
+        // If primalVal and diffVal are extracted from the same pointer-pair,
+        // we can just use the pointer-pair directly.
+        //
+        if (auto primalPtrVal = as<IRDifferentialPtrPairGetPrimal>(primalVal))
+        {
+            if (auto diffPtrVal = as<IRDifferentialPtrPairGetDifferential>(diffVal))
+            {
+                if (primalPtrVal->getBase() == diffPtrVal->getBase())
+                    return primalPtrVal->getBase();
+            }
+        }
         return builder->emitMakeDifferentialPtrPair(pairType, primalVal, diffVal);
     }
     else
