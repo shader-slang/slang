@@ -94,6 +94,7 @@ namespace Slang
         Metal               = SLANG_METAL,
         MetalLib            = SLANG_METAL_LIB,
         MetalLibAssembly    = SLANG_METAL_LIB_ASM,
+        WGSL                = SLANG_WGSL,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 

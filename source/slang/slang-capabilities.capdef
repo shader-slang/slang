@@ -111,6 +111,10 @@ def metal : target + textualTarget;
 /// [Target]
 def spirv : target;
 
+/// Represents the WebGPU shading language code generation target.
+/// [Target]
+def wgsl : target + textualTarget;
+
 // Capabilities that stand for target SPIR-V versions for the GLSL backend.
 // These are not compilation targets. We will convert `_spirv_*` to `glsl_spirv_*` during compilation.
 
@@ -228,15 +232,15 @@ def _cuda_sm_9_0 : _cuda_sm_8_0;
 
 /// All code-gen targets
 /// [Compound]
-alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv;
+alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl;
 
 /// All non-asm code-gen targets
 /// [Compound]
-alias any_textual_target = hlsl | metal | glsl | c | cpp | cuda;
+alias any_textual_target = hlsl | metal | glsl | c | cpp | cuda | wgsl;
 
 /// All slang-gfx compatible code-gen targets
 /// [Compound]
-alias any_gfx_target = hlsl | metal | glsl | spirv;
+alias any_gfx_target = hlsl | metal | glsl | spirv | wgsl;
 
 /// All "cpp syntax" code-gen targets
 /// [Compound]
@@ -265,6 +269,10 @@ alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;
 /// CPP, CUDA, GLSL, HLSL, Metal and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_metal_spirv = cpp | cuda | glsl | hlsl | metal | spirv;
+
+/// CPP, CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_metal_spirv_wgsl = cpp | cuda | glsl | hlsl | metal | spirv | wgsl;
 
 /// CPP, CUDA, and HLSL code-gen targets
 /// [Compound]
@@ -1178,6 +1186,7 @@ alias sm_4_0_version = _sm_4_0
              | spirv_1_0
              | _cuda_sm_2_0
              | metal
+             | wgsl
              | cpp
              ;
 
