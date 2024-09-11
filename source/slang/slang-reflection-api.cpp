@@ -933,7 +933,7 @@ SLANG_API bool spReflection_isSubType(
     }
 }
 
-SlangReflectionGeneric* getInnermostGenericParent(DeclRef<Decl> declRef)
+DeclRef<Decl> getInnermostGenericParent(DeclRef<Decl> declRef)
 {
     auto decl = declRef.getDecl();
     auto astBuilder = getModule(decl)->getLinkage()->getASTBuilder();
@@ -941,15 +941,14 @@ SlangReflectionGeneric* getInnermostGenericParent(DeclRef<Decl> declRef)
     while(parentDecl)
     {
         if(parentDecl->parentDecl && as<GenericDecl>(parentDecl->parentDecl))
-            return convertDeclToGeneric(
-                substituteDeclRef(
+            return substituteDeclRef(
                     SubstitutionSet(declRef),
                     astBuilder,
-                    createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, DeclRef(parentDecl))));
+                    createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, DeclRef(parentDecl)));
         parentDecl = parentDecl->parentDecl;
     }
 
-    return nullptr;
+    return DeclRef<Decl>();
 }
 
 SLANG_API SlangReflectionGeneric* spReflectionType_GetGenericContainer(SlangReflectionType* type)
@@ -957,11 +956,13 @@ SLANG_API SlangReflectionGeneric* spReflectionType_GetGenericContainer(SlangRefl
     auto slangType = convert(type);
     if (auto declRefType = as<DeclRefType>(slangType))
     {
-        return getInnermostGenericParent(declRefType->getDeclRef());
+        return convertDeclToGeneric(
+            getInnermostGenericParent(declRefType->getDeclRef()));
     }
     else if (auto genericDeclRefType = as<GenericDeclRefType>(slangType))
     {
-        return getInnermostGenericParent(genericDeclRefType->getDeclRef());
+        return convertDeclToGeneric(
+            getInnermostGenericParent(genericDeclRefType->getDeclRef()));
     }
 
     return nullptr;
@@ -2844,7 +2845,7 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
 SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(SlangReflectionVariable* var)
 {
     auto declRef = convert(var);
-    return getInnermostGenericParent(declRef);
+    return convertDeclToGeneric(getInnermostGenericParent(declRef));
 }
 
 SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(SlangReflectionVariable* var, SlangReflectionGeneric* generic)
@@ -3081,7 +3082,7 @@ SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflec
 SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(SlangReflectionFunction* func)
 {
     auto declRef = convert(func);
-    return getInnermostGenericParent(declRef);
+    return convertDeclToGeneric(getInnermostGenericParent(declRef));
 }
 
 SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(SlangReflectionFunction* func, SlangReflectionGeneric* generic)
@@ -3368,11 +3369,12 @@ SLANG_API SlangReflectionGeneric* spReflectionGeneric_GetOuterGenericContainer(S
     
     auto astBuilder = getModule(declRef.getDecl())->getLinkage()->getASTBuilder();
 
-    return getInnermostGenericParent(
-        substituteDeclRef(
-            SubstitutionSet(declRef),
-            astBuilder,
-            createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, DeclRef(declRef.getDecl()->parentDecl))));
+    return convertDeclToGeneric(
+        getInnermostGenericParent(
+            substituteDeclRef(
+                SubstitutionSet(declRef),
+                astBuilder,
+                createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, DeclRef(declRef.getDecl()->parentDecl)))));
 }
 
 SLANG_API SlangReflectionType* spReflectionGeneric_GetConcreteType(SlangReflectionGeneric* generic, SlangReflectionVariable* typeParam)

@@ -1068,6 +1068,8 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
         for (const auto& nameToMod : builtinLinkage->mapNameToLoadedModules)
             mapNameToLoadedModules.add(nameToMod);
     }
+
+    m_semanticsForReflection = new SharedSemanticsContext(this, nullptr, nullptr);
 }
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
@@ -1370,8 +1372,8 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     List<Type*>         argTypes,
     DiagnosticSink*     sink)
 {
-    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    SemanticsVisitor visitor(getSemanticsForReflection());
+    visitor = visitor.withSink(sink);
 
     ASTBuilder* astBuilder = getASTBuilder();
 
@@ -1409,8 +1411,8 @@ DeclRef<Decl> Linkage::specializeGeneric(
     SLANG_AST_BUILDER_RAII(getASTBuilder());
     SLANG_ASSERT(declRef);
 
-    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    SemanticsVisitor visitor(getSemanticsForReflection());
+    visitor = visitor.withSink(sink);
 
     auto genericDeclRef = getGenericParentDeclRef(getASTBuilder(), &visitor, declRef);
 
@@ -1602,8 +1604,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
 
     try
     {
-        SharedSemanticsContext sharedSemanticsContext(this, nullptr, &sink);
-        SemanticsVisitor visitor(&sharedSemanticsContext);
+        SemanticsVisitor visitor(getSemanticsForReflection());
+        visitor = visitor.withSink(&sink);
+
         auto witness =
             visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
@@ -2355,12 +2358,8 @@ DeclRef<Decl> ComponentType::findDeclFromString(
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SharedSemanticsContext sharedSemanticsContext(
-        linkage,
-        nullptr,
-        sink);
-    SemanticsContext context(&sharedSemanticsContext);
-    context = context.allowStaticReferenceToNonStaticMember();
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
 
@@ -2407,12 +2406,8 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SharedSemanticsContext sharedSemanticsContext(
-        linkage,
-        nullptr,
-        sink);
-    SemanticsContext context(&sharedSemanticsContext);
-    context = context.allowStaticReferenceToNonStaticMember();
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
 
@@ -2463,11 +2458,7 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
 
 bool ComponentType::isSubType(Type* subType, Type* superType)
 {
-    SharedSemanticsContext sharedSemanticsContext(
-        getLinkage(),
-        nullptr,
-        nullptr);
-    SemanticsContext context(&sharedSemanticsContext);
+    SemanticsContext context(getLinkage()->getSemanticsForReflection());
     SemanticsVisitor visitor(context);
 
     return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);

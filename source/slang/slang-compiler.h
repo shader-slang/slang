@@ -40,7 +40,9 @@
 namespace Slang
 {
     struct PathInfo;
-    struct IncludeHandler;
+    struct IncludeHandler;    
+    struct SharedSemanticsContext;
+
     class ProgramLayout;
     class PtrType;
     class TargetProgram;
@@ -2186,6 +2188,9 @@ namespace Slang
             m_retainedSession = nullptr;
         }
 
+        // Get shared semantics information for reflection purposes.
+        SharedSemanticsContext* getSemanticsForReflection() { return m_semanticsForReflection.get(); }
+
     private:
             /// The global Slang library session that this linkage is a child of
         Session* m_session = nullptr;
@@ -2238,6 +2243,8 @@ namespace Slang
             DiagnosticSink*     sink);
 
         List<Type*> m_specializedTypes;
+
+        RefPtr<SharedSemanticsContext> m_semanticsForReflection = nullptr;
 
     };
 
