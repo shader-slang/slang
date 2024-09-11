@@ -1980,6 +1980,7 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeDifferentialPair:
     case kIROp_MakeDifferentialPairUserCode:
+    case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeOptionalNone:
     case kIROp_MakeOptionalValue:
     case kIROp_MakeExistential:
@@ -1987,6 +1988,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_DifferentialPairGetPrimal:
     case kIROp_DifferentialPairGetDifferentialUserCode:
     case kIROp_DifferentialPairGetPrimalUserCode:
+    case kIROp_DifferentialPtrPairGetDifferential:
+    case kIROp_DifferentialPtrPairGetPrimal:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialWitnessTable:
