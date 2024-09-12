@@ -1,4 +1,5 @@
 // slang-check-overload.cpp
+#include "slang-ast-base.h"
 #include "slang-check-impl.h"
 
 #include "slang-lookup.h"
@@ -466,8 +467,22 @@ namespace Slang
                 Val* val = nullptr;
                 if (aa >= matchedArgs.getCount())
                 {
-                    // If we run out of matched args, we will just create an empty pack.
-                    val = m_astBuilder->getTypePack(ArrayView<Type*>());
+                    if (allowPartialGenericApp)
+                    {
+                        // If we have run out of arguments and the decl allows
+                        // partial specialization, then we don't apply any more
+                        // checks at this step. We will instead attempt to
+                        // *infer* an argument at this position at a later
+                        // stage.
+                        //
+                        candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
+                        break;
+                    }
+                    else
+                    {
+                        // Otherwise, we will just create an empty pack.
+                        val = m_astBuilder->getTypePack(ArrayView<Type*>());
+                    }
                 }
                 else
                 {
@@ -969,6 +984,7 @@ namespace Slang
         return ConstructDeclRefExpr(
             innerDeclRef,
             base,
+            innerDeclRef.getName(),
             originalExpr->loc,
             originalExpr);
     }
@@ -1023,6 +1039,7 @@ namespace Slang
                 baseExpr = ConstructLookupResultExpr(
                     candidate.item,
                     context.baseExpr,
+                    candidate.item.declRef.getName(),
                     context.funcLoc,
                     context.originalExpr);
                 break;
@@ -1173,6 +1190,40 @@ namespace Slang
         return CountParameters(parentGeneric).required;
     }
 
+    DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef)
+    {
+        auto parent = declRef.getParent();
+        while (parent.as<GenericDecl>())
+        {
+            parent = parent.getParent();
+        }
+        return parent;
+    }
+
+    void countDistanceToGloablScope(DeclRef<Slang::Decl> const& leftDecl,
+                                    DeclRef<Slang::Decl> const& rightDecl,
+                                    int& leftDistance, int& rightDistance)
+    {
+        leftDistance = 0;
+        rightDistance = 0;
+
+        DeclRef<Decl> decl = leftDecl;
+        while(decl)
+        {
+            leftDistance++;
+            decl = decl.getParent();
+        }
+
+        decl = rightDecl;
+        while(decl)
+        {
+            rightDistance++;
+            decl = decl.getParent();
+        }
+    }
+
+    // Returns -1 if left is preferred, 1 if right is preferred, and 0 if they are equal.
+    //
     int SemanticsVisitor::CompareLookupResultItems(
         LookupResultItem const& left,
         LookupResultItem const& right)
@@ -1190,12 +1241,30 @@ namespace Slang
         // directly (it is only visible through the requirement witness
         // information for inheritance declarations).
         //
-        auto leftDeclRefParent = left.declRef.getParent();
-        auto rightDeclRefParent = right.declRef.getParent();
+        auto leftDeclRefParent = getParentDeclRef(left.declRef);
+        auto rightDeclRefParent = getParentDeclRef(right.declRef);
         bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
         bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
         if(leftIsInterfaceRequirement != rightIsInterfaceRequirement)
             return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+
+        // Prefer non-extension declarations over extension declarations.
+        bool leftIsExtension = as<ExtensionDecl>(leftDeclRefParent.getDecl()) != nullptr;
+        bool rightIsExtension = as<ExtensionDecl>(rightDeclRefParent.getDecl()) != nullptr;
+        if (leftIsExtension != rightIsExtension)
+        {
+            return int(leftIsExtension) - int(rightIsExtension);
+        }
+        else if (leftIsExtension)
+        {
+            // If both are declared in extensions, prefer the one that is least generic.
+            bool leftIsGeneric = leftDeclRefParent.getParent().as<GenericDecl>() != nullptr;
+            bool rightIsGeneric = rightDeclRefParent.getParent().as<GenericDecl>() != nullptr;
+            if (leftIsGeneric != rightIsGeneric)
+            {
+                return int(leftIsGeneric) - int(rightIsGeneric);
+            }
+        }
 
         // Any decl is strictly better than a module decl.
         bool leftIsModule = (as<ModuleDeclarationDecl>(left.declRef) != nullptr);
@@ -1238,6 +1307,63 @@ namespace Slang
                 if (facet.getImpl()->getDeclRef().equals(rightDeclRefParent))
                     return -1;
         }
+
+        // If both are subscript decls, prefer the one that provides more
+        // accessors.
+        if (auto leftSubscriptDecl = left.declRef.as<SubscriptDecl>())
+        {
+            if (auto rightSubscriptDecl = right.declRef.as<SubscriptDecl>())
+            {
+                auto leftAccessorCount = leftSubscriptDecl.getDecl()->getMembersOfType<AccessorDecl>().getCount();
+                auto rightAccessorCount = rightSubscriptDecl.getDecl()->getMembersOfType<AccessorDecl>().getCount();
+                auto decl1IsSubsetOfDecl2 = [=](SubscriptDecl* decl1, SubscriptDecl* decl2)
+                    {
+                        for (auto accessorDecl1 : decl1->getMembersOfType<AccessorDecl>())
+                        {
+                            bool found = false;
+                            for (auto accessorDecl2 : decl2->getMembersOfType<AccessorDecl>())
+                            {
+                                if (accessorDecl1->astNodeType == accessorDecl2->astNodeType)
+                                {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found)
+                                return false;
+                        }
+                        return true;
+                    };
+                if (leftAccessorCount > rightAccessorCount
+                    && decl1IsSubsetOfDecl2(rightSubscriptDecl.getDecl(), leftSubscriptDecl.getDecl()))
+                {
+                    return -1;
+                }
+                else if (rightAccessorCount > leftAccessorCount
+                    && decl1IsSubsetOfDecl2(leftSubscriptDecl.getDecl(), rightSubscriptDecl.getDecl()))
+                {
+                    return 1;
+                }
+            }
+        }
+
+        // We need to consider the distance of the declarations to the global scope to resolve this case:
+        //      float f(float x);
+        //      struct S
+        //      {
+        //          float f(float x);
+        //          float g(float y) { return f(y); }   // will call S::f() instead of ::f()
+        //      }
+        // We don't need to know the call site of 'f(y)', but only need to count the two candidates' distance to the global scope,
+        // because this function will only choose the valid candidates. So if there is situation like this:
+        //  void main() {  S s; s.f(1.0);} or
+        //  struct T { float g(y) { f(y); } }, there won't be ambiguity.
+        //  So we just need to count which declaration is farther from the global scope and favor the farther one.
+        int leftDistance = 0;
+        int rightDistance = 0;
+        countDistanceToGloablScope(left.declRef, right.declRef, leftDistance, rightDistance);
+        if (leftDistance != rightDistance)
+            return leftDistance > rightDistance ? -1 : 1;
 
         // TODO: We should generalize above rules such that in a tie a declaration
         // A::m is better than B::m when all other factors are equal and
@@ -2159,7 +2285,7 @@ namespace Slang
                 if (lastInner)
                 {
                     auto baseExpr = GetBaseExpr(funcDeclRefExpr);
-                    lastInner->baseFunction = ConstructLookupResultExpr(candidate.item, baseExpr, funcDeclRefExpr->loc, funcDeclRefExpr);
+                    lastInner->baseFunction = ConstructLookupResultExpr(candidate.item, baseExpr, funcDeclRefExpr->name, funcDeclRefExpr->loc, funcDeclRefExpr);
                 }
                 candidate.exprVal = expr;
                 expr->type.type = diffFuncType;
@@ -2224,7 +2350,6 @@ namespace Slang
 
         // Look at the base expression for the call, and figure out how to invoke it.
         auto funcExpr = expr->functionExpr;
-        auto funcExprType = funcExpr->type;
 
         // If we are trying to apply an erroneous expression, then just bail out now.
         if(IsErrorExpr(funcExpr))
@@ -2253,25 +2378,6 @@ namespace Slang
         for (auto& arg : expr->arguments)
         {
             arg = maybeOpenRef(arg);
-        }
-
-        auto funcType = as<FuncType>(funcExprType);
-        for (Index i = 0; i < expr->arguments.getCount(); i++)
-        {
-            auto& arg = expr->arguments[i];
-            if (funcType && i < funcType->getParamCount())
-            {
-                switch (funcType->getParamDirection(i))
-                {
-                case kParameterDirection_Out:
-                case kParameterDirection_InOut:
-                case kParameterDirection_Ref:
-                case kParameterDirection_ConstRef:
-                    continue;
-                default:
-                    break;
-                }
-            }
             arg = maybeOpenExistential(arg);
         }
 
@@ -2401,6 +2507,45 @@ namespace Slang
             // the user the most help we can.
             if (shouldAddToCache)
                 typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
+
+            // Now that we have resolved the overload candidate, we need to undo an `openExistential`
+            // operation that was applied to `out` arguments.
+            //
+            auto funcType = context.bestCandidate->funcType;
+            ShortList<ParameterDirection> paramDirections;
+            if (funcType)
+            {
+                for (Index i = 0; i < funcType->getParamCount(); i++)
+                {
+                    paramDirections.add(funcType->getParamDirection(i));
+                }
+            }
+            else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
+            {
+                for (auto param : callableDeclRef.getDecl()->getParameters())
+                {
+                    paramDirections.add(getParameterDirection(param));
+                }
+            }
+            for (Index i = 0; i < expr->arguments.getCount(); i++)
+            {
+                auto& arg = expr->arguments[i];
+                if (i < paramDirections.getCount())
+                {
+                    switch (paramDirections[i])
+                    {
+                    case kParameterDirection_Out:
+                    case kParameterDirection_InOut:
+                    case kParameterDirection_Ref:
+                    case kParameterDirection_ConstRef:
+                        break;
+                    default:
+                        continue;
+                    }
+                }
+                if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(arg))
+                    arg = extractExistentialExpr->originalExpr;
+            }
             return CompleteOverloadCandidate(context, *context.bestCandidate);
         }
 
@@ -2433,7 +2578,7 @@ namespace Slang
 
         // Nothing at all was found that we could even consider invoking.
         // In all other cases, this is an error.
-        getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExprType);
+        getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
         expr->type = QualType(m_astBuilder->getErrorType());
         return expr;
     }

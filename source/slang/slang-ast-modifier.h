@@ -235,10 +235,6 @@ class GLSLUnparsedLayoutModifier : public GLSLLayoutModifier
 
 
 // Specific cases for known GLSL `layout` modifiers that we need to work with
-class GLSLConstantIDLayoutModifier : public GLSLParsedLayoutModifier 
-{
-    SLANG_AST_CLASS(GLSLConstantIDLayoutModifier)
-};
 
 class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier 
 {
@@ -727,11 +723,23 @@ class FlagsAttribute : public Attribute
 };
 
 // [[vk_push_constant]] [[push_constant]]
-class PushConstantAttribute : public Attribute 
+class PushConstantAttribute : public Attribute
 {
     SLANG_AST_CLASS(PushConstantAttribute)
 };
 
+// [[vk_specialization_constant]] [[specialization_constant]]
+class SpecializationConstantAttribute : public Attribute
+{
+    SLANG_AST_CLASS(SpecializationConstantAttribute)
+};
+
+// [[vk_constant_id]]
+class VkConstantIdAttribute : public Attribute
+{
+    SLANG_AST_CLASS(VkConstantIdAttribute)
+    int location;
+};
 
 // [[vk_shader_record]] [[shader_record]]
 class ShaderRecordAttribute : public Attribute 
@@ -1170,6 +1178,12 @@ class SealedAttribute : public InheritanceControlAttribute { SLANG_AST_CLASS(Sea
 class BuiltinAttribute : public Attribute
 {
     SLANG_AST_CLASS(BuiltinAttribute)
+};
+    
+    /// An attribute that marks a decl as a compiler built-in object for the autodiff system.
+class AutoDiffBuiltinAttribute : public Attribute
+{
+    SLANG_AST_CLASS(AutoDiffBuiltinAttribute)
 };
 
     /// An attribute that defines the size of `AnyValue` type to represent a polymoprhic value that conforms to

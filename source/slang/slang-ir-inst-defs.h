@@ -291,6 +291,10 @@ INST(IndexedFieldKey, indexedFieldKey, 2, HOISTABLE)
 // A placeholder witness that ThisType implements the enclosing interface.
 // Used only in interface definitions.
 INST(ThisTypeWitness, thisTypeWitness, 1, 0)
+
+// A placeholder witness for the fact that two types are equal.
+INST(TypeEqualityWitness, TypeEqualityWitness, 2, HOISTABLE)
+
 INST(GlobalHashedStringLiterals, global_hashed_string_literals, 0, 0)
 
 INST(Module, module, 0, PARENT)
@@ -769,6 +773,11 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         needs to be special cased for lookup. */
     INST(TransitoryDecoration,              transitory,             0, 0)
 
+    // The result witness table that the functon's return type is a subtype of an interface.
+    // This is used to keep track of the original witness table in a function that used to
+    // return an existential value but now returns a concrete type after specialization.
+    INST(ResultWitnessDecoration,           ResultWitness,          1, 0)
+
     INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
     INST(VulkanRayPayloadInDecoration,      vulkanRayPayloadIn,       0, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
@@ -784,6 +793,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
     INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
 
+    INST(DefaultValueDecoration,            DefaultValue,           1, 0)
     INST(ReadNoneDecoration,                readNone,               0, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
     INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)
@@ -791,6 +801,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(PreciseDecoration,                 precise,                0, 0)
     INST(PublicDecoration,                  public,                 0, 0)
     INST(HLSLExportDecoration,              hlslExport,             0, 0)
+    INST(DownstreamModuleExportDecoration,  downstreamModuleExport, 0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
     INST(OutputTopologyDecoration,          outputTopology,         1, 0)
@@ -800,6 +811,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
+
+    INST(AvailableInDownstreamIRDecoration, availableInDownstreamIR, 1, 0)
 
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
@@ -954,6 +967,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(ConstructorDecoration, constructor, 1, 0)
     INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
+    INST(SpecializationConstantDecoration, SpecializationConstantDecoration, 1, 0)
 
         // Reflection metadata for a shader parameter that provides the original type name.
     INST(UserTypeNameDecoration, UserTypeName, 1, 0)
@@ -968,6 +982,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
         /// Decorates a auto-diff transcribed value with the original value that the inst is transcribed from.
     INST(AutoDiffOriginalValueDecoration, AutoDiffOriginalValueDecoration, 1, 0)
+
+        /// Decorates a type as auto-diff builtin type.
+    INST(AutoDiffBuiltinDecoration, AutoDiffBuiltinDecoration, 0, 0)
 
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.
@@ -1233,7 +1250,7 @@ INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
 
 /* Embedded Precompiled Libraries */
-INST(EmbeddedDXIL, EmbeddedDXIL, 1, 0)
+INST(EmbeddedDownstreamIR, EmbeddedDownstreamIR, 2, 0)
 
 /* Inline assembly */
 

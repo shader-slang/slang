@@ -156,6 +156,8 @@ interface IInteger : IArithmetic, ILogical
     int64_t toInt64();
     uint toUInt();
     uint64_t toUInt64();
+    __init(int val);
+    __init(int64_t val);
 }
 
 interface IFloat : IArithmetic, IDifferentiable
@@ -220,7 +222,7 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 /// A type that can represent integers
 [sealed]
 [builtin]
-interface __BuiltinIntegerType : __BuiltinArithmeticType
+interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
 /// A type that can represent non-integers
@@ -566,7 +568,7 @@ ${{{{
         __intrinsic_op($(kIROp_Sub))  This sub(This other);
         __intrinsic_op($(kIROp_Mul))  This mul(This other);
         __intrinsic_op($(kIROp_Div))  This div(This other);
-        __intrinsic_op($(kIROp_FRem)) This mod(This other);
+        __intrinsic_op($(kIROp_IRem)) This mod(This other);
         __intrinsic_op($(kIROp_Neg))  This neg();
         __intrinsic_op($(kIROp_Lsh)) This shl(int other);
         __intrinsic_op($(kIROp_Rsh)) This shr(int other);
@@ -2697,10 +2699,17 @@ attribute_syntax [vk_shader_record]			                        : ShaderRecordAttr
 __attributeTarget(VarDeclBase)
 attribute_syntax [shader_record]			                        : ShaderRecordAttribute;
 
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax [vk_push_constant]									: PushConstantAttribute;
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax[vk_specialization_constant] : SpecializationConstantAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax[SpecializationConstant] : SpecializationConstantAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax[vk_constant_id(location: int)] : VkConstantIdAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
@@ -2926,6 +2935,9 @@ attribute_syntax [Specialize] : SpecializeAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax[__AutoDiffBuiltin] : AutoDiffBuiltinAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;

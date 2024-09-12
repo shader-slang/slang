@@ -83,8 +83,22 @@ namespace Slang
         Type*                   interfaceType)
     {
         // The most basic test here should be: does the type declare conformance to the trait.
-        if(isSubtype(type, interfaceType, IsSubTypeOptions::None))
-            return type;
+       
+        if (constraints->subTypeForAdditionalWitnesses == type)
+        {
+            // If additional subtype witnesses are provided for `type` in `constraints`,
+            // try to use them to see if the interface is satisfied.
+            if (constraints->additionalSubtypeWitnesses->containsKey(interfaceType))
+                return type;
+        }
+        else
+        {
+            if (isSubtype(
+                type,
+                interfaceType,
+                constraints->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching : IsSubTypeOptions::None))
+                return type;
+        }
 
         // Just because `type` doesn't conform to the given `interfaceDeclRef`, that
         // doesn't necessarily indicate a failure. It is possible that we have a call
@@ -179,6 +193,15 @@ namespace Slang
                             QualType(facet->getType()),
                             interfaceType);
 
+                        if (unificationResult)
+                            return type;
+                    }
+                }
+                if (constraints->subTypeForAdditionalWitnesses)
+                {
+                    for (auto witnessKV : *constraints->additionalSubtypeWitnesses)
+                    {
+                        auto unificationResult = TryUnifyTypes(*constraints, ValUnificationContext(), QualType(witnessKV.first), interfaceType);
                         if (unificationResult)
                             return type;
                     }
@@ -610,7 +633,7 @@ namespace Slang
 
         HashSet<Decl*> constrainedGenericParams;
 
-        for( auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>() )
+        for (auto constraintDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
         {
             DeclRef<GenericTypeConstraintDecl> constraintDeclRef = m_astBuilder->getGenericAppDeclRef(
                 genericDeclRef, args.getArrayView().arrayView, constraintDecl).as<GenericTypeConstraintDecl>();
@@ -618,14 +641,14 @@ namespace Slang
             // Extract the (substituted) sub- and super-type from the constraint.
             auto sub = getSub(m_astBuilder, constraintDeclRef);
             auto sup = getSup(m_astBuilder, constraintDeclRef);
-            
+
             // Mark sub type as constrained.
             if (auto subDeclRefType = as<DeclRefType>(constraintDeclRef.getDecl()->sub.type))
                 constrainedGenericParams.add(subDeclRefType->getDeclRef().getDecl());
             else if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
                 constrainedGenericParams.add(as<DeclRefType>(subEachType->getElementType())->getDeclRef().getDecl());
 
-            if (sub->equals(sup))
+            if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
             {
                 // We are trying to use an interface type itself to conform to the
                 // type constraint. We can reach this case when the user code does
@@ -636,7 +659,30 @@ namespace Slang
             }
 
             // Search for a witness that shows the constraint is satisfied.
-            auto subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
+            SubtypeWitness* subTypeWitness = nullptr;
+            if (sub == system->subTypeForAdditionalWitnesses)
+            {
+                // If we are trying to find the subtype info for a type whose inheritance info is
+                // being calculated, use what we have already known about the type.
+                system->additionalSubtypeWitnesses->tryGetValue(sup, subTypeWitness);
+            }
+            else
+            {
+                // The general case is to initiate a subtype query.
+                subTypeWitness = isSubtype(
+                    sub,
+                    sup,
+                    system->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching : IsSubTypeOptions::None);
+            }
+          
+            if (constraintDecl->isEqualityConstraint)
+            {
+                // If constraint is an equality constraint, we need to make sure
+                // the witness is equality witness.
+                if (!isTypeEqualityWitness(subTypeWitness))
+                    subTypeWitness = nullptr;
+            }
+
             if(subTypeWitness)
             {
                 // We found a witness, so it will become an (implicit) argument.
@@ -733,8 +779,8 @@ namespace Slang
                 SLANG_ASSERT(constraintDecl2);
                 return TryUnifyTypes(constraints,
                     unifyCtx,
-                    constraintDecl1.getDecl()->getSup().type,
-                    constraintDecl2.getDecl()->getSup().type);
+                    getSup(m_astBuilder, constraintDecl1),
+                    getSup(m_astBuilder, constraintDecl2));
             }
         }
 

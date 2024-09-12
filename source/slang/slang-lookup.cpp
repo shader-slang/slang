@@ -499,7 +499,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     BreadcrumbInfo* inBreadcrumbs)
 {
     auto semantics = request.semantics;
-    if (!as<InterfaceDecl>(declRef.getDecl()) && getText(name) == "This")
+    if (!as<InterfaceDecl>(declRef.getDecl()) && name == astBuilder->getSharedASTBuilder()->getThisTypeName())
     {
         // If we are looking for `This` in anything other than an InterfaceDecl,
         // we just need to return the declRef itself.
@@ -806,6 +806,10 @@ static void _lookUpInScopes(
                     // a type that uses the "target type" of the `extension`.
                     //
                     type = getTargetType(astBuilder, extDeclRef);
+                    if (name == astBuilder->getSharedASTBuilder()->getThisTypeName())
+                    {
+                        breadcrumbPtr = nullptr;
+                    }
                 }
                 else
                 {

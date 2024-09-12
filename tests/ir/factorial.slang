@@ -26,7 +26,7 @@ int factorial(int n)
 
 [numthreads(1, 1, 1)]
 void main(
-    uint tid   : SV_DispatchThreadIndex)
+    uint tid   : SV_DispatchThreadID)
 {
     output[tid] = factorial(input[tid]);
 }

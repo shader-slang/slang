@@ -1112,7 +1112,7 @@ void MetalSourceEmitter::emitVarDecorationsImpl(IRInst* varInst)
     SLANG_UNUSED(varInst);
 }
 
-void MetalSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout*)
+void MetalSourceEmitter::emitMatrixLayoutModifiersImpl(IRType*)
 {
     // Metal only supports column major layout, and we must have
     // already translated all matrix ops to assume column-major
