@@ -2191,7 +2191,7 @@ namespace Slang
         }
 
         // Get shared semantics information for reflection purposes.
-        SharedSemanticsContext* getSemanticsForReflection() { return m_semanticsForReflection.get(); }
+        SharedSemanticsContext* getSemanticsForReflection();
 
     private:
             /// The global Slang library session that this linkage is a child of
@@ -2246,7 +2246,7 @@ namespace Slang
 
         List<Type*> m_specializedTypes;
 
-        RefPtr<SharedSemanticsContext> m_semanticsForReflection = nullptr;
+        RefPtr<SharedSemanticsContext> m_semanticsForReflection;
 
     };
 

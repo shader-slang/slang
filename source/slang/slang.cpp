@@ -1072,6 +1072,8 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     m_semanticsForReflection = new SharedSemanticsContext(this, nullptr, nullptr);
 }
 
+SharedSemanticsContext* Linkage::getSemanticsForReflection() { return m_semanticsForReflection.get(); }
+
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
 {
     if(guid == ISlangUnknown::getTypeGuid() || guid == ISession::getTypeGuid())
