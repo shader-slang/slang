@@ -2499,6 +2499,8 @@ struct IRImageStoreArray : IRInst
     // array index is last component of coord
     IRInst* getCoord() { return getOperand(1); }
     IRInst* getValue() { return getOperand(2); }
+    // number of dimensions of the texture, so we know where the array coord is
+    IRInst* getDimensions() { return getOperand(3); };
 };
 // Terminators
 

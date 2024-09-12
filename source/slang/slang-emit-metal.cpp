@@ -499,9 +499,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(",");
             emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
             m_writer->emit(".");
-            IRInst* coord = imageOp->getCoord();
-            IRVectorType* vectorCoord = as<IRVectorType>(coord);
-            IRIntLit* numCoordComp = as<IRIntLit>(vectorCoord->getElementCount());
+            IRIntLit* numCoordComp = as<IRIntLit>(imageOp->getDimensions());
             const char* swizzle[] = {"x", "y", "z", "w"};
             uint i;
             for(i = 0; i < numCoordComp->getValue() - 1; ++i)

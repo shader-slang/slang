@@ -2957,7 +2957,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 
     [require(metal, texture_sm_4_1)]
     __intrinsic_op($(kIROp_ImageStoreArray))
-    static void __metalImageStoreArray(This val, vector<int, Shape.dimensions+isArray> location, T value);
+    static void __metalImageStoreArray(This val, vector<uint, Shape.dimensions+isArray> location, T value, uint nunDimensions);
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
@@ -3032,7 +3032,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         // lod is not supported for 1D texture
                         if (isArray == 1)
                             // void write(Tv color, uint coord, uint array, uint lod = 0) const
-                            __metalImageStoreArray(this, location, newValue);
+                            __metalImageStoreArray(this, location, newValue, 1);
                         else
                             // void write(Tv color, uint coord, uint lod = 0) const
                             __metalImageStore(this, location, newValue);
@@ -3040,7 +3040,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     case $(SLANG_TEXTURE_2D):
                         if (isArray == 1)
                             // void write(Tv color, uint2 coord, uint array, uint lod = 0) const
-                            __metalImageStoreArray(this, location, newValue);
+                            __metalImageStoreArray(this, location, newValue, 2);
                         else
                             // void write(Tv color, uint2 coord, uint lod = 0) const
                             __metalImageStore(this, location, newValue);
