@@ -2511,17 +2511,6 @@ struct IRImageStore : IRInst
     bool hasAuxCoord1() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
     IRInst* getAuxCoord1() { return getOperand(3); }
 };
-/// swizzle is not supported for the location to separate the array channel
-struct IRImageStoreArray : IRInst
-{
-    IR_LEAF_ISA(ImageStoreArray);
-    IRInst* getImage() { return getOperand(0); }
-    // array index is last component of coord
-    IRInst* getCoord() { return getOperand(1); }
-    IRInst* getValue() { return getOperand(2); }
-    // number of dimensions of the texture, so we know where the array coord is
-    IRInst* getDimensions() { return getOperand(3); };
-};
 // Terminators
 
 struct IRReturn : IRTerminatorInst

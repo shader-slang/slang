@@ -1740,12 +1740,43 @@ namespace Slang
         }
     };
 
+    void splitArrayIndexFromCoord(IRBuilder& builder, IRImageStore* imageStore)
+    {
+        auto textureType = as<IRTextureType>(imageStore->getImage()->getDataType());
+        if(!textureType->isArray())
+        {
+            return;
+        }
+        uint numDimensions = 0;
+        auto shape = textureType->getShape();
+        switch(shape) {
+            case SLANG_TEXTURE_1D_ARRAY:
+                numDimensions = 1;
+                break;
+            case SLANG_TEXTURE_2D_ARRAY:
+            case SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY:
+            case SLANG_TEXTURE_CUBE:
+            case SLANG_TEXTURE_CUBE_ARRAY:
+                numDimensions = 2;
+                break;
+            default:
+                SLANG_UNEXPECTED("Unknown texture type with isArray");
+        }
+        Slang::UInt components[] = {0, 1, 2, 3};
+        auto baseCoords = builder.emitSwizzle(builder.getVectorType(builder.getUIntType(), numDimensions), imageStore->getCoord(), numDimensions, components);
+        auto arrayCoord = builder.emitSwizzle(builder.getUIntType(), imageStore->getCoord(), 1, components + numDimensions);
+        imageStore->setOperand(1, baseCoords);
+        imageStore->setOperand(3, arrayCoord);
+    }
+
     // metal textures only support writing 4-component values, even if the texture is only 1, 2, or 3-component
     // in this case the other channels get ignored, but the signature still doesnt match
     // so now we have to replace the value being written with a 4-component vector where 
     // the new components get ignored, nice
-    IRInst* legalizeImageStoreValue(IRBuilder& builder, IRInst* originalValue)
+    void legalizeImageStoreValue(IRBuilder& builder, IRImageStore* imageStore)
     {
+        builder.setInsertBefore(imageStore);
+        auto originalValue = imageStore->getValue();
         auto valueBaseType = originalValue->getDataType();
         IRType* elementType = nullptr;
         List<IRInst*> components;
@@ -1755,7 +1786,7 @@ namespace Slang
             {
                 if(originalElementCount->getValue() == 4)
                 {
-                    return originalValue;
+                    return;
                 }
             }
             elementType = valueVectorType->getElementType();
@@ -1775,7 +1806,7 @@ namespace Slang
             components.add(builder.getIntValue(builder.getIntType(), 0));
         }
         auto fourComponentVectorType = builder.getVectorType(elementType, 4);
-        return builder.emitMakeVector(fourComponentVectorType, components);
+        imageStore->setOperand(2, builder.emitMakeVector(fourComponentVectorType, components));
     }
 
     void legalizeFuncBody(IRFunc* func)
@@ -1836,13 +1867,8 @@ namespace Slang
                 }
                 if(auto write = as<IRImageStore>(inst))
                 {
-                    builder.setInsertBefore(write);
-                    write->setOperand(2, legalizeImageStoreValue(builder, write->getValue()));
-                }
-                if(auto write = as<IRImageStoreArray>(inst))
-                {
-                    builder.setInsertBefore(write);
-                    write->setOperand(2, legalizeImageStoreValue(builder, write->getValue()));
+                    splitArrayIndexFromCoord(builder, write);
+                    legalizeImageStoreValue(builder, write);
                 }
             }
         }

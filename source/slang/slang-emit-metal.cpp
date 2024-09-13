@@ -486,33 +486,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             return true;
         }
-        // this is done in a terrible way, it shouldnt even require a separate 
-        // IR for arrays. But since separating regular and array coords in hlsl.meta.slang,
-        // we hack it like this for now
-        // TODO: remove once unified with kIROp_ImageStore
-        case kIROp_ImageStoreArray:
-        {
-            auto imageOp = as<IRImageStoreArray>(inst);
-            emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
-            m_writer->emit(".write(");
-            emitOperand(imageOp->getValue(), getInfo(EmitOp::General));
-            m_writer->emit(",");
-            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
-            m_writer->emit(".");
-            IRIntLit* numCoordComp = as<IRIntLit>(imageOp->getDimensions());
-            const char* swizzle[] = {"x", "y", "z", "w"};
-            uint i;
-            for(i = 0; i < numCoordComp->getValue() - 1; ++i)
-            {
-                m_writer->emit(swizzle[i]);
-            }
-            m_writer->emit(",");
-            emitOperand(imageOp->getCoord(), getInfo(EmitOp::General));
-            m_writer->emit(".");
-            m_writer->emit(swizzle[i]);
-            m_writer->emit(")");
-            return true;
-        }
         case kIROp_MetalSetVertex:
         {
             auto setVertex = as<IRMetalSetVertex>(inst);

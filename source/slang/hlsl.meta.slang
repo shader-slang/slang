@@ -2953,11 +2953,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
     
     [require(metal, texture_sm_4_1)]
     __intrinsic_op($(kIROp_ImageStore))
-    static void __metalImageStore(This val, vector<uint, Shape.dimensions+isArray> location, T value);
-
-    [require(metal, texture_sm_4_1)]
-    __intrinsic_op($(kIROp_ImageStoreArray))
-    static void __metalImageStoreArray(This val, vector<uint, Shape.dimensions+isArray> location, T value, uint nunDimensions);
+    static void __metalImageStore(This val, vector<uint, Shape.dimensions+isArray> location, T value, uint arrayIndex);
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
@@ -3026,35 +3022,8 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         OpImageWrite $this $location __convertTexel(newValue);
                     };
                 case metal:
-                    switch (Shape.flavor)
-                    {
-                    case $(SLANG_TEXTURE_1D):
-                        // lod is not supported for 1D texture
-                        if (isArray == 1)
-                            // void write(Tv color, uint coord, uint array, uint lod = 0) const
-                            __metalImageStoreArray(this, location, newValue, 1);
-                        else
-                            // void write(Tv color, uint coord, uint lod = 0) const
-                            __metalImageStore(this, location, newValue);
-                        break;
-                    case $(SLANG_TEXTURE_2D):
-                        if (isArray == 1)
-                            // void write(Tv color, uint2 coord, uint array, uint lod = 0) const
-                            __metalImageStoreArray(this, location, newValue, 2);
-                        else
-                            // void write(Tv color, uint2 coord, uint lod = 0) const
-                            __metalImageStore(this, location, newValue);
-                        break;
-                    case $(SLANG_TEXTURE_3D):
-                        if (isShadow == 0 && isArray == 0)
-                            // void write(Tv color, uint3 coord, uint lod = 0) const
-                            __metalImageStore(this, location, newValue);
-                        break;
-                    case $(SLANG_TEXTURE_CUBE):
-                        static_assert(isArray == 0, "Unsupported 'Store' of 'texture cube array' for 'metal' target");
-                        __metalImageStore(this, location, newValue);
-                        break;
-                    }
+                    // last arg will be replaced with the split off array index
+                    __metalImageStore(this, location, newValue, 0);
             }
         }
 
