@@ -3772,13 +3772,21 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
         return;
     }
 
-    String one = bitWidth <= 32 ? "1u" : "1ull";
+    String one;
+    switch(bitWidth) {
+        case 8:  one = "uint8_t(1)"; break;
+        case 16: one = "uint16_t(1)"; break;
+        case 32: one = "uint32_t(1)"; break;
+        case 64: one = "uint64_t(1)"; break;
+        default: SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unexpected bit width");
+    }
     
     // Emit open paren and type cast for later sign extension
     if (isSigned) 
     {
         m_writer->emit("(");
         emitType(inst->getDataType());
+        m_writer->emit("(");
     }
 
     // Emit bitfield extraction ((val>>off)&((1u<<bts)-1))
@@ -3797,7 +3805,7 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
     m_writer->emit("))");
 
     // Emit sign extension logic
-    // (bitfield<<(numBits-bts)>>(numBits-bts))
+    // (type(bitfield<<(numBits-bts))>>(numBits-bts))
     //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     if (isSigned) 
     {
@@ -3810,7 +3818,7 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
             emitOperand(bts, getInfo(EmitOp::General));
             m_writer->emit(")");
         });
-        m_writer->emit(">>");
+        m_writer->emit(")>>");
         emitVecNOrScalar(vectorType, [&]() 
         {
             m_writer->emit("(");
@@ -3848,7 +3856,14 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
         return;
     }
 
-    String one = bitWidth <= 32 ? "1u" : "1ull";
+    String one;
+    switch(bitWidth) {
+        case 8:  one = "uint8_t(1)"; break;
+        case 16: one = "uint16_t(1)"; break;
+        case 32: one = "uint32_t(1)"; break;
+        case 64: one = "uint64_t(1)"; break;
+        default: SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unexpected bit width");
+    }
 
     m_writer->emit("((");
     
