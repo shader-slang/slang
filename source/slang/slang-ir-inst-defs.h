@@ -775,6 +775,11 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         needs to be special cased for lookup. */
     INST(TransitoryDecoration,              transitory,             0, 0)
 
+    // The result witness table that the functon's return type is a subtype of an interface.
+    // This is used to keep track of the original witness table in a function that used to
+    // return an existential value but now returns a concrete type after specialization.
+    INST(ResultWitnessDecoration,           ResultWitness,          1, 0)
+
     INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
     INST(VulkanRayPayloadInDecoration,      vulkanRayPayloadIn,       0, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
