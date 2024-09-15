@@ -3,15 +3,9 @@
 
 
 #include "glslang/Public/ResourceLimits.h"
-#include "StandAlone/Worklist.h"
-#include "glslang/Include/ShHandle.h"
 #include "glslang/Public/ShaderLang.h"
 #include "SPIRV/GlslangToSpv.h"
-#include "SPIRV/GLSL.std.450.h"
-#include "SPIRV/doc.h"
 #include "SPIRV/disassemble.h"
-
-#include "glslang/MachineIndependent/localintermediate.h"
 
 #include "slang.h"
 
@@ -23,6 +17,7 @@
 #endif
 
 #include <memory>
+#include <mutex>
 #include <sstream>
 
 // This is a wrapper to allow us to run the `glslang` compiler
