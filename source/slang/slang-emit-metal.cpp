@@ -665,10 +665,8 @@ void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue
         case kIROp_BoolType:
         case kIROp_Int8Type:
         case kIROp_IntType:
-        case kIROp_Int64Type:
         case kIROp_UInt8Type:
         case kIROp_UIntType:
-        case kIROp_UInt64Type:
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
@@ -682,10 +680,12 @@ void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue
         case kIROp_UInt16Type:
             m_writer->emit("ushort");
             return;
+        case kIROp_Int64Type:
         case kIROp_IntPtrType:
             // NM: note, "long" is only type that works for i64 vec
             m_writer->emit("long");
             return;
+        case kIROp_UInt64Type:
         case kIROp_UIntPtrType:
             // NM: note, "ulong" is only type that works for i64 vec, but can't be used for scalars.
             // (See metal specification pg 26)
