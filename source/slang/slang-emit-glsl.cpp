@@ -2449,7 +2449,8 @@ void GLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
     }
 }
 
-void GLSLSourceEmitter::emitBitfieldExtractImpl(IRInst* inst) {
+void GLSLSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
+{
     m_writer->emit("bitfieldExtract(");
     emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
     m_writer->emit(",");
@@ -2459,7 +2460,8 @@ void GLSLSourceEmitter::emitBitfieldExtractImpl(IRInst* inst) {
     m_writer->emit(")");
 }
 
-void GLSLSourceEmitter::emitBitfieldInsertImpl(IRInst* inst) {
+void GLSLSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
+{
     m_writer->emit("bitfieldInsert(");
     emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
     m_writer->emit(",");

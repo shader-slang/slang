@@ -5600,7 +5600,8 @@ struct SPIRVEmitContext
         return emitInst(parent, inst, SpvOpConvertUToPtr, inst->getFullType(), kResultID, inst->getOperand(0));
     }
 
-    SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst) {
+    SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst)
+    {
         auto dataType = inst->getDataType();
         IRVectorType* vectorType = as<IRVectorType>(dataType);
         Slang::IRType* elementType = dataType;
@@ -5617,7 +5618,8 @@ struct SPIRVEmitContext
                     inst->getOperand(0), inst->getOperand(1), inst->getOperand(2));
     }
 
-    SpvInst* emitBitfieldInsert(SpvInstParent* parent, IRInst* inst) {
+    SpvInst* emitBitfieldInsert(SpvInstParent* parent, IRInst* inst)
+    {
         auto dataType = inst->getDataType();
         IRVectorType* vectorType = as<IRVectorType>(dataType);
         Slang::IRType* elementType = dataType;

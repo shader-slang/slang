@@ -3810,7 +3810,8 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
     }
 
     String one;
-    switch(bitWidth) {
+    switch(bitWidth)
+    {
         case 8:  one = "uint8_t(1)"; break;
         case 16: one = "uint16_t(1)"; break;
         case 32: one = "uint32_t(1)"; break;
