@@ -11,9 +11,9 @@
 // CHECK-NEXT: A8
 // CHECK-NEXT: 3FC0
 // CHECK-NEXT: 12D4
-// CHECK-NEXT: FFFF9A4C
-// CHECK-NEXT: FFFF8755
-// CHECK-NEXT: FFFFFE4C
+// CHECK-NEXT: 9A4C
+// CHECK-NEXT: 8755
+// CHECK-NEXT: FE4C
 
 // CHECK-NEXT: 8765432F
 // CHECK-NEXT: 876543F1
@@ -77,9 +77,9 @@ void computeMain()
         i16Buffer[5] = bitfieldInsert(base, value, 6, 8); // 0b11111111 000000 -> 0x3FC0
 
         // Test with a vector
-        vector<int16_t, 4> base4 = vector<int16_t, 4>(0x1234, 0x9abc, 0x8765, 0xfedc);
-        vector<int16_t, 4> value4 = vector<int16_t, 4>(0xABCD, 0x1234, 0x8765, 0x1234);
-        vector<int16_t, 4> output4 = bitfieldInsert(base4, value4, 4, 4);
+        vector<uint16_t, 4> base4 = vector<uint16_t, 4>(0x1234, 0x9abc, 0x8765, 0xfedc);
+        vector<uint16_t, 4> value4 = vector<uint16_t, 4>(0xABCD, 0x1234, 0x8765, 0x1234);
+        vector<uint16_t, 4> output4 = bitfieldInsert(base4, value4, 4, 4);
         i16Buffer[6] = output4.x;
         i16Buffer[7] = output4.y;
         i16Buffer[8] = output4.z;
