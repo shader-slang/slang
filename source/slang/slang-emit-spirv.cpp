@@ -5609,39 +5609,12 @@ struct SPIRVEmitContext
         
         const IntInfo i = getIntTypeInfo(elementType);
 
+        // NM: technically, using bitfield intrinsics for anything non-32-bit goes against 
+        // VK specification: VUID-StandaloneSpirv-Base-04781. However, it works on at least 
+        // NVIDIA HW. 
         SpvOp opcode = i.isSigned ? SpvOpBitFieldSExtract : SpvOpBitFieldUExtract;
         return emitInst(parent, inst, opcode, inst->getFullType(), kResultID, 
                     inst->getOperand(0), inst->getOperand(1), inst->getOperand(2));
-
-        // SpvOp opcastcode = i.isSigned ? SpvOpSConvert : SpvOpUConvert;
-
-        // IRBuilder builder(inst);
-        // builder.setInsertBefore(inst);
-        // Slang::IRType* i32Type = i.isSigned ? builder.getIntType() : builder.getUIntType();
-        // Slang::IRType* toTypeV = i32Type;
-        // Slang::IRType* fromTypeV = dataType;
-        // if (vectorType) {                
-        //     toTypeV = builder.getVectorType(i32Type, vectorType->getElementCount());
-        // }
-
-        
-
-        // if (i.width == 32) {
-        //     // For 32-bit types, we can just emit the instruction directly.
-            
-        // }
-        // else if (i.width < 32) {
-        //     // For smaller types, we need to promote to a 32-bit type, then go back.
-        //     Slang::IRInst * i32Val = builder.emitCast(toTypeV, inst->getOperand(0));
-        //     emitLocalInst(parent, i32Val);
-        //     Slang::IRInst * result = builder.emitBitfieldExtract(toTypeV, i32Val, inst->getOperand(1), inst->getOperand(2));
-        //     Slang::SpvInst * resultSpv = emitLocalInst(parent, result);
-        //     Slang::SpvInst * back = emitInst(parent, inst, opcastcode, fromTypeV, kResultID, resultSpv);
-        //     return back;
-        // }
-        // else {
-        //     SLANG_UNIMPLEMENTED_X("64-bit bitfieldExtract in SPIR-V emit");
-        // }
     }
 
     SpvInst* emitBitfieldInsert(SpvInstParent* parent, IRInst* inst) {
