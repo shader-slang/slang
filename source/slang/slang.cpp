@@ -28,7 +28,6 @@
 #include "slang-type-layout.h"
 #include "slang-lookup.h"
 
-#
 #include "slang-options.h"
 
 #include "slang-repro.h"
@@ -1069,7 +1068,11 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
         for (const auto& nameToMod : builtinLinkage->mapNameToLoadedModules)
             mapNameToLoadedModules.add(nameToMod);
     }
+
+    m_semanticsForReflection = new SharedSemanticsContext(this, nullptr, nullptr);
 }
+
+SharedSemanticsContext* Linkage::getSemanticsForReflection() { return m_semanticsForReflection.get(); }
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
 {
@@ -1348,18 +1351,11 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     return asExternal(specializedType);
 }
 
-
-DeclRef<Decl> Linkage::specializeGeneric(
-        DeclRef<Decl>                       declRef,
-        List<Expr*>                         argExprs,
-        DiagnosticSink*                     sink)
+DeclRef<GenericDecl> getGenericParentDeclRef(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef)
 {
-    SLANG_AST_BUILDER_RAII(getASTBuilder());
-    SLANG_ASSERT(declRef);
-
-    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
-    SemanticsVisitor visitor(&sharedSemanticsContext);
-
     // Create substituted parent decl ref.
     auto decl = declRef.getDecl();
 
@@ -1369,9 +1365,58 @@ DeclRef<Decl> Linkage::specializeGeneric(
     }
 
     auto genericDecl = as<GenericDecl>(decl);
-    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, DeclRef(genericDecl)).as<GenericDecl>();
-    genericDeclRef = substituteDeclRef(SubstitutionSet(declRef), getASTBuilder(), genericDeclRef).as<GenericDecl>();
+    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, DeclRef(genericDecl)).as<GenericDecl>();
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, genericDeclRef).as<GenericDecl>();
+}
 
+DeclRef<Decl> Linkage::specializeWithArgTypes(
+    DeclRef<Decl>   funcDeclRef,
+    List<Type*>         argTypes,
+    DiagnosticSink*     sink)
+{
+    SemanticsVisitor visitor(getSemanticsForReflection());
+    visitor = visitor.withSink(sink);
+
+    ASTBuilder* astBuilder = getASTBuilder();
+
+    List<Expr*> argExprs;
+    for (SlangInt aa = 0; aa < argTypes.getCount(); ++aa)
+    {
+        auto argType = argTypes[aa];
+
+        // Create an 'empty' expr with the given type. Ideally, the expression itself should not matter
+        // only its checked type.
+        //
+        auto argExpr = astBuilder->create<VarExpr>();
+        argExpr->type = argType;
+        argExprs.add(argExpr);
+    }
+
+    // Construct invoke expr.
+    auto invokeExpr = astBuilder->create<InvokeExpr>();
+    auto declRefExpr = astBuilder->create<DeclRefExpr>();
+    
+    declRefExpr->declRef = getGenericParentDeclRef(getASTBuilder(), &visitor, funcDeclRef);
+    invokeExpr->functionExpr = declRefExpr;
+    invokeExpr->arguments = argExprs;
+
+    auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
+    return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
+}
+
+
+DeclRef<Decl> Linkage::specializeGeneric(
+        DeclRef<Decl>                       declRef,
+        List<Expr*>                         argExprs,
+        DiagnosticSink*                     sink)
+{
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+    SLANG_ASSERT(declRef);
+
+    SemanticsVisitor visitor(getSemanticsForReflection());
+    visitor = visitor.withSink(sink);
+
+    auto genericDeclRef = getGenericParentDeclRef(getASTBuilder(), &visitor, declRef);
 
     DeclRefExpr* declRefExpr = getASTBuilder()->create<DeclRefExpr>();
     declRefExpr->declRef = genericDeclRef;
@@ -1561,8 +1606,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
 
     try
     {
-        SharedSemanticsContext sharedSemanticsContext(this, nullptr, &sink);
-        SemanticsVisitor visitor(&sharedSemanticsContext);
+        SemanticsVisitor visitor(getSemanticsForReflection());
+        visitor = visitor.withSink(&sink);
+
         auto witness =
             visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
@@ -2318,12 +2364,8 @@ DeclRef<Decl> ComponentType::findDeclFromString(
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SharedSemanticsContext sharedSemanticsContext(
-        linkage,
-        nullptr,
-        sink);
-    SemanticsContext context(&sharedSemanticsContext);
-    context = context.allowStaticReferenceToNonStaticMember();
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
 
@@ -2377,12 +2419,8 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SharedSemanticsContext sharedSemanticsContext(
-        linkage,
-        nullptr,
-        sink);
-    SemanticsContext context(&sharedSemanticsContext);
-    context = context.allowStaticReferenceToNonStaticMember();
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
 
@@ -2433,11 +2471,7 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
 
 bool ComponentType::isSubType(Type* subType, Type* superType)
 {
-    SharedSemanticsContext sharedSemanticsContext(
-        getLinkage(),
-        nullptr,
-        nullptr);
-    SemanticsContext context(&sharedSemanticsContext);
+    SemanticsContext context(getLinkage()->getSemanticsForReflection());
     SemanticsVisitor visitor(context);
 
     return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);
