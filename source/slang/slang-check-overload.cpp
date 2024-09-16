@@ -1440,29 +1440,68 @@ namespace Slang
         return 0;
     }
 
-    int getScopeRank(DeclRef<Decl> const& left, DeclRef<Decl> const& right)
+    int getScopeRank(DeclRef<Decl> const& left,
+                DeclRef<Decl> const& right, Slang::Scope* referenceSiteScope)
     {
+        if (!referenceSiteScope)
+            return 0;
+
+        DeclRef<Decl> prefixDecl = referenceSiteScope->containerDecl;
+
+        // find the common prefix decl of reference site and left
         int leftDistance = 0;
         int rightDistance = 0;
-
-        DeclRef<Decl> decl = left;
-        while(decl)
+        auto distanceToCommonPrefix = [](DeclRef<Decl> const& candidate, DeclRef<Decl> const& reference) -> int
         {
-            leftDistance++;
-            decl = decl.getParent();
+            bool found = false;
+            int distanceFromRefToPrefix = 0;
+            DeclRef<Decl> prefixDecl = reference;
+            for (;;)
+            {
+                if (prefixDecl == nullptr && !found)
+                {
+                    return -1;
+                }
+                DeclRef<Decl> decl = candidate;
+                int distanceFromPrefixToCandidate = 0;
+                for(;;)
+                {
+                    if (decl == nullptr)
+                        break;
+
+                    // found the common prefix
+                    if (decl == prefixDecl)
+                    {
+                        found = true;
+                        break;
+                    }
+
+                    decl = decl.getParent();
+                    distanceFromPrefixToCandidate++;
+                }
+                if (found == true)
+                    return distanceFromRefToPrefix + distanceFromPrefixToCandidate;
+
+                prefixDecl = prefixDecl.getParent();
+                distanceFromRefToPrefix++;
+            }
+        };
+
+        leftDistance = distanceToCommonPrefix(left, prefixDecl);
+        rightDistance = distanceToCommonPrefix(right, prefixDecl);
+
+        if (leftDistance == rightDistance)
+        {
+            return 0;
         }
 
-        decl = right;
-        while(decl)
-        {
-            rightDistance++;
-            decl = decl.getParent();
-        }
+        if (leftDistance == -1)
+            return 1;
 
-        if (leftDistance != rightDistance)
-            return leftDistance > rightDistance ? -1 : 1;
+        if (rightDistance == -1)
+            return -1;
 
-        return 0;
+        return leftDistance < rightDistance ? -1 : 1;
     }
 
     int SemanticsVisitor::CompareOverloadCandidates(
@@ -1555,12 +1594,9 @@ namespace Slang
             //          float f(float x);
             //          float g(float y) { return f(y); }   // will call S::f() instead of ::f()
             //      }
-            // We don't need to know the call site of 'f(y)', but only need to count the two candidates' distance to the global scope,
-            // because this function will only choose the valid candidates. So if there is situation like this:
-            //  void main() {  S s; s.f(1.0);} or
-            //  struct T { float g(y) { f(y); } }, there won't be ambiguity.
-            //  So we just need to count which declaration is farther from the global scope and favor the farther one.
-            auto scopeRank = getScopeRank(left->item.declRef, right->item.declRef);
+            //  we will count the distance from the reference site to the declaration in the scope tree.
+
+            auto scopeRank = getScopeRank(left->item.declRef, right->item.declRef, this->m_outerScope);
             if (scopeRank)
                 return scopeRank;
         }
