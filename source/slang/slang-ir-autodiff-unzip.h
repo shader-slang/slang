@@ -201,8 +201,6 @@ struct DiffUnzipPass
 
     InstPair splitCall(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRCall* mixedCall)
     {
-        mixedCall->dump();
-
         IRBuilder globalBuilder(autodiffContext->moduleInst->getModule());
 
         auto fwdCalleeType = mixedCall->getCallee()->getDataType();
