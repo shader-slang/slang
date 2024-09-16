@@ -1582,11 +1582,6 @@ namespace Slang
             if (externExportDiff)
                 return externExportDiff;
 
-            // If we reach here, we will attempt to use overload rank to break the ties.
-            auto overloadRankDiff = getOverloadRank(right->item.declRef) - getOverloadRank(left->item.declRef);
-            if (overloadRankDiff)
-                return overloadRankDiff;
-
             // We need to consider the distance of the declarations to the global scope to resolve this case:
             //      float f(float x);
             //      struct S
@@ -1599,6 +1594,12 @@ namespace Slang
             auto scopeRank = getScopeRank(left->item.declRef, right->item.declRef, this->m_outerScope);
             if (scopeRank)
                 return scopeRank;
+
+            // If we reach here, we will attempt to use overload rank to break the ties.
+            auto overloadRankDiff = getOverloadRank(right->item.declRef) - getOverloadRank(left->item.declRef);
+            if (overloadRankDiff)
+                return overloadRankDiff;
+
         }
 
         return 0;
