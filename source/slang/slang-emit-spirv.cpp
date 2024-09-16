@@ -2676,13 +2676,16 @@ struct SPIRVEmitContext
 
         // > OpFunctionParameter
         //
-        // Unlike Slang, where parameters always belong to blocks,
-        // the parameters of a SPIR-V function must appear as direct
-        // children of the function instruction, and before any basic blocks.
+        // Though parameters always belong to blocks in Slang, there are no
+        // blocks in a function declaration, so we will emit the parameters
+        // as derived from the function's type.
         //
-        for (auto irParam : irFunc->getParams())
+        auto funcType = irFunc->getDataType();
+        auto paramCount = funcType->getParamCount();
+        for (UInt pp = 0; pp < paramCount; ++pp)
         {
-            emitParam(spvFunc, irParam);
+            auto paramType = funcType->getParamType(pp);
+            emitOpFunctionParameter(spvFunc, nullptr, paramType);
         }
 
         // [3.32.9. Function Instructions]

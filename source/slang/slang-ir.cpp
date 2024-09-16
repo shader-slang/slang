@@ -8930,10 +8930,6 @@ namespace Slang
         switch (val->getOp())
         {
         case kIROp_Func:
-            if (val->findDecoration<IRDownstreamModuleImportDecoration>() != nullptr)
-            {
-                return false;
-            }
             return val->getFirstChild() != nullptr;
 
         case kIROp_GlobalConstant:
