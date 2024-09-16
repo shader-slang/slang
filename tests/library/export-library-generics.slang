@@ -33,7 +33,7 @@ public int normalFuncUsesGeneric(int a)
     return genericFunc(obj);
 }
 
-public int normalFunc(int a)
+public int normalFunc(int a, float b)
 {
-    return a - 2;
+    return a - floor(b);
 }
