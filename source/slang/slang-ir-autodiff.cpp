@@ -666,7 +666,6 @@ IRInst* DifferentiableTypeConformanceContext::getDifferentialTypeFromDiffPairTyp
 IRInst* DifferentiableTypeConformanceContext::getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type)
 {
     return this->differentiateType(builder, type->getValueType());
-    //return _getDiffTypeFromPairType(sharedContext, builder, type);
 }
 
 IRInst* DifferentiableTypeConformanceContext::getDiffTypeWitnessFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type)
@@ -896,7 +895,6 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
         if (auto pairType = as<IRDifferentialPairTypeBase>(globalInst))
         {
             addTypeToDictionary(pairType->getValueType(), pairType->getWitness());
-            //differentiableWitnessDictionary.addIfNotExists(pairType->getValueType(), pairType->getWitness());
         }
     }
 }

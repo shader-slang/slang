@@ -2909,15 +2909,16 @@ namespace Slang
 
         // Check if the provided type inherits from IDifferentiable.
         // If not, return the original type.
-        if (auto conformanceValWitness = as<Witness>(
-                isSubtype(primalType, differentiableInterface, IsSubTypeOptions::None)))
+        if (auto conformanceWitness = isTypeDifferentiable(primalType))
         {
-            return m_astBuilder->getDifferentialPairType(primalType, conformanceValWitness);
-        }
-        else if (auto conformancePtrWitness = as<Witness>(
-                isSubtype(primalType, differentiableRefInterface, IsSubTypeOptions::None)))
-        {
-            return m_astBuilder->getDifferentialPtrPairType(primalType, conformancePtrWitness);
+            if (conformanceWitness->getSup() == differentiableInterface)
+            {
+                return m_astBuilder->getDifferentialPairType(primalType, conformanceWitness);
+            }
+            else if (conformanceWitness->getSup() == differentiableRefInterface)
+            {
+                return m_astBuilder->getDifferentialPtrPairType(primalType, conformanceWitness);
+            }
         }
         else
             return primalType;
