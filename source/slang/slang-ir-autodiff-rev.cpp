@@ -403,6 +403,7 @@ namespace Slang
         List<IRType*> primalTypes, propagateTypes;
         IRType* primalResultType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getResultType());
 
+        IRParam *currentParam = origFunc->getFirstParam();
         for (UInt i = 0; i < origFuncType->getParamCount(); i++)
         {
             auto primalParamType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getParamType(i));
@@ -410,6 +411,8 @@ namespace Slang
             if (propagateParamType)
             {
                 auto param = builder.emitParam(propagateParamType);
+                param->sourceLoc = currentParam->sourceLoc;
+
                 propagateTypes.add(propagateParamType);
                 propagateArgs.add(param);
 
@@ -432,10 +435,12 @@ namespace Slang
                 {
                     // If primal parameter is mutable, we need to pass in a temp var.
                     auto tempVar = builder.emitVar(primalParamPtrType->getValueType());
+                    tempVar->sourceLoc = currentParam->sourceLoc;
                     if (primalParamPtrType->getOp() == kIROp_InOutType)
                     {
                         // If the primal parameter is inout, we need to set the initial value.
-                        builder.emitStore(tempVar, primalArg);
+                        auto store = builder.emitStore(tempVar, primalArg);
+                        store->sourceLoc = currentParam->sourceLoc;
                     }
                     primalArgs.add(tempVar);
                 }
@@ -450,9 +455,11 @@ namespace Slang
                 SLANG_RELEASE_ASSERT(primalPtrType);
                 auto primalValueType = primalPtrType->getValueType();
                 auto var = builder.emitVar(primalValueType);
+                var->sourceLoc = currentParam->sourceLoc;
                 primalArgs.add(var);
             }
             primalTypes.add(primalParamType);
+            currentParam = currentParam->getNextParam();
         }
 
         // Add dOut argument to propagateArgs.
@@ -928,6 +935,8 @@ namespace Slang
                 {
                     // Create dOut param. 
                     auto diffParam = builder->emitParam(diffType);
+                    diffParam->sourceLoc = fwdParam->sourceLoc;
+
                     copyNameHintAndDebugDecorations(diffParam, fwdParam);
                     result.propagateFuncParams.add(diffParam);
                     primalRefReplacement = builder->emitParam(builder->getOutType(primalType));
@@ -960,6 +969,7 @@ namespace Slang
                 
                 // Create a local var for the out param for the primal part of the prop func.
                 auto tempPrimalVar = nextBlockBuilder.emitVar(outType->getValueType());
+                tempPrimalVar->sourceLoc = fwdParam->sourceLoc;
                 copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = tempPrimalVar;
 
@@ -985,6 +995,7 @@ namespace Slang
 
                     // Create a local var for the out param for the primal part of the prop func.
                     auto tempPrimalVar = nextBlockBuilder.emitVar(inoutType->getValueType());
+                    tempPrimalVar->sourceLoc = fwdParam->sourceLoc;
                     copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
 
                     result.propagateFuncSpecificPrimalInsts.add(tempPrimalVar);
@@ -1020,10 +1031,15 @@ namespace Slang
                 auto propParam = builder->emitParam(inoutDiffPairType);
                 copyNameHintAndDebugDecorations(propParam, fwdParam);
                 result.propagateFuncParams.add(propParam);
+                
+                primalRefReplacement->sourceLoc = fwdParam->sourceLoc;
+                propParam->sourceLoc = fwdParam->sourceLoc;
 
                 // A reference to this parameter from the diff blocks should be replaced with a load
                 // of the differential component of the pair.
                 auto newParamLoad = diffBuilder.emitLoad(propParam);
+                newParamLoad->sourceLoc = fwdParam->sourceLoc;
+
                 diffBuilder.markInstAsDifferential(newParamLoad, primalType);
                 result.propagateFuncSpecificPrimalInsts.add(newParamLoad);
 
@@ -1056,6 +1072,9 @@ namespace Slang
                 auto diffParam = builder->emitParam(inoutType);
                 copyNameHintAndDebugDecorations(diffParam, fwdParam);
                 result.propagateFuncParams.add(diffParam);
+                
+                primalParam->sourceLoc = fwdParam->sourceLoc;
+                diffParam->sourceLoc = fwdParam->sourceLoc;
 
                 // Primal references to this param is the new primal param.
                 primalRefReplacement = primalParam;
@@ -1065,6 +1084,7 @@ namespace Slang
 
                 // Load the inital diff value.
                 auto loadedParam = nextBlockBuilder.emitLoad(diffParam);
+                loadedParam->sourceLoc = fwdParam->sourceLoc;
                 result.propagateFuncSpecificPrimalInsts.add(loadedParam);
 
                 auto initDiff = nextBlockBuilder.emitDifferentialPairGetDifferential(diffType, loadedParam);

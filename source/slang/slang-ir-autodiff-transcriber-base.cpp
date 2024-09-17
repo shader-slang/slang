@@ -505,6 +505,7 @@ InstPair AutoDiffTranscriberBase::transcribeParam(IRBuilder* builder, IRParam* o
         if (IRType* diffType = differentiateType(builder, (IRType*)origParam->getDataType()))
         {
             diff = builder->emitParam(diffType);
+            diff->sourceLoc = origParam->sourceLoc;
         }
         return InstPair(primal, diff);
     }

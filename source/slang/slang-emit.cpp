@@ -218,10 +218,7 @@ static void dumpIRIfEnabled(
 static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, DiagnosticSink* sink, IRModule* irModule)
 {
     // Report checkpointing information
-    EndToEndCompileRequest *compileRequest = codeGenContext->isEndToEndCompile();
-    CompilerOptionSet &optionSet = compileRequest->getOptionSet();
-    SLANG_ASSERT(compileRequest);
-
+    CompilerOptionSet& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
     SourceManager* sourceManager = sink->getSourceManager();
     
     SourceWriter typeWriter(sourceManager, LineDirectiveMode::None, nullptr);
