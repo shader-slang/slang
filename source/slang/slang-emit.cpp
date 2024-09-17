@@ -239,9 +239,6 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
 
     GLSLSourceEmitter emitter(description);
 
-    StringBuilder builder;
-    int nonEmptyCount = 0;
-
     for (auto inst : irModule->getGlobalInsts())
     {
         IRStructType *structType = as<IRStructType>(inst);
@@ -260,20 +257,8 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
             if (structSize.size == 0)
                 continue;
 
-            builder << "checkpointing context generated for function: ";
-            
             auto func = checkpointDecoration->getSourceFunction();
-            if (!func)
-                builder << "(?)";
-            else if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
-                builder << nameHint->getName();
-
-            HumaneSourceLoc structLocation = getHumanLoc(structType->sourceLoc);
-            
-            builder << "\n";
-            builder << "    defined at " << structLocation.pathInfo.foundPath << ":" << structLocation.line << "\n";
-            builder << "    size of context: " << structSize.size << " bytes\n";
-            builder << "\n";
+            sink->diagnose(structType, Diagnostics::reportCheckpointIntermediates, func, structSize.size);
 
             for (auto field : structType->getFields())
             {
@@ -283,40 +268,18 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
                 if (fieldSize.size == 0)
                     continue;
 
-                emitter.emitType(fieldType);
-                
-                HumaneSourceLoc fieldLocation = getHumanLoc(field->sourceLoc);
-
-                builder << "    " << fieldSize.size;
-                builder << " bytes used for field of type: ";
-                builder << typeWriter.getContent() << "\n";
                 typeWriter.clearContent();
+                emitter.emitType(fieldType);
 
-                builder << "    generated to checkpoint ";
-                if (field->findDecoration<IRLoopCounterDecoration>())
-                    builder << "loop counter created for loop at ";
-                else
-                    builder << "the following item defined at ";
-                builder << fieldLocation.pathInfo.foundPath << ":" << fieldLocation.line << "\n";
-
-                SourceView *sourceView = sourceManager->findSourceViewRecursively(field->sourceLoc);
-                if (sourceView)
-                    sourceLocationNoteDiagnostic(sink, sourceView, field->sourceLoc, builder);
-                else
-                    builder << "    no source view found for field\n";
-
-                nonEmptyCount++;
+                sink->diagnose(field->sourceLoc,
+                    field->findDecoration<IRLoopCounterDecoration>()
+                        ? Diagnostics::reportCheckpointCounter
+                        : Diagnostics::reportCheckpointVariable,
+                    fieldSize.size,
+                    typeWriter.getContent());
             }
         }
     }
-
-    if (nonEmptyCount == 0)
-        builder << "no checkpointing contexts were generated\n";
-
-    SourceWriter writer(sourceManager, LineDirectiveMode::None, nullptr);
-    writer.emit(builder);
-
-    File::writeAllText("checkpoint-report.txt", writer.getContent());
 }
 
 struct LinkingAndOptimizationOptions
