@@ -2920,8 +2920,7 @@ namespace Slang
                 return m_astBuilder->getDifferentialPtrPairType(primalType, conformanceWitness);
             }
         }
-        else
-            return primalType;
+        return primalType;
     }
 
     Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType)
