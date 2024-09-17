@@ -41,3 +41,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     __bwd_diff(f)(0, dpa, 1.0f);
     outputBuffer[0] = dpa.d; // Expect: 1
 }
+
+//CHK-NOT: note
