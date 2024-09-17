@@ -157,6 +157,7 @@ struct ExtractPrimalFuncContext
         IRInst* intermediateOutput)
     {
         auto field = addIntermediateContextField(inst->getDataType(), intermediateOutput);
+        field->sourceLoc = inst->sourceLoc;
         auto key = field->getKey();
         if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
             cloneDecoration(nameHint, key);

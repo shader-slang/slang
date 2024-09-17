@@ -223,14 +223,7 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
     SLANG_ASSERT(compileRequest);
 
     SourceManager* sourceManager = sink->getSourceManager();
-    auto getHumanLoc = [&](const SourceLoc &sourceLoc)
-    {
-        SourceView *sourceView = sourceManager->findSourceViewRecursively(sourceLoc);
-        if (sourceView)
-            return sourceView->getHumaneLoc(sourceLoc);
-        return HumaneSourceLoc();
-    };
-
+    
     SourceWriter typeWriter(sourceManager, LineDirectiveMode::None, nullptr);
 
     CLikeSourceEmitter::Desc description;
@@ -246,38 +239,38 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
             continue;
 
         auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
-        if (checkpointDecoration)
-        {
-            IRSizeAndAlignment structSize;
-            getNaturalSizeAndAlignment(optionSet, structType, &structSize);
+        if (!checkpointDecoration)
+            continue;
 
-            // Reporting happens before empty structs are optimized out
-            // and we still want to keep the checkpointing decorations,
-            // so we end up needing to check for non-zero-ness
-            if (structSize.size == 0)
+        IRSizeAndAlignment structSize;
+        getNaturalSizeAndAlignment(optionSet, structType, &structSize);
+
+        // Reporting happens before empty structs are optimized out
+        // and we still want to keep the checkpointing decorations,
+        // so we end up needing to check for non-zero-ness
+        if (structSize.size == 0)
+            continue;
+
+        auto func = checkpointDecoration->getSourceFunction();
+        sink->diagnose(structType, Diagnostics::reportCheckpointIntermediates, func, structSize.size);
+
+        for (auto field : structType->getFields())
+        {
+            IRType *fieldType = field->getFieldType();
+            IRSizeAndAlignment fieldSize;
+            getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
+            if (fieldSize.size == 0)
                 continue;
 
-            auto func = checkpointDecoration->getSourceFunction();
-            sink->diagnose(structType, Diagnostics::reportCheckpointIntermediates, func, structSize.size);
+            typeWriter.clearContent();
+            emitter.emitType(fieldType);
 
-            for (auto field : structType->getFields())
-            {
-                IRType *fieldType = field->getFieldType();
-                IRSizeAndAlignment fieldSize;
-                getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
-                if (fieldSize.size == 0)
-                    continue;
-
-                typeWriter.clearContent();
-                emitter.emitType(fieldType);
-
-                sink->diagnose(field->sourceLoc,
-                    field->findDecoration<IRLoopCounterDecoration>()
-                        ? Diagnostics::reportCheckpointCounter
-                        : Diagnostics::reportCheckpointVariable,
-                    fieldSize.size,
-                    typeWriter.getContent());
-            }
+            sink->diagnose(field->sourceLoc,
+                field->findDecoration<IRLoopCounterDecoration>()
+                    ? Diagnostics::reportCheckpointCounter
+                    : Diagnostics::reportCheckpointVariable,
+                fieldSize.size,
+                typeWriter.getContent());
         }
     }
 }
