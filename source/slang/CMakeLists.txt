@@ -152,7 +152,7 @@ target_include_directories(
 # generated lookup tables
 #
 
-if (NOT EXTERNAL_SPIRV_HEADERS)
+if (NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
 	set(SLANG_SPIRV_HEADERS_INCLUDE_DIR "${slang_SOURCE_DIR}/external/spirv-headers/include")
 endif()
 

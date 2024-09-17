@@ -99,25 +99,25 @@ option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang w
 option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 
-option(EXTERNAL_MINIZ "Build using external Miniz library" OFF)
-option(EXTERNAL_LZ4 "Build using external LZ4 library" OFF)
-option(EXTERNAL_VULKAN_HEADERS "Build using external Vulkan headers" OFF)
-option(EXTERNAL_SPIRV_HEADERS "Build using external SPIR-V headers" OFF)
-option(EXTERNAL_UNORDERED_DENSE "Build using external unordered dense" OFF)
+option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
+option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
+option(SLANG_USE_SYSTEM_VULKAN_HEADERS "Build using system Vulkan headers" OFF)
+option(SLANG_USE_SYSTEM_SPIRV_HEADERS "Build using system SPIR-V headers" OFF)
+option(SLANG_USE_SYSTEM_UNORDERED_DENSE "Build using system unordered dense" OFF)
 
-option(SLANG_SPIRV_HEADERS_INCLUDE_DIR "Provide an external path for the SPIR-V headers and grammar files")
+option(SLANG_SPIRV_HEADERS_INCLUDE_DIR "Provide a specific path for the SPIR-V headers and grammar files")
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
-if (${EXTERNAL_LZ4})
-    add_compile_definitions(SLANG_EXTERNAL_LZ4_HEADER)
+if (${SLANG_USE_SYSTEM_LZ4})
+    add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
 endif()
 
-if (${EXTERNAL_SPIRV_HEADERS})
-    add_compile_definitions(SLANG_EXTERNAL_SPIRV_HEADER)
+if (${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+    add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
 endif()
 
-if (${EXTERNAL_UNORDERED_DENSE})
-    add_compile_definitions(SLANG_EXTERNAL_UNORDERED_DENSE_HEADER)
+if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+    add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
 endif()
 
 enum_option(
@@ -221,7 +221,7 @@ add_subdirectory(external)
 set(SLANG_CORE_LIBRARIES "")
 list(APPEND SLANG_CORE_LIBRARIES miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS})
 
-if (${EXTERNAL_UNORDERED_DENSE})
+if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
 	find_package(unordered_dense CONFIG QUIET)
 
 	list(APPEND SLANG_CORE_LIBRARIES unordered_dense::unordered_dense)

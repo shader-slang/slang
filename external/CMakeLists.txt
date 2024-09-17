@@ -14,7 +14,7 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
 endif()
 
 # Miniz
-if (NOT ${EXTERNAL_MINIZ})
+if (NOT ${SLANG_USE_SYSTEM_MINIZ})
 	add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
 	set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
 # Work around https://github.com/richgel999/miniz/pull/292
@@ -26,7 +26,7 @@ if (NOT ${EXTERNAL_MINIZ})
 endif()
 
 # LZ4
-if (NOT ${EXTERNAL_LZ4})
+if (NOT ${SLANG_USE_SYSTEM_LZ4})
 	set(LZ4_BUNDLED_MODE ON)
 	add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
 	if(MSVC)
@@ -38,7 +38,7 @@ if (NOT ${EXTERNAL_LZ4})
 endif()
 
 # Vulkan headers
-if (NOT ${EXTERNAL_VULKAN_HEADERS})
+if (NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
 	add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
@@ -47,7 +47,7 @@ add_library(metal-cpp INTERFACE)
 target_include_directories(metal-cpp INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp")
 
 # SPIRV-Headers
-if (NOT ${EXTERNAL_SPIRV_HEADERS})
+if (NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
 	add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
