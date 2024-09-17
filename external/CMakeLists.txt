@@ -15,31 +15,31 @@ endif()
 
 # Miniz
 if (NOT ${SLANG_USE_SYSTEM_MINIZ})
-	add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
-	set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
-# Work around https://github.com/richgel999/miniz/pull/292
-	get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
-	if(MSVC AND miniz_c_launcher MATCHES "ccache")
-	set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
-	set_property(TARGET miniz PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
-	endif()
+    add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
+    set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
+    # Work around https://github.com/richgel999/miniz/pull/292
+    get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
+    if(MSVC AND miniz_c_launcher MATCHES "ccache")
+        set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
+        set_property(TARGET miniz PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
+    endif()
 endif()
 
 # LZ4
 if (NOT ${SLANG_USE_SYSTEM_LZ4})
-	set(LZ4_BUNDLED_MODE ON)
-	add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
-	if(MSVC)
+    set(LZ4_BUNDLED_MODE ON)
+    add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
+    if(MSVC)
 		target_compile_options(
-			lz4_static
-			PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
+		    lz4_static
+		    PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
 		)
-	endif()
+    endif()
 endif()
 
 # Vulkan headers
 if (NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
-	add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
 # metal-cpp headers
@@ -48,7 +48,7 @@ target_include_directories(metal-cpp INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-
 
 # SPIRV-Headers
 if (NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
-	add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)

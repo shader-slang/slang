@@ -153,7 +153,7 @@ target_include_directories(
 #
 
 if (NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
-	set(SLANG_SPIRV_HEADERS_INCLUDE_DIR "${slang_SOURCE_DIR}/external/spirv-headers/include")
+    set(SLANG_SPIRV_HEADERS_INCLUDE_DIR "${slang_SOURCE_DIR}/external/spirv-headers/include")
 endif()
 
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
