@@ -1454,7 +1454,7 @@ namespace Slang
         for (auto node = prefixDecl; node != nullptr; node = node.getParent())
         {
             Decl* key = node.getDecl();
-            uint32_t value = refPath.getCount();
+            uint32_t value = (uint32_t)refPath.getCount();
             refPath.add(key, value);
         }
 
