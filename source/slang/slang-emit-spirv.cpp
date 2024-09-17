@@ -2693,10 +2693,12 @@ struct SPIRVEmitContext
         // the parameters of a SPIR-V function must appear as direct
         // children of the function instruction, and before any basic blocks.
         //
+	printf("DEBUG ADAM: Start emit function parameters\n");
         for( auto irParam : irFunc->getParams() )
         {
             emitParam(spvFunc, irParam);
         }
+	printf("DEBUG ADAM: End emit function parameters\n");
 
         // [3.32.17. Control-Flow Instructions]
         //
@@ -4563,6 +4565,7 @@ struct SPIRVEmitContext
         {
             // If inst has a pointer type with PhysicalStorageBuffer address space,
             // emit AliasedPointer decoration.
+	    printf("DEBUG ADAM: Emit outer pointer decoration\n");
             emitOpDecorate(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
@@ -4579,6 +4582,7 @@ struct SPIRVEmitContext
                 return;
             if (addressSpaceToStorageClass(ptrType->getAddressSpace()) == SpvStorageClassPhysicalStorageBuffer)
             {
+	        printf("DEBUG ADAM: Emit inner pointer decoration\n");
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
