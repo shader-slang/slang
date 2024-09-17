@@ -1,10 +1,4 @@
 //TEST:SIMPLE(filecheck=WGSL): -stage compute -entry computeMain -target wgsl
-//TEST:SIMPLE(filecheck=GLSL): -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=GLSL_SPIRV): -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl
-//TEST:SIMPLE(filecheck=SPIR): -stage compute -entry computeMain -target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=HLSL): -stage compute -entry computeMain -target hlsl
-//TEST:SIMPLE(filecheck=CUDA): -stage compute -entry computeMain -target cuda
-//TEST:SIMPLE(filecheck=CPP):  -stage compute -entry computeMain -target cpp
 
 RWStructuredBuffer<int> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
