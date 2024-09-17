@@ -1740,35 +1740,6 @@ namespace Slang
         }
     };
 
-    void splitArrayIndexFromCoord(IRBuilder& builder, IRImageStore* imageStore)
-    {
-        auto textureType = as<IRTextureType>(imageStore->getImage()->getDataType());
-        if(!textureType->isArray())
-        {
-            return;
-        }
-        uint numDimensions = 0;
-        auto shape = textureType->getShape();
-        switch(shape) {
-            case SLANG_TEXTURE_1D_ARRAY:
-                numDimensions = 1;
-                break;
-            case SLANG_TEXTURE_2D_ARRAY:
-            case SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY:
-            case SLANG_TEXTURE_CUBE:
-            case SLANG_TEXTURE_CUBE_ARRAY:
-                numDimensions = 2;
-                break;
-            default:
-                SLANG_UNEXPECTED("Unknown texture type with isArray");
-        }
-        Slang::UInt components[] = {0, 1, 2, 3};
-        auto baseCoords = builder.emitSwizzle(builder.getVectorType(builder.getUIntType(), numDimensions), imageStore->getCoord(), numDimensions, components);
-        auto arrayCoord = builder.emitSwizzle(builder.getUIntType(), imageStore->getCoord(), 1, components + numDimensions);
-        imageStore->setOperand(1, baseCoords);
-        imageStore->setOperand(3, arrayCoord);
-    }
-
     // metal textures only support writing 4-component values, even if the texture is only 1, 2, or 3-component
     // in this case the other channels get ignored, but the signature still doesnt match
     // so now we have to replace the value being written with a 4-component vector where 
@@ -1791,7 +1762,7 @@ namespace Slang
             }
             elementType = valueVectorType->getElementType();
             auto vectorValue = as<IRMakeVector>(originalValue);
-            for(uint i = 0; i < vectorValue->getOperandCount(); i++)
+            for(UInt i = 0; i < vectorValue->getOperandCount(); i++)
             {
                 components.add(vectorValue->getOperand(i));
             }
@@ -1801,7 +1772,7 @@ namespace Slang
             elementType = valueBaseType;
             components.add(originalValue);
         }
-        for(uint i = components.getCount(); i < 4; i++)
+        for(UInt i = components.getCount(); i < 4; i++)
         {
             components.add(builder.getIntValue(builder.getIntType(), 0));
         }
@@ -1867,7 +1838,6 @@ namespace Slang
                 }
                 if(auto write = as<IRImageStore>(inst))
                 {
-                    splitArrayIndexFromCoord(builder, write);
                     legalizeImageStoreValue(builder, write);
                 }
             }

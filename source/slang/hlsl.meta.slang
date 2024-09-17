@@ -2953,7 +2953,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
     
     [require(metal, texture_sm_4_1)]
     __intrinsic_op($(kIROp_ImageStore))
-    static void __metalImageStore(This val, vector<uint, Shape.dimensions+isArray> location, T value, uint arrayIndex);
+    static void __metalImageStore(This val, vector<uint, Shape.dimensions> location, T value, uint arrayIndex);
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
@@ -3023,7 +3023,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     };
                 case metal:
                     // last arg will be replaced with the split off array index
-                    __metalImageStore(this, location, newValue, 0);
+                    __metalImageStore(this, __vectorReshape<Shape.dimensions>(location), newValue, location[Shape.dimensions+isArray-1]);
             }
         }
 
