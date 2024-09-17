@@ -1459,16 +1459,16 @@ namespace Slang
         }
 
         // find the common prefix decl of reference site and left
-        uint32_t leftDistance = 0;
-        uint32_t rightDistance = 0;
-        auto distanceToCommonPrefix = [](DeclRef<Decl> const& candidate, Dictionary<Decl*, uint32_t> refPath) -> uint32_t
+        int leftDistance = 0;
+        int rightDistance = 0;
+        auto distanceToCommonPrefix = [](DeclRef<Decl> const& candidate, Dictionary<Decl*, uint32_t> refPath) -> int
         {
             uint32_t distanceToReferenceSite = 0;
             uint32_t distanceToCandidate = 0;
 
             // Sanity check
             if (candidate.getDecl() == nullptr)
-                return UINT32_MAX;
+                return -1;
 
             // search from candidate to root, once we found the first node in the reference path, that is the first
             // common prefix, and we can stop searching.
@@ -1484,7 +1484,7 @@ namespace Slang
 
             // If we don't find the common prefix, there must be something wrong, return the max value.
             if (distanceToReferenceSite == 0)
-                return UINT32_MAX;
+                return -1;
 
             return distanceToReferenceSite + distanceToCandidate;
         };
@@ -1494,6 +1494,12 @@ namespace Slang
 
         if (leftDistance == rightDistance)
             return 0;
+
+        if (leftDistance == -1)
+            return 1;
+
+        if (rightDistance == -1)
+            return -1;
 
         return leftDistance < rightDistance ? -1 : 1;
     }
@@ -1585,11 +1591,12 @@ namespace Slang
             //      }
             //  we will count the distance from the reference site to the declaration in the scope tree.
             //  NOTE: DON'T do this for the generic function, because for the generic function compare, we only check the
-            //  template parameter/arguments, not the function parameters/arguments. This could break the assumption
+            //  generic parameter/arguments, not the function parameters/arguments. This could break the assumption
             //  for this logic where we assume that all the candidates are valid.
             //  This logic will be evaluated later when "Flavor" becomes "Func" or "Expr", because by then the type checks for
             //  the candidate will be done.
-            if (left->flavor != OverloadCandidate::Flavor::Generic && left->flavor != OverloadCandidate::Flavor::UnspecializedGeneric)
+            if ((left->flavor != OverloadCandidate::Flavor::Generic && left->flavor != OverloadCandidate::Flavor::UnspecializedGeneric) ||
+                (right->flavor != OverloadCandidate::Flavor::Generic && right->flavor != OverloadCandidate::Flavor::UnspecializedGeneric))
             {
                 auto scopeRank = getScopeRank(left->item.declRef, right->item.declRef, this->m_outerScope);
                 if (scopeRank)
