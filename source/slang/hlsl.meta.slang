@@ -5948,7 +5948,7 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
 // Reinterpret bits as a float (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 float asfloat(int x)
 {
     __target_switch
@@ -5961,11 +5961,12 @@ float asfloat(int x)
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     }
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 float asfloat(uint x)
 {
     __target_switch
@@ -5978,12 +5979,13 @@ float asfloat(uint x)
     case spirv: return spirv_asm {
         OpBitcast $$float result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
     __target_switch
@@ -5994,6 +5996,7 @@ vector<float, N> asfloat(vector< int, N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<float, N> result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
     }
@@ -6001,7 +6004,7 @@ vector<float, N> asfloat(vector< int, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
     __target_switch
@@ -6012,6 +6015,7 @@ vector<float,N> asfloat(vector<uint,N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<float,N> result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
     }
@@ -6176,7 +6180,7 @@ int asint(float x)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 int asint(uint x)
 {
     __target_switch
@@ -6189,12 +6193,13 @@ int asint(uint x)
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 vector<int, N> asint(vector<float, N> x)
 {
     __target_switch
@@ -6205,6 +6210,7 @@ vector<int, N> asint(vector<float, N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<int, N> result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     default:
         VECTOR_MAP_UNARY(int, N, asint, x);
     }
@@ -6212,7 +6218,7 @@ vector<int, N> asint(vector<float, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 vector<int, N> asint(vector<uint, N> x)
 {
     if(N == 1)
@@ -6225,6 +6231,7 @@ vector<int, N> asint(vector<uint, N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<int, N> result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     default:
         VECTOR_MAP_UNARY(int, N, asint, x);
     }
@@ -6320,7 +6327,7 @@ uint asuint(float x)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 uint asuint(int x)
 {
     __target_switch
@@ -6333,12 +6340,13 @@ uint asuint(int x)
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 vector<uint,N> asuint(vector<float,N> x)
 {
     __target_switch
@@ -6351,12 +6359,13 @@ vector<uint,N> asuint(vector<float,N> x)
     };
     default:
         VECTOR_MAP_UNARY(uint, N, asuint, x);
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 vector<uint, N> asuint(vector<int, N> x)
 {
     if(N == 1)
@@ -6369,6 +6378,7 @@ vector<uint, N> asuint(vector<int, N> x)
     case spirv: return spirv_asm {
         OpBitcast $$vector<uint, N> result $x
     };
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     default:
         VECTOR_MAP_UNARY(uint, N, asuint, x);
     }
