@@ -48,6 +48,10 @@ function(check_release_and_get_latest owner repo version os arch github_token ou
         message(WARNING "Failed to find ${desired_zip} in release assets for ${version} from ${version_url}\nFalling back to latest version if it differs")
     else()
         message(WARNING "Failed to download release info for version ${version} from ${version_url}\nFalling back to latest version if it differs")
+
+        if(status_code EQUAL 22)
+            message(WARNING "If API rate limit is exceeded, Github allows a higher limit when you use token. Try a cmake option -DSLANG_GITHUB_TOKEN=your_token_here")
+	endif()
     endif()
 
 
