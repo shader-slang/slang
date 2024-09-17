@@ -8658,8 +8658,19 @@ T frexp(T x, out int exp)
     case spirv: return spirv_asm {
         result:$$T = OpExtInst glsl450 Frexp $x &exp
     };
-    case wgsl: __intrinsic_asm "frexp";
+    case wgsl:
+        T fract;
+        __wgsl_frexp<T>(x, fract, exp);
+        return fract;
     }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(wgsl)]
+void __wgsl_frexp(T x, out T fract, out int exp)
+{
+    __intrinsic_asm "{ var s = frexp($0); $1 = s.fract; $2 = s.exp; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -8675,7 +8686,6 @@ vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
     case spirv: return spirv_asm {
         result:$$vector<T, N> = OpExtInst glsl450 Frexp $x &exp
     };
-    case wgsl: __intrinsic_asm "frexp";
     default:
         VECTOR_MAP_BINARY(T, N, frexp, x, exp);
     }
@@ -11055,8 +11065,19 @@ T modf(T x, out T ip)
     case spirv: return spirv_asm {
         result:$$T = OpExtInst glsl450 Modf $x &ip
     };
-    case wgsl: __intrinsic_asm "modf";
+    case wgsl:
+        T fract;
+        __wgsl_modf<T>(x, fract, ip);
+        return fract;
     }
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(wgsl)]
+void __wgsl_modf(T x, out T fract, out T whole)
+{
+    __intrinsic_asm "{ var s = modf($0); $1 = s.fract; $2 = s.whole; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -11072,7 +11093,6 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
     case spirv: return spirv_asm {
         result:$$vector<T,N> = OpExtInst glsl450 Modf $x &ip
     };
-    case wgsl: __intrinsic_asm "modf";
     default:
         VECTOR_MAP_BINARY(T, N, modf, x, ip);
     }
