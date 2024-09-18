@@ -505,7 +505,6 @@ InstPair AutoDiffTranscriberBase::transcribeParam(IRBuilder* builder, IRParam* o
         if (IRType* diffType = differentiateType(builder, (IRType*)origParam->getDataType()))
         {
             diff = builder->emitParam(diffType);
-            diff->sourceLoc = origParam->sourceLoc;
         }
         return InstPair(primal, diff);
     }
@@ -1034,12 +1033,9 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
     if (as<IRModuleInst>(origInst->getParent()) && !as<IRType>(origInst))
         return InstPair(origInst, nullptr);
 
-    auto result = transcribeInstImpl(builder, origInst);
-    if (result.primal)
-        result.primal->sourceLoc = origInst->sourceLoc;
-    if (result.differential)
-        result.differential->sourceLoc = origInst->sourceLoc;
+    IRBuilderSourceLocRAII sourceLocationScope(builder, origInst->sourceLoc);
 
+    auto result = transcribeInstImpl(builder, origInst);
     if (result.primal == nullptr && result.differential == nullptr)
     {
         if (auto origType = as<IRType>(origInst))

@@ -107,12 +107,9 @@ struct AddressInstEliminationContext
         // Store the initial value of the mutable argument into temp var.
         // If this is an `out` var, the initial value will be undefined,
         // which will get cleaned up later into a `defaultConstruct`.
-        auto value = getValue(builder, addr);
-        builder.emitStore(tempVar, value);
-
+        builder.emitStore(tempVar, getValue(builder, addr));
         builder.setInsertAfter(call);
-        auto load = builder.emitLoad(tempVar);
-        storeValue(builder, addr, load);
+        storeValue(builder, addr, builder.emitLoad(tempVar));
         use->set(tempVar);
     }
 
@@ -156,19 +153,19 @@ struct AddressInstEliminationContext
                     continue;
                 }
                     
-                IRBuilder builder(module);
-                IRBuilderSourceLocRAII sourceLocationScope(&builder, use->getUser()->sourceLoc);
+                IRBuilder transformBuilder(module);
+                IRBuilderSourceLocRAII sourceLocationScope(&transformBuilder, use->getUser()->sourceLoc);
 
                 switch (use->getUser()->getOp())
                 {
                 case kIROp_Load:
-                    transformLoadAddr(builder, use);
+                    transformLoadAddr(transformBuilder, use);
                     break;
                 case kIROp_Store:
-                    transformStoreAddr(builder, use);
+                    transformStoreAddr(transformBuilder, use);
                     break;
                 case kIROp_Call:
-                    transformCallAddr(builder, use);
+                    transformCallAddr(transformBuilder, use);
                     break;
                 case kIROp_GetElementPtr:
                 case kIROp_FieldAddress:
