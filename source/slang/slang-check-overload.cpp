@@ -1548,6 +1548,7 @@ namespace Slang
             auto itemDiff = CompareLookupResultItems(left->item, right->item);
             if(itemDiff)
                 return itemDiff;
+
             auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
             if(specificityDiff)
                 return specificityDiff;
