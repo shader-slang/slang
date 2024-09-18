@@ -406,13 +406,13 @@ namespace Slang
         IRParam *currentParam = origFunc->getFirstParam();
         for (UInt i = 0; i < origFuncType->getParamCount(); i++)
         {
+            IRBuilderSourceLocRAII sourceLocationScope(&builder, currentParam->sourceLoc);
+
             auto primalParamType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getParamType(i));
             auto propagateParamType = transcribeParamTypeForPropagateFunc(&builder, origFuncType->getParamType(i));
             if (propagateParamType)
             {
                 auto param = builder.emitParam(propagateParamType);
-                param->sourceLoc = currentParam->sourceLoc;
-
                 propagateTypes.add(propagateParamType);
                 propagateArgs.add(param);
 
@@ -435,12 +435,10 @@ namespace Slang
                 {
                     // If primal parameter is mutable, we need to pass in a temp var.
                     auto tempVar = builder.emitVar(primalParamPtrType->getValueType());
-                    tempVar->sourceLoc = currentParam->sourceLoc;
                     if (primalParamPtrType->getOp() == kIROp_InOutType)
                     {
                         // If the primal parameter is inout, we need to set the initial value.
-                        auto store = builder.emitStore(tempVar, primalArg);
-                        store->sourceLoc = currentParam->sourceLoc;
+                        builder.emitStore(tempVar, primalArg);
                     }
                     primalArgs.add(tempVar);
                 }
@@ -455,7 +453,6 @@ namespace Slang
                 SLANG_RELEASE_ASSERT(primalPtrType);
                 auto primalValueType = primalPtrType->getValueType();
                 auto var = builder.emitVar(primalValueType);
-                var->sourceLoc = currentParam->sourceLoc;
                 primalArgs.add(var);
             }
             primalTypes.add(primalParamType);
@@ -589,7 +586,7 @@ namespace Slang
         // reversible.
         if (SLANG_FAILED(prepareFuncForBackwardDiff(primalFunc)))
             return diffPropagateFunc;
-        
+
         // Forward transcribe the clone of the original func.
         ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
@@ -690,7 +687,7 @@ namespace Slang
         {
             tempBuilder.setInsertBefore(diffPropagateFunc);
         }
-        
+
         auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, primalFunc, diffPropagateFunc);
         if (!fwdDiffFunc)
             return;
@@ -914,6 +911,8 @@ namespace Slang
         //      from the primal compuation logic in the future propagate function be replaced to.
         for (auto fwdParam : fwdParams)
         {   
+            IRBuilderSourceLocRAII sourceLocationScope(builder, fwdParam->sourceLoc);
+
             // Define the replacement insts that we are going to fill in for each case.
             IRInst* diffRefReplacement = nullptr;
             IRInst* primalRefReplacement = nullptr;
@@ -968,10 +967,6 @@ namespace Slang
                     
                     diffWriteRefReplacement = tempVar;
                     diffRefReplacement = tempVar;
-                    
-                    diffParam->sourceLoc = fwdParam->sourceLoc;
-                    tempVar->sourceLoc = fwdParam->sourceLoc;
-                    storeInst->sourceLoc = fwdParam->sourceLoc;
                 }
                 else
                 {
@@ -982,8 +977,6 @@ namespace Slang
                 
                 // Create a local var for the out param for the primal part of the prop func.
                 auto tempPrimalVar = nextBlockBuilder.emitVar(outType->getValueType());
-                tempPrimalVar->sourceLoc = fwdParam->sourceLoc;
-                
                 copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = tempPrimalVar;
 
@@ -1015,10 +1008,6 @@ namespace Slang
                     auto storeInst = nextBlockBuilder.emitStore(tempPrimalVar, propParam);
                     result.propagateFuncSpecificPrimalInsts.add(storeInst);
                     result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = tempPrimalVar;
-                    
-                    tempPrimalVar->sourceLoc = fwdParam->sourceLoc;
-                    storeInst->sourceLoc = fwdParam->sourceLoc;
-                    propParam->sourceLoc = fwdParam->sourceLoc;
                 }
                 else
                 {
@@ -1048,7 +1037,7 @@ namespace Slang
                 auto propParam = builder->emitParam(inoutDiffPairType);
                 copyNameHintAndDebugDecorations(propParam, fwdParam);
                 result.propagateFuncParams.add(propParam);
-                
+
                 // A reference to this parameter from the diff blocks should be replaced with a load
                 // of the differential component of the pair.
                 auto newParamLoad = diffBuilder.emitLoad(propParam);
@@ -1068,11 +1057,6 @@ namespace Slang
                 auto primalVal = nextBlockBuilder.emitDifferentialPairGetPrimal(primalReplacementLoad);
                 result.propagateFuncSpecificPrimalInsts.add(primalVal);
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = primalVal;
-
-                propParam->sourceLoc = fwdParam->sourceLoc;
-                newParamLoad->sourceLoc = fwdParam->sourceLoc;
-                primalReplacementLoad->sourceLoc = fwdParam->sourceLoc;
-                primalVal->sourceLoc = fwdParam->sourceLoc;
 
                 instsToRemove.add(fwdParam);
             }
@@ -1137,29 +1121,9 @@ namespace Slang
                 result.propagateFuncSpecificPrimalInsts.add(storeInst);
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalParam] = primalVar;
                 result.outDiffWritebacks[diffParam] = InstPair(initPrimalVal, diffVar);
-                
-                primalParam->sourceLoc = fwdParam->sourceLoc;
-                diffParam->sourceLoc = fwdParam->sourceLoc;
-                loadedParam->sourceLoc = fwdParam->sourceLoc;
-                initDiff->sourceLoc = fwdParam->sourceLoc;
-                diffVar->sourceLoc = fwdParam->sourceLoc;
-                diffWriteVar->sourceLoc = fwdParam->sourceLoc;
-                dzero->sourceLoc = fwdParam->sourceLoc;
-                initDiffStore->sourceLoc = fwdParam->sourceLoc;
-                writeStore->sourceLoc = fwdParam->sourceLoc;
-                primalVar->sourceLoc = fwdParam->sourceLoc;
-                initPrimalVal->sourceLoc = fwdParam->sourceLoc;
-                storeInst->sourceLoc = fwdParam->sourceLoc;
 
                 instsToRemove.add(fwdParam);
             }
-
-            if (diffRefReplacement)
-                diffRefReplacement->sourceLoc = fwdParam->sourceLoc;
-            if (primalRefReplacement)
-                primalRefReplacement->sourceLoc = fwdParam->sourceLoc;
-            if (diffWriteRefReplacement)
-                diffWriteRefReplacement->sourceLoc = fwdParam->sourceLoc;
 
             // We have emitted all the new parameters and computed the replacements for the original
             // parameter. Now we perform that replacement.
