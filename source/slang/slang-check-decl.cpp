@@ -9706,6 +9706,9 @@ namespace Slang
     {
         List<Expr*> args;
         List<ParameterDirection> directions;
+
+        Expr* thisArg;
+        ParameterDirection thisArgDirection;
     };
 
     template<typename TDerivativeAttr>
@@ -9817,22 +9820,43 @@ namespace Slang
                 // So we need to check that `this` type matches.
                 bool funcIsStatic = isEffectivelyStatic(funcDecl);
                 bool derivativeFuncIsStatic = isEffectivelyStatic(calleeDeclRef->declRef.getDecl());
-                if (funcIsStatic != derivativeFuncIsStatic)
+                /*if (funcIsStatic != derivativeFuncIsStatic)
                 {
                     visitor->getSink()->diagnose(
                         attr,
                         Diagnostics::customDerivativeSignatureThisParamMismatch);
                     return;
-                }
+                }*/
+
                 if (!funcIsStatic)
                 {
                     auto defaultFuncDeclRef = createDefaultSubstitutionsIfNeeded(
                         visitor->getASTBuilder(),
                         visitor,
                         makeDeclRef(funcDecl));
-                    auto funcThisType = visitor->calcThisType(defaultFuncDeclRef);
-                    auto derivativeFuncThisType = visitor->calcThisType(calleeDeclRef->declRef);
+                    
+                    auto funcThisType = getTypeForThisExpr(visitor, defaultFuncDeclRef);
+                    auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeDeclRef->declRef);
+
+                    if (auto funcThisTypePair = visitor->getDifferentialPairType(funcThisType))
+                    {
+                        
+                    }
+
+                    // If the function is a member function, we need to check that the
+                    // `this` type matches the expected type.
                     if (!funcThisType->equals(derivativeFuncThisType))
+                    {
+                        visitor->getSink()->diagnose(
+                            attr,
+                            Diagnostics::customDerivativeSignatureThisParamMismatch);
+                        return;
+                    }
+
+                    //auto funcThisType = visitor->calcThisType(defaultFuncDeclRef);
+                    //auto derivativeFuncThisType = visitor->calcThisType(calleeDeclRef->declRef);
+
+                    /*if (!funcThisType->equals(derivativeFuncThisType))
                     {
                         visitor->getSink()->diagnose(
                             attr,
@@ -9845,7 +9869,7 @@ namespace Slang
                             attr,
                             Diagnostics::customDerivativeNotAllowedForMemberFunctionsOfDifferentiableType);
                         return;
-                    }
+                    }*/
                 }
 
                 attr->funcExpr = calleeDeclRef;
@@ -9910,8 +9934,45 @@ namespace Slang
         return { imaginaryArguments, directions };
     }
 
+    Type* getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)
+    {
+        ThisExpr* expr = visitor->getASTBuilder()->create<ThisExpr>();
+        expr->scope = funcDecl->ownedScope;
+        expr->loc = funcDecl->loc;
+
+        auto contextWithoutSink = visitor->withSink(nullptr);
+        auto visitorWithoutSink = SemanticsVisitor(contextWithoutSink);
+
+        auto expr = visitorWithoutSink.CheckTerm(expr);
+        
+        return (expr->type.type) ? as<ErrorType>(expr->type.type) : nullptr;
+    }
+
+    Type* getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase>* funcDeclRef)
+    {
+        auto type = getTypeForThisExpr(visitor, funcDeclRef->getDecl());
+        if (type)
+            return substituteType(
+                SubstitutionSet(funcDeclRef->declRefBase),
+                visitor->getASTBuilder(),
+                type);
+    }
+
     ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
     {
+        Expr* thisArgExpr = nullptr;
+        if (auto thisType = getTypeForThisExpr(visitor, originalFuncDecl))
+        {
+            thisArgExpr = visitor->getASTBuilder()->create<VarExpr>();
+            thisArgExpr->type = thisType;
+            thisArgExpr->loc = loc;
+        }
+
+        ParameterDirection thisTypeDirection = 
+            (thisArgExpr && !thisArgExpr->type.isLeftValue) ? 
+            ParameterDirection::kParameterDirection_In : 
+            ParameterDirection::kParameterDirection_InOut;
+
         List<Expr*> imaginaryArguments;
         for (auto param : originalFuncDecl->getParameters())
         {
@@ -9937,7 +9998,7 @@ namespace Slang
             expectedParamDirections.add(getParameterDirection(param));
         }
 
-        return { imaginaryArguments, expectedParamDirections };
+        return { imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection };
     }
 
     ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
