@@ -220,7 +220,6 @@ static void _cloneInstDecorationsAndChildren(
         auto oldType = oldParam->getFullType();
         auto newType = (IRType*)findCloneForOperand(env, oldType);
         newParam->setFullType(newType);
-
         newParam->sourceLoc = oldParam->sourceLoc;
     }
 }

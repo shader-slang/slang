@@ -1118,8 +1118,7 @@ IRVar* emitIndexedLocalVar(
 IRInst* emitIndexedStoreAddressForVar(
     IRBuilder* builder,
     IRVar* localVar,
-    const List<IndexTrackingInfo>& defBlockIndices,
-    SourceLoc location)
+    const List<IndexTrackingInfo>& defBlockIndices)
 {
     IRInst* storeAddr = localVar;
     for (auto& index : defBlockIndices)
@@ -1127,8 +1126,6 @@ IRInst* emitIndexedStoreAddressForVar(
         storeAddr = builder->emitElementAddress(
             storeAddr, 
             index.primalCountParam);
-
-        storeAddr->sourceLoc = location;
     }
 
     return storeAddr;
@@ -1193,11 +1190,9 @@ IRVar* storeIndexedValue(
 
     IRInst* addr = emitIndexedStoreAddressForVar(builder,
         localVar,
-        defBlockIndices,
-        instToStore->sourceLoc);
+        defBlockIndices);
 
-    auto store = builder->emitStore(addr, instToStore);
-    store->sourceLoc = instToStore->sourceLoc;
+    builder->emitStore(addr, instToStore);
 
     return localVar;
 }
@@ -1589,14 +1584,15 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 // 
                 defBlockIndices = maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
                     
-                auto load = builder.emitLoad(varToStore);
-                load->sourceLoc = varToStore->sourceLoc;
-
-                IRVar* localVar = storeIndexedValue(
-                    &builder,
-                    varBlock,
-                    load,
-                    defBlockIndices);
+                IRVar* localVar = nullptr;
+                {
+                    IRBuilderSourceLocRAII sourceLocationScope(&builder, varToStore->sourceLoc);
+                    localVar = storeIndexedValue(
+                        &builder,
+                        varBlock,
+                        builder.emitLoad(varToStore),
+                        defBlockIndices);
+                }
 
                 for (auto use : outOfScopeUses)
                 {
@@ -1643,6 +1639,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
             }
             else
             {
+                IRBuilderSourceLocRAII sourceLocationScope(&builder, instToStore->sourceLoc);
+                
                 // Handle the special case of loop counters.
                 // The only case where there will be a reference of primal loop counter from rev blocks
                 // is the start of a loop in the reverse code. Since loop counters are not considered a
@@ -1660,7 +1658,6 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
                 setInsertAfterOrdinaryInst(&builder, instToStore);
                 auto localVar = storeIndexedValue(&builder, varBlock, instToStore, defBlockIndices);
-                localVar->sourceLoc = instToStore->sourceLoc;
                 if (isLoopCounter)
                     builder.addLoopCounterDecoration(localVar);
 
