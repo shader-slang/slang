@@ -637,6 +637,7 @@ extern "C"
         SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
         SLANG_PASS_THROUGH_SPIRV_OPT,               ///< SPIRV-opt
         SLANG_PASS_THROUGH_METAL,                   ///< Metal compiler
+        SLANG_PASS_THROUGH_WGSL,                    ///< WGSL compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
