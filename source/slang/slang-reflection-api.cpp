@@ -3165,8 +3165,6 @@ SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
     {
         return nullptr;
     }
-
-    auto astBuilder = linkage->getASTBuilder();
     
     List<Type*> argTypeList;
     for (SlangInt ii = 0; ii < argTypeCount; ++ii)
