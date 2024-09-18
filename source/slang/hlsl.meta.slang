@@ -20604,3 +20604,18 @@ uint64_t clockARB()
         };
     }
 }
+
+extension<T, L : IBufferDataLayout> StructuredBuffer<T, L> : IArray<T>
+{
+    int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+}
+
+extension<T, L : IBufferDataLayout> RWStructuredBuffer<T, L> : IRWArray<T>
+{
+    int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+}
+
+extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IRWArray<T>
+{
+    int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+}
