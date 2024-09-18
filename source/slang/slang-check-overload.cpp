@@ -1359,11 +1359,11 @@ namespace Slang
         //  void main() {  S s; s.f(1.0);} or
         //  struct T { float g(y) { f(y); } }, there won't be ambiguity.
         //  So we just need to count which declaration is farther from the global scope and favor the farther one.
-        /*int leftDistance = 0;
+        int leftDistance = 0;
         int rightDistance = 0;
         countDistanceToGloablScope(left.declRef, right.declRef, leftDistance, rightDistance);
         if (leftDistance != rightDistance)
-            return leftDistance > rightDistance ? -1 : 1;*/
+            return leftDistance > rightDistance ? -1 : 1;
 
         // TODO: We should generalize above rules such that in a tie a declaration
         // A::m is better than B::m when all other factors are equal and
