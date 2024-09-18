@@ -7471,7 +7471,7 @@ ${{{{
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 T degrees(T x)
 {
     __target_switch
@@ -7481,6 +7481,7 @@ T degrees(T x)
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Degrees $x
     };
+    case wgsl: __intrinsic_asm "degrees";
     default:
         return x * (T(180) / T.getPi());
     }
@@ -8230,7 +8231,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 // Flip surface normal to face forward, if needed
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 {
     __target_switch
@@ -8241,6 +8242,7 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
     case spirv: return spirv_asm {
         OpExtInst $$vector<T,N> result glsl450 FaceForward $n $i $ng
     };
+    case wgsl: __intrinsic_asm "faceForward";
     default:
         return dot(ng, i) < T(0.0f) ? n : -n;
     }
