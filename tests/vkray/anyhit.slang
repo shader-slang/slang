@@ -24,7 +24,8 @@ ParameterBlock<Params> gParams;
 
 void main(
     SphereHitAttributes attributes,
-    in out ShadowRay    ioPayload)
+    in out ShadowRay    ioPayload,
+    out float3          dummyOut)
 {
     if(gParams.mode != 0)
     {
@@ -42,13 +43,13 @@ void main(
     }
 
     uint index = 0U;
-	HitTriangleVertexPosition(index);
+    dummyOut = HitTriangleVertexPosition(index);
 
-	index = 1U;
-	HitTriangleVertexPosition(index);
+    index = 1U;
+    dummyOut += HitTriangleVertexPosition(index);
 
-	index = 2U;
-	HitTriangleVertexPosition(index);
+    index = 2U;
+    dummyOut += HitTriangleVertexPosition(index);
 }
 
 // SPIRV-DAG: OpCapability RayTracing

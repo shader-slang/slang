@@ -17,7 +17,8 @@ cbuffer ShaderRecord
 
 void main(
 	BuiltInTriangleIntersectionAttributes 	attributes,
-	in out ReflectionRay 					ioPayload)
+	in out ReflectionRay 					ioPayload,
+	out float3								dummyOut)
 {
 	uint materialID = (InstanceIndex() << 1)
 		+ InstanceID()
@@ -32,13 +33,13 @@ void main(
 	ioPayload.color = color;
 
 	uint index = 0U;
-	HitTriangleVertexPosition(index);
+	dummyOut = HitTriangleVertexPosition(index);
 
 	index = 1U;
-	HitTriangleVertexPosition(index);
+	dummyOut += HitTriangleVertexPosition(index);
 
 	index = 2U;
-	HitTriangleVertexPosition(index);
+	dummyOut += HitTriangleVertexPosition(index);
 }
 
 // CHECK: OpCapability RayTracing
