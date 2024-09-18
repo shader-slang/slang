@@ -5095,6 +5095,7 @@ namespace Slang
         auto synSubscriptDecl = synthesizeMethodSignatureForRequirementWitness(context, requiredMemberDeclRef,
             synArgs, synThis);
         auto declType = getType(m_astBuilder, getDefaultDeclRef(synSubscriptDecl).as<SubscriptDecl>());
+        synThis->checked = true;
 
         // Form a `this[args...]` expression that we will use to coerce from
         // in the synthesized subscript accessors.
@@ -5198,6 +5199,7 @@ namespace Slang
         auto synSubscriptDecl = synthesizeMethodSignatureForRequirementWitness(context, requiredMemberDeclRef,
             synArgs, synThis);
         synThis->type.isLeftValue = true;
+        synThis->checked = true;
         synSubscriptDecl->parentDecl = context->parentDecl;
 
         auto declType = getType(m_astBuilder, getDefaultDeclRef(synSubscriptDecl).as<SubscriptDecl>());
