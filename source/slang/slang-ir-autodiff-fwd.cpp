@@ -526,10 +526,11 @@ InstPair ForwardDiffTranscriber::transcribeMakeStruct(IRBuilder* builder, IRInst
                 auto operandDataType = origMakeStruct->getOperand(ii)->getDataType();
                 auto diffOperandType = differentiateType(builder, operandDataType);
 
+                IRInst* dzero;
                 if (diffOperandType)
                 {
                     operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
-                    diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+                    dzero = getDifferentialZeroOfType(builder, operandDataType);
                 }
                 else
                 {
@@ -539,19 +540,22 @@ InstPair ForwardDiffTranscriber::transcribeMakeStruct(IRBuilder* builder, IRInst
                     // 
                     auto diffFieldOperandType = differentiateType(builder, field->getFieldType());
                     SLANG_RELEASE_ASSERT(diffFieldOperandType);
-                    diffOperands.add(getDifferentialZeroOfType(builder, (IRType*)diffFieldOperandType));
+                    dzero = getDifferentialZeroOfType(builder, as<IRType>(diffFieldOperandType));
                 }
+
+                dzero->sourceLoc = origMakeStruct->sourceLoc;
+                diffOperands.add(dzero);
             }
             ii++;
         }
 
-        return InstPair(
-            primalMakeStruct,
-            builder->emitIntrinsicInst(
+        auto diffMakeStruct = builder->emitIntrinsicInst(
                 diffStructType,
                 kIROp_MakeStruct,
                 diffOperands.getCount(),
-                diffOperands.getBuffer()));
+                diffOperands.getBuffer());
+
+        return InstPair(primalMakeStruct, diffMakeStruct);
     }
     else
     {
@@ -669,9 +673,10 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         // If the function is marked for auto-diff, push a `differentiate` inst for a follow up pass
         // to generate the implementation.
         diffCallee = builder->emitForwardDifferentiateInst(
-            differentiateFunctionType(
-                builder, primalCallee, as<IRFuncType>(primalCallee->getFullType())),
+            differentiateFunctionType(builder, primalCallee, as<IRFuncType>(primalCallee->getFullType())),
             primalCallee);
+
+        diffCallee->sourceLoc = origCall->sourceLoc;
     }
 
     if (!diffCallee)
@@ -690,6 +695,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
 
     auto placeholderCall = builder->emitCallInst(nullptr, builder->emitUndefined(builder->getTypeKind()), 0, nullptr);
+    placeholderCall->sourceLoc = origCall->sourceLoc;
+
     builder->setInsertBefore(placeholderCall);
     IRBuilder argBuilder = *builder;
     IRBuilder afterBuilder = argBuilder;
@@ -726,6 +733,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 {
                     // Create temp var to pass in/out arguments.
                     auto srcVar = argBuilder.emitVar(pairValType);
+                    srcVar->sourceLoc = origCall->sourceLoc;
+
                     argBuilder.markInstAsMixedDifferential(srcVar, pairValType->getValueType());
 
                     auto diffArg = findOrTranscribeDiffInst(&argBuilder, origArg);
@@ -733,17 +742,23 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                     {
                         // Set initial value.
                         auto primalVal = argBuilder.emitLoad(primalArg);
+                        primalVal->sourceLoc = origCall->sourceLoc;
+
                         auto diffArgVal = diffArg;
                         if (!diffArg)
                             diffArgVal = getDifferentialZeroOfType(builder, (IRType*)pairValType->getValueType());
                         else
                         {
                             diffArgVal = argBuilder.emitLoad(diffArg);
+                            diffArgVal->sourceLoc = origCall->sourceLoc;
                             argBuilder.markInstAsDifferential(diffArgVal, pairValType->getValueType());
                         }
                         auto initVal = argBuilder.emitMakeDifferentialPair(pairValType, primalVal, diffArgVal);
+                        initVal->sourceLoc = origCall->sourceLoc;
                         argBuilder.markInstAsMixedDifferential(initVal, primalType);
+                        
                         auto store = argBuilder.emitStore(srcVar, initVal);
+                        store->sourceLoc = origCall->sourceLoc;
                         argBuilder.markInstAsMixedDifferential(store, primalType);
                     }
                     if (as<IROutTypeBase>(ptrParamType))
@@ -751,16 +766,23 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         // Read back new value.
                         auto newVal = afterBuilder.emitLoad(srcVar);
                         afterBuilder.markInstAsMixedDifferential(newVal, pairValType->getValueType());
+                        newVal->sourceLoc = origCall->sourceLoc;
+                        
                         auto newPrimalVal = afterBuilder.emitDifferentialPairGetPrimal(pairValType->getValueType(), newVal);
-                        afterBuilder.emitStore(primalArg, newPrimalVal);
+                        newPrimalVal->sourceLoc = origCall->sourceLoc;
+                        
+                        auto store = afterBuilder.emitStore(primalArg, newPrimalVal);
+                        store->sourceLoc = origCall->sourceLoc;
 
                         if (diffArg)
                         {
                             auto newDiffVal = afterBuilder.emitDifferentialPairGetDifferential((IRType*)diffType, newVal);
                             afterBuilder.markInstAsDifferential(newDiffVal, pairValType->getValueType());
+                            newDiffVal->sourceLoc = origCall->sourceLoc;
 
                             auto storeInst = afterBuilder.emitStore(diffArg, newDiffVal);
                             afterBuilder.markInstAsDifferential(storeInst, pairValType->getValueType());
+                            storeInst->sourceLoc = origCall->sourceLoc;
                         }
                     }
                     args.add(srcVar);
@@ -776,6 +798,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                     SLANG_RELEASE_ASSERT(diffArg);
 
                     auto diffPair = argBuilder.emitMakeDifferentialPair(pairType, primalArg, diffArg);
+                    diffPair->sourceLoc = origCall->sourceLoc;
+
                     argBuilder.markInstAsMixedDifferential(diffPair, pairType);
 
                     args.add(diffPair);
@@ -811,9 +835,11 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
     if (diffReturnType->getOp() == kIROp_DifferentialPairType)
     {
-        IRInst* primalResultValue = afterBuilder.emitDifferentialPairGetPrimal(callInst);
         auto diffType = differentiateType(&afterBuilder, origCall->getFullType());
+        IRInst* primalResultValue = afterBuilder.emitDifferentialPairGetPrimal(callInst);
         IRInst* diffResultValue = afterBuilder.emitDifferentialPairGetDifferential(diffType, callInst);
+        primalResultValue->sourceLoc = origCall->sourceLoc;
+        diffResultValue->sourceLoc = origCall->sourceLoc;
         return InstPair(primalResultValue, diffResultValue);
     }
     else
@@ -1221,20 +1247,21 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
         if (auto diffVal = findOrTranscribeDiffInst(builder, origVal))
         {
             auto primalElementType = primalVal->getDataType();
-
-            diffUpdateElement = builder->emitUpdateElement(
-                diffBase, diffAccessChain.getArrayView(), diffVal);
+            diffUpdateElement = builder->emitUpdateElement(diffBase, diffAccessChain.getArrayView(), diffVal);
             builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
         }
         else
         {
             auto primalElementType = primalVal->getDataType();
             auto zeroElementDiff = getDifferentialZeroOfType(builder, primalElementType);
-            diffUpdateElement = builder->emitUpdateElement(
-                diffBase, diffAccessChain.getArrayView(), zeroElementDiff);
+            zeroElementDiff->sourceLoc = originalInst->sourceLoc;
+
+            diffUpdateElement = builder->emitUpdateElement(diffBase, diffAccessChain.getArrayView(), zeroElementDiff);
             builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
         }
     }
+
+    diffUpdateElement->sourceLoc = originalInst->sourceLoc;
     return InstPair(primalUpdateField, diffUpdateElement);
 }
 

@@ -133,6 +133,7 @@ struct AddressInstEliminationContext
         storeValue(builder, addr, load, call->sourceLoc);
         use->set(tempVar);
 
+        tempVar->sourceLoc = addr->sourceLoc;
         store->sourceLoc = call->sourceLoc;
         load->sourceLoc = call->sourceLoc;
     }

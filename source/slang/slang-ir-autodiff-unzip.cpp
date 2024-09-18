@@ -393,6 +393,9 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                             valType,
                             intermediateVar,
                             structKeyDecor->getStructKey());
+
+                        val->sourceLoc = use->getUser()->sourceLoc;
+
                         if (use->getUser()->getOp() == kIROp_Load)
                         {
                             use->getUser()->replaceUsesWith(val);
@@ -400,16 +403,17 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                         }
                         else
                         {
-                            auto tempVar =
-                                builder.emitVar(valType);
-                            builder.emitStore(tempVar, val);
+                            auto tempVar = builder.emitVar(valType);
+                            auto store = builder.emitStore(tempVar, val);
+                            tempVar->sourceLoc = val->sourceLoc;
+                            store->sourceLoc = val->sourceLoc;
                             use->set(tempVar);
                         }
                     }
                 }
                 else
                 {
-                    // Orindary value.
+                    // Ordinary value.
                     // We insert a fieldExtract at each use site instead of before `inst`,
                     // since at this stage of autodiff pass, `inst` does not necessarily
                     // dominate all the use sites if `inst` is defined in partial branch
@@ -425,6 +429,9 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                             inst->getFullType(),
                             intermediateVar,
                             structKeyDecor->getStructKey());
+
+                        val->sourceLoc = user->sourceLoc;
+
                         builder.replaceOperand(iuse, val);
                     }
                 }

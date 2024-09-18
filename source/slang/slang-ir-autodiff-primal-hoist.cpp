@@ -1092,7 +1092,8 @@ IRType* getTypeForLocalStorage(
 IRVar* emitIndexedLocalVar(
     IRBlock* varBlock,
     IRType* baseType,
-    const List<IndexTrackingInfo>& defBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices,
+    SourceLoc location)
 {
     // Cannot store pointers. Case should have been handled by now.
     SLANG_RELEASE_ASSERT(!as<IRPtrTypeBase>(baseType));
@@ -1106,7 +1107,12 @@ IRVar* emitIndexedLocalVar(
     IRType* varType = getTypeForLocalStorage(&varBuilder, baseType, defBlockIndices);
 
     auto var = varBuilder.emitVar(varType);
-    varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
+    auto defaultVal = varBuilder.emitDefaultConstruct(varType);
+    auto storeInit = varBuilder.emitStore(var, defaultVal);
+
+    var->sourceLoc = location;
+    defaultVal->sourceLoc = location;
+    storeInit->sourceLoc = location;
 
     return var;
 }
@@ -1114,7 +1120,8 @@ IRVar* emitIndexedLocalVar(
 IRInst* emitIndexedStoreAddressForVar(
     IRBuilder* builder,
     IRVar* localVar,
-    const List<IndexTrackingInfo>& defBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices,
+    SourceLoc location)
 {
     IRInst* storeAddr = localVar;
     for (auto& index : defBlockIndices)
@@ -1122,6 +1129,8 @@ IRInst* emitIndexedStoreAddressForVar(
         storeAddr = builder->emitElementAddress(
             storeAddr, 
             index.primalCountParam);
+
+        storeAddr->sourceLoc = location;
     }
 
     return storeAddr;
@@ -1179,11 +1188,18 @@ IRVar* storeIndexedValue(
     IRInst* instToStore,
     const List<IndexTrackingInfo>& defBlockIndices)
 {
-    IRVar* localVar = emitIndexedLocalVar(defaultVarBlock, instToStore->getDataType(), defBlockIndices);
+    IRVar* localVar = emitIndexedLocalVar(defaultVarBlock,
+        instToStore->getDataType(),
+        defBlockIndices,
+        instToStore->sourceLoc);
 
-    IRInst* addr = emitIndexedStoreAddressForVar(builder, localVar, defBlockIndices);
+    IRInst* addr = emitIndexedStoreAddressForVar(builder,
+        localVar,
+        defBlockIndices,
+        instToStore->sourceLoc);
 
-    builder->emitStore(addr, instToStore);
+    auto store = builder->emitStore(addr, instToStore);
+    store->sourceLoc = instToStore->sourceLoc;
 
     return localVar;
 }
@@ -1574,11 +1590,14 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 // region, that means there's no need to allocate a fully indexed var.
                 // 
                 defBlockIndices = maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
+                    
+                auto load = builder.emitLoad(varToStore);
+                load->sourceLoc = varToStore->sourceLoc;
 
                 IRVar* localVar = storeIndexedValue(
                     &builder,
                     varBlock,
-                    builder.emitLoad(varToStore),
+                    load,
                     defBlockIndices);
 
                 for (auto use : outOfScopeUses)

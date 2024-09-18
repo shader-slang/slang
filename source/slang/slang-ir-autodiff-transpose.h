@@ -695,7 +695,9 @@ struct DiffTransposePass
         SLANG_ASSERT(lastRevBlock->getTerminator() == nullptr);
 
         builder.setInsertInto(lastRevBlock);
-        builder.emitReturn();
+        
+        auto returnVal = builder.emitReturn();
+        returnVal->sourceLoc = revDiffFunc->sourceLoc;
 
         // Remove fwd-mode blocks.
         for (auto block : workList)
@@ -913,14 +915,16 @@ struct DiffTransposePass
                     auto gradInst = emitAggregateValue(
                         &builder,
                         tryGetPrimalTypeFromDiffInst(param),
-                        gradients);
+                        gradients,
+                        param->sourceLoc);
                     
                     phiParamRevGradInsts.add(gradInst);
                 }
                 else
                 { 
-                    phiParamRevGradInsts.add(
-                        emitDZeroOfDiffInstType(&builder, tryGetPrimalTypeFromDiffInst(param)));
+                    auto dzero = emitDZeroOfDiffInstType(&builder, tryGetPrimalTypeFromDiffInst(param));
+                    dzero->sourceLoc = param->sourceLoc;
+                    phiParamRevGradInsts.add(dzero);
                 }
             }
             else
@@ -969,7 +973,8 @@ struct DiffTransposePass
                 auto gradInst = emitAggregateValue(
                     &builder,
                     primalType,
-                    gradients);
+                    gradients,
+                    externInst->sourceLoc);
                 
                 builder.emitStore(accVar, gradInst);
             }
@@ -1061,7 +1066,7 @@ struct DiffTransposePass
         
         // Emit the aggregate of all the gradients here. 
         // This will form the total derivative for this inst.
-        auto revValue = emitAggregateValue(builder, primalType, gradients);
+        auto revValue = emitAggregateValue(builder, primalType, gradients, inst->sourceLoc);
 
         auto transposeResult = transposeInst(builder, inst, revValue);
         
@@ -1287,11 +1292,14 @@ struct DiffTransposePass
         for (auto wb : writebacks)
         {
             auto loadedPair = builder->emitLoad(wb.srcTempPairVar);
-            loadedPair->sourceLoc = fwdCall->sourceLoc;
 
             auto diffType = as<IRPtrTypeBase>(wb.destVar->getDataType())->getValueType();
             auto loadedDiff = builder->emitDifferentialPairGetDifferential(diffType, loadedPair);
-            builder->emitStore(wb.destVar, loadedDiff);
+            auto storeDiff = builder->emitStore(wb.destVar, loadedDiff);
+
+            loadedPair->sourceLoc = fwdCall->sourceLoc;
+            loadedDiff->sourceLoc = fwdCall->sourceLoc;
+            storeDiff->sourceLoc = fwdCall->sourceLoc;
         }
 
         List<RevGradient> gradients;
@@ -1595,7 +1603,8 @@ struct DiffTransposePass
         auto aggregateGradient = emitAggregateValue(
             builder,
             primalType,
-            gradients);
+            gradients,
+            fwdLoad->sourceLoc);
         
         if (as<IRDifferentialPairType>(loadType))
         {
@@ -1604,12 +1613,18 @@ struct DiffTransposePass
 
             auto pairVal = builder->emitMakeDifferentialPair(loadType, primalVal, aggregateGradient);
 
-            builder->emitStore(revPtr, pairVal);
+            auto store = builder->emitStore(revPtr, pairVal);
+
+            primalPairVal->sourceLoc = fwdLoad->sourceLoc;
+            primalVal->sourceLoc = fwdLoad->sourceLoc;
+            pairVal->sourceLoc = fwdLoad->sourceLoc;
+            store->sourceLoc = fwdLoad->sourceLoc;
         }
         else
         {
             // Store this back into the pointer.
-            builder->emitStore(revPtr, aggregateGradient);
+            auto store = builder->emitStore(revPtr, aggregateGradient);
+            store->sourceLoc = fwdLoad->sourceLoc;
         }
 
         return TranspositionResult(List<RevGradient>());
@@ -1712,16 +1727,23 @@ struct DiffTransposePass
     TranspositionResult transposeMakePairUserCode(IRBuilder* builder, IRMakeDifferentialPairUserCode* fwdMakePair, IRInst* revValue)
     {
         List<RevGradient> gradients;
+
+        auto primalVal = builder->emitDifferentialPairGetPrimalUserCode(revValue);
+        auto diffVal = builder->emitDifferentialPairGetDifferentialUserCode(
+                fwdMakePair->getDifferentialValue()->getFullType(), revValue);
+        
+        primalVal->sourceLoc = fwdMakePair->sourceLoc;
+        diffVal->sourceLoc = fwdMakePair->sourceLoc;
+
         gradients.add(RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakePair->getPrimalValue(),
-            builder->emitDifferentialPairGetPrimalUserCode(revValue),
+            primalVal,
             fwdMakePair));
         gradients.add(RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakePair->getDifferentialValue(),
-            builder->emitDifferentialPairGetDifferentialUserCode(
-                fwdMakePair->getDifferentialValue()->getFullType(), revValue),
+            diffVal,
             fwdMakePair));
         return TranspositionResult(gradients);
     }
@@ -1969,6 +1991,9 @@ struct DiffTransposePass
                 field->getFieldType(),
                 revValue,
                 field->getKey());
+
+            gradAtField->sourceLoc = field->sourceLoc;
+
             SLANG_RELEASE_ASSERT(ii < fwdMakeStruct->getOperandCount());
             gradients.add(RevGradient(
                 RevGradient::Flavor::Simple,
@@ -2654,7 +2679,7 @@ struct DiffTransposePass
         return materializeSimpleGradients(builder, aggPrimalType, simpleGradients);
     }
 
-    RevGradient materializeGradientSet(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
+    RevGradient materializeGradientSet(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients, SourceLoc fwdLoc)
     {
         switch (gradients[0].flavor)
         {
@@ -2665,10 +2690,10 @@ struct DiffTransposePass
                 return materializeSwizzleGradients(builder, aggPrimalType, gradients);
 
             case RevGradient::Flavor::FieldExtract:
-                return materializeFieldExtractGradients(builder, aggPrimalType, gradients);
+                return materializeFieldExtractGradients(builder, aggPrimalType, gradients, fwdLoc);
 
             case RevGradient::Flavor::GetElement:
-                return materializeGetElementGradients(builder, aggPrimalType, gradients);
+                return materializeGetElementGradients(builder, aggPrimalType, gradients, fwdLoc);
 
             case RevGradient::Flavor::DifferentialPairGetElementUserCode:
                 return materializeDifferentialPairUserCodeGetElementGradients(builder, aggPrimalType, gradients);
@@ -2678,7 +2703,7 @@ struct DiffTransposePass
         }
     }
 
-    RevGradient materializeGetElementGradients(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
+    RevGradient materializeGetElementGradients(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients, SourceLoc fwdLoc)
     {
         // Setup a temporary variable to aggregate gradients.
         // TODO: We can extend this later to grab an existing ptr to allow aggregation of
@@ -2686,13 +2711,17 @@ struct DiffTransposePass
         // Looking up an existing pointer could also allow chained accesses like x.a.b[1] to directly
         // write into the specific sub-field that is affected without constructing intermediate vars.
         // 
-        auto revGradVar = builder->emitVar(
-            (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
+        printf("materializing get element gradients: (%d)\n", fwdLoc.getRaw());
+        auto diffType = diffTypeContext.getDifferentialForType(builder, aggPrimalType);
+        auto revGradVar = builder->emitVar(as<IRType>(diffType));
+        revGradVar->sourceLoc = fwdLoc;
 
         // Initialize with T.dzero()
         auto zeroValueInst = emitDZeroOfDiffInstType(builder, aggPrimalType);
+        auto initStore = builder->emitStore(revGradVar, zeroValueInst);
 
-        builder->emitStore(revGradVar, zeroValueInst);
+        zeroValueInst->sourceLoc = fwdLoc;
+        initStore->sourceLoc = fwdLoc;
 
         OrderedDictionary<IRInst*, List<RevGradient>> bucketedGradients;
         for (auto gradient : gradients)
@@ -2732,11 +2761,16 @@ struct DiffTransposePass
                 revGradVar,
                 pair.key);
 
-            builder->emitStore(revGradTargetAddress, emitAggregateValue(builder, primalType, subGrads));
+            auto aggrVal = emitAggregateValue(builder, primalType, subGrads, fwdLoc);
+            auto storeAddress = builder->emitStore(revGradTargetAddress, aggrVal);
+
+            revGradTargetAddress->sourceLoc = fwdLoc;
+            aggrVal->sourceLoc = fwdLoc;
+            storeAddress->sourceLoc = fwdLoc;
         }
 
         auto loadedRevGradVar = builder->emitLoad(revGradVar);
-        loadedRevGradVar->sourceLoc = revGradVar->sourceLoc;
+        loadedRevGradVar->sourceLoc = fwdLoc;
 
         // Load the entire var and return it.
         return RevGradient(
@@ -2747,7 +2781,7 @@ struct DiffTransposePass
     }
 
 
-    RevGradient materializeFieldExtractGradients(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
+    RevGradient materializeFieldExtractGradients(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients, SourceLoc fwdLoc)
     {
         // Setup a temporary variable to aggregate gradients.
         // TODO: We can extend this later to grab an existing ptr to allow aggregation of
@@ -2755,13 +2789,16 @@ struct DiffTransposePass
         // Looking up an existing pointer could also allow chained accesses like x.a.b[1] to directly
         // write into the specific sub-field that is affected without constructing intermediate vars.
         // 
-        auto revGradVar = builder->emitVar(
-            (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
+        auto diffType = diffTypeContext.getDifferentialForType(builder, aggPrimalType);
+        auto revGradVar = builder->emitVar(as<IRType>(diffType));
+        revGradVar->sourceLoc = fwdLoc;
 
         // Initialize with T.dzero()
         auto zeroValueInst = emitDZeroOfDiffInstType(builder, aggPrimalType);
+        auto initStore = builder->emitStore(revGradVar, zeroValueInst);
 
-        builder->emitStore(revGradVar, zeroValueInst);
+        zeroValueInst->sourceLoc = fwdLoc;
+        initStore->sourceLoc = fwdLoc;
 
         OrderedDictionary<IRStructKey*, List<RevGradient>> bucketedGradients;
         for (auto gradient : gradients)
@@ -2801,11 +2838,16 @@ struct DiffTransposePass
                 revGradVar,
                 pair.key);
 
-            builder->emitStore(revGradTargetAddress, emitAggregateValue(builder, primalType, subGrads));
+            auto aggrVal = emitAggregateValue(builder, primalType, subGrads, fwdLoc);
+            auto store = builder->emitStore(revGradTargetAddress, aggrVal);
+
+            revGradTargetAddress->sourceLoc = fwdLoc;
+            aggrVal->sourceLoc = fwdLoc;
+            store->sourceLoc = fwdLoc;
         }
         
         auto loadedRevGradVar = builder->emitLoad(revGradVar);
-        loadedRevGradVar->sourceLoc = revGradVar->sourceLoc;
+        loadedRevGradVar->sourceLoc = fwdLoc;
             
         // Load the entire var and return it.
         return RevGradient(
@@ -2844,7 +2886,7 @@ struct DiffTransposePass
                     nullptr);
     }
 
-    IRInst* emitAggregateValue(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients)
+    IRInst* emitAggregateValue(IRBuilder* builder, IRType* aggPrimalType, List<RevGradient> gradients, SourceLoc fwdLoc)
     {
         // If we're dealing with the differential-pair types, we need to use a different aggregation method, since
         // a differential pair is really a 'hybrid' primal-differential type.
@@ -2888,7 +2930,7 @@ struct DiffTransposePass
                 }
 
                 // Turn the set into a simple gradient.
-                auto simpleGradient = materializeGradientSet(builder, aggPrimalType, gradientsOfFlavor);
+                auto simpleGradient = materializeGradientSet(builder, aggPrimalType, gradientsOfFlavor, fwdLoc);
                 SLANG_ASSERT(simpleGradient.flavor == RevGradient::Flavor::Simple);
 
                 simpleGradients.add(simpleGradient);

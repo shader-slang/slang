@@ -47,11 +47,15 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
             breakLabel:;
                 if (initialized)
                     continue;
+
                 builder.setInsertAfter(inst);
-                builder.emitStore(
-                    inst,
-                    builder.emitDefaultConstruct(
-                        as<IRPtrTypeBase>(inst->getFullType())->getValueType()));
+
+                auto valueType = as<IRPtrTypeBase>(inst->getFullType())->getValueType();
+                auto construct = builder.emitDefaultConstruct(valueType);
+                auto store = builder.emitStore(inst, construct);
+
+                construct->sourceLoc = inst->sourceLoc;
+                store->sourceLoc = inst->sourceLoc;
             }
         }
     }
