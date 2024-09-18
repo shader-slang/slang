@@ -710,7 +710,7 @@ struct DiffUnzipPass
     void splitMixedInst(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* inst)
     {
         IRBuilderSourceLocRAII primalLocationScope(primalBuilder, inst->sourceLoc);
-        IRBuilderSourceLocRAII diffLocationScope(primalBuilder, inst->sourceLoc);
+        IRBuilderSourceLocRAII diffLocationScope(diffBuilder, inst->sourceLoc);
 
         auto instPair = _splitMixedInst(primalBuilder, diffBuilder, inst);
 
