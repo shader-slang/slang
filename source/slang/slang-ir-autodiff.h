@@ -117,7 +117,7 @@ struct AutoDiffSharedContext
 
     
     // A reference to the builtin IDifferentiablePtrType interface type.
-    IRInterfaceType* differentiableRefInterfaceType = nullptr;
+    IRInterfaceType* differentiablePtrInterfaceType = nullptr;
 
     // The struct key for the 'Differential' associated type
     // defined inside IDifferentialPtrType. We use this to lookup the differential
@@ -191,19 +191,19 @@ private:
     IRStructKey* findDifferentialPtrTypeStructKey()
     {
         return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableRefInterfaceType, 0)->getRequirementKey());
+            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 0)->getRequirementKey());
     }
 
     IRStructKey* findDifferentialPtrTypeWitnessStructKey()
     {
         return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableRefInterfaceType, 1)->getRequirementKey());
+            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 1)->getRequirementKey());
     }
 
     IRWitnessTableType* findDifferentialPtrTypeWitnessTableType()
     {
         return cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(differentiableRefInterfaceType, 1)->getRequirementVal());
+            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 1)->getRequirementVal());
     }
 
     //IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index);
@@ -285,7 +285,7 @@ struct DifferentiableTypeConformanceContext
             if (isDifferentiableValueType(origType))
                 return this->sharedContext->differentiableInterfaceType;
             else if (isDifferentiablePtrType(origType))
-                return this->sharedContext->differentiableRefInterfaceType;
+                return this->sharedContext->differentiablePtrInterfaceType;
             else
                 return nullptr;
         }

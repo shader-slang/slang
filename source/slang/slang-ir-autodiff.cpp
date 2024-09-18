@@ -74,7 +74,7 @@ static IRInst* _getDiffTypeFromPairType(AutoDiffSharedContext* sharedContext, IR
         if (as<IRDifferentialPairType>(type) || as<IRDifferentialPairUserCodeType>(type))
             return sharedContext->differentiableInterfaceType;
         else if (as<IRDifferentialPtrPairType>(type))
-            return sharedContext->differentiableRefInterfaceType;
+            return sharedContext->differentiablePtrInterfaceType;
         else
             SLANG_UNEXPECTED("Unexpected differential pair type");
     }
@@ -391,9 +391,9 @@ AutoDiffSharedContext::AutoDiffSharedContext(TargetProgram* target, IRModuleInst
         isInterfaceAvailable = true;
     }
 
-    differentiableRefInterfaceType = as<IRInterfaceType>(findDifferentiableRefInterface(inModuleInst));
+    differentiablePtrInterfaceType = as<IRInterfaceType>(findDifferentiableRefInterface(inModuleInst));
 
-    if (differentiableRefInterfaceType)
+    if (differentiablePtrInterfaceType)
     {
         differentialAssocRefTypeStructKey = findDifferentialPtrTypeStructKey();
         differentialAssocRefTypeWitnessStructKey = findDifferentialPtrTypeWitnessStructKey();
@@ -546,7 +546,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 
             SLANG_ASSERT(
                 diffInterfaceType == sharedContext->differentiableInterfaceType
-                || diffInterfaceType == sharedContext->differentiableRefInterfaceType);
+                || diffInterfaceType == sharedContext->differentiablePtrInterfaceType);
 
             //lookUpConformanceForType(item->getConcreteType());
             // TODO: need to consider ref type.
@@ -579,7 +579,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                                 addTypeToDictionary(
                                     (IRType*)element,
                                     elementWitness);
-                            else if (diffInterfaceType == sharedContext->differentiableRefInterfaceType)
+                            else if (diffInterfaceType == sharedContext->differentiablePtrInterfaceType)
                                 addTypeToDictionary(
                                     (IRType*)element,
                                     elementWitness);
@@ -695,7 +695,7 @@ void DifferentiableTypeConformanceContext::addTypeToDictionary(IRType* type, IRI
         differentiableValueTypeWitnessDictionary.addIfNotExists(type, witness);
     }
     else if (sharedContext->isPtrInterfaceAvailable && 
-        conformanceType == sharedContext->differentiableRefInterfaceType)
+        conformanceType == sharedContext->differentiablePtrInterfaceType)
     {
         differentiablePtrTypeWitnessDictionary.addIfNotExists(type, witness);
     }
@@ -1152,7 +1152,7 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
         auto diffDiffPairType = (IRType*)differentiateType(builder, (IRType*)pairType);
 
         table = builder->createWitnessTable(
-            sharedContext->differentiableRefInterfaceType,
+            sharedContext->differentiablePtrInterfaceType,
             (IRType*)pairType);
 
         // And place it in the synthesized witness table.
@@ -1239,7 +1239,7 @@ IRInst* DifferentiableTypeConformanceContext::buildArrayWitness(
     {
         SLANG_ASSERT(isDifferentiablePtrType((IRType*)arrayType));
 
-        table = builder->createWitnessTable(sharedContext->differentiableRefInterfaceType, (IRType*)arrayType);
+        table = builder->createWitnessTable(sharedContext->differentiablePtrInterfaceType, (IRType*)arrayType);
 
         // And place it in the synthesized witness table.
         builder->createWitnessTableEntry(table, sharedContext->differentialAssocRefTypeStructKey, diffArrayType);
@@ -1357,7 +1357,7 @@ IRInst* DifferentiableTypeConformanceContext::buildTupleWitness(
     {
         SLANG_ASSERT(isDifferentiablePtrType((IRType*)inTupleType));
 
-        table = builder->createWitnessTable(sharedContext->differentiableRefInterfaceType, (IRType*)inTupleType);
+        table = builder->createWitnessTable(sharedContext->differentiablePtrInterfaceType, (IRType*)inTupleType);
 
         // And place it in the synthesized witness table.
         builder->createWitnessTableEntry(table, sharedContext->differentialAssocRefTypeStructKey, diffTupleType);

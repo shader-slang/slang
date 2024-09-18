@@ -199,7 +199,7 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
         return builder->getDifferentialPairType((IRType*)primalType, witness);
     }
     else if (autoDiffSharedContext->isPtrInterfaceAvailable &&
-        conformanceType == autoDiffSharedContext->differentiableRefInterfaceType)
+        conformanceType == autoDiffSharedContext->differentiablePtrInterfaceType)
     {
         return builder->getDifferentialPtrPairType((IRType*)primalType, witness);
     }
@@ -235,7 +235,7 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
         if (differentiableTypeConformanceContext.lookUpConformanceForType(origType, DiffConformanceKind::Value))
             return autoDiffSharedContext->differentiableInterfaceType;
         else if (differentiableTypeConformanceContext.lookUpConformanceForType(origType, DiffConformanceKind::Ptr))
-            return autoDiffSharedContext->differentiableRefInterfaceType;
+            return autoDiffSharedContext->differentiablePtrInterfaceType;
         else
             return nullptr;
     }
@@ -457,17 +457,24 @@ IRType* AutoDiffTranscriberBase::differentiateExtractExistentialType(IRBuilder* 
     auto interfaceType = as<IRInterfaceType>(unwrapAttributedType(origType->getOperand(0)->getDataType()));
     if (!interfaceType)
         return nullptr;
+    
+    List<IRInterfaceRequirementEntry*> lookupKeyPath;
+    IRStructKey* diffStructKey = nullptr;
+
     List<IRInterfaceRequirementEntry*> lookupPathValueType = differentiableTypeConformanceContext.findInterfaceLookupPath(
         autoDiffSharedContext->differentiableInterfaceType, interfaceType);
-    List<IRInterfaceRequirementEntry*> lookupPathPtrType = differentiableTypeConformanceContext.findInterfaceLookupPath(
-        autoDiffSharedContext->differentiableRefInterfaceType, interfaceType);
-    
-    SLANG_ASSERT(!(lookupPathValueType.getCount() && lookupPathPtrType.getCount()));
-
-    auto lookupKeyPath = lookupPathValueType.getCount() ? lookupPathValueType : lookupPathPtrType;
-    auto diffStructKey = lookupPathValueType.getCount() ? 
-        autoDiffSharedContext->differentialAssocTypeStructKey :
-        autoDiffSharedContext->differentialAssocRefTypeStructKey;
+    if (lookupPathValueType.getCount() > 0)
+    {
+        lookupKeyPath = lookupPathValueType;
+        diffStructKey = autoDiffSharedContext->differentialAssocTypeStructKey;
+    }
+    else
+    {
+        // Try IDifferentiablePtrType
+        lookupKeyPath = differentiableTypeConformanceContext.findInterfaceLookupPath(
+            autoDiffSharedContext->differentiablePtrInterfaceType, interfaceType);
+        diffStructKey = autoDiffSharedContext->differentialAssocRefTypeStructKey;
+    }
 
     if (lookupKeyPath.getCount())
     {
@@ -582,7 +589,7 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(IRBuilder* bui
 
             return InstPair(primal, diffWitness);
         }
-        else if (returnWitnessType->getConformanceType() == autoDiffSharedContext->differentiableRefInterfaceType)
+        else if (returnWitnessType->getConformanceType() == autoDiffSharedContext->differentiablePtrInterfaceType)
         {
             auto primalDiffType = builder->emitLookupInterfaceMethodInst(
                 builder->getTypeKind(),
