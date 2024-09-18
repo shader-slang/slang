@@ -861,7 +861,8 @@ namespace Slang
             }
 
             auto terminator = block->getTerminator();
-            if (as<IRReturn>(terminator)) {
+            if (as<IRReturn>(terminator))
+            {
                 returnLoc = terminator->sourceLoc;
                 break;
             }

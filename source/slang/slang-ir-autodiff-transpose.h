@@ -694,7 +694,11 @@ struct DiffTransposePass
         SLANG_ASSERT(lastRevBlock->getTerminator() == nullptr);
 
         builder.setInsertInto(lastRevBlock);
-        builder.emitReturn()->sourceLoc = revDiffFunc->sourceLoc;
+
+        {
+            IRBuilderSourceLocRAII sourceLocationScope(&builder, revDiffFunc->sourceLoc);
+            builder.emitReturn();
+        }
 
         // Remove fwd-mode blocks.
         for (auto block : workList)
@@ -2660,7 +2664,7 @@ struct DiffTransposePass
 
         // Initialize with T.dzero()
         auto zeroValueInst = emitDZeroOfDiffInstType(builder, aggPrimalType);
-        
+
         builder->emitStore(revGradVar, zeroValueInst);
 
         OrderedDictionary<IRInst*, List<RevGradient>> bucketedGradients;
