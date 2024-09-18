@@ -404,7 +404,7 @@ InstPair ForwardDiffTranscriber::transcribeStore(IRBuilder* builder, IRStore* or
         // Default case, storing the entire type (and not a member)
         diffStore = as<IRStore>(
             builder->emitStore(diffStoreLocation, diffStoreVal));
-
+        
         return InstPair(primalStore, diffStore);
     }
 
@@ -516,7 +516,7 @@ InstPair ForwardDiffTranscriber::transcribeMakeStruct(IRBuilder* builder, IRInst
                     // 
                     auto diffFieldOperandType = differentiateType(builder, field->getFieldType());
                     SLANG_RELEASE_ASSERT(diffFieldOperandType);
-                    diffOperands.add(getDifferentialZeroOfType(builder, as<IRType>(diffFieldOperandType)));
+                    diffOperands.add(getDifferentialZeroOfType(builder, (IRType*)diffFieldOperandType));
                 }
             }
             ii++;

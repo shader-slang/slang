@@ -91,16 +91,11 @@ struct DiffUnzipPass
                 IRInst* diffType = diffTypeContext.getDiffTypeFromPairType(builder, pairType);
                 if (as<IRPtrTypeBase>(primalParam->getFullType()))
                     diffType = builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
-
                 auto primalRef = builder->emitPrimalParamRef(primalParam);
                 auto diffRef = builder->emitDiffParamRef((IRType*)diffType, primalParam);
-
                 builder->markInstAsDifferential(diffRef, pairType->getValueType());
                 primalMap[primalParam] = primalRef;
                 diffMap[primalParam] = diffRef;
-                
-                primalRef->sourceLoc = primalParam->sourceLoc;
-                diffRef->sourceLoc = primalParam->sourceLoc;
             }
         }
 
@@ -251,7 +246,6 @@ struct DiffUnzipPass
         if (!as<IRVoidType>(intermediateType))
         {
             intermediateVar = primalBuilder->emitVar((IRType*)intermediateType);
-            intermediateVar->sourceLoc = mixedCall->sourceLoc;
             primalBuilder->markInstAsPrimal(intermediateVar);
         }
 
@@ -260,7 +254,6 @@ struct DiffUnzipPass
         {
             primalBuilder->addBackwardDerivativePrimalContextDecoration(intermediateVar, intermediateVar);
             primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst((IRType*)primalFuncType, baseFn);
-            primalFn->sourceLoc = mixedCall->sourceLoc;
         }
         else
         {
@@ -299,7 +292,6 @@ struct DiffUnzipPass
         }
 
         auto primalVal = primalBuilder->emitCallInst(primalType, primalFn, primalArgs);
-        primalVal->sourceLoc = mixedCall->sourceLoc;
         if (intermediateVar)
             primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
         primalBuilder->markInstAsPrimal(primalVal);
@@ -339,8 +331,6 @@ struct DiffUnzipPass
                     auto gradArg = diffBuilder->emitLoadReverseGradient(outDiffType, diffArg);
                     diffBuilder->markInstAsDifferential(gradArg, primalArg->getDataType());
                     diffArgs.add(gradArg);
-
-                    gradArg->sourceLoc = mixedCall->sourceLoc;
                 }
                 else if (const auto inoutType = as<IRInOutType>(primalParamType))
                 {
@@ -360,15 +350,11 @@ struct DiffUnzipPass
 
                     // Emit the temp var into the primal blocks since it's holding a primal value.
                     auto tempPrimalVar = primalBuilder->emitVar(primalValueType);
-                    auto storeTemp = primalBuilder->emitStore(tempPrimalVar, storedVal);
+                    primalBuilder->emitStore(tempPrimalVar, storedVal);
                     
                     auto diffPairRef = diffBuilder->emitReverseGradientDiffPairRef(arg->getDataType(), tempPrimalVar, diffArg);
                     diffBuilder->markInstAsDifferential(diffPairRef, primalValueType);
                     diffArgs.add(diffPairRef);
-
-                    tempPrimalVar->sourceLoc = mixedCall->sourceLoc;
-                    storeTemp->sourceLoc = mixedCall->sourceLoc;
-                    diffPairRef->sourceLoc = mixedCall->sourceLoc;
                 }
                 else
                 {
@@ -382,8 +368,6 @@ struct DiffUnzipPass
 
                     diffBuilder->markInstAsDifferential(pairArg, primalArg->getDataType());
                     diffArgs.add(pairArg);
-
-                    pairArg->sourceLoc = mixedCall->sourceLoc;
                 }
             }
             else
@@ -403,9 +387,6 @@ struct DiffUnzipPass
                     auto storeTemp = primalBuilder->emitStore(tempPrimalVar, storedVal);
 
                     diffArgs.add(tempPrimalVar);
-
-                    tempPrimalVar->sourceLoc = mixedCall->sourceLoc;
-                    storeTemp->sourceLoc = mixedCall->sourceLoc;
                 }
                 else
                 {
@@ -421,7 +402,6 @@ struct DiffUnzipPass
         }
         
         auto newFwdCallee = diffBuilder->emitForwardDifferentiateInst(fwdCalleeType, baseFn);
-        newFwdCallee->sourceLoc = mixedCall->sourceLoc;
 
         diffBuilder->markInstAsDifferential(newFwdCallee);
 
@@ -430,7 +410,6 @@ struct DiffUnzipPass
             newFwdCallee,
             diffArgs);
 
-        callInst->sourceLoc = mixedCall->sourceLoc;
         diffBuilder->markInstAsDifferential(callInst, primalType);
 
         if (intermediateVar)
@@ -445,7 +424,6 @@ struct DiffUnzipPass
         {
             diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, callInst);
             diffBuilder->markInstAsDifferential(diffVal, primalType);
-            diffVal->sourceLoc = callInst->sourceLoc;
         }
         return InstPair(primalVal, diffVal);
     }
@@ -461,8 +439,6 @@ struct DiffUnzipPass
         auto diffPtr = lookupDiffInst(mixedLoad->getPtr());
         auto primalVal = primalBuilder->emitLoad(primalPtr);
         auto diffVal = diffBuilder->emitLoad(diffPtr);
-        primalVal->sourceLoc = mixedLoad->sourceLoc;
-        diffVal->sourceLoc = mixedLoad->sourceLoc;
         diffBuilder->markInstAsDifferential(diffVal, primalVal->getFullType());
         return InstPair(primalVal, diffVal);
     }
@@ -478,9 +454,6 @@ struct DiffUnzipPass
         auto primalStore = primalBuilder->emitStore(primalAddr, primalVal);
         auto diffStore = diffBuilder->emitStore(diffAddr, diffVal);
 
-        primalStore->sourceLoc = mixedStore->sourceLoc;
-        diffStore->sourceLoc = mixedStore->sourceLoc;
-
         diffBuilder->markInstAsDifferential(diffStore, primalVal->getFullType());
         return InstPair(primalStore, diffStore);
     }
@@ -492,8 +465,6 @@ struct DiffUnzipPass
         auto diffType = (IRType*) diffTypeContext.getDifferentialForType(primalBuilder, primalType);
         auto primalVar = primalBuilder->emitVar(primalType);
         auto diffVar = diffBuilder->emitVar(diffType);
-        primalVar->sourceLoc = mixedVar->sourceLoc;
-        diffVar->sourceLoc = mixedVar->sourceLoc;
         diffBuilder->markInstAsDifferential(diffVar, diffBuilder->getPtrType(primalType));        
         return InstPair(primalVar, diffVar);
     }
@@ -520,7 +491,6 @@ struct DiffUnzipPass
             diffBuilder->markInstAsDifferential(pairVal, primalType);
 
             auto returnInst = diffBuilder->emitReturn(pairVal);
-            returnInst->sourceLoc = mixedReturn->sourceLoc;
 
             diffBuilder->markInstAsDifferential(returnInst, primalType);
 
@@ -534,7 +504,6 @@ struct DiffUnzipPass
                 primalBranch, mixedReturn->getVal());
 
             auto returnInst = diffBuilder->emitReturn();
-            returnInst->sourceLoc = mixedReturn->sourceLoc;
 
             diffBuilder->markInstAsDifferential(returnInst, nullptr);
             return InstPair(primalBranch, returnInst);
@@ -590,9 +559,6 @@ struct DiffUnzipPass
             diffBuilder->addLoopMaxItersDecoration(diffLoop, maxItersDecoration->getMaxIters());
         }
 
-        primalLoop->sourceLoc = mixedLoop->sourceLoc;
-        diffLoop->sourceLoc = mixedLoop->sourceLoc;
-
         return InstPair(primalLoop, diffLoop);
     }
 
@@ -627,9 +593,6 @@ struct DiffUnzipPass
                     diffArgs.getCount(),
                     diffArgs.getBuffer());
 
-                primalBranch->sourceLoc = branchInst->sourceLoc;
-                diffBranch->sourceLoc = branchInst->sourceLoc;
-                
                 return InstPair(primalBranch, diffBranch);
             }
         
@@ -752,6 +715,9 @@ struct DiffUnzipPass
 
     void splitMixedInst(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* inst)
     {
+        IRBuilderSourceLocRAII primalLocationScope(primalBuilder, inst->sourceLoc);
+        IRBuilderSourceLocRAII diffLocationScope(primalBuilder, inst->sourceLoc);
+
         auto instPair = _splitMixedInst(primalBuilder, diffBuilder, inst);
 
         primalMap[inst] = instPair.primal;
