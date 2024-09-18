@@ -431,6 +431,7 @@ PhiInfo* addPhi(
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
     context->phiInfos.add(phi, phiInfo);
 
+    phi->sourceLoc = var->sourceLoc;
     phiInfo->phi = phi;
     phiInfo->var = var;
 
@@ -677,8 +678,6 @@ IRInst* readVarRec(
     SSABlockInfo*           blockInfo,
     IRVar*                  var)
 {
-    IRBuilderSourceLocRAII sourceLocationScope(&context->builder, var->sourceLoc);
-
     IRInst* val = nullptr;
     if (!blockInfo->isSealed)
     {

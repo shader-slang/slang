@@ -16,36 +16,26 @@ struct AddressInstEliminationContext
     IRModule* module;
     DiagnosticSink* sink;
 
-    IRInst* getValue(IRBuilder& builder, IRInst* addr, SourceLoc loc)
+    IRInst* getValue(IRBuilder& builder, IRInst* addr)
     {
         switch (addr->getOp())
         {
         default:
-            {
-                IRInst* load = builder.emitLoad(addr);
-                load->sourceLoc = loc;
-                return load;
-            }
+            return builder.emitLoad(addr);
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             {
-                IRInst* first = getValue(builder, addr->getOperand(0), loc);
-
-                IRInst* args[] = { first, addr->getOperand(1) };
-                IRInst* value = builder.emitIntrinsicInst(
+                IRInst* args[] = { getValue(builder, addr->getOperand(0)), addr->getOperand(1) };
+                return builder.emitIntrinsicInst(
                     cast<IRPtrTypeBase>(addr->getFullType())->getValueType(),
                     (addr->getOp() == kIROp_GetElementPtr ? kIROp_GetElement : kIROp_FieldExtract),
-                    2, args);
-
-                first->sourceLoc = loc;
-                value->sourceLoc = loc;
-
-                return value;
+                    2,
+                    args);
             }
         }
     }
 
-    void storeValue(IRBuilder& builder, IRInst* addr, IRInst* val, SourceLoc loc)
+    void storeValue(IRBuilder& builder, IRInst* addr, IRInst* val)
     {
         List<IRInst*> accessChain;
 
@@ -71,43 +61,36 @@ struct AddressInstEliminationContext
         {
             auto lastVal = builder.emitLoad(lastAddr);
             auto update = builder.emitUpdateElement(lastVal, accessChain.getArrayView(), val);
-            auto store = builder.emitStore(lastAddr, update);
-
-            lastVal->sourceLoc = loc;
-            update->sourceLoc = loc;
-            store->sourceLoc = loc;
+            builder.emitStore(lastAddr, update);
         }
         else
         {
-            auto store = builder.emitStore(lastAddr, val);
-            store->sourceLoc = loc;
+            builder.emitStore(lastAddr, val);
         }
     }
 
-    void transformLoadAddr(IRUse* use)
+    void transformLoadAddr(IRBuilder& builder, IRUse* use)
     {
         auto addr = use->get();
         auto load = as<IRLoad>(use->getUser());
 
-        IRBuilder builder(module);
         builder.setInsertBefore(use->getUser());
-        auto value = getValue(builder, addr, load->sourceLoc);
+        auto value = getValue(builder, addr);
         load->replaceUsesWith(value);
         load->removeAndDeallocate();
     }
 
-    void transformStoreAddr(IRUse* use)
+    void transformStoreAddr(IRBuilder& builder, IRUse* use)
     {
         auto addr = use->get();
         auto store = as<IRStore>(use->getUser());
 
-        IRBuilder builder(module);
         builder.setInsertBefore(use->getUser());
-        storeValue(builder, addr, store->getVal(), store->sourceLoc);
+        storeValue(builder, addr, store->getVal());
         store->removeAndDeallocate();
     }
 
-    void transformCallAddr(IRUse* use)
+    void transformCallAddr(IRBuilder& builder, IRUse* use)
     {
         auto addr = use->get();
         auto call = as<IRCall>(use->getUser());
@@ -118,24 +101,19 @@ struct AddressInstEliminationContext
             return;
         }
 
-        IRBuilder builder(module);
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
 
         // Store the initial value of the mutable argument into temp var.
         // If this is an `out` var, the initial value will be undefined,
         // which will get cleaned up later into a `defaultConstruct`.
-        auto value = getValue(builder, addr, call->sourceLoc);
-        auto store = builder.emitStore(tempVar, value);
+        auto value = getValue(builder, addr);
+        builder.emitStore(tempVar, value);
 
         builder.setInsertAfter(call);
         auto load = builder.emitLoad(tempVar);
-        storeValue(builder, addr, load, call->sourceLoc);
+        storeValue(builder, addr, load);
         use->set(tempVar);
-
-        tempVar->sourceLoc = addr->sourceLoc;
-        store->sourceLoc = call->sourceLoc;
-        load->sourceLoc = call->sourceLoc;
     }
 
     SlangResult eliminateAddressInstsImpl(
@@ -177,17 +155,20 @@ struct AddressInstEliminationContext
                     use = nextUse;
                     continue;
                 }
+                    
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII sourceLocationScope(&builder, use->getUser()->sourceLoc);
 
                 switch (use->getUser()->getOp())
                 {
                 case kIROp_Load:
-                    transformLoadAddr(use);
+                    transformLoadAddr(builder, use);
                     break;
                 case kIROp_Store:
-                    transformStoreAddr(use);
+                    transformStoreAddr(builder, use);
                     break;
                 case kIROp_Call:
-                    transformCallAddr(use);
+                    transformCallAddr(builder, use);
                     break;
                 case kIROp_GetElementPtr:
                 case kIROp_FieldAddress:
