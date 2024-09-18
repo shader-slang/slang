@@ -1401,6 +1401,10 @@ namespace Slang
 
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
     {
+        // If we have already checked the expr, don't check again.
+        if (term->type && !IsErrorExpr(term))
+            return term;
+
         auto checkedTerm = _CheckTerm(term);
         // Differentiable type checking.
         // TODO: This can be super slow.
