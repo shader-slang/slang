@@ -1370,7 +1370,7 @@ DeclRef<GenericDecl> getGenericParentDeclRef(
 }
 
 DeclRef<Decl> Linkage::specializeWithArgTypes(
-    DeclRef<Decl>   funcDeclRef,
+    Expr*               funcExpr,
     List<Type*>         argTypes,
     DiagnosticSink*     sink)
 {
@@ -1378,6 +1378,16 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     visitor = visitor.withSink(sink);
 
     ASTBuilder* astBuilder = getASTBuilder();
+    
+    if (auto declRefFuncExpr = as<DeclRefExpr>(funcExpr))
+    {
+        auto genericDeclRefExpr = astBuilder->create<DeclRefExpr>();
+        genericDeclRefExpr->declRef = getGenericParentDeclRef(
+            getASTBuilder(),
+            &visitor,
+            declRefFuncExpr->declRef);
+        funcExpr = genericDeclRefExpr;
+    }
 
     List<Expr*> argExprs;
     for (SlangInt aa = 0; aa < argTypes.getCount(); ++aa)
@@ -1394,10 +1404,7 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
 
     // Construct invoke expr.
     auto invokeExpr = astBuilder->create<InvokeExpr>();
-    auto declRefExpr = astBuilder->create<DeclRefExpr>();
-    
-    declRefExpr->declRef = getGenericParentDeclRef(getASTBuilder(), &visitor, funcDeclRef);
-    invokeExpr->functionExpr = declRefExpr;
+    invokeExpr->functionExpr = funcExpr;
     invokeExpr->arguments = argExprs;
 
     auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
@@ -2331,14 +2338,14 @@ Type* ComponentType::getTypeFromString(
     return type;
 }
 
-DeclRef<Decl> ComponentType::findDeclFromString(
+Expr* ComponentType::findDeclFromString(
     String const& name,
     DiagnosticSink* sink)
 {
     // If we've looked up this type name before,
    // then we can re-use it.
    //
-    DeclRef<Decl> result;
+    Expr* result;
     if (m_decls.tryGetValue(name, result))
         return result;
 
@@ -2369,34 +2376,26 @@ DeclRef<Decl> ComponentType::findDeclFromString(
 
     SemanticsVisitor visitor(context);
 
-    auto checkedExpr = visitor.CheckExpr(expr);
-    if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+    auto checkedExpr = visitor.CheckTerm(expr);
+
+    if (as<DeclRefExpr>(checkedExpr) || as<OverloadedExpr>(checkedExpr))
     {
-        result = declRefExpr->declRef;
+        result = checkedExpr;
     }
-    else if (auto overloadedExpr = as<OverloadedExpr>(checkedExpr))
-    {
-        sink->diagnose(SourceLoc(), Diagnostics::ambiguousReference, name);
-        for (auto candidate : overloadedExpr->lookupResult2)
-        {
-            sink->diagnose(candidate.declRef.getDecl(), Diagnostics::overloadCandidate, candidate.declRef);
-        }
-    }
+    
     m_decls[name] = result;
     return result;
 }
 
-DeclRef<Decl> ComponentType::findDeclFromStringInType(
+Expr* ComponentType::findDeclFromStringInType(
     Type* type,
     String const& name,
     LookupMask mask,
     DiagnosticSink* sink)
 {
-    DeclRef<Decl> result;
-
     // Only look up in the type if it is a DeclRefType
     if (!as<DeclRefType>(type))
-        return DeclRef<Decl>();
+        return nullptr;
 
     // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
     //
@@ -2433,7 +2432,7 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
     }
 
     if (!as<VarExpr>(expr))
-        return result;
+        return nullptr;
 
     auto rs = astBuilder->create<StaticMemberExpr>();
     auto typeExpr = astBuilder->create<SharedTypeExpr>();
@@ -2453,20 +2452,18 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
     
     auto checkedTerm = visitor.CheckTerm(expr);
     auto resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+    
 
+    if (auto overloadedExpr = as<OverloadedExpr>(resolvedTerm))
+    {
+        return overloadedExpr;
+    }
     if (auto declRefExpr = as<DeclRefExpr>(resolvedTerm))
     {
-        result = declRefExpr->declRef;
+        return declRefExpr;
     }
 
-    if (auto genericDeclRef = result.as<GenericDecl>())
-    {   
-        result = createDefaultSubstitutionsIfNeeded(
-            astBuilder, &visitor, DeclRef(genericDeclRef.getDecl()->inner));
-        result = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, result);
-    }
-
-    return result;
+    return nullptr;
 }
 
 bool ComponentType::isSubType(Type* subType, Type* superType)
