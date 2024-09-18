@@ -691,7 +691,6 @@ namespace Slang
             tempBuilder.setInsertBefore(diffPropagateFunc);
         }
         
-        auto hint = primalFunc->findDecoration<IRNameHintDecoration>()->getName().begin();
         auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, primalFunc, diffPropagateFunc);
         if (!fwdDiffFunc)
             return;
