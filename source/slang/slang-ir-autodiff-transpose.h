@@ -1063,7 +1063,7 @@ struct DiffTransposePass
         // This will form the total derivative for this inst.
         IRBuilderSourceLocRAII sourceLocationScope(builder, inst->sourceLoc);
         auto revValue = emitAggregateValue(builder, primalType, gradients);
-        
+
         auto transposeResult = transposeInst(builder, inst, revValue);
         
         if (auto fwdNameHint = inst->findDecoration<IRNameHintDecoration>())
@@ -1300,7 +1300,6 @@ struct DiffTransposePass
                     auto diffArgType = (IRType*)diffTypeContext.getDifferentialForType(
                         builder, 
                         diffPairType->getValueType());
-
                     gradients.add(RevGradient(
                         RevGradient::Flavor::Simple,
                         fwdCall->getArg(ii),
@@ -2657,10 +2656,11 @@ struct DiffTransposePass
         // write into the specific sub-field that is affected without constructing intermediate vars.
         // 
         auto revGradVar = builder->emitVar(
-            (IRType*) diffTypeContext.getDifferentialForType(builder, aggPrimalType));
+            (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
 
         // Initialize with T.dzero()
         auto zeroValueInst = emitDZeroOfDiffInstType(builder, aggPrimalType);
+        
         builder->emitStore(revGradVar, zeroValueInst);
 
         OrderedDictionary<IRInst*, List<RevGradient>> bucketedGradients;
@@ -2722,11 +2722,11 @@ struct DiffTransposePass
         // write into the specific sub-field that is affected without constructing intermediate vars.
         // 
         auto revGradVar = builder->emitVar(
-            (IRType*) diffTypeContext.getDifferentialForType(builder, aggPrimalType));
+            (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
 
         // Initialize with T.dzero()
         auto zeroValueInst = emitDZeroOfDiffInstType(builder, aggPrimalType);
-        
+
         builder->emitStore(revGradVar, zeroValueInst);
 
         OrderedDictionary<IRStructKey*, List<RevGradient>> bucketedGradients;
