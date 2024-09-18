@@ -2345,7 +2345,7 @@ Expr* ComponentType::findDeclFromString(
     // If we've looked up this type name before,
    // then we can re-use it.
    //
-    Expr* result;
+    Expr* result = nullptr;
     if (m_decls.tryGetValue(name, result))
         return result;
 
