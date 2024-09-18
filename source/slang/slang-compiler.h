@@ -40,7 +40,9 @@
 namespace Slang
 {
     struct PathInfo;
-    struct IncludeHandler;
+    struct IncludeHandler;    
+    struct SharedSemanticsContext;
+
     class ProgramLayout;
     class PtrType;
     class TargetProgram;
@@ -94,6 +96,7 @@ namespace Slang
         Metal               = SLANG_METAL,
         MetalLib            = SLANG_METAL_LIB,
         MetalLibAssembly    = SLANG_METAL_LIB_ASM,
+        WGSL                = SLANG_WGSL,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -2169,6 +2172,11 @@ namespace Slang
             DeclRef<Decl>                       declRef,
             List<Expr*>                         argExprs,
             DiagnosticSink*                     sink);
+        
+        DeclRef<Decl> specializeWithArgTypes(
+            DeclRef<Decl>   funcDeclRef,
+            List<Type*>         argTypes,
+            DiagnosticSink*     sink);
 
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
 
@@ -2181,6 +2189,9 @@ namespace Slang
         {
             m_retainedSession = nullptr;
         }
+
+        // Get shared semantics information for reflection purposes.
+        SharedSemanticsContext* getSemanticsForReflection();
 
     private:
             /// The global Slang library session that this linkage is a child of
@@ -2234,6 +2245,8 @@ namespace Slang
             DiagnosticSink*     sink);
 
         List<Type*> m_specializedTypes;
+
+        RefPtr<SharedSemanticsContext> m_semanticsForReflection;
 
     };
 

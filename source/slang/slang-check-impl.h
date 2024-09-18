@@ -598,7 +598,7 @@ namespace Slang
     };
 
         /// Shared state for a semantics-checking session.
-    struct SharedSemanticsContext
+    struct SharedSemanticsContext : public RefObject
     {
         Linkage*        m_linkage   = nullptr;
 

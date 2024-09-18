@@ -111,6 +111,10 @@ def metal : target + textualTarget;
 /// [Target]
 def spirv : target;
 
+/// Represents the WebGPU shading language code generation target.
+/// [Target]
+def wgsl : target + textualTarget;
+
 // Capabilities that stand for target SPIR-V versions for the GLSL backend.
 // These are not compilation targets. We will convert `_spirv_*` to `glsl_spirv_*` during compilation.
 
@@ -228,15 +232,15 @@ def _cuda_sm_9_0 : _cuda_sm_8_0;
 
 /// All code-gen targets
 /// [Compound]
-alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv;
+alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl;
 
 /// All non-asm code-gen targets
 /// [Compound]
-alias any_textual_target = hlsl | metal | glsl | c | cpp | cuda;
+alias any_textual_target = hlsl | metal | glsl | c | cpp | cuda | wgsl;
 
 /// All slang-gfx compatible code-gen targets
 /// [Compound]
-alias any_gfx_target = hlsl | metal | glsl | spirv;
+alias any_gfx_target = hlsl | metal | glsl | spirv | wgsl;
 
 /// All "cpp syntax" code-gen targets
 /// [Compound]
@@ -262,9 +266,17 @@ alias cpp_cuda_glsl_hlsl = cpp | cuda | glsl | hlsl;
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;
 
+/// CPP, CUDA, GLSL, HLSL, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_spirv_wgsl = cpp | cuda | glsl | hlsl | spirv | wgsl;
+
 /// CPP, CUDA, GLSL, HLSL, Metal and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_metal_spirv = cpp | cuda | glsl | hlsl | metal | spirv;
+
+/// CPP, CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_metal_spirv_wgsl = cpp | cuda | glsl | hlsl | metal | spirv | wgsl;
 
 /// CPP, CUDA, and HLSL code-gen targets
 /// [Compound]
@@ -318,6 +330,10 @@ alias cuda_glsl_spirv = cuda | glsl | spirv;
 /// [Compound]
 alias cuda_glsl_metal_spirv = cuda | glsl | metal | spirv;
 
+/// CUDA, GLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cuda_glsl_metal_spirv_wgsl = cuda | glsl | metal | spirv | wgsl;
+
 /// CUDA, and HLSL code-gen targets
 /// [Compound]
 alias cuda_hlsl = cuda | hlsl;
@@ -330,9 +346,17 @@ alias cuda_hlsl_spirv = cuda | hlsl | spirv;
 /// [Compound]
 alias glsl_hlsl_spirv = glsl | hlsl | spirv;
 
+/// GLSL, HLSL, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias glsl_hlsl_spirv_wgsl = glsl | hlsl | spirv | wgsl;
+
 /// GLSL, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias glsl_hlsl_metal_spirv = glsl | hlsl | metal | spirv;
+
+/// GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias glsl_hlsl_metal_spirv_wgsl = glsl | hlsl | metal | spirv | wgsl;
 
 /// GLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
@@ -1178,6 +1202,7 @@ alias sm_4_0_version = _sm_4_0
              | spirv_1_0
              | _cuda_sm_2_0
              | metal
+             | wgsl
              | cpp
              ;
 
@@ -1198,6 +1223,7 @@ alias sm_4_1_version = _sm_4_1
              | spirv_1_0
              | _cuda_sm_6_0
              | metal
+             | wgsl
              | cpp
              ;
 /// HLSL shader model 4.1 and related capabilities of other targets.
@@ -1217,6 +1243,7 @@ alias sm_5_0_version = _sm_5_0
              | spirv_1_0
              | _cuda_sm_9_0
              | metal
+             | wgsl
              | cpp
              ;
 /// HLSL shader model 5.0 and related capabilities of other targets.
@@ -1686,6 +1713,7 @@ alias fragmentprocessing = fragment + _sm_5_0
                          | fragment + metal
                          | fragment + cpp
                          | fragment + cuda
+                         | fragment + wgsl
                          ;
 /// Capabilities required to use fragment derivative operations (with GLSL derivativecontrol)
 /// [Compound]

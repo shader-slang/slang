@@ -779,8 +779,8 @@ namespace Slang
                 SLANG_ASSERT(constraintDecl2);
                 return TryUnifyTypes(constraints,
                     unifyCtx,
-                    constraintDecl1.getDecl()->getSup().type,
-                    constraintDecl2.getDecl()->getSup().type);
+                    getSup(m_astBuilder, constraintDecl1),
+                    getSup(m_astBuilder, constraintDecl2));
             }
         }
 

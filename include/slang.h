@@ -603,6 +603,7 @@ extern "C"
         SLANG_METAL_LIB,                ///< Metal library
         SLANG_METAL_LIB_ASM,            ///< Metal library assembly
         SLANG_HOST_SHARED_LIBRARY,      ///< A shared library/Dll for host code (for hosting CPU/OS)
+        SLANG_WGSL,                     ///< WebGPU shading language
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -636,6 +637,7 @@ extern "C"
         SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
         SLANG_PASS_THROUGH_SPIRV_OPT,               ///< SPIRV-opt
         SLANG_PASS_THROUGH_METAL,                   ///< Metal compiler
+        SLANG_PASS_THROUGH_WGSL,                    ///< WGSL compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -735,6 +737,7 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_CUDA,
         SLANG_SOURCE_LANGUAGE_SPIRV,
         SLANG_SOURCE_LANGUAGE_METAL,
+        SLANG_SOURCE_LANGUAGE_WGSL,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
@@ -2587,6 +2590,7 @@ extern "C"
     SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* func);
     SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(SlangReflectionFunction* func);
     SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(SlangReflectionFunction* func, SlangReflectionGeneric* generic);
+    SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(SlangReflectionFunction* func, SlangInt argTypeCount, SlangReflectionType* const* argTypes);
 
     // Abstract Decl Reflection
 
@@ -3584,6 +3588,11 @@ namespace slang
         FunctionReflection* applySpecializations(GenericReflection* generic)
         {
             return (FunctionReflection*)spReflectionFunction_applySpecializations((SlangReflectionFunction*)this, (SlangReflectionGeneric*)generic);
+        }
+
+        FunctionReflection* specializeWithArgTypes(unsigned int argCount, TypeReflection* const* types)
+        {
+            return (FunctionReflection*)spReflectionFunction_specializeWithArgTypes((SlangReflectionFunction*)this, argCount, (SlangReflectionType* const*)types);
         }
     };
 

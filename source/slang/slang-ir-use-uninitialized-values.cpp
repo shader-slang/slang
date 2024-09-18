@@ -442,6 +442,12 @@ namespace Slang
             IRInst* user = use->getUser();
             if (as<IRReturn>(user))
                 return true;
+            
+            // Loading from a Ptr type should be
+            // treated as an aliased path to any return
+            IRLoad *load = as<IRLoad>(user);
+            if (load && isReturnedValue(load))
+                return true;
         }
         return false;
     }
