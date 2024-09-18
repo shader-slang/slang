@@ -16,86 +16,6 @@
 
 namespace Slang
 {
-    
-IRInst* emitMakeDifferentialPair(IRBuilder* builder, IRType* pairType, IRInst* primalVal, IRInst* diffVal)
-{
-    if (as<IRDifferentialPairType>(pairType))
-    {
-        return builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
-    }
-    else if (as<IRDifferentialPtrPairType>(pairType))
-    {
-        // Quick optimization:
-        // If primalVal and diffVal are extracted from the same pointer-pair,
-        // we can just use the pointer-pair directly.
-        //
-        if (auto primalPtrVal = as<IRDifferentialPtrPairGetPrimal>(primalVal))
-        {
-            if (auto diffPtrVal = as<IRDifferentialPtrPairGetDifferential>(diffVal))
-            {
-                if (primalPtrVal->getBase() == diffPtrVal->getBase())
-                    return primalPtrVal->getBase();
-            }
-        }
-        return builder->emitMakeDifferentialPtrPair(pairType, primalVal, diffVal);
-    }
-    else
-    {
-        SLANG_ASSERT(!"unreachable");
-        return nullptr;
-    }
-}
-
-IRInst* emitDifferentialPairGetDifferential(IRBuilder* builder, IRType* diffType, IRInst* pairVal)
-{
-    if (as<IRDifferentialPairType>(pairVal->getDataType()))
-    {
-        return builder->emitDifferentialPairGetDifferential(diffType, pairVal);
-    }
-    else if (as<IRDifferentialPtrPairType>(pairVal->getDataType()))
-    {
-        return builder->emitDifferentialPtrPairGetDifferential(diffType, pairVal);
-    }
-    else
-    {
-        SLANG_ASSERT(!"unreachable");
-        return nullptr;
-    }
-}
-
-IRInst* emitDifferentialPairGetPrimal(IRBuilder* builder, IRInst* pairVal)
-{
-    if (as<IRDifferentialPairType>(pairVal->getDataType()))
-    {
-        return builder->emitDifferentialPairGetPrimal(pairVal);
-    }
-    else if (as<IRDifferentialPtrPairType>(pairVal->getDataType()))
-    {
-        return builder->emitDifferentialPtrPairGetPrimal(pairVal);
-    }
-    else
-    {
-        SLANG_ASSERT(!"unreachable");
-        return nullptr;
-    }
-}
-
-IRInst* emitDifferentialPairGetPrimal(IRBuilder* builder, IRType* primalType, IRInst* pairVal)
-{
-    if (as<IRDifferentialPairType>(pairVal->getDataType()))
-    {
-        return builder->emitDifferentialPairGetPrimal(primalType, pairVal);
-    }
-    else if (as<IRDifferentialPtrPairType>(pairVal->getDataType()))
-    {
-        return builder->emitDifferentialPtrPairGetPrimal(primalType, pairVal);
-    }
-    else
-    {
-        SLANG_ASSERT(!"unreachable");
-        return nullptr;
-    }
-}
 
 IRFuncType* ForwardDiffTranscriber::differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType)
 {
@@ -822,7 +742,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                             diffArgVal = argBuilder.emitLoad(diffArg);
                             markDiffTypeInst(&argBuilder, diffArgVal, pairValType->getValueType());
                         }
-                        auto initVal = emitMakeDifferentialPair(&argBuilder, pairValType, primalVal, diffArgVal);
+                        auto initVal = argBuilder.emitMakeDifferentialPair(pairValType, primalVal, diffArgVal);
                         markDiffPairTypeInst(&argBuilder, initVal, pairValType);
                         auto store = argBuilder.emitStore(srcVar, initVal);
                         markDiffPairTypeInst(&argBuilder, store, pairValType);
@@ -832,12 +752,12 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         // Read back new value.
                         auto newVal = afterBuilder.emitLoad(srcVar);
                         markDiffPairTypeInst(&afterBuilder, newVal, pairValType);
-                        auto newPrimalVal = emitDifferentialPairGetPrimal(&afterBuilder, pairValType->getValueType(), newVal);
+                        auto newPrimalVal = afterBuilder.emitDifferentialPairGetPrimal(pairValType->getValueType(), newVal);
                         afterBuilder.emitStore(primalArg, newPrimalVal);
 
                         if (diffArg)
                         {
-                            auto newDiffVal = emitDifferentialPairGetDifferential(&afterBuilder, (IRType*)diffType, newVal);
+                            auto newDiffVal = afterBuilder.emitDifferentialPairGetDifferential((IRType*)diffType, newVal);
                             markDiffTypeInst(&afterBuilder, newDiffVal, pairValType->getValueType());
 
                             auto storeInst = afterBuilder.emitStore(diffArg, newDiffVal);
@@ -856,7 +776,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                     // If a pair type can be formed, this must be non-null.
                     SLANG_RELEASE_ASSERT(diffArg);
 
-                    auto diffPair = emitMakeDifferentialPair(&argBuilder, pairType, primalArg, diffArg);
+                    auto diffPair = argBuilder.emitMakeDifferentialPair(pairType, primalArg, diffArg);
                     markDiffPairTypeInst(&argBuilder, diffPair, pairType);
 
                     args.add(diffPair);
@@ -891,9 +811,9 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
     if (as<IRDifferentialPairType>(diffReturnType) || as<IRDifferentialPtrPairType>(diffReturnType))
     {
-        IRInst* primalResultValue = emitDifferentialPairGetPrimal(&afterBuilder, callInst);
+        IRInst* primalResultValue = afterBuilder.emitDifferentialPairGetPrimal(callInst);
         auto diffType = differentiateType(&afterBuilder, origCall->getFullType());
-        IRInst* diffResultValue = emitDifferentialPairGetDifferential(&afterBuilder, diffType, callInst);
+        IRInst* diffResultValue = afterBuilder.emitDifferentialPairGetDifferential(diffType, callInst);
         return InstPair(primalResultValue, diffResultValue);
     }
     else
@@ -1860,8 +1780,7 @@ InstPair ForwardDiffTranscriber::transcribeFunc(IRBuilder* inBuilder, IRFunc* pr
                         auto diffVal = builder.emitLoad(writeBack.value.differential);
                         markDiffTypeInst(&builder, diffVal, primalVal->getFullType());
 
-                        valToStore = emitMakeDifferentialPair(
-                            &builder, pairValType, primalVal, diffVal);
+                        valToStore = builder.emitMakeDifferentialPair(pairValType, primalVal, diffVal);
 
                         markDiffPairTypeInst(&builder, valToStore, pairValType);
                     }
@@ -2153,9 +2072,8 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam
         if (as<IRDifferentialPairType>(diffPairType) || as<IRDifferentialPtrPairType>(diffPairType))
         {
             return InstPair(
-                emitDifferentialPairGetPrimal(builder, diffPairParam),
-                emitDifferentialPairGetDifferential(
-                    builder,
+                builder->emitDifferentialPairGetPrimal(diffPairParam),
+                builder->emitDifferentialPairGetDifferential(
                     (IRType*)differentiableTypeConformanceContext.getDiffTypeFromPairType(
                         builder,
                         as<IRDifferentialPairTypeBase>(diffPairType)),
@@ -2183,8 +2101,8 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(IRBuilder* builder, IRParam
                 auto initVal = builder->emitLoad(diffPairParam);
                 markDiffPairTypeInst(builder, initVal, ptrInnerPairType);
 
-                primalInitVal = emitDifferentialPairGetPrimal(builder, initVal);
-                diffInitVal = emitDifferentialPairGetDifferential(builder, diffType, initVal);
+                primalInitVal = builder->emitDifferentialPairGetPrimal(initVal);
+                diffInitVal = builder->emitDifferentialPairGetDifferential(diffType, initVal);
             }
             
             markDiffTypeInst(builder, diffInitVal, ptrInnerPairType->getValueType());

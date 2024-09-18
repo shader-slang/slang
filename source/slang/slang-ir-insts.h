@@ -3803,8 +3803,9 @@ public:
     IRInst* emitGetTorchCudaStream();
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
-    IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
+    IRInst* emitMakeDifferentialValuePair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialPtrPair(IRType* type, IRInst* primal, IRInst* differential);
+    IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
 
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
 
@@ -3986,12 +3987,19 @@ public:
     IRInst* emitGetOptionalValue(IRInst* optValue);
     IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
+    
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialValuePairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPtrPairGetDifferential(IRType* diffType, IRInst* diffPair);
+
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
+    IRInst* emitDifferentialValuePairGetPrimal(IRInst* diffPair);
     IRInst* emitDifferentialPtrPairGetPrimal(IRInst* diffPair);
+
     IRInst* emitDifferentialPairGetPrimal(IRType* primalType, IRInst* diffPair);
+    IRInst* emitDifferentialValuePairGetPrimal(IRType* primalType, IRInst* diffPair);
     IRInst* emitDifferentialPtrPairGetPrimal(IRType* primalType, IRInst* diffPair);
+
     IRInst* emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimalUserCode(IRInst* diffPair);
     IRInst* emitMakeVector(

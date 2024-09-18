@@ -216,8 +216,7 @@ struct DifferentiableTypeConformanceContext
     AutoDiffSharedContext* sharedContext;
 
     IRGlobalValueWithCode* parentFunc = nullptr;
-    OrderedDictionary<IRType*, IRInst*> differentiableValueTypeWitnessDictionary;
-    OrderedDictionary<IRType*, IRInst*> differentiablePtrTypeWitnessDictionary;
+    OrderedDictionary<IRType*, IRInst*> differentiableTypeWitnessDictionary;
 
     IRFunc* existentialDAddFunc = nullptr;
 
@@ -226,7 +225,7 @@ struct DifferentiableTypeConformanceContext
     {
         // Populate dictionary with null differential type.
         if (sharedContext->nullDifferentialStructType)
-            differentiableValueTypeWitnessDictionary.add(
+            differentiableTypeWitnessDictionary.add(
                 sharedContext->nullDifferentialStructType,
                 sharedContext->nullDifferentialWitness);
     }

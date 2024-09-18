@@ -548,9 +548,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                 diffInterfaceType == sharedContext->differentiableInterfaceType
                 || diffInterfaceType == sharedContext->differentiablePtrInterfaceType);
 
-            //lookUpConformanceForType(item->getConcreteType());
-            // TODO: need to consider ref type.
-            auto existingItem = differentiableValueTypeWitnessDictionary.tryGetValue(item->getConcreteType());
+            auto existingItem = differentiableTypeWitnessDictionary.tryGetValue(item->getConcreteType());
             if (existingItem)
             {
                 *existingItem = item->getWitness();
@@ -629,25 +627,22 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 IRInst* DifferentiableTypeConformanceContext::lookUpConformanceForType(IRInst* type, DiffConformanceKind kind)
 {
     IRInst* foundResult = nullptr;
-
-    switch (kind)
+    differentiableTypeWitnessDictionary.tryGetValue(type, foundResult);
+    if (!foundResult)
+        return nullptr;
+    
+    if (kind == DiffConformanceKind::Any)
+        return foundResult;
+    
+    if (auto baseType = getConformanceTypeFromWitness(foundResult))
     {
-    case DiffConformanceKind::Any:
-    {
-        differentiableValueTypeWitnessDictionary.tryGetValue(type, foundResult);
-        if (!foundResult)
-            differentiablePtrTypeWitnessDictionary.tryGetValue(type, foundResult);
-        break;
-    }
-    case DiffConformanceKind::Value:
-        differentiableValueTypeWitnessDictionary.tryGetValue(type, foundResult);
-        break;
-    case DiffConformanceKind::Ptr:
-        differentiablePtrTypeWitnessDictionary.tryGetValue(type, foundResult);
-        break;
+        if (baseType == sharedContext->differentiableInterfaceType && kind == DiffConformanceKind::Value)
+            return foundResult;
+        else if (baseType == sharedContext->differentiablePtrInterfaceType && kind == DiffConformanceKind::Ptr)
+            return foundResult;
     }
 
-    return foundResult;
+    return nullptr;
 }
 
 IRInst* DifferentiableTypeConformanceContext::lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key, IRType* resultType)
@@ -687,22 +682,16 @@ IRInst* DifferentiableTypeConformanceContext::getDiffAddMethodFromPairType(IRBui
 
 void DifferentiableTypeConformanceContext::addTypeToDictionary(IRType* type, IRInst* witness)
 {
-    //auto witnessType = cast<IRWitnessTableType>(witness->getDataType());
     auto conformanceType = getConformanceTypeFromWitness(witness);
-    if (sharedContext->isInterfaceAvailable && 
-        conformanceType == sharedContext->differentiableInterfaceType)
-    {
-        differentiableValueTypeWitnessDictionary.addIfNotExists(type, witness);
-    }
-    else if (sharedContext->isPtrInterfaceAvailable && 
-        conformanceType == sharedContext->differentiablePtrInterfaceType)
-    {
-        differentiablePtrTypeWitnessDictionary.addIfNotExists(type, witness);
-    }
-    else
-    {
-        SLANG_UNEXPECTED("Unexpected witness type");
-    }
+
+    if (!sharedContext->isInterfaceAvailable && !sharedContext->isPtrInterfaceAvailable)
+        return;
+
+    SLANG_ASSERT(
+        conformanceType == sharedContext->differentiableInterfaceType || 
+        conformanceType == sharedContext->differentiablePtrInterfaceType);
+    
+    differentiableTypeWitnessDictionary.addIfNotExists(type, witness);
 }
 
 IRInst *DifferentiableTypeConformanceContext::tryExtractConformanceFromInterfaceType(IRBuilder *builder, IRInterfaceType *interfaceType, IRWitnessTable *witnessTable)
@@ -1572,20 +1561,13 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
 
     if (context.isDifferentiableType((IRType*)typeInst))
         return true;
+    
     // Look for equivalent types.
-    for (auto type : context.differentiableValueTypeWitnessDictionary)
+    for (auto type : context.differentiableTypeWitnessDictionary)
     {
         if (isTypeEqual(type.key, (IRType*)typeInst))
         {
-            context.differentiableValueTypeWitnessDictionary[(IRType*)typeInst] = type.value;
-            return true;
-        }
-    }
-    for (auto type : context.differentiablePtrTypeWitnessDictionary)
-    {
-        if (isTypeEqual(type.key, (IRType*)typeInst))
-        {
-            context.differentiablePtrTypeWitnessDictionary[(IRType*)typeInst] = type.value;
+            context.differentiableTypeWitnessDictionary[(IRType*)typeInst] = type.value;
             return true;
         }
     }
