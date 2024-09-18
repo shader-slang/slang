@@ -1590,24 +1590,38 @@ namespace Slang
             //          float g(float y) { return f(y); }   // will call S::f() instead of ::f()
             //      }
             //  we will count the distance from the reference site to the declaration in the scope tree.
-            //  NOTE: DON'T do this for the generic function, because for the generic function compare, we only check the
-            //  generic parameter/arguments, not the function parameters/arguments. This could break the assumption
-            //  for this logic where we assume that all the candidates are valid.
-            //  This logic will be evaluated later when "Flavor" becomes "Func" or "Expr", because by then the type checks for
-            //  the candidate will be done.
-            if ((left->flavor != OverloadCandidate::Flavor::Generic && left->flavor != OverloadCandidate::Flavor::UnspecializedGeneric) ||
-                (right->flavor != OverloadCandidate::Flavor::Generic && right->flavor != OverloadCandidate::Flavor::UnspecializedGeneric))
+
+            //  NOTE: We CAN'T do this for the generic function, because generic lookup is little bit complicated.
+            //  It will go through multiple passes of candidates compare.
+            //  In the first pass, it will lookup all the generic candidates that matches the generic parameter only,
+            //  e.g., the following generic functions are totally different, but they will be selected as candidates
+            //  because the function name and the generic parameters are the same:
+            //  void func<let Z0 : uint, let Z1 : uint>(Z0 a, Z1 b);
+            //  void func<let Z0 : uint, let Z1 : uint>(Z0 a, Z1 b, Z0 c);
+            //  void func<let Z0 : uint, let Z1 : uint>(Z0 a, Z1 b, Z0 c, Z1 d);
+            //
+            //  So in this case, we should not consider the scope rank and overload rank at all, because there is only
+            //  one of above candidates is valid, and the rank calculation doesn't consider the correctness of the
+            //  candidates, so it could select the wrong candidate.
+            //
+            //  In the next pass, the lookup system will match the input parameters in those candidates to find out the valid
+            //  match, the "flavor" field will become "Func" or "Expr". So the rank calculation can be applied.
+            if (left->flavor == OverloadCandidate::Flavor::Generic ||
+                left->flavor == OverloadCandidate::Flavor::UnspecializedGeneric ||
+                right->flavor == OverloadCandidate::Flavor::Generic ||
+                right->flavor == OverloadCandidate::Flavor::UnspecializedGeneric)
             {
-                auto scopeRank = getScopeRank(left->item.declRef, right->item.declRef, this->m_outerScope);
-                if (scopeRank)
-                    return scopeRank;
+                return 0;
             }
+
+            auto scopeRank = getScopeRank(left->item.declRef, right->item.declRef, this->m_outerScope);
+            if (scopeRank)
+                return scopeRank;
 
             // If we reach here, we will attempt to use overload rank to break the ties.
             auto overloadRankDiff = getOverloadRank(right->item.declRef) - getOverloadRank(left->item.declRef);
             if (overloadRankDiff)
                 return overloadRankDiff;
-
         }
 
         return 0;
