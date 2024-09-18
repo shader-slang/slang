@@ -45,7 +45,7 @@ float3 infinitesimal(float3 x)
     return x - detach(x);
 }
 
-//CHK: note: checkpointing context of 20 bytes was generated for function: 'computeLoop'
+//CHK: note: checkpointing context of 20 bytes associated with function: 'computeLoop'
 [BackwardDifferentiable]
 [PreferRecompute]
 float3 computeLoop(float y)
@@ -53,10 +53,10 @@ float3 computeLoop(float y)
     //CHK: note: 4 bytes (float) used to checkpoint the following item:
     float w = 0;
 
-    //CHK: note: 12 bytes (vec3) used to checkpoint the following item:
+    //CHK: note: 12 bytes (Vector<float, 3> ) used to checkpoint the following item:
     float3 w3 = float3(0, 0, 0);
 
-    //CHK: note: 4 bytes (int) used for a loop counter here:
+    //CHK: note: 4 bytes (int32_t) used for a loop counter here:
     for (int i = 0; i < 8; i++)
     {
         float k = compute(i, y);

@@ -227,8 +227,9 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
     description.codeGenContext = codeGenContext;
     description.sourceWriter = &typeWriter;
 
-    GLSLSourceEmitter emitter(description);
+    CPPSourceEmitter emitter(description);
 
+    int nonEmptyStructs = 0;
     for (auto inst : irModule->getGlobalInsts())
     {
         IRStructType *structType = as<IRStructType>(inst);
@@ -250,6 +251,7 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
 
         auto func = checkpointDecoration->getSourceFunction();
         sink->diagnose(structType, Diagnostics::reportCheckpointIntermediates, func, structSize.size);
+        nonEmptyStructs++;
 
         for (auto field : structType->getFields())
         {
@@ -270,6 +272,9 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
                 typeWriter.getContent());
         }
     }
+
+    if (nonEmptyStructs == 0)
+        sink->diagnose(SourceLoc(), Diagnostics::reportCheckpointNone);
 }
 
 struct LinkingAndOptimizationOptions

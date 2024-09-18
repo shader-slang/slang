@@ -9,14 +9,14 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-//CHK: note: checkpointing context of 24 bytes was generated for function: 'test_simple_loop'
+//CHK: note: checkpointing context of 24 bytes associated with function: 'test_simple_loop'
 [Differentiable]
 float test_simple_loop(float y)
 {
-    //CHK: note: 20 bytes (float [5]) used to checkpoint the following item:
+    //CHK: note: 20 bytes (FixedArray<float, 5> ) used to checkpoint the following item:
     float t = y;
 
-    //CHK: note: 4 bytes (int) used for a loop counter here:
+    //CHK: note: 4 bytes (int32_t) used for a loop counter here:
     for (int i = 0; i < 3; i++)
     {
         t = t * t;

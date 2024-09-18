@@ -127,14 +127,14 @@ struct AddressInstEliminationContext
         // which will get cleaned up later into a `defaultConstruct`.
         auto value = getValue(builder, addr, call->sourceLoc);
         auto store = builder.emitStore(tempVar, value);
+
+        builder.setInsertAfter(call);
         auto load = builder.emitLoad(tempVar);
+        storeValue(builder, addr, load, call->sourceLoc);
+        use->set(tempVar);
 
         store->sourceLoc = call->sourceLoc;
         load->sourceLoc = call->sourceLoc;
-
-        builder.setInsertAfter(call);
-        storeValue(builder, addr, load, store->sourceLoc);
-        use->set(tempVar);
     }
 
     SlangResult eliminateAddressInstsImpl(

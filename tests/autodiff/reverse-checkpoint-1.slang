@@ -17,7 +17,7 @@ float g(float x)
     return log(x);
 }
 
-//CHK: note: checkpointing context of 4 bytes was generated for function: 'f'
+//CHK: note: checkpointing context of 4 bytes associated with function: 'f'
 [BackwardDifferentiable]
 float f(int p, float x)
 {

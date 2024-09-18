@@ -16,7 +16,7 @@ float g(float y)
     return result * result;
 }
 
-//CHK: note: checkpointing context of 4 bytes was generated for function: 'f'
+//CHK: note: checkpointing context of 4 bytes associated with function: 'f'
 [BackwardDifferentiable]
 float f(float x)
 {

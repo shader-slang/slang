@@ -91,8 +91,12 @@ struct DiffUnzipPass
                 IRInst* diffType = diffTypeContext.getDiffTypeFromPairType(builder, pairType);
                 if (as<IRPtrTypeBase>(primalParam->getFullType()))
                     diffType = builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
+
                 auto primalRef = builder->emitPrimalParamRef(primalParam);
                 auto diffRef = builder->emitDiffParamRef((IRType*)diffType, primalParam);
+                primalRef->sourceLoc = primalParam->sourceLoc;
+                diffRef->sourceLoc = primalParam->sourceLoc;
+
                 builder->markInstAsDifferential(diffRef, pairType->getValueType());
                 primalMap[primalParam] = primalRef;
                 diffMap[primalParam] = diffRef;
@@ -427,6 +431,7 @@ struct DiffUnzipPass
         {
             diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, callInst);
             diffBuilder->markInstAsDifferential(diffVal, primalType);
+            diffVal->sourceLoc = callInst->sourceLoc;
         }
         return InstPair(primalVal, diffVal);
     }
@@ -442,6 +447,8 @@ struct DiffUnzipPass
         auto diffPtr = lookupDiffInst(mixedLoad->getPtr());
         auto primalVal = primalBuilder->emitLoad(primalPtr);
         auto diffVal = diffBuilder->emitLoad(diffPtr);
+        primalVal->sourceLoc = mixedLoad->sourceLoc;
+        diffVal->sourceLoc = mixedLoad->sourceLoc;
         diffBuilder->markInstAsDifferential(diffVal, primalVal->getFullType());
         return InstPair(primalVal, diffVal);
     }
