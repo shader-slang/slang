@@ -387,14 +387,15 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                             use->set(builder.getVoidValue());
                             continue;
                         }
+
+                        IRBuilderSourceLocRAII sourceLocationScope(&builder, use->getUser()->sourceLoc);
+
                         builder.setInsertBefore(use->getUser());
                         auto valType = cast<IRPtrTypeBase>(inst->getFullType())->getValueType();
                         auto val = builder.emitFieldExtract(
                             valType,
                             intermediateVar,
                             structKeyDecor->getStructKey());
-
-                        val->sourceLoc = use->getUser()->sourceLoc;
 
                         if (use->getUser()->getOp() == kIROp_Load)
                         {
@@ -404,9 +405,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                         else
                         {
                             auto tempVar = builder.emitVar(valType);
-                            auto store = builder.emitStore(tempVar, val);
-                            tempVar->sourceLoc = val->sourceLoc;
-                            store->sourceLoc = val->sourceLoc;
+                            builder.emitStore(tempVar, val);
                             use->set(tempVar);
                         }
                     }
@@ -429,9 +428,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                             inst->getFullType(),
                             intermediateVar,
                             structKeyDecor->getStructKey());
-
                         val->sourceLoc = user->sourceLoc;
-
                         builder.replaceOperand(iuse, val);
                     }
                 }

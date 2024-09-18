@@ -384,7 +384,7 @@ struct DiffUnzipPass
                     auto storeInst = cast<IRStore>(storeUse->getUser());
                     auto storedVal = storeInst->getVal();
 
-                    auto storeTemp = primalBuilder->emitStore(tempPrimalVar, storedVal);
+                    primalBuilder->emitStore(tempPrimalVar, storedVal);
 
                     diffArgs.add(tempPrimalVar);
                 }
@@ -409,7 +409,6 @@ struct DiffUnzipPass
             resultType,
             newFwdCallee,
             diffArgs);
-
         diffBuilder->markInstAsDifferential(callInst, primalType);
 
         if (intermediateVar)
@@ -465,7 +464,7 @@ struct DiffUnzipPass
         auto diffType = (IRType*) diffTypeContext.getDifferentialForType(primalBuilder, primalType);
         auto primalVar = primalBuilder->emitVar(primalType);
         auto diffVar = diffBuilder->emitVar(diffType);
-        diffBuilder->markInstAsDifferential(diffVar, diffBuilder->getPtrType(primalType));        
+        diffBuilder->markInstAsDifferential(diffVar, diffBuilder->getPtrType(primalType));
         return InstPair(primalVar, diffVar);
     }
 
@@ -491,7 +490,6 @@ struct DiffUnzipPass
             diffBuilder->markInstAsDifferential(pairVal, primalType);
 
             auto returnInst = diffBuilder->emitReturn(pairVal);
-
             diffBuilder->markInstAsDifferential(returnInst, primalType);
 
             return InstPair(primalBranch, returnInst);
@@ -504,7 +502,6 @@ struct DiffUnzipPass
                 primalBranch, mixedReturn->getVal());
 
             auto returnInst = diffBuilder->emitReturn();
-
             diffBuilder->markInstAsDifferential(returnInst, nullptr);
             return InstPair(primalBranch, returnInst);
         }
@@ -564,7 +561,6 @@ struct DiffUnzipPass
 
     InstPair splitControlFlow(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* branchInst)
     {
-        // TODO: put the instructions here, then assign source loc at the end
         switch (branchInst->getOp())
         {
         case kIROp_unconditionalBranch:
@@ -583,17 +579,15 @@ struct DiffUnzipPass
                         primalArgs.add(uncondBranchInst->getArg(ii));
                 }
                     
-                auto primalBranch = primalBuilder->emitBranch(
-                    as<IRBlock>(primalMap[targetBlock]),
-                    primalArgs.getCount(),
-                    primalArgs.getBuffer());
-
-                auto diffBranch = diffBuilder->emitBranch(
-                    as<IRBlock>(diffMap[targetBlock]),
-                    diffArgs.getCount(),
-                    diffArgs.getBuffer());
-
-                return InstPair(primalBranch, diffBranch);
+                return InstPair(
+                    primalBuilder->emitBranch(
+                        as<IRBlock>(primalMap[targetBlock]),
+                        primalArgs.getCount(),
+                        primalArgs.getBuffer()),
+                    diffBuilder->emitBranch(
+                        as<IRBlock>(diffMap[targetBlock]),
+                        diffArgs.getCount(),
+                        diffArgs.getBuffer()));
             }
         
         case kIROp_conditionalBranch:
