@@ -251,7 +251,7 @@ static void _reduceLength(Index startIndex, const UnownedStringSlice& prefix, St
     ioBuf = buf;
 }
 
-void sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb)
+static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
     if (!sourceFile)
@@ -461,7 +461,7 @@ static void formatDiagnostic(
 
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.loc.isValid())
     {
-        sourceLocationNoteDiagnostic(sink, sourceView, sourceLoc, sb);
+        _sourceLocationNoteDiagnostic(sink, sourceView, sourceLoc, sb);
     }
 
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))

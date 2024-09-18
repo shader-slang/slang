@@ -360,9 +360,6 @@ protected:
     MemoryArena m_arena;
 };
 
-// Display source location
-void sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb);
-
 }
 
 #endif

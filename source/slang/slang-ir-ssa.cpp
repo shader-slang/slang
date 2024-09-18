@@ -431,7 +431,6 @@ PhiInfo* addPhi(
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
     context->phiInfos.add(phi, phiInfo);
 
-    phi->sourceLoc = var->sourceLoc;
     phiInfo->phi = phi;
     phiInfo->var = var;
 
@@ -678,6 +677,8 @@ IRInst* readVarRec(
     SSABlockInfo*           blockInfo,
     IRVar*                  var)
 {
+    IRBuilderSourceLocRAII sourceLocationScope(&context->builder, var->sourceLoc);
+
     IRInst* val = nullptr;
     if (!blockInfo->isSealed)
     {
@@ -985,8 +986,7 @@ void IRBuilder::insertBlockAlongEdge(
     // The edge block should branch (unconditionally)
     // to the successor block.
     builder.setInsertInto(edgeBlock);
-    auto unconditionalBranch = builder.emitBranch(succ);
-    unconditionalBranch->sourceLoc = edgeUse->getUser()->sourceLoc;
+    builder.emitBranch(succ);
 
     // Insert the new block into the block list
     // for the function.

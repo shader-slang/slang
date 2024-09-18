@@ -526,6 +526,7 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     // we will now introduce a breakable region for each iteration.
 
     IRBuilder builder(module);
+    IRBuilderSourceLocRAII sourceLocationScope(&builder, loopInst->sourceLoc);
    
     auto targetBlock = loopInst->getTargetBlock();
 
@@ -544,15 +545,13 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     moveParams(innerBreakableRegionHeader, targetBlock);
 
     builder.setInsertInto(innerBreakableRegionHeader);
-    auto innerLoop = builder.emitLoop(targetBlock, innerBreakableRegionBreakBlock, targetBlock);
-    innerLoop->sourceLoc = loopInst->sourceLoc;
+    builder.emitLoop(targetBlock, innerBreakableRegionBreakBlock, targetBlock);
 
     continueBlock->replaceUsesWith(innerBreakableRegionBreakBlock);
     
     builder.setInsertInto(innerBreakableRegionBreakBlock);
     moveParams(innerBreakableRegionBreakBlock, continueBlock);
-    auto unconditionalBranch = builder.emitBranch(continueBlock);
-    unconditionalBranch->sourceLoc = loopInst->sourceLoc;
+    builder.emitBranch(continueBlock);
 
     // If the original loop can be executed up to N times, the new loop may be executed
     // upto N+1 times (although most insts are skipped in the last traversal)
