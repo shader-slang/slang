@@ -48,14 +48,13 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                 if (initialized)
                     continue;
 
+                IRBuilderSourceLocRAII sourceLocationScope(&builder, inst->sourceLoc);
+                
                 builder.setInsertAfter(inst);
-
-                auto valueType = as<IRPtrTypeBase>(inst->getFullType())->getValueType();
-                auto construct = builder.emitDefaultConstruct(valueType);
-                auto store = builder.emitStore(inst, construct);
-
-                construct->sourceLoc = inst->sourceLoc;
-                store->sourceLoc = inst->sourceLoc;
+                builder.emitStore(
+                    inst,
+                    builder.emitDefaultConstruct(
+                        as<IRPtrTypeBase>(inst->getFullType())->getValueType()));
             }
         }
     }

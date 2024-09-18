@@ -53,7 +53,7 @@ struct AddressInstEliminationContext
                 break;
             }
         }
-    endLoop:
+    endLoop:;
         auto lastAddr = accessChain.getLast();
         accessChain.removeLast();
         accessChain.reverse();

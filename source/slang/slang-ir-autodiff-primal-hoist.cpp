@@ -3,8 +3,9 @@
 #include "slang-ir-autodiff-region.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-util.h"
-#include "../core/slang-func-ptr.h"
+#include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "../core/slang-func-ptr.h"
 
 namespace Slang
 {
@@ -1102,17 +1103,14 @@ IRVar* emitIndexedLocalVar(
     SLANG_RELEASE_ASSERT(!as<IRTypeType>(baseType));
 
     IRBuilder varBuilder(varBlock->getModule());
+    IRBuilderSourceLocRAII sourceLocationScope(&varBuilder, location);
+
     varBuilder.setInsertBefore(varBlock->getFirstOrdinaryInst());
 
     IRType* varType = getTypeForLocalStorage(&varBuilder, baseType, defBlockIndices);
 
     auto var = varBuilder.emitVar(varType);
-    auto defaultVal = varBuilder.emitDefaultConstruct(varType);
-    auto storeInit = varBuilder.emitStore(var, defaultVal);
-
-    var->sourceLoc = location;
-    defaultVal->sourceLoc = location;
-    storeInit->sourceLoc = location;
+    varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
 
     return var;
 }
@@ -1750,6 +1748,8 @@ static IRBlock* getUpdateBlock(IRLoop* loop)
 void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalCountParam, IRInst*& diffCountParam)
 {
     IRBuilder builder(primalLoop);
+    IRBuilderSourceLocRAII sourceLocationScope(&builder, primalLoop->sourceLoc);
+
     primalCountParam = nullptr;
 
     // Grab first primal block.
@@ -1760,7 +1760,6 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
             primalInitBlock->getTerminator())->getTargetBlock();
         builder.setInsertBefore(primalInitBlock->getTerminator());
 
-        SourceLoc loc = primalLoop->sourceLoc;
         auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
             &builder,
             primalInitBlock,
@@ -1776,7 +1775,6 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
         builder.addLoopCounterDecoration(primalCountParam);
         builder.addNameHintDecoration(primalCountParam, UnownedStringSlice("_pc"));
         builder.markInstAsPrimal(primalCountParam);
-        primalCountParam->sourceLoc = loc;
 
         IRBlock* primalUpdateBlock = getUpdateBlock(primalLoop);
         IRInst* terminator = primalUpdateBlock->getTerminator();
@@ -1828,7 +1826,6 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
             diffCountParam,
             builder.getIntValue(builder.getIntType(), 1));
         builder.markInstAsPrimal(decCounterVal);
-        // TODO: sourceLoc for _dc here?
 
         auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, diffUpdateBlock, terminator, decCounterVal);
 
