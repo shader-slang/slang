@@ -8713,7 +8713,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(wgsl)]
 void __wgsl_frexp(T x, out T fract, out int exp)
 {
-    __intrinsic_asm "{ var s = frexp($0); $1 = s.fract; $2 = s.exp; }";
+    __intrinsic_asm "{ var s = frexp($0); (*($1)) = s.fract; (*($2)) = s.exp; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -8730,9 +8730,22 @@ vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
     case spirv: return spirv_asm {
         result:$$vector<T, N> = OpExtInst glsl450 Frexp $x &exp
     };
+    case wgsl:
+        vector<T,N> fract;
+        __wgsl_frexp<T>(x, fract, exp);
+        return fract;
     default:
         VECTOR_MAP_BINARY(T, N, frexp, x, exp);
     }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[ForceInline]
+[require(wgsl)]
+void __wgsl_frexp(vector<T, N> x, out vector<T, N> fract, out vector<int, N> exp)
+{
+    __intrinsic_asm "{ var s = frexp($0); (*($1)) = s.fract; (*($2)) = s.exp; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
@@ -11130,7 +11143,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(wgsl)]
 void __wgsl_modf(T x, out T fract, out T whole)
 {
-    __intrinsic_asm "{ var s = modf($0); $1 = s.fract; $2 = s.whole; }";
+    __intrinsic_asm "{ var s = modf($0); (*($1)) = s.fract; (*($2)) = s.whole; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -11147,9 +11160,22 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
     case spirv: return spirv_asm {
         result:$$vector<T,N> = OpExtInst glsl450 Modf $x &ip
     };
+    case wgsl:
+        vector<T,N> fract;
+        __wgsl_modf<T>(x, fract, ip);
+        return fract;
     default:
         VECTOR_MAP_BINARY(T, N, modf, x, ip);
     }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[ForceInline]
+[require(wgsl)]
+void __wgsl_modf(vector<T,N> x, out vector<T,N> fract, out vector<T,N> whole)
+{
+    __intrinsic_asm "{ var s = modf($0); (*($1)) = s.fract; (*($2)) = s.whole; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
