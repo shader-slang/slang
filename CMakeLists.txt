@@ -82,6 +82,7 @@ auto_option(
     "Enable Aftermath in GFX, and add aftermath crash example to project"
 )
 advanced_option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support" OFF)
+advanced_option(SLANG_ENABLE_SLANG_RHI "Use slang-rhi as dependency" ON)
 
 option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
@@ -662,26 +663,28 @@ if(SLANG_ENABLE_TESTS)
             REQUIRED_BY slang-test
             FOLDER test/tools
         )
-        slang_add_target(
-            tools/render-test
-            MODULE
-            EXCLUDE_FROM_ALL
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-            USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE
-                core
-                compiler-core
-                slang
-                slang-rhi
-                platform
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
-                $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
-            OUTPUT_NAME render-test-tool
-            REQUIRED_BY slang-test
-            FOLDER test/tools
-        )
+        if(SLANG_ENABLE_SLANG_RHI)
+            slang_add_target(
+                tools/render-test
+                MODULE
+                EXCLUDE_FROM_ALL
+                EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+                USE_FEWER_WARNINGS
+                LINK_WITH_PRIVATE
+                    core
+                    compiler-core
+                    slang
+                    slang-rhi
+                    platform
+                    $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+                EXTRA_COMPILE_DEFINITIONS_PRIVATE
+                    $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
+                    $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
+                OUTPUT_NAME render-test-tool
+                REQUIRED_BY slang-test
+                FOLDER test/tools
+            )
+        endif()
     endif()
     slang_add_target(
         tools/slang-unit-test

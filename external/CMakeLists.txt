@@ -78,14 +78,16 @@ endif()
 add_library(imgui INTERFACE)
 target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
 
-# slang-rhi
-set(SLANG_RHI_SLANG_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
-set(SLANG_RHI_BUILD_TESTS OFF)
-if(SLANG_ENABLE_DX_ON_VK)
-    set(SLANG_RHI_HAS_D3D12 ON)
+if(SLANG_ENABLE_SLANG_RHI)
+    # slang-rhi
+    set(SLANG_RHI_SLANG_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+    set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
+    set(SLANG_RHI_BUILD_TESTS OFF)
+    if(SLANG_ENABLE_DX_ON_VK)
+        set(SLANG_RHI_HAS_D3D12 ON)
+    endif()
+    add_subdirectory(slang-rhi)
 endif()
-add_subdirectory(slang-rhi)
 
 # Tidy things up:
 
