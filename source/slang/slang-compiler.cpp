@@ -2451,11 +2451,15 @@ namespace Slang
         return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DumpIr);
     }
 
+    bool CodeGenContext::shouldReportCheckpointIntermediates()
+    {
+        return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::ReportCheckpointIntermediates);
+    }
+
     bool CodeGenContext::shouldDumpIntermediates()
     {
         return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DumpIntermediates);
     }
-
 
     bool CodeGenContext::shouldTrackLiveness()
     {
