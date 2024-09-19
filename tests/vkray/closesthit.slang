@@ -5,6 +5,7 @@
 struct ReflectionRay
 {
     float4 color;
+    float3 dummyOut;
 };
 
 StructuredBuffer<float4> colors;
@@ -17,8 +18,7 @@ cbuffer ShaderRecord
 
 void main(
    BuiltInTriangleIntersectionAttributes attributes,
-   in out ReflectionRay                  ioPayload,
-   out float3                            dummyOut)
+   in out ReflectionRay                  ioPayload)
 {
    uint materialID = (InstanceIndex() << 1)
       + InstanceID()
@@ -33,19 +33,18 @@ void main(
    ioPayload.color = color;
 
    uint index = 0U;
-   dummyOut = HitTriangleVertexPosition(index);
+   ioPayload.dummyOut = HitTriangleVertexPosition(index);
 
    index = 1U;
-   dummyOut += HitTriangleVertexPosition(index);
+   ioPayload.dummyOut += HitTriangleVertexPosition(index);
 
    index = 2U;
-   dummyOut += HitTriangleVertexPosition(index);
+   ioPayload.dummyOut += HitTriangleVertexPosition(index);
 }
 
 // CHECK: OpCapability RayTracing
 // CHECK: OpCapability RayTracingPositionFetchKHR
-// orig: OpEntryPoint ClosestHit{{NV|KHR}} %main "main"
-// CHECK: OpEntryPoint ClosestHit{{NV|KHR}}
+// CHECK: OpEntryPoint ClosestHit{{NV|KHR}} %main "main"
 // CHECK-DAG: OpDecorate %[[INSTANCE_ID:[A-Za-z0-9_]+]] BuiltIn InstanceId
 // CHECK-DAG: OpDecorate %[[INSTANCE_INDEX:[A-Za-z0-9_]+]] BuiltIn InstanceCustomIndex{{NV|KHR}}
 // CHECK-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
