@@ -137,9 +137,8 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt tests/vkray/closesthit || cat tests/vkray/closesthit.*actual* ; echo 'END ACTUAL DUMP'
+              -expected-failure-list tests/expected-failure-record-replay-tests.txt
           fi
-
       - name: Test Slang via glsl
         if: ${{matrix.full-gpu-tests}}
         run: |
