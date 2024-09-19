@@ -1060,6 +1060,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// Hint that the result from a call to the decorated function should be recomputed in backward prop function.
     INST(PreferRecomputeDecoration, PreferRecomputeDecoration, 0, 0)
 
+        /// Hint that a struct is used for reverse mode checkpointing
+    INST(CheckpointIntermediateDecoration, CheckpointIntermediateDecoration, 1, 0)
+
     INST_RANGE(CheckpointHintDecoration, PreferCheckpointDecoration, PreferRecomputeDecoration)
 
         /// Marks a function whose return value is never dynamic uniform.

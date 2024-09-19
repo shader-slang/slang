@@ -2728,6 +2728,7 @@ namespace Slang
 
         bool shouldValidateIR();
         bool shouldDumpIR();
+        bool shouldReportCheckpointIntermediates();
 
         bool shouldTrackLiveness();
 

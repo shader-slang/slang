@@ -3523,6 +3523,7 @@ namespace Slang
         auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
             this, kIROp_MakeDifferentialPair, type, 2, args);
         addInst(inst);
+        inst->sourceLoc = primal->sourceLoc;
         return inst;
     }
 
@@ -3627,6 +3628,7 @@ namespace Slang
         auto inst = createInstWithTrailingArgs<IRMakeDifferentialPair>(
             this, kIROp_MakeDifferentialPairUserCode, type, 2, args);
         addInst(inst);
+        inst->sourceLoc = primal->sourceLoc;
         return inst;
     }
 

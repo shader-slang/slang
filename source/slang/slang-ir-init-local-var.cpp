@@ -47,6 +47,9 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
             breakLabel:;
                 if (initialized)
                     continue;
+
+                IRBuilderSourceLocRAII sourceLocationScope(&builder, inst->sourceLoc);
+                
                 builder.setInsertAfter(inst);
                 builder.emitStore(
                     inst,

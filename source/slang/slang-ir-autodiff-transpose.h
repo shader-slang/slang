@@ -609,6 +609,8 @@ struct DiffTransposePass
                 auto nextInst = inst->getNextInst();
                 if (auto varInst = as<IRVar>(inst))
                 {
+                    IRBuilderSourceLocRAII sourceLocationScope(&builder, varInst->sourceLoc);
+
                     if (isDifferentialInst(varInst) && tryGetPrimalTypeFromDiffInst(varInst))
                     {
                         if (auto ptrPrimalType = as<IRPtrTypeBase>(tryGetPrimalTypeFromDiffInst(varInst)))
@@ -692,7 +694,11 @@ struct DiffTransposePass
         SLANG_ASSERT(lastRevBlock->getTerminator() == nullptr);
 
         builder.setInsertInto(lastRevBlock);
-        builder.emitReturn();
+
+        {
+            IRBuilderSourceLocRAII sourceLocationScope(&builder, revDiffFunc->sourceLoc);
+            builder.emitReturn();
+        }
 
         // Remove fwd-mode blocks.
         for (auto block : workList)
@@ -703,6 +709,8 @@ struct DiffTransposePass
 
     IRInst* extractAccumulatorVarGradient(IRBuilder* builder, IRInst* fwdInst)
     {
+        IRBuilderSourceLocRAII sourceLocationScope(builder, fwdInst->sourceLoc);
+
         if (auto accVar = getOrCreateAccumulatorVar(fwdInst))
         {
             auto gradValue = builder->emitLoad(accVar);
@@ -731,6 +739,7 @@ struct DiffTransposePass
             return revAccumulatorVarMap[fwdInst];
         
         IRBuilder tempVarBuilder(autodiffContext->moduleInst->getModule());
+        IRBuilderSourceLocRAII sourceLocationSCope(&tempVarBuilder, fwdInst->sourceLoc);
         
         IRBlock* firstDiffBlock = firstRevDiffBlockMap[as<IRFunc>(fwdInst->getParent()->getParent())];
 
@@ -785,6 +794,8 @@ struct DiffTransposePass
             for (UIndex ii = 0; ii < branchInst->getArgCount(); ii++)
             {
                 auto arg = branchInst->getArg(ii);
+
+                IRBuilderSourceLocRAII sourceLocationScope(&builder, arg->sourceLoc);
                 if (isDifferentialInst(arg))
                 {
                     // If the arg is a differential, emit a parameter
@@ -885,6 +896,8 @@ struct DiffTransposePass
         List<IRInst*> phiParamRevGradInsts;
         for (IRParam* param = fwdBlock->getFirstParam(); param; param = param->getNextParam())
         {
+            IRBuilderSourceLocRAII sourceLocationScope(&builder, param->sourceLoc);
+
             if (isDifferentialInst(param))
             {
                 // This param might be used outside this block.
@@ -949,6 +962,8 @@ struct DiffTransposePass
 
             if (auto accVar = getOrCreateAccumulatorVar(externInst))
             {
+                IRBuilderSourceLocRAII sourceLocationScope(&builder, externInst->sourceLoc);
+
                 // Accumulate all gradients, including our accumulator variable,
                 // into one inst.
                 //
@@ -1050,6 +1065,7 @@ struct DiffTransposePass
         
         // Emit the aggregate of all the gradients here. 
         // This will form the total derivative for this inst.
+        IRBuilderSourceLocRAII sourceLocationScope(builder, inst->sourceLoc);
         auto revValue = emitAggregateValue(builder, primalType, gradients);
 
         auto transposeResult = transposeInst(builder, inst, revValue);
@@ -2739,7 +2755,6 @@ struct DiffTransposePass
                 gradient.revGradInst,
                 gradient.fwdGradInst
             ));
-
         }
 
         for (auto pair : bucketedGradients)

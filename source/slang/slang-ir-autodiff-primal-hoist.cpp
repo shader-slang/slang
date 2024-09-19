@@ -3,8 +3,9 @@
 #include "slang-ir-autodiff-region.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-util.h"
-#include "../core/slang-func-ptr.h"
+#include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "../core/slang-func-ptr.h"
 
 namespace Slang
 {
@@ -1102,7 +1103,8 @@ IRType* getTypeForLocalStorage(
 IRVar* emitIndexedLocalVar(
     IRBlock* varBlock,
     IRType* baseType,
-    const List<IndexTrackingInfo>& defBlockIndices)
+    const List<IndexTrackingInfo>& defBlockIndices,
+    SourceLoc location)
 {
     // Cannot store pointers. Case should have been handled by now.
     SLANG_RELEASE_ASSERT(!as<IRPtrTypeBase>(baseType));
@@ -1111,6 +1113,8 @@ IRVar* emitIndexedLocalVar(
     SLANG_RELEASE_ASSERT(!as<IRTypeType>(baseType));
 
     IRBuilder varBuilder(varBlock->getModule());
+    IRBuilderSourceLocRAII sourceLocationScope(&varBuilder, location);
+
     varBuilder.setInsertBefore(varBlock->getFirstOrdinaryInst());
 
     IRType* varType = getTypeForLocalStorage(&varBuilder, baseType, defBlockIndices);
@@ -1189,9 +1193,14 @@ IRVar* storeIndexedValue(
     IRInst* instToStore,
     const List<IndexTrackingInfo>& defBlockIndices)
 {
-    IRVar* localVar = emitIndexedLocalVar(defaultVarBlock, instToStore->getDataType(), defBlockIndices);
+    IRVar* localVar = emitIndexedLocalVar(defaultVarBlock,
+        instToStore->getDataType(),
+        defBlockIndices,
+        instToStore->sourceLoc);
 
-    IRInst* addr = emitIndexedStoreAddressForVar(builder, localVar, defBlockIndices);
+    IRInst* addr = emitIndexedStoreAddressForVar(builder,
+        localVar,
+        defBlockIndices);
 
     builder->emitStore(addr, instToStore);
 
@@ -1584,12 +1593,16 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 // region, that means there's no need to allocate a fully indexed var.
                 // 
                 defBlockIndices = maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
-
-                IRVar* localVar = storeIndexedValue(
-                    &builder,
-                    varBlock,
-                    builder.emitLoad(varToStore),
-                    defBlockIndices);
+                    
+                IRVar* localVar = nullptr;
+                {
+                    IRBuilderSourceLocRAII sourceLocationScope(&builder, varToStore->sourceLoc);
+                    localVar = storeIndexedValue(
+                        &builder,
+                        varBlock,
+                        builder.emitLoad(varToStore),
+                        defBlockIndices);
+                }
 
                 for (auto use : outOfScopeUses)
                 {
@@ -1636,6 +1649,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
             }
             else
             {
+                IRBuilderSourceLocRAII sourceLocationScope(&builder, instToStore->sourceLoc);
+                
                 // Handle the special case of loop counters.
                 // The only case where there will be a reference of primal loop counter from rev blocks
                 // is the start of a loop in the reverse code. Since loop counters are not considered a
@@ -1653,6 +1668,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
                 setInsertAfterOrdinaryInst(&builder, instToStore);
                 auto localVar = storeIndexedValue(&builder, varBlock, instToStore, defBlockIndices);
+                if (isLoopCounter)
+                    builder.addLoopCounterDecoration(localVar);
 
                 for (auto use : outOfScopeUses)
                 {
@@ -1738,6 +1755,8 @@ static IRBlock* getUpdateBlock(IRLoop* loop)
 void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalCountParam, IRInst*& diffCountParam)
 {
     IRBuilder builder(primalLoop);
+    IRBuilderSourceLocRAII sourceLocationScope(&builder, primalLoop->sourceLoc);
+
     primalCountParam = nullptr;
 
     // Grab first primal block.
@@ -1909,8 +1928,7 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     // Legalize the primal inst accesses by introducing local variables / arrays and emitting
     // necessary load/store logic.
     //
-    primalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
-    return primalsInfo;
+    return ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
 }
 
 void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)
