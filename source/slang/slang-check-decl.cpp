@@ -116,6 +116,8 @@ namespace Slang
 
         void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
 
+        void validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type);
+
         void visitGenericDecl(GenericDecl* genericDecl);
 
         void visitTypeDefDecl(TypeDefDecl* decl);
@@ -2487,6 +2489,69 @@ namespace Slang
         return true;
     }
 
+    void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type)
+    {
+        // Validate that the sub type of a constraint is in valid form.
+        //
+        if (auto subDeclRef = isDeclRefTypeOf<Decl>(type.type))
+        {
+            if (subDeclRef.getDecl()->parentDecl == decl->parentDecl)
+            {
+                // OK, sub type is one of the generic parameter type.
+                return;
+            }
+            if (as<GenericDecl>(decl->parentDecl))
+            {
+                // If the constraint is in a generic decl, then the sub type must be dependent on at least one
+                // of the generic type parameters defined in the same generic decl.
+                // For example, it is invalid to define a constraint like `void foo<T>() where int : float` since
+                // `int` isn't dependent on any generic type parameter.
+                auto dependentGeneric = getShared()->getDependentGenericParent(subDeclRef);
+                if (dependentGeneric.getDecl() != decl->parentDecl)
+                {
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                    return;
+                }
+            }
+            else if (as<AssocTypeDecl>(decl->parentDecl))
+            {
+                // If the constraint is on an associated type, then it should either be the associated type itself,
+                // or a associated type of the associated type.
+                // For example,
+                // ```
+                // interface IFoo {
+                //    associatedtype T
+                //        where T : IFoo  // OK, constraint is on the associatedtype T itself.
+                //        where T.T == X; // OK, constraint is on the associated type of T.
+                //        where int == X; // Error, int is not a valid left hand side of a constraint.
+                //  }
+                // ```
+                auto lookupDeclRef = as<LookupDeclRef>(subDeclRef.declRefBase);
+                if (!lookupDeclRef)
+                {
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                    return;
+                }
+
+                // We allow `associatedtype T where This.T : ...`.
+                // In this case, the left hand side will be in the form of
+                // LookupDeclRef(ThisType, T). i.e. lookupDeclRef->getDecl() == T.
+                //
+                if (lookupDeclRef->getDecl()->parentDecl == decl->parentDecl ||
+                    lookupDeclRef->getDecl() == decl->parentDecl)
+                    return;
+                auto baseType = as<Type>(lookupDeclRef->getLookupSource());
+                if (!baseType)
+                {
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                    return;
+                }
+                type.type = baseType;
+                validateGenericConstraintSubType(decl, type);
+            }
+        }
+    }
+
     void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
     {
         // TODO: are there any other validations we can do at this point?
@@ -2501,6 +2566,12 @@ namespace Slang
             decl->sub = TranslateTypeNodeForced(decl->sub);
         if (!decl->sup.type)
             decl->sup = TranslateTypeNodeForced(decl->sup);
+
+        if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+        {
+            validateGenericConstraintSubType(decl, decl->sub);
+        }
+
         if (!decl->isEqualityConstraint && !isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sub.type))
         {
             getSink()->diagnose(decl->sup.exp, Diagnostics::invalidTypeForConstraint, decl->sup);
