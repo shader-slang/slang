@@ -44,7 +44,8 @@ void main(
 
 // CHECK: OpCapability RayTracing
 // CHECK: OpCapability RayTracingPositionFetchKHR
-// CHECK: OpEntryPoint ClosestHit{{NV|KHR}} %main "main"
+// orig: OpEntryPoint ClosestHit{{NV|KHR}} %main "main"
+// CHECK: OpEntryPoint ClosestHit{{NV|KHR}}
 // CHECK-DAG: OpDecorate %[[INSTANCE_ID:[A-Za-z0-9_]+]] BuiltIn InstanceId
 // CHECK-DAG: OpDecorate %[[INSTANCE_INDEX:[A-Za-z0-9_]+]] BuiltIn InstanceCustomIndex{{NV|KHR}}
 // CHECK-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId

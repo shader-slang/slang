@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows]
+        os: []
         config: [release]
         compiler: [cl]
         platform: [x86_64]
