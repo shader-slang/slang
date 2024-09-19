@@ -474,6 +474,137 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         m_writer->emit(");\n");
         return true;
     }
+    case kIROp_AtomicLoad:
+    {
+        emitInstResultDecl(inst);
+        emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return true;
+    }
+    case kIROp_AtomicStore:
+    {
+        emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(" = ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return true;
+    }
+    case kIROp_AtomicExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicExch(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicCompareExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicCAS(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicAdd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicSub:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", -(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit("));\n");
+        return true;
+    }
+    case kIROp_AtomicAnd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAnd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicOr:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicOr(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicXor:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicXor(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMin:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicMin(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMax:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicMax(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicInc:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicInc(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicDec:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicDec(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
     default:
         return false;
     }

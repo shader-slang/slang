@@ -28,6 +28,7 @@ public:
     virtual bool tryEmitInstExprImpl(
         IRInst* inst, const EmitOpInfo& inOuterPrec
     ) SLANG_OVERRIDE;
+    virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSwitchCaseSelectorsImpl(
         IRBasicType *const switchCondition,
         const SwitchRegion::Case *const currentCase,

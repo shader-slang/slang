@@ -7,11 +7,11 @@ Status
 
 Author: Yong He
 
-Status: Design Discussion.
+Status: Implementation in-progress.
 
 Implementation: N/A
 
-Reviewed by: N/A
+Reviewed by: Theresa Foley, Jay Kwak
 
 Background
 ----------

@@ -1660,6 +1660,12 @@ struct SPIRVEmitContext
                     SpvLiteralInteger::from32(stride));
                 return arrayType;
             }
+        case kIROp_AtomicType:
+            {
+                auto result = ensureInst(as<IRAtomicType>(inst)->getElementType());
+                registerInst(inst, result);
+                return result;
+            }
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
@@ -2860,6 +2866,109 @@ struct SPIRVEmitContext
         return (isSpirv16OrLater() || m_useDemoteToHelperInvocationExtension);
     }
 
+    SpvInst* emitMemorySemanticMask(IRInst* inst)
+    {
+        IRBuilder builder(inst);
+        auto memoryOrder = (IRMemoryOrder)getIntVal(inst);
+        switch (memoryOrder)
+        {
+        case kIRMemoryOrder_Relaxed:
+            return emitIntConstant(IRIntegerValue{ SpvMemorySemanticsMaskNone }, builder.getUIntType());
+        case kIRMemoryOrder_SeqCst:
+            return emitIntConstant(IRIntegerValue{ SpvMemorySemanticsSequentiallyConsistentMask }, builder.getUIntType());
+        default:
+            SLANG_UNEXPECTED("unhandled memory order");
+            UNREACHABLE_RETURN(nullptr);
+        }
+    }
+
+    SpvOp getSpvAtomicOp(IRInst* atomicInst, bool& outNegateOperand)
+    {
+        auto typeSelect = [&](SpvOp sop, SpvOp uop, SpvOp fop)
+            {
+                auto scalarType = getVectorElementType(atomicInst->getDataType());
+                if (isIntegralType(scalarType))
+                {
+                    auto intInfo = getIntTypeInfo(scalarType);
+                    if (intInfo.isSigned)
+                        return sop;
+                    return uop;
+                }
+                return fop;
+            };
+        outNegateOperand = false;
+        switch (atomicInst->getOp())
+        {
+        case kIROp_AtomicAdd:
+            return typeSelect(SpvOpAtomicIAdd, SpvOpAtomicIAdd, SpvOpAtomicFAddEXT);
+        case kIROp_AtomicSub:
+            if (isFloatingType(getVectorElementType(atomicInst->getDataType())))
+                outNegateOperand = true;
+            return typeSelect(SpvOpAtomicISub, SpvOpAtomicISub, SpvOpAtomicFAddEXT);
+        case kIROp_AtomicMin:
+            return typeSelect(SpvOpAtomicSMin, SpvOpAtomicUMin, SpvOpAtomicFMinEXT);
+        case kIROp_AtomicMax:
+            return typeSelect(SpvOpAtomicSMax, SpvOpAtomicUMax, SpvOpAtomicFMaxEXT);
+        case kIROp_AtomicAnd:
+            return SpvOpAtomicAnd;
+        case kIROp_AtomicOr:
+            return SpvOpAtomicOr;
+        case kIROp_AtomicXor:
+            return SpvOpAtomicXor;
+        default:
+            SLANG_UNEXPECTED("unhandled atomic op");
+            UNREACHABLE_RETURN(SpvOpNop);
+        }
+    }
+
+    void ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
+    {
+        switch (op)
+        {
+        case SpvOpAtomicFAddEXT:
+        {
+            auto typeOp = getVectorElementType(atomicInst->getDataType())->getOp();
+            switch (typeOp)
+            {
+            case kIROp_FloatType:
+                ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float_add"));
+                requireSPIRVCapability(SpvCapabilityAtomicFloat32AddEXT);
+                break;
+            case kIROp_DoubleType:
+                ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float_add"));
+                requireSPIRVCapability(SpvCapabilityAtomicFloat64AddEXT);
+                break;
+            case kIROp_HalfType:
+                ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float16_add"));
+                requireSPIRVCapability(SpvCapabilityAtomicFloat16AddEXT);
+                break;
+            }
+        }
+        break;
+        case SpvOpAtomicFMinEXT:
+        case SpvOpAtomicFMaxEXT:
+        {
+            auto typeOp = getVectorElementType(atomicInst->getDataType())->getOp();
+            switch (typeOp)
+            {
+            case kIROp_FloatType:
+                ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float_min_max"));
+                requireSPIRVCapability(SpvCapabilityAtomicFloat32MinMaxEXT);
+                break;
+            case kIROp_DoubleType:
+                ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float_min_max"));
+                requireSPIRVCapability(SpvCapabilityAtomicFloat64MinMaxEXT);
+                break;
+            case kIROp_HalfType:
+                ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float_min_max"));
+                requireSPIRVCapability(SpvCapabilityAtomicFloat16MinMaxEXT);
+                break;
+            }
+        }
+        break;
+        }
+    }
+
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
@@ -3200,20 +3309,80 @@ struct SPIRVEmitContext
         case kIROp_ImageSubscript:
             result = emitImageSubscript(parent, as<IRImageSubscript>(inst));
             break;
-        case kIROp_AtomicCounterIncrement:
+        case kIROp_AtomicInc:
             {
                 IRBuilder builder{inst};
-                const auto memoryScope =  emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics =  emitIntConstant(IRIntegerValue{SpvMemorySemanticsMaskNone}, builder.getUIntType());
+                const auto memoryScope = emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
                 result = emitOpAtomicIIncrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
             }
             break;
-        case kIROp_AtomicCounterDecrement:
+        case kIROp_AtomicDec:
             {
-                IRBuilder builder{inst};
-                const auto memoryScope =  emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics =  emitIntConstant(IRIntegerValue{SpvMemorySemanticsMaskNone}, builder.getUIntType());
+                IRBuilder builder{ inst };
+                const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
+                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
                 result = emitOpAtomicIDecrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+            }
+            break;
+        case kIROp_AtomicLoad:
+            {
+                IRBuilder builder{ inst };
+                const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
+                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
+                result = emitOpAtomicLoad(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+            }
+            break;
+        case kIROp_AtomicStore:
+            {
+                IRBuilder builder{ inst };
+                const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
+                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
+                result = emitOpAtomicStore(parent, inst, inst->getOperand(0), memoryScope, memorySemantics, inst->getOperand(1));
+            }
+            break;
+        case kIROp_AtomicExchange:
+            {
+                IRBuilder builder{ inst };
+                const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
+                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
+                result = emitOpAtomicExchange(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics, inst->getOperand(1));
+            }
+            break;
+        case kIROp_AtomicCompareExchange:
+            {
+                IRBuilder builder{ inst };
+                const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
+                const auto memorySemanticsEqual = emitMemorySemanticMask(inst->getOperand(3));
+                const auto memorySemanticsUnequal = emitMemorySemanticMask(inst->getOperand(4));
+                result = emitOpAtomicCompareExchange(
+                    parent, inst, inst->getFullType(), inst->getOperand(0),
+                    memoryScope, memorySemanticsEqual, memorySemanticsUnequal,
+                    inst->getOperand(2), inst->getOperand(1));
+            }
+            break;
+        case kIROp_AtomicAdd:
+        case kIROp_AtomicSub:
+        case kIROp_AtomicMax:
+        case kIROp_AtomicMin:
+        case kIROp_AtomicAnd:
+        case kIROp_AtomicOr:
+        case kIROp_AtomicXor:
+            {
+                IRBuilder builder{ inst };
+                const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
+                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
+                bool negateOperand = false;
+                auto spvOp = getSpvAtomicOp(inst, negateOperand);
+                auto operand = inst->getOperand(1);
+                if (negateOperand)
+                {
+                    builder.setInsertBefore(inst);
+                    auto negatedOperand = builder.emitNeg(inst->getDataType(), operand);
+                    operand = negatedOperand;
+                }
+                result = emitOpAtomicOp(parent, inst, spvOp, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics, operand);
+                ensureAtomicCapability(inst, spvOp);
             }
             break;
         case kIROp_ControlBarrier:

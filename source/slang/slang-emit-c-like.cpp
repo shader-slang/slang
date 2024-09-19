@@ -500,32 +500,6 @@ void CLikeSourceEmitter::defaultEmitInstStmt(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_AtomicCounterIncrement:
-        {
-            auto oldValName = getName(inst);
-            m_writer->emit("int ");
-            m_writer->emit(oldValName);
-            m_writer->emit(";\n");
-            m_writer->emit("InterlockedAdd(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", 1, ");
-            m_writer->emit(oldValName);
-            m_writer->emit(");\n");
-        }
-        break;
-    case kIROp_AtomicCounterDecrement:
-        {
-            auto oldValName = getName(inst);
-            m_writer->emit("int ");
-            m_writer->emit(oldValName);
-            m_writer->emit(";\n");
-            m_writer->emit("InterlockedAdd(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", -1, ");
-            m_writer->emit(oldValName);
-            m_writer->emit(");\n");
-        }
-        break;
     case kIROp_StructuredBufferGetDimensions:
         {
             auto count = _generateUniqueName(UnownedStringSlice("_elementCount"));
@@ -2920,8 +2894,17 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
         // Insts that needs to be emitted as code blocks.
     case kIROp_CudaKernelLaunch:
-    case kIROp_AtomicCounterIncrement:
-    case kIROp_AtomicCounterDecrement:
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicAnd:
+    case kIROp_AtomicOr:
+    case kIROp_AtomicXor:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
     case kIROp_StructuredBufferGetDimensions:
     case kIROp_MetalAtomicCast:
         emitInstStmt(inst);

@@ -2721,6 +2721,74 @@ __Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
 
+// Atomic<T>
+
+enum MemoryOrder
+{
+    Relaxed = $(kIRMemoryOrder_Relaxed),
+    SeqCst = $(kIRMemoryOrder_SeqCst),
+}
+
+[sealed] interface IAtomicable {}
+[sealed] interface IArithmeticAtomicable : IAtomicable {}
+[sealed] interface IBitAtomicable : IArithmeticAtomicable {}
+
+extension int : IArithmeticAtomicable {}
+extension uint : IArithmeticAtomicable {}
+extension int64_t : IBitAtomicable {}
+extension uint64_t : IBitAtomicable {}
+extension float : IArithmeticAtomicable {}
+extension half : IArithmeticAtomicable {}
+
+__magic_type(AtomicType)
+__intrinsic_type($(kIROp_AtomicType))
+[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+struct Atomic<T : IAtomicable>
+{
+    __intrinsic_op($(kIROp_AtomicLoad))
+    T load(MemoryOrder order = MemoryOrder.Relaxed);
+
+    __intrinsic_op($(kIROp_AtomicStore))
+    [__ref] void store(T newValue, MemoryOrder order = MemoryOrder.Relaxed);
+
+    __intrinsic_op($(kIROp_AtomicExchange))
+    [__ref] T exchange(T newValue, MemoryOrder order = MemoryOrder.Relaxed); // returns old value
+
+    __intrinsic_op($(kIROp_AtomicCompareExchange))
+    [__ref] T compareExchange(
+        T compareValue,
+        T newValue,
+        MemoryOrder successOrder = MemoryOrder.Relaxed,
+        MemoryOrder failOrder = MemoryOrder.Relaxed);
+}
+
+extension<T : IArithmeticAtomicable> Atomic<T>
+{
+    __intrinsic_op($(kIROp_AtomicAdd))
+    [__ref] T atomicAdd(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    __intrinsic_op($(kIROp_AtomicSub))
+    [__ref] T atomicSub(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    __intrinsic_op($(kIROp_AtomicMax))
+    [__ref] T atomicMax(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    __intrinsic_op($(kIROp_AtomicMin))
+    [__ref] T atomicMin(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+}
+
+extension<T : IBitAtomicable> Atomic<T>
+{
+    __intrinsic_op($(kIROp_AtomicAnd))
+    [__ref] T atomicAnd(T value, MemoryOrder order = MemoryOrder.Relaxed);      // returns original value
+    __intrinsic_op($(kIROp_AtomicOr))
+    [__ref] T atomicOr(T value, MemoryOrder order = MemoryOrder.Relaxed);         // returns original value
+    __intrinsic_op($(kIROp_AtomicXor))
+    [__ref] T atomicXor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    __intrinsic_op($(kIROp_AtomicInc))
+    [__ref] T atomicIncrement(MemoryOrder order = MemoryOrder.Relaxed);
+    __intrinsic_op($(kIROp_AtomicDec))
+    [__ref] T atomicDecrement(MemoryOrder order = MemoryOrder.Relaxed);
+}
+
+
 // Binding Attributes
 
 __attributeTarget(DeclBase)
