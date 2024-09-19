@@ -1033,8 +1033,9 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
     if (as<IRModuleInst>(origInst->getParent()) && !as<IRType>(origInst))
         return InstPair(origInst, nullptr);
 
-    auto result = transcribeInstImpl(builder, origInst);
+    IRBuilderSourceLocRAII sourceLocationScope(builder, origInst->sourceLoc);
 
+    auto result = transcribeInstImpl(builder, origInst);
     if (result.primal == nullptr && result.differential == nullptr)
     {
         if (auto origType = as<IRType>(origInst))
