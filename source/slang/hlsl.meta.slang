@@ -8686,6 +8686,7 @@ vector<T, N> fract(vector<T, N> x)
 // Split float into mantissa and exponent
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T frexp(T x, out int exp)
 {
@@ -8708,6 +8709,7 @@ T frexp(T x, out int exp)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[ForceInline]
 [require(wgsl)]
 void __wgsl_frexp(T x, out T fract, out int exp)
 {
@@ -8716,6 +8718,7 @@ void __wgsl_frexp(T x, out T fract, out int exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 {
@@ -8734,6 +8737,7 @@ vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 {
@@ -11099,6 +11103,7 @@ vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 // split into integer and fractional parts (both with same sign)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T modf(T x, out T ip)
 {
@@ -11121,6 +11126,7 @@ T modf(T x, out T ip)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[ForceInline]
 [require(wgsl)]
 void __wgsl_modf(T x, out T fract, out T whole)
 {
@@ -11129,6 +11135,7 @@ void __wgsl_modf(T x, out T fract, out T whole)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 {
@@ -11147,6 +11154,7 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 {
