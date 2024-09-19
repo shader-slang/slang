@@ -70,7 +70,7 @@ extension<T:IBitAtomicable> Atomic<T>
 ```
 
 We allow `Atomic<T>` to be defined anywhere: as struct fields, as array elements, as elements of `RWStructuredBuffer` types,
-or as local and groupshared variable types. For example, in global memory:
+or as local, global and groupshared variable types or function parameter types. For example, in global memory:
 
 ```hlsl
 struct MyType
