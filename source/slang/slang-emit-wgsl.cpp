@@ -472,7 +472,21 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_TextureType:
         if (auto texType = as<IRTextureType>(type))
         {
-            m_writer->emit("texture");
+            switch (texType->getAccess())
+            {
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                m_writer->emit("texture_storage");
+                break;
+            default:
+                m_writer->emit("texture");
+                break;
+            }
+
+            if (texType->isMultisample())
+            {
+                m_writer->emit("_multisampled");
+            }
+
             switch (texType->GetBaseShape())
             {
             case SLANG_TEXTURE_1D:		m_writer->emit("_1d");		break;

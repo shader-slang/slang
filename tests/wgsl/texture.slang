@@ -193,7 +193,7 @@ bool TEST_texture(
     TextureCubeArray<vector<T,N>> tCubeArray
 )
 {
-    // METAL-LABEL: TEST_texture
+    // WGSL-LABEL: TEST_texture
     typealias Tvn = vector<T,N>;
     typealias Tv4 = vector<T,4>;
 
@@ -208,187 +208,111 @@ bool TEST_texture(
     float fnumLevels = 0.0f, felements = 0.0f;
 
     bool voidResult = true;
-#if 0
 
     // ======================
     //  void GetDimensions()
     // ======================
 
-    // METAL: .get_width(
+    // WGSL doesn't support the mip level query;
+
+    // WGSL: textureDimensions(t1D
     t1D.GetDimensions(width);
     voidResult = voidResult && (uint(4) == width);
 
-    // METAL: .get_width({{.*}}.get_num_mip_levels()
-    t1D.GetDimensions(0, width, numLevels);
-    voidResult = voidResult && (uint(4) == width);
-    voidResult = voidResult && (uint(3) == numLevels);
-
-    // METAL: .get_width({{.*}}.get_height(
+    // WGSL: textureDimensions(t2D
     t2D.GetDimensions(width, height);
     voidResult = voidResult && (uint(4) == width);
     voidResult = voidResult && (uint(4) == height);
 
-    // METAL: .get_width({{.*}}.get_height({{.*}}.get_num_mip_levels()
-    t2D.GetDimensions(0, width, height, numLevels);
-    voidResult = voidResult && (uint(4) == width);
-    voidResult = voidResult && (uint(4) == height);
-    voidResult = voidResult && (uint(3) == numLevels);
-
-    // METAL: .get_width({{.*}}.get_height({{.*}}.get_depth(
+    // WGSL: textureDimensions(t3D
     t3D.GetDimensions(width, height, depth);
     voidResult = voidResult && (uint(4) == width);
     voidResult = voidResult && (uint(4) == height);
     voidResult = voidResult && (uint(4) == depth);
 
-    // METAL: .get_width({{.*}}.get_height({{.*}}.get_depth({{.*}}.get_num_mip_levels()
-    t3D.GetDimensions(0, width, height, depth, numLevels);
-    voidResult = voidResult && (uint(4) == width);
-    voidResult = voidResult && (uint(4) == height);
-    voidResult = voidResult && (uint(4) == depth);
-    voidResult = voidResult && (uint(3) == numLevels);
-
-    // METAL: .get_width({{.*}}.get_height({{.*}}
+    // WGSL: textureDimensions(tCube
     tCube.GetDimensions(width, height);
     voidResult = voidResult && (uint(4) == width);
     voidResult = voidResult && (uint(4) == height);
 
-    // METAL: .get_width({{.*}}.get_height({{.*}}.get_num_mip_levels()
-    tCube.GetDimensions(0, width, height, numLevels);
-    voidResult = voidResult && (uint(4) == width);
-    voidResult = voidResult && (uint(4) == height);
-    voidResult = voidResult && (uint(3) == numLevels);
-
-    // METAL: .get_width({{.*}}.get_array_size(
+    // WGSL: textureDimensions(t1DArray
     t1DArray.GetDimensions(width, elements);
     voidResult = voidResult && (uint(4) == width);
     voidResult = voidResult && (uint(2) == elements);
 
-    // METAL: .get_width({{.*}}.get_num_mip_levels(
-    t1DArray.GetDimensions(0, width, elements, numLevels);
-    voidResult = voidResult && (uint(4) == width);
-    voidResult = voidResult && (uint(2) == elements);
-    voidResult = voidResult && (uint(3) == numLevels);
-
-    // METAL: .get_width({{.*}}.get_height({{.*}}.get_array_size(
+    // WGSL: textureDimensions(t2DArray
     t2DArray.GetDimensions(width, height, elements);
     voidResult = voidResult && (uint(4) == width);
     voidResult = voidResult && (uint(4) == height);
     voidResult = voidResult && (uint(2) == elements);
 
-    // METAL: .get_width({{.*}}.get_height({{.*}}.get_num_mip_levels(
-    t2DArray.GetDimensions(0, width, height, elements, numLevels);
-    voidResult = voidResult && (uint(4) == width);
-    voidResult = voidResult && (uint(4) == height);
-    voidResult = voidResult && (uint(2) == elements);
-    voidResult = voidResult && (uint(3) == numLevels);
-
-    // METAL: .get_width({{.*}}.get_height({{.*}}.get_array_size(
+    // WGSL: textureDimensions(tCubeArray
     tCubeArray.GetDimensions(width, height, elements);
     voidResult = voidResult && (uint(4) == width);
     voidResult = voidResult && (uint(4) == height);
     voidResult = voidResult && (uint(2) == elements);
 
-    // METAL: .get_width({{.*}}.get_height({{.*}}.get_num_mip_levels(
-    tCubeArray.GetDimensions(0, width, height, elements, numLevels);
-    voidResult = voidResult && (uint(4) == width);
-    voidResult = voidResult && (uint(4) == height);
-    voidResult = voidResult && (uint(2) == elements);
-    voidResult = voidResult && (uint(3) == numLevels);
-#endif
-
     bool result = voidResult
-#if 0
         // ===============================
         // float CalculateLevelOfDetail()
         // ===============================
-
-        // Metal doesn't support LOD for 1D texture
-
-        // METAL: t2D{{.*}}.calculate_clamped_lod({{.*}}
-        && float(0) == t2D.CalculateLevelOfDetail(samplerState, float2(u, u))
-
-        // METAL: t3D{{.*}}.calculate_clamped_lod({{.*}}
-        && float(0) == t3D.CalculateLevelOfDetail(samplerState, float3(u, u, u))
-
-        // METAL: tCube{{.*}}.calculate_clamped_lod({{.*}}
-        && float(0) == tCube.CalculateLevelOfDetail(samplerState, normalize(float3(u, 1 - u, u)))
-
-        // METAL: t2DArray{{.*}}.calculate_clamped_lod({{.*}}
-        && float(0) == t2DArray.CalculateLevelOfDetail(samplerState, float2(u, u))
-
-        // METAL: tCubeArray{{.*}}.calculate_clamped_lod({{.*}}
-        && float(0) == tCubeArray.CalculateLevelOfDetail(samplerState, normalize(float3(u, 1 - u, u)))
+        // WGSL doesn't have a way to calculate mip-map level for the given coordinate
 
         // ========================================
         // float CalculateLevelOfDetailUnclamped()
         // ========================================
-
-        // Metal doesn't support LOD for 1D texture
-
-        // METAL: t2D{{.*}}.calculate_unclamped_lod({{.*}}
-        && float(0) >= t2D.CalculateLevelOfDetailUnclamped(samplerState, float2(u, u))
-
-        // METAL: t3D{{.*}}.calculate_unclamped_lod({{.*}}
-        && float(0) >= t3D.CalculateLevelOfDetailUnclamped(samplerState, float3(u, u, u))
-
-        // METAL: tCube{{.*}}.calculate_unclamped_lod({{.*}}
-        && float(0) >= tCube.CalculateLevelOfDetailUnclamped(samplerState, normalize(float3(u, 1 - u, u)))
-
-        // METAL: t2DArray{{.*}}.calculate_unclamped_lod({{.*}}
-        && float(0) >= t2DArray.CalculateLevelOfDetailUnclamped(samplerState, float2(u, u))
-
-        // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
-        && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(samplerState, normalize(float3(u, 1 - u, u)))
+        // WGSL doesn't have a way to calculate mip-map level for the given coordinate
 
         // ===========
         // T Sample()
         // ===========
 
-        // METAL: t1D{{.*}}.sample(
+#if 0
+        // WGSL: textureSample(t1D
         && all(Tvn(T(0)) == t1D.Sample(samplerState, u))
 
-        // METAL: t2D{{.*}}.sample({{.*}}
+        // WGSL: textureSample(t2D
         && all(Tvn(T(0)) == t2D.Sample(samplerState, float2(u, u)))
 
-        // METAL: t3D{{.*}}.sample({{.*}}
+        // WGSL: textureSample(t3D
         && all(Tvn(T(0)) == t3D.Sample(samplerState, float3(u, u, u)))
 
-        // METAL: tCube{{.*}}.sample({{.*}}
+        // WGSL: textureSample(tCube
         && all(Tvn(T(0)) == tCube.Sample(samplerState, normalize(float3(u, 1 - u, u))))
 
-        // METAL: t1DArray{{.*}}.sample(
+        // WGSL: textureSample(t1DArray
         && all(Tvn(T(0)) == t1DArray.Sample(samplerState, float2(u, 0)))
 
-        // METAL: t2DArray{{.*}}.sample({{.*}}
+        // WGSL: textureSample(t2DArray
         && all(Tvn(T(0)) == t2DArray.Sample(samplerState, float3(u, u, 0)))
 
-        // METAL: tCubeArray{{.*}}.sample({{.*}}
+        // WGSL: textureSample(tCubeArray
         && all(Tvn(T(0)) == tCubeArray.Sample(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // Offset variant
 
         // Metal doesn't support Offset for 1D and Cube texture
 
-        // METAL: t2D{{.*}}.sample({{.*}}
+        // WGSL: t2D{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t2D.Sample(samplerState, float2(u, u), int2(1, 1)))
 
-        // METAL: t3D{{.*}}.sample({{.*}}
+        // WGSL: t3D{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t3D.Sample(samplerState, float3(u, u, u), int3(1, 1, 1)))
 
-        // METAL: t2DArray{{.*}}.sample({{.*}}
+        // WGSL: t2DArray{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t2DArray.Sample(samplerState, float3(u, u, 0), int2(1, 1)))
 
         // Clamp variant
 
         // Metal doesn't support Offset for 1D and Cube texture
 
-        // METAL: t2D{{.*}}.sample({{.*}} min_lod_clamp(
+        // WGSL: t2D{{.*}}.sample({{.*}} min_lod_clamp(
         && all(Tvn(T(0)) == t2D.Sample(samplerState, float2(u, u), int2(1, 1), float(1)))
 
-        // METAL: t3D{{.*}}.sample({{.*}} min_lod_clamp(
+        // WGSL: t3D{{.*}}.sample({{.*}} min_lod_clamp(
         && all(Tvn(T(0)) == t3D.Sample(samplerState, float3(u, u, u), int3(1, 1, 1), float(1)))
 
-        // METAL: t2DArray{{.*}}.sample({{.*}} min_lod_clamp(
+        // WGSL: t2DArray{{.*}}.sample({{.*}} min_lod_clamp(
         && all(Tvn(T(0)) == t2DArray.Sample(samplerState, float3(u, u, 0), int2(1, 1), float(1)))
 
         // ===============
@@ -397,32 +321,32 @@ bool TEST_texture(
 
         // Metal doesn't support Bias for 1D texture
 
-        // METAL: t2D{{.*}}.sample({{.*}}
+        // WGSL: t2D{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t2D.SampleBias(samplerState, float2(u, u), float(-1)))
 
-        // METAL: t3D{{.*}}.sample({{.*}}
+        // WGSL: t3D{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t3D.SampleBias(samplerState, float3(u, u, u), float(-1)))
 
-        // METAL: tCube{{.*}}.sample({{.*}}
+        // WGSL: tCube{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == tCube.SampleBias(samplerState, normalize(float3(u, 1 - u, u)), float(-1)))
 
-        // METAL: t2DArray{{.*}}.sample({{.*}}
+        // WGSL: t2DArray{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t2DArray.SampleBias(samplerState, float3(u, u, 0), float(-1)))
 
-        // METAL: tCubeArray{{.*}}.sample({{.*}}
+        // WGSL: tCubeArray{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == tCubeArray.SampleBias(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), float(-1)))
 
         // Offset variant
 
         // Metal doesn't support Offset for 1D and Cube texture
 
-        // METAL: t2D{{.*}}.sample({{.*}}
+        // WGSL: t2D{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t2D.SampleBias(samplerState, float2(u, u), float(-1), int2(1, 1)))
 
-        // METAL: t3D{{.*}}.sample({{.*}}
+        // WGSL: t3D{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t3D.SampleBias(samplerState, float3(u, u, u), float(-1), int3(1, 1, 1)))
 
-        // METAL: t2DArray{{.*}}.sample({{.*}}
+        // WGSL: t2DArray{{.*}}.sample({{.*}}
         && all(Tvn(T(0)) == t2DArray.SampleBias(samplerState, float3(u, u, 0), float(-1), int2(1, 1)))
 
         // ===================================
@@ -431,98 +355,98 @@ bool TEST_texture(
 
         // Metal doesn't support LOD for 1D texture
 
-        // METAL: t2D{{.*}}.sample({{.*}} level(
+        // WGSL: t2D{{.*}}.sample({{.*}} level(
         && all(Tvn(T(0)) == t2D.SampleLevel(samplerState, float2(u, u), 0))
 
-        // METAL: t3D{{.*}}.sample({{.*}} level(
+        // WGSL: t3D{{.*}}.sample({{.*}} level(
         && all(Tvn(T(0)) == t3D.SampleLevel(samplerState, float3(u, u, u), 0))
 
-        // METAL: tCube{{.*}}.sample({{.*}} level(
+        // WGSL: tCube{{.*}}.sample({{.*}} level(
         && all(Tvn(T(0)) == tCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0))
 
-        // METAL: t2DArray{{.*}}.sample({{.*}} level(
+        // WGSL: t2DArray{{.*}}.sample({{.*}} level(
         && all(Tvn(T(0)) == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0))
 
-        // METAL: tCubeArray{{.*}}.sample({{.*}} level(
+        // WGSL: tCubeArray{{.*}}.sample({{.*}} level(
         && all(Tvn(T(0)) == tCubeArray.SampleLevel(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), 0))
 
         // Offset variant
 
         // Metal doesn't support LOD for 1D texture
 
-        // METAL: t2D{{.*}}.sample({{.*}} level(
+        // WGSL: t2D{{.*}}.sample({{.*}} level(
         && all(Tvn(T(0)) == t2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1)))
 
-        // METAL: t3D{{.*}}.sample({{.*}} level(
+        // WGSL: t3D{{.*}}.sample({{.*}} level(
         && all(Tvn(T(0)) == t3D.SampleLevel(samplerState, float3(u, u, u), 0, int3(1, 1, 1)))
 
-        // METAL: t2DArray{{.*}}.sample({{.*}} level(
+        // WGSL: t2DArray{{.*}}.sample({{.*}} level(
         && all(Tvn(T(0)) == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1)))
 
         // ==================
         // float SampleCmp()
         // ==================
 
-        // METAL: d2D{{.*}}.sample_compare(
+        // WGSL: d2D{{.*}}.sample_compare(
         && float(0) == d2D.SampleCmp(shadowSampler, float2(u, u), 0)
 
-        // METAL: d2DArray{{.*}}.sample_compare(
+        // WGSL: d2DArray{{.*}}.sample_compare(
         && float(0) == d2DArray.SampleCmp(shadowSampler, float3(u, u, 0), 0)
 
-        // METAL: dCube{{.*}}.sample_compare(
+        // WGSL: dCube{{.*}}.sample_compare(
         && float(0) == dCube.SampleCmp(shadowSampler, normalize(float3(u, 1 - u, u)), 0)
 
-        // METAL: dCubeArray{{.*}}.sample_compare(
+        // WGSL: dCubeArray{{.*}}.sample_compare(
         && float(0) == dCubeArray.SampleCmp(shadowSampler, float4(normalize(float3(u, 1 - u, u)), 0), 0)
 
         // Offset variant
 
-        // METAL: d2D{{.*}}.sample_compare(
+        // WGSL: d2D{{.*}}.sample_compare(
         && float(0) == d2D.SampleCmp(shadowSampler, float2(u2, u), 0, int2(0, 0))
 
         // ===================================
         //  float SampleCmpLevelZero()
         // ===================================
 
-        // METAL: d2D{{.*}}.sample_compare(
+        // WGSL: d2D{{.*}}.sample_compare(
         && float(0) == d2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0)
 
-        // METAL: d2DArray{{.*}}.sample_compare(
+        // WGSL: d2DArray{{.*}}.sample_compare(
         && float(0) == d2DArray.SampleCmpLevelZero(shadowSampler, float3(u, u, 0), 0)
 
-        // METAL: dCube{{.*}}.sample_compare(
+        // WGSL: dCube{{.*}}.sample_compare(
         && float(0) == dCube.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0)
 
-        // METAL: dCubeArray{{.*}}.sample_compare(
+        // WGSL: dCubeArray{{.*}}.sample_compare(
         && float(0) == dCubeArray.SampleCmpLevelZero(shadowSampler, float4(normalize(float3(u, 1-u, u)), 0), 0)
 
         // Offset variant
 
-        // METAL: d2D{{.*}}.sample_compare(
+        // WGSL: d2D{{.*}}.sample_compare(
         && float(0) == d2D.SampleCmpLevelZero(shadowSampler, float2(u2, u), 0, int2(0, 0))
 
         // ==================================
         //  vector<T,4> Gather()
         // ==================================
 
-        // METAL: t2D{{.*}}.gather(
+        // WGSL: t2D{{.*}}.gather(
         && all(Tv4(T(0)) == t2D.Gather(samplerState, float2(u, u)))
 
-        // METAL: tCube{{.*}}.gather(
+        // WGSL: tCube{{.*}}.gather(
         && all(Tv4(T(0)) == tCube.Gather(samplerState, normalize(float3(u, 1 - u, u))))
 
-        // METAL: t2DArray{{.*}}.gather(
+        // WGSL: t2DArray{{.*}}.gather(
         && all(Tv4(T(0)) == t2DArray.Gather(samplerState, float3(u, u, 0)))
 
-        // METAL: tCubeArray{{.*}}.gather(
+        // WGSL: tCubeArray{{.*}}.gather(
         && all(Tv4(T(0)) == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // Offset variant
 
-        // METAL: t2D{{.*}}.gather(
+        // WGSL: t2D{{.*}}.gather(
         && all(Tv4(T(0)) == t2D.Gather(samplerState, float2(u2, u), int2(0, 0)))
 
-        // METAL: t2DArray{{.*}}.gather(
+        // WGSL: t2DArray{{.*}}.gather(
         && all(Tv4(T(0)) == t2DArray.Gather(samplerState, float3(u2, u, 0), int2(0, 0)))
 
         // =====================================
@@ -531,46 +455,46 @@ bool TEST_texture(
 
         // Metal doesn't support LOD for 1D texture
 
-        // METAL: t2D{{.*}}.sample(
+        // WGSL: t2D{{.*}}.sample(
         && all(Tvn(T(0)) == t2D.SampleGrad(samplerState, float2(u, u), float2(ddx, ddx), float2(ddy, ddy)))
 
-        // METAL: t3D{{.*}}.sample(
+        // WGSL: t3D{{.*}}.sample(
         && all(Tvn(T(0)) == t3D.SampleGrad(samplerState, float3(u, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
 
-        // METAL: tCube{{.*}}.sample(
+        // WGSL: tCube{{.*}}.sample(
         && all(Tvn(T(0)) == tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
 
-        // METAL: t2DArray{{.*}}.sample(
+        // WGSL: t2DArray{{.*}}.sample(
         && all(Tvn(T(0)) == t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy)))
 
         // Offset variant
 
-        // METAL: t2D{{.*}}.sample(
+        // WGSL: t2D{{.*}}.sample(
         && all(Tvn(T(0)) == t2D.SampleGrad(samplerState, float2(u2, u), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
 
-        // METAL: t3D{{.*}}.sample(
+        // WGSL: t3D{{.*}}.sample(
         && all(Tvn(T(0)) == t3D.SampleGrad(samplerState, float3(u2, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy), int3(0, 0, 0)))
 
-        // METAL: t2DArray{{.*}}.sample(
+        // WGSL: t2DArray{{.*}}.sample(
         && all(Tvn(T(0)) == t2DArray.SampleGrad(samplerState, float3(u2, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
 
         // ===================
         //  T Load()
         // ===================
 
-        // METAL: t1D{{.*}}.read(
+        // WGSL: t1D{{.*}}.read(
         && all(Tvn(T(0)) == t1D.Load(int2(0, 0)))
 
-        // METAL: t2D{{.*}}.read(
+        // WGSL: t2D{{.*}}.read(
         && all(Tvn(T(0)) == t2D.Load(int3(0, 0, 0)))
 
-        // METAL: t3D{{.*}}.read(
+        // WGSL: t3D{{.*}}.read(
         && all(Tvn(T(0)) == t3D.Load(int4(0, 0, 0, 0)))
 
-        // METAL: t1DArray{{.*}}.read(
+        // WGSL: t1DArray{{.*}}.read(
         && all(Tvn(T(0)) == t1DArray.Load(int3(0, 0, 0)))
 
-        // METAL: t2DArray{{.*}}.read(
+        // WGSL: t2DArray{{.*}}.read(
         && all(Tvn(T(0)) == t2DArray.Load(int4(0, 0, 0, 0)))
 
         // Offset variant
