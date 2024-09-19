@@ -947,6 +947,16 @@ struct IRPreferCheckpointDecoration : IRCheckpointHintDecoration
     IR_LEAF_ISA(PreferCheckpointDecoration)
 };
 
+struct IRCheckpointIntermediateDecoration : IRCheckpointHintDecoration
+{
+    enum
+    {
+        kOp = kIROp_CheckpointIntermediateDecoration
+    };
+    IR_LEAF_ISA(CheckpointIntermediateDecoration)
+
+    IRInst* getSourceFunction() { return getOperand(0); }
+};
 
 struct IRLoopCounterDecoration : IRDecoration
 {
@@ -5151,6 +5161,11 @@ public:
     void addMemoryQualifierSetDecoration(IRInst* inst, IRIntegerValue flags)
     {
         addDecoration(inst, kIROp_MemoryQualifierSetDecoration, getIntValue(getIntType(), flags));
+    }
+
+    void addCheckpointIntermediateDecoration(IRInst* inst, IRGlobalValueWithCode *func)
+    {
+        addDecoration(inst, kIROp_CheckpointIntermediateDecoration, func);
     }
 };
 

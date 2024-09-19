@@ -403,8 +403,11 @@ namespace Slang
         List<IRType*> primalTypes, propagateTypes;
         IRType* primalResultType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getResultType());
 
+        IRParam *currentParam = origFunc->getFirstParam();
         for (UInt i = 0; i < origFuncType->getParamCount(); i++)
         {
+            IRBuilderSourceLocRAII sourceLocationScope(&builder, currentParam->sourceLoc);
+
             auto primalParamType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getParamType(i));
             auto propagateParamType = transcribeParamTypeForPropagateFunc(&builder, origFuncType->getParamType(i));
             if (propagateParamType)
@@ -453,6 +456,7 @@ namespace Slang
                 primalArgs.add(var);
             }
             primalTypes.add(primalParamType);
+            currentParam = currentParam->getNextParam();
         }
 
         // Add dOut argument to propagateArgs.
@@ -588,6 +592,8 @@ namespace Slang
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
         auto oldCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
         IRFunc* fwdDiffFunc = as<IRFunc>(getGenericReturnVal(fwdTranscriber.transcribe(builder, primalOuterParent)));
+        fwdDiffFunc->sourceLoc = primalFunc->sourceLoc;
+
         SLANG_ASSERT(fwdDiffFunc);
         auto newCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
         for (auto i = oldCount; i < newCount; i++)
@@ -712,8 +718,10 @@ namespace Slang
         }
 
         // Transpose the first block (parameter block)
-        auto paramTransposeInfo =
-            splitAndTransposeParameterBlock(builder, diffPropagateFunc, isResultDifferentiable);
+        auto paramTransposeInfo = splitAndTransposeParameterBlock(builder,
+            diffPropagateFunc,
+            primalFunc->sourceLoc,
+            isResultDifferentiable);
 
         // The insts we inserted in paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc
         // may be used by write back logic that we are going to insert later.
@@ -815,6 +823,7 @@ namespace Slang
     ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(
         IRBuilder* builder,
         IRFunc* diffFunc,
+        SourceLoc primalLoc,
         bool isResultDifferentiable)
     {
         // This method splits transposes the all the parameters for both the primal and propagate computation.
@@ -841,12 +850,20 @@ namespace Slang
         auto nextBlockBuilder = *builder;
         nextBlockBuilder.setInsertBefore(paramPreludeBlock->getFirstOrdinaryInst());
 
+        SourceLoc returnLoc;
         IRBlock* firstDiffBlock = nullptr;
         for (auto block : diffFunc->getBlocks())
         {
             if (isDifferentialInst(block))
             {
                 firstDiffBlock = block;
+                break;
+            }
+
+            auto terminator = block->getTerminator();
+            if (as<IRReturn>(terminator))
+            {
+                returnLoc = terminator->sourceLoc;
                 break;
             }
         }
@@ -895,6 +912,8 @@ namespace Slang
         //      from the primal compuation logic in the future propagate function be replaced to.
         for (auto fwdParam : fwdParams)
         {   
+            IRBuilderSourceLocRAII sourceLocationScope(builder, fwdParam->sourceLoc);
+
             // Define the replacement insts that we are going to fill in for each case.
             IRInst* diffRefReplacement = nullptr;
             IRInst* primalRefReplacement = nullptr;
@@ -1186,6 +1205,7 @@ namespace Slang
             SLANG_ASSERT(dOutParamType);
 
             dOutParam = builder->emitParam(dOutParamType);
+            dOutParam->sourceLoc = returnLoc;
             builder->addNameHintDecoration(dOutParam, UnownedStringSlice("_s_dOut"));
             result.propagateFuncParams.add(dOutParam);
         }
@@ -1196,6 +1216,10 @@ namespace Slang
         result.primalFuncParams.add(ctxParam);
         result.propagateFuncParams.add(ctxParam);
         result.dOutParam = dOutParam;
+        
+        diffFunc->sourceLoc = primalLoc;
+        ctxParam->sourceLoc = primalLoc;
+
         return result;
     }
 
