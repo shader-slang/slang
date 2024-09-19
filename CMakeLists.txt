@@ -218,15 +218,14 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     find_package(Clang REQUIRED CONFIG)
 endif()
 
+if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+    find_package(unordered_dense CONFIG QUIET)
+endif()
+
 add_subdirectory(external)
 
 set(SLANG_CORE_LIBRARIES "")
 list(APPEND SLANG_CORE_LIBRARIES miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS})
-
-if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
-    find_package(unordered_dense CONFIG QUIET)
-    list(APPEND SLANG_CORE_LIBRARIES unordered_dense::unordered_dense)
-endif()
 
 #
 # Our targets
@@ -238,6 +237,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE ${SLANG_CORE_LIBRARIES}
+    LINK_WITH_PUBLIC unordered_dense::unordered_dense
     INCLUDE_DIRECTORIES_PUBLIC source include
 )
 
@@ -249,6 +249,7 @@ if(SLANG_ENABLE_SLANGRT)
         EXTRA_SOURCE_DIRS source/core
         USE_EXTRA_WARNINGS
         LINK_WITH_PRIVATE ${SLANG_CORE_LIBRARIES}
+        LINK_WITH_PUBLIC unordered_dense::unordered_dense
         EXPORT_MACRO_PREFIX SLANG_RT
         INCLUDE_DIRECTORIES_PUBLIC include
         INSTALL
@@ -261,6 +262,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE core
+    INCLUDE_FROM_PUBLIC SPIRV-Headers
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers
@@ -340,6 +342,7 @@ if(SLANG_ENABLE_SLANGD)
         EXECUTABLE
         LINK_WITH_PRIVATE
             core
+            compiler-core
             slang
             slang-reflect-headers
             slang-capability-defs
@@ -639,7 +642,7 @@ if(SLANG_ENABLE_TESTS)
         tools/unit-test
         OBJECT
         EXCLUDE_FROM_ALL
-        INCLUDE_FROM_PRIVATE slang
+        INCLUDE_FROM_PRIVATE slang core
         INCLUDE_DIRECTORIES_PRIVATE include
         FOLDER test
     )

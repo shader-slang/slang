@@ -9,11 +9,7 @@
 #include "slang-math.h"
 #include "slang-hash.h"
 
-#ifdef SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER
 #include <ankerl/unordered_dense.h>
-#else
-#include "../../external/unordered_dense/include/ankerl/unordered_dense.h"
-#endif
 
 #include <initializer_list>
 

@@ -4,11 +4,7 @@
 #include "../../include/slang.h"
 #include "slang-math.h"
 
-#ifdef SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER
 #include <ankerl/unordered_dense.h>
-#else
-#include "../../external/unordered_dense/include/ankerl/unordered_dense.h"
-#endif
 
 #include <cstring>
 #include <type_traits>

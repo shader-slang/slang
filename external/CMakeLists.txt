@@ -17,6 +17,10 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     endif()
 endif()
 
+if (NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+    add_subdirectory(unordered_dense EXCLUDE_FROM_ALL SYSTEM)
+endif()
+
 # Miniz
 if (NOT ${SLANG_USE_SYSTEM_MINIZ})
     add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
