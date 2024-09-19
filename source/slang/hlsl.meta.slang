@@ -1256,14 +1256,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSample($0, $1, ($2).x, $(2).y)";
+                        __intrinsic_asm "textureSample($0, $1, ($2).x, i32(($2).y))$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureSample($0, $1, ($2).xy, $(2).z)";
+                        __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, $(2).w)";
+                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w))$z";
                     }
                 }
-                __intrinsic_asm "textureSample($0, $1, $2)";
+                __intrinsic_asm "textureSample($0, $1, $2)$z";
         }
     }
 
@@ -1320,14 +1320,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSample($0, $1, ($2).x, $(2).y, $3)";
+                        __intrinsic_asm "textureSample($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureSample($0, $1, ($2).xy, $(2).z, $3)";
+                        __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z), $3)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, $(2).w, $3)";
+                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w), $3)$z";
                     }
                 }
-                __intrinsic_asm "textureSample($0, $1, $2, $3)";
+                __intrinsic_asm "textureSample($0, $1, $2, $3)$z";
         }
     }
 
@@ -1452,14 +1452,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, $(2).y, $3)";
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, $(2).z, $3)";
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, $(2).w, $3)";
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3)$z";
                     }
                 }
-                __intrinsic_asm "textureSampleBias($0, $1, $2, $3)";
+                __intrinsic_asm "textureSampleBias($0, $1, $2, $3)$z";
         }
     }
 
@@ -1515,14 +1515,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, $(2).y, $3, $4)";
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, $(2).z, $3, $4)";
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, $(2).w, $3, $4)";
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
                     }
                 }
-                __intrinsic_asm "textureSampleBias($0, $1, $2, $3, $4)";
+                __intrinsic_asm "textureSampleBias($0, $1, $2, $3, $4)$z";
         }
     }
 
@@ -1587,11 +1587,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, $(2).y, $3)";
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3)";
                 case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, $(2).z, $3)";
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3)";
                 case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, $(2).w, $3)";
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3)";
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3)";
@@ -1655,11 +1655,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, $(2).y, $3)";
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3)";
                 case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, $(2).z, $3)";
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3)";
                 case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, $(2).w, $3)";
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3)";
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3)";
@@ -1720,11 +1720,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, $(2).y, $3, $4)";
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3, $4)";
                 case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, $(2).z, $3, $4)";
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3, $4)";
                 case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, $(2).w, $3, $4)";
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3, $4)";
@@ -1787,11 +1787,11 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 switch (Shape.flavor)
                 {
                 case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, $(2).y, $3, $4)";
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3, $4)";
                 case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, $(2).z, $3, $4)";
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)";
                 case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, $(2).w, $3, $4)";
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3, $4)";
@@ -1854,14 +1854,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, $(2).y, $3, $4)";
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, $(2).z, $3, $4)";
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, $(2).w, $3, $4)";
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
                     }
                 }
-                __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4)";
+                __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4)$z";
         }
     }
 
@@ -1918,14 +1918,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, $(2).y, $3, $4, $5)";
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4, $5)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, $(2).z, $3, $4, $5)";
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4, $5)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, $(2).w, $3, $4, $5)";
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4, $5)$z";
                     }
                 }
-                __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4, $5)";
+                __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4, $5)$z";
         }
     }
 
@@ -2067,14 +2067,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, $(2).y, $3)";
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, $(2).z, $3)";
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, $(2).w, $3)";
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3)$z";
                     }
                 }
-                __intrinsic_asm "textureSampleLevel($0, $1, $2, $3)";
+                __intrinsic_asm "textureSampleLevel($0, $1, $2, $3)$z";
         }
     }
 
@@ -2132,14 +2132,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, $(2).y, $3, $4)";
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, $(2).z, $3, $4)";
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, $(2).w, $3, $4)";
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
                     }
                 }
-                __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)";
+                __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)$z";
         }
     }
 }
@@ -2743,19 +2743,27 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
         case wgsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 , "WGSL supports only f32 type textures");
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
+                || Shape.flavor == $(SLANG_TEXTURE_2D)
+                || Shape.flavor == $(SLANG_TEXTURE_3D)
+                , "WGSL supports textureLoad only for 1D, 2D and 3D textures");
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureLoad($0, ($1).x, $(1).y)";
                 case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "textureLoad($0, ($1).xy, $(1).z)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureLoad($0, ($1).xyz, $(1).w)";
+                    __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z), ($1).w)$z";
                 }
             }
-            __intrinsic_asm "textureLoad($0, $1)";
+            switch (Shape.flavor)
+            {
+            case $(SLANG_TEXTURE_1D):
+                __intrinsic_asm "textureLoad($0, ($1).x, ($1).y)$z";
+            case $(SLANG_TEXTURE_2D):
+                __intrinsic_asm "textureLoad($0, ($1).xy, ($1).z)$z";
+            case $(SLANG_TEXTURE_3D):
+                __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
+            }
         }
     }
 
@@ -2801,14 +2809,14 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureLoad($0, ($1).x, $(1).y, $2)";
+                        __intrinsic_asm "textureLoad($0, ($1).x, i32(($1).y), $2)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureLoad($0, ($1).xy, $(1).z, $2)";
+                        __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z), $2)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureLoad($0, ($1).xyz, $(1).w, $2)";
+                        __intrinsic_asm "textureLoad($0, ($1).xyz, i32(($1).w), $2)$z";
                     }
                 }
-                __intrinsic_asm "textureLoad($0, $1, $2)";
+                __intrinsic_asm "textureLoad($0, $1, $2)$z";
         }
     }
 
@@ -2943,14 +2951,14 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureLoad($0, ($1).x, $(1).y, $2)";
+                        __intrinsic_asm "textureLoad($0, ($1).x, i32(($1).y), $2)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureLoad($0, ($1).xy, $(1).z, $2)";
+                        __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z), $2)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureLoad($0, ($1).xyz, $(1).w, $2)";
+                        __intrinsic_asm "textureLoad($0, ($1).xyz, i32(($1).w), $2)$z";
                     }
                 }
-                __intrinsic_asm "textureLoad($0, $1, $2)";
+                __intrinsic_asm "textureLoad($0, $1, $2)$z";
         }
     }
 
@@ -3181,14 +3189,14 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureLoad($0, ($1).x, $(1).y)";
+                        __intrinsic_asm "textureLoad($0, ($1).x, i32(($1).y))$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureLoad($0, ($1).xy, $(1).z)";
+                        __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureLoad($0, ($1).xyz, $(1).w)";
+                        __intrinsic_asm "textureLoad($0, ($1).xyz, i32(($1).w))$z";
                     }
                 }
-                __intrinsic_asm "textureLoad($0, $1)";
+                __intrinsic_asm "textureLoad($0, $1)$z";
         }
     }
 
@@ -3360,14 +3368,14 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureStore($0, ($1).x, $(1).y, $2)";
+                        __intrinsic_asm "textureStore($0, ($1).x, i32(($1).y), $2)$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureStore($0, ($1).xy, $(1).z, $2)";
+                        __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), $2)$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureStore($0, ($1).xyz, $(1).w, $2)";
+                        __intrinsic_asm "textureStore($0, ($1).xyz, i32(($1).w), $2)$z";
                     }
                 }
-                __intrinsic_asm "textureStore($0, $1, $2)";
+                __intrinsic_asm "textureStore($0, $1, $2)$z";
             }
         }
 
@@ -3439,14 +3447,14 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                     switch (Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureLoad($0, ($1).x, $(1).y)";
+                        __intrinsic_asm "textureLoad($0, ($1).x, i32(($1).y))$z";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureLoad($0, ($1).xy, $(1).z)";
+                        __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z))$z";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureLoad($0, ($1).xyz, $(1).w)";
+                        __intrinsic_asm "textureLoad($0, ($1).xyz, i32(($1).w))$z";
                     }
                 }
-                __intrinsic_asm "textureLoad($0, $1)";
+                __intrinsic_asm "textureLoad($0, $1)$z";
         }
     }
 

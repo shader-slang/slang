@@ -482,6 +482,11 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 break;
             }
 
+            if (texType->isShadow())
+            {
+                m_writer->emit("_depth");
+            }
+
             if (texType->isMultisample())
             {
                 m_writer->emit("_multisampled");
@@ -498,13 +503,16 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             if (texType->isArray())
                 m_writer->emit("_array");
 
-            m_writer->emit("<");
-            auto elemType = texType->getElementType();
-            if (auto vecElemType = as<IRVectorType>(elemType))
-                emitSimpleType(vecElemType->getElementType());
-            else
-                emitType(elemType);
-            m_writer->emit(">");
+            if (!texType->isShadow())
+            {
+                m_writer->emit("<");
+                auto elemType = texType->getElementType();
+                if (auto vecElemType = as<IRVectorType>(elemType))
+                    emitSimpleType(vecElemType->getElementType());
+                else
+                    emitType(elemType);
+                m_writer->emit(">");
+            }
         }
         return;
 
