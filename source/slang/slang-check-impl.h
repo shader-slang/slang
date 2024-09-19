@@ -1743,6 +1743,12 @@ namespace Slang
             CallableDecl* synthesized,
             List<Expr*>& synArgs);
 
+        CallableDecl* synthesizeMethodSignatureForRequirementWitnessInner(
+            ConformanceCheckingContext* context,
+            DeclRef<CallableDecl> requiredMemberDeclRef,
+            List<Expr*>& synArgs,
+            ThisExpr*& synThis);
+
         CallableDecl* synthesizeMethodSignatureForRequirementWitness(
             ConformanceCheckingContext* context,
             DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -1803,6 +1809,7 @@ namespace Slang
 
         bool trySynthesizeSubscriptRequirementWitness(
             ConformanceCheckingContext* context,
+            const LookupResult& lookupResult,
             DeclRef<SubscriptDecl>      requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 

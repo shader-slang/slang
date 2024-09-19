@@ -2614,7 +2614,7 @@ namespace Slang
         {
             // We are referring to a bunch of declarations, each of which might be generic
             LookupResult result;
-            for (auto item : overloadedExpr->lookupResult2.items)
+            for (auto item : overloadedExpr->lookupResult2)
             {
                 AddGenericOverloadCandidate(item, context);
             }
