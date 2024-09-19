@@ -4588,7 +4588,7 @@ namespace Slang
 
         auto containerDecl = getParentDecl(ctorDecl);
         auto containerDeclRef = getDefaultDeclRef(containerDecl);
-        auto synDeclRef = m_astBuilder->getMemberDeclRef(getDefaultDeclRef(context->parentDecl), ctorDecl);
+        auto synDeclRef = m_astBuilder->getMemberDeclRef(containerDeclRef, ctorDecl);
         _addMethodWitness(witnessTable, requiredMemberDeclRef, synDeclRef);
 
         return true;
