@@ -1117,14 +1117,9 @@ IRInst* emitIndexedStoreAddressForVar(
     const List<IndexTrackingInfo>& defBlockIndices)
 {
     IRInst* storeAddr = localVar;
-    IRType* currType = as<IRPtrTypeBase>(localVar->getDataType())->getValueType();
-
     for (auto& index : defBlockIndices)
     {
-        currType = as<IRArrayType>(currType)->getElementType();
-
         storeAddr = builder->emitElementAddress(
-            builder->getPtrType(currType),
             storeAddr, 
             index.primalCountParam);
     }
@@ -1141,11 +1136,9 @@ IRInst* emitIndexedLoadAddressForVar(
     const List<IndexTrackingInfo>& useBlockIndices)
 {
     IRInst* loadAddr = localVar;
-    IRType* currType = as<IRPtrTypeBase>(localVar->getDataType())->getValueType();
 
     for (auto index : defBlockIndices)
     {
-        currType = as<IRArrayType>(currType)->getElementType();
         if (useBlockIndices.contains(index))
         {
             // If the use-block is under the same region, use the 
@@ -1154,7 +1147,6 @@ IRInst* emitIndexedLoadAddressForVar(
             auto diffCounterCurrValue = index.diffCountParam;
 
             loadAddr = builder->emitElementAddress(
-                builder->getPtrType(currType),
                 loadAddr, 
                 diffCounterCurrValue);
         }
@@ -1173,7 +1165,6 @@ IRInst* emitIndexedLoadAddressForVar(
                     builder->getIntValue(builder->getIntType(), 1));
 
             loadAddr = builder->emitElementAddress(
-                builder->getPtrType(currType),
                 loadAddr, 
                 primalCounterLastValue);
         }

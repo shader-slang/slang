@@ -400,6 +400,12 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+/// GLSL fvk-use-dx-layout for `ShaderResource`
+struct FXCShaderResourceLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    // Currently this FXC layout is equal to how we compute 'DefaultLayoutRulesImpl'
+};
+
 /* CPU layout requires that all sizes are a multiple of alignment.
 */
 struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
@@ -597,6 +603,28 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+};
+
+struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
+{
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+
+        const auto elementSize = elementInfo.size.getFiniteValue();
+        auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
+
+        // Metal aligns vectors to 2/4 element boundaries.
+        size_t size = elementSize * elementCount;
+        size_t alignment = alignedElementCount * elementSize;
+
+        SimpleLayoutInfo vectorInfo;
+        vectorInfo.kind = elementInfo.kind;
+        vectorInfo.size = size;
+        vectorInfo.alignment = alignment;
+     
+        return vectorInfo;
     }
 };
 
@@ -894,6 +922,7 @@ struct CUDARayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
 DefaultLayoutRulesImpl kDefaultLayoutRulesImpl;
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
+FXCShaderResourceLayoutRulesImpl kFXCShaderResourceLayoutRulesImpl;
 HLSLConstantBufferLayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl;
 HLSLStructuredBufferLayoutRulesImpl kHLSLStructuredBufferLayoutRulesImpl;
 
@@ -1206,6 +1235,18 @@ LayoutRulesImpl kScalarLayoutRulesImpl_ = {
     &kGLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kFXCShaderResourceLayoutRulesFamilyImpl = {
+    &kGLSLLayoutRulesFamilyImpl,
+    &kFXCShaderResourceLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kFXCConstantBufferLayoutRulesFamilyImpl = {
+    &kGLSLLayoutRulesFamilyImpl,
+    &kHLSLConstantBufferLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
 LayoutRulesImpl kGLSLAnyValueLayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl,
     &kDefaultLayoutRulesImpl,
@@ -1300,6 +1341,9 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptio
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+
     return &kStd140LayoutRulesImpl_;
 }
 
@@ -1307,6 +1351,9 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptio
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+
     return &kStd140LayoutRulesImpl_;
 }
 
@@ -1324,6 +1371,9 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOption
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+
     return &kStd430LayoutRulesImpl_;
 
 }
@@ -1347,6 +1397,9 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(Compiler
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCShaderResourceLayoutRulesFamilyImpl;
+
     return &kStd430LayoutRulesImpl_;
 }
 
@@ -1365,10 +1418,13 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kGLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet& options)
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet& compilerOptions)
 {
-    if (options.shouldUseScalarLayout())
+    if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCShaderResourceLayoutRulesFamilyImpl;
+
     return &kGLSLStructuredBufferLayoutRulesImpl_;
 }
 
@@ -1662,6 +1718,7 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
 
 static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
 static MetalArgumentBufferElementLayoutRulesImpl kMetalArgumentBufferElementLayoutRulesImpl;
+static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
 
 LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
@@ -1670,7 +1727,7 @@ LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
 };
 
 LayoutRulesImpl kMetalConstantBufferLayoutRulesImpl_ = {
-    &kMetalLayoutRulesFamilyImpl, & kCPULayoutRulesImpl, &kMetalObjectLayoutRulesImpl,
+    &kMetalLayoutRulesFamilyImpl, & kMetalLayoutRulesImpl, &kMetalObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kMetalParameterBlockLayoutRulesImpl_ = {
@@ -1678,7 +1735,7 @@ LayoutRulesImpl kMetalParameterBlockLayoutRulesImpl_ = {
 };
 
 LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
-    &kMetalLayoutRulesFamilyImpl, &kCPULayoutRulesImpl, & kMetalObjectLayoutRulesImpl,
+    &kMetalLayoutRulesFamilyImpl, &kMetalLayoutRulesImpl, & kMetalObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kMetalVaryingInputLayoutRulesImpl_ = {
@@ -1774,6 +1831,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::WGSL:
         return &kGLSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::HostHostCallable:
@@ -2083,6 +2141,10 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         case CodeGenTarget::MetalLibAssembly:
         {
             return SourceLanguage::Metal;
+        }
+        case CodeGenTarget::WGSL:
+        {
+            return SourceLanguage::WGSL;
         }
         case CodeGenTarget::CSource:
         {
@@ -4388,6 +4450,84 @@ static TypeLayoutResult _createTypeLayout(
         ptrLayout->valueTypeLayout = valueTypeLayout.layout;
 
         return result;
+    }
+    else if (as<DynamicResourceType>(type))
+    {
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1),
+            type,
+            rules);
+    }
+    else if (auto tupleType = as<TupleType>(type))
+    {
+        // A `Tuple` type is laid out exactly the same way as a `struct` type,
+        // except that we want have a declref to the field.
+        
+        StructTypeLayoutBuilder typeLayoutBuilder;
+        StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
+
+        typeLayoutBuilder.beginLayout(type, rules);
+        auto typeLayout = typeLayoutBuilder.getTypeLayout();
+
+        _addLayout(context, type, typeLayout);
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            // The members of a `Tuple` type may include existential (interface)
+            // types (including as nested sub-fields), and any types present
+            // in those fields will need to be specialized based on the
+            // input arguments being passed to `_createTypeLayout`.
+            //
+            // We won't know how many type slots each field consumes until
+            // we process it, but we can figure out the starting index for
+            // the slots its will consume by looking at the layout we've
+            // computed so far.
+            //
+            Int baseExistentialSlotIndex = 0;
+            if (auto resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
+                baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
+            //
+            // When computing the layout for the field, we will give it access
+            // to all the incoming specialized type slots that haven't already
+            // been consumed/claimed by preceding fields.
+            //
+            auto fieldLayoutContext = context.withSpecializationArgsOffsetBy(baseExistentialSlotIndex);
+
+            auto elementType = tupleType->getMember(i);
+            TypeLayoutResult fieldResult = _createTypeLayout(
+                fieldLayoutContext,
+                elementType,
+                nullptr);
+            auto fieldTypeLayout = fieldResult.layout;
+
+            auto fieldVarLayout = typeLayoutBuilder.addField(DeclRef<VarDeclBase>(), fieldResult);
+
+            // If any of the members of the `Tuple` type had existential/interface
+            // type, then we need to compute a second `StructTypeLayout` that
+            // represents the layout and resource using for the "pending data"
+            // that this type needs to have stored somewhere, but which can't
+            // be laid out in the layout of the type itself.
+            //
+            if (auto fieldPendingDataTypeLayout = fieldTypeLayout->pendingDataTypeLayout)
+            {
+                // We only create this secondary layout on-demand, so that
+                // we don't end up with a bunch of empty structure type layouts
+                // created for no reason.
+                //
+                pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(type, rules);
+                auto fieldPendingVarLayout = pendingDataTypeLayoutBuilder.addField(DeclRef<VarDeclBase>(), fieldPendingDataTypeLayout);
+                fieldVarLayout->pendingVarLayout = fieldPendingVarLayout;
+            }
+        }
+
+        typeLayoutBuilder.endLayout();
+        pendingDataTypeLayoutBuilder.endLayout();
+
+        if (auto pendingDataTypeLayout = pendingDataTypeLayoutBuilder.getTypeLayout())
+        {
+            typeLayout->pendingDataTypeLayout = pendingDataTypeLayout;
+        }
+
+        return _updateLayout(context, type, typeLayoutBuilder.getTypeLayoutResult());
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {

@@ -31,7 +31,7 @@ protected:
     
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
 
-    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace) SLANG_OVERRIDE;
+    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace) SLANG_OVERRIDE;
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsets) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
     virtual void emitPostDeclarationAttributesForType(IRInst* type) SLANG_OVERRIDE;
@@ -44,7 +44,7 @@ protected:
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
-    virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
+    virtual void emitMatrixLayoutModifiersImpl(IRType* varType) SLANG_OVERRIDE;
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;

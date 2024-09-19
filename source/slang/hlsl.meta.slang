@@ -83,7 +83,7 @@ __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 struct ByteAddressBuffer
 {
     [__readNone]
-    [__unsafeForceInlineEarly]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
     void GetDimensions(out uint dim)
     {
@@ -3071,7 +3071,10 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
             }
         }
 
-        __intrinsic_op($(kIROp_ImageSubscript)) ref;
+        // If a 'Texture[location]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location)'.
+        // This allows call's to stay aware that the input is from a 'Texture'.
+        __intrinsic_op($(kIROp_ImageSubscript)) 
+        ref;
     }
 }
 
@@ -3211,7 +3214,10 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
             }
         }
 
-        __intrinsic_op($(kIROp_ImageSubscript)) ref;
+        // If a 'Texture[location, sampleIndex]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location, sampleIndex)'.
+        // This allows call's to stay aware that the input is from a 'Texture'.
+        __intrinsic_op($(kIROp_ImageSubscript))
+        ref;
     }
 }
 
@@ -3839,7 +3845,7 @@ __intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct StructuredBuffer
 {
     [__readNone]
-    [__unsafeForceInlineEarly]
+    [ForceInline]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -3956,7 +3962,7 @@ struct $(item.name)
     // Note(tfoley): supports all operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
-    [__unsafeForceInlineEarly]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
     void GetDimensions(out uint dim)
     {
@@ -5285,7 +5291,7 @@ struct $(item.name)
     uint DecrementCounter();
 
     [__readNone]
-    [__unsafeForceInlineEarly]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
     void GetDimensions(
         out uint numStructs,
@@ -5314,6 +5320,9 @@ struct $(item.name)
     __generic<TIndex : __BuiltinIntegerType>
     __subscript(TIndex index) -> T
     {
+        // If a 'Buffer[index]' is referred to by a '__ref', call 'kIROp_RWStructuredBufferGetElementPtr(index)'.
+        //
+        // This allows call's to stay aware that the input is from a 'Buffer'.
         [__NoSideEffect]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
         ref;
@@ -5659,7 +5668,7 @@ vector<T,N> acosh(vector<T,N> x)
 // Test if all components are non-zero (HLSL SM 1.0)
 __generic<T : __BuiltinType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool all(T x)
 {
     __target_switch
@@ -5669,6 +5678,8 @@ bool all(T x)
     case hlsl:
         __intrinsic_asm "all";
     case metal:
+        __intrinsic_asm "all";
+    case wgsl:
         __intrinsic_asm "all";
     case spirv:
         let zero = __default<T>();
@@ -5797,7 +5808,7 @@ int3 WorkgroupSize();
 
 __generic<T : __BuiltinType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool any(T x)
 {
     __target_switch
@@ -5807,6 +5818,8 @@ bool any(T x)
     case hlsl:
         __intrinsic_asm "any";
     case metal:
+        __intrinsic_asm "any";
+    case wgsl:
         __intrinsic_asm "any";
     case spirv:
         let zero = __default<T>();
@@ -6133,7 +6146,7 @@ vector<T,N> asinh(vector<T,N> x)
 // Reinterpret bits as an int (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 int asint(float x)
 {
     __target_switch
@@ -6143,6 +6156,7 @@ int asint(float x)
     case glsl: __intrinsic_asm "floatBitsToInt";
     case hlsl: __intrinsic_asm "asint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
@@ -6276,7 +6290,7 @@ void asuint(double value, out uint lowbits, out uint highbits)
 // Reinterpret bits as a uint (HLSL SM 4.0)
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 uint asuint(float x)
 {
     __target_switch
@@ -6286,6 +6300,7 @@ uint asuint(float x)
     case glsl: __intrinsic_asm "floatBitsToUint";
     case hlsl: __intrinsic_asm "asuint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
+    case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
@@ -7016,7 +7031,7 @@ void clip(matrix<T,N,M> x)
 // Cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T cos(T x)
 {
     __target_switch
@@ -7026,6 +7041,7 @@ T cos(T x)
     case glsl: __intrinsic_asm "cos";
     case hlsl: __intrinsic_asm "cos";
     case metal: __intrinsic_asm "cos";
+    case wgsl: __intrinsic_asm "cos";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Cos $x
     };
@@ -10418,7 +10434,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 // maximum
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T max(T x, T y)
 {
     // Note: a stdlib implementation of `max` (or `min`) will require splitting
@@ -10431,6 +10447,7 @@ T max(T x, T y)
     case hlsl: __intrinsic_asm "max";
     case glsl: __intrinsic_asm "max";
     case metal: __intrinsic_asm "max";
+    case wgsl: __intrinsic_asm "max";
     case cuda: __intrinsic_asm "$P_max($0, $1)";
     case cpp: __intrinsic_asm "$P_max($0, $1)";
     case spirv:
@@ -10647,7 +10664,7 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 // minimum
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T min(T x, T y)
 {
     __target_switch
@@ -10655,6 +10672,7 @@ T min(T x, T y)
     case hlsl:
     case glsl:
     case metal:
+    case wgsl:
         __intrinsic_asm "min";
     case cuda:
     case cpp:
@@ -11094,13 +11112,14 @@ T mul(vector<T, N> x, vector<T, N> y)
 // vector-matrix
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "($1 * $0)";
     case metal: __intrinsic_asm "($1 * $0)";
+    case wgsl: __intrinsic_asm "($1 * $0)";
     case hlsl: __intrinsic_asm "mul";
     case spirv: return spirv_asm {
         OpMatrixTimesVector $$vector<T, M> result $right $left
@@ -12157,7 +12176,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T sin(T x)
 {
     __target_switch
@@ -12167,6 +12186,7 @@ T sin(T x)
     case glsl: __intrinsic_asm "sin";
     case hlsl: __intrinsic_asm "sin";
     case metal: __intrinsic_asm "sin";
+    case wgsl: __intrinsic_asm "sin";
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Sin $x
     };
@@ -15420,6 +15440,8 @@ ${{{{
                 }
             }
 
+            // If a 'Texture[index]' is referred to by a '__ref', call 'kIROp_ImageSubscript(index)'.
+            // This allows call's to stay aware that the input is from a 'Texture'.
             __intrinsic_op($(kIROp_ImageSubscript))
             ref;
 ${{{{
@@ -15870,6 +15892,20 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
     }
 }
 
+__generic<each T : __BuiltinIntegerType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
+bool ReportHitOptix(float tHit, uint hitKind, expand each T attribs)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "optixReportIntersection";
+    default:
+        return ReportHit(tHit, hitKind, makeTuple(expand each attribs));
+    }
+}
+
 // 10.3.4
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void IgnoreHit()
@@ -16277,7 +16313,8 @@ float dot2add(float2 left, float2 right, float acc);
 // Set the number of output vertices and primitives for a mesh shader invocation.
 __glsl_extension(GL_EXT_mesh_shader)
 __glsl_version(450)
-[require(glsl_hlsl_spirv, meshshading)]
+[require(glsl_hlsl_metal_spirv, meshshading)]
+[noRefInline]
 void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 {
     __target_switch
@@ -16286,6 +16323,8 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
         __intrinsic_asm "SetMeshOutputCounts";
     case glsl:
         __intrinsic_asm "SetMeshOutputsEXT";
+    case metal:
+        __intrinsic_asm "_slang_mesh.set_primitive_count($1)";
     case spirv:
         return spirv_asm
         {
@@ -16317,7 +16356,7 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
         // is dealt with separately by 'legalizeDispatchMeshPayloadForGLSL'.
         __intrinsic_asm "EmitMeshTasksEXT($0, $1, $2)";
     case metal:
-        __intrinsic_asm "_slang_mesh_payload = *$3; _slang_mgp.set_threadgroups_per_grid(uint3($0, $1, $2)); return;";
+        __intrinsic_asm "*_slang_mesh_payload = *$3; _slang_mgp.set_threadgroups_per_grid(uint3($0, $1, $2)); return;";
     case spirv:
         return spirv_asm
         {
@@ -17568,11 +17607,11 @@ Ref<T> __hitObjectAttributes<T>()
     return t;
 }
 [ForceInline]
-Ptr<T> __allocHitObjectAttributes<T>()
+__Addr<T> __allocHitObjectAttributes<T>()
 {
-    [__vulkanHitObjectAttributes]   
+    [__vulkanHitObjectAttributes]
     static T t;
-    return &t;
+    return __get_addr(t);
 }
 
 // Next is the custom intrinsic that will compute the hitObjectAttributes location
@@ -17840,7 +17879,7 @@ struct HitObject
         case spirv:
             {
                 // Save the attributes
-                Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+                __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
 
                 *attr = attributes;
 
@@ -17914,7 +17953,7 @@ struct HitObject
         case spirv:
         {
             // Save the attributes
-            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+            __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
 
             *attr = attributes;
 
@@ -18004,7 +18043,7 @@ struct HitObject
         case spirv:
         {
             // Save the attributes
-            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+            __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
             *attr = attributes;
             let origin = Ray.Origin;
             let direction = Ray.Direction;
@@ -18071,7 +18110,7 @@ struct HitObject
         case spirv:
         {
             // Save the attributes
-            Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+            __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
             *attr = attributes;
             let origin = Ray.Origin;
             let direction = Ray.Direction;
@@ -18618,7 +18657,7 @@ struct HitObject
             }
         case spirv:
             {
-                Ptr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+                __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
                 spirv_asm 
                 {
                     OpExtension "SPV_NV_shader_invocation_reorder";
@@ -20286,6 +20325,72 @@ struct ConstBufferPointer
         }
     }
 }
+
+//
+// HLSL-like dynamic resources
+// https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html
+//
+// For Khronos targets, `__DynamicResource` can be used to declare "untyped" global bindings as
+// usual (e.g. unsized arrays for descriptor indexing), which will then be materialized into 
+// new aliased bindings for each distinct cast type.
+//
+
+__magic_type(DynamicResourceType)
+__intrinsic_type($(kIROp_DynamicResourceType))
+struct __DynamicResource<let kind = __DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    T as<T : __IDynamicResourceCastable<kind>>();
+}
+interface __IDynamicResourceCastable<let kind = __DynamicResourceKind.General>
+{
+}
+
+enum __DynamicResourceKind
+{
+    General = 0, // CBV_SRV_UAV
+    Sampler = 1
+}
+
+__generic<T, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
+extension __TextureImpl<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IDynamicResourceCastable<__DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+}
+
+${{{{
+const char* kDynamicResourceCastableTypes[] = {
+    "StructuredBuffer<T, L>", "RWStructuredBuffer<T, L>",
+    "AppendStructuredBuffer<T, L>", "ConsumeStructuredBuffer<T, L>", "RasterizerOrderedStructuredBuffer<T, L>",
+    "ByteAddressBuffer", "RWByteAddressBuffer", "RasterizerOrderedByteAddressBuffer",
+
+    "SamplerState", "SamplerComparisonState",
+
+    "ConstantBuffer<T>", "TextureBuffer<T>",
+};
+
+for (auto typeName : kDynamicResourceCastableTypes) {
+    auto kind = strstr(typeName, "Sampler") ? "Sampler" : "General";
+
+    if (strstr(typeName, "StructuredBuffer<T, L>"))
+        sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
+    else if (strstr(typeName, "Buffer<T>"))
+        sb << "__generic<T>\n";
+}}}}
+
+extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(kind)>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+}
+
+${{{{
+}
+}}}}
+
 
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)

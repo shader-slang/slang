@@ -296,6 +296,28 @@ The binding index of a parameter is the zero-based index of the slot (of the app
 Note that while OpenGL and Vulkan both use binding indices for shader parameters like textures, the semantics of those are different because OpenGL uses distinct slots for passing buffers and textures.
 For OpenGL it is legal to have a texture that uses `binding=2` and a buffer that uses `binding=2` in the same kernel, because those are indices of distinct kinds of slots, while this scenario would typically be invalid for Vulkan.
 
+Metal
+-----
+
+> #### Note ####
+> Slang support for Metal is a work in progress.
+
+Metal is a shading language exclusive on Apple platforms. The functionality from Metal is similar to DX12 or Vulkan with more or less features.
+
+### Pipelines
+
+Metal includes vertex, fragment, task, mesh and tessellation stages for rasterization, as well as compute, and ray tracing stages.
+
+> #### Note ####
+> Ray-tracing support for Metal is a work in progress.
+
+### Parameter Passing
+
+Metal uses slots for binding resources, and it has three types of bindings: buffer, texture and sampler.
+In addition, it has argument buffer which is itself a buffer, but any further resource members of the argument buffer does not occupy any explicit binding points, and instead set via an offset within the buffer referred to as id in the metal spec.
+
+Note that Metal 3.1 currently doesn't support arrays of buffers.
+
 CUDA and OptiX
 --------------
 

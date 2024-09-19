@@ -209,8 +209,8 @@ bool isPointerToResourceType(IRType* type)
 {
     while (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        if (ptrType->getAddressSpace() == SpvStorageClassStorageBuffer ||
-            ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBufferEXT)
+        if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer ||
+            ptrType->getAddressSpace() == AddressSpace::UserPointer)
             return true;
         type = ptrType->getValueType();
     }
@@ -287,6 +287,11 @@ struct TupleTypeBuilder
                 {
                     specialType = legalFieldType;
                 }
+
+                // `void` is currently legalized to simple, but we don't want to add a
+                // `void` field to the struct.
+                if (legalLeafType.getSimple()->getOp() == kIROp_VoidType)
+                    return;
             }
             break;
 
@@ -419,7 +424,6 @@ struct TupleTypeBuilder
 
         bool isSpecialField = context->isSpecialType(fieldType);
         auto legalFieldType = legalizeType(context, fieldType);
-
         addField(
             field->getKey(),
             legalFieldType,
@@ -467,21 +471,13 @@ struct TupleTypeBuilder
             IRBuilder* builder = context->getBuilder();
             IRStructType* ordinaryStructType = builder->createStructType();
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
-            copyNameHintAndDebugDecorations(ordinaryStructType, originalStructType);
+            originalStructType->transferDecorationsTo(ordinaryStructType);
+            copyNameHintAndDebugDecorations(originalStructType, ordinaryStructType);
 
             // The new struct type will appear right after the original in the IR,
             // so that we can be sure any instruction that could reference the
             // original can also reference the new one.
             ordinaryStructType->insertAfter(originalStructType);
-
-            // Mark the original type for removal once all the other legalization
-            // activity is completed. This is necessary because both the original
-            // and replacement type have the same mangled name, so they would
-            // collide.
-            //
-            // (Also, the original type wasn't legal - that was the whole point...)
-            originalStructType->removeFromParent();
-            context->replacedInstructions.add(originalStructType);
 
             for(auto ee : ordinaryElements)
             {
@@ -1197,6 +1193,32 @@ LegalType legalizeTypeImpl(
                 legalElementType);
 
     }
+    else if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    {
+        auto legalElementType = legalizeType(context, bufferType->getElementType());
+        IRInst* newElementType = nullptr;
+        switch (legalElementType.flavor)
+        {
+        case LegalType::Flavor::simple:
+            if (legalElementType.getSimple() == bufferType->getElementType())
+                return LegalType::simple(bufferType);
+            newElementType = legalElementType.getSimple();
+            break;
+        case LegalType::Flavor::none:
+            newElementType = context->getBuilder()->getIntType();
+            break;
+        default:
+            return LegalType::simple(bufferType);
+        }
+        ShortList<IRInst*> operands;
+        for (UInt i = 0; i < bufferType->getOperandCount(); i++)
+            operands.add(bufferType->getOperand(i));
+        operands[0] = newElementType;
+        return LegalType::simple(context->getBuilder()->getType(
+            bufferType->getOp(),
+            bufferType->getOperandCount(),
+            operands.getArrayView().getBuffer()));
+    }
     else if (isResourceType(type))
     {
         // We assume that any resource types not handled above
@@ -1367,10 +1389,15 @@ LegalType legalizeTypeImpl(
             context,
             arrayType->getElementType());
 
-        // If element type hasn't change, return original type.
-        if (legalElementType.flavor == LegalType::Flavor::simple &&
-            legalElementType.getSimple() == arrayType->getElementType())
-            return LegalType::simple(arrayType);
+        if (legalElementType.flavor == LegalType::Flavor::simple)
+        {
+            if (legalElementType.getSimple()->getOp() == kIROp_VoidType)
+                return LegalType();
+
+            // If element type hasn't change, return original type.
+            if (legalElementType.getSimple() == arrayType->getElementType())
+                return LegalType::simple(arrayType);
+        }
 
         ArrayLegalTypeWrapper wrapper;
         wrapper.arrayType = arrayType;

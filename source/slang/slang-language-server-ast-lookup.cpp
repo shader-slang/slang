@@ -118,6 +118,27 @@ public:
         return dispatchIfNotNull(subscriptExpr->baseExpression);
     }
 
+    bool visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
+    {
+        int tokenLength = 0;
+        if (as<CountOfExpr>(expr))
+            tokenLength = 7; // strlen("countof");
+        else if (as<SizeOfExpr>(expr))
+            tokenLength = 6; // strlen("sizeof");
+        else if (as<AlignOfExpr>(expr))
+            tokenLength = 7; // strlen("alignof");
+
+        if (_isLocInRange(context, expr->loc, tokenLength))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return dispatchIfNotNull(expr->value);
+    }
+
     bool visitParenExpr(ParenExpr* expr)
     {
         return dispatchIfNotNull(expr->base);
@@ -225,7 +246,10 @@ public:
     }
     bool visitSwizzleExpr(SwizzleExpr* expr)
     {
-        if (_isLocInRange(context, expr->memberOpLoc, 0))
+        Index tokenLength = expr->elementIndices.getCount();
+        if (expr->base && as<TupleType>(expr->base->type))
+            tokenLength *= 2;
+        if (_isLocInRange(context, expr->loc, tokenLength))
         {
             ASTLookupResult result;
             result.path = context->nodePath;
@@ -461,7 +485,16 @@ public:
         return false;
     }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
-    bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+    bool visitPackExpr(PackExpr* expr)
+    {
+        for (auto arg : expr->args)
+        {
+            if(dispatchIfNotNull(arg))
+                return true;
+        }
+        return false;
+    }
+    bool reportLookupResultIfInExprLeadingIdentifierRange(Expr* expr)
     {
         auto humaneLoc = context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
         auto tokenLen = context->doc->getTokenLength(humaneLoc.line, humaneLoc.column);
@@ -473,6 +506,24 @@ public:
             context->results.add(result);
             return true;
         }
+        return false;
+    }
+    bool visitExpandExpr(ExpandExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->baseExpr);
+    }
+    bool visitEachExpr(EachExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->baseExpr);
+    }
+    bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
         return dispatchIfNotNull(expr->baseFunction);
     }
     bool visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
@@ -666,6 +717,14 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             ASTLookupExprVisitor visitor(&context);
             if (visitor.dispatchIfNotNull(typeConstraint->getSup().exp))
                 return true;
+            if (auto genTypeConstraint = as<GenericTypeConstraintDecl>(node))
+            {
+                if (genTypeConstraint->whereTokenLoc.isValid())
+                {
+                    if (visitor.dispatchIfNotNull(genTypeConstraint->sub.exp))
+                        return true;
+                }
+            }
         }
         else if (auto typedefDecl = as<TypeDefDecl>(node))
         {

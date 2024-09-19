@@ -18,7 +18,7 @@ struct MeshPayload
     int exponent;
 };
 
-// CHECK: MeshPayload_0 object_data& _slang_mesh_payload
+// CHECK: MeshPayload_0 object_data* _slang_mesh_payload
 // CHECK: mesh_grid_properties  _slang_mgp
 [numthreads(1,1,1)]
 void taskMain()
@@ -54,6 +54,11 @@ struct Vertex
     int value : Value;
 };
 
+struct Primitive
+{
+    uint prim : SV_PrimitiveID;
+};
+
 const static uint MAX_VERTS = 12;
 const static uint MAX_PRIMS = 4;
 
@@ -66,7 +71,9 @@ void meshMain(
     // requires:
     // HLSL: , in payload MeshPayload
     OutputVertices<Vertex, MAX_VERTS> verts,
-    OutputIndices<uint3, MAX_PRIMS> triangles)
+    OutputIndices<uint3, MAX_PRIMS> triangles,
+    OutputPrimitives<Primitive, MAX_PRIMS> primitives
+    )
 {
     const uint numVertices = 12;
     const uint numPrimitives = 4;
@@ -79,7 +86,10 @@ void meshMain(
     }
 
     if (tig < numPrimitives)
+    {
         triangles[tig] = tig * 3 + uint3(0, 1, 2);
+        primitives[tig] = { tig };
+    }
 }
 
 //

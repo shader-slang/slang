@@ -10,7 +10,11 @@ endif()
 
 # Similarly, disable warnings for external projects
 if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
-    add_compile_options(-w)
+    if(MSVC)
+        add_compile_options(/W0)
+    else()
+        add_compile_options(-w)
+    endif()
 endif()
 
 # Miniz
@@ -69,6 +73,12 @@ endif()
 # imgui
 add_library(imgui INTERFACE)
 target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
+
+# slang-rhi
+set(SLANG_RHI_SLANG_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
+set(SLANG_RHI_BUILD_TESTS OFF)
+add_subdirectory(slang-rhi)
 
 # Tidy things up:
 

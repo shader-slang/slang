@@ -368,12 +368,6 @@ convention for interface methods.
 #				define SLANG_OVERRIDE override
 #			endif
 #		endif
-
-// TODO(JS): Not used in previous code. Left here as may be useful on some other version. 
-// #define SLANG_RETURN_NEVER __attribute__((__noreturn__))
-
-#       define SLANG_RETURN_NEVER [[noreturn]]
-
 #	endif // SLANG_GCC_FAMILY
 
 // Visual Studio
@@ -390,9 +384,6 @@ convention for interface methods.
 #	    if _MSC_VER >= 1700
 #		    define SLANG_HAS_ENUM_CLASS 1
 #       endif
-
-#   define SLANG_RETURN_NEVER __declspec(noreturn)
-
 #   endif // SLANG_VC
 
 // Set non set
@@ -407,10 +398,6 @@ convention for interface methods.
 #   endif
 
 #endif // __cplusplus
-
-#ifndef SLANG_RETURN_NEVER
-#   define SLANG_RETURN_NEVER [[noreturn]]
-#endif // SLANG_RETURN_NEVER
 
 /* Macros for detecting processor */
 #if defined(_M_ARM) || defined(__ARM_EABI__)
@@ -616,6 +603,7 @@ extern "C"
         SLANG_METAL_LIB,                ///< Metal library
         SLANG_METAL_LIB_ASM,            ///< Metal library assembly
         SLANG_HOST_SHARED_LIBRARY,      ///< A shared library/Dll for host code (for hosting CPU/OS)
+        SLANG_WGSL,                     ///< WebGPU shading language
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -748,6 +736,7 @@ extern "C"
         SLANG_SOURCE_LANGUAGE_CUDA,
         SLANG_SOURCE_LANGUAGE_SPIRV,
         SLANG_SOURCE_LANGUAGE_METAL,
+        SLANG_SOURCE_LANGUAGE_WGSL,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
@@ -943,6 +932,7 @@ extern "C"
             NoHLSLPackConstantBufferElements,
             ValidateUniformity,
             AllowGLSL,
+            EnableExperimentalPasses,
 
             // Internal
 
@@ -968,7 +958,8 @@ extern "C"
             GenerateWholeProgram,       // bool
             UseUpToDateBinaryModule,    // bool, when set, will only load
                                         // precompiled modules if it is up-to-date with its source.
-
+            EmbedDownstreamIR,          // bool
+            ForceDXLayout,              // bool
             CountOf,
         };
 
@@ -2119,6 +2110,21 @@ extern "C"
     typedef struct SlangReflectionTypeParameter     SlangReflectionTypeParameter;
     typedef struct SlangReflectionUserAttribute     SlangReflectionUserAttribute;
     typedef struct SlangReflectionFunction          SlangReflectionFunction;
+    typedef struct SlangReflectionGeneric           SlangReflectionGeneric;
+    
+    union SlangReflectionGenericArg
+    {
+        SlangReflectionType* typeVal;
+        int64_t intVal;
+        bool boolVal;
+    };
+
+    enum SlangReflectionGenericArgType
+    {
+        SLANG_GENERIC_ARG_TYPE = 0,
+        SLANG_GENERIC_ARG_INT = 1,
+        SLANG_GENERIC_ARG_BOOL = 2
+    };
 
     /*
     Type aliases to maintain backward compatibility.
@@ -2154,6 +2160,7 @@ extern "C"
         SLANG_TYPE_KIND_SPECIALIZED,
         SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_POINTER,
+        SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -2187,7 +2194,8 @@ extern "C"
         SLANG_DECL_KIND_FUNC,
         SLANG_DECL_KIND_MODULE,
         SLANG_DECL_KIND_GENERIC,
-        SLANG_DECL_KIND_VARIABLE
+        SLANG_DECL_KIND_VARIABLE,
+        SLANG_DECL_KIND_NAMESPACE
     };
 
 #ifndef SLANG_RESOURCE_SHAPE
@@ -2411,7 +2419,10 @@ extern "C"
         SLANG_MODIFIER_EXPORT,
         SLANG_MODIFIER_EXTERN,
         SLANG_MODIFIER_DIFFERENTIABLE,
-        SLANG_MODIFIER_MUTATING
+        SLANG_MODIFIER_MUTATING,
+        SLANG_MODIFIER_IN,
+        SLANG_MODIFIER_OUT,
+        SLANG_MODIFIER_INOUT
     };
 
     // User Attribute
@@ -2433,6 +2444,7 @@ extern "C"
     SLANG_API unsigned int spReflectionType_GetUserAttributeCount(SlangReflectionType* type);
     SLANG_API SlangReflectionUserAttribute* spReflectionType_GetUserAttribute(SlangReflectionType* type, unsigned int index);
     SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName(SlangReflectionType* type, char const* name);
+    SLANG_API SlangReflectionType* spReflectionType_applySpecializations(SlangReflectionType* type, SlangReflectionGeneric* generic);
 
     SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* type);
     SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflectionType* type, unsigned index);
@@ -2463,6 +2475,7 @@ extern "C"
 
     SLANG_API char const* spReflectionType_GetName(SlangReflectionType* type);
     SLANG_API SlangResult spReflectionType_GetFullName(SlangReflectionType* type, ISlangBlob** outNameBlob);
+    SLANG_API SlangReflectionGeneric* spReflectionType_GetGenericContainer(SlangReflectionType* type);
 
     // Type Layout Reflection
 
@@ -2547,6 +2560,8 @@ extern "C"
     SLANG_API SlangReflectionUserAttribute* spReflectionVariable_GetUserAttribute(SlangReflectionVariable* var, unsigned int index);
     SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeByName(SlangReflectionVariable* var, SlangSession * globalSession, char const* name);
     SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
+    SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(SlangReflectionVariable* var);
+    SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(SlangReflectionVariable* var, SlangReflectionGeneric* generic);
 
     // Variable Layout Reflection
 
@@ -2572,16 +2587,39 @@ extern "C"
     SLANG_API unsigned int spReflectionFunction_GetParameterCount(SlangReflectionFunction* func);
     SLANG_API SlangReflectionVariable* spReflectionFunction_GetParameter(SlangReflectionFunction* func, unsigned index);
     SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* func);
+    SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(SlangReflectionFunction* func);
+    SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(SlangReflectionFunction* func, SlangReflectionGeneric* generic);
+    SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(SlangReflectionFunction* func, SlangInt argTypeCount, SlangReflectionType* const* argTypes);
 
     // Abstract Decl Reflection
 
     SLANG_API unsigned int spReflectionDecl_getChildrenCount(SlangReflectionDecl* parentDecl);
     SLANG_API SlangReflectionDecl* spReflectionDecl_getChild(SlangReflectionDecl* parentDecl, unsigned int index);
+    SLANG_API char const* spReflectionDecl_getName(SlangReflectionDecl* decl);
     SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl);
     SLANG_API SlangReflectionFunction* spReflectionDecl_castToFunction(SlangReflectionDecl* decl);
     SLANG_API SlangReflectionVariable* spReflectionDecl_castToVariable(SlangReflectionDecl* decl);
-    SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangSession* session, SlangReflectionDecl* decl);
-    
+    SLANG_API SlangReflectionGeneric* spReflectionDecl_castToGeneric(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionDecl* spReflectionDecl_getParent(SlangReflectionDecl* decl);
+
+    // Generic Reflection
+
+    SLANG_API SlangReflectionDecl* spReflectionGeneric_asDecl(SlangReflectionGeneric* generic);
+    SLANG_API char const* spReflectionGeneric_GetName(SlangReflectionGeneric* generic);
+    SLANG_API unsigned int spReflectionGeneric_GetTypeParameterCount(SlangReflectionGeneric* generic);
+    SLANG_API SlangReflectionVariable* spReflectionGeneric_GetTypeParameter(SlangReflectionGeneric* generic, unsigned index);
+    SLANG_API unsigned int spReflectionGeneric_GetValueParameterCount(SlangReflectionGeneric* generic);
+    SLANG_API SlangReflectionVariable* spReflectionGeneric_GetValueParameter(SlangReflectionGeneric* generic, unsigned index);
+    SLANG_API unsigned int spReflectionGeneric_GetTypeParameterConstraintCount(SlangReflectionGeneric* generic, SlangReflectionVariable* typeParam);
+    SLANG_API SlangReflectionType* spReflectionGeneric_GetTypeParameterConstraintType(SlangReflectionGeneric* generic, SlangReflectionVariable* typeParam, unsigned index);
+    SLANG_API SlangDeclKind spReflectionGeneric_GetInnerKind(SlangReflectionGeneric* generic);
+    SLANG_API SlangReflectionDecl* spReflectionGeneric_GetInnerDecl(SlangReflectionGeneric* generic);
+    SLANG_API SlangReflectionGeneric* spReflectionGeneric_GetOuterGenericContainer(SlangReflectionGeneric* generic);
+    SLANG_API SlangReflectionType* spReflectionGeneric_GetConcreteType(SlangReflectionGeneric* generic, SlangReflectionVariable* typeParam);
+    SLANG_API int64_t spReflectionGeneric_GetConcreteIntVal(SlangReflectionGeneric* generic, SlangReflectionVariable* valueParam);
+    SLANG_API SlangReflectionGeneric* spReflectionGeneric_applySpecializations(SlangReflectionGeneric* currGeneric, SlangReflectionGeneric* generic);
+
 
     /** Get the stage that a variable belongs to (if any).
 
@@ -2672,6 +2710,8 @@ extern "C"
     SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(SlangReflection* reflection, SlangReflectionType* reflectionType, SlangLayoutRules rules);
 
     SLANG_API SlangReflectionFunction* spReflection_FindFunctionByName(SlangReflection* reflection, char const* name);
+    SLANG_API SlangReflectionFunction* spReflection_FindFunctionByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name);
+    SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(SlangReflection* reflection, SlangReflectionType* reflType, char const* name);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(SlangReflection* reflection, SlangUInt index);
@@ -2680,12 +2720,25 @@ extern "C"
     SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection* reflection);
     SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* reflection);
 
-    SLANG_API  SlangReflectionType* spReflection_specializeType(
+    SLANG_API SlangReflectionType* spReflection_specializeType(
         SlangReflection*            reflection,
         SlangReflectionType*        type,
         SlangInt                    specializationArgCount,
         SlangReflectionType* const* specializationArgs,
         ISlangBlob**                outDiagnostics);
+    
+    SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
+        SlangReflection*                        inProgramLayout,
+        SlangReflectionGeneric*                 generic,
+        SlangInt                                argCount,
+        SlangReflectionGenericArgType const*    argTypes,
+        SlangReflectionGenericArg const*        args,
+        ISlangBlob**                            outDiagnostics);
+    
+    SLANG_API bool spReflection_isSubType(
+        SlangReflection * reflection,
+        SlangReflectionType* subType,
+        SlangReflectionType* superType);
 
         /// Get the number of hashed strings
     SLANG_API SlangUInt spReflection_getHashedStringCount(
@@ -2729,6 +2782,15 @@ namespace slang
     struct TypeReflection;
     struct VariableLayoutReflection;
     struct VariableReflection;
+    struct FunctionReflection;
+    struct GenericReflection;
+    
+    union GenericArgReflection
+    {
+        TypeReflection* typeVal;
+        int64_t intVal;
+        bool boolVal;
+    };
     
     struct UserAttribute
     {
@@ -2780,6 +2842,7 @@ namespace slang
             Specialized = SLANG_TYPE_KIND_SPECIALIZED,
             Feedback = SLANG_TYPE_KIND_FEEDBACK,
             Pointer = SLANG_TYPE_KIND_POINTER,
+            DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         };
 
         enum ScalarType : SlangScalarTypeIntegral
@@ -2898,13 +2961,25 @@ namespace slang
         {
             return spReflectionType_GetUserAttributeCount((SlangReflectionType*)this);
         }
+
         UserAttribute* getUserAttributeByIndex(unsigned int index)
         {
             return (UserAttribute*)spReflectionType_GetUserAttribute((SlangReflectionType*)this, index);
         }
+
         UserAttribute* findUserAttributeByName(char const* name)
         {
             return (UserAttribute*)spReflectionType_FindUserAttributeByName((SlangReflectionType*)this, name);
+        }
+
+        TypeReflection* applySpecializations(GenericReflection* generic)
+        {
+            return (TypeReflection*)spReflectionType_applySpecializations((SlangReflectionType*)this, (SlangReflectionGeneric*)generic);
+        }
+
+        GenericReflection* getGenericContainer()
+        {
+            return (GenericReflection*) spReflectionType_GetGenericContainer((SlangReflectionType*) this);
         }
     };
 
@@ -3325,7 +3400,10 @@ namespace slang
             Export = SLANG_MODIFIER_EXPORT,
             Extern = SLANG_MODIFIER_EXTERN,
             Differentiable = SLANG_MODIFIER_DIFFERENTIABLE,
-            Mutating = SLANG_MODIFIER_MUTATING
+            Mutating = SLANG_MODIFIER_MUTATING,
+            In = SLANG_MODIFIER_IN,
+            Out = SLANG_MODIFIER_OUT,
+            InOut = SLANG_MODIFIER_INOUT
         };
     };
 
@@ -3350,10 +3428,12 @@ namespace slang
         {
             return spReflectionVariable_GetUserAttributeCount((SlangReflectionVariable*)this);
         }
+
         UserAttribute* getUserAttributeByIndex(unsigned int index)
         {
             return (UserAttribute*)spReflectionVariable_GetUserAttribute((SlangReflectionVariable*)this, index);
         }
+
         UserAttribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
         {
             return (UserAttribute*)spReflectionVariable_FindUserAttributeByName((SlangReflectionVariable*)this, globalSession, name);
@@ -3362,6 +3442,16 @@ namespace slang
         bool hasDefaultValue()
         {
             return spReflectionVariable_HasDefaultValue((SlangReflectionVariable*)this);
+        }
+
+        GenericReflection* getGenericContainer()
+        {
+            return (GenericReflection*)spReflectionVariable_GetGenericContainer((SlangReflectionVariable*)this);
+        }
+
+        VariableReflection* applySpecializations(GenericReflection* generic)
+        {
+            return (VariableReflection*)spReflectionVariable_applySpecializations((SlangReflectionVariable*)this, (SlangReflectionGeneric*)generic);
         }
     };
 
@@ -3488,6 +3578,95 @@ namespace slang
         {
             return (Modifier*)spReflectionFunction_FindModifier((SlangReflectionFunction*)this, (SlangModifierID)id);
         }
+
+        GenericReflection* getGenericContainer()
+        {
+            return (GenericReflection*)spReflectionFunction_GetGenericContainer((SlangReflectionFunction*)this);
+        }
+
+        FunctionReflection* applySpecializations(GenericReflection* generic)
+        {
+            return (FunctionReflection*)spReflectionFunction_applySpecializations((SlangReflectionFunction*)this, (SlangReflectionGeneric*)generic);
+        }
+
+        FunctionReflection* specializeWithArgTypes(unsigned int argCount, TypeReflection* const* types)
+        {
+            return (FunctionReflection*)spReflectionFunction_specializeWithArgTypes((SlangReflectionFunction*)this, argCount, (SlangReflectionType* const*)types);
+        }
+    };
+
+    struct GenericReflection
+    {
+
+        DeclReflection* asDecl()
+        {
+            return (DeclReflection*)spReflectionGeneric_asDecl((SlangReflectionGeneric*)this);
+        }
+
+        char const* getName()
+        {
+            return spReflectionGeneric_GetName((SlangReflectionGeneric*)this);
+        }
+
+        unsigned int getTypeParameterCount()
+        {
+            return spReflectionGeneric_GetTypeParameterCount((SlangReflectionGeneric*)this);
+        }
+
+        VariableReflection* getTypeParameter(unsigned index)
+        {
+            return (VariableReflection*)spReflectionGeneric_GetTypeParameter((SlangReflectionGeneric*)this, index);
+        }
+
+        unsigned int getValueParameterCount()
+        {
+            return spReflectionGeneric_GetValueParameterCount((SlangReflectionGeneric*)this);
+        }
+
+        VariableReflection* getValueParameter(unsigned index)
+        {
+            return (VariableReflection*)spReflectionGeneric_GetValueParameter((SlangReflectionGeneric*)this, index);
+        }
+
+        unsigned int getTypeParameterConstraintCount(VariableReflection* typeParam)
+        {
+            return spReflectionGeneric_GetTypeParameterConstraintCount((SlangReflectionGeneric*)this, (SlangReflectionVariable*)typeParam);
+        }
+
+        TypeReflection* getTypeParameterConstraintType(VariableReflection* typeParam, unsigned index)
+        {
+            return (TypeReflection*)spReflectionGeneric_GetTypeParameterConstraintType((SlangReflectionGeneric*)this, (SlangReflectionVariable*)typeParam, index);
+        }
+
+        DeclReflection* getInnerDecl()
+        {
+            return (DeclReflection*)spReflectionGeneric_GetInnerDecl((SlangReflectionGeneric*)this);
+        }
+
+        SlangDeclKind getInnerKind()
+        {
+            return spReflectionGeneric_GetInnerKind((SlangReflectionGeneric*)this);
+        }
+
+        GenericReflection* getOuterGenericContainer()
+        {
+            return (GenericReflection*)spReflectionGeneric_GetOuterGenericContainer((SlangReflectionGeneric*)this);
+        }
+
+        TypeReflection* getConcreteType(VariableReflection* typeParam)
+        {
+            return (TypeReflection*)spReflectionGeneric_GetConcreteType((SlangReflectionGeneric*)this, (SlangReflectionVariable*)typeParam);
+        }
+
+        int64_t getConcreteIntVal(VariableReflection* valueParam)
+        {
+            return spReflectionGeneric_GetConcreteIntVal((SlangReflectionGeneric*)this, (SlangReflectionVariable*)valueParam);
+        }
+
+        GenericReflection* applySpecializations(GenericReflection* generic)
+        {
+            return (GenericReflection*)spReflectionGeneric_applySpecializations((SlangReflectionGeneric*)this, (SlangReflectionGeneric*)generic);
+        }
     };
 
     struct EntryPointReflection
@@ -3590,6 +3769,7 @@ namespace slang
     };
 
     typedef struct ShaderReflection ProgramLayout;
+    typedef enum SlangReflectionGenericArgType GenericArgType;
 
     struct ShaderReflection
     {
@@ -3662,6 +3842,22 @@ namespace slang
                 name);
         }
 
+        FunctionReflection* findFunctionByNameInType(TypeReflection* type, const char* name)
+        {
+            return (FunctionReflection*)spReflection_FindFunctionByNameInType(
+                (SlangReflection*) this,
+                (SlangReflectionType*) type,
+                name);
+        }
+
+        VariableReflection* findVarByNameInType(TypeReflection* type, const char* name)
+        {
+            return (VariableReflection*)spReflection_FindVarByNameInType(
+                (SlangReflection*) this,
+                (SlangReflectionType*) type,
+                name);
+        }
+
         TypeLayoutReflection* getTypeLayout(
             TypeReflection* type,
             LayoutRules     rules = LayoutRules::Default)
@@ -3693,6 +3889,32 @@ namespace slang
                 outDiagnostics);
         }
 
+        GenericReflection* specializeGeneric(
+            GenericReflection* generic,
+            SlangInt specializationArgCount,
+            GenericArgType const* specializationArgTypes,
+            GenericArgReflection const* specializationArgVals,
+            ISlangBlob** outDiagnostics)
+        {
+            return (GenericReflection*) spReflection_specializeGeneric(
+                (SlangReflection*) this,
+                (SlangReflectionGeneric*) generic,
+                specializationArgCount,
+                (SlangReflectionGenericArgType const*) specializationArgTypes,
+                (SlangReflectionGenericArg const*) specializationArgVals,
+                outDiagnostics);
+        }
+
+        bool isSubType(
+            TypeReflection* subType,
+            TypeReflection* superType)
+        {
+            return spReflection_isSubType(
+                (SlangReflection*) this,
+                (SlangReflectionType*) subType,
+                (SlangReflectionType*) superType);
+        }
+
         SlangUInt getHashedStringCount() const { return spReflection_getHashedStringCount((SlangReflection*)this); }
 
         const char* getHashedString(SlangUInt index, size_t* outCount) const
@@ -3722,7 +3944,13 @@ namespace slang
             Module = SLANG_DECL_KIND_MODULE,
             Generic = SLANG_DECL_KIND_GENERIC,
             Variable = SLANG_DECL_KIND_VARIABLE,
+            Namespace = SLANG_DECL_KIND_NAMESPACE,
         };
+
+        char const* getName()
+        {
+            return spReflectionDecl_getName((SlangReflectionDecl*) this);
+        }
 
         Kind getKind()
         {
@@ -3739,9 +3967,9 @@ namespace slang
             return (DeclReflection*)spReflectionDecl_getChild((SlangReflectionDecl*)this, index);
         }
 
-        TypeReflection* getType(SlangSession* session)
+        TypeReflection* getType()
         {
-            return (TypeReflection*)spReflection_getTypeFromDecl(session, (SlangReflectionDecl*)this);
+            return (TypeReflection*)spReflection_getTypeFromDecl((SlangReflectionDecl*)this);
         }
 
         VariableReflection* asVariable()
@@ -3752,6 +3980,16 @@ namespace slang
         FunctionReflection* asFunction()
         {
             return (FunctionReflection*)spReflectionDecl_castToFunction((SlangReflectionDecl*)this);
+        }
+
+        GenericReflection* asGeneric()
+        {
+            return (GenericReflection*)spReflectionDecl_castToGeneric((SlangReflectionDecl*)this);
+        }
+
+        DeclReflection* getParent()
+        {
+            return (DeclReflection*)spReflectionDecl_getParent((SlangReflectionDecl*)this);
         }
 
         template <Kind K>
@@ -4142,7 +4380,6 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFlags(
             int                     targetIndex,
             SlangTargetFlags        flags) = 0;
-
 
             /*!
             @brief Set the floating point mode (e.g., precise or fast) to use a target.
@@ -4695,6 +4932,13 @@ namespace slang
         // return a copy of internal profiling results, and if `shouldClear` is true, clear the internal profiling results before returning.
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCompileTimeProfile(ISlangProfiler** compileTimeProfile, bool shouldClear) = 0;
 
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(
+            int                     targetIndex,
+            bool                    value) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) = 0;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDownstreamIR(int targetIndex, bool value) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
@@ -5289,6 +5533,10 @@ namespace slang
             SlangInt32 index) = 0;
 
         virtual SLANG_NO_THROW DeclReflection* SLANG_MCALL getModuleReflection() = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            ISlangBlob** outDiagnostics) = 0;
     };
     
     #define SLANG_UUID_IModule IModule::getTypeGuid()
@@ -5351,6 +5599,14 @@ Returns nullptr if there isn't an embedded stdlib.
 */
 SLANG_API ISlangBlob* slang_getEmbeddedStdLib();
 
+
+/* Cleanup all global allocations used by Slang, to prevent memory leak detectors from
+ reporting them as leaks. This function should only be called after all Slang objects
+ have been released. No other Slang functions such as `createGlobalSession`
+ should be called after this function.
+ */
+SLANG_EXTERN_C SLANG_API void slang_shutdown();
+
 namespace slang
 {
     inline SlangResult createGlobalSession(
@@ -5358,6 +5614,7 @@ namespace slang
     {
         return slang_createGlobalSession(SLANG_API_VERSION, outGlobalSession);
     }
+    inline void shutdown() { slang_shutdown(); }
 }
 
 /** @see slang::ICompileRequest::getProgram

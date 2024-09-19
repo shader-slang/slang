@@ -1096,12 +1096,6 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
                 passThru = SLANG_PASS_THROUGH_DXC;
             }
             break;
-
-        case RenderApiType::OpenGl:
-            target = SLANG_GLSL;
-            nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
-            passThru = SLANG_PASS_THROUGH_GLSLANG;
-            break;
         case RenderApiType::Vulkan:
             target = SLANG_SPIRV;
             nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
@@ -4256,7 +4250,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     ComPtr<ISlangSharedLibrary> moduleLibrary;
 
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(
-        Path::combine(context->exeDirectoryPath, moduleName).getBuffer(),
+        Path::combine(context->dllDirectoryPath, moduleName).getBuffer(),
         moduleLibrary.writeRef()));
 
     UnitTestGetModuleFunc getModuleFunc =
@@ -4617,7 +4611,7 @@ SlangResult innerMain(int argc, char** argv)
 int main(int argc, char** argv)
 {
     const SlangResult res = innerMain(argc, argv);
-
+    slang::shutdown();
     Slang::RttiInfo::deallocateAll();
 
 #ifdef _MSC_VER

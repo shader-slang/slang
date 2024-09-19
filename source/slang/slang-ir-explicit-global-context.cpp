@@ -12,8 +12,118 @@ namespace Slang
 // thread-group, and wrap them up in an explicit "context"
 // type that gets passed between functions.
 
+enum class GlobalObjectKind : UInt
+{
+    None = 0,
+    GlobalVar = 1 << 0,
+    GlobalParam = 1 << 1,
+    All = 0xFFFFFFFF,
+};
+
+enum class HoistGlobalVarOptions : UInt
+{
+    PlainGlobal = 0,
+    SharedGlobal = 1 << 0,
+    RaytracingGlobal = 1 << 1,
+    All = 0xFFFFFFFF,
+};
+
 struct IntroduceExplicitGlobalContextPass
 {
+
+    // TODO: (#4742) Discontinuity of AddressSpace values between targets 
+    // (SpvStorageClassFunction vs. AddressSpace::ThreadLocal) needs
+    // to be addressed. This means `addressSpaceOfLocals` may be refactored out.
+
+    /// Target specific options to manage `IntroduceExplicitGlobalContextPass`
+    class ExplicitContextPolicy
+    {
+    public:
+        ExplicitContextPolicy(CodeGenTarget target)
+        {
+            switch (target)
+            {
+            case CodeGenTarget::SPIRV:
+            case CodeGenTarget::SPIRVAssembly:
+                hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
+                requiresFuncTypeCorrectionPass = true;
+                addressSpaceOfLocals = AddressSpace::Function;
+                hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
+                break;
+            case CodeGenTarget::CUDASource:
+                hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
+
+                // One important exception is that CUDA *does* support
+                // global variables with the `__shared__` qualifer, with
+                // semantics that exactly match HLSL/Slang `groupshared`.
+                //
+                // We thus need to skip processing of global variables
+                // that were marked `groupshared`. In our current IR,
+                // this is represented as a variable with the `@GroupShared`
+                // rate on its type.
+                //
+                hoistGlobalVarOptions = HoistGlobalVarOptions(0
+                                        | (UInt)HoistGlobalVarOptions::PlainGlobal
+                                        | (UInt)HoistGlobalVarOptions::RaytracingGlobal
+                                        );
+                break;
+            }
+        }
+
+        bool canHoistType(GlobalObjectKind hoistable)
+        {
+            return (UInt)hoistableGlobalObjectKind & (UInt)hoistable;
+        }
+
+        bool canHoistGlobalVar(IRGlobalVar* inst)
+        {
+            if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::SharedGlobal)
+                && as<IRGroupSharedRate>(inst->getRate()))
+                return false;
+
+            if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::RaytracingGlobal))
+            {
+                for (auto decoration : inst->getDecorations())
+                {
+                    switch (decoration->getOp())
+                    {
+                    case kIROp_VulkanRayPayloadDecoration:
+                    case kIROp_VulkanRayPayloadInDecoration:
+                    case kIROp_VulkanCallablePayloadDecoration:
+                    case kIROp_VulkanCallablePayloadInDecoration:
+                    case kIROp_VulkanHitObjectAttributesDecoration:
+                    case kIROp_VulkanHitAttributesDecoration:
+                        return false;
+                    default:
+                        continue;
+                    };
+                }
+            }
+
+            return true;
+        }
+
+        bool requiresFuncTypeCorrection()
+        {
+            return requiresFuncTypeCorrectionPass;
+        }
+
+        AddressSpace getAddressSpaceOfLocal()
+        {
+            return addressSpaceOfLocals;
+        }
+
+    private:
+        HoistGlobalVarOptions hoistGlobalVarOptions = HoistGlobalVarOptions::All;
+        GlobalObjectKind hoistableGlobalObjectKind = GlobalObjectKind::All;
+        bool requiresFuncTypeCorrectionPass = false;
+        AddressSpace addressSpaceOfLocals = AddressSpace::ThreadLocal;
+    };
+
+    IntroduceExplicitGlobalContextPass(IRModule* module, CodeGenTarget target) : m_module(module), m_target(target), m_options(target)
+    {
+    }
+
     IRModule*       m_module = nullptr;
     CodeGenTarget   m_target = CodeGenTarget::Unknown;
 
@@ -24,10 +134,22 @@ struct IntroduceExplicitGlobalContextPass
     List<IRGlobalVar*>  m_globalVars;
     List<IRFunc*>       m_entryPoints;
 
-    enum class GlobalObjectKind
+    ExplicitContextPolicy m_options;
+
+    AddressSpace getAddressSpaceOfLocal()
     {
-        GlobalParam, GlobalVar
-    };
+        return m_options.getAddressSpaceOfLocal();
+    }
+
+    bool canHoistType(GlobalObjectKind hoistable)
+    {
+        return m_options.canHoistType(hoistable);
+    }
+
+    bool canHoistGlobalVar(IRGlobalVar* inst)
+    {
+        return m_options.canHoistGlobalVar(inst);
+    }
 
     void processModule()
     {
@@ -45,6 +167,8 @@ struct IntroduceExplicitGlobalContextPass
             {
             case kIROp_GlobalVar:
                 {
+                    if (!canHoistType(GlobalObjectKind::GlobalVar))
+                        continue;
                     // A "global variable" in HLSL (and thus Slang) is actually
                     // a weird kind of thread-local variable, and so it cannot
                     // actually be lowered to a global variable on targets where
@@ -58,20 +182,8 @@ struct IntroduceExplicitGlobalContextPass
                         continue;
                     }
 
-                    // One important exception is that CUDA *does* support
-                    // global variables with the `__shared__` qualifer, with
-                    // semantics that exactly match HLSL/Slang `groupshared`.
-                    //
-                    // We thus need to skip processing of global variables
-                    // that were marked `groupshared`. In our current IR,
-                    // this is represented as a variable with the `@GroupShared`
-                    // rate on its type.
-                    //
-                    if( m_target == CodeGenTarget::CUDASource )
-                    {
-                        if( as<IRGroupSharedRate>(globalVar->getRate()) )
-                            continue;
-                    }
+                    if (!canHoistGlobalVar(globalVar))
+                        continue;
 
                     m_globalVars.add(globalVar);
                 }
@@ -79,6 +191,8 @@ struct IntroduceExplicitGlobalContextPass
 
             case kIROp_GlobalParam:
                 {
+                    if (!canHoistType(GlobalObjectKind::GlobalParam))
+                        continue;
                     // Global parameters are another HLSL/Slang concept
                     // that doesn't have a parallel in langauges like C/C++.
                     //
@@ -170,7 +284,7 @@ struct IntroduceExplicitGlobalContextPass
         // The context will usually be passed around by pointer,
         // so we get and cache that pointer type up front.
         //
-        m_contextStructPtrType = builder.getPtrType(kIROp_PtrType, m_contextStructType, (IRIntegerValue)AddressSpace::ThreadLocal);
+        m_contextStructPtrType = builder.getPtrType(kIROp_PtrType, m_contextStructType, getAddressSpaceOfLocal());
 
 
         // The first step will be to create fields in the `KernelContext`
@@ -227,6 +341,17 @@ struct IntroduceExplicitGlobalContextPass
         {
             replaceUsesOfGlobalVar(globalVar);
         }
+
+        // SPIRV requires a correct IR func-type to emit properly
+        if (m_options.requiresFuncTypeCorrection())
+        {
+            for (auto pairOfFuncs : m_mapFuncToContextPtr)
+            {
+                if (pairOfFuncs.second->getOp() == kIROp_Var)
+                    continue;
+                fixUpFuncType(pairOfFuncs.first);
+            }
+        }
     }
 
     // As noted above, we will maintain mappings to record
@@ -258,7 +383,7 @@ struct IntroduceExplicitGlobalContextPass
         if (kind == GlobalObjectKind::GlobalVar)
         {
             auto ptrType = as<IRPtrTypeBase>(type);
-            if (ptrType->getAddressSpace() == (IRIntegerValue)AddressSpace::GroupShared)
+            if (ptrType->getAddressSpace() == AddressSpace::GroupShared)
             {
                 fieldDataType = ptrType;
                 needDereference = true;
@@ -380,12 +505,12 @@ struct IntroduceExplicitGlobalContextPass
             auto fieldInfo = m_mapInstToContextFieldInfo[globalVar];
             if (fieldInfo.needDereference)
             {
-                auto var = builder.emitVar(globalVar->getDataType()->getValueType(), (IRIntegerValue)AddressSpace::GroupShared);
+                auto var = builder.emitVar(globalVar->getDataType()->getValueType(), AddressSpace::GroupShared);
                 if (auto nameDecor = globalVar->findDecoration<IRNameHintDecoration>())
                 {
                     builder.addNameHintDecoration(var, nameDecor->getName());
                 }
-                auto ptrPtrType = builder.getPtrType(getGlobalVarPtrType(globalVar), AddressSpace::ThreadLocal);
+                auto ptrPtrType = builder.getPtrType(getGlobalVarPtrType(globalVar), getAddressSpaceOfLocal());
                 auto fieldPtr = builder.emitFieldAddress(ptrPtrType, contextVarPtr, fieldInfo.key);
                 builder.emitStore(fieldPtr, var);
             }
@@ -438,7 +563,7 @@ struct IntroduceExplicitGlobalContextPass
         {
             return builder.getPtrType(globalVar->getDataType()->getValueType(), AddressSpace::GroupShared);
         }
-        return builder.getPtrType(globalVar->getDataType()->getValueType(), AddressSpace::ThreadLocal);
+        return builder.getPtrType(globalVar->getDataType()->getValueType(), getAddressSpaceOfLocal());
     }
 
     void replaceUsesOfGlobalVar(IRGlobalVar* globalVar)
@@ -452,7 +577,7 @@ struct IntroduceExplicitGlobalContextPass
 
         auto ptrType = getGlobalVarPtrType(globalVar);
         if (fieldInfo.needDereference)
-            ptrType = builder.getPtrType(kIROp_PtrType, ptrType, AddressSpace::ThreadLocal);
+            ptrType = builder.getPtrType(kIROp_PtrType, ptrType, getAddressSpaceOfLocal());
 
         // We then iterate over the uses of the variable,
         // being careful to defend against the use/def information
@@ -628,9 +753,7 @@ void introduceExplicitGlobalContext(
     IRModule*       module,
     CodeGenTarget   target)
 {
-    IntroduceExplicitGlobalContextPass pass;
-    pass.m_module = module;
-    pass.m_target = target;
+    IntroduceExplicitGlobalContextPass pass(module, target);
     pass.processModule();
 }
 

@@ -3,15 +3,9 @@
 
 
 #include "glslang/Public/ResourceLimits.h"
-#include "StandAlone/Worklist.h"
-#include "glslang/Include/ShHandle.h"
 #include "glslang/Public/ShaderLang.h"
 #include "SPIRV/GlslangToSpv.h"
-#include "SPIRV/GLSL.std.450.h"
-#include "SPIRV/doc.h"
 #include "SPIRV/disassemble.h"
-
-#include "glslang/MachineIndependent/localintermediate.h"
 
 #include "slang.h"
 
@@ -23,6 +17,7 @@
 #endif
 
 #include <memory>
+#include <mutex>
 #include <sstream>
 
 // This is a wrapper to allow us to run the `glslang` compiler
@@ -145,6 +140,28 @@ struct SPIRVOptimizationDiagnostic
     std::string message;
 };
 
+// TODO: the actual printing should happen on the application side.
+static void validationMessageConsumer(spv_message_level_t level, const char*,
+    const spv_position_t& position, const char* message)
+{
+    switch (level)
+    {
+    case SPV_MSG_FATAL:
+    case SPV_MSG_INTERNAL_ERROR:
+    case SPV_MSG_ERROR:
+        std::cerr << "error: line " << position.index << ": " << message << std::endl;
+        break;
+    case SPV_MSG_WARNING:
+        std::cout << "warning: line " << position.index << ": " << message << std::endl;
+        break;
+    case SPV_MSG_INFO:
+        std::cout << "info: line " << position.index << ": " << message << std::endl;
+        break;
+    default:
+        break;
+    }
+}
+
 // Validate the given SPIRV-ASM instructions.
 extern "C"
 #ifdef _MSC_VER
@@ -160,7 +177,7 @@ bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
     options.SetScalarBlockLayout(true);
 
     spvtools::SpirvTools tools(target_env);
-    //tools.SetMessageConsumer(spvtools::utils::CLIMessageConsumer);
+    tools.SetMessageConsumer(validationMessageConsumer);
 
     return tools.Validate(contents, contentsSize, options);
 }

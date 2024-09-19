@@ -500,6 +500,11 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+        case kIROp_ControlBarrier:
+        {
+            m_writer->emit("GroupMemoryBatrierWithGroupSync();\n");
+            return true;
+        }
         case kIROp_MakeVector:
         case kIROp_MakeMatrix:
         {
@@ -954,15 +959,37 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_MatrixType:
         {
             auto matType = (IRMatrixType*)type;
-
-            // TODO(tfoley): should really emit these with sugar
-            m_writer->emit("matrix<");
-            emitType(matType->getElementType());
-            m_writer->emit(",");
-            emitVal(matType->getRowCount(), getInfo(EmitOp::General));
-            m_writer->emit(",");
-            emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
-            m_writer->emit("> ");           
+            bool canUseSugar = true;
+            switch (matType->getElementType()->getOp())
+            {
+            case kIROp_IntType:
+            case kIROp_UIntType:
+            case kIROp_FloatType:
+                canUseSugar = true;
+                break;
+            default:
+                canUseSugar = false;
+                break;
+            }
+            if (!as<IRIntLit>(matType->getRowCount()) || !as<IRIntLit>(matType->getColumnCount()))
+                canUseSugar = false;
+            if (canUseSugar)
+            {
+                emitType(matType->getElementType());
+                m_writer->emitInt64(getIntVal(matType->getRowCount()));
+                m_writer->emit("x");
+                m_writer->emitInt64(getIntVal(matType->getColumnCount()));
+            }
+            else
+            {
+                m_writer->emit("matrix<");
+                emitType(matType->getElementType());
+                m_writer->emit(",");
+                emitVal(matType->getRowCount(), getInfo(EmitOp::General));
+                m_writer->emit(",");
+                emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
+                m_writer->emit("> ");
+            }
             return;
         }
         case kIROp_SamplerStateType:
@@ -1096,7 +1123,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] IRIntegerValue addressSpace)
+void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] AddressSpace addressSpace)
 {
     if (as<IRGroupSharedRate>(rate))
     {
@@ -1301,25 +1328,24 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
     }
 }
 
-void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
+void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* type)
 {
-    // When a variable has a matrix type, we want to emit an explicit
-    // layout qualifier based on what the layout has been computed to be.
-    //
-
-    auto typeLayout = layout->getTypeLayout()->unwrapArray();
-
-    if (auto matrixTypeLayout = as<IRMatrixTypeLayout>(typeLayout))
+    auto matType = as<IRMatrixType>(type);
+    if (!matType)
+        return;
+    auto matrixLayout = getIntVal(matType->getLayout());
+    if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() != (MatrixLayoutMode)matrixLayout)
     {
-        switch (matrixTypeLayout->getMode())
+        switch (matrixLayout)
         {
-            case kMatrixLayoutMode_ColumnMajor:
-                m_writer->emit("column_major ");
-                break;
-
-            case kMatrixLayoutMode_RowMajor:
-                m_writer->emit("row_major ");
-                break;
+        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+            m_writer->emit("column_major ");
+            break;
+        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+            m_writer->emit("row_major ");
+            break;
+        default:
+            break;
         }
     }
 }

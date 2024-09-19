@@ -22,8 +22,10 @@ namespace Slang
     enum class IsSubTypeOptions
     {
         None = 0,
-        /// Type may not be finished 'DeclCheckState::ReadyForLookup`
-        NotReadyForLookup = 1 << 0,
+
+        /// A type may not be finished 'DeclCheckState::ReadyForLookup` while `isSubType` is called.
+        /// We should not cache any negative results when this flag is set.
+        NoCaching = 1 << 0,
     };
 
         /// Should the given `decl` be treated as a static rather than instance declaration?
@@ -596,7 +598,7 @@ namespace Slang
     };
 
         /// Shared state for a semantics-checking session.
-    struct SharedSemanticsContext
+    struct SharedSemanticsContext : public RefObject
     {
         Linkage*        m_linkage   = nullptr;
 
@@ -686,11 +688,37 @@ namespace Slang
         FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(FunctionDeclBase* func, int recurseLimit);
         FunctionDifferentiableLevel getFuncDifferentiableLevel(FunctionDeclBase* func);
 
+        struct InheritanceCircularityInfo
+        {
+            InheritanceCircularityInfo(
+                Decl* decl,
+                InheritanceCircularityInfo* next)
+                : decl(decl)
+                , next(next)
+            {}
+
+            /// A declaration whose inheritance is being calculated
+            Decl* decl = nullptr;
+
+            /// The rest of the links in the chain of declarations being processed
+            InheritanceCircularityInfo* next = nullptr;
+        };
+
             /// Get the processed inheritance information for `type`, including all its facets
-        InheritanceInfo getInheritanceInfo(Type* type);
+        InheritanceInfo getInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo = nullptr);
 
             /// Get the processed inheritance information for `extension`, including all its facets
-        InheritanceInfo getInheritanceInfo(DeclRef<ExtensionDecl> const& extension);
+        InheritanceInfo getInheritanceInfo(DeclRef<ExtensionDecl> const& extension, InheritanceCircularityInfo* circularityInfo = nullptr);
+
+            /// Prevent an unsupported case of
+            /// ```
+            ///     extension<T:IFoo> : IBar{};
+            ///     extesnion<T:IBar> : IFoo{};
+            /// ```
+            /// from causing infinite recursion.
+        bool _checkForCircularityInExtensionTargetType(
+            Decl* decl,
+            InheritanceCircularityInfo* circularityInfo);
 
             /// Try get subtype witness from cache, returns true if cache contains a result for the query.
         bool tryGetSubtypeWitnessFromCache(Type* sub, Type* sup, SubtypeWitness*& outWitness)
@@ -734,9 +762,15 @@ namespace Slang
 
         ASTBuilder* _getASTBuilder() { return m_linkage->getASTBuilder(); }
 
-        InheritanceInfo _getInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType);
-        InheritanceInfo _calcInheritanceInfo(Type* type);
-        InheritanceInfo _calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType);
+        InheritanceInfo _getInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType, InheritanceCircularityInfo* circularityInfo);
+        InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
+        InheritanceInfo _calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType, InheritanceCircularityInfo* circularityInfo);
+
+        // Get the inner most generic decl that a decl-ref is dependent on.
+        // For example, `Foo<T>` depends on the generic decl that defines `T`.
+        //
+        DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
+        void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
 
         struct DirectBaseInfo
         {
@@ -894,6 +928,14 @@ namespace Slang
             return result;
         }
 
+        SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Type*>* capturedTypes)
+        {
+            SemanticsContext result(*this);
+            result.m_parentExpandExpr = expr;
+            result.m_capturedTypePacks = capturedTypes;
+            return result;
+        }
+
             /// Information for tracking one or more outer statements.
             ///
             /// During checking of statements, we need to track what
@@ -1003,6 +1045,8 @@ namespace Slang
 
         Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
+        OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
+
     private:
         SharedSemanticsContext* m_shared = nullptr;
 
@@ -1044,6 +1088,10 @@ namespace Slang
         // 2. the logic expression is in the init expression of a static const variable.
         // 3. the logic expression is in an array size declaration.
         bool m_shouldShortCircuitLogicExpr = true;
+
+        ExpandExpr* m_parentExpandExpr = nullptr;
+
+        OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
     };
 
     struct OuterScopeContextRAII
@@ -1177,10 +1225,11 @@ namespace Slang
         }
 
         DeclRefExpr* ConstructDeclRefExpr(
-            DeclRef<Decl>   declRef,
-            Expr*    baseExpr,
+            DeclRef<Decl> declRef,
+            Expr* baseExpr,
+            Name* name,
             SourceLoc loc,
-            Expr*    originalExpr);
+            Expr* originalExpr);
 
         Expr* ConstructDerefExpr(
             Expr*    base,
@@ -1194,16 +1243,17 @@ namespace Slang
 
         Expr* ConstructLookupResultExpr(
             LookupResultItem const& item,
-            Expr*            baseExpr,
+            Expr* baseExpr,
+            Name* name,
             SourceLoc loc,
             Expr* originalExpr);
 
         Expr* createLookupResultExpr(
-            Name*                   name,
-            LookupResult const&     lookupResult,
-            Expr*            baseExpr,
+            Name* name,
+            LookupResult const& lookupResult,
+            Expr* baseExpr,
             SourceLoc loc,
-            Expr*    originalExpr);
+            Expr* originalExpr);
 
         DeclVisibility getTypeVisibility(Type* type);
         bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);
@@ -1341,10 +1391,10 @@ namespace Slang
         // TODO(tfoley): consider just allowing `void` as a
         // simple example of a "unit" type, and get rid of
         // this check.
-        TypeExp CoerceToUsableType(TypeExp const& typeExp);
+        TypeExp CoerceToUsableType(TypeExp const& typeExp, Decl* decl);
 
         // Check a type, and coerce it to be usable
-        TypeExp CheckUsableType(TypeExp typeExp);
+        TypeExp CheckUsableType(TypeExp typeExp, Decl* decl);
 
         Expr* CheckTerm(Expr* term);
 
@@ -1601,7 +1651,9 @@ namespace Slang
 
         bool getAttributeTargetSyntaxClasses(SyntaxClass<NodeBase> & cls, uint32_t typeFlags);
 
-        bool validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget);
+        // Check an attribute, and return a checked modifier that represents it.
+        //
+        Modifier* validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl, ModifiableSyntaxNode* attrTarget);
 
         AttributeBase* checkAttribute(
             UncheckedAttribute*     uncheckedAttr,
@@ -2060,6 +2112,8 @@ namespace Slang
         struct Constraint
         {
             Decl*		decl = nullptr; // the declaration of the thing being constraints
+            Index indexInPack = 0; // If the constraint is for a type parameter pack, which index in the pack is this constraint for?
+
             Val*	val = nullptr; // the value to which we are constraining it
             bool isUsedAsLValue = false;   // If this constraint is for a type parameter, is the type used in an l-value parameter?
             bool satisfied = false; // Has this constraint been met?
@@ -2083,9 +2137,14 @@ namespace Slang
             // Constraints we have accumulated, which constrain
             // the possible arguments for those parameters.
             List<Constraint> constraints;
+
+            // Additional subtype witnesses available to the currentt constraint solving context.
+            Type* subTypeForAdditionalWitnesses = nullptr;
+            Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;
         };
 
         Type* TryJoinVectorAndScalarType(
+            ConstraintSystem* constraints,
             VectorExpressionType* vectorType,
             BasicExpressionType*  scalarType);
 
@@ -2180,11 +2239,13 @@ namespace Slang
         ConversionCost getConversionCost(Type* toType, QualType fromType);
 
         Type* _tryJoinTypeWithInterface(
+            ConstraintSystem* constraints,
             Type*                   type,
             Type*                   interfaceType);
 
         // Try to compute the "join" between two types
         Type* TryJoinTypes(
+            ConstraintSystem* constraints,
             QualType  left,
             QualType  right);
 
@@ -2230,11 +2291,11 @@ namespace Slang
 
             // The original arguments to the call
             Index argCount = 0;
-            Expr** args = nullptr;
+            List<Expr*>* args = nullptr;
             Type** argTypes = nullptr;
 
             Index getArgCount() { return argCount; }
-            Expr*& getArg(Index index) { return args[index]; }
+            Expr*& getArg(Index index) { return (*args)[index]; }
             Type* getArgType(Index index)
             {
                 if(argTypes)
@@ -2249,6 +2310,12 @@ namespace Slang
                 else
                     return semantics->maybeResolveOverloadedExpr(getArg(index), LookupMask::Default, nullptr)->type;
             }
+            struct MatchedArg
+            {
+                Expr* argExpr = nullptr;
+                Type* argType = nullptr;
+            };
+            bool matchArgumentsToParams(SemanticsVisitor* semantics, const List<QualType>& params, bool computeTypes, ShortList<MatchedArg>& outMatchedArgs);
 
             bool disallowNestedConversions = false;
 
@@ -2433,9 +2500,15 @@ namespace Slang
         // indirect parents.
         GenericDecl* findNextOuterGeneric(Decl* decl);
 
+        struct ValUnificationContext
+        {
+            Index indexInTypePack = 0;
+        };
+
         // Try to find a unification for two values
         bool TryUnifyVals(
             ConstraintSystem&	constraints,
+            ValUnificationContext unificationContext,
             Val*			fst,
             bool            fstLVal,
             Val*			snd,
@@ -2443,6 +2516,7 @@ namespace Slang
 
         bool tryUnifyDeclRef(
             ConstraintSystem&       constraints,
+            ValUnificationContext unificationContext,
             DeclRefBase*   fst,
             bool           fstLVal,
             DeclRefBase*   snd,
@@ -2450,6 +2524,7 @@ namespace Slang
 
         bool tryUnifyGenericAppDeclRef(
             ConstraintSystem& constraints,
+            ValUnificationContext unificationContext,
             GenericAppDeclRef* fst,
             bool            fstLVal,
             GenericAppDeclRef* snd,
@@ -2457,36 +2532,43 @@ namespace Slang
 
         bool TryUnifyTypeParam(
             ConstraintSystem&     constraints,
-            GenericTypeParamDecl* typeParamDecl,
+            ValUnificationContext unificationContext,
+            GenericTypeParamDeclBase* typeParamDecl,
             QualType              type);
 
         bool TryUnifyIntParam(
             ConstraintSystem&               constraints,
+            ValUnificationContext unificationContext,
             GenericValueParamDecl*	paramDecl,
             IntVal*                  val);
 
         bool TryUnifyIntParam(
             ConstraintSystem&       constraints,
+            ValUnificationContext unificationContext,
             DeclRef<VarDeclBase> const&   varRef,
             IntVal*          val);
 
         bool TryUnifyTypesByStructuralMatch(
             ConstraintSystem&       constraints,
+            ValUnificationContext unificationContext,
             QualType fst,
             QualType snd);
 
         bool TryUnifyTypes(
             ConstraintSystem&       constraints,
+            ValUnificationContext unificationContext,
             QualType fst,
             QualType snd);
 
         bool TryUnifyConjunctionType(
             ConstraintSystem&   constraints,
+            ValUnificationContext unificationContext,
             QualType            fst,
             QualType            snd);
 
         void maybeUnifyUnconstraintIntParam(
             ConstraintSystem& constraints,
+            ValUnificationContext unificationContext,
             IntVal* param,
             IntVal* arg,
             bool paramIsLVal);
@@ -2494,7 +2576,8 @@ namespace Slang
         // Is the candidate extension declaration actually applicable to the given type
         DeclRef<ExtensionDecl> applyExtensionToType(
             ExtensionDecl*  extDecl,
-            Type*    type);
+            Type*    type,
+            Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnessesForType = nullptr);
 
             // Take a generic declaration that is being applied
             // in a context and attempt to infer any missing generic
@@ -2600,6 +2683,8 @@ namespace Slang
             IntVal*        baseElementRowCount,
             IntVal*        baseElementColCount);
 
+        Expr* checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType* baseTupleType);
+
         Expr* CheckSwizzleExpr(
             MemberExpr* memberRefExpr,
             Type*      baseElementType,
@@ -2609,6 +2694,10 @@ namespace Slang
             MemberExpr*	memberRefExpr,
             Type*		baseElementType,
             IntVal*				baseElementCount);
+
+        // Check a member expr as a general member lookup.
+        // This is the default/fallback behavior if the base type isn't swizzlable.
+        Expr* checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType);
 
             /// Perform semantic checking of an assignment where the operands have already been checked.
         Expr* checkAssignWithCheckedOperands(AssignExpr* expr);
@@ -2622,6 +2711,10 @@ namespace Slang
 
             /// Perform checking operations required for the "base" expression of a member-reference like `base.someField`
         Expr* checkBaseForMemberExpr(Expr* baseExpr, bool& outNeedDeref);
+
+            /// Prepare baseExpr for use as the base of a member expr.
+            /// This include inserting implicit open-existential operations as needed.
+        Expr* maybeInsertImplicitOpForMemberBase(Expr* baseExpr, bool& outNeedDeref);
 
         Expr* lookupMemberResultFailure(
             DeclRefExpr*     expr,
@@ -2650,7 +2743,8 @@ namespace Slang
     DeclRef<ExtensionDecl> applyExtensionToType(
         SemanticsVisitor*   semantics,
         ExtensionDecl*      extDecl,
-        Type*               type);
+        Type*               type,
+        Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitness = nullptr);
 
 
     struct SemanticsExprVisitor
@@ -2696,6 +2790,10 @@ namespace Slang
 
         Expr* visitAsTypeExpr(AsTypeExpr* expr);
 
+        Expr* visitExpandExpr(ExpandExpr* expr);
+
+        Expr* visitEachExpr(EachExpr* expr);
+
         void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
 
         //
@@ -2726,7 +2824,7 @@ namespace Slang
         CASE(OpenRefExpr)
         CASE(MakeOptionalExpr)
         CASE(PartiallyAppliedGenericExpr)
-
+        CASE(PackExpr)
     #undef CASE
 
         Expr* visitStaticMemberExpr(StaticMemberExpr* expr);
@@ -2755,6 +2853,8 @@ namespace Slang
         Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 
         Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
+
+        Expr* visitDetachExpr(DetachExpr* expr);
 
         Expr* visitSPIRVAsmExpr(SPIRVAsmExpr*);
 
@@ -2868,7 +2968,8 @@ namespace Slang
     // texture, buffer, sampler, acceleration structure, etc.
     bool isOpaqueHandleType(Type* type);
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl = false);
+    void diagnoseMissingCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilitySet& setToFind);
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, HashSet<Decl*>& printedDecls);
 
     void _ensureAllDeclsRec(
         SemanticsDeclVisitorBase* visitor,

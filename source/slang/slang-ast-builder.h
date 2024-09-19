@@ -6,7 +6,7 @@
 
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
-
+#include "slang-ir.h"
 #include "../core/slang-type-traits.h"
 #include "../core/slang-memory-arena.h"
 
@@ -72,6 +72,14 @@ public:
 
     ASTBuilder* getInnerASTBuilder() { return m_astBuilder; }
 
+    Name* getThisTypeName()
+    {
+        if (!m_thisTypeName)
+        {
+            m_thisTypeName = getNamePool()->getName("This");
+        }
+        return m_thisTypeName;
+    }
 protected:
     // State shared between ASTBuilders
 
@@ -104,6 +112,8 @@ protected:
     Dictionary<Name*, const ReflectClassInfo*> m_nameToTypeMap;
     
     NamePool* m_namePool = nullptr;
+
+    Name* m_thisTypeName = nullptr;
 
     // This is a private builder used for these shared types
     ASTBuilder* m_astBuilder = nullptr;
@@ -289,7 +299,7 @@ public:
         auto interfaceDecl = create<InterfaceDecl>();
         // Always include a `This` member and a `This:IThisInterface` member.
         auto thisDecl = create<ThisTypeDecl>();
-        thisDecl->nameAndLoc.name = m_sharedASTBuilder->getNamePool()->getName(UnownedStringSlice("This", 4));
+        thisDecl->nameAndLoc.name = getSharedASTBuilder()->getThisTypeName();
         thisDecl->nameAndLoc.loc = loc;
         interfaceDecl->addMember(thisDecl);
         auto thisConstraint = create<ThisTypeConstraintDecl>();
@@ -336,7 +346,7 @@ public:
             case ASTNodeType::ThisTypeDecl:
             case ASTNodeType::ExtensionDecl:
             case ASTNodeType::AssocTypeDecl:
-                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl);
+                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl).template as<T>();
             default:
                 break;
             }
@@ -396,13 +406,13 @@ public:
         return getOrCreate<GenericAppDeclRef>(innerDecl, genericDeclRef, args);
     }
 
-    LookupDeclRef* getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
+    DeclRef<Decl> getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
         auto result = getOrCreate<LookupDeclRef>(declToLookup, base, subtypeWitness);
         return result;
     }
 
-    LookupDeclRef* getLookupDeclRef(SubtypeWitness* subtypeWitness, Decl* declToLookup)
+    DeclRef<Decl> getLookupDeclRef(SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
         return getLookupDeclRef(subtypeWitness->getSub(), subtypeWitness, declToLookup);
     }
@@ -439,7 +449,7 @@ public:
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
         // Construct the type `Ptr<valueType>`, where `Ptr`
         // is looked up as a builtin type.
-    PtrType* getPtrType(Type* valueType);
+    PtrType* getPtrType(Type* valueType, AddressSpace addrSpace);
 
         // Construct the type `Out<valueType>`
     OutType* getOutType(Type* valueType);
@@ -448,7 +458,7 @@ public:
     InOutType* getInOutType(Type* valueType);
 
         // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType);
+    RefType* getRefType(Type* valueType, AddressSpace addrSpace);
 
         // Construct the type `ConstRef<valueType>`
     ConstRefType* getConstRefType(Type* valueType);
@@ -459,6 +469,7 @@ public:
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
+    PtrTypeBase* getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 
@@ -507,11 +518,17 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
-    TupleType* getTupleType(List<Type*>& types);
+    TupleType* getTupleType(ArrayView<Type*> types);
 
     FuncType* getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType = nullptr);
 
     TypeType* getTypeType(Type* type);
+
+    Type* getEachType(Type* baseType);
+
+    Type* getExpandType(Type* pattern, ArrayView<Type*> capturedPacks);
+
+    ConcreteTypePack* getTypePack(ArrayView<Type*> types);
 
         /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(
@@ -521,6 +538,12 @@ public:
         Type*                   subType,
         Type*                   superType,
         DeclRef<Decl> const&    declRef);
+
+    TypePackSubtypeWitness* getSubtypeWitnessPack(Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses);
+
+    SubtypeWitness* getExpandSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getEachSubtypeWitness(Type* subType, Type* superType, SubtypeWitness* patternWitness);
 
         /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(

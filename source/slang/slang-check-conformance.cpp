@@ -60,7 +60,7 @@ namespace Slang
             return result;
         result = checkAndConstructSubtypeWitness(subType, superType, isSubTypeOptions);
         
-        if(int(isSubTypeOptions) & int(IsSubTypeOptions::NotReadyForLookup))
+        if(!result && (int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))
             return result;    
         
         getShared()->cacheSubtypeWitness(subType, superType, result);
@@ -112,7 +112,7 @@ namespace Slang
         // tangling convertibility into it.
 
         // First, make sure both sub type and super type decl are ready for lookup.
-        if ( !(int(isSubTypeOptions) & int(IsSubTypeOptions::NotReadyForLookup)) )
+        if ( !(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)) )
         {
             if (auto subDeclRefType = as<DeclRefType>(subType))
             {
@@ -232,7 +232,35 @@ namespace Slang
             }
             return nullptr;
         }
-
+        else if (auto subTypePack = as<ConcreteTypePack>(subType))
+        {
+            // A type pack (T0, T1, ...) is a subtype of supType, if each of its elements
+            // is a subtype of the supType.
+            ShortList<SubtypeWitness*> elementWitnesses;
+            for (Index i = 0; i < subTypePack->getTypeCount(); i++)
+            {
+                auto elementWitness = isSubtype(subTypePack->getElementType(i), superType, IsSubTypeOptions::None);
+                if (!elementWitness)
+                    return nullptr;
+                elementWitnesses.add(elementWitness);
+            }
+            return m_astBuilder->getSubtypeWitnessPack(subType, superType, elementWitnesses.getArrayView().arrayView);
+        }
+        else if (auto expandType = as<ExpandType>(subType))
+        {
+            // A expand type `expand patternType, captureList` is a subtype of supType, if patternType is a subtype of supType.
+            auto elementWitness = isSubtype(expandType->getPatternType(), superType, IsSubTypeOptions::None);
+            if (!elementWitness)
+                return nullptr;
+            return m_astBuilder->getExpandSubtypeWitness(subType, superType, elementWitness);
+        }
+        else if (auto eachType = as<EachType>(subType))
+        {
+            auto elementWitness = isSubtype(eachType->getElementType(), superType, IsSubTypeOptions::None);
+            if (!elementWitness)
+                return nullptr;
+            return m_astBuilder->getEachSubtypeWitness(subType, superType, elementWitness);
+        }
         // default is failure
         return nullptr;
     }

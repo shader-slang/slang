@@ -17,7 +17,8 @@ namespace gfx_test
     static Slang::Result precompileProgram(
         gfx::IDevice* device,
         ISlangMutableFileSystem* fileSys,
-        const char* shaderModuleName)
+        const char* shaderModuleName,
+        bool precompileToTarget)
     {
         Slang::ComPtr<slang::ISession> slangSession;
         SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
@@ -33,6 +34,23 @@ namespace gfx_test
         diagnoseIfNeeded(diagnosticsBlob);
         if (!module)
             return SLANG_FAIL;
+
+        if (precompileToTarget)
+        {
+            SlangCompileTarget target;
+            switch (device->getDeviceInfo().deviceType)
+            {
+            case gfx::DeviceType::DirectX12:
+                target = SLANG_DXIL;
+                break;
+            case gfx::DeviceType::Vulkan:
+                target = SLANG_SPIRV;
+                break;
+            default:
+                return SLANG_FAIL;
+            }
+            module->precompileForTarget(target, diagnosticsBlob.writeRef());
+        }
 
         // Write loaded modules to memory file system.
         for (SlangInt i = 0; i < slangSession->getLoadedModuleCount(); i++)
@@ -50,7 +68,7 @@ namespace gfx_test
         return SLANG_OK;
     }
 
-    void precompiledModule2TestImpl(IDevice* device, UnitTestContext* context)
+    void precompiledModule2TestImplCommon(IDevice* device, UnitTestContext* context, bool precompileToTarget)
     {
         Slang::ComPtr<ITransientResourceHeap> transientHeap;
         ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -63,7 +81,7 @@ namespace gfx_test
 
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
-        GFX_CHECK_CALL_ABORT(precompileProgram(device, memoryFileSystem.get(), "precompiled-module-imported"));
+        GFX_CHECK_CALL_ABORT(precompileProgram(device, memoryFileSystem.get(), "precompiled-module-imported", precompileToTarget));
 
         // Next, load the precompiled slang program.
         Slang::ComPtr<slang::ISession> slangSession;
@@ -168,14 +186,34 @@ namespace gfx_test
             Slang::makeArray<float>(3.0f, 3.0f, 3.0f, 3.0f));
     }
 
+    void precompiledModule2TestImpl(IDevice* device, UnitTestContext* context)
+    {
+        precompiledModule2TestImplCommon(device, context, false);
+    }
+
+    void precompiledTargetModule2TestImpl(IDevice* device, UnitTestContext* context)
+    {
+        precompiledModule2TestImplCommon(device, context, true);
+    }
+
     SLANG_UNIT_TEST(precompiledModule2D3D12)
     {
         runTestImpl(precompiledModule2TestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
+    SLANG_UNIT_TEST(precompiledTargetModule2D3D12)
+    {
+        runTestImpl(precompiledTargetModule2TestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
     SLANG_UNIT_TEST(precompiledModule2Vulkan)
     {
         runTestImpl(precompiledModule2TestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)
+    {
+        runTestImpl(precompiledTargetModule2TestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
 }

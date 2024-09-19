@@ -155,7 +155,7 @@ namespace Slang
                         {
                             if (ptrType->hasAddressSpace())
                             {
-                                mapInstToAddrSpace[inst] = (AddressSpace)ptrType->getAddressSpace();
+                                mapInstToAddrSpace[inst] = ptrType->getAddressSpace();
                                 continue;
                             }
                         }
@@ -331,9 +331,12 @@ namespace Slang
                 auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
                 if (ptrType)
                 {
-                    IRBuilder builder(inst);
-                    auto newType = builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), addrSpace);
-                    setDataType(inst, newType);
+                    if (ptrType->getAddressSpace() != addrSpace)
+                    {
+                        IRBuilder builder(inst);
+                        auto newType = builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), addrSpace);
+                        setDataType(inst, newType);
+                    }
                 }
             }
         }

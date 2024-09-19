@@ -93,7 +93,7 @@ namespace Slang
         void checkDerivativeMemberAttributeParent(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
         void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
         void checkMeshOutputDecl(VarDeclBase* varDecl);
-
+        void maybeApplyMatrixLayoutModifier(VarDeclBase* varDecl);
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
         void visitVarDecl(VarDecl* varDecl)
@@ -354,7 +354,7 @@ namespace Slang
 
         virtual void processReferencedDecl(Decl* decl) = 0;
 
-        virtual void processDeclModifiers(Decl* decl) = 0;
+        virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) = 0;
 
         void dispatchIfNotNull(Stmt* stmt)
         {
@@ -464,7 +464,9 @@ namespace Slang
         {
             dispatchIfNotNull(expr->type.type);
             dispatchIfNotNull(expr->declRef.declRefBase);
-            processDeclModifiers(expr->declRef.getDecl());
+
+            // Pass down the callee location
+            processDeclModifiers(expr->declRef.getDecl(), expr->loc);
         }
         void visitStaticMemberExpr(StaticMemberExpr* expr)
         {
@@ -786,6 +788,9 @@ namespace Slang
         if(as<ConstructorDecl>(decl))
             return true;
 
+        if (as<EnumCaseDecl>(decl))
+            return true;
+
         // Things nested inside functions may have dependencies
         // on values from the enclosing scope, but this needs to
         // be dealt with via "capture" so they are also effectively
@@ -1070,12 +1075,13 @@ namespace Slang
     DeclRef<ExtensionDecl> applyExtensionToType(
         SemanticsVisitor*       semantics,
         ExtensionDecl*          extDecl,
-        Type*  type)
+        Type*  type,
+        Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitness)
     {
         if(!semantics)
             return DeclRef<ExtensionDecl>();
 
-        return semantics->applyExtensionToType(extDecl, type);
+        return semantics->applyExtensionToType(extDecl, type, additionalSubtypeWitness);
     }
 
     bool SemanticsVisitor::isDeclUsableAsStaticMember(
@@ -1510,6 +1516,22 @@ namespace Slang
             }
         }
     }
+    void SemanticsDeclHeaderVisitor::maybeApplyMatrixLayoutModifier(VarDeclBase* varDecl)
+    {
+        if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
+        {
+            if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
+            {
+                auto matrixLayout = as<ColumnMajorLayoutModifier>(matrixLayoutModifier) ? SLANG_MATRIX_LAYOUT_COLUMN_MAJOR : SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+                auto newMatrixType = getASTBuilder()->getMatrixType(
+                    matrixType->getElementType(),
+                    matrixType->getRowCount(),
+                    matrixType->getColumnCount(),
+                    getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
+                varDecl->type.type = newMatrixType;
+            }
+        }
+    }
 
     void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
@@ -1556,7 +1578,7 @@ namespace Slang
             // A variable with an explicit type is simpler, for the
             // most part.
             SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
-            TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type);
+            TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type, varDecl);
             varDecl->type = typeExp;
             if (varDecl->type.equals(m_astBuilder->getVoidType()))
             {
@@ -1592,21 +1614,7 @@ namespace Slang
         }
 
         // If there is a matrix layout modifier, we will modify the matrix type now.
-        if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
-        {
-            if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
-            {
-                auto matrixLayout = as<ColumnMajorLayoutModifier>(matrixLayoutModifier) ? SLANG_MATRIX_LAYOUT_COLUMN_MAJOR : SLANG_MATRIX_LAYOUT_ROW_MAJOR;
-                auto newMatrixType = getASTBuilder()->getMatrixType(
-                    matrixType->getElementType(),
-                    matrixType->getRowCount(),
-                    matrixType->getColumnCount(),
-                    getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
-                varDecl->type.type = newMatrixType;
-                if (varDecl->initExpr)
-                    varDecl->initExpr = coerce(CoercionSite::Initializer, varDecl->type, varDecl->initExpr);
-            }
-        }
+        maybeApplyMatrixLayoutModifier(varDecl);
 
         if (varDecl->initExpr)
         {
@@ -1919,9 +1927,58 @@ namespace Slang
         checkVisibility(classDecl);
     }
 
+    bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
+    {
+        // find groupshared modifier
+        if (varDecl->findModifier<HLSLGroupSharedModifier>())
+        {
+            if (sink && varDecl->initExpr)
+                sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool isDefaultInitializable(VarDeclBase* varDecl)
+    {
+        if (!DiagnoseIsAllowedInitExpr(varDecl, nullptr))
+            return false;
+
+        // Find struct and modifiers associated with varDecl
+        StructDecl* structDecl = as<StructDecl>(varDecl);
+        if (auto declRefType = as<DeclRefType>(varDecl->getType()))
+        {
+            if (auto genericAppRefDecl = as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
+            {
+                auto baseGenericRefType = genericAppRefDecl->getBase()->getDecl();
+                if (auto baseTypeStruct = as<StructDecl>(baseGenericRefType))
+                {
+                    structDecl = baseTypeStruct;
+                }
+                else if (auto genericDecl = as<GenericDecl>(baseGenericRefType))
+                {
+                    if(auto innerTypeStruct = as<StructDecl>(genericDecl->inner))
+                        structDecl = innerTypeStruct;
+                }
+            }
+        }
+        if (structDecl)
+        {
+            // find if a type is non-copyable
+            if (structDecl->findModifier<NonCopyableTypeAttribute>())
+                return false;
+        }
+
+        return true;
+    }
+
     static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
     {
         if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+        
+        if (!isDefaultInitializable(varDecl))
             return nullptr;
 
         ConstructorDecl* defaultCtor = nullptr;
@@ -1938,7 +1995,7 @@ namespace Slang
         {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
             auto member = visitor->getASTBuilder()->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
-            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->loc, nullptr);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->getName(), defaultCtor->loc, nullptr);
             return invoke;
         }
         else
@@ -1948,8 +2005,11 @@ namespace Slang
             return defaultCall;
         }
     }
+
     void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
+        DiagnoseIsAllowedInitExpr(varDecl, getSink());
+
         // if zero initialize is true, set everything to a default
         if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) 
             && !varDecl->initExpr
@@ -2037,10 +2097,11 @@ namespace Slang
                 if (overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
                 {
                     getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
-                    return;
                 }
-
-                getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
+                else
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
+                }
             }
             else if(overloadContext.bestCandidate)
             {
@@ -2053,16 +2114,17 @@ namespace Slang
                 if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
                 {
                     getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
-                    return;
                 }
-
-                // If we had a single best candidate *and* it was applicable,
-                // then we use it to construct a new initial-value expression
-                // for the variable, that will be used for all downstream
-                // code generation.
-                //
-                varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
-                getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{ *overloadContext.bestCandidate, 0});
+                else
+                {
+                    // If we had a single best candidate *and* it was applicable,
+                    // then we use it to construct a new initial-value expression
+                    // for the variable, that will be used for all downstream
+                    // code generation.
+                    //
+                    varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+                    getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{*overloadContext.bestCandidate, 0});
+                }
             }
         }
 
@@ -2216,13 +2278,17 @@ namespace Slang
             
             markSelfDifferentialMembersOfType(as<AggTypeDecl>(context->parentDecl), context->conformingType);
 
+            witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(context->conformingType));
             if (doesTypeSatisfyAssociatedTypeConstraintRequirement(context->conformingType, requirementDeclRef, witnessTable))
             {
-                witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(context->conformingType));
 
                 // Increase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
                 m_astBuilder->incrementEpoch();
                 return true;
+            }
+            else
+            {
+                witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
             }
 
             // Something went wrong.
@@ -2245,16 +2311,35 @@ namespace Slang
         // from requirementDeclRef to get the generic arguments for the outer generic, and
         // apply it to the newly synthesized decl.
         SubstitutionSet substSet;
+        Type* thisType = nullptr;
         if (auto thisWitness = findThisTypeWitness(
             SubstitutionSet(requirementDeclRef),
             as<InterfaceDecl>(requirementDeclRef.getParent()).getDecl()))
         {
-            if (auto declRefType = as<DeclRefType>(thisWitness->getSub()))
+            thisType = thisWitness->getSub();
+            if (auto declRefType = as<DeclRefType>(thisType))
             {
                 substSet = SubstitutionSet(declRefType->getDeclRef());
             }
         }
-        auto satisfyingType = DeclRefType::create(m_astBuilder, m_astBuilder->getMemberDeclRef(substSet.declRef, aggTypeDecl));
+        if (!substSet.declRef)
+            return false;
+        Type* satisfyingType = nullptr;
+        if (substSet.declRef->getDecl() == context->parentDecl)
+        {
+            // The type we are synthesizing conformance for is direct inside a type itself.
+            // We need to copy the outer generic arguments to the synthesized type.
+            satisfyingType = DeclRefType::create(m_astBuilder, m_astBuilder->getMemberDeclRef(substSet.declRef, aggTypeDecl));
+        }
+        else if (auto parentExtDecl = as<ExtensionDecl>(context->parentDecl))
+        {
+            // The type is defined in an extension, we need to form a declref to the parent
+            // extension from the requirementDeclRef.
+            auto extDeclRef = applyExtensionToType(parentExtDecl, thisType);
+            satisfyingType = DeclRefType::create(m_astBuilder, m_astBuilder->getMemberDeclRef(extDeclRef, aggTypeDecl));
+        }
+        if (!satisfyingType)
+            return false;
 
         // Helper function to add a `diffType` field into the synthesized type for the original
         // `member`.
@@ -2390,19 +2475,16 @@ namespace Slang
         // conformance on the synthesized decl.
         checkAggTypeConformance(aggTypeDecl);
 
-        if (doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
+        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
+        if (!doesTypeSatisfyAssociatedTypeConstraintRequirement(satisfyingType, requirementDeclRef, witnessTable))
         {
-            witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
-
-            // Incrase the epoch so that future calls to Type::getCanonicalType will return the up-to-date folded types.
-            m_astBuilder->incrementEpoch();
-            return true;
+            // Note: the call to `doesTypeSatisfyAssociatedTypeConstraintRequirement` should always succeed.
+            // If not, there is something wrong with the code synthesis logic. For now we just return false
+            // instead of crashing so the user can work around the issues.
+            witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
+            return false;
         }
-
-        // Note: the call to `doesTypeSatisfyAssociatedTypeConstraintRequirement` should always succeed.
-        // If not, there is something wrong with the code synthesis logic. For now we just return false
-        // instead of crashing so the user can work around the issues.
-        return false;
+        return true;
     }
 
     void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
@@ -2416,7 +2498,7 @@ namespace Slang
         CheckConstraintSubType(decl->sub);
         decl->sub = TranslateTypeNodeForced(decl->sub);
         decl->sup = TranslateTypeNodeForced(decl->sup);
-        if (!isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sub.type))
+        if (!decl->isEqualityConstraint && !isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sub.type))
         {
             getSink()->diagnose(decl->sup.exp, Diagnostics::invalidTypeForConstraint, decl->sup);
         }
@@ -2444,18 +2526,22 @@ namespace Slang
         // and likely a crash.
         // 
         // Accessing the members via index side steps the issue.
+
+        Index parameterIndex = 0;
         const auto& members = genericDecl->members;
         for (Index i = 0; i < members.getCount(); ++i)
         {
             Decl* m = members[i];
 
-            if (auto typeParam = as<GenericTypeParamDecl>(m))
+            if (auto typeParam = as<GenericTypeParamDeclBase>(m))
             {
                 ensureDecl(typeParam, DeclCheckState::ReadyForReference);
+                typeParam->parameterIndex = parameterIndex++;
             }
             else if (auto valParam = as<GenericValueParamDecl>(m))
             {
                 ensureDecl(valParam, DeclCheckState::ReadyForReference);
+                valParam->parameterIndex = parameterIndex++;
             }
             else if (auto constraint = as<GenericTypeConstraintDecl>(m))
             {
@@ -2681,6 +2767,23 @@ namespace Slang
         _registerBuiltinDeclsRec(session, decl);
     }
 
+    void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)
+    {
+        if (auto extDecl = as<ExtensionDecl>(parent))
+            decls.add(extDecl);
+        if (auto containerDecl = as<ContainerDecl>(parent))
+        {
+            for (auto child : containerDecl->members)
+            {
+                discoverExtensionDecls(decls, child);
+            }
+        }
+        if (auto genericDecl = as<GenericDecl>(parent))
+        {
+            discoverExtensionDecls(decls, genericDecl->inner);
+        }
+    }
+
     void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     {
         // When we are dealing with code from the standard library,
@@ -2822,6 +2925,23 @@ namespace Slang
             DeclCheckState::DefinitionChecked,
             DeclCheckState::CapabilityChecked,
         };
+
+        // Discover and check all extension decls before anything else.
+        List<ExtensionDecl*> extensionDecls;
+        discoverExtensionDecls(extensionDecls, moduleDecl);
+        for (auto s : states)
+        {
+            for (auto extensionDecl : extensionDecls)
+            {
+                ensureDecl(extensionDecl, s);
+            }
+            // We only need to check extension decls up to ReadyForLookup
+            // so they are properly registered in type inheritance infos.
+            if (s == DeclCheckState::ReadyForLookup)
+                break;
+        }
+
+        // With extensions taken care of, we can now check the remaining decls.
         for(auto s : states)
         {
             // When advancing to state `s` we will recursively
@@ -3429,18 +3549,28 @@ namespace Slang
 
     bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeConstraintRequirement(Type* satisfyingType, DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef, RefPtr<WitnessTable> witnessTable)
     {
+        SLANG_UNUSED(satisfyingType);
+
         // We will enumerate the type constraints placed on the
         // associated type and see if they can be satisfied.
         //
         bool conformance = true;
         Val* witness = nullptr;
-        for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(m_astBuilder, requiredAssociatedTypeDeclRef))
+        for (auto requiredConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, requiredAssociatedTypeDeclRef))
         {
             // Grab the type we expect to conform to from the constraint.
             auto requiredSuperType = getSup(m_astBuilder, requiredConstraintDeclRef);
 
+            auto subType = getSub(m_astBuilder, requiredConstraintDeclRef);
+
             // Perform a search for a witness to the subtype relationship.
-            witness = tryGetSubtypeWitness(satisfyingType, requiredSuperType);
+            witness = tryGetSubtypeWitness(subType, requiredSuperType);
+            if (witness)
+            {
+                auto genConstraint = as<GenericTypeConstraintDecl>(requiredConstraintDeclRef.getDecl());
+                if (genConstraint && genConstraint->isEqualityConstraint && !isTypeEqualityWitness(witness))
+                    witness = nullptr;
+            }
             if (witness)
             {
                 // If a subtype witness was found, then the conformance
@@ -3469,6 +3599,15 @@ namespace Slang
             if (declRefType->getDeclRef().getDecl()->hasModifier<ToBeSynthesizedModifier>())
                 return false;
         }
+
+        // Register the satisfying type to the witness table
+        // before checking the constraints, since the subtype of
+        // the constraints maybe referencing the satisfying type via
+        // witness lookups.
+        auto requirementWitness = RequirementWitness(satisfyingType->getCanonicalType());
+        witnessTable->m_requirementDictionary[requiredAssociatedTypeDeclRef.getDecl()]
+            = requirementWitness;
+
         // We need to confirm that the chosen type `satisfyingType`,
         // meets all the constraints placed on the associated type
         // requirement `requiredAssociatedTypeDeclRef`.
@@ -3482,15 +3621,11 @@ namespace Slang
         // TODO: if any conformance check failed, we should probably include
         // that in an error message produced about not satisfying the requirement.
 
-        if(conformance)
+        if (!conformance)
         {
-            // If all the constraints were satisfied, then the chosen
-            // type can indeed satisfy the interface requirement.
-            witnessTable->add(
-                requiredAssociatedTypeDeclRef.getDecl(),
-                RequirementWitness(satisfyingType->getCanonicalType()));
+            witnessTable->m_requirementDictionary.remove(requiredAssociatedTypeDeclRef.getDecl());
         }
-
+        
         return conformance;
     }
 
@@ -3817,7 +3952,7 @@ namespace Slang
     {
         // Our synthesized method will have parameters matching the names
         // and types of those on the requirement, and it will use expressions
-        // that reference those parametesr as arguments for the call expresison
+        // that reference those parameters as arguments for the call expresison
         // that makes up the body.
         //
         for (auto paramDeclRef : getParameters(m_astBuilder, requirement))
@@ -3837,14 +3972,6 @@ namespace Slang
             synParamDecl->parentDecl = synthesized;
             synthesized->members.add(synParamDecl);
 
-            // For each paramter, we will create an argument expression
-            // for the call in the function body.
-            //
-            auto synArg = m_astBuilder->create<VarExpr>();
-            synArg->declRef = makeDeclRef(synParamDecl);
-            synArg->type = paramType;
-            synArgs.add(synArg);
-
             // Add modifiers
             for (auto modifier : paramDeclRef.getDecl()->modifiers)
             {
@@ -3860,6 +3987,33 @@ namespace Slang
                     clonedModifier->keywordName = modifier->keywordName;
                     addModifier(synParamDecl, clonedModifier);
                 }
+            }
+
+            // Create an expression that references the parameter for use in arguments.
+            auto synArg = m_astBuilder->create<VarExpr>();
+            synArg->declRef = makeDeclRef(synParamDecl);
+            synArg->type = paramType;
+
+            if (auto typePack = as<ConcreteTypePack>(paramType))
+            {
+                // If paramType is a concrete type pack, we want to expand it out into
+                // individual arguments.
+                for (Index i = 0; i < typePack->getTypeCount(); i++)
+                {
+                    auto elementType = typePack->getElementType(i);
+                    auto synMemberExpr = m_astBuilder->create<SwizzleExpr>();
+                    synMemberExpr->base = synArg;
+                    synMemberExpr->elementIndices.add((UInt)i);
+                    synMemberExpr->type = elementType;
+                    synArgs.add(synMemberExpr);
+                }
+            }
+            else
+            {
+                // For ordinary non-pack paramters, we will use synArg directly to
+                // referencing the parameter for the call in the function body.
+                //
+                synArgs.add(synArg);
             }
         }
     }
@@ -4042,8 +4196,6 @@ namespace Slang
             addModifier(synFuncDecl, m_astBuilder->create<ForceInlineAttribute>());
 
             synFuncDecl->parentDecl = aggTypeDecl;
-            SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
-            bodyVisitor.registerDifferentiableTypesForFunc(synFuncDecl);
         }
         else
         {
@@ -4094,7 +4246,7 @@ namespace Slang
         //
         DiagnosticSink tempSink(getSourceManager(), nullptr);
         ExprLocalScope localScope;
-        SemanticsVisitor subVisitor(withSink(&tempSink).withExprLocalScope(&localScope));
+        SemanticsVisitor subVisitor(withSink(&tempSink).withParentFunc(synFuncDecl).withExprLocalScope(&localScope));
 
         // With our temporary diagnostic sink soaking up any messages
         // from overload resolution, we can now try to resolve
@@ -4166,6 +4318,11 @@ namespace Slang
         // to it to indicate that it should be ignored by things like lookup.
         //
         synFuncDecl->parentDecl = context->parentDecl;
+
+        // If the synthesized func is differentiable, make sure to populate its
+        // differential type dictionary.
+        SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
+        bodyVisitor.registerDifferentiableTypesForFunc(synFuncDecl);
 
         // Once our synthesized declaration is complete, we need
         // to install it as the witness that satifies the given
@@ -5181,12 +5338,12 @@ namespace Slang
         }
         else if (auto funcDeclRef = requirementDeclRef.as<FuncDecl>())
         {
-            synFunc = as<FuncDecl>(synthesizeMethodSignatureForRequirementWitness( 
-               context, funcDeclRef, synArgs, synThis));
+            synFunc = as<FuncDecl>(synthesizeMethodSignatureForRequirementWitness(
+                context, funcDeclRef, synArgs, synThis));
         }
-        
+
         SLANG_ASSERT(synFunc);
-        
+
         addModifier(synFunc, m_astBuilder->create<BackwardDifferentiableAttribute>());
 
         if (synGeneric)
@@ -5229,49 +5386,49 @@ namespace Slang
 
             switch (pattern)
             {
-                case SynthesisPattern::AllInductive:
+            case SynthesisPattern::AllInductive:
+            {
+                for (auto arg : synArgs)
                 {
-                    for (auto arg : synArgs)
+                    auto memberExpr = m_astBuilder->create<MemberExpr>();
+                    memberExpr->baseExpression = arg;
+
+                    memberExpr->name = derivMemberName;
+
+                    paramFields.add(memberExpr);
+                    inductiveArgMask.add(true);
+                }
+                break;
+            }
+            case SynthesisPattern::FixedFirstArg:
+            {
+                int paramIndex = 0;
+                for (auto arg : synArgs)
+                {
+                    if (paramIndex == 0)
+                    {
+                        paramFields.add(arg);
+                        inductiveArgMask.add(false);
+
+                        paramIndex++;
+                    }
+                    else
                     {
                         auto memberExpr = m_astBuilder->create<MemberExpr>();
                         memberExpr->baseExpression = arg;
 
                         memberExpr->name = derivMemberName;
-                        
                         paramFields.add(memberExpr);
                         inductiveArgMask.add(true);
+
+                        paramIndex++;
                     }
-                    break;
                 }
-                case SynthesisPattern::FixedFirstArg:
-                {
-                    int paramIndex = 0;
-                    for (auto arg : synArgs)
-                    {
-                        if (paramIndex == 0)
-                        {
-                            paramFields.add(arg);
-                            inductiveArgMask.add(false);
-
-                            paramIndex++;
-                        }
-                        else
-                        {
-                            auto memberExpr = m_astBuilder->create<MemberExpr>();
-                            memberExpr->baseExpression = arg;
-
-                            memberExpr->name = derivMemberName;
-                            paramFields.add(memberExpr);
-                            inductiveArgMask.add(true);
-
-                            paramIndex++;
-                        }
-                    }
-                    break;
-                }
-                default:
-                    SLANG_UNIMPLEMENTED_X("unhandled synthesis pattern");
-                    break;
+                break;
+            }
+            default:
+                SLANG_UNIMPLEMENTED_X("unhandled synthesis pattern");
+                break;
             }
 
             // Invoke the method for the field and assign the value to resultVar.
@@ -5292,8 +5449,9 @@ namespace Slang
         auto synReturn = m_astBuilder->create<ReturnStmt>();
         synReturn->expression = resultVarExpr;
         seqStmt->stmts.add(synReturn);
-        
-        context->parentDecl->members.add(synFunc);
+
+        Decl* witnessDecl = synGeneric ? (Decl*)synGeneric : synFunc;
+        context->parentDecl->members.add(witnessDecl);
         context->parentDecl->invalidateMemberDictionary();
         addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
 
@@ -5311,21 +5469,29 @@ namespace Slang
                 substSet = SubstitutionSet(declRefType->getDeclRef());
             }
         }
-        if (auto outerGeneric = GetOuterGeneric(context->parentDecl))
+        if (!substSet.declRef)
+            return false;
+        DeclRef<Decl> synthesizedWitnessDeclRef;
+        if (auto parentExtDecl = as<ExtensionDecl>(context->parentDecl))
         {
-            // If the context->parentDecl is not the same as ThisType represented by genApp, then it must be an extension
-            // to ThisType. In this case, we need to form a new GenericAppDeclRef to specailizethe outer parent extension
-            // decl. Note that the extension might be a partial extension with some generic arguments missing, and
-            // we can't support that case right now. For now we can just assume the extension will have the same set
-            // of generic parameters as the target type.
-            auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, outerGeneric);
-            auto specializedParent = m_astBuilder->getGenericAppDeclRef(makeDeclRef(outerGeneric), defaultArgs.getArrayView());
-            auto specializedFunc = m_astBuilder->getMemberDeclRef(specializedParent, synFunc);
-            witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(specializedFunc));
-            return true;
-        }
+            // If the conformance is declared on an extension to ThisType,
+            // we need to form a new proper decl ref to the parent extension decl
+            // with the correct specialization arguments.
+            //
+            if (GetOuterGeneric(context->parentDecl))
+            {
 
-        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(m_astBuilder->getDirectDeclRef(synFunc)));
+                auto extDeclRef = applyExtensionToType(parentExtDecl, context->conformingType);
+                synthesizedWitnessDeclRef = m_astBuilder->getMemberDeclRef(extDeclRef, witnessDecl);
+            }
+        }
+        else
+        {
+            synthesizedWitnessDeclRef = m_astBuilder->getMemberDeclRef(substSet.declRef, witnessDecl);
+        }
+        if (!synthesizedWitnessDeclRef)
+            synthesizedWitnessDeclRef = m_astBuilder->getDirectDeclRef(witnessDecl);
+        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(synthesizedWitnessDeclRef));
         return true;
     }
 
@@ -5349,6 +5515,15 @@ namespace Slang
         // with the same name in the type declaration and
         // its (known) extensions.
 
+        // The exception to that is when the requiredMemberDeclRef is already
+        // resolved to the actual satisfying decl, in which case we simply return
+        // true without any further lookup.
+        if (!as<InterfaceDecl>(requiredMemberDeclRef.getParent().getDecl()))
+            return true;
+
+        // If `requiredMemberDeclRef` is a lookup decl ref for an interface requirement
+        // we attempt to do the loopkup through witness tables.
+        // 
         // As a first pass, lets check if we already have a
         // witness in the table for the requirement, so
         // that we can bail out early.
@@ -5653,7 +5828,7 @@ namespace Slang
                 subType,
                 superInterfaceType,
                 inheritanceDecl,
-                thisTypeDeclRef,
+                superInterfaceDeclRef,
                 requiredMemberDeclRef,
                 witnessTable,
                 subTypeConformsToSuperInterfaceWitness);
@@ -5672,7 +5847,7 @@ namespace Slang
                 subType,
                 superInterfaceType,
                 inheritanceDecl,
-                thisTypeDeclRef,
+                superInterfaceDeclRef,
                 requiredMemberDeclRef,
                 witnessTable,
                 subTypeConformsToSuperInterfaceWitness);
@@ -5724,7 +5899,7 @@ namespace Slang
                     subType,
                     superInterfaceType,
                     inheritanceDecl,
-                    thisTypeDeclRef,
+                    superInterfaceDeclRef,
                     requiredInheritanceDeclRef,
                     witnessTable,
                     subTypeConformsToSuperInterfaceWitness);
@@ -6166,7 +6341,7 @@ namespace Slang
             {
                 // Force add IDefaultInitializable to any struct missing (transitively) `IDefaultInitializable`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
-                if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType, IsSubTypeOptions::NotReadyForLookup))
+                if(!isSubtype(DeclRefType::create(m_astBuilder, decl), defaultInitializableType, IsSubTypeOptions::NoCaching))
                 {
                     InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                     conformanceDecl->parentDecl = decl;
@@ -7000,6 +7175,11 @@ namespace Slang
             {
                 args.add(DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypeParamDecl)));
             }
+            else if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(mm))
+            {
+                auto packType = DeclRefType::create(astBuilder, astBuilder->getDirectDeclRef(genericTypePackParamDecl));
+                args.add(packType);
+            }
             else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
             {
                 if (semantics)
@@ -7446,7 +7626,7 @@ namespace Slang
         if(typeExpr.exp)
         {
             SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(paramDecl));
-            typeExpr = subVisitor.CheckUsableType(typeExpr);
+            typeExpr = subVisitor.CheckUsableType(typeExpr, paramDecl);
             paramDecl->type = typeExpr;
             checkMeshOutputDecl(paramDecl);
         }
@@ -7494,6 +7674,29 @@ namespace Slang
                 }
             }
         }
+        else if (isTypePack(paramDecl->type.type))
+        {
+            // For now, we only allow parameter packs to be `const`.
+            bool hasConstModifier = false;
+            for (auto modifier : paramDecl->modifiers)
+            {
+                if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) || as<RefModifier>(modifier) || as<ConstRefModifier>(modifier))
+                {
+                    getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
+                }
+                else if (as<ConstModifier>(modifier))
+                {
+                    hasConstModifier = true;
+                }
+            }
+            if (!hasConstModifier)
+            {
+                auto constModifier = this->getASTBuilder()->create<ConstModifier>();
+                addModifier(paramDecl, constModifier);
+            }
+        }
+
+        maybeApplyMatrixLayoutModifier(paramDecl);
 
         // Only texture types are allowed to have memory qualifiers on parameters
         if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
@@ -7701,7 +7904,7 @@ namespace Slang
                 ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
                 ctorToInvoke->name = declInfo.defaultCtor->getName();
                 ctorToInvoke->loc = declInfo.defaultCtor->loc;
-                ctorToInvoke->type = structDeclInfo.defaultCtor->returnType.type;
+                ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), structDeclInfo.defaultCtor->returnType.type);
 
                 auto invoke = m_astBuilder->create<InvokeExpr>();
                 invoke->functionExpr = ctorToInvoke;
@@ -8065,7 +8268,12 @@ namespace Slang
         if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
         {
             // Attach our extension to that type as a candidate...
-            if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
+            if (targetDeclRefType->getDeclRef().as<InterfaceDecl>())
+            {
+                getSink()->diagnose(decl->targetType.exp, Diagnostics::invalidExtensionOnInterface, decl->targetType);
+                return;
+            }
+            else if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
             {
                 auto aggTypeDecl = aggTypeDeclRef.getDecl();
 
@@ -8073,7 +8281,31 @@ namespace Slang
 
                 return;
             }
+            else if (auto genericTypeParamDecl = targetDeclRefType->getDeclRef().as<GenericTypeParamDecl>())
+            {
+                // If we are extending a generic type parameter as in `extension<T:IFoo> T`,
+                // we want to register the extension with the interface type `IFoo` instead.
+                auto genericDecl = as<GenericDecl>(genericTypeParamDecl.getDecl()->parentDecl);
+                if (!genericDecl)
+                    goto error;
+                if (genericDecl != decl->parentDecl)
+                    goto error;
+                bool isTypeConstrained = false;
+                for (auto constraintDecl : genericDecl->getMembersOfType<GenericTypeConstraintDecl>())
+                {
+                    ensureDecl(constraintDecl, DeclCheckState::ReadyForReference);
+                    if (targetDeclRefType == constraintDecl->sub.type)
+                    {
+                        auto supTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(constraintDecl->sup.type);
+                        getShared()->registerCandidateExtension(supTypeDeclRef.getDecl(), decl);
+                        isTypeConstrained = true;
+                    }
+                }
+                if (isTypeConstrained)
+                    return;
+            }
         }
+    error:;
         if (!as<ErrorType>(decl->targetType.type))
         {
             getSink()->diagnose(decl->targetType.exp, Diagnostics::invalidExtensionOnType, decl->targetType);
@@ -8098,6 +8330,7 @@ namespace Slang
         // to extend.
         //
         decl->targetType = CheckProperType(decl->targetType);
+
         _validateExtensionDeclTargetType(decl);
 
         _validateExtensionDeclMembers(decl);
@@ -8176,6 +8409,15 @@ namespace Slang
             // type, much like the `interface` case above.
             //
             return DeclRefType::create(m_astBuilder, aggTypeDeclRef);
+        }
+        else if (auto genTypeParam = declRef.as<GenericTypeParamDecl>())
+        {
+            // We will reach here when we are checking `extension<T> T {...}`,
+            // where inside the extension, `This` type is the target type
+            // of the extension, in this case this is a DeclRefType to
+            // a GenericTypeParamDecl.
+            //
+            return DeclRefType::create(m_astBuilder, declRef);
         }
         else if (auto extDeclRef = declRef.as<ExtensionDecl>())
         {
@@ -8285,7 +8527,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     {
-        decl->returnType = CheckUsableType(decl->returnType);
+        decl->returnType = CheckUsableType(decl->returnType, decl);
 
         visitAbstractStorageDeclCommon(decl);
 
@@ -8295,7 +8537,7 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     {
         SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
-        decl->type = subVisitor.CheckUsableType(decl->type);
+        decl->type = subVisitor.CheckUsableType(decl->type, decl);
         visitAbstractStorageDeclCommon(decl);
         checkVisibility(decl);
     }
@@ -8481,7 +8723,8 @@ namespace Slang
 
     DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
         ExtensionDecl*  extDecl,
-        Type*    type)
+        Type*    type,
+        Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnessesForType)
     {
         DeclRef<ExtensionDecl> extDeclRef = makeDeclRef(extDecl);
 
@@ -8494,6 +8737,11 @@ namespace Slang
             ConstraintSystem constraints;
             constraints.loc = extDecl->loc;
             constraints.genericDecl = extGenericDecl;
+            if (additionalSubtypeWitnessesForType)
+            {
+                constraints.subTypeForAdditionalWitnesses = type;
+                constraints.additionalSubtypeWitnesses = additionalSubtypeWitnessesForType;
+            }
 
             // Inside the body of an extension declaration, we may end up trying to apply that
             // extension to its own target type.
@@ -8501,17 +8749,10 @@ namespace Slang
             // without any additional substitutions.
             if (extDecl->targetType->equals(type))
             {
-                /*
-                auto subst = trySolveConstraintSystem(
-                    &constraints,
-                    DeclRef<Decl>(extGenericDecl, nullptr).as<GenericDecl>(),
-                    as<GenericSubstitution>(as<DeclRefType>(type)->declRef.substitutions.substitutions));
-                return DeclRef<Decl>(extDecl, subst).as<ExtensionDecl>();
-                */
                 return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, extDeclRef).as<ExtensionDecl>();
             }
 
-            if (!TryUnifyTypes(constraints, extDecl->targetType.Ptr(), type))
+            if (!TryUnifyTypes(constraints, ValUnificationContext(), extDecl->targetType.Ptr(), type))
                 return DeclRef<ExtensionDecl>();
 
             ConversionCost baseCost;
@@ -8549,7 +8790,9 @@ namespace Slang
                             // Looks like we have a match in the types,
                             // now let's see if `type`'s declref starts with a Lookup.
                             targetType = type;
-                            extDeclRef = m_astBuilder->getLookupDeclRef(thisTypeLookupDeclRef->getWitness(), extDeclRef.getDecl());
+                            extDeclRef = m_astBuilder->getLookupDeclRef(
+                                thisTypeLookupDeclRef->getWitness(), extDeclRef.getDecl())
+                                .as<ExtensionDecl>();
                         }
                     }
                 }
@@ -8973,13 +9216,13 @@ namespace Slang
                 // look up extensions based on what would be visible to that
                 // module.
                 //
-                // We need to consider the extensions declared in the module itself,
+                // Extensions declared in the module itself should have already
+                // been registered when we check them, but we still need to bring
                 // along with everything the module imported.
                 //
                 // Note: there is an implicit assumption here that the `importedModules`
                 // member on the `SharedSemanticsContext` is accurate in this case.
                 //
-                _addCandidateExtensionsFromModule(m_module->getModuleDecl());
                 for( auto moduleDecl : this->importedModulesList )
                 {
                     _addCandidateExtensionsFromModule(moduleDecl);
@@ -9424,12 +9667,12 @@ namespace Slang
             outTypeList.add(type);
         }
     }
-    OrderedDictionary<GenericTypeParamDecl*, List<Type*>> getCanonicalGenericConstraints(
+    OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
         ASTBuilder* astBuilder,
         DeclRef<ContainerDecl> genericDecl)
     {
-        OrderedDictionary<GenericTypeParamDecl*, List<Type*>> genericConstraints;
-        for (auto mm : getMembersOfType<GenericTypeParamDecl>(astBuilder, genericDecl))
+        OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> genericConstraints;
+        for (auto mm : getMembersOfType<GenericTypeParamDeclBase>(astBuilder, genericDecl))
         {
             genericConstraints[mm.getDecl()] = List<Type*>();
         }
@@ -9440,11 +9683,12 @@ namespace Slang
                 ASTNodeType::DeclRefType);
             auto typeParamDecl = as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)->getDeclRef().getDecl();
             List<Type*>* constraintTypes = genericConstraints.tryGetValue(typeParamDecl);
-            assert(constraintTypes);
+            if (!constraintTypes)
+                continue;
             constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
         }
 
-        OrderedDictionary<GenericTypeParamDecl*, List<Type*>> result;
+        OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> result;
         for (auto& constraints : genericConstraints)
         {
             List<Type*> typeList;
@@ -9882,7 +10126,7 @@ namespace Slang
         // aggregate type, we want to form a full declref with default arguments.
         declRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, declRef);
 
-        auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, derivativeOfAttr->loc, nullptr);
+        auto declRefExpr = visitor->ConstructDeclRefExpr(declRef, nullptr, declRef.getName(), derivativeOfAttr->loc, nullptr);
         declRefExpr->type.type = nullptr;
         derivativeAttr->args.add(declRefExpr);
         derivativeAttr->funcExpr = declRefExpr;
@@ -10228,15 +10472,8 @@ namespace Slang
             decl = visitor->getParentFuncOfVisitor();
         if (referencedDecl && decl)
         {
-            for (auto& capSet : nodeCaps.getAtomSets())
-            {
-                auto elements = capSet.getElements<CapabilityAtom>();
-                decl->capabilityRequirementProvenance.reserve(decl->capabilityRequirementProvenance.getCount()+elements.getCount());
-                for (auto atom : elements)
-                {
-                    decl->capabilityRequirementProvenance.addIfNotExists(atom, DeclReferenceWithLoc{ referencedDecl, referenceLoc });
-                }
-            }
+            // Here we store a childDecl that added/removed capabilities from a parentDecl
+            decl->capabilityRequirementProvenance.add(DeclReferenceWithLoc{ referencedDecl, referenceLoc });
         }
     };
 
@@ -10267,10 +10504,10 @@ namespace Slang
                 loc = Base::sourceLocStack.getLast();
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
         }
-        virtual void processDeclModifiers(Decl* decl) override
+        virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
         {
             if (decl)
-                handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+                handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
         }
         void visitDiscardStmt(DiscardStmt* stmt)
         {
@@ -10469,6 +10706,7 @@ namespace Slang
 
     void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
     {
+        // If the function is an entrypoint and specifies a target stage, add the capabilities to our function capabilities.
         _dispatchCapabilitiesVisitorOfFunctionDecl(this, funcDecl, 
                 [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
                 {
@@ -10482,30 +10720,12 @@ namespace Slang
 
         auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
 
-        if (!declaredCaps.isEmpty())
-        {
-            // If the function is an entrypoint, add the stage to declaredCaps.
-            if (auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>())
-            {
-                auto stageCaps = CapabilitySet(Profile(entryPointAttr->stage).getCapabilityName());
-                if (declaredCaps.isIncompatibleWith(stageCaps))
-                {
-                    maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, funcDecl->loc, Diagnostics::stageIsIncompatibleWithCapabilityDefinition, funcDecl, stageCaps, declaredCaps);
-                }
-                else
-                {
-                    declaredCaps.join(stageCaps);
-                }
-            }
-        }
-
         auto vis = getDeclVisibility(funcDecl);
 
         // If 0 capabilities were annotated on a function, capabilities are inferred from the function body
         if (declaredCaps.isEmpty())
         {
             declaredCaps = funcDecl->inferredCapabilityRequirements;
-            return;
         }
         else
         {
@@ -10694,18 +10914,62 @@ namespace Slang
         return false;
     }
 
-    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, bool optionallyNeverPrintDecl)
+    void diagnoseMissingCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilitySet& setToFind)
     {
-        HashSet<Decl*> printedDecls;
+        HashSet<Decl*> checkedDecls;
+        DeclReferenceWithLoc declWithRef;
+        declWithRef.referencedDecl = decl;
+        declWithRef.referenceLoc = (decl) ? decl->loc : SourceLoc();
+        bool bottomOfProvenanceStack = false;
+        // Find the bottom of the atom provenance stack which fails to contain `setToFind`
+        while(!bottomOfProvenanceStack && declWithRef.referencedDecl)
+        {
+            bottomOfProvenanceStack = true;
+            for(auto& i : declWithRef.referencedDecl->capabilityRequirementProvenance)
+            {
+                if (checkedDecls.contains(i.referencedDecl))
+                    continue;
+                checkedDecls.add(i.referencedDecl);
+                
+                if(!i.referencedDecl->inferredCapabilityRequirements.implies(setToFind))
+                {
+                    // We found a source of the incompatible capability, follow this 
+                    // element inside the provenance stack until we are at the bottom
+                    declWithRef = i;
+                    bottomOfProvenanceStack = false;
+                    break;
+                }
+            }
+        }
+
+        if (!declWithRef.referencedDecl)
+            return;
+        
+        // Diagnose the use-site
+        maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declWithRef.referenceLoc, Diagnostics::seeUsingOf, declWithRef.referencedDecl);
+        // Diagnose the definition as the problem
+        maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declWithRef.referencedDecl->loc, Diagnostics::seeDefinitionOf, declWithRef.referencedDecl);
+
+        // If we find a 'require' modifier, this is contributing to the overall capability incompatibility.
+        // We should hint to the user that this declaration is problematic.
+        if (auto requireCapabilityAttribute = declWithRef.referencedDecl->findModifier<RequireCapabilityAttribute>())
+            maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, requireCapabilityAttribute->loc, Diagnostics::seeDeclarationOf, requireCapabilityAttribute);
+    }
+
+    void diagnoseCapabilityProvenance(CompilerOptionSet& optionSet, DiagnosticSink* sink, Decl* decl, CapabilityAtom atomToFind, HashSet<Decl*>& printedDecls)
+    {
         auto thisModule = getModuleDecl(decl);
         Decl* declToPrint = decl;
         while (declToPrint)
         {
+            Decl* previousDecl = declToPrint;
             printedDecls.add(declToPrint);
-            if (auto provenance = declToPrint->capabilityRequirementProvenance.tryGetValue(atomToFind))
+            for(auto& provenance : declToPrint->capabilityRequirementProvenance)
             {
-                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, provenance->referenceLoc, Diagnostics::seeUsingOf, provenance->referencedDecl);
-                declToPrint = provenance->referencedDecl;
+                if (!provenance.referencedDecl->inferredCapabilityRequirements.implies(atomToFind))
+                    continue;
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, provenance.referenceLoc, Diagnostics::seeUsingOf, provenance.referencedDecl);
+                declToPrint = provenance.referencedDecl;
                 if (printedDecls.contains(declToPrint))
                     break;
                 if (declToPrint->findModifier<RequireCapabilityAttribute>())
@@ -10718,12 +10982,10 @@ namespace Slang
                 if (getDeclVisibility(declToPrint) == DeclVisibility::Public)
                     break;
             }
-            else
-            {
+            if (previousDecl == declToPrint)
                 break;
-            }
         }
-        if (declToPrint && !optionallyNeverPrintDecl)
+        if (declToPrint)
         {
             maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, declToPrint->loc, Diagnostics::seeDefinitionOf, declToPrint);
         }
@@ -10763,10 +11025,11 @@ namespace Slang
                 CapabilityAtomSet targetsNotUsedSet;
                 CapabilityAtomSet::calcSubtract(targetsNotUsedSet, getAtomSetOfTargets(), failedAtomSet);
                 
+                HashSet<Decl*> printedDecls;
                 for (auto atom : targetsNotUsedSet)
                 {
                     CapabilityAtom formattedAtom = asAtom(atom);
-                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, true);
+                    diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, printedDecls);
                 }
                 return;
             }
@@ -10786,12 +11049,14 @@ namespace Slang
 
         // We will produce all failed atoms. This is important since provenance of multiple atoms
         // can come from multiple referenced items in a function body.
-        for (auto i : failedAtomsInsideAvailableSet)
+        HashSet<Decl*> printedDecls;
+        auto simplifiedFailedAtomsSet = failedAtomsInsideAvailableSet.newSetWithoutImpliedAtoms();
+        for (auto i : simplifiedFailedAtomsSet)
         {
             CapabilityAtom formattedAtom = asAtom(i);
             maybeDiagnose(getSink(), this->getOptionSet(), DiagnosticCategory::Capability, decl->loc, diagnosticInfo, decl, formattedAtom);
             // Print provenances.
-            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom);
+            diagnoseCapabilityProvenance(this->getOptionSet(), getSink(), decl, formattedAtom, printedDecls);
         }
     }
 

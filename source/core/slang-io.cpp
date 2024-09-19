@@ -17,6 +17,7 @@
 #ifdef _WIN32
 #   include <direct.h>
 #   include <windows.h>
+#   include <shellapi.h>
 #endif
 
 #if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY
@@ -27,6 +28,7 @@
 #   include <dirent.h>
 #   include <sys/stat.h>
 #   include <sys/file.h>
+#   include <ftw.h> // for nftw
 #endif
 
 #if SLANG_APPLE_FAMILY
@@ -562,6 +564,61 @@ namespace Slang
 #endif
     }
 
+    bool Path::createDirectoryRecursive(const String& path)
+    {
+        String finalPath = Path::simplify(path);
+        if (finalPath.getLength() == 0)
+        {
+            return false;
+        }
+
+        List<String> pathList;
+
+        // Check whether the parent directories exist, and add to the pathList if they are
+        // not, we will create all the directories from back of the list.
+        String parentDir = finalPath;
+        for(;;)
+        {
+            if (parentDir.getLength() == 0 || File::exists(parentDir))
+            {
+                break;
+            }
+            else
+            {
+                pathList.add(parentDir);
+                parentDir = Path::getParentDirectory(parentDir);
+            }
+        }
+
+        // If there are no directories to create, then we are done
+        if (pathList.getCount() == 0)
+        {
+            return true;
+        }
+
+        // Traverse from back of the list, because that is most outer directory.
+        Int i = 0;
+        for (i = pathList.getCount() - 1; i >= 0; i--)
+        {
+            if (!createDirectory(pathList[i]))
+            {
+                break;
+            }
+        }
+
+        // Something wrong when creating parent directories
+        if (i > 0)
+        {
+            // Remove the directories if we've created
+            if (i != pathList.getCount() - 1)
+                remove(pathList[i]);
+
+            return false;
+        }
+
+        return true;
+    }
+
     /* static */SlangResult Path::getPathType(const String& path, SlangPathType* pathTypeOut)
     {
 #ifdef _WIN32
@@ -661,6 +718,13 @@ namespace Slang
 #endif
     }
 
+    String Path::getCurrentPath()
+    {
+        Slang::String path;
+        getCanonical(".", path);
+        return path;
+    }
+
     String Path::getRelativePath(String base, String path)
     {
         std::filesystem::path p1(base.getBuffer());
@@ -713,6 +777,61 @@ namespace Slang
         }
         return SLANG_FAIL;
 #endif
+    }
+
+    /* static */SlangResult Path::removeNonEmpty(const String& path)
+    {
+        if (File::exists(path) == false)
+        {
+            return SLANG_OK;
+        }
+
+        StringBuilder msgBuilder;
+        // Path::remove() doesn't support remove a non-empty directory, so we need to implement
+        // a simple function to remove the directory recursively.
+#ifdef _WIN32
+        // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
+        // Note: the fromPath requires a double-null-terminated string.
+        String newPath = path;
+        newPath.append('\0');
+        SHFILEOPSTRUCTA file_op = {
+            NULL,
+            FO_DELETE,
+            newPath.begin(),
+            nullptr,
+            FOF_NOCONFIRMATION |
+            FOF_NOERRORUI |
+            FOF_SILENT,
+            false,
+            0,
+            nullptr };
+        int ret = SHFileOperationA(&file_op);
+        if (ret)
+        {
+            return SLANG_FAIL;
+        }
+#else
+        auto unlink_cb = [](const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf) -> int
+        {
+            SLANG_UNUSED(sb)
+            SLANG_UNUSED(typeflag)
+            SLANG_UNUSED(ftwbuf)
+            int rv = ::remove(fpath);
+            if (rv)
+            {
+                perror(fpath);
+            }
+            return rv;
+        };
+        // https://linux.die.net/man/3/nftw
+        int ret = ::nftw(path.begin(), unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
+        if (ret)
+        {
+            return SLANG_FAIL;
+        }
+#endif
+
+        return SLANG_OK;
     }
 
 #if defined(_WIN32)

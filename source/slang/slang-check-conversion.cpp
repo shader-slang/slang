@@ -498,6 +498,27 @@ namespace Slang
             toInitializerListExpr->type = QualType(toType);
             toInitializerListExpr->args = coercedArgs;
 
+            // Wrap initalizer list args if we're creating a non-differentiable struct within a 
+            // differentiable function.
+            // 
+            if (auto func = getParentFuncOfVisitor())
+            {
+                if (func->findModifier<DifferentiableAttribute>() && 
+                    !isTypeDifferentiable(toType))
+                {
+                    for (auto &arg : toInitializerListExpr->args)
+                    {
+                        if (isTypeDifferentiable(arg->type.type))
+                        {
+                            auto detachedArg = m_astBuilder->create<DetachExpr>();
+                            detachedArg->inner = arg;
+                            detachedArg->type = arg->type;
+                            arg = detachedArg;
+                        }
+                    }
+                }
+            }
+
             *outToExpr = toInitializerListExpr;
         }
 
@@ -750,6 +771,31 @@ namespace Slang
             return true;
         }
 
+        // Allow implicit conversion from sized array to unsized array when
+        // calling a function.
+        // Note: we implement the logic here instead of an implicit_conversion
+        // intrinsic in the stdlib because we only want to allow this conversion
+        // when calling a function.
+        //
+        if (site == CoercionSite::Argument)
+        {
+            if (auto fromArrayType = as<ArrayExpressionType>(fromType))
+            {
+                if (auto toArrayType = as<ArrayExpressionType>(toType))
+                {
+                    if (fromArrayType->getElementType()->equals(toArrayType->getElementType())
+                        && toArrayType->isUnsized())
+                    {
+                        if (outToExpr)
+                            *outToExpr = fromExpr;
+                        if (outCost)
+                            *outCost = kConversionCost_SizedArrayToUnsizedArray;
+                        return true;
+                    }
+                }
+            }
+        }
+
         // Another important case is when either the "to" or "from" type
         // represents an error. In such a case we must have already
         // reporeted the error, so it is better to allow the conversion
@@ -878,7 +924,11 @@ namespace Slang
                 *outCost = kConversionCost_NullPtrToPtr;
             }
             if (outToExpr)
-                *outToExpr = fromExpr;
+            {
+                auto* defaultExpr = getASTBuilder()->create<DefaultConstructExpr>();
+                defaultExpr->type = QualType(toType);
+                *outToExpr = defaultExpr;
+            }
             return true;
         }
         // none_t can be cast into any Optional<T> type.
@@ -969,6 +1019,22 @@ namespace Slang
                 *outCost = kConversionCost_CastToInterface;
             return true;
         }
+        else if (auto fromIsToWitness = tryGetSubtypeWitness(toType, fromType))
+        {
+            // Is toType and fromType the same via some type equality witness?
+            // If so there is no need to do any conversion.
+            //
+            if (isTypeEqualityWitness(fromIsToWitness))
+            {
+                if (outToExpr)
+                {
+                    *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, fromIsToWitness);
+                }
+                if (outCost)
+                    *outCost = 0;
+                return true;
+            }
+        }
 
         // Disallow converting to a ParameterGroupType.
         //
@@ -1024,7 +1090,6 @@ namespace Slang
                 return false;
             if (as<RefType>(toType) && !fromExpr->type.isLeftValue)
                 return false;
-            
             ConversionCost subCost = kConversionCost_GetRef;
 
             MakeRefExpr* refExpr = nullptr;
@@ -1087,8 +1152,10 @@ namespace Slang
         OverloadResolveContext overloadContext;
         overloadContext.disallowNestedConversions = true;
         overloadContext.argCount = 1;
+        List<Expr*> args;
+        args.add(fromExpr);
         overloadContext.argTypes = &fromType.type;
-        overloadContext.args = &fromExpr;
+        overloadContext.args = &args;
         overloadContext.sourceScope = m_outerScope;
         overloadContext.originalExpr = nullptr;
         if(fromExpr)

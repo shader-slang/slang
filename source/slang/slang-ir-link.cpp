@@ -751,9 +751,9 @@ void cloneGlobalValueWithCodeCommon(
             IRParam* originalParam;
             IRParam* clonedParam;
         };
-        ShortList<ParamCloneInfo> paramCloneInfos;
         while (ob)
         {
+            ShortList<ParamCloneInfo> paramCloneInfos;
             SLANG_ASSERT(cb);
 
             builder->setInsertInto(cb);
@@ -1170,6 +1170,17 @@ IRFunc* cloneFuncImpl(
     return clonedFunc;
 }
 
+// Can an inst with `opcode` contain basic blocks as children?
+bool canInstContainBasicBlocks(IROp opcode)
+{
+    switch (opcode)
+    {
+    case kIROp_Expand:
+        return true;
+    default:
+        return false;
+    }
+}
 
 IRInst* cloneInst(
     IRSpecContextBase*              context,
@@ -1238,7 +1249,10 @@ IRInst* cloneInst(
         argCount, newArgs.getArrayView().getBuffer());
     builder->addInst(clonedInst);
     registerClonedValue(context, clonedInst, originalValues);
-    cloneDecorationsAndChildren(context, clonedInst, originalInst);
+    if (canInstContainBasicBlocks(clonedInst->getOp()))
+        cloneGlobalValueWithCodeCommon(context, (IRGlobalValueWithCode*)clonedInst, (IRGlobalValueWithCode*)originalInst, originalValues);
+    else
+        cloneDecorationsAndChildren(context, clonedInst, originalInst);
     cloneExtraDecorations(context, clonedInst, originalValues);
     return clonedInst;
 }
@@ -1447,7 +1461,7 @@ static bool _isHLSLExported(IRInst* inst)
     for (auto decoration : inst->getDecorations())
     {
         const auto op = decoration->getOp();
-        if (op == kIROp_HLSLExportDecoration)
+        if (op == kIROp_HLSLExportDecoration || op == kIROp_DownstreamModuleExportDecoration)
         {
             return true;
         }
@@ -1497,6 +1511,7 @@ static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
+    case CodeGenTarget::WGSL:
     case CodeGenTarget::DXIL:
     case CodeGenTarget::DXILAssembly:
     case CodeGenTarget::HostCPPSource:

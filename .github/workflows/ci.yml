@@ -3,8 +3,18 @@ name: CI
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - 'LICENCE'
+      - 'CONTRIBUTION.md'
+      - 'README.md'
   pull_request:
     branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - 'LICENCE'
+      - 'CONTRIBUTION.md'
+      - 'README.md'
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -44,6 +54,8 @@ jobs:
           - { config: release, test-category: full }
           # default not full gpu tests
           - full-gpu-tests: false
+          # The runners don't have a GPU by default except for the self-hosted ones
+          - has-gpu: false
           # Self-hosted aarch64 build
           - os: linux
             config: release
@@ -52,6 +64,7 @@ jobs:
             test-category: smoke
             full-gpu-tests: false
             runs-on: [self-hosted, Linux, ARM64]
+            has-gpu: true
           # Self-hosted full gpu build
           - os: windows
             config: release
@@ -60,6 +73,7 @@ jobs:
             test-category: full
             full-gpu-tests: true
             runs-on: [Windows, self-hosted]
+            has-gpu: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -70,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: 'true'
+          submodules: 'recursive'
           fetch-depth: '0'
       - name: Setup
         uses: ./.github/actions/common-setup
@@ -111,12 +125,19 @@ jobs:
               -server-count 8 \
               -category ${{ matrix.test-category }} \
               -api all-cpu
-          else
+          elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt
+          else
+            "$bin_dir/slang-test" \
+              -use-test-server \
+              -category ${{ matrix.test-category }} \
+              -api all-dx12 \
+              -expected-failure-list tests/expected-failure-github.txt \
+              -expected-failure-list tests/expected-failure-record-replay-tests.txt
           fi
       - name: Test Slang via glsl
         if: ${{matrix.full-gpu-tests}}

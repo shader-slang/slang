@@ -71,6 +71,19 @@ class DeclRefType : public Type
     }
 };
 
+template<typename T>
+DeclRef<T> isDeclRefTypeOf(Val* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        return declRefType->getDeclRef().template as<T>();
+    }
+    return DeclRef<T>();
+}
+
+bool isTypePack(Type* type);
+bool isAbstractTypePack(Type* type);
+
 // Base class for types that can be used in arithmetic expressions
 class ArithmeticExpressionType : public DeclRefType 
 {
@@ -211,6 +224,10 @@ class PointerLikeType : public BuiltinGenericType
     SLANG_AST_CLASS(PointerLikeType)
 };
 
+class DynamicResourceType : public BuiltinType
+{
+    SLANG_AST_CLASS(DynamicResourceType)
+};
 
 // HLSL buffer-type resources
 
@@ -535,6 +552,8 @@ class PtrTypeBase : public BuiltinType
 
     // Get the type of the pointed-to value.
     Type* getValueType();
+
+    Val* getAddressSpace();
 };
 
 class NoneType : public BuiltinType
@@ -551,6 +570,8 @@ class NullPtrType : public BuiltinType
 class PtrType : public PtrTypeBase 
 {
     SLANG_AST_CLASS(PtrType)
+
+    void _toTextOverride(StringBuilder& out);
 };
 
 // A GPU pointer type into global memory.
@@ -595,6 +616,7 @@ class RefTypeBase : public ParamDirectionType
 class RefType : public RefTypeBase
 {
     SLANG_AST_CLASS(RefType)
+    void _toTextOverride(StringBuilder& out);
 };
 
 // The type for an `constref` parameter, e.g., `constref T`
@@ -669,21 +691,59 @@ class FuncType : public Type
 };
 
 // A tuple is a product of its member types
-class TupleType : public Type
+class TupleType : public DeclRefType
 {
     SLANG_AST_CLASS(TupleType)
 
-    // Construct a unary tupletion
-    TupleType(ArrayView<Type*> memberTypes)
+    Index getMemberCount() const;
+    Type* getMember(Index i) const;
+    Type* getTypePack() const;
+
+};
+
+class EachType : public Type
+{
+    SLANG_AST_CLASS(EachType)
+    Type* getElementType() const { return as<Type>(getOperand(0)); }
+    DeclRefType* getElementDeclRefType() const { return as<DeclRefType>(getOperand(0)); }
+
+    EachType(Type* elementType)
     {
-        for (auto t : memberTypes)
+        m_operands.add(ValNodeOperand(elementType));
+    }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class ExpandType : public Type
+{
+    SLANG_AST_CLASS(ExpandType)
+    Type* getPatternType() const { return as<Type>(getOperand(0)); }
+    Index getCapturedTypePackCount() { return getOperandCount() - 1; }
+    Type* getCapturedTypePack(Index i) { return as<Type>(getOperand(i + 1)); }
+    ExpandType(Type* patternType, ArrayView<Type*> capturedPacks)
+    {
+        m_operands.add(ValNodeOperand(patternType));
+        for (auto t : capturedPacks)
             m_operands.add(ValNodeOperand(t));
     }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
 
-    auto getMemberCount() const { return getOperandCount(); }
-    Type* getMember(Index i) const { return as<Type>(getOperand(i)); }
-
-    // Overrides should be public so base classes can access
+// A concrete pack of types.
+class ConcreteTypePack : public Type
+{
+    SLANG_AST_CLASS(ConcreteTypePack)
+    ConcreteTypePack(ArrayView<Type*> types)
+    {
+        for (auto t : types)
+            m_operands.add(ValNodeOperand(t));
+    }
+    Index getTypeCount() { return getOperandCount(); }
+    Type* getElementType(Index i) { return as<Type>(getOperand(i)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);

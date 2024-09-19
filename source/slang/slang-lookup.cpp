@@ -387,53 +387,16 @@ static void _lookUpMembersInSuperType(
     _lookUpMembersInSuperTypeImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, request, ioResult, &breadcrumb);
 }
 
-static void _lookUpMembersInSuperTypeDeclImpl(
-    ASTBuilder* astBuilder,
+static void _lookupMembersInSuperTypeFacets(ASTBuilder* astBuilder,
     Name* name,
-    DeclRef<Decl>           declRef,
+    Type* selfType,
+    InheritanceInfo const& inheritanceInfo,
     LookupRequest const& request,
     LookupResult& ioResult,
     BreadcrumbInfo* inBreadcrumbs)
 {
-    auto semantics = request.semantics;
-    if (!as<InterfaceDecl>(declRef.getDecl()) && getText(name) == "This")
-    {
-        // If we are looking for `This` in anything other than an InterfaceDecl,
-        // we just need to return the declRef itself.
-        AddToLookupResult(ioResult, CreateLookupResultItem(declRef, inBreadcrumbs));
-        return;
-    }
+    
 
-    // If the semantics context hasn't been established yet (e.g. when looking up during parsing),
-    // we simply do a direct lookup without considering subtypes or extensions.
-    //
-    if (!semantics)
-    {
-        // In this case we can only lookup in an aggregate type.
-        if (auto aggTypeDeclBaseRef = declRef.as<AggTypeDeclBase>())
-        {
-            _lookUpDirectAndTransparentMembers(astBuilder, name, aggTypeDeclBaseRef.getDecl(), aggTypeDeclBaseRef, request, ioResult, inBreadcrumbs);
-        }
-        return;
-    }
-
-    ensureDecl(semantics, declRef.getDecl(), DeclCheckState::ReadyForLookup);
-
-    // With semantics context, we can do a comprehensive lookup by scanning through
-    // the linearized inheritance list.
-
-    auto selfType = DeclRefType::create(astBuilder, declRef);
-    InheritanceInfo inheritanceInfo;
-    if (auto extDeclRef = declRef.as<ExtensionDecl>())
-    {
-        inheritanceInfo = semantics->getShared()->getInheritanceInfo(extDeclRef);
-    }
-    else
-    {
-        selfType = selfType->getCanonicalType();
-        inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
-    }
-        
     for (auto facet : inheritanceInfo.facets)
     {
         auto containerDeclRef = facet->getDeclRef().as<ContainerDecl>();
@@ -457,12 +420,12 @@ static void _lookUpMembersInSuperTypeDeclImpl(
                 continue;
         }
         // If we are looking up only immediate members, ignore non "Self" facets or extension to "Self"
-        else if (int(request.options) & int(LookupOptions::IgnoreInheritance) 
+        else if (int(request.options) & int(LookupOptions::IgnoreInheritance)
             && (facet.getImpl()->directness != Facet::Directness::Self
                 && (!extensionFacet || !extensionFacet->targetType.type->equals(selfType))
                 ))
         {
-                continue;
+            continue;
         }
 
         // Some things that are syntactically `InheritanceDecl`s don't actually
@@ -527,6 +490,56 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     }
 }
 
+static void _lookUpMembersInSuperTypeDeclImpl(
+    ASTBuilder* astBuilder,
+    Name* name,
+    DeclRef<Decl>           declRef,
+    LookupRequest const& request,
+    LookupResult& ioResult,
+    BreadcrumbInfo* inBreadcrumbs)
+{
+    auto semantics = request.semantics;
+    if (!as<InterfaceDecl>(declRef.getDecl()) && name == astBuilder->getSharedASTBuilder()->getThisTypeName())
+    {
+        // If we are looking for `This` in anything other than an InterfaceDecl,
+        // we just need to return the declRef itself.
+        AddToLookupResult(ioResult, CreateLookupResultItem(declRef, inBreadcrumbs));
+        return;
+    }
+
+    // If the semantics context hasn't been established yet (e.g. when looking up during parsing),
+    // we simply do a direct lookup without considering subtypes or extensions.
+    //
+    if (!semantics)
+    {
+        // In this case we can only lookup in an aggregate type.
+        if (auto aggTypeDeclBaseRef = declRef.as<AggTypeDeclBase>())
+        {
+            _lookUpDirectAndTransparentMembers(astBuilder, name, aggTypeDeclBaseRef.getDecl(), aggTypeDeclBaseRef, request, ioResult, inBreadcrumbs);
+        }
+        return;
+    }
+
+    ensureDecl(semantics, declRef.getDecl(), DeclCheckState::ReadyForLookup);
+
+    // With semantics context, we can do a comprehensive lookup by scanning through
+    // the linearized inheritance list.
+
+    auto selfType = DeclRefType::create(astBuilder, declRef);
+    InheritanceInfo inheritanceInfo;
+    if (auto extDeclRef = declRef.as<ExtensionDecl>())
+    {
+        inheritanceInfo = semantics->getShared()->getInheritanceInfo(extDeclRef);
+    }
+    else
+    {
+        selfType = selfType->getCanonicalType();
+        inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
+    }
+
+    _lookupMembersInSuperTypeFacets(astBuilder, name, selfType, inheritanceInfo, request, ioResult, inBreadcrumbs);
+}
+
 static void _lookUpMembersInSuperTypeImpl(
     ASTBuilder*             astBuilder,
     Name*                   name,
@@ -564,6 +577,12 @@ static void _lookUpMembersInSuperTypeImpl(
         auto declRef = declRefType->getDeclRef();
 
         _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, declRef, request, ioResult, inBreadcrumbs);
+    }
+    else if (auto eachType = as<EachType>(superType))
+    {
+        auto canEachType = eachType->getCanonicalType();
+        InheritanceInfo inheritanceInfo = request.semantics->getShared()->getInheritanceInfo(canEachType);
+        _lookupMembersInSuperTypeFacets(astBuilder, name, canEachType, inheritanceInfo, request, ioResult, inBreadcrumbs);
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(superType))
     {
@@ -787,6 +806,10 @@ static void _lookUpInScopes(
                     // a type that uses the "target type" of the `extension`.
                     //
                     type = getTargetType(astBuilder, extDeclRef);
+                    if (name == astBuilder->getSharedASTBuilder()->getThisTypeName())
+                    {
+                        breadcrumbPtr = nullptr;
+                    }
                 }
                 else
                 {

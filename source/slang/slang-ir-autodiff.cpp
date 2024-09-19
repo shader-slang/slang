@@ -44,6 +44,13 @@ IRInst* _lookupWitness(IRBuilder* builder, IRInst* witness, IRInst* requirementK
                 return entry->getRequirementVal();
         }
     }
+    else if (as<IRMakeWitnessPack>(witness))
+    {
+        // We are looking up a witness from a type pack.
+        // This is only allowed if we are looking up a differential type.
+        // We should turn this into an actual witness table for the type pack/tuple type.
+        SLANG_UNEXPECTED("looking up from a witness pack is invalid and should have been lowered.");
+    }
     else
     {
         return builder->emitLookupInterfaceMethodInst(
@@ -434,10 +441,33 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             }
             else
             {
-                differentiableWitnessDictionary.add((IRType*)item->getConcreteType(), item->getWitness());
+                auto witness = item->getWitness();
 
                 // Also register the type's differential type with the same witness.
+                auto concreteType = item->getConcreteType();
                 IRBuilder subBuilder(item->getConcreteType());
+                if (as<IRTypePack>(concreteType) || as<IRTupleType>(concreteType))
+                {
+                    // For tuple types with concrete element types,
+                    // register the differential type for each element, but don't register for the
+                    // tuple/typepack itself.
+                    if (auto witnessPack = as<IRMakeWitnessPack>(witness))
+                    {
+
+                        for (UInt i = 0; i < concreteType->getOperandCount(); i++)
+                        {
+                            auto element = concreteType->getOperand(i);
+                            auto elementWitness = witnessPack->getOperand(i);
+                            differentiableWitnessDictionary.addIfNotExists(
+                                (IRType*)element,
+                                _lookupWitness(&subBuilder, elementWitness, sharedContext->differentialAssocTypeStructKey));
+                        }
+                        return;
+                    }
+                }
+
+                differentiableWitnessDictionary.add((IRType*)item->getConcreteType(), item->getWitness());
+
                 if (!as<IRInterfaceType>(item->getConcreteType()))
                 {
                     differentiableWitnessDictionary.addIfNotExists(
@@ -768,16 +798,18 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(IRBuilder* build
         SLANG_UNIMPLEMENTED_X("Impl");
     }
 
+    case kIROp_TypePack:
     case kIROp_TupleType:
     {
-        auto tupleType = as<IRTupleType>(primalType);
         List<IRType*> diffTypeList;
         // TODO: what if we have type parameters here?
-        for (UIndex ii = 0; ii < tupleType->getOperandCount(); ii++)
+        for (UIndex ii = 0; ii < primalType->getOperandCount(); ii++)
             diffTypeList.add(
-                differentiateType(builder, (IRType*)tupleType->getOperand(ii)));
-
-        return builder->getTupleType(diffTypeList);
+                differentiateType(builder, (IRType*)primalType->getOperand(ii)));
+        if (primalType->getOp() == kIROp_TupleType)
+            return builder->getTupleType(diffTypeList);
+        else
+            return builder->getTypePack((UInt)diffTypeList.getCount(), diffTypeList.getBuffer());
     }
 
     default:
@@ -795,6 +827,12 @@ IRInst* DifferentiableTypeConformanceContext::tryGetDifferentiableWitness(IRBuil
     {
         SLANG_RELEASE_ASSERT(witness || as<IRArrayType>(primalType));
     }
+    if (as<IRMakeWitnessPack>(witness))
+    {
+        // If registered witness is a witness pack for a type pack,
+        // we should reconstruct the true witness table.
+        witness = nullptr;
+    }
 
     if (!witness)
     {
@@ -810,6 +848,14 @@ IRInst* DifferentiableTypeConformanceContext::tryGetDifferentiableWitness(IRBuil
         else if (auto extractExistential = as<IRExtractExistentialType>(primalType))
         {
             witness = getExtractExistensialTypeWitness(builder, extractExistential);
+        }
+        else if (auto typePack = as<IRTypePack>(primalType))
+        {
+            witness = getTupleWitness(builder, typePack);
+        }
+        else if (auto tupleType = as<IRTupleType>(primalType))
+        {
+            witness = getTupleWitness(builder, tupleType);
         }
     }
     return witness;
@@ -963,6 +1009,104 @@ IRInst* DifferentiableTypeConformanceContext::getArrayWitness(IRBuilder* builder
     return table;
 }
 
+IRInst* DifferentiableTypeConformanceContext::getTupleWitness(IRBuilder* builder, IRInst* inTupleType)
+{
+    // Differentiate the pair type to get it's differential (which is itself a pair)
+    auto diffTupleType = (IRType*)differentiateType(builder, (IRType*)inTupleType);
+
+    if (!diffTupleType)
+        return nullptr;
+
+    auto addMethod = builder->createFunc();
+    auto zeroMethod = builder->createFunc();
+
+    auto table = builder->createWitnessTable(sharedContext->differentiableInterfaceType, (IRType*)inTupleType);
+
+    // And place it in the synthesized witness table.
+    builder->createWitnessTableEntry(table, sharedContext->differentialAssocTypeStructKey, diffTupleType);
+    builder->createWitnessTableEntry(table, sharedContext->differentialAssocTypeWitnessStructKey, table);
+    builder->createWitnessTableEntry(table, sharedContext->addMethodStructKey, addMethod);
+    builder->createWitnessTableEntry(table, sharedContext->zeroMethodStructKey, zeroMethod);
+
+    // Fill in differential method implementations.
+    {
+        // Add method.
+        IRBuilder b = *builder;
+        b.setInsertInto(addMethod);
+        b.addBackwardDifferentiableDecoration(addMethod);
+        IRType* paramTypes[2] = { diffTupleType, diffTupleType };
+        addMethod->setFullType(b.getFuncType(2, paramTypes, diffTupleType));
+        b.emitBlock();
+        auto p0 = b.emitParam(diffTupleType);
+        auto p1 = b.emitParam(diffTupleType);
+        List<IRInst*> results;
+        for (UInt i = 0; i < inTupleType->getOperandCount(); i++)
+        {
+            auto elementType = inTupleType->getOperand(i);
+            auto diffElementType = (IRType*)diffTupleType->getOperand(i);
+            auto innerWitness = tryGetDifferentiableWitness(&b, (IRType*)elementType);
+            IRInst* elementResult = nullptr;
+            if (!innerWitness)
+            {
+                elementResult = b.getVoidValue();
+            }
+            else
+            {
+                auto innerAdd = _lookupWitness(&b, innerWitness, sharedContext->addMethodStructKey);
+                auto iVal = b.getIntValue(b.getIntType(), i);
+                IRInst* args[2] = {
+                    b.emitGetTupleElement(diffElementType, p0, iVal),
+                    b.emitGetTupleElement(diffElementType, p1, iVal) };
+                elementResult = b.emitCallInst(diffElementType, innerAdd, 2, args);
+            }
+            results.add(elementResult);
+        }
+        IRInst* resultVal = nullptr;
+        if (diffTupleType->getOp() == kIROp_TupleType)
+            resultVal = b.emitMakeTuple(diffTupleType, results);
+        else
+            resultVal = b.emitMakeValuePack(diffTupleType, (UInt)results.getCount(), results.getBuffer());
+        b.emitReturn(resultVal);
+    }
+    {
+        // Zero method.
+        IRBuilder b = *builder;
+        b.setInsertInto(addMethod);
+        b.addBackwardDifferentiableDecoration(addMethod);
+        addMethod->setFullType(b.getFuncType(0, nullptr, diffTupleType));
+        b.emitBlock();
+        List<IRInst*> results;
+        for (UInt i = 0; i < inTupleType->getOperandCount(); i++)
+        {
+            auto elementType = inTupleType->getOperand(i);
+            auto diffElementType = (IRType*)diffTupleType->getOperand(i);
+            auto innerWitness = tryGetDifferentiableWitness(&b, (IRType*)elementType);
+            IRInst* elementResult = nullptr;
+            if (!innerWitness)
+            {
+                elementResult = b.getVoidValue();
+            }
+            else
+            {
+                auto innerZero = _lookupWitness(&b, innerWitness, sharedContext->zeroMethodStructKey);
+                elementResult = b.emitCallInst(diffElementType, innerZero, 0, nullptr);
+            }
+            results.add(elementResult);
+        }
+        IRInst* resultVal = nullptr;
+        if (diffTupleType->getOp() == kIROp_TupleType)
+            resultVal = b.emitMakeTuple(diffTupleType, results);
+        else
+            resultVal = b.emitMakeValuePack(diffTupleType, (UInt)results.getCount(), results.getBuffer());
+        b.emitReturn(resultVal);
+    }
+
+    // Record this in the context for future lookups
+    differentiableWitnessDictionary[(IRType*)inTupleType] = table;
+
+    return table;
+}
+
 IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(
     IRBuilder* builder,
     IRExtractExistentialType* extractExistentialType)
@@ -979,17 +1123,31 @@ IRInst* DifferentiableTypeConformanceContext::getExtractExistensialTypeWitness(
     return nullptr;
 }
 
-
 void copyCheckpointHints(IRBuilder* builder, IRGlobalValueWithCode* oldInst, IRGlobalValueWithCode* newInst)
 {
     for (auto decor = oldInst->getFirstDecoration(); decor; decor = decor->getNextDecoration())
     {
         if (auto chkHint = as<IRCheckpointHintDecoration>(decor))
         {
-            SLANG_ASSERT(chkHint->getOperandCount() == 0);
-            builder->addDecoration(newInst, chkHint->getOp());
+            cloneCheckpointHint(builder, chkHint, newInst);
         }
     }
+}
+
+void cloneCheckpointHint(IRBuilder* builder, IRCheckpointHintDecoration* chkHint, IRGlobalValueWithCode* target)
+{
+    // Grab all the operands
+    List<IRInst*> operands;
+    for (UCount operand = 0; operand < chkHint->getOperandCount(); operand++)
+    {
+        operands.add(chkHint->getOperand(operand));
+    }
+
+    builder->addDecoration(
+        target,
+        chkHint->getOp(),
+        operands.getBuffer(),
+        operands.getCount());
 }
 
 void stripDerivativeDecorations(IRInst* inst)
@@ -1021,6 +1179,7 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
 {
     for (auto inst : parent->getChildren())
     {
+        bool shouldRemoveKeepAliveDecorations = false;
         for (auto decor = inst->getFirstDecoration(); decor; )
         {
             auto next = decor->getNextDecoration();
@@ -1046,10 +1205,32 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_IntermediateContextFieldDifferentialTypeDecoration:
                 decor->removeAndDeallocate();
                 break;
+            case kIROp_AutoDiffBuiltinDecoration:
+                // Remove the builtin decoration, and also remove any export/keep-alive
+                // decorations.
+                shouldRemoveKeepAliveDecorations = true;
+                decor->removeAndDeallocate();
             default:
                 break;
             }
             decor = next;
+        }
+
+        if (shouldRemoveKeepAliveDecorations)
+        {
+            for (auto decor = inst->getFirstDecoration(); decor; )
+            {
+                auto next = decor->getNextDecoration();
+                switch (decor->getOp())
+                {
+                case kIROp_ExportDecoration:
+                case kIROp_HLSLExportDecoration:
+                case kIROp_KeepAliveDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                }
+                decor = next;
+            }
         }
 
         if (inst->getFirstChild() != nullptr)
@@ -1952,6 +2133,46 @@ protected:
 
 };
 
+void checkAutodiffPatterns(
+    TargetProgram* target,
+    IRModule*                           module,
+    DiagnosticSink*                     sink)
+{
+    SLANG_UNUSED(target);
+    
+    enum SideEffectBehavior
+    {
+        Warn = 0,
+        Allow = 1,
+    };
+
+    // For now, we have only 1 check to see if methods that have side-effects 
+    // are marked with prefer-recompute
+    // 
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(inst))
+        {
+            if (func->sourceLoc.isValid() && // Don't diagnose for synthesized functions
+                func->findDecoration<IRPreferRecomputeDecoration>() &&
+                !func->findDecoration<IRNoSideEffectDecoration>())
+            {
+                auto preferRecomputeDecor = func->findDecoration<IRPreferRecomputeDecoration>();
+                auto sideEffectBehavior = as<IRIntLit>(preferRecomputeDecor->getOperand(0))->getValue();
+
+                if (sideEffectBehavior == SideEffectBehavior::Allow)
+                    continue;
+
+                // Find function name. (don't diagnose on nameless functions)
+                if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+                {
+                    sink->diagnose(func, Diagnostics::potentialIssuesWithPreferRecomputeOnSideEffectMethod, nameHint->getName());
+                }
+            }
+        }
+    }
+}
+
 bool processAutodiffCalls(
     TargetProgram* target,
     IRModule*                           module,
@@ -2043,12 +2264,16 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     {
         if (auto keepAliveDecoration = nullStruct->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
+        if (auto exportDecoration = nullStruct->findDecoration<IRHLSLExportDecoration>())
+            exportDecoration->removeAndDeallocate();
     }
 
     if (auto nullWitness = context->nullDifferentialWitness)
     {
         if (auto keepAliveDecoration = nullWitness->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
+        if (auto exportDecoration = nullWitness->findDecoration<IRHLSLExportDecoration>())
+            exportDecoration->removeAndDeallocate();
     }
 }
 
@@ -2071,11 +2296,6 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
     lowerNullCheckInsts(module, &autodiffContext);
 
     stripNoDiffTypeAttribute(module);
-
-    // Remove keep-alive decorations from null-differential type
-    // so it can be DCE'd if unused.
-    // 
-    releaseNullDifferentialType(&autodiffContext);
 
     return modified;
 }

@@ -145,13 +145,10 @@ namespace Slang
             case kIROp_VectorType:
             {
                 auto vectorType = static_cast<IRVectorType*>(dataType);
-                auto elementType = vectorType->getElementType();
                 auto elementCount = getIntVal(vectorType->getElementCount());
-                auto elementPtrType = builder->getPtrType(elementType);
                 for (IRIntegerValue i = 0; i < elementCount; i++)
                 {
                     auto elementAddr = builder->emitElementAddress(
-                        elementPtrType,
                         concreteTypedVar,
                         builder->getIntValue(builder->getIntType(), i));
                     emitMarshallingCode(builder, context, elementAddr);
@@ -161,20 +158,16 @@ namespace Slang
             case kIROp_MatrixType:
             {
                 auto matrixType = static_cast<IRMatrixType*>(dataType);
-                auto elementType = matrixType->getElementType();
                 auto colCount = getIntVal(matrixType->getColumnCount());
                 auto rowCount = getIntVal(matrixType->getRowCount());
-                auto rowVecType = builder->getVectorType(elementType, matrixType->getRowCount());
                 for (IRIntegerValue i = 0; i < colCount; i++)
                 {
                     auto col = builder->emitElementAddress(
-                        builder->getPtrType(rowVecType),
                         concreteTypedVar,
                         builder->getIntValue(builder->getIntType(), i));
                     for (IRIntegerValue j = 0; j < rowCount; j++)
                     {
                         auto element = builder->emitElementAddress(
-                            builder->getPtrType(elementType),
                             col,
                             builder->getIntValue(builder->getIntType(), j));
                         emitMarshallingCode(builder, context, element);
@@ -198,11 +191,9 @@ namespace Slang
             case kIROp_ArrayType:
             {
                 auto arrayType = cast<IRArrayType>(dataType);
-                auto elementPtrType = builder->getPtrType(arrayType->getElementType());
                 for (IRIntegerValue i = 0; i < getIntVal(arrayType->getElementCount()); i++)
                 {
                     auto fieldAddr = builder->emitElementAddress(
-                        elementPtrType,
                         concreteTypedVar,
                         builder->getIntValue(builder->getIntType(), i));
                     emitMarshallingCode(builder, context, fieldAddr);

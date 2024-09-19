@@ -132,12 +132,30 @@ struct ASTIterator
             for (auto arg : expr->arguments)
                 dispatchIfNotNull(arg);
         }
+        void visitPackExpr(PackExpr* expr)
+        {
+            for (auto arg : expr->args)
+                dispatchIfNotNull(arg);
+        }
+
+        void visitExpandExpr(ExpandExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->baseExpr);
+        }
+
+        void visitEachExpr(EachExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->baseExpr);
+        }
 
         void visitDerefExpr(DerefExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base);
         }
+
         void visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -459,6 +477,18 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
     }
     else if (auto typeConstraint = as<TypeConstraintDecl>(decl))
     {
+        if (auto genericTypeConstraint = as<GenericTypeConstraintDecl>(typeConstraint))
+        {
+            // A generic constraint decl has a left hand side and right hand side expression
+            // for the base and super type of the constraint.
+            // In the case of a folded-in constraint syntax as in `Foo<T:IBar>`,
+            // the left hand side of the constraint is represented by the same token
+            // as the parameter decl itself, so we don't need to traverse into it.
+            // In the case of `Foo<T> where T:IBar`, the left hand side is its own
+            // expression so we do want to traverse it.
+            if (genericTypeConstraint->whereTokenLoc.isValid())
+                visitExpr(genericTypeConstraint->sub.exp);
+        }
         visitExpr(typeConstraint->getSup().exp);
     }
     else if (auto typedefDecl = as<TypeDefDecl>(decl))

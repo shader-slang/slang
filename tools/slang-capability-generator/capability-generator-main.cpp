@@ -65,6 +65,95 @@ static void _removeFromOtherAtomsNotInThis(HashSet<const CapabilityDef*> thisSet
         otherSet.remove(atomToRemove);
 }
 
+enum class AutoDocHeaderGroup : UInt
+{
+    Targets = 0,
+    Stages,
+    Versions,
+    Extensions,
+    Compound,
+    Other,
+    Count,
+    Invalid,
+};
+
+UnownedStringSlice getHeaderNameFromAutoDocHeaderGroup(UInt headerGroup)
+{
+    switch (headerGroup)
+    {
+    case (UInt)AutoDocHeaderGroup::Targets:
+        return UnownedStringSlice("Targets");
+    case (UInt)AutoDocHeaderGroup::Stages:
+        return UnownedStringSlice("Stages");
+    case (UInt)AutoDocHeaderGroup::Extensions:
+        return UnownedStringSlice("Extensions");
+    case (UInt)AutoDocHeaderGroup::Versions:
+        return UnownedStringSlice("Versions");
+    case (UInt)AutoDocHeaderGroup::Compound:
+        return UnownedStringSlice("Compound Capabilities");
+    case (UInt)AutoDocHeaderGroup::Other:
+        return UnownedStringSlice("Other");
+    default:
+        SLANG_ASSERT("Unknown `AutoDocHeaderGroup`");
+        return UnownedStringSlice("");
+    }
+}
+
+UnownedStringSlice getHeaderDescriptionFromAutoDocHeaderGroup(UInt headerGroup)
+{
+    switch (headerGroup)
+    {
+    case (UInt)AutoDocHeaderGroup::Targets:
+        return UnownedStringSlice("Capabilities to specify code generation targets (`glsl`, `spirv`...)");
+    case (UInt)AutoDocHeaderGroup::Stages:
+        return UnownedStringSlice("Capabilities to specify code generation stages (`vertex`, `fragment`...)");
+    case (UInt)AutoDocHeaderGroup::Extensions:
+        return UnownedStringSlice("Capabilities to specify extensions (`GL_EXT`, `SPV_EXT`...)");
+    case (UInt)AutoDocHeaderGroup::Versions:
+        return UnownedStringSlice("Capabilities to specify versions of a code generation target (`sm_5_0`, `GLSL_400`...)");
+    case (UInt)AutoDocHeaderGroup::Compound:
+        return UnownedStringSlice("Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)");
+    case (UInt)AutoDocHeaderGroup::Other:
+        return UnownedStringSlice("Capabilities which may be deprecated");
+    default:
+        SLANG_ASSERT("Unknown `AutoDocHeaderGroup`");
+        return UnownedStringSlice("");
+    }
+}
+
+AutoDocHeaderGroup getAutoDocHeaderGroupFromTag(DiagnosticSink* sink, UnownedStringSlice headerGroupName, SourceLoc loc)
+{
+    if (headerGroupName.caseInsensitiveEquals(UnownedStringSlice("Other")))
+        return AutoDocHeaderGroup::Other;
+    else if (headerGroupName.caseInsensitiveEquals(UnownedStringSlice("Target")))
+        return AutoDocHeaderGroup::Targets;
+    else if (headerGroupName.caseInsensitiveEquals(UnownedStringSlice("Stage")))
+        return AutoDocHeaderGroup::Stages;
+    else if (headerGroupName.caseInsensitiveEquals(UnownedStringSlice("EXT")))
+        return AutoDocHeaderGroup::Extensions;
+    else if (headerGroupName.caseInsensitiveEquals(UnownedStringSlice("Version")))
+        return AutoDocHeaderGroup::Versions;
+    else if (headerGroupName.caseInsensitiveEquals(UnownedStringSlice("Compound")))
+        return AutoDocHeaderGroup::Compound;
+    else
+    {
+        sink->diagnose(loc, Diagnostics::invalidDocCommentHeader, headerGroupName);
+        return AutoDocHeaderGroup::Invalid;
+    }
+}
+
+struct AutoDocInfo
+{
+    String comment;
+    AutoDocHeaderGroup headerGroup;
+
+    AutoDocInfo()
+    {
+        comment = {};
+        headerGroup = AutoDocHeaderGroup::Other;
+    }
+};
+
 struct CapabilityDef : public RefObject
 {
 public:
@@ -80,6 +169,7 @@ public:
         this->sourceLoc = other.sourceLoc;
         this->keyAtomsPresent = other.keyAtomsPresent;
         this->sharedContext = other.sharedContext;
+        this->docComment = other.docComment;
     }
 
     String name;
@@ -91,6 +181,7 @@ public:
     List<List<CapabilityDef*>> canonicalRepresentation;
     SerializedArrayView serializedCanonicalRepresentation;
     SourceLoc sourceLoc;
+    AutoDocInfo docComment;
     /// Stores key atoms a CapabilityDef refers to. 
     /// Shared key atoms: key atoms shared between every individual set in a canonicalRepresentation, added together.
     HashSet<const CapabilityDef*> keyAtomsPresent;
@@ -174,6 +265,24 @@ public:
     }
 };
 
+/// Advances through BlockComment/LineComment, otherwise, "advanceIf 'type' is the next token"
+enum class AdvanceOptions : UInt
+{
+    None = 0 << 0,
+    SkipComments = 1 << 0,
+};
+
+template<AdvanceOptions L, AdvanceOptions R>
+constexpr bool ContainsOption()
+{
+    return (UInt)L & (UInt)R;
+}
+
+static bool isInternalDef(RefPtr<CapabilityDef> def)
+{
+    return def->name.startsWith("_");
+}
+
 struct CapabilityDefParser
 {
     CapabilityDefParser(
@@ -195,9 +304,19 @@ struct CapabilityDefParser
 
     TokenReader m_tokenReader;
 
+    template<AdvanceOptions advanceOptions>
     bool advanceIf(TokenType type)
     {
-        if (m_tokenReader.peekTokenType() == type)
+        auto peekToken = m_tokenReader.peekTokenType();
+        if constexpr (ContainsOption<advanceOptions, AdvanceOptions::SkipComments>())
+        {
+            while (peekToken == TokenType::BlockComment || peekToken == TokenType::LineComment)
+            {
+                m_tokenReader.advanceToken();
+                peekToken = m_tokenReader.peekTokenType();
+            }
+        }
+        if (peekToken == type)
         {
             m_tokenReader.advanceToken();
             return true;
@@ -205,9 +324,15 @@ struct CapabilityDefParser
         return false;
     }
 
+    template<AdvanceOptions advanceOptions>
     SlangResult readToken(TokenType type, Token& nextToken)
     {
         nextToken = m_tokenReader.advanceToken();
+        if constexpr (ContainsOption<advanceOptions, AdvanceOptions::SkipComments>())
+        {
+            while (nextToken.type == TokenType::BlockComment || nextToken.type == TokenType::LineComment)
+                nextToken = m_tokenReader.advanceToken();
+        }
         if (nextToken.type != type)
         {
             m_sink->diagnose(nextToken.loc, Diagnostics::unexpectedTokenExpectedTokenType, nextToken, type);
@@ -216,10 +341,11 @@ struct CapabilityDefParser
         return SLANG_OK;
     }
 
+    template<AdvanceOptions advanceOptions>
     SlangResult readToken(TokenType type)
     {
         Token nextToken;
-        return readToken(type, nextToken);
+        return readToken<advanceOptions>(type, nextToken);
     }
 
     SlangResult parseConjunction(CapabilityConjunctionExpr& expr)
@@ -227,7 +353,7 @@ struct CapabilityDefParser
         for (;;)
         {
             Token nameToken;
-            SLANG_RETURN_ON_FAIL(readToken(TokenType::Identifier, nameToken));
+            SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(TokenType::Identifier, nameToken));
             CapabilityDef* def = nullptr;
             if (m_mapNameToCapability.tryGetValue(nameToken.getContent(), def))
             {
@@ -238,7 +364,7 @@ struct CapabilityDefParser
                 m_sink->diagnose(nameToken.loc, Diagnostics::undefinedIdentifier, nameToken);
                 return SLANG_FAIL;
             }
-            if (!(advanceIf(TokenType::OpAdd)))
+            if (!(advanceIf<AdvanceOptions::SkipComments>(TokenType::OpAdd)))
                 break;
         }
         return SLANG_OK;
@@ -252,22 +378,68 @@ struct CapabilityDefParser
             conjunction.sourceLoc = this->m_tokenReader.m_cursor->getLoc();
             SLANG_RETURN_ON_FAIL(parseConjunction(conjunction));
             expr.conjunctions.add(conjunction);
-            if (!advanceIf(TokenType::OpBitOr))
+            if (!advanceIf<AdvanceOptions::SkipComments>(TokenType::OpBitOr))
                 break;
         }
         return SLANG_OK;
     }
 
+    void validateInternalAtomExternalAtomPair()
+    {
+        // All `_Internal` atoms must have an `External` atom. 
+        // `External` atoms do not require to have an `_Internal` atom.
+        // The following behavior ensures that if we error with 'atom' instead of 
+        // '_atom' a user may add the 'atom' capability to solve their error. This is
+        // important because '_Internal' will only be for 1 target, 'External' will alias
+        // to more than 1 target. We need to ensure users avoid 'Internal' when possible.
+
+        Dictionary<String, List<RefPtr<CapabilityDef>>> nameToInternalAndExternalAtom;
+        for(auto i : m_defs)
+        {
+            // 'abstract' atoms are not reported to a user and are ignored
+            if (i->flavor == CapabilityFlavor::Abstract)
+                continue;
+
+            // Try to pack `_atom` and `atom` into the same per key List
+            String name = i->name;
+            if(i->name.startsWith("_"))
+                name = name.subString(1, name.getLength() - 1);
+            nameToInternalAndExternalAtom[name].add(i);
+        }
+        for(auto i : nameToInternalAndExternalAtom)
+        {
+            SLANG_ASSERT(i.second.getCount() <= 2);
+            if(i.second.getCount() != 2)
+            {
+                // If we only have a '_Internal' atom inside our name list there is a missing 'External' atom
+                if(i.second[0]->name.startsWith("_"))
+                    m_sink->diagnose(i.second[0]->sourceLoc, Diagnostics::missingExternalInternalAtomPair, i.second[0]->name);
+            }
+        }
+    }
+
+    bool isLineSuccessive(HumaneSourceLoc above, HumaneSourceLoc below)
+    {
+        return above.line + 1 == below.line;
+    }
+
     SlangResult parseDefs()
     {
-        auto tokens = m_lexer->lexAllSemanticTokens();
+        auto tokens = m_lexer->lexAllMarkupTokens();
         m_tokenReader = TokenReader(tokens);
+        AutoDocInfo successiveComments = AutoDocInfo();
+        HumaneSourceLoc successiveCommentLine = {};
+
         for (;;)
         {
+            auto nextToken = m_tokenReader.advanceToken();
+
+            if (!isLineSuccessive(successiveCommentLine, m_lexer->m_sourceView->getHumaneLoc(nextToken.getLoc())))
+                successiveComments = AutoDocInfo();
+
             RefPtr<CapabilityDef> def = new CapabilityDef();
             def->sharedContext = &m_sharedContext;
             def->flavor = CapabilityFlavor::Normal;
-            auto nextToken = m_tokenReader.advanceToken();
             if (nextToken.getContent() == "alias")
             {
                 def->flavor = CapabilityFlavor::Alias;
@@ -280,6 +452,51 @@ struct CapabilityDefParser
             {
                 def->flavor = CapabilityFlavor::Normal;
             }
+            else if (nextToken.type == TokenType::BlockComment)
+            {
+                // Do not auto-document
+                continue;
+            }
+            else if (nextToken.type == TokenType::LineComment)
+            {
+                // Auto-document if the preceeding token to an identifier is '///'
+                // complete rules described in `source\slang\slang-capabilities.capdef`
+                auto commentContent = nextToken.getContent();
+                
+                // remove "//"
+                commentContent = commentContent.subString(2, commentContent.getLength() - 2);
+                if (commentContent.startsWith("/"))
+                {
+                    auto commentLine = m_lexer->m_sourceView->getHumaneLoc(nextToken.getLoc());      
+
+                    // Reset the `successiveCommentLine` to our newest commentLine
+                    successiveCommentLine = commentLine;
+
+                    // remove "/" from "///"
+                    commentContent = commentContent.subString(1, commentContent.getLength() - 1).trim();
+                    
+                    // Check if we have a `[header]`
+                    if (commentContent.startsWith("["))
+                    {
+                        // Make a substring of `header]`
+                        auto consumedLeftBracketOfHeader = commentContent.subString(1, commentContent.getLength() - 1);
+                        // Find a `]` of `header]` if it exists
+                        auto indexOfHeaderEnd = consumedLeftBracketOfHeader.indexOf(']');
+                        if (indexOfHeaderEnd != -1)
+                        {
+                            // We found our `header`
+                            auto headerName = consumedLeftBracketOfHeader.subString(0, indexOfHeaderEnd);
+                            successiveComments.headerGroup = getAutoDocHeaderGroupFromTag(m_sink, headerName, nextToken.getLoc());
+                            continue;
+                        }
+                        // If we did not find a header this is a regular comment
+                    }
+                    successiveComments.comment.append("> ");
+                    successiveComments.comment.append(commentContent);
+                    successiveComments.comment.append("\n");
+                }
+                continue;
+            }
             else if (nextToken.type == TokenType::EndOfFile)
             {
                 break;
@@ -291,35 +508,41 @@ struct CapabilityDefParser
             }
 
             Token nameToken;
-            SLANG_RETURN_ON_FAIL(readToken(TokenType::Identifier, nameToken));
+            SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(TokenType::Identifier, nameToken));
             def->name = nameToken.getContent();
 
             if (def->flavor == CapabilityFlavor::Normal)
             {
-                if (advanceIf(TokenType::Colon))
+                if (advanceIf<AdvanceOptions::SkipComments>(TokenType::Colon))
                 {
                     SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
                 }
-                if (advanceIf(TokenType::OpAssign))
+                if (advanceIf<AdvanceOptions::SkipComments>(TokenType::OpAssign))
                 {
                     Token rankToken;
-                    SLANG_RETURN_ON_FAIL(readToken(TokenType::IntegerLiteral, rankToken));
+                    SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(TokenType::IntegerLiteral, rankToken));
                     def->rank = stringToInt(rankToken.getContent());
                 }
+                def->docComment = successiveComments;
+                if(def->docComment.comment.getLength() == 0 && !isInternalDef(def))
+                    m_sink->diagnose(nextToken.loc, Diagnostics::requiresDocComment, def->name);
             }
             else if (def->flavor == CapabilityFlavor::Alias)
             {
-                SLANG_RETURN_ON_FAIL(readToken(TokenType::OpAssign));
+                SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(TokenType::OpAssign));
                 SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
+                def->docComment = successiveComments;
+                if (def->docComment.comment.getLength() == 0 && !isInternalDef(def))
+                    m_sink->diagnose(nextToken.loc, Diagnostics::requiresDocComment, def->name);
             }
             else if (def->flavor == CapabilityFlavor::Abstract)
             {
-                if (advanceIf(TokenType::Colon))
+                if (advanceIf<AdvanceOptions::SkipComments>(TokenType::Colon))
                 {
                     SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
                 }
             }
-            SLANG_RETURN_ON_FAIL(readToken(TokenType::Semicolon));
+            SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(TokenType::Semicolon));
             m_defs.add(def);
             if (!m_mapNameToCapability.addIfNotExists(def->name, m_defs.getLast()))
             {
@@ -337,6 +560,7 @@ struct CapabilityDefParser
 
             def->sourceLoc = nameToken.loc;
         }
+        validateInternalAtomExternalAtomPair();
         return SLANG_OK;
     }
 };
@@ -689,6 +913,84 @@ UIntSet atomSetToUIntSet(const List<CapabilityDef*>& atomSet)
     return set;
 }
 
+void printDocForCapabilityDef(StringBuilder& sbDoc, RefPtr<CapabilityDef> def, List<StringBuilder>& sbDocSections)
+{
+    if (isInternalDef(def)
+        || def->flavor == CapabilityFlavor::Abstract
+        || def->docComment.headerGroup == AutoDocHeaderGroup::Invalid)
+        return;
+
+    auto& sbDocSection = sbDocSections[(UInt)def->docComment.headerGroup];
+    sbDocSection << "\n" << "`" << def->name << "`\n";
+    sbDocSection << def->docComment.comment;
+}
+
+List<StringBuilder> setupDocCommentHeaderStringBuilders()
+{
+    List<StringBuilder> sbDocSections;
+    sbDocSections.setCount((UInt)AutoDocHeaderGroup::Count);
+    for (UInt i = 0; i < (UInt)AutoDocHeaderGroup::Count; i++)
+    {
+        sbDocSections[i] << "\n" << getHeaderNameFromAutoDocHeaderGroup(i) << "\n----------------------\n";
+        sbDocSections[i] << "*" << getHeaderDescriptionFromAutoDocHeaderGroup(i) << "*\n";
+    }
+    return sbDocSections;
+}
+
+/// "[Link Name](fileName#Link-Name)"
+void addHyperLink(StringBuilder& sbDoc, UnownedStringSlice suffix)
+{
+    String suffixReformatted = "";
+
+    for (auto i : suffix)
+    {
+        if (i == ' ')
+        {
+            suffixReformatted.appendChar('-');
+            continue;
+        }
+        suffixReformatted.appendChar(i);
+    }
+    sbDoc << "[" << suffix << "](#" << suffixReformatted << ")";
+}
+
+void setupDocumentationHeader(StringBuilder& sbDoc, const String& outPath)
+{
+    sbDoc << R"(
+---
+layout: user-guide
+---
+
+Capability Atoms
+============================
+
+### Sections:
+
+)";
+
+    // Hyper-Links
+    for (UInt i = 0; i < (UInt)AutoDocHeaderGroup::Count; i++)
+    {
+        auto headerName = getHeaderNameFromAutoDocHeaderGroup(i);
+        sbDoc << i + 1 << ". "; // "i. " 
+        addHyperLink(sbDoc, headerName);
+        sbDoc << "\n";
+    }
+}
+
+SlangResult generateDocumentation(DiagnosticSink* sink, List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbDoc, const String& outPath)
+{
+    setupDocumentationHeader(sbDoc, outPath);
+
+    List<StringBuilder> sbDocSections = setupDocCommentHeaderStringBuilders();
+    for (auto def : defs)
+    {
+        printDocForCapabilityDef(sbDoc, def, sbDocSections);
+    }
+    for (auto stringBuilder : sbDocSections)
+        sbDoc << stringBuilder.toString();
+    return 1;
+}
 SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>>& defs, StringBuilder& sbHeader, StringBuilder& sbCpp)
 {
    
@@ -770,11 +1072,11 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
         }
     }
     outputUIntSetGenerator("generatorOf_kAnyTargetUIntSetBuffer", anyTargetUIntSetHash, anyTargetAtomSet);
-    anyTargetUIntSetHash << "const static CapabilityAtomSet kAnyTargetUIntSetBuffer = generatorOf_kAnyTargetUIntSetBuffer();\n";
+    anyTargetUIntSetHash << "static CapabilityAtomSet kAnyTargetUIntSetBuffer = generatorOf_kAnyTargetUIntSetBuffer();\n";
     sbCpp << anyTargetUIntSetHash;
 
     outputUIntSetGenerator("generatorOf_kAnyStageUIntSetBuffer", anyStageUIntSetHash, anyStageAtomSet);
-    anyStageUIntSetHash << "const static CapabilityAtomSet kAnyStageUIntSetBuffer = generatorOf_kAnyStageUIntSetBuffer();\n";
+    anyStageUIntSetHash << "static CapabilityAtomSet kAnyStageUIntSetBuffer = generatorOf_kAnyStageUIntSetBuffer();\n";
     sbCpp << anyStageUIntSetHash;
 
     sbHeader << "\nenum {\n";
@@ -856,12 +1158,12 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
     {
         if (!def)
         {
-            sbCpp << R"(    { "Invalid", CapabilityNameFlavor::Concrete, CapabilityName::Invalid, 0, {nullptr, 0} },)" << "\n";
+            sbCpp << R"(    { UnownedStringSlice::fromLiteral("Invalid"), CapabilityNameFlavor::Concrete, CapabilityName::Invalid, 0, {nullptr, 0} },)" << "\n";
             continue;
         }
 
         // name.
-        sbCpp << "    { \"" << def->name << "\", ";
+        sbCpp << "    { UnownedStringSlice::fromLiteral(\"" << def->name << "\"), ";
 
         // flavor.
         switch (def->flavor)
@@ -899,7 +1201,15 @@ SlangResult generateDefinitions(DiagnosticSink* sink, List<RefPtr<CapabilityDef>
     }
     
     sbCpp << "};\n";
-    return SLANG_OK;
+
+sbCpp
+<< "void freeCapabilityDefs()\n"
+<< "{\n"
+<< "    for (auto& cap : kCapabilityArray) { cap = CapabilityAtomSet(); }\n"
+<< "    kAnyTargetUIntSetBuffer = CapabilityAtomSet();\n"
+<< "    kAnyStageUIntSetBuffer = CapabilityAtomSet();\n"
+<< "}\n";
+return SLANG_OK;
 }
 
 
@@ -917,7 +1227,7 @@ SlangResult parseDefFile(DiagnosticSink* sink, String inputPath, List<RefPtr<Cap
     RootNamePool rootPool;
     namePool.setRootNamePool(&rootPool);
     lexer.initialize(sourceView, sink, &namePool, sourceManager->getMemoryArena());
-   
+
     CapabilityDefParser parser(&lexer, sink, capabilitySharedContext);
 
     SLANG_RETURN_ON_FAIL(parser.parseDefs());
@@ -989,8 +1299,22 @@ int main(int argc, const char* const* argv)
         return 1;
     }
 
+    auto outDocPath = Path::combine(targetDir, "../../docs/user-guide/a3-02-reference-capability-atoms.md");
+    if (!File::exists(outDocPath))
+    {
+        sink.diagnose(SourceLoc(), Diagnostics::couldNotFindValidDocumentationOutputPath, outDocPath);
+    }
+
+    StringBuilder sbDoc;
+    if (SLANG_FAILED(generateDocumentation(&sink, defs, sbDoc, outDocPath)))
+    {
+        printDiagnostics(&sink);
+        return 1;
+    }
+
     writeIfChanged(outHeaderPath, sbHeader.produceString());
     writeIfChanged(outCppPath, sbCpp.produceString());
+    writeIfChanged(outDocPath, sbDoc.produceString());
 
     List<String> opnames;
     for (auto def : defs)

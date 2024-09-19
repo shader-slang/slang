@@ -148,6 +148,7 @@ class TestContext
     Slang::RefPtr<Slang::DownstreamCompilerSet> compilerSet;
 
     Slang::String exeDirectoryPath;
+    Slang::String dllDirectoryPath;
     Slang::String exePath;
 
         /// Timeout time for communication over connection.

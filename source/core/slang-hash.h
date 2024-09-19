@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_HASH_H
 #define SLANG_CORE_HASH_H
 
-#include "slang.h"
+#include "../../include/slang.h"
 #include "slang-math.h"
 
 #ifdef SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER

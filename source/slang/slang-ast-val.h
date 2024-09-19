@@ -248,6 +248,30 @@ class FuncCallIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
+class CountOfIntVal : public IntVal
+{
+    SLANG_AST_CLASS(CountOfIntVal)
+
+    CountOfIntVal(Type* inType, Type* typeArg)
+    {
+        setOperands(inType, typeArg);
+    }
+
+    Val* getTypeArg() { return getOperand(1); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+    bool _isLinkTimeValOverride()
+    {
+        return false;
+    }
+
+    static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
+
+    static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
+};
+
 class WitnessLookupIntVal : public IntVal
 {
     SLANG_AST_CLASS(WitnessLookupIntVal)
@@ -522,6 +546,61 @@ class SubtypeWitness : public Witness
     ConversionCost getOverloadResolutionCost();
 };
 
+class TypePackSubtypeWitness : public SubtypeWitness
+{
+    SLANG_AST_CLASS(TypePackSubtypeWitness)
+
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+
+    Index getCount() { return getOperandCount() - 2; }
+    SubtypeWitness* getWitness(Index index) { return as<SubtypeWitness>(getOperand(index + 2)); }
+
+    TypePackSubtypeWitness(Type* sub, Type* sup, ArrayView<SubtypeWitness*> witnesses)
+    {
+        setOperands(sub);
+        addOperands(sup);
+        for(auto w : witnesses)
+            addOperands(ValNodeOperand(w));
+    }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class EachSubtypeWitness : public SubtypeWitness
+{
+    SLANG_AST_CLASS(EachSubtypeWitness)
+
+    EachSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class ExpandSubtypeWitness : public SubtypeWitness
+{
+    SLANG_AST_CLASS(ExpandSubtypeWitness)
+
+    ExpandSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 class TypeEqualityWitness : public SubtypeWitness 
 {
     SLANG_AST_CLASS(TypeEqualityWitness)
@@ -545,6 +624,13 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     DeclRef<Decl> getDeclRef()
     {
         return as<DeclRefBase>(getOperand(2));
+    }
+
+    bool isEquality()
+    {
+        if (auto declRef = getDeclRef().as<GenericTypeConstraintDecl>())
+            return declRef.getDecl()->isEqualityConstraint;
+        return false;
     }
 
     // Overrides should be public so base classes can access
@@ -816,4 +902,31 @@ void SubstitutionSet::forEachSubstitutionArg(F func) const
         }
     }
 }
+
+inline bool isTypeEqualityWitness(Val* witness)
+{
+    if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        return declaredWitness->isEquality();
+    }
+    else if (as<TypeEqualityWitness>(witness))
+    {
+        return true;
+    }
+    else if (auto eachWitness = as<EachSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(eachWitness->getPatternTypeWitness());
+    }
+    else if (auto typePackWitness = as<TypePackSubtypeWitness>(witness))
+    {
+        for (Index i = 0; i < typePackWitness->getCount(); i++)
+        {
+            if (!isTypeEqualityWitness(typePackWitness->getWitness(i)))
+                return false;
+        }
+        return true;
+    }
+    return false;
+}
+
 } // namespace Slang

@@ -444,6 +444,10 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
                     operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
                     diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
                 }
+                else
+                {
+                    diffOperands.add(builder->getVoidValue());
+                }
             }
         }
         
@@ -1110,6 +1114,39 @@ InstPair ForwardDiffTranscriber::transcribeGetElement(IRBuilder* builder, IRInst
     return InstPair(primalGetElementPtr, diffGetElementPtr);
 }
 
+InstPair ForwardDiffTranscriber::transcribeGetTupleElement(IRBuilder* builder, IRInst* originalInst)
+{
+    IRInst* origBase = originalInst->getOperand(0);
+    auto primalBase = findOrTranscribePrimalInst(builder, origBase);
+    auto primalIndex = originalInst->getOperand(1);
+
+    auto primalType = (IRType*)findOrTranscribePrimalInst(builder, originalInst->getDataType());
+
+    IRInst* primalOperands[] = { primalBase, primalIndex };
+    IRInst* primalGetElement = builder->emitIntrinsicInst(
+        primalType,
+        originalInst->getOp(),
+        2,
+        primalOperands);
+
+    IRInst* diffGetElement = nullptr;
+
+    if (auto diffType = differentiateType(builder, primalGetElement->getDataType()))
+    {
+        if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
+        {
+            IRInst* diffOperands[] = { diffBase, primalIndex };
+            diffGetElement = builder->emitIntrinsicInst(
+                diffType,
+                originalInst->getOp(),
+                2,
+                diffOperands);
+        }
+    }
+
+    return InstPair(primalGetElement, diffGetElement);
+}
+
 InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst)
 {
     auto updateInst = as<IRUpdateElement>(originalInst);
@@ -1127,7 +1164,7 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
     auto primalVal = findOrTranscribePrimalInst(builder, origVal);
 
     IRInst* primalUpdateField =
-        builder->emitUpdateElement(primalBase, primalAccessChain, primalVal);
+        builder->emitUpdateElement(primalBase, primalAccessChain.getArrayView(), primalVal);
 
     IRInst* diffUpdateElement = nullptr;
     List<IRInst*> diffAccessChain;
@@ -1161,7 +1198,7 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
             auto primalElementType = primalVal->getDataType();
 
             diffUpdateElement = builder->emitUpdateElement(
-                diffBase, diffAccessChain, diffVal);
+                diffBase, diffAccessChain.getArrayView(), diffVal);
             builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
         }
         else
@@ -1169,7 +1206,7 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
             auto primalElementType = primalVal->getDataType();
             auto zeroElementDiff = getDifferentialZeroOfType(builder, primalElementType);
             diffUpdateElement = builder->emitUpdateElement(
-                diffBase, diffAccessChain, zeroElementDiff);
+                diffBase, diffAccessChain.getArrayView(), zeroElementDiff);
             builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
         }
     }
@@ -1656,6 +1693,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     {
         disableIRValidationAtInsert();
         auto simplifyOptions = IRSimplificationOptions::getDefault(nullptr);
+        simplifyOptions.removeRedundancy = true;
         simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
         enableIRValidationAtInsert();
     }
@@ -1791,6 +1829,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeVectorFromScalar:
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
+    case kIROp_MakeTuple:
+    case kIROp_MakeValuePack:
         return transcribeConstruct(builder, origInst);
     case kIROp_MakeStruct:
         return transcribeMakeStruct(builder, origInst);
@@ -1804,7 +1844,6 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_swizzle:
         return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
     
-    case kIROp_MakeTuple:
     case kIROp_Neg:
         return transcribeByPassthrough(builder, origInst);
 
@@ -1830,6 +1869,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
         return transcribeGetElement(builder, origInst);
+
+    case kIROp_GetTupleElement:
+        return transcribeGetTupleElement(builder, origInst);
 
     case kIROp_ifElse:
         return transcribeIfElse(builder, as<IRIfElse>(origInst));
@@ -1943,6 +1985,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DebugLine:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
+    case kIROp_GetArrayLength:
+    case kIROp_SizeOf:
+    case kIROp_AlignOf:
         return transcribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,

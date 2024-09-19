@@ -245,6 +245,10 @@ String getDeclKindString(DeclRef<Decl> declRef)
     {
         return "(generic type parameter) ";
     }
+    else if (declRef.as<GenericTypePackParamDecl>())
+    {
+        return "(generic type pack parameter) ";
+    }
     else if (declRef.as<GenericValueParamDecl>())
     {
         return "(generic value parameter) ";
@@ -572,7 +576,7 @@ SlangResult LanguageServer::hover(
         }
     };
 
-    auto fillDeclRefHoverInfo = [&](DeclRef<Decl> declRef)
+    auto fillDeclRefHoverInfo = [&](DeclRef<Decl> declRef, Name* name)
     {
         if (declRef.getDecl())
         {
@@ -654,10 +658,14 @@ SlangResult LanguageServer::hover(
             maybeAppendAdditionalOverloadsHint();
             auto nodeHumaneLoc =
                 version->linkage->getSourceManager()->getHumaneLoc(leafNode->loc);
-            hover.range.start.line = int(nodeHumaneLoc.line - 1);
-            hover.range.end.line = int(nodeHumaneLoc.line - 1);
-            hover.range.start.character = int(nodeHumaneLoc.column - 1);
-            auto name = declRef.getName();
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                nodeHumaneLoc.line,
+                nodeHumaneLoc.column,
+                hover.range.start.line,
+                hover.range.start.character);
+            hover.range.end = hover.range.start;
+            if (!name)
+                name = declRef.getName();
             if (auto ctorDecl = declRef.as<ConstructorDecl>())
             {
                 auto parent = ctorDecl.getDecl()->parentDecl;
@@ -668,22 +676,24 @@ SlangResult LanguageServer::hover(
             }
             if (name)
             {
-                hover.range.end.character = int(nodeHumaneLoc.column + name->text.getLength() - 1);
+                hover.range.end.character = hover.range.start.character + (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice());
             }
         }
     };
     auto fillLoc = [&](SourceLoc loc)
     {
         auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(loc, SourceLocType::Actual);
-        hover.range.start.line = int(humaneLoc.line - 1);
-        hover.range.end.line = int(humaneLoc.line - 1);
-        hover.range.start.character = int(humaneLoc.column - 1);
-        hover.range.end.character = hover.range.start.character + int(doc->getTokenLength(humaneLoc.line, humaneLoc.column));
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, hover.range.start.line, hover.range.start.character);
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+            humaneLoc.line,
+            humaneLoc.column + doc->getTokenLength(humaneLoc.line, humaneLoc.column),
+            hover.range.end.line,
+            hover.range.end.character);
     };
     auto fillExprHoverInfo = [&](Expr* expr)
     {
         if (auto declRefExpr = as<DeclRefExpr>(expr))
-            return fillDeclRefHoverInfo(declRefExpr->declRef);
+            return fillDeclRefHoverInfo(declRefExpr->declRef, declRefExpr->name);
         else if (as<ThisExpr>(expr))
         {
             if (expr->type)
@@ -691,6 +701,40 @@ SlangResult LanguageServer::hover(
                 sb << "```\n" << expr->type->toString() << " this" << "\n```\n";
             }
             fillLoc(expr->loc);
+        }
+        else if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            if (expr->type && swizzleExpr->base && swizzleExpr->base->type)
+            {
+                bool isTupleType = as<TupleType>(swizzleExpr->base->type) != nullptr;
+                sb << "```\n";
+                swizzleExpr->type->toText(sb);
+                sb << " ";
+                swizzleExpr->base->type->toText(sb);
+                sb << ".";
+                for (auto index : swizzleExpr->elementIndices)
+                {
+                    if (isTupleType || index > 4)
+                        sb << "_" << index;
+                    else
+                        sb << "xyzw"[index];
+                }
+                sb << "\n```\n";
+                fillLoc(expr->loc);
+            }
+        }
+        else if (auto countOfExpr = as<CountOfExpr>(expr))
+        {
+            if (countOfExpr->sizedType)
+            {
+                if (auto foldedVal = as<ConstantIntVal>(CountOfIntVal::tryFoldOrNull(version->linkage->getASTBuilder(), expr->type.type, countOfExpr->sizedType)))
+                {
+                    sb << "```\n" << "countof(";
+                    countOfExpr->sizedType->toText(sb);
+                    sb << ") = " << foldedVal->getValue() << "\n```\n";
+                    fillLoc(expr->loc);
+                }
+            }
         }
         if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
         {
@@ -708,12 +752,12 @@ SlangResult LanguageServer::hover(
     };
     if (auto declRefExpr = as<DeclRefExpr>(leafNode))
     {
-        fillDeclRefHoverInfo(declRefExpr->declRef);
+        fillDeclRefHoverInfo(declRefExpr->declRef, declRefExpr->name);
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(leafNode))
     {
         LookupResultItem& item = overloadedExpr->lookupResult2.item;
-        fillDeclRefHoverInfo(item.declRef);
+        fillDeclRefHoverInfo(item.declRef, overloadedExpr->name);
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(leafNode))
     {
@@ -730,6 +774,14 @@ SlangResult LanguageServer::hover(
     else if (auto thisExprExpr = as<ThisExpr>(leafNode))
     {
         fillExprHoverInfo(thisExprExpr);
+    }
+    else if (auto countOfExpr = as<CountOfExpr>(leafNode))
+    {
+        fillExprHoverInfo(countOfExpr);
+    }
+    else if (auto swizzleExpr = as<SwizzleExpr>(leafNode))
+    {
+        fillExprHoverInfo(swizzleExpr);
     }
     else if (auto importDecl = as<ImportDecl>(leafNode))
     {
@@ -775,11 +827,11 @@ SlangResult LanguageServer::hover(
     }
     else if (auto decl = as<Decl>(leafNode))
     {
-        fillDeclRefHoverInfo(makeDeclRef(decl));
+        fillDeclRefHoverInfo(makeDeclRef(decl), nullptr);
     }
     else if (auto attr = as<Attribute>(leafNode))
     {
-        fillDeclRefHoverInfo(makeDeclRef(attr->attributeDecl));
+        fillDeclRefHoverInfo(makeDeclRef(attr->attributeDecl), nullptr);
         hover.range.end.character = hover.range.start.character + (int)attr->originalIdentifierToken.getContentLength();
     }
     if (sb.getLength() == 0)
@@ -851,7 +903,7 @@ SlangResult LanguageServer::gotoDefinition(
                                                                 : declRefExpr->declRef.getLoc(),
                     SourceLocType::Actual);
             auto name = declRefExpr->declRef.getName();
-            locations.add(LocationResult{location, name ? (int)name->text.getLength() : 0});
+            locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
         }
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(leafNode))
@@ -863,7 +915,7 @@ SlangResult LanguageServer::gotoDefinition(
                 auto location = version->linkage->getSourceManager()->getHumaneLoc(
                     item.declRef.getNameLoc(), SourceLocType::Actual);
                 auto name = item.declRef.getName();
-                locations.add(LocationResult{location, name ? (int)name->text.getLength() : 0});
+                locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
             }
         }
         else 
@@ -874,7 +926,7 @@ SlangResult LanguageServer::gotoDefinition(
                 auto location = version->linkage->getSourceManager()->getHumaneLoc(
                     item.declRef.getNameLoc(), SourceLocType::Actual);
                 auto name = item.declRef.getName();
-                locations.add(LocationResult{location, name ? (int)name->text.getLength() : 0});
+                locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
             }
         }
     }
@@ -909,8 +961,11 @@ SlangResult LanguageServer::gotoDefinition(
             {
                 result.uri =
                     URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
-                result.range.start.line = int(loc.loc.line - 1);
-                result.range.start.character = int(loc.loc.column - 1);
+                doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                    loc.loc.line,
+                    loc.loc.column,
+                    result.range.start.line,
+                    result.range.start.character);
                 result.range.end = result.range.start;
                 result.range.end.character += loc.length;
                 results.add(result);

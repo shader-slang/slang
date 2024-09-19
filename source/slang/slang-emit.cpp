@@ -15,6 +15,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-check-recursive-type.h"
+#include "slang-ir-check-shader-parameter-type.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-dll-export.h"
@@ -30,6 +31,7 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-metal-legalize.h"
+#include "slang-ir-wgsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-legalize-array-return-type.h"
@@ -57,6 +59,7 @@
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-redundancy-removal.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-sccp.h"
@@ -99,6 +102,7 @@
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
 #include "slang-emit-metal.h"
+#include "slang-emit-wgsl.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
 #include "slang-emit-torch.h"
@@ -244,6 +248,7 @@ struct RequiredLoweringPassSet
     bool glslGlobalVar;
     bool glslSSBO;
     bool byteAddressBuffer;
+    bool dynamicResource;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -347,6 +352,9 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
+    case kIROp_DynamicResourceType:
+        result.dynamicResource = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -408,6 +416,53 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     }
 
     return false;
+}
+
+static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
+{
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_Func)
+        {
+            bool remove = false;
+            if (target == CodeGenTarget::HLSL)
+            {
+                // DXIL does not permit HLSLStructureBufferType in exported functions
+                // or sadly Matrices (https://github.com/shader-slang/slang/issues/4880)
+                auto type = as<IRFuncType>(inst->getFullType());
+                auto argCount = type->getOperandCount();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    auto operand = type->getOperand(aa);
+                    if (operand->getOp() == kIROp_HLSLStructuredBufferType ||
+                        operand->getOp() == kIROp_MatrixType)
+                    {
+                        remove = true;
+                        break;
+                    }
+                }
+            }
+            else if (target == CodeGenTarget::SPIRV)
+            {
+                // SPIR-V does not allow exporting entry points
+                if (inst->findDecoration<IREntryPointDecoration>())
+                {
+                    remove = true;
+                }
+            }
+            if (remove)
+            {
+                if (auto dec = inst->findDecoration<IRPublicDecoration>())
+                {
+                    dec->removeAndDeallocate();
+                }
+                if (auto dec = inst->findDecoration<IRDownstreamModuleExportDecoration>())
+                {
+                    dec->removeAndDeallocate();
+                }
+            }
+        }
+    }
 }
 
 Result linkAndOptimizeIR(
@@ -632,6 +687,13 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    if (requiredLoweringPassSet.autodiff)
+    {
+        // Generate warnings for potentially incorrect or badly-performing autodiff patterns.
+        checkAutodiffPatterns(targetProgram, irModule, sink);
+    }
+    
     // Next, we need to ensure that the code we emit for
     // the target doesn't contain any operations that would
     // be illegal on the target platform. For example,
@@ -734,8 +796,20 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    if (codeGenContext->removeAvailableInDownstreamIR)
+    {
+        removeAvailableInDownstreamModuleDecorations(target, irModule);
+    }
+
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
+    {
         checkForRecursiveTypes(irModule, sink);
+
+        // For some targets, we are more restrictive about what types are allowed
+        // to be used as shader parameters in ConstantBuffer/ParameterBlock.
+        // We will check for these restrictions here.
+        checkForInvalidShaderParameterType(targetRequest, irModule, sink);
+    }
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
@@ -766,6 +840,10 @@ Result linkAndOptimizeIR(
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+    }
+    else if (requiredLoweringPassSet.generics)
+    {
+        eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
     }
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
@@ -943,13 +1021,13 @@ Result linkAndOptimizeIR(
     specializeResourceUsage(codeGenContext, irModule);
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
-    // For GLSL targets, we also want to specialize calls to functions that
-    // takes array parameters if possible, to avoid performance issues on
-    // those platforms.
-    if (isKhronosTarget(targetRequest))
-    {
-        specializeArrayParameters(codeGenContext, irModule);
-    }
+    // We also want to specialize calls to functions that
+    // takes unsized array parameters if possible.
+    // Moreover, for Khronos targets, we also want to specialize calls to functions
+    // that takes arrays/structs containing arrays as parameters with the actual
+    // global array object to avoid loading big arrays into SSA registers, which seems
+    // to cause performance issues.
+    specializeArrayParameters(codeGenContext, irModule);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");
@@ -1125,6 +1203,10 @@ Result linkAndOptimizeIR(
             ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
             : &glslExtensionTracker;
 
+#if 0
+            dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
+#endif
+
         legalizeEntryPointsForGLSL(
             session,
             irModule,
@@ -1158,6 +1240,12 @@ Result linkAndOptimizeIR(
         }
         break;
 
+    case CodeGenTarget::WGSL:
+    {
+        legalizeIRForWGSL(irModule, sink);
+    }
+    break;
+
     default:
         break;
     }
@@ -1166,6 +1254,10 @@ Result linkAndOptimizeIR(
     if(isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
 
+    // Create aliases for all dynamic resource parameters.
+    if(requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
+        legalizeDynamicResourcesForGLSL(codeGenContext, irModule);
+    
     legalizeExtractFromTextureAccess(irModule);
 
     // Legalize `ImageSubscript` loads.
@@ -1205,9 +1297,17 @@ Result linkAndOptimizeIR(
     default:
         break;
     case CodeGenTarget::GLSL:
+        moveGlobalVarInitializationToEntryPoints(irModule);
+        break;
+    // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         moveGlobalVarInitializationToEntryPoints(irModule);
+        if(targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EnableExperimentalPasses))
+            introduceExplicitGlobalContext(irModule, target);
+    #if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
+    #endif
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
@@ -1418,6 +1518,11 @@ Result linkAndOptimizeIR(
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
+    {
+        unexportNonEmbeddableIR(target, irModule);
+    }
+
     collectMetadata(irModule, *metadata);
 
     outLinkedIR.metadata = metadata;
@@ -1442,15 +1547,28 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto targetProgram = getTargetProgram();
 
     auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(CompilerOptionName::LineDirectiveMode);
-    // To try to make the default behavior reasonable, we will
-    // always use C-style line directives (to give the user
-    // good source locations on error messages from downstream
-    // compilers) *unless* they requested raw GLSL as the
-    // output (in which case we want to maximize compatibility
-    // with downstream tools).
-    if (lineDirectiveMode ==  LineDirectiveMode::Default && targetRequest->getTarget() == CodeGenTarget::GLSL)
+    // We will generally use C-style line directives in order to give the user good
+    // source locations on error messages from downstream compilers, but there are
+    // a few exceptions.
+    if (lineDirectiveMode == LineDirectiveMode::Default)
     {
-        lineDirectiveMode = LineDirectiveMode::GLSL;
+
+        switch(targetRequest->getTarget())
+        {
+
+        case CodeGenTarget::GLSL:
+            // We want to maximize compatibility with downstream tools.
+            lineDirectiveMode = LineDirectiveMode::GLSL;
+            break;
+
+        case CodeGenTarget::WGSL:
+            // WGSL doesn't support line directives.
+            // See https://github.com/gpuweb/gpuweb/issues/606.
+            lineDirectiveMode = LineDirectiveMode::None;
+            break;
+
+        }
+
     }
 
     ComPtr<IBoxValue<SourceMap>> sourceMap;
@@ -1515,6 +1633,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             case SourceLanguage::Metal:
             {
                 sourceEmitter = new MetalSourceEmitter(desc);
+                break;
+            }
+            case SourceLanguage::WGSL:
+            {
+                sourceEmitter = new WGSLSourceEmitter(desc);
                 break;
             }
             default: break;
@@ -1710,9 +1833,13 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             {
                 if (SLANG_FAILED(compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount()/4))))
                 {
+                    String err;
+                    String dis;
+                    disassembleSPIRV(spirv, err, dis);
                     codeGenContext->getSink()->diagnoseWithoutSourceView(
                         SourceLoc{},
-                        Diagnostics::spirvValidationFailed
+                        Diagnostics::spirvValidationFailed,
+                        dis
                     );
                 }
             }

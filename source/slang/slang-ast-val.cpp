@@ -205,7 +205,7 @@ Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet
             (*ioDiff)++;
             return args[argIndex];
         }
-        else if (const auto typeParam = as<GenericTypeParamDecl>(m))
+        else if (const auto typeParam = as<GenericTypeParamDeclBase>(m))
         {
             argIndex++;
         }
@@ -272,6 +272,163 @@ void TypeEqualityWitness::_toTextOverride(StringBuilder& out)
     out << toSlice("TypeEqualityWitness(") << getSub() << toSlice(")");
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypePackSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* TypePackSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    ShortList<SubtypeWitness*> newWitnesses;
+    for (Index i = 0; i < getCount(); i++)
+    {
+        auto witness = getWitness(i);
+        auto newWitness = as<SubtypeWitness>(witness->substituteImpl(astBuilder, subst, &diff));
+        newWitnesses.add(newWitness);
+    }
+    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return getCurrentASTBuilder()->getSubtypeWitnessPack(newSub, newSup, newWitnesses.getArrayView().arrayView);
+}
+
+Val* TypePackSubtypeWitness::_resolveImplOverride()
+{
+    int diff = 0;
+    ShortList<SubtypeWitness*> newWitnesses;
+    for (Index i = 0; i < getCount(); i++)
+    {
+        auto witness = getWitness(i);
+        auto newWitness = as<SubtypeWitness>(witness->resolve());
+        if (witness != newWitness)
+            diff++;
+        newWitnesses.add(newWitness);
+    }
+    auto newSub = as<Type>(getSub()->resolve());
+    if (newSub != getSub())
+        diff++;
+    auto newSup = as<Type>(getSup()->resolve());
+    if (newSup != getSup())
+        diff++;
+
+    if (!diff)
+        return this;
+    return getCurrentASTBuilder()->getSubtypeWitnessPack(newSub, newSup, newWitnesses.getArrayView().arrayView);
+}
+
+void TypePackSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("Pack(");
+    for (Index i = 0; i < getCount(); i++)
+    {
+        if (i != 0)
+            out << toSlice(", ");
+        getWitness(i)->toText(out);
+    }
+    out << toSlice(")");
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExpandSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* ExpandSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    if (auto subTypePack = as<ConcreteTypePack>(newSub))
+    {
+        // If sub is substituted into a concrete type pack, we should return a
+        // TypePackSubtypeWitness.
+        ShortList<SubtypeWitness*> newWitnesses;
+        for (Index i = 0; i < subTypePack->getTypeCount(); i++)
+        {
+            auto elementType = subTypePack->getElementType(i);
+            subst.packExpansionIndex = i;
+            auto elementWitness = as<SubtypeWitness>(getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+            auto newWitness = getCurrentASTBuilder()->getExpandSubtypeWitness(elementType, newSup, elementWitness);
+            newWitnesses.add(as<SubtypeWitness>(newWitness));
+        }
+        (*ioDiff)++;
+        return getCurrentASTBuilder()->getSubtypeWitnessPack(newSub, newSup, newWitnesses.getArrayView().arrayView);
+    }
+
+    (*ioDiff)++;
+    auto newPatternWitness = as<SubtypeWitness>(getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+    return getCurrentASTBuilder()->getExpandSubtypeWitness(newSub, newSup, newPatternWitness);
+}
+
+Val* ExpandSubtypeWitness::_resolveImplOverride()
+{
+    int diff = 0;
+    auto newPatternWitness = as<SubtypeWitness>(getPatternTypeWitness()->resolve());
+    if (newPatternWitness != getPatternTypeWitness())
+        diff++;
+    auto newSub = as<Type>(getSub()->resolve());
+    if (newSub != getSub())
+        diff++;
+    auto newSup = as<Type>(getSup()->resolve());
+    if (newSup != getSup())
+        diff++;
+    if (!diff)
+        return this;
+    return getCurrentASTBuilder()->getExpandSubtypeWitness(newSub, newSup, newPatternWitness);
+}
+
+void ExpandSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ExpandWitness(");
+    getPatternTypeWitness()->toText(out);
+    out << toSlice(")");
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EachSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* EachSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    auto newPatternWitness = as<SubtypeWitness>(getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
+    {
+        if (subst.packExpansionIndex >= 0 && subst.packExpansionIndex < witnessPack->getCount())
+        {
+            auto newWitness = witnessPack->getWitness(subst.packExpansionIndex);
+            (*ioDiff)++;
+            return newWitness;
+        }
+    }
+    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    return getCurrentASTBuilder()->getEachSubtypeWitness(newSub, newSup, newPatternWitness);
+}
+
+Val* EachSubtypeWitness::_resolveImplOverride()
+{
+    int diff = 0;
+    auto newPatternWitness = as<SubtypeWitness>(getPatternTypeWitness()->resolve());
+    if (newPatternWitness != getPatternTypeWitness())
+        diff++;
+    auto newSub = as<Type>(getSub()->resolve());
+    if (newSub != getSub())
+        diff++;
+    auto newSup = as<Type>(getSup()->resolve());
+    if (newSup != getSup())
+        diff++;
+    if (!diff)
+        return this;
+    return getCurrentASTBuilder()->getEachSubtypeWitness(newSub, newSup, newPatternWitness);
+}
+
+void EachSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("EachWitness(");
+    getPatternTypeWitness()->toText(out);
+    out << toSlice(")");
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Val* DeclaredSubtypeWitness::_resolveImplOverride()
@@ -336,7 +493,7 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
         }
         if (found)
         {
-            auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDecl>().getCount() +
+            auto ordinaryParamCount = genericDecl->getMembersOfType<GenericTypeParamDeclBase>().getCount() +
                 genericDecl->getMembersOfType<GenericValueParamDecl>().getCount();
             if (index + ordinaryParamCount < args.getCount())
             {
@@ -1375,6 +1532,81 @@ Val* FuncCallIntVal::_substituteImplOverride(ASTBuilder* astBuilder, Substitutio
     }
     // Nothing found: don't substitute.
     return this;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CountOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void CountOfIntVal::_toTextOverride(StringBuilder& out)
+{
+    out << "countof(";
+    getTypeArg()->toText(out);
+    out << ")";
+}
+
+Val* CountOfIntVal::tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType)
+{
+    if (auto typePack = as<ConcreteTypePack>(newType))
+    {
+        bool anyAbstract = false;
+        for (Index i = 0; i < typePack->getTypeCount(); i++)
+        {
+            if (isAbstractTypePack(typePack->getElementType(i)))
+            {
+                anyAbstract = true;
+                break;
+            }
+        }
+        if (!anyAbstract)
+        {
+            auto result = astBuilder->getIntVal(intType, typePack->getTypeCount());
+            return result;
+        }
+    }
+    else if (auto tupleType = as<TupleType>(newType))
+    {
+        bool anyAbstract = false;
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            if (isAbstractTypePack(tupleType->getMember(i)))
+            {
+                anyAbstract = true;
+                break;
+            }
+        }
+        if (!anyAbstract)
+        {
+            auto result = astBuilder->getIntVal(intType, tupleType->getMemberCount());
+            return result;
+        }
+    }
+    return nullptr;
+}
+
+Val* CountOfIntVal::tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType)
+{
+    if (auto result = tryFoldOrNull(astBuilder, intType, newType))
+        return result;
+    auto result = astBuilder->getOrCreate<CountOfIntVal>(intType, newType);
+    return result;
+}
+
+Val* CountOfIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    auto newType = as<Type>(getTypeArg()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return tryFold(astBuilder, getType(), newType);
+}
+
+Val* CountOfIntVal::_resolveImplOverride()
+{
+    auto resolvedTypeArg = getTypeArg()->resolve();
+    if (resolvedTypeArg == getTypeArg())
+        return this;
+    return tryFold(getCurrentASTBuilder(), getType(), as<Type>(resolvedTypeArg));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! WitnessLookupIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

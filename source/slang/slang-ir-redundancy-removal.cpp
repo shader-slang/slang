@@ -8,6 +8,19 @@ namespace Slang
 struct RedundancyRemovalContext
 {
     RefPtr<IRDominatorTree> dom;
+    bool isSingleIterationLoop(IRLoop* loop)
+    {
+        int useCount = 0;
+        for (auto use = loop->getBreakBlock()->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser() == loop)
+                continue;
+            useCount++;
+            if (useCount > 1)
+                return false;
+        }
+        return true;
+    }
 
     bool tryHoistInstToOuterMostLoop(IRGlobalValueWithCode* func, IRInst* inst)
     {
@@ -17,7 +30,8 @@ struct RedundancyRemovalContext
              parentBlock = dom->getImmediateDominator(parentBlock))
         {
             auto terminatorInst = parentBlock->getTerminator();
-            if (terminatorInst->getOp() == kIROp_loop)
+            if (terminatorInst->getOp() == kIROp_loop &&
+                !isSingleIterationLoop(as<IRLoop>(terminatorInst)))
             {
                 // Consider hoisting the inst into this block.
                 // This is only possible if all operands of the inst are dominating `parentBlock`.
@@ -143,6 +157,39 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
         result |= eliminateRedundantLoadStore(normalFunc);
     }
     return result;
+}
+
+// Remove IR definitions from all AvailableInDownstreamIR functions where the
+// languages match what we're currently targetting,  as these functions are
+// already defined in the embedded precompiled library.
+void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module)
+{
+    List<IRInst*> toRemove;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto funcInst = as<IRFunc>(globalInst))
+        {
+            if (auto dec = globalInst->findDecoration<IRAvailableInDownstreamIRDecoration>())
+            {
+                if ((dec->getTarget() == CodeGenTarget::DXIL && target == CodeGenTarget::HLSL) ||
+                    (dec->getTarget() == target))
+                {
+                    // Gut the function definition, turning it into a declaration
+                    for (auto inst : funcInst->getChildren())
+                    {
+                        if (inst->getOp() == kIROp_Block)
+                        {
+                            toRemove.add(inst);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (auto inst : toRemove)
+    {
+        inst->removeAndDeallocate();
+    }
 }
 
 static IRInst* _getRootVar(IRInst* inst)

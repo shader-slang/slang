@@ -228,7 +228,6 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSL
     HLSLAppendStructuredBufferType                  - Write
     HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be readonly, but we currently don't support on GLSL
     */
-    _emitMemoryQualifierDecorations(varDecl);
     if (as<IRHLSLStructuredBufferType>(structuredBufferType))
     {
         m_writer->emit("readonly ");
@@ -386,6 +385,15 @@ void GLSLSourceEmitter::_emitGLSLSSBO(IRGlobalParam* varDecl, IRGLSLShaderStorag
     m_writer->emit(";\n");
 }
 
+void GLSLSourceEmitter::emitGlobalParamDefaultVal(IRGlobalParam* param)
+{
+    if (auto defaultValDecor = param->findDecoration<IRDefaultValueDecoration>())
+    {
+        m_writer->emit(" = ");
+        emitInstExpr(defaultValDecor->getOperand(0), EmitOpInfo());
+    }
+}
+
 void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
     auto varLayout = getVarLayout(varDecl);
@@ -419,6 +427,8 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     }
 
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
+    _emitGLSLLayoutQualifier(LayoutResourceKind::SpecializationConstant, &containerChain);
+
     bool isShaderRecord = _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
     if (isShaderRecord)
@@ -1728,6 +1738,11 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+        case kIROp_ControlBarrier:
+        {
+            m_writer->emit("barrier();\n");
+            return true;
+        }
         case kIROp_MakeVectorFromScalar:
         case kIROp_MatrixReshape:
         {
@@ -2638,9 +2653,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type");
 }
 
-void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, IRIntegerValue addressSpace)
+void GLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
 {
-    if(addressSpace == SpvStorageClassTaskPayloadWorkgroupEXT)
+    if(addressSpace == AddressSpace::TaskPayloadWorkgroup)
     {
         m_writer->emit("taskPayloadSharedEXT ");
     }
@@ -2835,28 +2850,28 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 
 }
 
-void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
+void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* varType)
 {
     // When a variable has a matrix type, we want to emit an explicit
     // layout qualifier based on what the layout has been computed to be.
     //
 
-    auto typeLayout = layout->getTypeLayout()->unwrapArray();
+    auto matrixType = as<IRMatrixType>(unwrapArray(varType));
 
-    if (auto matrixTypeLayout = as<IRMatrixTypeLayout>(typeLayout))
+    if (matrixType)
     {
         // Reminder: the meaning of row/column major layout
         // in our semantics is the *opposite* of what GLSL
         // calls them, because what they call "columns"
         // are what we call "rows."
         //
-        switch (matrixTypeLayout->getMode())
+        switch (getIntVal(matrixType->getLayout()))
         {
-            case kMatrixLayoutMode_ColumnMajor:
+            case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
                 m_writer->emit("layout(row_major)\n");
                 break;
 
-            case kMatrixLayoutMode_RowMajor:
+            case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
                 m_writer->emit("layout(column_major)\n");
                 break;
         }

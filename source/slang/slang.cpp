@@ -26,7 +26,8 @@
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-type-layout.h"
-#
+#include "slang-lookup.h"
+
 #include "slang-options.h"
 
 #include "slang-repro.h"
@@ -140,7 +141,7 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
-    
+
     _initCodeGenTransitionMap();
 
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
@@ -1067,7 +1068,11 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
         for (const auto& nameToMod : builtinLinkage->mapNameToLoadedModules)
             mapNameToLoadedModules.add(nameToMod);
     }
+
+    m_semanticsForReflection = new SharedSemanticsContext(this, nullptr, nullptr);
 }
+
+SharedSemanticsContext* Linkage::getSemanticsForReflection() { return m_semanticsForReflection.get(); }
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
 {
@@ -1346,6 +1351,85 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     return asExternal(specializedType);
 }
 
+DeclRef<GenericDecl> getGenericParentDeclRef(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef)
+{
+    // Create substituted parent decl ref.
+    auto decl = declRef.getDecl();
+
+    while (!as<GenericDecl>(decl))
+    {
+        decl = decl->parentDecl;
+    }
+
+    auto genericDecl = as<GenericDecl>(decl);
+    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, DeclRef(genericDecl)).as<GenericDecl>();
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, genericDeclRef).as<GenericDecl>();
+}
+
+DeclRef<Decl> Linkage::specializeWithArgTypes(
+    DeclRef<Decl>   funcDeclRef,
+    List<Type*>         argTypes,
+    DiagnosticSink*     sink)
+{
+    SemanticsVisitor visitor(getSemanticsForReflection());
+    visitor = visitor.withSink(sink);
+
+    ASTBuilder* astBuilder = getASTBuilder();
+
+    List<Expr*> argExprs;
+    for (SlangInt aa = 0; aa < argTypes.getCount(); ++aa)
+    {
+        auto argType = argTypes[aa];
+
+        // Create an 'empty' expr with the given type. Ideally, the expression itself should not matter
+        // only its checked type.
+        //
+        auto argExpr = astBuilder->create<VarExpr>();
+        argExpr->type = argType;
+        argExprs.add(argExpr);
+    }
+
+    // Construct invoke expr.
+    auto invokeExpr = astBuilder->create<InvokeExpr>();
+    auto declRefExpr = astBuilder->create<DeclRefExpr>();
+    
+    declRefExpr->declRef = getGenericParentDeclRef(getASTBuilder(), &visitor, funcDeclRef);
+    invokeExpr->functionExpr = declRefExpr;
+    invokeExpr->arguments = argExprs;
+
+    auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
+    return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
+}
+
+
+DeclRef<Decl> Linkage::specializeGeneric(
+        DeclRef<Decl>                       declRef,
+        List<Expr*>                         argExprs,
+        DiagnosticSink*                     sink)
+{
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+    SLANG_ASSERT(declRef);
+
+    SemanticsVisitor visitor(getSemanticsForReflection());
+    visitor = visitor.withSink(sink);
+
+    auto genericDeclRef = getGenericParentDeclRef(getASTBuilder(), &visitor, declRef);
+
+    DeclRefExpr* declRefExpr = getASTBuilder()->create<DeclRefExpr>();
+    declRefExpr->declRef = genericDeclRef;
+
+    GenericAppExpr* genericAppExpr = getASTBuilder()->create<GenericAppExpr>();
+    genericAppExpr->functionExpr = declRefExpr;
+    genericAppExpr->arguments = argExprs;
+
+    auto specializedDeclRef = as<DeclRefExpr>(visitor.checkGenericAppWithCheckedArgs(genericAppExpr))->declRef;
+
+    return specializedDeclRef;
+}
+
 SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     slang::TypeReflection*  inType,
     SlangInt                targetIndex,
@@ -1522,8 +1606,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
 
     try
     {
-        SharedSemanticsContext sharedSemanticsContext(this, nullptr, &sink);
-        SemanticsVisitor visitor(&sharedSemanticsContext);
+        SemanticsVisitor visitor(getSemanticsForReflection());
+        visitor = visitor.withSink(&sink);
+
         auto witness =
             visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
@@ -1710,7 +1795,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     // If the user specified a explicit profile, we should pull
     // a corresponding atom representing the target version from the profile.
-    CapabilitySet profileCaps = CapabilitySet(optionSet.getProfile().getCapabilityName());
+    CapabilitySet profileCaps = optionSet.getProfile().getCapabilityName();
 
     bool isGLSLTarget = false;
     switch(getTarget())
@@ -1799,6 +1884,10 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::metal);
         break;
 
+    case CodeGenTarget::WGSL:
+        atoms.add(CapabilityName::wgsl);
+        break;        
+        
     default:
         break;
     }
@@ -2275,20 +2364,117 @@ DeclRef<Decl> ComponentType::findDeclFromString(
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SharedSemanticsContext sharedSemanticsContext(
-        linkage,
-        nullptr,
-        sink);
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
+
+    SemanticsVisitor visitor(context);
 
     auto checkedExpr = visitor.CheckExpr(expr);
     if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
     {
         result = declRefExpr->declRef;
     }
-
+    else if (auto overloadedExpr = as<OverloadedExpr>(checkedExpr))
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::ambiguousReference, name);
+        for (auto candidate : overloadedExpr->lookupResult2)
+        {
+            sink->diagnose(candidate.declRef.getDecl(), Diagnostics::overloadCandidate, candidate.declRef);
+        }
+    }
     m_decls[name] = result;
     return result;
+}
+
+DeclRef<Decl> ComponentType::findDeclFromStringInType(
+    Type* type,
+    String const& name,
+    LookupMask mask,
+    DiagnosticSink* sink)
+{
+    DeclRef<Decl> result;
+
+    // Only look up in the type if it is a DeclRefType
+    if (!as<DeclRefType>(type))
+        return DeclRef<Decl>();
+
+    // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
+    //
+    // The parseTermString uses the linkage ASTBuilder for it's parsing.
+    //
+    // It might be possible to just create a temporary ASTBuilder - the worry though is
+    // that the parsing sets a member variable in AST node to one of these scopes, and then
+    // it become a dangling pointer. So for now we go with the linkages.
+    auto astBuilder = getLinkage()->getASTBuilder();
+
+    // Otherwise, we need to start looking in
+    // the modules that were directly or
+    // indirectly referenced.
+    //
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+
+    auto linkage = getLinkage();
+
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+
+    Expr* expr = linkage->parseTermString(name, scope);
+
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
+
+    SemanticsVisitor visitor(context);
+
+    GenericAppExpr* genericOuterExpr = nullptr;
+    if (as<GenericAppExpr>(expr))
+    {
+        // Unwrap the generic application, and re-wrap it around the static-member expr
+        genericOuterExpr = as<GenericAppExpr>(expr);
+        expr = genericOuterExpr->functionExpr;
+    }
+
+    if (!as<VarExpr>(expr))
+        return result;
+
+    auto rs = astBuilder->create<StaticMemberExpr>();
+    auto typeExpr = astBuilder->create<SharedTypeExpr>();
+    auto typetype = astBuilder->getOrCreate<TypeType>(type);
+    typeExpr->type = typetype;
+    rs->baseExpression = typeExpr;
+    rs->name = as<VarExpr>(expr)->name;
+
+    expr = rs;
+
+    // If we have a generic-app expression, re-wrap the static-member expr
+    if (genericOuterExpr)
+    {
+        genericOuterExpr->functionExpr = expr;
+        expr = genericOuterExpr;
+    }
+    
+    auto checkedTerm = visitor.CheckTerm(expr);
+    auto resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+
+    if (auto declRefExpr = as<DeclRefExpr>(resolvedTerm))
+    {
+        result = declRefExpr->declRef;
+    }
+
+    if (auto genericDeclRef = result.as<GenericDecl>())
+    {   
+        result = createDefaultSubstitutionsIfNeeded(
+            astBuilder, &visitor, DeclRef(genericDeclRef.getDecl()->inner));
+        result = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, result);
+    }
+
+    return result;
+}
+
+bool ComponentType::isSubType(Type* subType, Type* superType)
+{
+    SemanticsContext context(getLinkage()->getSemanticsForReflection());
+    SemanticsVisitor visitor(context);
+
+    return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);
 }
 
 static void collectExportedConstantInContainer(
@@ -2657,6 +2843,7 @@ static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager*
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
+    SLANG_PROFILE;
     if (translationUnit->isChecked)
         return;
 
@@ -2839,6 +3026,7 @@ void FrontEndCompileRequest::checkAllTranslationUnits()
 
 void FrontEndCompileRequest::generateIR()
 {
+    SLANG_PROFILE;
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
     // Our task in this function is to generate IR code
@@ -2936,6 +3124,7 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 
 SlangResult FrontEndCompileRequest::executeActionsInner()
 {
+    SLANG_PROFILE_SECTION(frontEndExecute);
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
     for (TranslationUnitRequest* translationUnit : translationUnits)
@@ -2961,7 +3150,11 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         return SLANG_FAIL;
 
     // Perform semantic checking on the whole collection
-    checkAllTranslationUnits();
+    {
+        SLANG_PROFILE_SECTION(SemanticChecking);
+        checkAllTranslationUnits();
+    }
+
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -3087,6 +3280,7 @@ void EndToEndCompileRequest::init()
 
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
+    SLANG_PROFILE_SECTION(endToEndActions);
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
     //
@@ -3147,6 +3341,24 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         SLANG_RETURN_ON_FAIL(maybeWriteContainer(m_containerOutputPath));
 
         return SLANG_OK;
+    }
+
+    // If requested, attempt to compile the translation unit all the way down to the target language(s)
+    // and stash the result blobs in IR.
+    for (auto target : getLinkage()->targets)
+    {
+        SlangCompileTarget targetEnum = SlangCompileTarget(target->getTarget());
+        if (target->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
+        {
+            auto frontEndReq = getFrontEndReq();
+
+            for (auto translationUnit : frontEndReq->translationUnits)
+            {
+                SLANG_RETURN_ON_FAIL(translationUnit->getModule()->precompileForTarget(
+                    targetEnum,
+                    nullptr));
+            }
+        }
     }
 
     // If codegen is enabled, we need to move along to
@@ -5743,6 +5955,11 @@ void EndToEndCompileRequest::setTargetForceGLSLScalarBufferLayout(int targetInde
     getTargetOptionSet(targetIndex).set(CompilerOptionName::GLSLForceScalarLayout, value);
 }
 
+void EndToEndCompileRequest::setTargetForceDXLayout(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceDXLayout, value);
+}
+
 void EndToEndCompileRequest::setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode  mode)
 {
     getTargetOptionSet(targetIndex).set(CompilerOptionName::FloatingPointMode, FloatingPointMode(mode));
@@ -5756,6 +5973,16 @@ void EndToEndCompileRequest::setMatrixLayoutMode(SlangMatrixLayoutMode mode)
 void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode  mode)
 {
     getTargetOptionSet(targetIndex).setMatrixLayoutMode(MatrixLayoutMode(mode));
+}
+
+void EndToEndCompileRequest::setTargetGenerateWholeProgram(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::GenerateWholeProgram, value);
+}
+
+void EndToEndCompileRequest::setTargetEmbedDownstreamIR(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::EmbedDownstreamIR, value);
 }
 
 void EndToEndCompileRequest::setTargetLineDirectiveMode(
@@ -6190,6 +6417,7 @@ SlangResult EndToEndCompileRequest::compile()
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportDownstreamTime))
     {
         getSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
+        PerformanceProfiler::getProfiler()->clear();
     }
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
@@ -6204,6 +6432,7 @@ SlangResult EndToEndCompileRequest::compile()
 
     try
     {
+        SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
     catch (const AbortCompilationException& e)

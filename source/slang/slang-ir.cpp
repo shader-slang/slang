@@ -808,12 +808,7 @@ namespace Slang
     IRType* IRFunc::getResultType() { return getDataType()->getResultType(); }
     UInt IRFunc::getParamCount() { return getDataType()->getParamCount(); }
     IRType* IRFunc::getParamType(UInt index) { return getDataType()->getParamType(index); }
-
-    void IRGlobalValueWithCode::addBlock(IRBlock* block)
-    {
-        block->insertAtEnd(this);
-    }
-
+    
     void fixUpFuncType(IRFunc* func, IRType* resultType)
     {
         SLANG_ASSERT(func);
@@ -1279,14 +1274,16 @@ namespace Slang
 
     // Get the current function (or other value with code)
     // that we are inserting into (if any).
-    IRGlobalValueWithCode* IRInsertLoc::getFunc() const
+    IRInst* IRInsertLoc::getFunc() const
     {
         auto pp = getParent();
         if (const auto block = as<IRBlock>(pp))
         {
             pp = pp->getParent();
         }
-        return as<IRGlobalValueWithCode>(pp);
+        if (as<IRGlobalValueWithCode>(pp) || as<IRExpand>(pp))
+            return pp;
+        return nullptr;
     }
 
     void addHoistableInst(
@@ -2059,7 +2056,7 @@ namespace Slang
 
     UnownedStringSlice IRConstant::getStringSlice()
     {
-        assert(getOp() == kIROp_StringLit);
+        assert(getOp() == kIROp_StringLit || getOp() == kIROp_BlobLit);
         // If the transitory decoration is set, then this is uses the transitoryStringVal for the text storage.
         // This is typically used when we are using a transitory IRInst held on the stack (such that it can be looked up in cached), 
         // that just points to a string elsewhere, and NOT the typical normal style, where the string is held after the instruction in memory.
@@ -2133,6 +2130,7 @@ namespace Slang
             {
                 return value.ptrVal == rhs->value.ptrVal;
             }
+            case kIROp_BlobLit:
             case kIROp_StringLit:
             {
                 return getStringSlice() == rhs->getStringSlice();
@@ -2174,6 +2172,7 @@ namespace Slang
             {
                 return combineHash(code, Slang::getHashCode(value.ptrVal));
             }
+            case kIROp_BlobLit:
             case kIROp_StringLit:
             {
                 const UnownedStringSlice slice = getStringSlice();
@@ -2264,6 +2263,7 @@ namespace Slang
                 irValue->value.ptrVal = keyInst.value.ptrVal;
                 break;
             }
+            case kIROp_BlobLit:
             case kIROp_StringLit:
             {
                 const UnownedStringSlice slice = keyInst.getStringSlice();
@@ -2385,6 +2385,36 @@ namespace Slang
         dstSlice.numChars = uint32_t(inSlice.getLength());
 
         return static_cast<IRStringLit*>(_findOrEmitConstant(keyInst));
+    }
+
+    IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
+    {
+        IRConstant keyInst;
+        memset(&keyInst, 0, sizeof(keyInst));
+
+        char* buffer = (char*)(getModule()->getMemoryArena().allocate(blob->getBufferSize()));
+        if (!buffer)
+        {
+            return nullptr;
+        }
+        memcpy(buffer, blob->getBufferPointer(), blob->getBufferSize());
+
+        UnownedStringSlice inSlice(buffer, blob->getBufferSize());
+
+        // Mark that this is on the stack...
+        IRDecoration stackDecoration;
+        memset(&stackDecoration, 0, sizeof(stackDecoration));
+        stackDecoration.m_op = kIROp_TransitoryDecoration;
+        stackDecoration.insertAtEnd(&keyInst);
+
+        keyInst.m_op = kIROp_BlobLit;
+        keyInst.typeUse.usedValue = nullptr; // not used
+
+        IRConstant::StringSliceValue& dstSlice = keyInst.value.transitoryStringVal;
+        dstSlice.chars = const_cast<char*>(inSlice.begin());
+        dstSlice.numChars = uint32_t(inSlice.getLength());
+
+        return static_cast<IRBlobLit*>(_findOrEmitConstant(keyInst));
     }
 
     IRPtrLit* IRBuilder::_getPtrValue(void* data)
@@ -2772,6 +2802,19 @@ namespace Slang
         return getTupleType(SLANG_COUNT_OF(operands), operands);
     }
 
+    IRTypePack* IRBuilder::getTypePack(UInt count, IRType* const* types)
+    {
+        return (IRTypePack*)getType(kIROp_TypePack, count, (IRInst* const*)types);
+    }
+
+    IRExpandType* IRBuilder::getExpandTypeOrVal(IRType* type, IRInst* pattern, ArrayView<IRInst*> capture)
+    {
+        ShortList<IRInst*> args;
+        args.add(pattern);
+        args.addRange(capture);
+        return (IRExpandType*)emitIntrinsicInst(type, kIROp_ExpandTypeOrVal, args.getCount(), args.getArrayView().getBuffer());
+    }
+
     IRResultType* IRBuilder::getResultType(IRType* valueType, IRType* errorType)
     {
         IRInst* operands[] = {valueType, errorType};
@@ -2813,9 +2856,9 @@ namespace Slang
         return (IRInOutType*) getPtrType(kIROp_InOutType, valueType);
     }
 
-    IRRefType* IRBuilder::getRefType(IRType* valueType)
+    IRRefType* IRBuilder::getRefType(IRType* valueType, AddressSpace addrSpace)
     {
-        return (IRRefType*) getPtrType(kIROp_RefType, valueType);
+        return (IRRefType*) getPtrType(kIROp_RefType, valueType, addrSpace);
     }
 
     IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
@@ -2838,10 +2881,15 @@ namespace Slang
             operands);
     }
 
-    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace)
+    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
     {
-        IRInst* operands[] = {valueType, getIntValue(getIntType(), addressSpace)};
-        return (IRPtrType*)getType(op, 2, operands);
+        return (IRPtrType*)getPtrType(op, valueType, getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
+    }
+
+    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRInst* addressSpace)
+    {
+        IRInst* operands[] = { valueType, addressSpace };
+        return (IRPtrType*)getType(op, addressSpace ? 2 : 1, operands);
     }
 
     IRTextureTypeBase* IRBuilder::getTextureType(IRType* elementType, IRInst* shape, IRInst* isArray, IRInst* isMS, IRInst* sampleCount, IRInst* access, IRInst* isShadow, IRInst* isCombined, IRInst* format)
@@ -3510,6 +3558,26 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitExpandInst(IRType* type, UInt capturedArgCount, IRInst* const* capturedArgs)
+    {
+        auto inst = createInstWithTrailingArgs<IRSpecialize>(
+            this,
+            kIROp_Expand,
+            type,
+            capturedArgCount,
+            capturedArgs,
+            0,
+            nullptr);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitEachInst(IRType* type, IRInst* base, IRInst* indexArg)
+    {
+        IRInst* args[] = { base, indexArg };
+        return emitIntrinsicInst(type, kIROp_Each, indexArg ? 2 : 1, args);
+    }
+
     IRInst* IRBuilder::emitLookupInterfaceMethodInst(
         IRType* type,
         IRInst* witnessTableVal,
@@ -3795,6 +3863,13 @@ namespace Slang
         return nullptr;
     }
 
+    IRInst* IRBuilder::emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob *blob)
+    {
+        IRInst* args[] = { getIntValue(getIntType(), (int)target), getBlobValue(blob) };
+
+        return emitIntrinsicInst(getVoidType(), kIROp_EmbeddedDownstreamIR, 2, args);
+    }
+
     enum class TypeCastStyle
     {
         Unknown = -1, 
@@ -3976,6 +4051,21 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitMakeValuePack(IRType* type, UInt count, IRInst* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeValuePack, count, args);
+    }
+
+    IRInst* IRBuilder::emitMakeValuePack(UInt count, IRInst* const* args)
+    {
+        ShortList<IRType*> types;
+        for (UInt i = 0; i < count; ++i)
+            types.add(args[i]->getFullType());
+
+        auto type = getTypePack((UInt)types.getCount(), types.getArrayView().getBuffer());
+        return emitIntrinsicInst(type, kIROp_MakeValuePack, count, args);
+    }
+
     IRInst* IRBuilder::emitMakeTuple(IRType* type, UInt count, IRInst* const* args)
     {
         return emitIntrinsicInst(type, kIROp_MakeTuple, count, args);
@@ -4012,22 +4102,31 @@ namespace Slang
         return emitIntrinsicInst(getNativeStringType(), kIROp_getNativeStr, 1, &str);
     }
 
+    IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element)
+    {
+        IRInst* args[] = { tuple, element };
+        return emitIntrinsicInst(type, kIROp_GetTupleElement, 2, args);
+    }
+
     IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element)
     {
         // As a quick simplification/optimization, if the user requests
         // `getTupleElement(makeTuple(a_0, a_1, ... a_N), i)` then we should
         // just return `a_i`, provided that the index is properly in range.
         //
-        if( auto makeTuple = as<IRMakeTuple>(tuple) )
+        switch(tuple->getOp())
         {
-            if( element < makeTuple->getOperandCount() )
+        case kIROp_MakeTuple:
+        case kIROp_MakeValuePack:
+        case kIROp_MakeWitnessPack:
+        case kIROp_TypePack:
+            if( element < tuple->getOperandCount() )
             {
-                return makeTuple->getOperand(element);
+                return tuple->getOperand(element);
             }
+            break;
         }
-
-        IRInst* args[] = { tuple, getIntValue(getIntType(), element) };
-        return emitIntrinsicInst(type, kIROp_GetTupleElement, 2, args);
+        return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
     }
 
     IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)
@@ -4436,7 +4535,7 @@ namespace Slang
 
     IRGlobalVar* IRBuilder::createGlobalVar(
         IRType*         valueType,
-        IRIntegerValue  addressSpace)
+        AddressSpace  addressSpace)
     {
         auto ptrType = getPtrType(kIROp_PtrType, valueType, addressSpace);
         IRGlobalVar* globalVar = createInst<IRGlobalVar>(
@@ -4515,6 +4614,15 @@ namespace Slang
         return witness;
     }
 
+    IRInst* IRBuilder::getTypeEqualityWitness(IRType* witnessType, IRType* type1, IRType* type2)
+    {
+        IRInst* operands[2] = { type1, type2 };
+        return (IRType*)createIntrinsicInst(
+            witnessType,
+            kIROp_TypeEqualityWitness,
+            2,
+            operands);
+    }
 
     IRStructType* IRBuilder::createStructType()
     {
@@ -4713,7 +4821,7 @@ namespace Slang
 
     IRVar* IRBuilder::emitVar(
         IRType*         type,
-        IRIntegerValue  addressSpace)
+        AddressSpace  addressSpace)
     {
         auto allocatedType = getPtrType(kIROp_PtrType, type, addressSpace);
         auto inst = createInst<IRVar>(
@@ -4865,6 +4973,27 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitFieldExtract(IRInst* base, IRInst* fieldKey)
+    {
+        IRType* resultType = nullptr;
+        auto valueType = base->getDataType();
+        auto structType = as<IRStructType>(valueType);
+        SLANG_RELEASE_ASSERT(structType);
+        for (auto child : valueType->getChildren())
+        {
+            auto field = as<IRStructField>(child);
+            if (!field)
+                continue;
+            if (field->getKey() == fieldKey)
+            {
+                resultType = field->getFieldType();
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(resultType);
+        return emitFieldExtract(resultType, base, fieldKey);
+    }
+
     IRInst* IRBuilder::emitFieldExtract(
         IRType* type,
         IRInst* base,
@@ -4881,11 +5010,64 @@ namespace Slang
         return inst;
     }
 
+    IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* type)
+    {
+        if (auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType()))
+        {
+            if (auto resultPtrType = as<IRPtrTypeBase>(type))
+            {
+                if (basePtrType->getAddressSpace() != resultPtrType->getAddressSpace())
+                {
+                    type = builder->getPtrType(
+                        resultPtrType->getOp(), resultPtrType->getValueType(), basePtrType->getAddressSpace());
+                }
+            }
+        }
+        return type;
+    }
+
+    IRInst* IRBuilder::emitFieldAddress(
+        IRInst* basePtr,
+        IRInst* fieldKey)
+    {
+        AddressSpace addrSpace = AddressSpace::Generic;
+        IRInst* valueType = nullptr;
+        auto basePtrType = unwrapAttributedType(basePtr->getDataType());
+        if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
+        {
+            addrSpace = ptrType->getAddressSpace();
+            valueType = ptrType->getValueType();
+        }
+        else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
+        {
+            valueType = ptrLikeType->getElementType();
+        }
+        IRType* resultType = nullptr;
+        auto structType = as<IRStructType>(valueType);
+        SLANG_RELEASE_ASSERT(structType);
+        for (auto child : valueType->getChildren())
+        {
+            auto field = as<IRStructField>(child);
+            if (!field)
+                continue;
+            if (field->getKey() == fieldKey)
+            {
+                resultType = field->getFieldType();
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(resultType);
+        return emitFieldAddress(getPtrType(kIROp_PtrType, resultType, addrSpace), basePtr, fieldKey);
+    }
+
     IRInst* IRBuilder::emitFieldAddress(
         IRType* type,
         IRInst* base,
         IRInst* field)
     {
+        // Propagate pointer address space if it is available on base.
+        type = maybePropagateAddressSpace(this, base, type);
+
         auto inst = createInst<IRFieldAddress>(
             this,
             kIROp_FieldAddress,
@@ -4935,6 +5117,11 @@ namespace Slang
         {
             type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
         }
+        else if (auto tupleType = as<IRTupleType>(base->getDataType()))
+        {
+            type = (IRType*)tupleType->getOperand(getIntVal(index));
+            return emitGetTupleElement(type, base, index);
+        }
         SLANG_RELEASE_ASSERT(type);
 
         return emitElementExtract(type, base, index);
@@ -4982,6 +5169,9 @@ namespace Slang
         IRInst*    basePtr,
         IRInst*    index)
     {
+        // Propagate pointer address space if it is available on base.
+        type = maybePropagateAddressSpace(this, basePtr, type);
+
         auto inst = createInst<IRFieldAddress>(
             this,
             kIROp_GetElementPtr,
@@ -5004,9 +5194,20 @@ namespace Slang
         IRInst* basePtr,
         IRInst* index)
     {
+        AddressSpace addrSpace = AddressSpace::Generic;
+        IRInst* valueType = nullptr;
+        auto basePtrType = unwrapAttributedType(basePtr->getDataType());
+        if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
+        {
+            addrSpace = ptrType->getAddressSpace();
+            valueType = ptrType->getValueType();
+        }
+        else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
+        {
+            valueType = ptrLikeType->getElementType();
+        }
         IRType* type = nullptr;
-        auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType());
-        auto valueType = unwrapAttributedType(basePtrType->getValueType());
+        valueType = unwrapAttributedType(valueType);
         if (auto arrayType = as<IRArrayTypeBase>(valueType))
         {
             type = arrayType->getElementType();
@@ -5024,11 +5225,16 @@ namespace Slang
             // HLSL support things like float.x, in which case we just return the base pointer.
             return basePtr;
         }
+        else if (const auto tupleType = as<IRTupleType>(valueType))
+        {
+            SLANG_ASSERT(as<IRIntLit>(index));
+            type = (IRType*)tupleType->getOperand(getIntVal(index));
+        }
         SLANG_RELEASE_ASSERT(type);
         auto inst = createInst<IRGetElementPtr>(
             this,
             kIROp_GetElementPtr,
-            getPtrType(type),
+            getPtrType(kIROp_PtrType, type, addrSpace),
             basePtr,
             index);
 
@@ -5042,23 +5248,9 @@ namespace Slang
     {
         for (auto access : accessChain)
         {
-            auto basePtrType = cast<IRPtrTypeBase>(basePtr->getDataType());
-            auto valueType = unwrapAttributedType(basePtrType->getValueType());
-            IRType* resultType = nullptr;
             if (auto structKey = as<IRStructKey>(access))
             {
-                auto structType = as<IRStructType>(valueType);
-                SLANG_RELEASE_ASSERT(structType);
-                for (auto field : structType->getFields())
-                {
-                    if (field->getKey() == structKey)
-                    {
-                        resultType = field->getFieldType();
-                        break;
-                    }
-                }
-                SLANG_RELEASE_ASSERT(resultType);
-                basePtr = emitFieldAddress(getPtrType(resultType), basePtr, structKey);
+                basePtr = emitFieldAddress(basePtr, structKey);
             }
             else
             {
@@ -5108,7 +5300,7 @@ namespace Slang
         return emitUpdateElement(base, getIntValue(getIntType(), index), newElement);
     }
 
-    IRInst* IRBuilder::emitUpdateElement(IRInst* base, const List<IRInst*>& accessChain, IRInst* newElement)
+    IRInst* IRBuilder::emitUpdateElement(IRInst* base, ArrayView<IRInst*> accessChain, IRInst* newElement)
     {
         List<IRInst*> args;
         args.add(base);
@@ -5197,6 +5389,32 @@ namespace Slang
         return emitSwizzle(type, base, elementCount, irElementIndices);
     }
 
+    IRMetalSetVertex* IRBuilder::emitMetalSetVertex(
+        IRInst* index,
+        IRInst* vertex)
+    {
+        auto inst = createInst<IRMetalSetVertex>(this, kIROp_MetalSetVertex, getVoidType(), index, vertex);
+        addInst(inst);
+        return inst;
+    }
+
+    IRMetalSetPrimitive* IRBuilder::emitMetalSetPrimitive(
+        IRInst* index,
+        IRInst* primitive)
+    {
+        auto inst = createInst<IRMetalSetPrimitive>(this, kIROp_MetalSetVertex, getVoidType(), index, primitive);
+        addInst(inst);
+        return inst;
+    }
+
+    IRMetalSetIndices* IRBuilder::emitMetalSetIndices(
+        IRInst* index,
+        IRInst* indices)
+    {
+        auto inst = createInst<IRMetalSetIndices>(this, kIROp_MetalSetVertex, getVoidType(), index, indices);
+        addInst(inst);
+        return inst;
+    }
 
     IRInst* IRBuilder::emitSwizzleSet(
         IRType*         type,
@@ -5284,6 +5502,18 @@ namespace Slang
         auto inst = createInst<IRReturn>(
             this,
             kIROp_Return,
+            nullptr,
+            val);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitYield(
+        IRInst* val)
+    {
+        auto inst = createInst<IRYield>(
+            this,
+            kIROp_Yield,
             nullptr,
             val);
         addInst(inst);
@@ -5613,6 +5843,19 @@ namespace Slang
             this,
             kIROp_AlignOf,
             getUIntType(),
+            sizedType);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitCountOf(
+        IRType* type,
+        IRInst* sizedType)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_CountOf,
+            type,
             sizedType);
         addInst(inst);
         return inst;
@@ -7019,6 +7262,10 @@ namespace Slang
                 dump(context, irConst->value.intVal ? "true" : "false");
                 return;
 
+            case kIROp_BlobLit:
+                dump(context, "<binary blob>");
+                return;
+
             case kIROp_StringLit:
                 dumpEncodeString(context, irConst->getStringSlice());
                 return;
@@ -7115,6 +7362,7 @@ namespace Slang
         case kIROp_Func:
         case kIROp_GlobalVar:
         case kIROp_Generic:
+        case kIROp_Expand:
             dumpIRGlobalValueWithCode(context, (IRGlobalValueWithCode*)inst);
             return;
 
@@ -8107,6 +8355,8 @@ namespace Slang
         case kIROp_WitnessTableEntry:
         case kIROp_InterfaceRequirementEntry:
         case kIROp_Block:
+        case kIROp_Each:
+        case kIROp_TypeEqualityWitness:
             return false;
 
             /// Liveness markers have no side effects
@@ -8127,6 +8377,7 @@ namespace Slang
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MatrixReshape:
         case kIROp_VectorReshape:
+        case kIROp_MakeWitnessPack:
         case kIROp_MakeArray:
         case kIROp_MakeArrayFromElement:
         case kIROp_MakeStruct:
@@ -8145,6 +8396,7 @@ namespace Slang
         case kIROp_DifferentialPairGetDifferential:
         case kIROp_MakeDifferentialPair:
         case kIROp_MakeTuple:
+        case kIROp_MakeValuePack:
         case kIROp_GetTupleElement:
         case kIROp_StructuredBufferLoad:
         case kIROp_RWStructuredBufferLoad:
@@ -8198,6 +8450,7 @@ namespace Slang
         case kIROp_CastPtrToInt:
         case kIROp_CastIntToPtr:
         case kIROp_PtrCast:
+        case kIROp_CastDynamicResource:
         case kIROp_AllocObj:
         case kIROp_PackAnyValue:
         case kIROp_UnpackAnyValue:
@@ -8211,6 +8464,7 @@ namespace Slang
         case kIROp_TorchTensorGetView:
         case kIROp_GetStringHash:
         case kIROp_AllocateOpaqueHandle:
+        case kIROp_GetArrayLength:
             return false;
 
         case kIROp_ForwardDifferentiate:
@@ -8638,6 +8892,7 @@ namespace Slang
         case kIROp_CastPtrToBool:
         case kIROp_CastPtrToInt:
         case kIROp_PtrCast:
+        case kIROp_CastDynamicResource:
         case kIROp_BitAnd:
         case kIROp_BitNot:
         case kIROp_BitOr:
@@ -8678,6 +8933,11 @@ namespace Slang
         default:
             return false;
         }
+    }
+
+    void IRInst::addBlock(IRBlock* block)
+    {
+        block->insertAtEnd(this);
     }
 
     void IRInst::dump()

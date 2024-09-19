@@ -578,7 +578,7 @@ namespace Slang
                 {
                     if (auto ptrType = as<IRPtrType>(globalInst))
                     {
-                        if (ptrType->getAddressSpace() == SpvStorageClassPhysicalStorageBuffer)
+                        if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
                             elementType = ptrType->getValueType();
                     }
                 }
@@ -703,7 +703,7 @@ namespace Slang
                                         for (UInt i = 0; i < user->getOperandCount(); i++)
                                             args.add(user->getOperand(i));
                                         auto newArrayPtrVal = builder.emitFieldAddress(
-                                            getLoweredPtrLikeType(ptrVal->getDataType(), loweredElementTypeInfo.loweredInnerArrayType),
+                                            builder.getPtrType(loweredElementTypeInfo.loweredInnerArrayType),
                                             ptrVal,
                                             loweredElementTypeInfo.loweredInnerStructKey);
                                         builder.replaceOperand(use, newArrayPtrVal);
@@ -888,16 +888,29 @@ namespace Slang
 
     IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType)
     {
-        if (!isKhronosTarget(target->getTargetReq()))
-            return IRTypeLayoutRules::getNatural();
+        if (target->getTargetReq()->getTarget() != CodeGenTarget::WGSL)
+        {
+            if (!isKhronosTarget(target->getTargetReq()))
+                return IRTypeLayoutRules::getNatural();
 
-        // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->shouldEmitSPIRVDirectly())
-            return IRTypeLayoutRules::getNatural();
+            // If we are just emitting GLSL, we can just use the general layout rule.
+            if (!target->shouldEmitSPIRVDirectly())
+                return IRTypeLayoutRules::getNatural();
 
-        // If the user specified a scalar buffer layout, then just use that.
-        if (target->getOptionSet().shouldUseScalarLayout())
-            return IRTypeLayoutRules::getNatural();
+            // If the user specified a scalar buffer layout, then just use that.
+            if (target->getOptionSet().shouldUseScalarLayout())
+                return IRTypeLayoutRules::getNatural();
+        }
+
+        if (target->getOptionSet().shouldUseDXLayout())
+        {
+            if (as<IRUniformParameterGroupType>(bufferType))
+            {
+                return IRTypeLayoutRules::getConstantBuffer();
+            }
+            else
+                return IRTypeLayoutRules::getNatural();
+        }
 
         // The default behavior is to use std140 for constant buffers and std430 for other buffers.
         switch (bufferType->getOp())

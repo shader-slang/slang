@@ -23,16 +23,16 @@ static const char rtEntryPointName[] = "raygenMain";
 static const char taskEntryPointName[] = "taskMain";
 static const char meshEntryPointName[] = "meshMain";
 
-gfx::StageType translateStage(SlangStage slangStage)
+rhi::StageType translateStage(SlangStage slangStage)
 {
     switch(slangStage)
     {
     default:
         SLANG_ASSERT(!"unhandled case");
-        return gfx::StageType::Unknown;
+        return rhi::StageType::Unknown;
 
 #define CASE(FROM, TO) \
-    case SLANG_STAGE_##FROM: return gfx::StageType::TO
+    case SLANG_STAGE_##FROM: return rhi::StageType::TO
 
     CASE(VERTEX,    Vertex);
     CASE(HULL,      Hull);

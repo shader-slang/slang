@@ -283,6 +283,14 @@ struct PeepholeContext : InstPassBase
                 changed = true;
             }
             break;
+        case kIROp_GetArrayLength:
+            if (auto arrayType = as<IRArrayType>(inst->getOperand(0)->getDataType()))
+            {
+                inst->replaceUsesWith(arrayType->getElementCount());
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
@@ -316,7 +324,12 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_GetTupleElement:
-            if (inst->getOperand(0)->getOp() == kIROp_MakeTuple)
+            switch (inst->getOperand(0)->getOp())
+            {
+            case kIROp_MakeTuple:
+            case kIROp_MakeValuePack:
+            case kIROp_MakeWitnessPack:
+            case kIROp_TypePack:
             {
                 auto element = inst->getOperand(1);
                 if (auto intLit = as<IRIntLit>(element))
@@ -325,6 +338,10 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+                break;
+            }
+            default:
+                break;
             }
             break;
         case kIROp_FieldExtract:
@@ -1171,6 +1188,15 @@ bool peepholeOptimize(TargetProgram* target, IRInst* func)
         ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
         : true;
     return context.processFunc(func);
+}
+
+bool peepholeOptimizeInst(TargetProgram* target, IRModule* module, IRInst* inst)
+{
+    PeepholeContext context = PeepholeContext(module);
+    context.targetProgram = target;
+    context.useFastAnalysis = true;
+    context.processInst(inst);
+    return context.changed;
 }
 
 bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)

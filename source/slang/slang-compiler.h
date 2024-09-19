@@ -40,7 +40,9 @@
 namespace Slang
 {
     struct PathInfo;
-    struct IncludeHandler;
+    struct IncludeHandler;    
+    struct SharedSemanticsContext;
+
     class ProgramLayout;
     class PtrType;
     class TargetProgram;
@@ -94,6 +96,7 @@ namespace Slang
         Metal               = SLANG_METAL,
         MetalLib            = SLANG_METAL_LIB,
         MetalLibAssembly    = SLANG_METAL_LIB_ASM,
+        WGSL                = SLANG_WGSL,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -420,6 +423,14 @@ namespace Slang
         DeclRef<Decl> findDeclFromString(
             String const& name,
             DiagnosticSink* sink);
+        
+        DeclRef<Decl> findDeclFromStringInType(
+            Type* type,
+            String const& name,
+            LookupMask mask,
+            DiagnosticSink* sink);
+        
+        bool isSubType(Type* subType, Type* superType);
 
         Dictionary<String, IntVal*>& getMangledNameToIntValMap();
         ConstantIntVal* tryFoldIntVal(IntVal* intVal);
@@ -547,7 +558,6 @@ namespace Slang
             /// and parsing via Slang reflection, and is not recommended for future APIs to use.
             ///
         Scope* _getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder);
-
     protected:
         ComponentType(Linkage* linkage);
 
@@ -1475,6 +1485,11 @@ namespace Slang
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
             SlangInt32 index) override;
 
+        /// Precompile TU to target language
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            slang::IBlob** outDiagnostics) override;
+
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
         virtual slang::DeclReflection* getModuleReflection() SLANG_OVERRIDE;
@@ -1556,6 +1571,8 @@ namespace Slang
         void _collectShaderParams();
 
         void _discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
+        void _discoverEntryPointsImpl(ContainerDecl* containerDecl, DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
+
 
         class ModuleSpecializationInfo : public SpecializationInfo
         {
@@ -2151,6 +2168,16 @@ namespace Slang
 
         void setFileSystem(ISlangFileSystem* fileSystem);
 
+        DeclRef<Decl> specializeGeneric(
+            DeclRef<Decl>                       declRef,
+            List<Expr*>                         argExprs,
+            DiagnosticSink*                     sink);
+        
+        DeclRef<Decl> specializeWithArgTypes(
+            DeclRef<Decl>   funcDeclRef,
+            List<Type*>         argTypes,
+            DiagnosticSink*     sink);
+
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
 
         bool m_requireCacheFileSystem = false;
@@ -2162,6 +2189,9 @@ namespace Slang
         {
             m_retainedSession = nullptr;
         }
+
+        // Get shared semantics information for reflection purposes.
+        SharedSemanticsContext* getSemanticsForReflection();
 
     private:
             /// The global Slang library session that this linkage is a child of
@@ -2215,6 +2245,8 @@ namespace Slang
             DiagnosticSink*     sink);
 
         List<Type*> m_specializedTypes;
+
+        RefPtr<SharedSemanticsContext> m_semanticsForReflection;
 
     };
 
@@ -2714,7 +2746,13 @@ namespace Slang
 
         SlangResult emitEntryPoints(ComPtr<IArtifact>& outArtifact);
 
+        SlangResult emitPrecompiledDownstreamIR(ComPtr<IArtifact>& outArtifact);
+
         void maybeDumpIntermediate(IArtifact* artifact);
+
+        // Used to cause instructions available in precompiled blobs to be
+        // removed between IR linking and target source generation.
+        bool removeAvailableInDownstreamIR = false;
 
     protected:
         CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
@@ -2752,7 +2790,6 @@ namespace Slang
 
 
         SlangResult _emitEntryPoints(ComPtr<IArtifact>& outArtifact);
-
     private:
         Shared* m_shared = nullptr;
     };
@@ -2790,6 +2827,9 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceGLSLScalarBufferLayout(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceDXLayout(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDownstreamIR(int targetIndex, bool value) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
@@ -3352,6 +3392,16 @@ SLANG_FORCE_INLINE Type* asInternal(slang::TypeReflection* type)
 SLANG_FORCE_INLINE slang::TypeReflection* asExternal(Type* type)
 {
     return reinterpret_cast<slang::TypeReflection*>(type);
+}
+
+SLANG_FORCE_INLINE DeclRef<Decl> asInternal(slang::GenericReflection* generic)
+{
+    return DeclRef<Decl>(reinterpret_cast<DeclRefBase*>(generic));
+}
+
+SLANG_FORCE_INLINE slang::GenericReflection* asExternal(DeclRef<Decl> generic)
+{
+    return reinterpret_cast<slang::GenericReflection*>(generic.declRefBase);
 }
 
 SLANG_FORCE_INLINE TypeLayout* asInternal(slang::TypeLayoutReflection* type)

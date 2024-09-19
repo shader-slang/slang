@@ -142,6 +142,18 @@ class GetArrayLengthExpr : public Expr
     Expr* arrayExpr = nullptr;
 };
 
+class ExpandExpr : public Expr
+{
+    SLANG_AST_CLASS(ExpandExpr)
+    Expr* baseExpr = nullptr;
+};
+
+class EachExpr : public Expr
+{
+    SLANG_AST_CLASS(EachExpr)
+    Expr* baseExpr = nullptr;
+};
+
 // A base class for expressions with arguments
 class ExprWithArgsBase : public Expr
 {
@@ -279,8 +291,7 @@ class SwizzleExpr: public Expr
 {
     SLANG_AST_CLASS(SwizzleExpr)
     Expr* base = nullptr;
-    int elementCount;
-    int elementIndices[4];
+    ShortList<UInt, 4> elementIndices;
     SourceLoc memberOpLoc;
 };
 
@@ -413,6 +424,11 @@ class AlignOfExpr : public SizeOfLikeExpr
     SLANG_AST_CLASS(AlignOfExpr);
 };
 
+class CountOfExpr : public SizeOfLikeExpr
+{
+    SLANG_AST_CLASS(CountOfExpr);
+};
+
 class MakeOptionalExpr : public Expr
 {
     SLANG_AST_CLASS(MakeOptionalExpr)
@@ -528,6 +544,13 @@ class OpenRefExpr : public Expr
     Expr* innerExpr = nullptr;
 };
 
+class DetachExpr : public Expr
+{
+    SLANG_AST_CLASS(DetachExpr)
+
+    Expr* inner = nullptr;
+};
+
     /// Base class for higher-order function application
     /// Eg: foo(fn) where fn is a function expression.
     ///
@@ -547,6 +570,7 @@ class DifferentiateExpr : public HigherOrderInvokeExpr
 {
     SLANG_ABSTRACT_AST_CLASS(DifferentiateExpr)
 };
+
     /// An expression of the form `__fwd_diff(fn)` to access the 
     /// forward-mode derivative version of the function `fn`
     ///
@@ -668,6 +692,17 @@ public:
 
         /// A substitution that includes the generic arguments known so far
     List<Val*> knownGenericArgs;
+};
+
+   
+    /// An expression that holds a set of argument exprs that got matched to a pack parameter
+    /// during overload resolution.
+    ///
+class PackExpr : public Expr
+{
+    SLANG_AST_CLASS(PackExpr)
+
+    List<Expr*> args;
 };
 
 class SPIRVAsmOperand

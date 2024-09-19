@@ -346,7 +346,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     }
     if (auto originalNameHint = originalFunc->findDecoration<IRNameHintDecoration>())
     {
-        auto primalName = String("s_bwd_primal_") + UnownedStringSlice(originalNameHint->getName());
+        auto primalName = String("s_primal_ctx_") + UnownedStringSlice(originalNameHint->getName());
         builder.addNameHintDecoration(primalFunc, builder.getStringValue(primalName.getUnownedSlice()));
     }
 

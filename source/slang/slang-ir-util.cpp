@@ -244,6 +244,14 @@ bool isSimpleDataType(IRType* type)
     }
 }
 
+bool isSimpleHLSLDataType(IRInst* inst)
+{
+    // TODO: Add criteria
+    // https://github.com/shader-slang/slang/issues/4792
+    SLANG_UNUSED(inst);
+    return true;
+}
+
 SourceLoc findFirstUseLoc(IRInst* inst)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -1422,11 +1430,15 @@ HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block)
         currBlock = dom->getImmediateDominator(currBlock))
     {
         if (auto loopInst = as<IRLoop>(currBlock->getTerminator()))
+        {
             if (!dom->dominates(loopInst->getBreakBlock(), block))
                 parentBreakBlocksSet.add(loopInst->getBreakBlock());
+        }
         else if (auto switchInst = as<IRSwitch>(currBlock->getTerminator()))
+        {
             if (!dom->dominates(switchInst->getBreakLabel(), block))
                 parentBreakBlocksSet.add(switchInst->getBreakLabel());
+        }
     }
 
     return parentBreakBlocksSet;
@@ -1557,10 +1569,24 @@ void hoistInstOutOfASMBlocks(IRBlock* block)
 IRType* getSPIRVSampledElementType(IRInst* sampledType)
 {
     auto sampledElementType = getVectorElementType((IRType*)sampledType);
-    if (sampledElementType->getOp() == kIROp_HalfType)
+    
+    IRBuilder builder(sampledType);
+    switch (sampledElementType->getOp())
     {
-        IRBuilder builder(sampledType);
+    case kIROp_HalfType:
         sampledElementType = builder.getBasicType(BaseType::Float);
+        break;
+    case kIROp_UInt16Type:
+    case kIROp_UInt8Type:
+    case kIROp_CharType:
+        sampledElementType = builder.getBasicType(BaseType::UInt);
+        break;
+    case kIROp_Int8Type:
+    case kIROp_Int16Type:
+        sampledElementType = builder.getBasicType(BaseType::Int);
+        break;
+    default:
+        break;
     }
     return sampledElementType;
 }
@@ -1681,6 +1707,7 @@ struct GenericChildrenMigrationContextImpl
                 case kIROp_ClassType:
                 case kIROp_Func:
                 case kIROp_Generic:
+                case kIROp_Expand:
                     return false;
                 default:
                     break;

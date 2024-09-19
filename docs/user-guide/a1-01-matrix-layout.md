@@ -74,7 +74,7 @@ If we put this all together - best performance, consistency between vector inter
 2) Platform independence: Kernel uses `row-major` matrix layout
 3) Performance: Host vector interpretation should match host matrix layout
 
-The only combination that forfils all aspects is `row-major` matrix layout and `row` vector interpretation for both host and kernel.
+The only combination that fulfills all aspects is `row-major` matrix layout and `row` vector interpretation for both host and kernel.
 
 It's worth noting that for targets that honor the default matrix layout - that setting can act like a toggle transposing a matrix layout. If for some reason the combination of choices leads to inconsistent vector transforms, an implementation can perform this transform in *host* code at the boundary between host and the kernel. This is not the most performant or convenient scenario, but if supported in an implementation it could be used for targets that do not support kernel matrix layout settings. 
 
@@ -121,7 +121,7 @@ This being the case only the following matrix types/matrix layouts will work acr
 
 These are all 'row-major' because as previously discussed currently only `row-major` matrix layout works across all targets currently.
 
-NOTE! This only applies to matrices that are trafficed between host and kernel - any matrix size will work appropriately for variables in shader/kernel code for example.
+NOTE! This only applies to matrices that are transferred between host and kernel - any matrix size will work appropriately for variables in shader/kernel code for example.
 
 The hosts maths library also plays a part here. The library may hold all elements consecutively in memory. If that's the case it will match the CPU/CUDA kernels, but will only work on 'graphics'-like targets that match that layout for the size. 
 

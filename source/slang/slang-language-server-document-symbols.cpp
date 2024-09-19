@@ -167,7 +167,7 @@ namespace Slang
                 sym.selectionRange.start.line = (int)line;
                 sym.selectionRange.start.character = (int)col;
                 sym.selectionRange.end.line = (int)line;
-                sym.selectionRange.end.character = (int)(col + nameLoc.name->text.getLength());
+                sym.selectionRange.end.character = (int)(col + (int)UTF8Util::calcUTF16CharCount(nameLoc.name->text.getUnownedSlice()));
                 sym.range.start.line = (int)line;
                 sym.range.start.character = 0;
                 sym.range.end.line = (int)line;
@@ -179,8 +179,14 @@ namespace Slang
                     auto closingHumaneLoc = srcManager->getHumaneLoc(closingLoc, SourceLocType::Actual);
                     context.doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
                         closingHumaneLoc.line, closingHumaneLoc.column, line, col);
-                    sym.range.end.line = (int)line;
-                    sym.range.end.character = (int)col;
+                    // Due to macro replacements, the closing loc may be before the start loc,
+                    // and we need to make sure never returning such invalid ranges to the editor client.
+                    if (closingHumaneLoc.line > sym.range.start.line ||
+                        closingHumaneLoc.line == sym.range.start.line && closingHumaneLoc.column >= sym.range.start.character)
+                    {
+                        sym.range.end.line = (int)line;
+                        sym.range.end.character = (int)col;
+                    }
                 }
                 if (const auto childContainerDecl = as<ContainerDecl>(child))
                 {

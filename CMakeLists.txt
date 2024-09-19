@@ -46,6 +46,7 @@ include(Glob)
 include(LLVM)
 include(SlangTarget)
 include(AutoOption)
+include(GitHubRelease)
 
 #
 # Options
@@ -98,6 +99,7 @@ option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang wrapper target" ON)
 option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
+option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
 option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
@@ -145,25 +147,26 @@ enum_option(
     "How to get or build slang-llvm:"
     # Options
     FETCH_BINARY
-    "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default for Windows)"
+    "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default)"
     USE_SYSTEM_LLVM
-    "Build slang-llvm using system-provided LLVM and Clang binaries (default for non-Windows hosts)"
+    "Build slang-llvm using system-provided LLVM and Clang binaries"
     DISABLE
     "Do not build llvm or fetch slang-llvm"
 )
-macro(slang_llvm_binary_url_option version filename)
+
+if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
+    # If the user didn't specify a URL, find the best one now
+    if(NOT SLANG_SLANG_LLVM_BINARY_URL)
+        get_best_slang_binary_release_url(url)
+        if(NOT DEFINED url)
+            message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
+        endif()
+    endif()
     set(SLANG_SLANG_LLVM_BINARY_URL
-        "https://github.com/shader-slang/slang-llvm/releases/download/${version}/${filename}"
+        ${url}
         CACHE STRING
         "URL specifying the location of the slang-llvm prebuilt library"
     )
-endmacro()
-if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-13.x-43-win64.zip")
-elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-v13.x-43-macosx-x86_64-release.zip")
-else()
-    slang_llvm_binary_url_option("v13.x-43" "slang-llvm-v13.x-43-linux-x86_64-release.zip")
 endif()
 
 #
@@ -422,7 +425,7 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
     endif()
 
     set(slang_llvm_dest_object
-        ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/${slang_llvm_filename}
+        ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${slang_llvm_filename}
     )
     add_custom_command(
         OUTPUT ${slang_llvm_dest_object}
@@ -665,8 +668,7 @@ if(SLANG_ENABLE_TESTS)
                 core
                 compiler-core
                 slang
-                gfx
-                gfx-util
+                slang-rhi
                 platform
                 $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             EXTRA_COMPILE_DEFINITIONS_PRIVATE
@@ -802,6 +804,20 @@ if (SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_GFX)
 endif()
 
 #
+# slang-replay tool for replaying the record files
+#
+if (SLANG_ENABLE_REPLAYER)
+    slang_add_target(
+        tools/slang-replay
+        EXECUTABLE
+        EXTRA_SOURCE_DIRS source/slang-record-replay/replay source/slang-record-replay/util
+        LINK_WITH_PRIVATE core compiler-core slang
+        INCLUDE_DIRECTORIES_PUBLIC source/slang-record-replay
+        FOLDER test
+    )
+endif()
+
+#
 # Testing
 #
 if(SLANG_ENABLE_TESTS)
@@ -833,6 +849,10 @@ install(FILES
 install(DIRECTORY
   "${slang_SOURCE_DIR}/docs/"
   DESTINATION share/doc/slang
+)
+install(DIRECTORY
+  "${slang_SOURCE_DIR}/include"
+  DESTINATION .
 )
 
 include(CPack)

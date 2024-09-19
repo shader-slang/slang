@@ -235,75 +235,17 @@ namespace Slang
         Name*                   name,
         DiagnosticSink*         sink)
     {
-        auto translationUnitSyntax = translationUnit->getModuleDecl();
-        FuncDecl* entryPointFuncDecl = nullptr;
+        auto declRef = translationUnit->findDeclFromString(getText(name), sink);
+        FuncDecl* entryPointFuncDecl = declRef.as<FuncDecl>().getDecl();
 
-        for (auto globalScope = translationUnit->getModuleDecl()->ownedScope; globalScope; globalScope = globalScope->nextSibling)
-        {
-            if (globalScope->containerDecl != translationUnitSyntax && globalScope->containerDecl->parentDecl != translationUnitSyntax)
-                continue; // Skip scopes that aren't part of the current module.
-
-            // We will look up any global-scope declarations in the translation
-            // unit that match the name of our entry point.
-            Decl* firstDeclWithName = nullptr;
-            if (!globalScope->containerDecl->getMemberDictionary().tryGetValue(name, firstDeclWithName))
-            {
-                // If there doesn't appear to be any such declaration, then we are done with this scope.
-                continue;
-            }
-
-            // We found at least one global-scope declaration with the right name,
-            // but (1) it might not be a function, and (2) there might be
-            // more than one function.
-            //
-            // We'll walk the linked list of declarations with the same name,
-            // to see what we find. Along the way we'll keep track of the
-            // first function declaration we find, if any:
-            for (auto ee = firstDeclWithName; ee; ee = ee->nextInContainerWithSameName)
-            {
-                // Is this declaration a function?
-                if (auto funcDecl = as<FuncDecl>(ee))
-                {
-                    // Skip non-primary declarations, so that
-                    // we don't give an error when an entry
-                    // point is forward-declared.
-                    if (!isPrimaryDecl(funcDecl))
-                        continue;
-
-                    // is this the first one we've seen?
-                    if (!entryPointFuncDecl)
-                    {
-                        // If so, this is a candidate to be
-                        // the entry point function.
-                        entryPointFuncDecl = funcDecl;
-                    }
-                    else
-                    {
-                        // Uh-oh! We've already seen a function declaration with this
-                        // name before, so the whole thing is ambiguous. We need
-                        // to diagnose and bail out.
-
-                        sink->diagnose(translationUnitSyntax, Diagnostics::ambiguousEntryPoint, name);
-
-                        // List all of the declarations that the user *might* mean
-                        for (auto ff = firstDeclWithName; ff; ff = ff->nextInContainerWithSameName)
-                        {
-                            if (auto candidate = as<FuncDecl>(ff))
-                            {
-                                sink->diagnose(candidate, Diagnostics::entryPointCandidate, candidate->getName());
-                            }
-                        }
-
-                        // Bail out.
-                        return nullptr;
-                    }
-                }
-            }
-        }
+        if (entryPointFuncDecl && getModule(entryPointFuncDecl) != translationUnit)
+            entryPointFuncDecl = nullptr;
 
         if (!entryPointFuncDecl)
+        {
+            auto translationUnitSyntax = translationUnit->getModuleDecl();
             sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, name);
-
+        }
         return entryPointFuncDecl;
     }
 
@@ -333,7 +275,17 @@ namespace Slang
 
     bool isBuiltinParameterType(Type* type)
     {
-        return as<BuiltinType>(type) != nullptr;
+        if (!as<BuiltinType>(type))
+            return false;
+        if (as<BasicExpressionType>(type))
+            return false;
+        if (as<VectorExpressionType>(type))
+            return false;
+        if (as<MatrixExpressionType>(type))
+            return false;
+        if (auto arrayType = as<ArrayExpressionType>(type))
+            return isBuiltinParameterType(arrayType->getElementType());
+        return true;
     }
 
     bool doStructFieldsHaveSemanticImpl(Type* type, HashSet<Type*>& seenTypes)
@@ -345,18 +297,20 @@ namespace Slang
         if (!structDecl)
             return false;
         seenTypes.add(type);
+        bool hasFields = false;
         for (auto field : structDecl->getFields())
         {
+            hasFields = true;
             if (!field->findModifier<HLSLSemantic>())
             {
-                if (!seenTypes.contains(type))
+                if (!seenTypes.contains(field->getType()))
                 {
                     if (!doStructFieldsHaveSemanticImpl(field->getType(), seenTypes))
                         return false;
                 }
             }
         }
-        return true;
+        return hasFields;
     }
 
     bool doStructFieldsHaveSemantic(Type* type)
@@ -488,59 +442,76 @@ namespace Slang
             }
         }
 
+        bool canHaveVaryingInput = false;
+        switch (stage)
+        {
+        case Stage::Vertex:
+        case Stage::Fragment:
+        case Stage::Miss:
+        case Stage::AnyHit:
+        case Stage::ClosestHit:
+        case Stage::Callable:
+        case Stage::Geometry:
+        case Stage::Mesh:
+        case Stage::Hull:
+        case Stage::Domain:
+            canHaveVaryingInput = true;
+            break;
+        default:
+            break;
+        }
+
         for (const auto& param : entryPointFuncDecl->getParameters())
         {
             if (isUniformParameterType(param->getType()))
             {
                 // Automatically add `uniform` modifier to entry point parameters.
                 if (!param->hasModifier<HLSLUniformModifier>())
-                    addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
-            }
-            else if (isBuiltinParameterType(param->getType()))
-            {
-            }
-            else
-            {
-                // For all non-uniform parameters of a general type, we require the parameter be associated with
-                // a system value semantic.
-                if (!param->hasModifier<HLSLUniformModifier>())
                 {
-                    if (!param->findModifier<HLSLSemantic>())
-                    {
-                        if (!doStructFieldsHaveSemantic(param->getType()))
-                            sink->diagnose(param, Diagnostics::nonUniformEntryPointParameterMustHaveSemantic, param->getName());
-                    }
+                    addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
+                    continue;
                 }
             }
+
+            if (canHaveVaryingInput)
+                continue;
+
+            // If the stage doesn't allow varying input/output, 
+            // we require the parameter to be associated with a system value semantic.
+            if (param->hasModifier<HLSLUniformModifier>())
+                continue;
+            if (param->findModifier<HLSLSemantic>())
+                continue;
+
+            bool isBuiltinType = isBuiltinParameterType(param->getType());
+            if (isBuiltinType)
+                continue;
+
+            if (doStructFieldsHaveSemantic(param->getType()))
+                continue;
+
+            // The user is defining a parameter with no 'uniform' modifier for a stage that doesn't support
+            // varying input/output. We will automatically convert it to a 'uniform' parameter, and diagnose a warning.
+            addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
+            sink->diagnose(param, Diagnostics::nonUniformEntryPointParameterTreatedAsUniform, param->getName());
         }
         
         for (auto target : linkage->targets)
         {
             auto targetCaps = target->getTargetCaps();
-            auto stageCapabilitySet = CapabilitySet(entryPoint->getProfile().getCapabilityName());
+            auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
             targetCaps.join(stageCapabilitySet);
             if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
             {
-                maybeDiagnose(sink, linkage->m_optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, entryPointFuncDecl->inferredCapabilityRequirements, targetCaps);
+                // Incompatable means we don't support a set of abstract atoms.
+                // Diagnose that we lack support for 'stage' and 'target' atoms with our provided entry-point
+                auto compileTarget = target->getTargetCaps().getCompileTarget();
+                auto stageTarget = stageCapabilitySet.getTargetStage();
+                maybeDiagnose(sink, linkage->m_optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::entryPointUsesUnavailableCapability, entryPointFuncDecl, compileTarget, stageTarget);
                 
-                // Find out what exactly is incompatible and print out a trace of provenance to
-                // help user diagnose their code.
-                // TODO: provedence should have a way to filter out for provenance that are missing X capabilitySet from their caps, else in big functions we get junk errors
-                // This is specifically a problem for when a function is missing a target but otherwise has identical capabilities.
-                
-                const auto interredCapConjunctions = entryPointFuncDecl->inferredCapabilityRequirements.getAtomSets();
-                const auto compileCaps = targetCaps.getAtomSets();
-                if (compileCaps && interredCapConjunctions)
-                {
-                    for (auto inferredAtom : *interredCapConjunctions.begin())
-                    {
-                        CapabilityAtom inferredAtomFormatted = asAtom(inferredAtom);
-                        if (!compileCaps->contains((UInt)inferredAtom))
-                        {
-                            diagnoseCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, inferredAtomFormatted);
-                        }
-                    }
-                }
+                // Find out what is incompatible (ancestor missing a super set of 'target+stage')
+                CapabilitySet failedSet({ (CapabilityName)compileTarget, (CapabilityName)stageTarget });
+                diagnoseMissingCapabilityProvenance(linkage->m_optionSet, sink, entryPointFuncDecl, failedSet);
             }
             else
             {
@@ -571,6 +542,8 @@ namespace Slang
                         entryPointFuncDecl->loc,
                         Diagnostics::profileImplicitlyUpgraded,
                         Diagnostics::profileImplicitlyUpgradedRestrictive,
+                        entryPointFuncDecl,
+                        target->getOptionSet().getProfile().getName(),
                         addedAtoms.getElements<CapabilityAtom>());
                 }
             }
@@ -582,20 +555,23 @@ namespace Slang
         if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
         {
             auto entryPointProfileStage = entryPointProfile.getStage();
-            // Ensure every target is specifying the same stage as an entry` point
+            auto entryPointStage = getStageFromAtom(entryPointAttr->capabilitySet.getTargetStage());
+
+            // Ensure every target is specifying the same stage as an entry-point
             // if a profile+stage was set, else user will not be aware that their
             // code is requiring `fragment` on a `vertex` shader
             for (auto target : targets)
             {
                 auto targetProfile = target->getOptionSet().getProfile();
                 auto profileStage = targetProfile.getStage();
-                if (profileStage != Stage::Unknown && profileStage != entryPointAttr->stage)
-                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointAttr->stage, targetProfile.getName());
+                if (profileStage != Stage::Unknown && profileStage != entryPointStage)
+                    maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointAttr, Diagnostics::entryPointAndProfileAreIncompatible, entryPointFuncDecl, entryPointStage, targetProfile.getName());
             }
             if (entryPointProfileStage == Stage::Unknown)
-                entryPointProfile.setStage(entryPointAttr->stage);
-            else if (entryPointProfileStage != Stage::Unknown && entryPointProfileStage != entryPointAttr->stage)
-                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::specifiedStageDoesntMatchAttribute, entryPointFuncDecl->getName(), entryPointProfileStage, entryPointAttr->stage);
+                entryPointProfile = Profile(entryPointStage);
+            else if (entryPointProfileStage != Stage::Unknown && entryPointProfileStage != entryPointStage)
+                maybeDiagnose(sink, optionSet, DiagnosticCategory::Capability, entryPointFuncDecl, Diagnostics::specifiedStageDoesntMatchAttribute, entryPointFuncDecl->getName(), entryPointProfileStage, entryPointStage);
+            entryPointProfile.additionalCapabilities.add(entryPointAttr->capabilitySet);
             return true;
         }
         return false;

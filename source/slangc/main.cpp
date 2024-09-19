@@ -104,7 +104,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobal
     SlangResult res = _compile(compileRequest, argc, argv);
     // Now that we are done, clean up after ourselves
     spDestroyCompileRequest(compileRequest);
-
+    
     return res;
 }
 
@@ -112,6 +112,7 @@ int MAIN(int argc, char** argv)
 {
     auto stdWriters = StdWriters::initDefaultSingleton();
     SlangResult res = innerMain(stdWriters, nullptr, argc, argv);
+    slang::shutdown();
     return (int)TestToolUtil::getReturnCode(res);
 }
 
@@ -139,6 +140,7 @@ int wmain(int argc, wchar_t** argv)
     }
 
 #ifdef _MSC_VER
+    // _CrtXXX functions are functional only for debug build. The spec says,
     // "When _DEBUG isn't defined, calls to _CrtSetReportMode are removed
     // during preprocessing."
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
@@ -148,7 +150,9 @@ int wmain(int argc, wchar_t** argv)
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
 
-    _CrtDumpMemoryLeaks();
+    int memleakDetected = _CrtDumpMemoryLeaks();
+    SLANG_UNUSED(memleakDetected);
+    assert(!memleakDetected);
 #endif
 
     return result;

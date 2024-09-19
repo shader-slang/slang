@@ -703,20 +703,21 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
             type);
     }
 
-    // TODO: The cases below for detecting globals that aren't actually
-    // shader parameters should be redundant now that the semantic
-    // checking logic is responsible for populating the list of
-    // parameters on a `Program`. We should be able to clean up
-    // the code by removing these two cases, and the related null
-    // pointer checks in the code that calls this.
-
-    // HLSL `static` modifier indicates "thread local"
-    if(varDecl->hasModifier<HLSLStaticModifier>())
-        return nullptr;
-
-    // HLSL `groupshared` modifier indicates "thread-group local"
-    if(varDecl->hasModifier<HLSLGroupSharedModifier>())
-        return nullptr;
+    if (varDecl->hasModifier<SpecializationConstantAttribute>() ||
+        varDecl->hasModifier<VkConstantIdAttribute>())
+    {
+        auto specializationConstantRule = rules->getSpecializationConstantRules();
+        if (!specializationConstantRule)
+        {
+            // If the target doesn't support specialization constants, then we will
+            // layout them as ordinary uniform data.
+            specializationConstantRule = rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet());
+        }
+        return createTypeLayoutWith(
+            layoutContext,
+            specializationConstantRule,
+            type);
+    }
 
     // TODO(tfoley): there may be other cases that we need to handle here
 
@@ -1143,10 +1144,10 @@ static void addExplicitParameterBindings_GLSL(
     else if(auto foundSpecializationConstant = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
     {
         info[kResInfo].resInfo = foundSpecializationConstant;
-        DeclRef<Decl> varDecl2(varDecl);
 
-        // Try to find `constant_id` binding
-        if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &info[kResInfo].semanticInfo.index))
+        if (auto layoutAttr = varDecl.getDecl()->findModifier<VkConstantIdAttribute>())
+            info[kResInfo].semanticInfo.index = layoutAttr->location;
+        else
             return;
     }
 
@@ -4097,6 +4098,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
             if( varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
             {
                 needDefaultConstantBuffer = true;
+                if(varLayout->varDecl.getDecl()->hasModifier<GLSLBindingAttribute>() || varLayout->varDecl.getDecl()->hasModifier<GLSLLocationLayoutModifier>())
+                    sink->diagnose(varLayout->varDecl, Diagnostics::explicitUniformLocation, as<VarDecl>(varLayout->varDecl).getDecl()->getType());
                 diagnoseGlobalUniform(&sharedContext, as<VarDeclBase>(varLayout->varDecl.getDecl()));
             }
         }

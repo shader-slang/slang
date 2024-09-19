@@ -156,6 +156,8 @@ interface IInteger : IArithmetic, ILogical
     int64_t toInt64();
     uint toUInt();
     uint64_t toUInt64();
+    __init(int val);
+    __init(int64_t val);
 }
 
 interface IFloat : IArithmetic, IDifferentiable
@@ -220,7 +222,7 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 /// A type that can represent integers
 [sealed]
 [builtin]
-interface __BuiltinIntegerType : __BuiltinArithmeticType
+interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
 /// A type that can represent non-integers
@@ -566,7 +568,7 @@ ${{{{
         __intrinsic_op($(kIROp_Sub))  This sub(This other);
         __intrinsic_op($(kIROp_Mul))  This mul(This other);
         __intrinsic_op($(kIROp_Div))  This div(This other);
-        __intrinsic_op($(kIROp_FRem)) This mod(This other);
+        __intrinsic_op($(kIROp_IRem)) This mod(This other);
         __intrinsic_op($(kIROp_Neg))  This neg();
         __intrinsic_op($(kIROp_Lsh)) This shl(int other);
         __intrinsic_op($(kIROp_Rsh)) This shr(int other);
@@ -679,14 +681,14 @@ struct __none_t
 {
 };
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
     __generic<U>
     __intrinsic_op($(kIROp_BitCast))
-    __init(Ptr<U> ptr);
+    __init(Ptr<U, addrSpace> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
@@ -697,59 +699,62 @@ struct Ptr
     __generic<TInt : __BuiltinIntegerType>
     __subscript(TInt index) -> T
     {
+        // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
         __intrinsic_op($(kIROp_GetOffsetPtr))
         ref;
     }
 };
 
 __intrinsic_op($(kIROp_Load))
-T __load<T>(Ptr<T> ptr);
+T __load<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr);
 
 __intrinsic_op($(kIROp_Store))
-void __store<T>(Ptr<T> ptr, T val);
+void __store<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr, T val);
 
 __intrinsic_op($(kIROp_GetElementPtr))
-Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int index);
-
-__intrinsic_op($(kIROp_GetElementPtr))
-Ptr<T> __getElementPtr<T>(Ptr<T> ptr, int64_t index);
+Ptr<T, addrSpace> __getElementPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
 
 __intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int index);
+Ptr<T, addrSpace> __getOffsetPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
 
-__intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> __getOffsetPtr<T>(Ptr<T> ptr, int64_t index);
-
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Less))
-bool operator<(Ptr<T> p1, Ptr<T> p2);
+bool operator <(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Leq))
-bool operator<=(Ptr<T> p1, Ptr<T> p2);
+bool operator <=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Greater))
-bool operator>(Ptr<T> p1, Ptr<T> p2);
+bool operator>(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Geq))
-bool operator>=(Ptr<T> p1, Ptr<T> p2);
+bool operator >=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Neq))
-bool operator!=(Ptr<T> p1, Ptr<T> p2);
+bool operator !=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_Eql))
-bool operator==(Ptr<T> p1, Ptr<T> p2);
+bool operator ==(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
 extension bool : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __implicit_conversion($(kConversionCost_PtrToBool))
     __intrinsic_op($(kIROp_CastPtrToBool))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
+
+    __generic<T : __EnumType>
+    __implicit_conversion($(kConversionCost_IntegerTruncate))
+    [__unsafeForceInlineEarly]
+    __init(T v)
+    {
+        return __slang_noop_cast<T.__Tag>(v) != __intCast<T.__Tag>(0);
+    }
 
     static const bool maxValue = true;
     static const bool minValue = false;
@@ -757,9 +762,9 @@ extension bool : IRangedValue
 
 extension uint64_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     static const uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
     static const uint64_t minValue = 0;
@@ -767,9 +772,9 @@ extension uint64_t : IRangedValue
 
 extension int64_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     static const int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
     static const int64_t minValue = -0x8000000000000000LL;
@@ -777,9 +782,9 @@ extension int64_t : IRangedValue
 
 extension intptr_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
     static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
     static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
@@ -787,9 +792,9 @@ extension intptr_t : IRangedValue
 
 extension uintptr_t : IRangedValue
 {
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
     static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
     static const uintptr_t minValue = 0z;
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
@@ -818,6 +823,8 @@ __magic_type(ConstRefType)
 __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
+
+typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
 
 __generic<T>
 __magic_type(OptionalType)
@@ -864,6 +871,113 @@ __generic<T>
 bool operator!=(__none_t noneVal, Optional<T> val)
 {
     return val.hasValue;
+}
+
+__generic<each T>
+__magic_type(TupleType)
+struct Tuple
+{
+    __intrinsic_op($(kIROp_MakeTuple))
+    __init(expand each T);
+}
+
+__intrinsic_op($(kIROp_MakeTuple))
+Tuple<T> makeTuple<each T>(T v);
+
+Tuple<T, U> concat<each T, each U>(Tuple<T> t, Tuple<U> u)
+{
+    return makeTuple(expand each t, expand each u);
+}
+
+
+[__unsafeForceInlineEarly]
+bool __assign(inout bool v, bool newVal)
+{
+    v = newVal;
+    return newVal;
+}
+
+[__unsafeForceInlineEarly]
+void __tupleLessKernel<T : IComparable>(inout bool result, inout bool exit, T a, T b)
+{
+    if (!exit)
+    {
+        if (a.lessThan(b))
+        {
+            result = true;
+            exit = true;
+        }
+        else if (!a.equals(b))
+        {
+            exit = true;
+        }
+    }
+}
+
+[__unsafeForceInlineEarly]
+void __tupleGreaterKernel<T : IComparable>(inout bool result, inout bool exit, T a, T b)
+{
+    if (!exit)
+    {
+        if (!a.lessThanOrEquals(b))
+        {
+            result = true;
+            exit = true;
+        }
+        else if (!a.equals(b))
+        {
+            exit = true;
+        }
+    }
+}
+
+__generic<each T : IComparable>
+extension Tuple<T> : IComparable
+{
+    bool lessThan(Tuple<T> other)
+    {
+        bool result = false;
+        bool exit = false;
+        expand __tupleLessKernel(result, exit, each this, each other);
+        return result;
+    }
+    bool lessThanOrEquals(Tuple<T> other)
+    {
+        bool result = false;
+        bool exit = false;
+        expand __tupleGreaterKernel(result, exit, each this, each other);
+        return !result;
+    }
+    bool equals(Tuple<T> other)
+    {
+        bool result = true;
+        expand result && __assign(result, result && (each this).equals(each other));
+        return result;
+    }
+}
+
+interface IMutatingFunc<TR, each TP>
+{
+    [mutating]
+    TR operator()(expand each TP p);
+}
+
+interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
+{
+    TR operator()(expand each TP p);
+}
+
+interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
+{
+    [Differentiable]
+    [mutating]
+    TR operator()(expand each TP p);
+}
+
+interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
+{
+    [Differentiable]
+    TR operator()(expand each TP p);
 }
 
 __generic<T>
@@ -961,10 +1075,10 @@ extension Ptr<void>
     [__unsafeForceInlineEarly]
     __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
 
-    __generic<T>
+    __generic<T, let addrSpace : uint64_t>
     __intrinsic_op(0)
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
-    __init(Ptr<T> ptr);
+    __init(Ptr<T, addrSpace> ptr);
 
     __generic<T>
     __intrinsic_op(0)
@@ -1036,8 +1150,8 @@ __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
 struct Array : IArray<T>
 {
-    [ForceInline]
-    int getCount() { return N; }
+    __intrinsic_op($(kIROp_GetArrayLength))
+    int getCount();
 
     __subscript(int index) -> T
     {
@@ -1045,7 +1159,6 @@ struct Array : IArray<T>
         get;
     }
 }
-
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)
@@ -1275,8 +1388,8 @@ for (int tt = 0; tt < kTypeCount; ++tt)
     }
 
     // Declare HLSL matrix types
-    for (int rr = 2; rr <= 4; ++rr)
-    for (int cc = 2; cc <= 4; ++cc)
+    for (int rr = 1; rr <= 4; ++rr)
+    for (int cc = 1; cc <= 4; ++cc)
     {
         sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
     }
@@ -1324,11 +1437,34 @@ __intrinsic_type($(kIROp_VerticesType))
 [__NonCopyableType]
 struct OutputVertices
 {
+    __intrinsic_op($(kIROp_MetalSetVertex))
+    static void _metalSetVertex(uint index, T val);
+
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    static void _setVertex(This v, uint index, T val);
+
     __subscript(uint index) -> T
     {
         // TODO: Make sure this remains write only, we can't do this with just
         // a 'set' operation as it's legal to only write to part of the output
         // buffer, or part of the output buffer at a time.
+
+        [mutating]
+        [require(glsl_hlsl_metal_spirv, meshshading)]
+        set
+        {
+            __target_switch
+            {
+            case metal: _metalSetVertex(index, newValue);
+            case glsl: _setVertex(this, index, newValue);
+            case hlsl: _setVertex(this, index, newValue);
+            case spirv: _setVertex(this, index, newValue);
+            }
+        }
+        
+        //
+        // If a 'OutputVertices[index]' is referred to by a '__ref', call 'kIROp_MeshOutputRef(index)'
+        [require(glsl_hlsl_spirv, meshshading)]
         __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
     }
@@ -1340,13 +1476,29 @@ __intrinsic_type($(kIROp_IndicesType))
 [__NonCopyableType]
 struct OutputIndices
 {
+    __intrinsic_op($(kIROp_MetalSetIndices))
+    static void __metalSetIndices(uint index, T val);
+
+    // for some reason only here in the indices array it uses the return value as an actual
+    // operand, while the others use the value of the instruction (the return value) to access
+    // the type of the vertex, as when using the ref there is no third operand
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    static void __setIndices(This v, uint index, T val);
+
     __subscript(uint index) -> T
     {
-        // It's illegal to not write out the entire primitive at once, so limit
-        // this to set
         [mutating]
-        __intrinsic_op($(kIROp_MeshOutputSet))
-        set;
+        [require(glsl_hlsl_metal_spirv, meshshading)]
+        set
+        {
+            __target_switch
+            {
+            case metal: __metalSetIndices(index, newValue);
+            case glsl: __setIndices(this, index, newValue);
+            case hlsl: __setIndices(this, index, newValue);
+            case spirv: __setIndices(this, index, newValue);
+            }
+        }
     }
 };
 
@@ -1356,8 +1508,29 @@ __intrinsic_type($(kIROp_PrimitivesType))
 [__NonCopyableType]
 struct OutputPrimitives
 {
-    __subscript(uint index) -> T
+    __intrinsic_op($(kIROp_MetalSetPrimitive))
+    static void __metalSetPrimitive(uint index, T val);
+
+    __intrinsic_op($(kIROp_MeshOutputSet))
+    static void __setPrimitive(This v, uint index, T val);
+
+    __subscript(uint index)->T
     {
+        [mutating]
+        [require(glsl_hlsl_metal_spirv, meshshading)]
+        set
+        {
+            __target_switch
+            {
+            case metal: __metalSetPrimitive(index, newValue);
+            case glsl: __setPrimitive(this, index, newValue);
+            case hlsl: __setPrimitive(this, index, newValue);
+            case spirv: __setPrimitive(this, index, newValue);
+            }
+        }
+
+        // If a 'OutputPrimitives[index]' is referred to by a '__ref', call 'kIROp_MeshOutputRef(index)'
+        [require(glsl_hlsl_spirv, meshshading)]
         __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
     }
@@ -1461,12 +1634,14 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     sb << "}\n";
 }
 
-for( int R = 2; R <= 4; ++R )
-for( int C = 2; C <= 4; ++C )
+for( int R = 1; R <= 4; ++R )
+for( int C = 1; C <= 4; ++C )
 {
     sb << "__generic<T, let L:int> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
 
     // initialize from R*C scalars
+    if (R == 1 || C == 1)
+        sb << "[require(hlsl)]\n";
     sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
     for( int ii = 0; ii < R; ++ii )
     for( int jj = 0; jj < C; ++jj )
@@ -1477,6 +1652,8 @@ for( int C = 2; C <= 4; ++C )
     sb << ");\n";
 
     // Initialize from R C-vectors
+    if (R == 1 || C == 1)
+        sb << "[require(hlsl)]\n";
     sb << "__intrinsic_op(" << int(kIROp_MakeMatrix) << ") __init(";
     for (int ii = 0; ii < R; ++ii)
     {
@@ -1490,6 +1667,8 @@ for( int C = 2; C <= 4; ++C )
     for( int cc = C; cc <= 4; ++cc )
     {
         if(rr == R && cc == C) continue;
+        if (R == 1 || C == 1)
+            sb << "[require(hlsl)]\n";
         sb << "__intrinsic_op(" << int(kIROp_MatrixReshape) << ") __init(matrix<T," << rr << "," << cc << ", L> value);\n";
     }
 
@@ -1614,21 +1793,28 @@ for (auto op : intrinsicUnaryOps)
 
 }}}}
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op(0)
-__prefix Ref<T> operator*(Ptr<T> value);
+[require(cpp_cuda_spirv)]
+__prefix Ref<T> operator*(Ptr<T, addrSpace> value);
 
 __generic<T>
 __intrinsic_op(0)
-__prefix Ptr<T> operator&(__ref T value);
+[require(cpp_cuda_spirv)]
+__prefix Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
 
 __generic<T>
+__intrinsic_op(0)
+[require(cpp_cuda_spirv)]
+__Addr<T> __get_addr( __ref T value);
+
+__generic<T, let addrSpace : uint64_t>
 __intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T> operator+(Ptr<T> value, int64_t offset);
+Ptr<T, addrSpace> operator+(Ptr<T, addrSpace> value, int64_t offset);
 
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 [__unsafeForceInlineEarly]
-Ptr<T> operator-(Ptr<T> value, int64_t offset)
+Ptr<T, addrSpace> operator -(Ptr<T, addrSpace> value, int64_t offset)
 {
     return __getOffsetPtr(value, -offset);
 }
@@ -1693,9 +1879,9 @@ matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T>
+__generic<T, let addrSpace : uint64_t>
 [__unsafeForceInlineEarly]
-Ptr<T> operator$(op.name)(in out Ptr<T> value)
+Ptr<T, addrSpace> operator$(op.name)(in out Ptr<T, addrSpace> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) 1; return $(fixity.returnVal); }
 
 ${{{{
@@ -2009,12 +2195,19 @@ T reinterpret(U value);
 
 // Use an otherwise unused value
 //
-// This can be used to silence the warning about returning before initializing
-// an out paramter.
+// This can be used to silence the warning about returning before initializing an out paramter.
 __generic<T>
 [__readNone]
 [ForceInline]
+__intrinsic_op($(kIROp_Unmodified))
 void unused(inout T){}
+
+// This can be used to silence the warning about not writing to an inout parameter.
+__generic<T>
+[__readNone]
+[ForceInline]
+__intrinsic_op($(kIROp_Unmodified))
+void unmodified(out T){}
 
 // Specialized function
 
@@ -2150,7 +2343,7 @@ __generic<T : IComparable>
 [OverloadRank(-10)]
 bool operator >=(T v0, T v1)
 {
-    return v1.lessThan(v1);
+    return v1.lessThanOrEquals(v0);
 }
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
@@ -2486,8 +2679,8 @@ __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
 
 __generic<T>
-__intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
-Ptr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
+__intrinsic_op( $(kIROp_GetLegalizedSPIRVGlobalParamAddr))
+__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
@@ -2506,10 +2699,17 @@ attribute_syntax [vk_shader_record]			                        : ShaderRecordAttr
 __attributeTarget(VarDeclBase)
 attribute_syntax [shader_record]			                        : ShaderRecordAttribute;
 
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax [vk_push_constant]									: PushConstantAttribute;
-__attributeTarget(DeclBase)
+__attributeTarget(VarDeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax[vk_specialization_constant] : SpecializationConstantAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax[SpecializationConstant] : SpecializationConstantAttribute;
+__attributeTarget(VarDeclBase)
+attribute_syntax[vk_constant_id(location: int)] : VkConstantIdAttribute;
 
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
@@ -2574,6 +2774,9 @@ attribute_syntax [call]                 : CallAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [shader(stage)]    : EntryPointAttribute;
 
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader(stage)]    : EntryPointAttribute;
+
 // Hull Shader
 __attributeTarget(FuncDecl)
 attribute_syntax [maxtessfactor(factor: float)]     : MaxTessFactorAttribute;
@@ -2608,6 +2811,9 @@ attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 // Compute Shader
 __attributeTarget(FuncDecl)
 attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
@@ -2731,6 +2937,9 @@ __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
 
 __attributeTarget(DeclBase)
+attribute_syntax[__AutoDiffBuiltin] : AutoDiffBuiltinAttribute;
+
+__attributeTarget(DeclBase)
 attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
 
 __attributeTarget(AggTypeDecl)
@@ -2748,8 +2957,16 @@ attribute_syntax [payload] : PayloadAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 
+enum SideEffectBehavior
+{
+    /// Causes a warning if the method is detected to have side-effects
+    Warn = 0,
+
+    /// Suppresses the warning
+    Allow = 1
+};
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [PreferRecompute] : PreferRecomputeAttribute;
+attribute_syntax[PreferRecompute(behavior: SideEffectBehavior = SideEffectBehavior.Warn)] : PreferRecomputeAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
