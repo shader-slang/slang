@@ -20,15 +20,24 @@ namespace Slang
         return true;
     }
 
+    static inline bool _isDefaultCtor(ConstructorDecl* ctor)
+    {
+        // 1. default ctor must have definition
+        // 2. either 2.1 or 2.2 is safisfied
+        // 2.1. default ctor must have no parameters
+        // 2.2. default ctor can have parameters, but all parameters have init expr (Because we won't differentiate this case from 2.)
+        if (!ctor->body || (ctor->members.getCount() != 0 && !allParamHaveInitExpr(ctor)))
+            return false;
+
+        return true;
+    }
+
     ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
     {
         for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
         {
-            // 1. default ctor must have definition
-            // 2. default ctor must have no parameters or all parameters have init expr
-            if (!ctor->body || (ctor->members.getCount() != 0 && !allParamHaveInitExpr(ctor)))
-                continue;
-            return ctor;
+            if (_isDefaultCtor(ctor))
+                return ctor;
         }
         return nullptr;
     }

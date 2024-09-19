@@ -8299,7 +8299,6 @@ namespace Slang
         return ctor->containsOption(ConstructorTags::Synthesized)
             && ctor->getParameters().getCount() != 0
             && !allParamHaveInitExpr(ctor);
-        // return ctor->findModifier<SynthesizedModifier>();
     }
 
     template<typename T>
