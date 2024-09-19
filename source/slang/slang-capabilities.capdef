@@ -322,6 +322,10 @@ alias cuda_glsl_hlsl_spirv = cuda | glsl | hlsl | spirv;
 /// [Compound]
 alias cuda_glsl_hlsl_metal_spirv = cuda | glsl | hlsl | metal | spirv;
 
+/// CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cuda_glsl_hlsl_metal_spirv_wgsl = cuda | glsl | hlsl | metal | spirv | wgsl;
+
 /// CUDA, GLSL, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_glsl_spirv = cuda | glsl | spirv;
@@ -329,6 +333,10 @@ alias cuda_glsl_spirv = cuda | glsl | spirv;
 /// CUDA, GLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_glsl_metal_spirv = cuda | glsl | metal | spirv;
+
+/// CUDA, GLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cuda_glsl_metal_spirv_wgsl = cuda | glsl | metal | spirv | wgsl;
 
 /// CUDA, and HLSL code-gen targets
 /// [Compound]
@@ -341,6 +349,10 @@ alias cuda_hlsl_spirv = cuda | hlsl | spirv;
 /// GLSL, HLSL, and SPIRV code-gen targets
 /// [Compound]
 alias glsl_hlsl_spirv = glsl | hlsl | spirv;
+
+/// GLSL, HLSL, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias glsl_hlsl_spirv_wgsl = glsl | hlsl | spirv | wgsl;
 
 /// GLSL, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
@@ -1705,6 +1717,7 @@ alias fragmentprocessing = fragment + _sm_5_0
                          | fragment + metal
                          | fragment + cpp
                          | fragment + cuda
+                         | fragment + wgsl
                          ;
 /// Capabilities required to use fragment derivative operations (with GLSL derivativecontrol)
 /// [Compound]
