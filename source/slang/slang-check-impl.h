@@ -1748,7 +1748,7 @@ namespace Slang
         void addModifiersToSynthesizedDecl(
             ConformanceCheckingContext* context,
             DeclRef<Decl> requirement,
-            FunctionDeclBase* synthesized,
+            CallableDecl* synthesized,
             ThisExpr* &synThis);
 
         void addRequiredParamsToSynthesizedDecl(
@@ -1756,9 +1756,9 @@ namespace Slang
             CallableDecl* synthesized,
             List<Expr*>& synArgs);
 
-        FunctionDeclBase* synthesizeMethodSignatureForRequirementWitness(
+        CallableDecl* synthesizeMethodSignatureForRequirementWitness(
             ConformanceCheckingContext* context,
-            DeclRef<FunctionDeclBase> requiredMemberDeclRef,
+            DeclRef<CallableDecl> requiredMemberDeclRef,
             List<Expr*>& synArgs,
             ThisExpr*& synThis);
         
@@ -1768,6 +1768,14 @@ namespace Slang
             List<Expr*>& synArgs,
             List<Expr*>& synGenericArgs,
             ThisExpr*& synThis);
+
+        bool synthesizeAccessorRequirements(
+            ConformanceCheckingContext* context,
+            DeclRef<ContainerDecl> requiredMemberDeclRef,
+            Type* resultType,
+            Expr* synBoundStorageExpr,
+            ContainerDecl* synAccesorContainer,
+            RefPtr<WitnessTable> witnessTable);
 
         void _addMethodWitness(
             WitnessTable* witnessTable,
@@ -1804,6 +1812,16 @@ namespace Slang
         bool trySynthesizeWrapperTypePropertyRequirementWitness(
             ConformanceCheckingContext* context,
             DeclRef<PropertyDecl>       requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
+        bool trySynthesizeSubscriptRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<SubscriptDecl>      requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
+        bool trySynthesizeWrapperTypeSubscriptRequirementWitness(
+            ConformanceCheckingContext* context,
+            DeclRef<SubscriptDecl>      requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 
         bool trySynthesizeAssociatedTypeRequirementWitness(
@@ -2203,7 +2221,7 @@ namespace Slang
 
         bool isValidGenericConstraintType(Type* type);
 
-        bool isTypeDifferentiable(Type* type);
+        SubtypeWitness* isTypeDifferentiable(Type* type);
 
         bool doesTypeHaveTag(Type* type, TypeTag tag);
 

@@ -107,10 +107,13 @@ struct DiffPairLoweringPass : InstPassBase
                 case kIROp_DifferentialPairGetPrimal:
                 case kIROp_DifferentialPairGetDifferentialUserCode:
                 case kIROp_DifferentialPairGetPrimalUserCode:
+                case kIROp_DifferentialPtrPairGetDifferential:
+                case kIROp_DifferentialPtrPairGetPrimal:
                     lowerPairAccess(builder, inst);
                     break;
 
                 case kIROp_MakeDifferentialPairUserCode:
+                case kIROp_MakeDifferentialPtrPair:
                     lowerMakePair(builder, inst);
                     break;
 

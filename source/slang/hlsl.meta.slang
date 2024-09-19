@@ -5775,7 +5775,7 @@ bool all(matrix<T,N,M> x)
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void AllMemoryBarrier()
 {
     __target_switch
@@ -5788,12 +5788,13 @@ void AllMemoryBarrier()
         {
             OpMemoryBarrier Device AcquireRelease|UniformMemory|WorkgroupMemory|ImageMemory;
         };
+    case wgsl: __intrinsic_asm "storageBarrier(); textureBarrier(); workgroupBarrier();";
     }
 }
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void AllMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -5806,6 +5807,7 @@ void AllMemoryBarrierWithGroupSync()
         {
             OpControlBarrier Workgroup Device AcquireRelease|UniformMemory|WorkgroupMemory|ImageMemory;
         };
+    case wgsl: __intrinsic_asm "storageBarrier(); textureBarrier(); workgroupBarrier();";
     }
 }
 
@@ -7540,7 +7542,7 @@ T determinant(matrix<T,N,N> m)
 
 // Barrier for device memory
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void DeviceMemoryBarrier()
 {
     __target_switch
@@ -7553,11 +7555,12 @@ void DeviceMemoryBarrier()
         {
             OpMemoryBarrier Device AcquireRelease|UniformMemory|ImageMemory;
         };
+    case wgsl: __intrinsic_asm "storageBarrier(); textureBarrier(); workgroupBarrier();";
     }
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void DeviceMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -7570,6 +7573,7 @@ void DeviceMemoryBarrierWithGroupSync()
         {
             OpControlBarrier Workgroup Device AcquireRelease|UniformMemory|ImageMemory;
         };
+    case wgsl: __intrinsic_asm "storageBarrier(); textureBarrier(); workgroupBarrier();";
     }
 }
 
@@ -8932,7 +8936,7 @@ float2 GetRenderTargetSamplePosition(int Index)
 
 // Group memory barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void GroupMemoryBarrier()
 {
     __target_switch
@@ -8946,6 +8950,7 @@ void GroupMemoryBarrier()
         {
             OpMemoryBarrier Workgroup AcquireRelease|WorkgroupMemory
         };
+    case wgsl: __intrinsic_asm "workgroupBarrier";
     }
 }
 
@@ -8967,7 +8972,7 @@ void __subgroupBarrier()
 }
 
 __glsl_extension(GL_KHR_memory_scope_semantics)
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void GroupMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -8981,6 +8986,7 @@ void GroupMemoryBarrierWithGroupSync()
         {
             OpControlBarrier Workgroup Workgroup AcquireRelease|WorkgroupMemory
         };
+    case wgsl: __intrinsic_asm "workgroupBarrier";
     }
 }
 
@@ -20616,4 +20622,19 @@ uint64_t clockARB()
             result:$$uint64_t = OpReadClockKHR $scopeId_subgroup;
         };
     }
+}
+
+extension<T, L : IBufferDataLayout> StructuredBuffer<T, L> : IArray<T>
+{
+    int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+}
+
+extension<T, L : IBufferDataLayout> RWStructuredBuffer<T, L> : IRWArray<T>
+{
+    int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+}
+
+extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IRWArray<T>
+{
+    int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
