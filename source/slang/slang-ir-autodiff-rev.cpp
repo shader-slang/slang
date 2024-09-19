@@ -152,6 +152,16 @@ namespace Slang
         builder->emitBlock();
         params = _defineFuncParams(builder, as<IRFunc>(existingPrimalFunc));
         params.removeLast();
+
+        // Unwrap any ref pairs. We need this special case for trivial funcs.
+        for (Int i = 0; i < params.getCount(); i++)
+        {
+            if (as<IRDifferentialPtrPairType>(params[i]->getDataType()))
+            {
+                params[i] = builder->emitDifferentialPtrPairGetPrimal(params[i]);
+            }
+        }
+
         IRInst* originalFuncRefFromPrimalFunc = originalFunc;
         if (originalGeneric)
             originalFuncRefFromPrimalFunc = maybeSpecializeWithGeneric(*builder, originalGeneric, existingPriamlFuncGeneric);
@@ -266,7 +276,20 @@ namespace Slang
         if (auto primalNoDiffType = _getPrimalTypeFromNoDiffType(this, builder, paramType))
             return primalNoDiffType;
 
-        return (IRType*)findOrTranscribePrimalInst(builder, paramType);
+        auto primalType = (IRType*)findOrTranscribePrimalInst(builder, paramType);
+        
+        // Differentiable pointer types are treated as primal pairs, since they aren't involved in the transposition
+        // process.
+        //
+        if (differentiableTypeConformanceContext.isDifferentiablePtrType(primalType))
+        {
+            auto diffPairType = tryGetDiffPairType(builder, primalType);
+            SLANG_ASSERT(diffPairType);
+
+            return diffPairType;
+        }
+
+        return primalType;
     }
 
     IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(IRBuilder* builder, IRType* paramType)
@@ -292,7 +315,7 @@ namespace Slang
         auto diffPairType = tryGetDiffPairType(builder, paramType);
         if (diffPairType)
         {
-            if (!as<IRPtrTypeBase>(diffPairType))
+            if (!as<IRPtrTypeBase>(diffPairType) && !as<IRDifferentialPtrPairType>(diffPairType))
                 return builder->getInOutType(diffPairType);
             return diffPairType;
         }
@@ -403,8 +426,11 @@ namespace Slang
         List<IRType*> primalTypes, propagateTypes;
         IRType* primalResultType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getResultType());
 
+        IRParam *currentParam = origFunc->getFirstParam();
         for (UInt i = 0; i < origFuncType->getParamCount(); i++)
         {
+            IRBuilderSourceLocRAII sourceLocationScope(&builder, currentParam->sourceLoc);
+
             auto primalParamType = transcribeParamTypeForPrimalFunc(&builder, origFuncType->getParamType(i));
             auto propagateParamType = transcribeParamTypeForPropagateFunc(&builder, origFuncType->getParamType(i));
             if (propagateParamType)
@@ -453,6 +479,7 @@ namespace Slang
                 primalArgs.add(var);
             }
             primalTypes.add(primalParamType);
+            currentParam = currentParam->getNextParam();
         }
 
         // Add dOut argument to propagateArgs.
@@ -588,6 +615,8 @@ namespace Slang
             autoDiffSharedContext->transcriberSet.forwardTranscriber);
         auto oldCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
         IRFunc* fwdDiffFunc = as<IRFunc>(getGenericReturnVal(fwdTranscriber.transcribe(builder, primalOuterParent)));
+        fwdDiffFunc->sourceLoc = primalFunc->sourceLoc;
+
         SLANG_ASSERT(fwdDiffFunc);
         auto newCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
         for (auto i = oldCount; i < newCount; i++)
@@ -712,8 +741,10 @@ namespace Slang
         }
 
         // Transpose the first block (parameter block)
-        auto paramTransposeInfo =
-            splitAndTransposeParameterBlock(builder, diffPropagateFunc, isResultDifferentiable);
+        auto paramTransposeInfo = splitAndTransposeParameterBlock(builder,
+            diffPropagateFunc,
+            primalFunc->sourceLoc,
+            isResultDifferentiable);
 
         // The insts we inserted in paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc
         // may be used by write back logic that we are going to insert later.
@@ -815,6 +846,7 @@ namespace Slang
     ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParameterBlock(
         IRBuilder* builder,
         IRFunc* diffFunc,
+        SourceLoc primalLoc,
         bool isResultDifferentiable)
     {
         // This method splits transposes the all the parameters for both the primal and propagate computation.
@@ -841,12 +873,20 @@ namespace Slang
         auto nextBlockBuilder = *builder;
         nextBlockBuilder.setInsertBefore(paramPreludeBlock->getFirstOrdinaryInst());
 
+        SourceLoc returnLoc;
         IRBlock* firstDiffBlock = nullptr;
         for (auto block : diffFunc->getBlocks())
         {
             if (isDifferentialInst(block))
             {
                 firstDiffBlock = block;
+                break;
+            }
+
+            auto terminator = block->getTerminator();
+            if (as<IRReturn>(terminator))
+            {
+                returnLoc = terminator->sourceLoc;
                 break;
             }
         }
@@ -895,6 +935,8 @@ namespace Slang
         //      from the primal compuation logic in the future propagate function be replaced to.
         for (auto fwdParam : fwdParams)
         {   
+            IRBuilderSourceLocRAII sourceLocationScope(builder, fwdParam->sourceLoc);
+
             // Define the replacement insts that we are going to fill in for each case.
             IRInst* diffRefReplacement = nullptr;
             IRInst* primalRefReplacement = nullptr;
@@ -942,7 +984,7 @@ namespace Slang
                     // Initialize the var with input diff param at start.
                     // Note that we insert the store in the primal block so it won't get transposed.
                     auto storeInst = nextBlockBuilder.emitStore(tempVar, diffParam);
-                    nextBlockBuilder.markInstAsDifferential(storeInst, diffPairType);
+                    nextBlockBuilder.markInstAsDifferential(storeInst, primalType);
                     // Since this store inst is specific to propagate function, we track it in a
                     // set so we can remove it when we generate the primal func.
                     result.propagateFuncSpecificPrimalInsts.add(storeInst);
@@ -1186,6 +1228,7 @@ namespace Slang
             SLANG_ASSERT(dOutParamType);
 
             dOutParam = builder->emitParam(dOutParamType);
+            dOutParam->sourceLoc = returnLoc;
             builder->addNameHintDecoration(dOutParam, UnownedStringSlice("_s_dOut"));
             result.propagateFuncParams.add(dOutParam);
         }
@@ -1196,6 +1239,10 @@ namespace Slang
         result.primalFuncParams.add(ctxParam);
         result.propagateFuncParams.add(ctxParam);
         result.dOutParam = dOutParam;
+        
+        diffFunc->sourceLoc = primalLoc;
+        ctxParam->sourceLoc = primalLoc;
+
         return result;
     }
 

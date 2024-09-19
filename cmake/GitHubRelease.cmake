@@ -1,4 +1,4 @@
-function(check_release_and_get_latest owner repo version os arch out_var)
+function(check_release_and_get_latest owner repo version os arch github_token out_var)
     # Construct the URL for the specified version's release API endpoint
     set(version_url "https://api.github.com/repos/${owner}/${repo}/releases/tags/v${version}")
 
@@ -17,8 +17,22 @@ function(check_release_and_get_latest owner repo version os arch out_var)
         set(${found_var} "${found}" PARENT_SCOPE)
     endfunction()
 
-    # Download the specified release info from GitHub
-    file(DOWNLOAD "${version_url}" "${json_output_file}" STATUS download_statuses)
+    # Prepare download arguments
+    set(download_args
+        "${version_url}"
+        "${json_output_file}"
+        STATUS download_statuses
+    )
+
+    if(github_token)
+        # Add authorization header if token is provided
+        list(APPEND download_args HTTPHEADER "Authorization: token ${github_token}")
+    endif()
+
+    # Perform the download
+    file(DOWNLOAD ${download_args})
+
+    # Check if the downloading was successful
     list(GET download_statuses 0 status_code)
     if(status_code EQUAL 0)
         file(READ "${json_output_file}" json_content)
@@ -34,6 +48,10 @@ function(check_release_and_get_latest owner repo version os arch out_var)
         message(WARNING "Failed to find ${desired_zip} in release assets for ${version} from ${version_url}\nFalling back to latest version if it differs")
     else()
         message(WARNING "Failed to download release info for version ${version} from ${version_url}\nFalling back to latest version if it differs")
+
+        if(status_code EQUAL 22)
+            message(WARNING "If API rate limit is exceeded, Github allows a higher limit when you use token. Try a cmake option -DSLANG_GITHUB_TOKEN=your_token_here")
+	endif()
     endif()
 
 
@@ -69,7 +87,7 @@ function(check_release_and_get_latest owner repo version os arch out_var)
     endif()
 endfunction()
 
-function(get_best_slang_binary_release_url out_var)
+function(get_best_slang_binary_release_url github_token out_var)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
         set(arch "x86_64")
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
@@ -93,7 +111,7 @@ function(get_best_slang_binary_release_url out_var)
     set(owner "shader-slang")
     set(repo "slang")
 
-    check_release_and_get_latest(${owner} ${repo} ${SLANG_VERSION_NUMERIC} ${os} ${arch} release_version)
+    check_release_and_get_latest(${owner} ${repo} ${SLANG_VERSION_NUMERIC} ${os} ${arch} "${github_token}" release_version)
     if(DEFINED release_version)
       set(${out_var} "https://github.com/${owner}/${repo}/releases/download/v${release_version}/slang-${release_version}-${os}-${arch}.zip" PARENT_SCOPE)
     endif()

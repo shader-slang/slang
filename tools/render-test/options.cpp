@@ -34,7 +34,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     case RenderApiType::CPU:    return rhi::DeviceType::CPU;
     case RenderApiType::CUDA:   return rhi::DeviceType::CUDA;
     default:
-        return rhi::DeviceType::Unknown;
+        return rhi::DeviceType::Default;
     }
 }
 
@@ -244,7 +244,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
                 UnownedStringSlice argName = argSlice.tail(1);
                 DeviceType deviceType = _toRenderType(RenderApiUtil::findApiTypeByName(argName));
 
-                if (deviceType != DeviceType::Unknown)
+                if (deviceType != DeviceType::Default)
                 {
                     outOptions.deviceType = deviceType;
                     continue;
@@ -253,7 +253,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
                 // Lookup the target language type
                 DeviceType targetLanguageDeviceType = _toRenderType(RenderApiUtil::findImplicitLanguageRenderApiType(argName));
                     
-                if (targetLanguageDeviceType != DeviceType::Unknown || argName == "glsl")
+                if (targetLanguageDeviceType != DeviceType::Default || argName == "glsl")
                 {
                     outOptions.targetLanguageDeviceType = targetLanguageDeviceType;
                     outOptions.inputLanguageID = (argName == "hlsl" || argName == "glsl" || argName == "cpp" || argName == "cxx" || argName == "c") ?  InputLanguageID::Native : InputLanguageID::Slang;
@@ -266,7 +266,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     }
 
     // If a render option isn't set use defaultRenderType 
-    outOptions.deviceType = (outOptions.deviceType == DeviceType::Unknown)
+    outOptions.deviceType = (outOptions.deviceType == DeviceType::Default)
                                 ? outOptions.targetLanguageDeviceType
                                 : outOptions.deviceType;
 
