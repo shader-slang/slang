@@ -81,8 +81,7 @@ auto_option(
     Aftermath
     "Enable Aftermath in GFX, and add aftermath crash example to project"
 )
-option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support")
-mark_as_advanced(SLANG_ENABLE_DX_ON_VK)
+advanced_option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support" OFF)
 
 option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
@@ -101,11 +100,11 @@ option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENA
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
-option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
-option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
-option(SLANG_USE_SYSTEM_VULKAN_HEADERS "Build using system Vulkan headers" OFF)
-option(SLANG_USE_SYSTEM_SPIRV_HEADERS "Build using system SPIR-V headers" OFF)
-option(SLANG_USE_SYSTEM_UNORDERED_DENSE "Build using system unordered dense" OFF)
+advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
+advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
+advanced_option(SLANG_USE_SYSTEM_VULKAN_HEADERS "Build using system Vulkan headers" OFF)
+advanced_option(SLANG_USE_SYSTEM_SPIRV_HEADERS "Build using system SPIR-V headers" OFF)
+advanced_option(SLANG_USE_SYSTEM_UNORDERED_DENSE "Build using system unordered dense" OFF)
 
 option(SLANG_SPIRV_HEADERS_INCLUDE_DIR "Provide a specific path for the SPIR-V headers and grammar files")
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
