@@ -235,8 +235,17 @@ namespace Slang
         Name*                   name,
         DiagnosticSink*         sink)
     {
-        auto declRef = translationUnit->findDeclFromString(getText(name), sink);
-        FuncDecl* entryPointFuncDecl = declRef.as<FuncDecl>().getDecl();
+        FuncDecl* entryPointFuncDecl = nullptr;
+
+        auto expr = translationUnit->findDeclFromString(getText(name), sink);   
+        if (auto declRefExpr = as<DeclRefExpr>(expr))
+        {
+            auto declRef = declRefExpr->declRef;
+            entryPointFuncDecl = declRef.as<FuncDecl>().getDecl();
+
+            if (entryPointFuncDecl && getModule(entryPointFuncDecl) != translationUnit)
+                entryPointFuncDecl = nullptr;
+        }
 
         if (entryPointFuncDecl && getModule(entryPointFuncDecl) != translationUnit)
             entryPointFuncDecl = nullptr;

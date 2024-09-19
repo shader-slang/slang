@@ -1765,6 +1765,27 @@ namespace Slang
             expr->baseExpression->accept(this, nullptr);
             expr->scope = scope;
         }
+        void visitAppExprBase(AppExprBase* expr)
+        {
+            expr->functionExpr->accept(this, nullptr);
+            for (auto arg : expr->arguments)
+                arg->accept(this, nullptr);
+        }
+        void visitIsTypeExpr(IsTypeExpr* expr)
+        {
+            if (expr->typeExpr.exp)
+                expr->typeExpr.exp->accept(this, nullptr);
+        }
+        void visitAsTypeExpr(AsTypeExpr* expr)
+        {
+            if (expr->typeExpr)
+                expr->typeExpr->accept(this, nullptr);
+        }
+        void visiSizeOfLikeExpr(SizeOfLikeExpr* expr)
+        {
+            if (expr->value)
+                expr->value->accept(this, nullptr);
+        }
         void visitExpr(Expr* /*expr*/)
         {}
     };
