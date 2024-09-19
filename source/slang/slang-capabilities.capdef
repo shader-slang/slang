@@ -322,6 +322,10 @@ alias cuda_glsl_hlsl_spirv = cuda | glsl | hlsl | spirv;
 /// [Compound]
 alias cuda_glsl_hlsl_metal_spirv = cuda | glsl | hlsl | metal | spirv;
 
+/// CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cuda_glsl_hlsl_metal_spirv_wgsl = cuda | glsl | hlsl | metal | spirv | wgsl;
+
 /// CUDA, GLSL, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_glsl_spirv = cuda | glsl | spirv;

@@ -285,6 +285,13 @@ interface IDifferentiable
     static Differential dmul(T, Differential);
 };
 
+__magic_type(DifferentiablePtrType)
+interface IDifferentiablePtrType
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
+    associatedtype Differential : IDifferentiablePtrType;
+};
+
 
 /// Pair type that serves to wrap the primal and
 /// differential types of an arbitrary type T.
@@ -354,6 +361,36 @@ struct DifferentialPair : IDifferentiable
         return Differential(
             T.dmul<U>(a, b.p),
             T.Differential.dmul<U>(a, b.d));
+    }
+};
+
+__generic<T : IDifferentiablePtrType>
+__magic_type(DifferentialPtrPairType)
+__intrinsic_type($(kIROp_DifferentialPtrPairType))
+struct DifferentialPtrPair : IDifferentiablePtrType
+{
+    typedef DifferentialPtrPair<T.Differential> Differential;
+    typedef T.Differential DifferentialElementType;
+
+    __intrinsic_op($(kIROp_MakeDifferentialPtrPair))
+    __init(T _primal, T.Differential _differential);
+
+    property p : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetPrimal))
+        get;
+    }
+
+    property v : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetPrimal))
+        get;
+    }
+
+    property d : T.Differential
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetDifferential))
+        get;
     }
 };
 

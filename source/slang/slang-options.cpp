@@ -339,6 +339,7 @@ void initCommandOptions(CommandOptions& options)
         { OptionKind::InputFilesRemain, "--", nullptr, "Treat the rest of the command line as input files."},
         { OptionKind::ReportDownstreamTime, "-report-downstream-time", nullptr, "Reports the time spent in the downstream compiler." },
         { OptionKind::ReportPerfBenchmark, "-report-perf-benchmark", nullptr, "Reports compiler performance benchmark results." },
+        { OptionKind::ReportCheckpointIntermediates, "-report-checkpoint-intermediates", nullptr, "Reports information about checkpoint contexts used for reverse-mode automatic differentiation." },
         { OptionKind::SkipSPIRVValidation, "-skip-spirv-validation", nullptr, "Skips spirv validation." },
         { OptionKind::SourceEmbedStyle, "-source-embed-style", "-source-embed-style <source-embed-style>",
         "If source embedding is enabled, defines the style used. When enabled (with any style other than `none`), "
@@ -1703,6 +1704,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::DumpReproOnError:
             case OptionKind::ReportDownstreamTime:
             case OptionKind::ReportPerfBenchmark:
+            case OptionKind::ReportCheckpointIntermediates:
             case OptionKind::SkipSPIRVValidation:
             case OptionKind::DisableSpecialization:
             case OptionKind::DisableDynamicDispatch:

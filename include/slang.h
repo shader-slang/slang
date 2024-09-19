@@ -852,6 +852,7 @@ extern "C"
             EmitIr,                // bool
             ReportDownstreamTime,  // bool
             ReportPerfBenchmark,   // bool
+            ReportCheckpointIntermediates, // bool
             SkipSPIRVValidation,   // bool
             SourceEmbedStyle,
             SourceEmbedName,
