@@ -99,7 +99,10 @@ void main()
 ```
 
 When generating WGSL code where `atomic<T>` isn't allowed on local variables or other illegal address spaces, we will lower the type
-into its underlying type. This should be handled by a legalization pass similar to `lowerBufferElementTypeToStorageType` but operates
+into its underlying type. The use of atomic type in these positions will simply have no meaning. A caveat is what the semantics should be
+when there is a function that takes `inout Atomic<T>` as parameter. This likely need to be a warning or error.
+
+This should be handled by a legalization pass similar to `lowerBufferElementTypeToStorageType` but operates
 in the opposite direction: the "loaded" value from a buffer is converted into an atomic-free type, and storing a value leads to an
 atomic store at the corresponding locations.
 
