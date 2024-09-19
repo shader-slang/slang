@@ -32,27 +32,36 @@ Proposed Approach
 
 We define an `Atomic<T>` type that functions as a wrapper of `T` and provides atomic operations:
 ```
-interface IAtomicable {}
-extension int : IAtomicable {}
-extension uint : IAtomicable {}
-extension float : IAtomicable {}
-extension half : IAtomicable {}
+[sealed] interface IAtomicable {}
+[sealed] interface IArithmeticAtomicable : IAtomicable {}
+[sealed] interface IBitAtomicable : IArithmeticAtomicable {}
 
-struct Atomic<T>
+extension int : IArithmeticAtomicable {}
+extension uint : IArithmeticAtomicable {}
+extension int64_t : IBitAtomicable {}
+extension uint64_t : IBitAtomicable {}
+extension float : IArithmeticAtomicable {}
+extension half : IArithmeticAtomicable {}
+
+struct Atomic<T : IAtomicable>
 {
     T load();
     [ref] void store(T newValue); // Question: do we really need this?
     [ref] T exchange(T newValue); // returns old value
     [ref] T compareExchange(T compareValue, T newValue); // returns old value.
+}
+
+extension<T:IArithmeticAtomicable> Atomic<T>
+{
     [ref] T atomicAdd(T value); // returns original value
     [ref] T atomicSub(T value); // returns original value
     [ref] T atomicMax(T value); // returns original value
     [ref] T atomicMin(T value); // returns original value
+    [ref] T atomicIncrement();
+    [ref] T atomicDecrement();
 }
 
-extension<T> Atomic<T>
-    where T : IAtomicable
-    where T : __BuiltinIntegerType
+extension<T:IBitAtomicable> Atomic<T>
 {
     [ref] T atomicAnd(T value); // returns original value
     [ref] T atomicOr(T value); // returns original value
@@ -61,7 +70,7 @@ extension<T> Atomic<T>
 ```
 
 We allow `Atomic<T>` to be defined anywhere: as struct fields, as array elements, as elements of `RWStructuredBuffer` types,
-or as groupshared variable types. For example, in global memory:
+or as local and groupshared variable types. For example, in global memory:
 
 ```hlsl
 struct MyType
