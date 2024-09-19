@@ -3037,7 +3037,7 @@ namespace Slang
     Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructZeroInitListOptions options);
     FuncDecl* findZeroInitListFunc(StructDecl* structDecl);
 
-    bool checkIfCStyleStruct(SemanticsVisitor* visitor, StructDecl* decl);
+    bool isCStyleStructDecl(SemanticsVisitor* visitor, StructDecl* decl, List<ConstructorDecl*> const& ctorList);
 
     DefaultConstructExpr* createDefaultConstructExprForType(ASTBuilder* m_astBuilder, QualType type, SourceLoc loc);
 

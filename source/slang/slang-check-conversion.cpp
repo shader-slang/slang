@@ -550,7 +550,7 @@ namespace Slang
                     // b. Collect and coerce init-list arguments into constructor parameters
                     // c. Create InvokeExpr for our valid ConstructorDecl 
                     List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, toStructDecl, nullptr);
-                    bool allowCStyleInitList = checkIfCStyleStruct(this, toStructDecl);
+                    bool allowCStyleInitList = isCStyleStructDecl(this, toStructDecl, ctorList);
 
                     List<Expr*> maybeArgList;
                     maybeArgList.reserve(argCount);

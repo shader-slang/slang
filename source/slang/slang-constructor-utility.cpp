@@ -12,16 +12,6 @@ namespace Slang
         return defaultConstructExpr;
     }
 
-    ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
-    {
-        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
-        {
-            if (!ctor->body || ctor->members.getCount() != 0)
-                continue;
-            return ctor;
-        }
-        return nullptr;
-    }
     bool allParamHaveInitExpr(ConstructorDecl* ctor)
     {
         for (auto i : ctor->getParameters())
@@ -29,6 +19,20 @@ namespace Slang
                 return false;
         return true;
     }
+
+    ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
+    {
+        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+        {
+            // 1. default ctor must have definition
+            // 2. default ctor must have no parameters or all parameters have init expr
+            if (!ctor->body || (ctor->members.getCount() != 0 && !allParamHaveInitExpr(ctor)))
+                continue;
+            return ctor;
+        }
+        return nullptr;
+    }
+
     List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut)
     {
         List<ConstructorDecl*> ctorList;
@@ -36,7 +40,7 @@ namespace Slang
         auto ctorLookupResult = lookUpMember(
             m_astBuilder,
             visitor,
-            visitor->getName("$init"),
+            m_astBuilder->getSharedASTBuilder()->getCtorName(),
             DeclRefType::create(m_astBuilder, structDecl),
             structDecl->ownedScope,
             LookupMask::Function,
@@ -63,7 +67,7 @@ namespace Slang
             return ctorList;
         }
 
-        for (auto m : ctorLookupResult.items)
+        for (auto m : ctorLookupResult)
         {
             lookupResultHandle(m);
         }
@@ -151,7 +155,7 @@ namespace Slang
         return nullptr;
     }
 
-    Expr* _constructZeroInitListFuncMakeDefaultCtor(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructorDecl* defaultCtor)
+    Expr* constructDefaultCtorInvocationExpr(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructorDecl* defaultCtor)
     {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
             auto member = visitor->getASTBuilder()->getMemberDeclRef(structDecl->getDefaultDeclRef(), defaultCtor);
@@ -192,34 +196,34 @@ namespace Slang
                 }
             }
             if(canCreateCtor)
-                return _constructZeroInitListFuncMakeDefaultCtor(visitor, structDecl, structDeclType, defaultCtor);
+                return constructDefaultCtorInvocationExpr(visitor, structDecl, structDeclType, defaultCtor);
         }
 
         // 2.
-        if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
+        if (auto defaultInitFunc = findZeroInitListFunc(structDecl))
         {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
             DeclRef<Decl> member;
             auto declRefType = as<DeclRefType>(structDeclType);
             if(declRefType && as<GenericAppDeclRef>(declRefType->getDeclRefBase()))
-                member = visitor->getASTBuilder()->getMemberDeclRef(as<GenericAppDeclRef>(declRefType->getDeclRefBase()), zeroInitListFunc);
+                member = visitor->getASTBuilder()->getMemberDeclRef(as<GenericAppDeclRef>(declRefType->getDeclRefBase()), defaultInitFunc);
             else
-                member = visitor->getASTBuilder()->getMemberDeclRef(structDecl, zeroInitListFunc);
+                member = visitor->getASTBuilder()->getMemberDeclRef(structDecl, defaultInitFunc);
 
-            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, zeroInitListFunc->getName(), zeroInitListFunc->loc, nullptr);
+            invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultInitFunc->getName(), defaultInitFunc->loc, nullptr);
             invoke->type = structDeclType;
             return invoke;
         }
 
         // 3.
         if (defaultCtor)
-            return _constructZeroInitListFuncMakeDefaultCtor(visitor, structDecl, structDeclType, defaultCtor);
+            return constructDefaultCtorInvocationExpr(visitor, structDecl, structDeclType, defaultCtor);
 
         // 4.
         return createDefaultConstructExprForType(visitor->getASTBuilder(), QualType(structDeclType), {});
     }
 
-    bool checkIfCStyleStruct(SemanticsVisitor* visitor, StructDecl* structDecl)
+    bool isCStyleStructDecl(SemanticsVisitor* visitor, StructDecl* structDecl, List<ConstructorDecl*> const& ctorList)
     {
         // CStyleStruct follows the following rules:
         // 1. Does not contain a non 'Synthesized' Ctor (excluding 'DefaultCtor')
@@ -236,7 +240,6 @@ namespace Slang
             return *isCStyleStruct;
 
         // Add to IsCStyleStruct cache
-        auto ctorList = _getCtorList(visitor->getASTBuilder(), visitor, structDecl, nullptr);
         int nonDefaultInitCount = 0;
         for (auto i : ctorList)
         {

@@ -2798,7 +2798,7 @@ namespace Slang
 
                     // `checkIfCStyleStruct` must check after we add all possible Ctors.
                     // If we are a CStyleStruct add DefaultConstructExpr to all params (excluding arg 0)
-                    bool isCStyleStruct = checkIfCStyleStruct(this, structDecl);
+                    bool isCStyleStruct = isCStyleStructDecl(this, structDecl, ctorList);
                     if (isCStyleStruct && generatedMemberwiseCtors.getCount() > 0)
                     {
                         // We know the user provided 0 non-default ctor's, we only had a chance to generate non default Ctors above in this AST pass.
@@ -8299,6 +8299,7 @@ namespace Slang
         return ctor->containsOption(ConstructorTags::Synthesized)
             && ctor->getParameters().getCount() != 0
             && !allParamHaveInitExpr(ctor);
+        // return ctor->findModifier<SynthesizedModifier>();
     }
 
     template<typename T>
@@ -8766,7 +8767,7 @@ namespace Slang
         }
 
         // Compiler generated ctor may be destroyed
-        bool destroyedDefaultCtor = false; 
+        bool destroyedDefaultCtor = false;
         if(structDeclInfo.m_defaultCtor
             && structDeclInfo.m_defaultCtor->containsOption(ConstructorTags::Synthesized))
         {

@@ -80,6 +80,15 @@ public:
         }
         return m_thisTypeName;
     }
+
+    Name* getCtorName()
+    {
+        if (!m_ctorName)
+        {
+            m_ctorName = getNamePool()->getName("$init");
+        }
+        return m_ctorName;
+    }
 protected:
     // State shared between ASTBuilders
 
@@ -114,6 +123,7 @@ protected:
     NamePool* m_namePool = nullptr;
 
     Name* m_thisTypeName = nullptr;
+    Name* m_ctorName = nullptr;
 
     // This is a private builder used for these shared types
     ASTBuilder* m_astBuilder = nullptr;
