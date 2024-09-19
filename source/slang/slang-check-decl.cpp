@@ -3787,7 +3787,7 @@ namespace Slang
 
         // Dictionary to map from the original type parameters to the synthesized ones.
         Dictionary<Decl*, Decl*> mapOrigToSynTypeParams;
-       
+
         // Our synthesized method will have parameters matching the names
         // and types of those on the requirement, and it will use expressions
         // that reference those parametesr as arguments for the call expresison
