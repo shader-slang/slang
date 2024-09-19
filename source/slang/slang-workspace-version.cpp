@@ -457,7 +457,7 @@ ArrayView<Index> DocumentVersion::getUTF8Boundaries(Index line)
 }
 
 void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
-    Index inLine, Index inCol, Index& outLine, Index& outCol)
+    Index inLine, Index inCol, int64_t& outLine, int64_t& outCol)
 {
     if (inLine <= 0)
     {
@@ -472,12 +472,12 @@ void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
 }
 
 void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
-    Index inLine, Index inCol, int& outLine, int& outCol)
+    Index inLine, Index inCol, int32_t& outLine, int32_t& outCol)
 {
-    Index ioutLine, ioutCol;
+    int64_t ioutLine, ioutCol;
     oneBasedUTF8LocToZeroBasedUTF16Loc(inLine, inCol, ioutLine, ioutCol);
-    outLine = (int)ioutLine;
-    outCol = (int)ioutCol;
+    outLine = (int32_t)ioutLine;
+    outCol = (int32_t)ioutCol;
 }
 
 void DocumentVersion::zeroBasedUTF16LocToOneBasedUTF8Loc(
