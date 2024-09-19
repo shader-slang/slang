@@ -2208,7 +2208,7 @@ namespace Slang
 
         bool isValidGenericConstraintType(Type* type);
 
-        bool isTypeDifferentiable(Type* type);
+        SubtypeWitness* isTypeDifferentiable(Type* type);
 
         bool doesTypeHaveTag(Type* type, TypeTag tag);
 

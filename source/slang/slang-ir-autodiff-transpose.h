@@ -2116,7 +2116,8 @@ struct DiffTransposePass
         // If we reach this point, revValue must be a differentiable type.
         auto revTypeWitness = diffTypeContext.tryGetDifferentiableWitness(
             builder,
-            primalType);
+            primalType,
+            DiffConformanceKind::Value);
         SLANG_ASSERT(revTypeWitness);
 
         auto baseExistential = fwdInst->getOperand(0);
