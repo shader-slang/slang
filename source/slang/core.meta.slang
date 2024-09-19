@@ -285,6 +285,13 @@ interface IDifferentiable
     static Differential dmul(T, Differential);
 };
 
+__magic_type(DifferentiablePtrType)
+interface IDifferentiablePtrType
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
+    associatedtype Differential : IDifferentiablePtrType;
+};
+
 
 /// Pair type that serves to wrap the primal and
 /// differential types of an arbitrary type T.
@@ -357,6 +364,36 @@ struct DifferentialPair : IDifferentiable
     }
 };
 
+__generic<T : IDifferentiablePtrType>
+__magic_type(DifferentialPtrPairType)
+__intrinsic_type($(kIROp_DifferentialPtrPairType))
+struct DifferentialPtrPair : IDifferentiablePtrType
+{
+    typedef DifferentialPtrPair<T.Differential> Differential;
+    typedef T.Differential DifferentialElementType;
+
+    __intrinsic_op($(kIROp_MakeDifferentialPtrPair))
+    __init(T _primal, T.Differential _differential);
+
+    property p : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetPrimal))
+        get;
+    }
+
+    property v : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetPrimal))
+        get;
+    }
+
+    property d : T.Differential
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetDifferential))
+        get;
+    }
+};
+
 
 /// A type that uses a floating-point representation
 [sealed]
@@ -393,6 +430,15 @@ interface IArray<T>
     __subscript(int index) -> T
     {
         get;
+    }
+}
+
+interface IRWArray<T> : IArray<T>
+{
+    __subscript(int index)->T
+    {
+        get;
+        set;
     }
 }
 
@@ -1148,21 +1194,15 @@ extension int16_t : IRangedValue
 
 __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
-struct Array : IArray<T>
+struct Array : IRWArray<T>
 {
     __intrinsic_op($(kIROp_GetArrayLength))
     int getCount();
-
-    __subscript(int index) -> T
-    {
-        __intrinsic_op($(kIROp_GetElement))
-        get;
-    }
 }
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)
-struct vector : IArray<T>
+struct vector : IRWArray<T>
 {
         /// The element type of the vector
     typedef T Element;
@@ -1182,8 +1222,6 @@ struct vector : IArray<T>
 
     [ForceInline]
     int getCount() { return N; }
-
-    __subscript(int index) -> T { __intrinsic_op($(kIROp_GetElement)) get; }
 }
 
 const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
@@ -1192,7 +1230,7 @@ const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
     /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 __generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
 __magic_type(MatrixExpressionType)
-struct matrix : IArray<vector<T,C>>
+struct matrix : IRWArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
@@ -1207,8 +1245,6 @@ struct matrix : IArray<vector<T,C>>
 
     [ForceInline]
     int getCount() { return R; }
-
-    __subscript(int index) -> vector<T,C> { __intrinsic_op($(kIROp_GetElement)) get; }
 }
 
 __intrinsic_op($(kIROp_Eql))

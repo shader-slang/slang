@@ -100,6 +100,8 @@ option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENA
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
+option(SLANG_GITHUB_TOKEN "Use a given token value for accessing Github REST API" "")
+
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
 advanced_option(SLANG_USE_SYSTEM_VULKAN_HEADERS "Build using system Vulkan headers" OFF)
@@ -156,7 +158,7 @@ enum_option(
 if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     # If the user didn't specify a URL, find the best one now
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
-        get_best_slang_binary_release_url(url)
+        get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
         if(NOT DEFINED url)
             message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
         endif()
