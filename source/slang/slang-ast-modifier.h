@@ -38,8 +38,8 @@ class ToBeSynthesizedModifier : public Modifier {SLANG_AST_CLASS(ToBeSynthesized
 // Marks that the definition of a decl is synthesized.
 class SynthesizedModifier : public Modifier { SLANG_AST_CLASS(SynthesizedModifier) };
 
-// Marks that the definition of a decl is our $ZeroInit function.
-class ZeroInitModifier : public Modifier { SLANG_AST_CLASS(ZeroInitModifier) };
+// Marks that the definition of a decl is our $DefaultInit function.
+class DefaultInitModifier : public Modifier { SLANG_AST_CLASS(DefaultInitModifier) };
 
 // Marks a synthesized variable as local temporary variable.
 class LocalTempVarModifier : public Modifier { SLANG_AST_CLASS(LocalTempVarModifier) };

@@ -153,11 +153,11 @@ namespace Slang
         }
     }
 
-    FuncDecl* findZeroInitListFunc(StructDecl* structDecl)
+    FuncDecl* findDefaultInitListFunc(StructDecl* structDecl)
     {
         for (auto funcDecl : structDecl->getMembersOfType<FuncDecl>())
         {
-            if (!funcDecl->findModifier<ZeroInitModifier>())
+            if (!funcDecl->findModifier<DefaultInitModifier>())
                 continue;
             return funcDecl;
         }
@@ -172,15 +172,15 @@ namespace Slang
             invoke->type = structDeclType;
             return invoke;
     }
-    Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructZeroInitListOptions options)
+    Expr* constructDefaultInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructDefaultInitListOptions options)
     {
         SLANG_ASSERT(structDecl);
 
         // 1. Prefer non-synth default-ctor
-        //  * Skip this option if `ConstructZeroInitListOptions::PreferZeroInitFunc` is true
-        //  * Skip this option if `ConstructZeroInitListOptions::CheckToAvoidRecursion` detects recursion
+        //  * Skip this option if `ConstructDefaultInitListOptions::PreferDefaultInitFunc` is true
+        //  * Skip this option if `ConstructDefaultInitListOptions::CheckToAvoidRecursion` detects recursion
         //      * Only user-defined ctor will try and have recursion of `{}`
-        // 2. Prefer $ZeroInit
+        // 2. Prefer $DefaultInit
         // 3. Prefer any default-ctor
         // 4. Use `DefaultConstructExpr`
 
@@ -188,10 +188,10 @@ namespace Slang
         auto defaultCtor = _getDefaultCtor(structDecl);
         if(defaultCtor
             && !defaultCtor->containsOption(ConstructorTags::Synthesized)
-            && !((UInt)options & (UInt)ConstructZeroInitListOptions::PreferZeroInitFunc))
+            && !((UInt)options & (UInt)ConstructDefaultInitListOptions::PreferDefaultInitFunc))
         {
             bool canCreateCtor = true;
-            if(((UInt)options & (UInt)ConstructZeroInitListOptions::CheckToAvoidRecursion))
+            if(((UInt)options & (UInt)ConstructDefaultInitListOptions::CheckToAvoidRecursion))
             {
                 auto callingScope = visitor->getOuterScope();
                 while (callingScope)
@@ -209,7 +209,7 @@ namespace Slang
         }
 
         // 2.
-        if (auto defaultInitFunc = findZeroInitListFunc(structDecl))
+        if (auto defaultInitFunc = findDefaultInitListFunc(structDecl))
         {
             auto* invoke = visitor->getASTBuilder()->create<InvokeExpr>();
             DeclRef<Decl> member;

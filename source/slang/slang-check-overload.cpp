@@ -2394,7 +2394,7 @@ namespace Slang
     /// We allow a special case for when `funcExpr` is expected to be a Default initializer
     /// but none exist. Note, we cannot just create a default initializer for every variable
     /// since then we are introducing initialization to every variable through an indirect
-    /// init returning data. Instead we will call `$ZeroInit` through this logic below.
+    /// init returning data. Instead we will call `$DefaultInit` through this logic below.
     Expr* _tryToSpecialCaseOverloadDefaultConstructWithoutInit(SemanticsVisitor* visitor, SemanticsVisitor::OverloadResolveContext& context, Expr* expr, OverloadCandidate* bestCandidate)
     {
         if (context.argCount == 0)

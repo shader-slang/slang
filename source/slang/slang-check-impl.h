@@ -3036,14 +3036,14 @@ namespace Slang
     bool isDefaultInitializable(Type* varDeclType, VarDeclBase* associatedDecl);
     Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, TypeExp varDeclType, VarDeclBase* decl);
 
-    enum class ConstructZeroInitListOptions : UInt
+    enum class ConstructDefaultInitListOptions : UInt
     {
         None = 0 << 0,
-        PreferZeroInitFunc = 1 << 0,
+        PreferDefaultInitFunc = 1 << 0,
         CheckToAvoidRecursion = 1 << 2,
     };
-    Expr* constructZeroInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructZeroInitListOptions options);
-    FuncDecl* findZeroInitListFunc(StructDecl* structDecl);
+    Expr* constructDefaultInitListFunc(SemanticsVisitor* visitor, StructDecl* structDecl, Type* structDeclType, ConstructDefaultInitListOptions options);
+    FuncDecl* findDefaultInitListFunc(StructDecl* structDecl);
 
     bool isCStyleStructDecl(SemanticsVisitor* visitor, StructDecl* decl, List<ConstructorDecl*> const& ctorList);
 

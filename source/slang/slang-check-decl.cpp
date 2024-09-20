@@ -2704,49 +2704,49 @@ namespace Slang
                 //
                 //
                 // Steps:
-                // 1. Generate $ZeroInit
+                // 1. Generate $DefaultInit
                 // 2. Add an declaration for default-ctor if missing a real default-ctor.
                 // 3. Generate 'member-wise' constructors
 
                 if (_structHasMemberWithValue(getASTBuilder(), structDecl))
                 {
-                    // 1. Generate $ZeroInit
+                    // 1. Generate $DefaultInit
                     //
-                    // $ZeroInit is a synthisized static-function only used In 2 cases:
+                    // $DefaultInit is a synthisized static-function only used In 2 cases:
                     //     1. if `{}` is used inside a `__init()`
                     //     2. if `{}` is used and a user has a 'synthisized __init()` 
                     //
-                    // Use of $ZeroInit is only for functionality of `{}` to avoid hacks.
+                    // Use of $DefaultInit is only for functionality of `{}` to avoid hacks.
                     {
-                        auto zeroInitFunc = m_astBuilder->create<FuncDecl>();
-                        auto ctorName = getName("$ZeroInit");
-                        zeroInitFunc->ownedScope = m_astBuilder->create<Scope>();
-                        zeroInitFunc->ownedScope->containerDecl = zeroInitFunc;
-                        zeroInitFunc->ownedScope->parent = getScope(structDecl);
-                        zeroInitFunc->parentDecl = structDecl;
-                        zeroInitFunc->loc = structDecl->loc;
-                        zeroInitFunc->closingSourceLoc = zeroInitFunc->loc;
-                        zeroInitFunc->nameAndLoc.name = ctorName;
-                        zeroInitFunc->nameAndLoc.loc = zeroInitFunc->loc;
-                        zeroInitFunc->returnType.type = calcThisType(makeDeclRef(structDecl));
+                        auto defaultInitFunc = m_astBuilder->create<FuncDecl>();
+                        auto ctorName = getName("$DefaultInit");
+                        defaultInitFunc->ownedScope = m_astBuilder->create<Scope>();
+                        defaultInitFunc->ownedScope->containerDecl = defaultInitFunc;
+                        defaultInitFunc->ownedScope->parent = getScope(structDecl);
+                        defaultInitFunc->parentDecl = structDecl;
+                        defaultInitFunc->loc = structDecl->loc;
+                        defaultInitFunc->closingSourceLoc = defaultInitFunc->loc;
+                        defaultInitFunc->nameAndLoc.name = ctorName;
+                        defaultInitFunc->nameAndLoc.loc = defaultInitFunc->loc;
+                        defaultInitFunc->returnType.type = calcThisType(makeDeclRef(structDecl));
                         auto body = m_astBuilder->create<BlockStmt>();
                         body->scopeDecl = m_astBuilder->create<ScopeDecl>();
                         body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
-                        body->scopeDecl->ownedScope->parent = getScope(zeroInitFunc);
-                        body->scopeDecl->parentDecl = zeroInitFunc;
-                        body->scopeDecl->loc = zeroInitFunc->loc;
-                        body->scopeDecl->closingSourceLoc = zeroInitFunc->loc;
-                        body->closingSourceLoc = zeroInitFunc->closingSourceLoc;
-                        zeroInitFunc->body = body;
+                        body->scopeDecl->ownedScope->parent = getScope(defaultInitFunc);
+                        body->scopeDecl->parentDecl = defaultInitFunc;
+                        body->scopeDecl->loc = defaultInitFunc->loc;
+                        body->scopeDecl->closingSourceLoc = defaultInitFunc->loc;
+                        body->closingSourceLoc = defaultInitFunc->closingSourceLoc;
+                        defaultInitFunc->body = body;
                         body->body = m_astBuilder->create<SeqStmt>();
 
-                        addAutoDiffModifiersToFunc(this, m_astBuilder, zeroInitFunc);
-                        addModifier(zeroInitFunc, m_astBuilder->create<SynthesizedModifier>());
+                        addAutoDiffModifiersToFunc(this, m_astBuilder, defaultInitFunc);
+                        addModifier(defaultInitFunc, m_astBuilder->create<SynthesizedModifier>());
 
-                        addModifier(zeroInitFunc, m_astBuilder->create<HLSLStaticModifier>());
-                        addVisibilityModifier(m_astBuilder, zeroInitFunc, getDeclVisibility(structDecl));
-                        addModifier(zeroInitFunc, m_astBuilder->create<ZeroInitModifier>());
-                        structDecl->addMember(zeroInitFunc);
+                        addModifier(defaultInitFunc, m_astBuilder->create<HLSLStaticModifier>());
+                        addVisibilityModifier(m_astBuilder, defaultInitFunc, getDeclVisibility(structDecl));
+                        addModifier(defaultInitFunc, m_astBuilder->create<DefaultInitModifier>());
+                        structDecl->addMember(defaultInitFunc);
                     }
 
                     // 2. Add an declaration for default-ctor if missing a real default-ctor.
@@ -9041,21 +9041,21 @@ namespace Slang
             }
         }
 
-        // Fill in our $ZeroInit
-        if (auto zeroInitListFunc = findZeroInitListFunc(structDecl))
+        // Fill in our $DefaultInit
+        if (auto defaultInitListFunc = findDefaultInitListFunc(structDecl))
         {
-            SLANG_ASSERT(zeroInitListFunc->getParameters().getCount() == 0);
-            SLANG_ASSERT(zeroInitListFunc->findModifier<HLSLStaticModifier>());
+            SLANG_ASSERT(defaultInitListFunc->getParameters().getCount() == 0);
+            SLANG_ASSERT(defaultInitListFunc->findModifier<HLSLStaticModifier>());
 
-            SLANG_ASSERT(as<BlockStmt>(zeroInitListFunc->body));
-            auto block = as<BlockStmt>(zeroInitListFunc->body);
+            SLANG_ASSERT(as<BlockStmt>(defaultInitListFunc->body));
+            auto block = as<BlockStmt>(defaultInitListFunc->body);
             SLANG_ASSERT(as<SeqStmt>(block->body));
             auto seqStmt = as<SeqStmt>(block->body);
 
             /*
             3 steps:
             1. Assign DefaultConstructExpr to `this`
-            2. Insert `super::$ZeroInit()` into `this->$ZeroInit`
+            2. Insert `super::$DefaultInit()` into `this->$DefaultInit`
             3. Assign initExpr to all members
             */
 
@@ -9069,7 +9069,7 @@ namespace Slang
             addModifier(structVarDecl, m_astBuilder->create<LocalTempVarModifier>());
             structVarDecl->type = TypeExp(structDeclType);
             structVarDecl->initExpr = defaultConstructExpr;
-            structVarDecl->parentDecl = zeroInitListFunc;
+            structVarDecl->parentDecl = defaultInitListFunc;
             structVarDecl->loc = seqStmt->loc;
             ensureDecl(structVarDecl, DeclCheckState::VarInitExprAreChecked);
 
@@ -9090,7 +9090,7 @@ namespace Slang
             seqStmt->stmts.add(structAssignExprStmt);
 
             // Part 2
-            // Insert `super::$ZeroInit()` into `this->$ZeroInit`
+            // Insert `super::$DefaultInit()` into `this->$DefaultInit`
             // Only insert if we have values to insert for
             if (baseStructInfo)
             {
@@ -9098,10 +9098,10 @@ namespace Slang
                 {
                     if (_structHasMemberWithValue(getASTBuilder(), structDecl))
                     {
-                        Expr* zeroInitFunc = constructZeroInitListFunc(this, baseStructDecl, baseStructInfo->m_inheritanceDecl->base.type, ConstructZeroInitListOptions::PreferZeroInitFunc);
+                        Expr* defaultInitFunc = constructDefaultInitListFunc(this, baseStructDecl, baseStructInfo->m_inheritanceDecl->base.type, ConstructDefaultInitListOptions::PreferDefaultInitFunc);
                         auto assign = m_astBuilder->create<AssignExpr>();
-                        assign->left = coerce(CoercionSite::Initializer, zeroInitFunc->type, structVarDeclExpr);
-                        assign->right = zeroInitFunc;
+                        assign->left = coerce(CoercionSite::Initializer, defaultInitFunc->type, structVarDeclExpr);
+                        assign->right = defaultInitFunc;
                         auto stmt = m_astBuilder->create<ExpressionStmt>();
                         stmt->expression = assign;
                         stmt->loc = seqStmt->loc;
@@ -9116,7 +9116,7 @@ namespace Slang
             {
 
                 auto member = memberRef.getDecl();
-                addCudaHostModifierIfRequired(zeroInitListFunc, member, foundCudaHostModifier);
+                addCudaHostModifierIfRequired(defaultInitListFunc, member, foundCudaHostModifier);
 
                 auto initExpr = member->initExpr;
                 if (!initExpr)
@@ -9125,7 +9125,7 @@ namespace Slang
                 MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
                 memberExpr->baseExpression = structVarDeclExpr;
                 memberExpr->declRef = member->getDefaultDeclRef();
-                memberExpr->scope = zeroInitListFunc->ownedScope;
+                memberExpr->scope = defaultInitListFunc->ownedScope;
                 memberExpr->loc = member->loc;
                 memberExpr->name = member->getName();
                 memberExpr->type = GetTypeForDeclRef(member, member->loc);
