@@ -442,6 +442,5 @@ void fragMain()
             tCubeArray_f32v4)
         ;
 
-    // FUNCTIONAL: 1
     outputBuffer[0] = int(result);
 }
