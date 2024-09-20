@@ -2522,7 +2522,7 @@ namespace Slang
                 // interface IFoo {
                 //    associatedtype T
                 //        where T : IFoo  // OK, constraint is on the associatedtype T itself.
-                //        where T.T == X; // OK, constraint is on the associated type of T.
+                //        where T.T == X  // OK, constraint is on the associated type of T.
                 //        where int == X; // Error, int is not a valid left hand side of a constraint.
                 //  }
                 // ```
