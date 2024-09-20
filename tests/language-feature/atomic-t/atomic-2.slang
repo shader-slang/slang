@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_MTL):-mtl -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d12 -output-using-type
@@ -38,14 +38,19 @@ void computeMain()
         result = false;
     if (atomicInt.decrement() != 6)
         result = false;
+
+    // CHECK: 5
+    // CHECK_MTL: 5
+    outputBuffer[0] = atomicInt.load();
+    
     atomicInt.store(6);
     if (atomicInt.load() != 6)
         result = false;
     // CHECK: 1
     if (result)
-        outputBuffer[0] = 1;
+        outputBuffer[1] = 1;
     else
-        outputBuffer[0] = 0;
+        outputBuffer[1] = 0;
 }
 
 // WGSL: atomicAdd
