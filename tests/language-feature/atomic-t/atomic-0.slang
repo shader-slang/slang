@@ -17,13 +17,13 @@ void computeMain()
         result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].max(2) != 0)
-    {} //result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].min(1) != 2)
-    {} // result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].or(3) != 1)
-    {} //result = false;
+    {} // result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].and(2) != 3)
     {} //result = false;
