@@ -2737,6 +2737,7 @@ extension int : IArithmeticAtomicable {}
 extension uint : IArithmeticAtomicable {}
 extension int64_t : IBitAtomicable {}
 extension uint64_t : IBitAtomicable {}
+extension double : IArithmeticAtomicable {}
 extension float : IArithmeticAtomicable {}
 extension half : IArithmeticAtomicable {}
 

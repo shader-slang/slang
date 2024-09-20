@@ -7,7 +7,7 @@ Status
 
 Author: Yong He
 
-Status: Implementation in-progress.
+Status: Implementation in review.
 
 Implementation: N/A
 
@@ -31,42 +31,70 @@ Proposed Approach
 -----------------
 
 We define an `Atomic<T>` type that functions as a wrapper of `T` and provides atomic operations:
-```
+```csharp
+enum MemoryOrder
+{
+    Relaxed = $(kIRMemoryOrder_Relaxed),
+    SeqCst = $(kIRMemoryOrder_SeqCst),
+}
+
 [sealed] interface IAtomicable {}
 [sealed] interface IArithmeticAtomicable : IAtomicable {}
 [sealed] interface IBitAtomicable : IArithmeticAtomicable {}
+
+[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+struct Atomic<T : IAtomicable>
+{
+    __intrinsic_op($(kIROp_AtomicLoad))
+    T load(MemoryOrder order = MemoryOrder.Relaxed);
+
+    __intrinsic_op($(kIROp_AtomicStore))
+    [__ref] void store(T newValue, MemoryOrder order = MemoryOrder.Relaxed);
+
+    __intrinsic_op($(kIROp_AtomicExchange))
+    [__ref] T exchange(T newValue, MemoryOrder order = MemoryOrder.Relaxed); // returns old value
+
+    __intrinsic_op($(kIROp_AtomicCompareExchange))
+    [__ref] T compareExchange(
+        T compareValue,
+        T newValue,
+        MemoryOrder successOrder = MemoryOrder.Relaxed,
+        MemoryOrder failOrder = MemoryOrder.Relaxed);
+}
+
+extension<T : IArithmeticAtomicable> Atomic<T>
+{
+    __intrinsic_op($(kIROp_AtomicAdd))
+    [__ref] T atomicAdd(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    __intrinsic_op($(kIROp_AtomicSub))
+    [__ref] T atomicSub(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    __intrinsic_op($(kIROp_AtomicMax))
+    [__ref] T atomicMax(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    __intrinsic_op($(kIROp_AtomicMin))
+    [__ref] T atomicMin(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+}
+
+extension<T : IBitAtomicable> Atomic<T>
+{
+    __intrinsic_op($(kIROp_AtomicAnd))
+    [__ref] T atomicAnd(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    __intrinsic_op($(kIROp_AtomicOr))
+    [__ref] T atomicOr(T value, MemoryOrder order = MemoryOrder.Relaxed);  // returns original value
+    __intrinsic_op($(kIROp_AtomicXor))
+    [__ref] T atomicXor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    __intrinsic_op($(kIROp_AtomicInc))
+    [__ref] T atomicIncrement(MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    __intrinsic_op($(kIROp_AtomicDec))
+    [__ref] T atomicDecrement(MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+}
 
 extension int : IArithmeticAtomicable {}
 extension uint : IArithmeticAtomicable {}
 extension int64_t : IBitAtomicable {}
 extension uint64_t : IBitAtomicable {}
+extension double : IArithmeticAtomicable {}
 extension float : IArithmeticAtomicable {}
 extension half : IArithmeticAtomicable {}
-
-struct Atomic<T : IAtomicable>
-{
-    T load();
-    [ref] void store(T newValue); // Question: do we really need this?
-    [ref] T exchange(T newValue); // returns old value
-    [ref] T compareExchange(T compareValue, T newValue); // returns old value.
-}
-
-extension<T:IArithmeticAtomicable> Atomic<T>
-{
-    [ref] T atomicAdd(T value); // returns original value
-    [ref] T atomicSub(T value); // returns original value
-    [ref] T atomicMax(T value); // returns original value
-    [ref] T atomicMin(T value); // returns original value
-    [ref] T atomicIncrement();
-    [ref] T atomicDecrement();
-}
-
-extension<T:IBitAtomicable> Atomic<T>
-{
-    [ref] T atomicAnd(T value); // returns original value
-    [ref] T atomicOr(T value); // returns original value
-    [ref] T atomicXor(T value); // returns original value
-}
 ```
 
 We allow `Atomic<T>` to be defined anywhere: as struct fields, as array elements, as elements of `RWStructuredBuffer` types,
