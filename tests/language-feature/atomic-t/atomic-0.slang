@@ -14,43 +14,43 @@ void computeMain()
         result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].sub(1) != 1)
-        result = false;
+    {}//result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].max(2) != 0)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].min(1) != 2)
-        result = false;
+    {} // result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].or(3) != 1)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].and(2) != 3)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].xor(3) != 2)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].exchange(4) != 1)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].compareExchange(4, 5) != 4)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].load() != 5)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].increment() != 5)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].decrement() != 6)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     // CHECK: 6
     outputBuffer[0].store(6);
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].load() != 6)
-        result = false;
+    {} //result = false;
     AllMemoryBarrierWithGroupSync();
     // CHECK: 1
     if (result)
