@@ -5533,13 +5533,34 @@ namespace slang
             SlangInt32 index) = 0;
 
         virtual SLANG_NO_THROW DeclReflection* SLANG_MCALL getModuleReflection() = 0;
+    };
+    
+    #define SLANG_UUID_IModule IModule::getTypeGuid()
+
+    /* Experimental interface for doing target precompilation of slang modules */
+    struct IModulePrecompileService : public ISlangUnknown
+    {
+        //uuidgen output:     8e12e8e3 -  5fcd -  433e -    afcb -      13a088bc5ee5
+        SLANG_COM_INTERFACE(0x8e12e8e3, 0x5fcd, 0x433e, { 0xaf, 0xcb, 0x13, 0xa0, 0x88, 0xbc, 0x5e, 0xe5 })        
 
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
             SlangCompileTarget target,
             ISlangBlob** outDiagnostics) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPrecompiledTargetCode(
+            SlangCompileTarget target,
+            IBlob** outCode,
+            IBlob** outDiagnostics = nullptr) = 0;
+                
+        virtual SLANG_NO_THROW SlangInt SLANG_MCALL getModuleDependencyCount() = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getModuleDependency(
+            SlangInt dependencyIndex,
+            IModule** outModule,
+            IBlob** outDiagnostics = nullptr) = 0;        
     };
-    
-    #define SLANG_UUID_IModule IModule::getTypeGuid()
+
+    #define SLANG_UUID_IModulePrecompileService IModulePrecompileService::getTypeGuid()
 
         /** Argument used for specialization to types/values.
         */

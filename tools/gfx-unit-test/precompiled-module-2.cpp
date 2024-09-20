@@ -29,9 +29,12 @@ namespace gfx_test
         auto globalSession = slangSession->getGlobalSession();
         globalSession->createSession(sessionDesc, slangSession.writeRef());
 
-        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-        slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
-        diagnoseIfNeeded(diagnosticsBlob);
+        slang::IModule* module;
+        {
+            Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+            module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
+            diagnoseIfNeeded(diagnosticsBlob);
+        }
         if (!module)
             return SLANG_FAIL;
 
@@ -49,7 +52,14 @@ namespace gfx_test
             default:
                 return SLANG_FAIL;
             }
-            module->precompileForTarget(target, diagnosticsBlob.writeRef());
+
+            ComPtr<slang::IModulePrecompileService> precompileService;
+            if (module->queryInterface(slang::SLANG_UUID_IModulePrecompileService, (void**)precompileService.writeRef()) == SLANG_OK)
+            {
+                Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+                precompileService->precompileForTarget(target, diagnosticsBlob.writeRef());
+                diagnoseIfNeeded(diagnosticsBlob);
+            }
         }
 
         // Write loaded modules to memory file system.

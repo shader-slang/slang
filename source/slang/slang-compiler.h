@@ -294,7 +294,7 @@ namespace Slang
         /// Base class for "component types" that represent the pieces a final
         /// shader program gets linked together from.
         ///
-    class ComponentType : public RefObject, public slang::IComponentType
+    class ComponentType : public RefObject, public slang::IComponentType, public slang::IModulePrecompileService
     {
     public:
         //
@@ -357,6 +357,27 @@ namespace Slang
             uint32_t count,
             slang::CompilerOptionEntry* entries,
             ISlangBlob** outDiagnostics) override;
+
+
+        //
+        // slang::IModulePrecompileService interface
+        //
+        SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getPrecompiledTargetCode(
+            SlangCompileTarget target,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
+
+        SLANG_NO_THROW SlangInt SLANG_MCALL getModuleDependencyCount()
+            SLANG_OVERRIDE;
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getModuleDependency(
+            SlangInt dependencyIndex,
+            slang::IModule** outModule,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
         CompilerOptionSet& getOptionSet() { return m_optionSet; }
 
@@ -1485,10 +1506,25 @@ namespace Slang
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
             SlangInt32 index) override;
 
+
+        // IModulePrecompileService
         /// Precompile TU to target language
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
             SlangCompileTarget target,
             slang::IBlob** outDiagnostics) override;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPrecompiledTargetCode(
+            SlangCompileTarget target,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) override;
+
+        virtual SLANG_NO_THROW SlangInt SLANG_MCALL getModuleDependencyCount()
+            SLANG_OVERRIDE;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getModuleDependency(
+            SlangInt dependencyIndex,
+            slang::IModule** outModule,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 

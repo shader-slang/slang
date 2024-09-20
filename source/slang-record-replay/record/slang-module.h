@@ -46,9 +46,6 @@ namespace SlangRecord
         virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override;
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
             SlangInt32 index) override;
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
-            SlangCompileTarget target,
-            ISlangBlob** outDiagnostics) override;
 
         // Interfaces for `IComponentType`
         virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override
