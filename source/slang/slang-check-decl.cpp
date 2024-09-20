@@ -8294,7 +8294,7 @@ namespace Slang
         return as<SeqStmt>(stmt->body);
     }
 
-    static bool _doesCtorExpectInitializerListUsage(ConstructorDecl* ctor)
+    static bool _isSynthisizedMemberwiseCtor(ConstructorDecl* ctor)
     {
         return ctor->containsOption(ConstructorTags::Synthesized)
             && ctor->getParameters().getCount() != 0
@@ -8464,7 +8464,7 @@ namespace Slang
             // Synthesized constructors should not inject a defaultCtor of base-struct-type
             // unless ctor has 0 parameters. This is to allow a ctor which desires to be
             // init-list initialized to control which members initialize.
-            if(_doesCtorExpectInitializerListUsage(ctor))
+            if(_isSynthisizedMemberwiseCtor(ctor))
                 continue;
 
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
@@ -8528,7 +8528,7 @@ namespace Slang
         for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
             auto ctor = ctorInfo.m_ctor;
-            
+
             ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
             thisExpr->scope = ctor->ownedScope;
             thisExpr->type = ctor->returnType.type;
@@ -8612,13 +8612,15 @@ namespace Slang
         for (auto& ctorInfo : structDeclInfo.m_ctorInfoList)
         {
             auto ctor = ctorInfo.m_ctor;
-            if(!_doesCtorExpectInitializerListUsage(ctor))
+
+            if(!_isSynthisizedMemberwiseCtor(ctor))
                 continue;
+
             auto ctorVisibility = getDeclVisibility(ctor);
 
             Index paramIndex = 0;
             auto paramList = ctor->getParameters();
-            
+
             Index memberIndex = 0;
             auto members = membersOfStructDeclInstance;
 
@@ -8707,7 +8709,7 @@ namespace Slang
                         continue;
                     }
                 }
-                
+
                 // Part 2
                 // Regular assignment logic
                 paramIndex++;
