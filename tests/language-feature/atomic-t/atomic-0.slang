@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_MTL):-mtl -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d12 -output-using-type
@@ -35,7 +35,7 @@ void computeMain()
         result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].compareExchange(4, 5) != 4)
-    {} //result = false;
+    {} //result = false; // for some reason this fails on Metal Github CI, so disabling.
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].load() != 5)
         result = false;
@@ -47,18 +47,12 @@ void computeMain()
         result = false;
     AllMemoryBarrierWithGroupSync();
     // CHECK: 6
-
-    // For some reason the metal results obtained from github runners are
-    // incorrect, although M2 GPU does produce correct result.
-    // For now we are just not going to check outputBuffer[1] for metal on the CI.
-    // CHECK_MTL: 6
     outputBuffer[0].store(6);
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].load() != 6)
         result = false;
     AllMemoryBarrierWithGroupSync();
     // CHECK: 1
-    // CHECK_MTL: 1
     if (result)
         outputBuffer[1].store(1);
     else
