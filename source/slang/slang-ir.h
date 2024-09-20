@@ -96,7 +96,10 @@ enum IROpMask : std::underlying_type_t<IROp>
 enum IRMemoryOrder
 {
     kIRMemoryOrder_Relaxed = 0,
-    kIRMemoryOrder_SeqCst = 1,
+    kIRMemoryOrder_Acquire = 1,
+    kIRMemoryOrder_Release = 2,
+    kIRMemoryOrder_AcquireRelease = 3,
+    kIRMemoryOrder_SeqCst = 4,
 };
 
 inline int32_t operator&(const IROpMask m, const IROp o)

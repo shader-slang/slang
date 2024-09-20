@@ -254,11 +254,8 @@ void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
     case kIRMemoryOrder_Relaxed:
         m_writer->emit("memory_order_relaxed");
         break;
-    case kIRMemoryOrder_SeqCst:
-        m_writer->emit("memory_order_seq_cst");
-        break;
     default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled memory order");
+        m_writer->emit("memory_order_seq_cst");
         break;
     }
 }

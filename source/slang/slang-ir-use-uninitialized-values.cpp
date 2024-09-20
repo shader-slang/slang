@@ -297,6 +297,7 @@ namespace Slang
         case kIROp_Store:
         case kIROp_SwizzledStore:
         case kIROp_SPIRVAsm:
+        case kIROp_AtomicStore:
             return Store;
 
         case kIROp_SPIRVAsmOperandInst:

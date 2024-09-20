@@ -2874,6 +2874,12 @@ struct SPIRVEmitContext
         {
         case kIRMemoryOrder_Relaxed:
             return emitIntConstant(IRIntegerValue{ SpvMemorySemanticsMaskNone }, builder.getUIntType());
+        case kIRMemoryOrder_Acquire:
+            return emitIntConstant(IRIntegerValue{ SpvMemorySemanticsAcquireMask }, builder.getUIntType());
+        case kIRMemoryOrder_Release:
+            return emitIntConstant(IRIntegerValue{ SpvMemorySemanticsReleaseMask }, builder.getUIntType());
+        case kIRMemoryOrder_AcquireRelease:
+            return emitIntConstant(IRIntegerValue{ SpvMemorySemanticsAcquireReleaseMask }, builder.getUIntType());
         case kIRMemoryOrder_SeqCst:
             return emitIntConstant(IRIntegerValue{ SpvMemorySemanticsSequentiallyConsistentMask }, builder.getUIntType());
         default:

@@ -2726,12 +2726,15 @@ void __requireComputeDerivative();
 enum MemoryOrder
 {
     Relaxed = $(kIRMemoryOrder_Relaxed),
+    Acquire = $(kIRMemoryOrder_Acquire),
+    Release = $(kIRMemoryOrder_Release),
+    AcquireRelease = $(kIRMemoryOrder_AcquireRelease),
     SeqCst = $(kIRMemoryOrder_SeqCst),
 }
 
 [sealed] interface IAtomicable {}
-[sealed] interface IArithmeticAtomicable : IAtomicable {}
-[sealed] interface IBitAtomicable : IArithmeticAtomicable {}
+[sealed] interface IArithmeticAtomicable : IAtomicable, IArithmetic {}
+[sealed] interface IBitAtomicable : IArithmeticAtomicable, IInteger {}
 
 extension int : IBitAtomicable {}
 extension uint : IBitAtomicable {}
@@ -2789,7 +2792,61 @@ extension<T : IBitAtomicable> Atomic<T>
     [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed);
 }
 
+__generic<T : IArithmeticAtomicable>
+[ForceInline]
+T operator +=(__ref Atomic<T> v, T value)
+{
+    return v.add(value) + value;
+}
+__generic<T : IArithmeticAtomicable>
+[ForceInline]
+T operator -=(__ref Atomic<T> v, T value)
+{
+    return v.sub(value) - value;
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+T operator &=(__ref Atomic<T> v, T value)
+{
+    return v.and(value) & value;
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+T operator |=(__ref Atomic<T> v, T value)
+{
+    return v.or(value) | value;
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+T operator ^=(__ref Atomic<T> v, T value)
+{
+    return v.xor(value) ^ value;
+}
 
+__generic<T : IBitAtomicable>
+[ForceInline]
+__prefix T operator ++(__ref Atomic<T> v)
+{
+    return v.increment() + T(1);
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+__postfix T operator ++(__ref Atomic<T> v)
+{
+    return v.increment();
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+__prefix T operator --(__ref Atomic<T> v)
+{
+    return v.decrement() - T(1);
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+__postfix T operator --(__ref Atomic<T> v)
+{
+    return v.decrement();
+}
 // Binding Attributes
 
 __attributeTarget(DeclBase)

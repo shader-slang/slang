@@ -4,43 +4,45 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d12 -output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4);
-RWStructuredBuffer<Atomic<uint>> outputBuffer;
+RWStructuredBuffer<int> outputBuffer;
 
 [NumThreads(1,1,1)]
 void computeMain()
 {
+    static groupshared Atomic<int> atomicInt;
+    atomicInt = 0;
+
     bool result = true;
-    if ((outputBuffer[0]+=1) != 1)
+    if (atomicInt.add(1) != 0)
         result = false;
-    if ((outputBuffer[0]-=1) != 0)
+    if (atomicInt.sub(1) != 1)
         result = false;
-    if (outputBuffer[0].max(2) != 0)
+    if (atomicInt.max(2) != 0)
         result = false;
-    if (outputBuffer[0].min(1) != 2)
+    if (atomicInt.min(1) != 2)
         result = false;
-    if ((outputBuffer[0]|=3) != 3)
+    if (atomicInt.or(3) != 1)
         result = false;
-    if ((outputBuffer[0]&=2) != 2)
+    if (atomicInt.and(2) != 3)
         result = false;
-    if ((outputBuffer[0]^=3) != 1)
+    if (atomicInt.xor(3) != 2)
         result = false;
-    if (outputBuffer[0].exchange(4) != 1)
+    if (atomicInt.exchange(4) != 1)
         result = false;
-    if (outputBuffer[0].compareExchange(4, 5) != 4)
+    if (atomicInt.compareExchange(4, 5) != 4)
         result = false;
-    if (outputBuffer[0].load() != 5)
+    if (atomicInt.load() != 5)
         result = false;
-    if ((outputBuffer[0]++) != 5)
+    if (atomicInt.increment() != 5)
         result = false;
-    if ((--outputBuffer[0]) != 5)
+    if (atomicInt.decrement() != 6)
         result = false;
-    // CHECK: 6
-    outputBuffer[0].store(6);
-    if (outputBuffer[0].load() != 6)
+    atomicInt.store(6);
+    if (atomicInt.load() != 6)
         result = false;
     // CHECK: 1
     if (result)
-        outputBuffer[1].store(1);
+        outputBuffer[0] = 1;
     else
-        outputBuffer[1].store(0);
+        outputBuffer[0] = 0;
 }

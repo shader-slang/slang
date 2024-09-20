@@ -34,27 +34,26 @@ We define an `Atomic<T>` type that functions as a wrapper of `T` and provides at
 ```csharp
 enum MemoryOrder
 {
-    Relaxed = $(kIRMemoryOrder_Relaxed),
-    SeqCst = $(kIRMemoryOrder_SeqCst),
+    Relaxed = 0,
+    Acquire = 1,
+    Release = 2,
+    AcquireRelease = 3,
+    SeqCst = 4,
 }
 
 [sealed] interface IAtomicable {}
-[sealed] interface IArithmeticAtomicable : IAtomicable {}
-[sealed] interface IBitAtomicable : IArithmeticAtomicable {}
+[sealed] interface IArithmeticAtomicable : IAtomicable, IArithmetic {}
+[sealed] interface IBitAtomicable : IArithmeticAtomicable, IInteger {}
 
 [require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 struct Atomic<T : IAtomicable>
 {
-    __intrinsic_op($(kIROp_AtomicLoad))
     T load(MemoryOrder order = MemoryOrder.Relaxed);
 
-    __intrinsic_op($(kIROp_AtomicStore))
     [__ref] void store(T newValue, MemoryOrder order = MemoryOrder.Relaxed);
 
-    __intrinsic_op($(kIROp_AtomicExchange))
     [__ref] T exchange(T newValue, MemoryOrder order = MemoryOrder.Relaxed); // returns old value
 
-    __intrinsic_op($(kIROp_AtomicCompareExchange))
     [__ref] T compareExchange(
         T compareValue,
         T newValue,
@@ -64,28 +63,19 @@ struct Atomic<T : IAtomicable>
 
 extension<T : IArithmeticAtomicable> Atomic<T>
 {
-    __intrinsic_op($(kIROp_AtomicAdd))
-    [__ref] T atomicAdd(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
-    __intrinsic_op($(kIROp_AtomicSub))
-    [__ref] T atomicSub(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
-    __intrinsic_op($(kIROp_AtomicMax))
-    [__ref] T atomicMax(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
-    __intrinsic_op($(kIROp_AtomicMin))
-    [__ref] T atomicMin(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T add(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T sub(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T max(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
 }
 
 extension<T : IBitAtomicable> Atomic<T>
 {
-    __intrinsic_op($(kIROp_AtomicAnd))
-    [__ref] T atomicAnd(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
-    __intrinsic_op($(kIROp_AtomicOr))
-    [__ref] T atomicOr(T value, MemoryOrder order = MemoryOrder.Relaxed);  // returns original value
-    __intrinsic_op($(kIROp_AtomicXor))
-    [__ref] T atomicXor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
-    __intrinsic_op($(kIROp_AtomicInc))
-    [__ref] T atomicIncrement(MemoryOrder order = MemoryOrder.Relaxed); // returns original value
-    __intrinsic_op($(kIROp_AtomicDec))
-    [__ref] T atomicDecrement(MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T and(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T or(T value, MemoryOrder order = MemoryOrder.Relaxed);  // returns original value
+    [__ref] T xor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T increment(MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed); // returns original value
 }
 
 extension int : IArithmeticAtomicable {}
@@ -95,6 +85,18 @@ extension uint64_t : IBitAtomicable {}
 extension double : IArithmeticAtomicable {}
 extension float : IArithmeticAtomicable {}
 extension half : IArithmeticAtomicable {}
+
+// Operator overloads:
+// All operator overloads are using MemoryOrder.Relaxed semantics.
+__prefix T operator++<T>(__ref Atomic<T> v); // returns new value.
+__postfix T operator++<T>(__ref Atomic<T> v); // returns original value.
+__prefix T operator--<T>(__ref Atomic<T> v); // returns new value.
+__postfix T operator--<T>(__ref Atomic<T> v); // returns original value.
+T operator+=(__ref Atomic<T> v, T operand); // returns new value.
+T operator-=(__ref Atomic<T> v, T operand); // returns new value.
+T operator|=(__ref Atomic<T> v, T operand); // returns new value.
+T operator&=(__ref Atomic<T> v, T operand); // returns new value.
+T operator^=(__ref Atomic<T> v, T operand); // returns new value.
 ```
 
 We allow `Atomic<T>` to be defined anywhere: as struct fields, as array elements, as elements of `RWStructuredBuffer` types,
