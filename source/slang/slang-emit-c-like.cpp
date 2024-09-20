@@ -1998,6 +1998,11 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     }
 }
 
+void CLikeSourceEmitter::emitCallArg(IRInst* inst)
+{
+    emitOperand(inst, getInfo(EmitOp::General));
+}
+
 void CLikeSourceEmitter::_emitCallArgList(IRCall* inst, int startingOperandIndex)
 {
     bool isFirstArg = true;
@@ -2018,7 +2023,7 @@ void CLikeSourceEmitter::_emitCallArgList(IRCall* inst, int startingOperandIndex
             m_writer->emit(", ");
         else
             isFirstArg = false;
-        emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+        emitCallArg(inst->getOperand(aa));
     }
     m_writer->emit(")");
 }
@@ -4201,7 +4206,7 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
 
     emitRateQualifiersAndAddressSpace(varDecl);
     emitVarKeyword(varType, varDecl);
-    emitGlobalParamType(varType, getName(varDecl));
+    emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
 

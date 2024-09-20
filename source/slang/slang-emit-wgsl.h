@@ -28,6 +28,7 @@ public:
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void emitVarKeywordImpl(IRType * type, IRInst* varDecl) SLANG_OVERRIDE;
     virtual void emitDeclaratorImpl(DeclaratorInfo* declarator) SLANG_OVERRIDE;
+    virtual void emitOperandImpl(IRInst* operand, EmitOpInfo const& outerPrec) SLANG_OVERRIDE;
     virtual void emitStructDeclarationSeparatorImpl() SLANG_OVERRIDE;
     virtual void emitLayoutQualifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
@@ -35,8 +36,7 @@ public:
     virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitStructFieldAttributes(IRStructType * structType, IRStructField * field) SLANG_OVERRIDE;
-    virtual void emitGlobalParamType(IRType* type, const String& name) SLANG_OVERRIDE;
-    virtual void emitOperandImpl(IRInst* inst, const EmitOpInfo& outerPrec) SLANG_OVERRIDE;
+    virtual void emitCallArg(IRInst* inst) SLANG_OVERRIDE;
 
     virtual void emitIntrinsicCallExprImpl(
         IRCall* inst,

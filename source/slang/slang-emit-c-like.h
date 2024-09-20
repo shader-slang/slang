@@ -257,7 +257,6 @@ public:
     void emitType(IRType* type);
     void emitType(IRType* type, Name* name, SourceLoc const& nameLoc);
     void emitType(IRType* type, NameLoc const& nameAndLoc);
-    virtual void emitGlobalParamType(IRType* type, String const& name) {emitType(type, name);}
     bool hasExplicitConstantBufferOffset(IRInst* cbufferType);
     bool isSingleElementConstantBuffer(IRInst* cbufferType);
     bool shouldForceUnpackConstantBufferElements(IRInst* cbufferType);
@@ -566,6 +565,7 @@ public:
 
         // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call, int startingOperandIndex = 1);
+    virtual void emitCallArg(IRInst* arg);
 
     String _generateUniqueName(const UnownedStringSlice& slice);
 
