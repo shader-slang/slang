@@ -584,25 +584,17 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicInc:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicInc(");
+        m_writer->emit("atomicAdd(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
-        m_writer->emit(");\n");
+        m_writer->emit(", 1);\n");
         return true;
     }
     case kIROp_AtomicDec:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicDec(");
+        m_writer->emit("atomicAdd(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
-        m_writer->emit(");\n");
+        m_writer->emit(", -1);\n");
         return true;
     }
     default:

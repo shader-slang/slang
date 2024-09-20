@@ -2894,6 +2894,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
         // Insts that needs to be emitted as code blocks.
     case kIROp_CudaKernelLaunch:
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicStore:
     case kIROp_AtomicInc:
     case kIROp_AtomicDec:
     case kIROp_AtomicAdd:

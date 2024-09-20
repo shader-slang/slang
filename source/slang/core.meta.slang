@@ -2733,8 +2733,8 @@ enum MemoryOrder
 [sealed] interface IArithmeticAtomicable : IAtomicable {}
 [sealed] interface IBitAtomicable : IArithmeticAtomicable {}
 
-extension int : IArithmeticAtomicable {}
-extension uint : IArithmeticAtomicable {}
+extension int : IBitAtomicable {}
+extension uint : IBitAtomicable {}
 extension int64_t : IBitAtomicable {}
 extension uint64_t : IBitAtomicable {}
 extension double : IArithmeticAtomicable {}
@@ -2747,7 +2747,7 @@ __intrinsic_type($(kIROp_AtomicType))
 struct Atomic<T : IAtomicable>
 {
     __intrinsic_op($(kIROp_AtomicLoad))
-    T load(MemoryOrder order = MemoryOrder.Relaxed);
+    [__ref] T load(MemoryOrder order = MemoryOrder.Relaxed);
 
     __intrinsic_op($(kIROp_AtomicStore))
     [__ref] void store(T newValue, MemoryOrder order = MemoryOrder.Relaxed);
@@ -2766,27 +2766,27 @@ struct Atomic<T : IAtomicable>
 extension<T : IArithmeticAtomicable> Atomic<T>
 {
     __intrinsic_op($(kIROp_AtomicAdd))
-    [__ref] T atomicAdd(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    [__ref] T add(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
     __intrinsic_op($(kIROp_AtomicSub))
-    [__ref] T atomicSub(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    [__ref] T sub(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
     __intrinsic_op($(kIROp_AtomicMax))
-    [__ref] T atomicMax(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    [__ref] T max(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
     __intrinsic_op($(kIROp_AtomicMin))
-    [__ref] T atomicMin(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
 }
 
 extension<T : IBitAtomicable> Atomic<T>
 {
     __intrinsic_op($(kIROp_AtomicAnd))
-    [__ref] T atomicAnd(T value, MemoryOrder order = MemoryOrder.Relaxed);      // returns original value
+    [__ref] T and(T value, MemoryOrder order = MemoryOrder.Relaxed);      // returns original value
     __intrinsic_op($(kIROp_AtomicOr))
-    [__ref] T atomicOr(T value, MemoryOrder order = MemoryOrder.Relaxed);         // returns original value
+    [__ref] T or(T value, MemoryOrder order = MemoryOrder.Relaxed);         // returns original value
     __intrinsic_op($(kIROp_AtomicXor))
-    [__ref] T atomicXor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T xor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
     __intrinsic_op($(kIROp_AtomicInc))
-    [__ref] T atomicIncrement(MemoryOrder order = MemoryOrder.Relaxed);
+    [__ref] T increment(MemoryOrder order = MemoryOrder.Relaxed);
     __intrinsic_op($(kIROp_AtomicDec))
-    [__ref] T atomicDecrement(MemoryOrder order = MemoryOrder.Relaxed);
+    [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed);
 }
 
 
