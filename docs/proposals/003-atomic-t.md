@@ -9,7 +9,7 @@ Author: Yong He
 
 Status: Implementation in review.
 
-Implementation: N/A
+Implementation: [PR 5125](https://github.com/shader-slang/slang/pull/5125)
 
 Reviewed by: Theresa Foley, Jay Kwak
 

@@ -1,3 +1,4 @@
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
@@ -44,3 +45,18 @@ void computeMain()
     else
         outputBuffer[1].store(0);
 }
+
+// WGSL: atomicAdd
+// WGSL: atomicSub
+// WGSL: atomicMax
+// WGSL: atomicMin
+// WGSL: atomicOr
+// WGSL: atomicAnd
+// WGSL: atomicXor
+// WGSL: atomicExchange
+// WGSL: atomicCompareExchangeWeak
+// WGSL: atomicLoad
+// WGSL: atomicAdd
+// WGSL: atomicSub
+// WGSL: atomicStore
+// WGSL: atomicLoad

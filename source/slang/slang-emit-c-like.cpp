@@ -1836,8 +1836,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     emitRateQualifiers(inst);
 
-    bool isConstant(as<IRModuleInst>(inst->getParent()));
-    if(isConstant)
+    if (as<IRModuleInst>(inst->getParent()))
     {
         // "Ordinary" instructions at module scope are constants
 
@@ -1862,7 +1861,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     }
 
-    emitVarKeyword(type, isConstant);
+    emitVarKeyword(type, inst);
 
     emitType(type, getName(inst));
     m_writer->emit(" = ");
@@ -3128,7 +3127,7 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
 
 void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* type)
 {
-    emitVarKeyword(type, /* isConstant */ false);
+    emitVarKeyword(type, inst);
 
     emitType(type, getName(inst));
 
@@ -3960,7 +3959,7 @@ void CLikeSourceEmitter::emitParameterGroup(IRGlobalParam* varDecl, IRUniformPar
     emitParameterGroupImpl(varDecl, type);
 }
 
-void CLikeSourceEmitter::emitVarKeywordImpl(IRType * /* type */, bool /* isConstant */) {}
+void CLikeSourceEmitter::emitVarKeywordImpl(IRType * /* type */, IRInst* /* varDecl */) {}
 
 void CLikeSourceEmitter::emitVar(IRVar* varDecl)
 {
@@ -4000,7 +3999,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
 #endif
     emitRateQualifiersAndAddressSpace(varDecl);
 
-    emitVarKeyword(varType, /* isConstant */ false);
+    emitVarKeyword(varType, varDecl);
 
     emitType(varType, getName(varDecl));
 
@@ -4132,7 +4131,7 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     emitVarModifiers(layout, varDecl, varType);
 
     emitRateQualifiersAndAddressSpace(varDecl);
-    emitVarKeyword(varType, /* isConstant */ true);
+    emitVarKeyword(varType, varDecl);
     emitType(varType, getName(varDecl));
 
     // TODO: These shouldn't be needed for ordinary
@@ -4206,7 +4205,7 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     emitDecorationLayoutSemantics(varDecl, "register");
 
     emitRateQualifiersAndAddressSpace(varDecl);
-    emitVarKeyword(varType, /* isConstant */ false);
+    emitVarKeyword(varType, varDecl);
     emitGlobalParamType(varType, getName(varDecl));
 
     emitSemantics(varDecl);

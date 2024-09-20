@@ -498,8 +498,8 @@ public:
 
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator);
     void emitSimpleTypeAndDeclarator(IRType* type, DeclaratorInfo* declarator) {emitSimpleTypeAndDeclaratorImpl(type, declarator);};
-    virtual void emitVarKeywordImpl(IRType * type, bool isConstant);
-    void emitVarKeyword(IRType * type, bool isConstant) {emitVarKeywordImpl(type, isConstant);}
+    virtual void emitVarKeywordImpl(IRType * type, IRInst* varDecl);
+    void emitVarKeyword(IRType * type, IRInst* varDecl) {emitVarKeywordImpl(type, varDecl);}
 
     virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
 

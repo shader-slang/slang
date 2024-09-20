@@ -45,4 +45,17 @@ void computeMain()
         outputBuffer[1].store(0);
 }
 
-//WGSL: 
+// WGSL: atomicAdd
+// WGSL: atomicSub
+// WGSL: atomicMax
+// WGSL: atomicMin
+// WGSL: atomicOr
+// WGSL: atomicAnd
+// WGSL: atomicXor
+// WGSL: atomicExchange
+// WGSL: atomicCompareExchangeWeak
+// WGSL: atomicLoad
+// WGSL: atomicAdd
+// WGSL: atomicSub
+// WGSL: atomicStore
+// WGSL: atomicLoad
