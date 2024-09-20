@@ -23,12 +23,13 @@
 // 'transpose' calls, or else perform more complicated transformations that
 // end up duplicating expressions many times.
 
-namespace Slang {
+namespace Slang
+{
 
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     IRBasicType *const switchConditionType,
-    const SwitchRegion::Case *const currentCase, const bool isDefault
-    )
+    const SwitchRegion::Case *const currentCase,
+    const bool isDefault)
 {
     // WGSL has special syntax for blocks sharing case labels:
     // "case 2, 3, 4: ...;" instead of the C-like syntax
@@ -80,8 +81,8 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
 }
 
 void WGSLSourceEmitter::emitParameterGroupImpl(
-    IRGlobalParam* varDecl, IRUniformParameterGroupType* type
-)
+    IRGlobalParam* varDecl,
+    IRUniformParameterGroupType* type)
 {
     auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
@@ -140,8 +141,8 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
 }
 
 void WGSLSourceEmitter::emitEntryPointAttributesImpl(
-    IRFunc* irFunc, IREntryPointDecoration* entryPointDecor
-    )
+    IRFunc* irFunc,
+    IREntryPointDecoration* entryPointDecor)
 {
     auto stage = entryPointDecor->getProfile().getStage();
 
@@ -238,9 +239,7 @@ static bool isPowerOf2(const uint32_t n)
     return (n != 0U) && ((n - 1U) & n) == 0U;
 }
 
-void WGSLSourceEmitter::emitStructFieldAttributes(
-    IRStructType * structType, IRStructField * field
-    )
+void WGSLSourceEmitter::emitStructFieldAttributes(IRStructType * structType, IRStructField * field)
 {
     // Tint emits errors unless we explicitly spell out the layout in some cases, so emit
     // offset and align attribtues for all fields.
@@ -271,26 +270,6 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
     m_writer->emit("@align(");
     m_writer->emit(fieldAlignment);
     m_writer->emit(")");
-}
-
-bool WGSLSourceEmitter::isPointerSyntaxRequiredImpl(IRInst* inst)
-{
-    if (inst->getOp() == kIROp_RWStructuredBufferGetElementPtr)
-        return false;
-
-    // Don't emit "->" to access fields in resource structs
-    if (inst->getOp() == kIROp_FieldAddress)
-        return false;
-
-    // Don't emit "*" to access fields in resource structs
-    if (inst->getOp() == kIROp_GlobalParam)
-        return false;
-
-    // Emit 'globalVar' instead of  "*&globalVar"
-    if (inst->getOp() == kIROp_GlobalVar)
-        return false;
-
-    return true;
 }
 
 void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
@@ -647,8 +626,8 @@ void WGSLSourceEmitter::emitDeclaratorImpl(DeclaratorInfo* declarator)
 }
 
 void WGSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(
-    IRType* type, DeclaratorInfo* declarator
-    )
+    IRType* type,
+    DeclaratorInfo* declarator)
 {
     if (declarator)
     {
@@ -1094,9 +1073,7 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     return false;
 }
 
-void WGSLSourceEmitter::emitVectorTypeNameImpl(
-    IRType* elementType, IRIntegerValue elementCount
-    )
+void WGSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
 
     if (elementCount > 1)
