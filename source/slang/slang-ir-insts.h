@@ -2358,11 +2358,29 @@ struct IRLoad : IRInst
     IRInst* getPtr() { return ptr.get(); }
 };
 
+struct IRAtomicLoad : IRInst
+{
+    IRUse ptr;
+    IR_LEAF_ISA(AtomicLoad)
+
+    IRInst* getPtr() { return ptr.get(); }
+};
+
 struct IRStore : IRInst
 {
     IRUse ptr;
     IRUse val;
     IR_LEAF_ISA(Store)
+
+    IRInst* getPtr() { return ptr.get(); }
+    IRInst* getVal() { return val.get(); }
+};
+
+struct IRAtomicStore : IRInst
+{
+    IRUse ptr;
+    IRUse val;
+    IR_LEAF_ISA(AtomicStore)
 
     IRInst* getPtr() { return ptr.get(); }
     IRInst* getVal() { return val.get(); }
@@ -4229,6 +4247,11 @@ public:
     IRInst* emitStore(
         IRInst*    dstPtr,
         IRInst*    srcVal);
+
+    IRInst* emitAtomicStore(
+        IRInst* dstPtr,
+        IRInst* srcVal,
+        IRInst* memoryOrder);
 
     IRInst* emitImageLoad(
         IRType* type,

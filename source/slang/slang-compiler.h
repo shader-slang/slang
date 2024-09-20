@@ -420,11 +420,11 @@ namespace Slang
             String const&   typeStr,
             DiagnosticSink* sink);
 
-        DeclRef<Decl> findDeclFromString(
+        Expr* findDeclFromString(
             String const& name,
             DiagnosticSink* sink);
         
-        DeclRef<Decl> findDeclFromStringInType(
+        Expr* findDeclFromStringInType(
             Type* type,
             String const& name,
             LookupMask mask,
@@ -576,7 +576,7 @@ namespace Slang
         Dictionary<String, Type*> m_types;
 
         // Any decls looked up dynamically using `findDeclFromString`.
-        Dictionary<String, DeclRef<Decl>> m_decls;
+        Dictionary<String, Expr*> m_decls;
 
         Scope* m_lookupScope = nullptr;
         std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;
@@ -2174,7 +2174,7 @@ namespace Slang
             DiagnosticSink*                     sink);
         
         DeclRef<Decl> specializeWithArgTypes(
-            DeclRef<Decl>   funcDeclRef,
+            Expr*               funcExpr,
             List<Type*>         argTypes,
             DiagnosticSink*     sink);
 

@@ -69,7 +69,9 @@ INST(Nop, nop, 0, 0)
     INST(TensorViewType, TensorView, 1, HOISTABLE)
     INST(TorchTensorType, TorchTensor, 0, HOISTABLE)
     INST(ArrayListType, ArrayListVector, 1, HOISTABLE)
-    
+
+    INST(AtomicType, Atomic, 1, HOISTABLE)
+
     /* BindExistentialsTypeBase */
 
         // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
@@ -400,6 +402,21 @@ INST(Var, var, 0, 0)
 INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
 
+// Atomic Operations
+INST(AtomicLoad, atomicLoad, 1, 0)
+INST(AtomicStore, atomicStore, 2, 0)
+INST(AtomicExchange, atomicExchange, 2, 0)
+INST(AtomicCompareExchange, atomicCompareExchange, 3, 0)
+INST(AtomicAdd, atomicAdd, 2, 0)
+INST(AtomicSub, atomicSub, 2, 0)
+INST(AtomicAnd, atomicAnd, 2, 0)
+INST(AtomicOr, atomicOr, 2, 0)
+INST(AtomicXor, atomicXor, 2, 0)
+INST(AtomicMin, atomicMin, 2, 0)
+INST(AtomicMax, atomicMax, 2, 0)
+INST(AtomicInc, atomicInc, 1, 0)
+INST(AtomicDec, atomicDec, 1, 0)
+
 // Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 // currently accumulated derivative to pass to some dOut argument in a nested call.
 INST(LoadReverseGradient, LoadReverseGradient, 1, 0)
@@ -513,9 +530,6 @@ INST(StructuredBufferGetDimensions, StructuredBufferGetDimensions, 1, 0)
 
 // Resource qualifiers for dynamically varying index
 INST(NonUniformResourceIndex, nonUniformResourceIndex, 1, 0)
-
-INST(AtomicCounterIncrement, AtomicCounterIncrement, 1, 0)
-INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
 
 INST(GetNaturalStride, getNaturalStride, 1, 0)
 
