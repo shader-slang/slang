@@ -20189,13 +20189,8 @@ ${
 
         case hlsl:
             uint isSingleLod = 0;
-            // Note: we cannot pass `Shape.dimensions`
-            // directly as a parameter into a Call, otherwise
-            // AST lookup fails (bug?), creating an intermediary works
-            // so we do this workaround.
-            int shapeDim = Shape.dimensions;
             Footprint footprint =  {__queryFootprint$(CoarseOrFine)NVAPI(
-                shapeDim,
+                Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
                 __vectorReshape<3>(coords), granularity, /* out */isSingleLod), false};
@@ -20227,9 +20222,8 @@ ${
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            int shapeDim = Shape.dimensions;
             Footprint footprint = {__queryFootprint$(CoarseOrFine)BiasNVAPI(
-                shapeDim,
+                Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
                 __vectorReshape<3>(coords), granularity, lodBias, /* out */isSingleLod), false}; 
@@ -20311,9 +20305,8 @@ ${
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            int shapeDim = Shape.dimensions;
             Footprint footprint = {__queryFootprint$(CoarseOrFine)LevelNVAPI(
-                shapeDim,
+                Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
                 __vectorReshape<3>(coords), granularity, lod, /* out */isSingleLod), false};
@@ -20351,9 +20344,8 @@ ${{{
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            int shapeDim = Shape.dimensions;
             Footprint footprint = {__queryFootprint$(CoarseOrFine)GradNVAPI(
-                shapeDim,
+                Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
                 __vectorReshape<3>(coords), granularity, __vectorReshape<3>(dx), __vectorReshape<3>(dy), /* out */isSingleLod), false};
