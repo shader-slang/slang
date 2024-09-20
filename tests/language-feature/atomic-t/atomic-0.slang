@@ -10,7 +10,7 @@ RWStructuredBuffer<Atomic<int>> outputBuffer;
 void computeMain()
 {
     bool result = true;
-    if (outputBuffer[0].add(1, MemoryOrder.AcquireRelease) != 0)
+    if (outputBuffer[0].add(1) != 0)
         result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].sub(1) != 1)
