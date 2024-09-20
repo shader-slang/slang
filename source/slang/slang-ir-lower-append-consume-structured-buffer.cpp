@@ -99,7 +99,8 @@ namespace Slang
             auto counterBuffer = builder.emitFieldExtract(counterBufferType, bufferParam, counterBufferKey);
             IRInst* getCounterPtrArgs[] = { counterBuffer, builder.getIntValue(builder.getIntType(), 0) };
             auto counterBufferPtr = builder.emitIntrinsicInst(builder.getPtrType(builder.getIntType()), kIROp_RWStructuredBufferGetElementPtr, 2, getCounterPtrArgs);
-            auto oldCounter = builder.emitIntrinsicInst(builder.getIntType(), kIROp_AtomicInc, 1, &counterBufferPtr);
+            IRInst* atomicIncArgs[] = { counterBufferPtr, builder.getIntValue(builder.getIntType(), kIRMemoryOrder_Relaxed) };
+            auto oldCounter = builder.emitIntrinsicInst(builder.getIntType(), kIROp_AtomicInc, 2, atomicIncArgs);
 
             IRInst* getElementPtrArgs[] = { elementBuffer, oldCounter };
             auto elementBufferPtr = builder.emitIntrinsicInst(builder.getPtrType(elementType), kIROp_RWStructuredBufferGetElementPtr, 2, getElementPtrArgs);
@@ -122,7 +123,8 @@ namespace Slang
             auto counterBuffer = builder.emitFieldExtract(counterBufferType, bufferParam, counterBufferKey);
             IRInst* getCounterPtrArgs[] = { counterBuffer, builder.getIntValue(builder.getIntType(), 0) };
             auto counterBufferPtr = builder.emitIntrinsicInst(builder.getPtrType(builder.getIntType()), kIROp_RWStructuredBufferGetElementPtr, 2, getCounterPtrArgs);
-            auto oldCounter = builder.emitIntrinsicInst(builder.getIntType(), kIROp_AtomicDec, 1, &counterBufferPtr);
+            IRInst* atomicDecArgs[] = { counterBufferPtr, builder.getIntValue(builder.getIntType(), kIRMemoryOrder_Relaxed) };
+            auto oldCounter = builder.emitIntrinsicInst(builder.getIntType(), kIROp_AtomicDec, 2, atomicDecArgs);
             auto index = builder.emitSub(builder.getIntType(), oldCounter, builder.getIntValue(builder.getIntType(), 1));
 
             // Test if index is greater or equal than 0.
