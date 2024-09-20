@@ -2286,8 +2286,6 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         m_writer->emit("atomicAdd(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
         emitType(inst->getDataType());
         m_writer->emit("(1)");
         m_writer->emit(");\n");
@@ -2298,8 +2296,6 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         emitInstResultDecl(inst);
         m_writer->emit("atomicAdd(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitType(inst->getDataType());
         m_writer->emit("(-1)");
