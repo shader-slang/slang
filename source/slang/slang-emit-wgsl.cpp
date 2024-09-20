@@ -275,7 +275,6 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
 
 bool WGSLSourceEmitter::isPointerSyntaxRequiredImpl(IRInst* inst)
 {
-    // Structured buffers are mapped to 'array' types, which don't need dereferencing
     if (inst->getOp() == kIROp_RWStructuredBufferGetElementPtr)
         return false;
 
@@ -470,6 +469,14 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(">");
         return;
     }
+
+    case kIROp_AtomicType:
+    {
+        m_writer->emit("atomic<");
+        emitType(cast<IRAtomicType>(type)->getElementType());
+        m_writer->emit(">");
+        return;
+    }
     default:
         break;
 
@@ -504,13 +511,32 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 }
 
-void WGSLSourceEmitter::emitVarKeywordImpl(IRType * type, const bool isConstant)
+void WGSLSourceEmitter::emitVarKeywordImpl(IRType * type, IRInst* varDecl)
 {
-    if (isConstant)
-        m_writer->emit("const");
-    else
+    switch (varDecl->getOp())
+    {
+    case kIROp_GlobalParam:
+    case kIROp_GlobalVar:
+    case kIROp_Var:
         m_writer->emit("var");
-    if (type->getOp() == kIROp_HLSLRWStructuredBufferType)
+        break;
+    default:
+        if (as<IRModuleInst>(varDecl->getParent()))
+        {
+            m_writer->emit("const");
+        }
+        else
+        {
+            m_writer->emit("var");
+        }
+        break;
+    }
+
+    if (as<IRGroupSharedRate>(varDecl->getRate()))
+    {
+        m_writer->emit("<workgroup>");
+    }
+    else if (type->getOp() == kIROp_HLSLRWStructuredBufferType)
     {
         m_writer->emit("<");
         m_writer->emit("storage, read_write");
@@ -789,6 +815,144 @@ void WGSLSourceEmitter::emitParamTypeImpl(IRType* type, const String& name)
     emitType(type, name);
 }
 
+bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    default:
+        return false;
+    case kIROp_AtomicLoad:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicLoad(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("));\n");
+        return true;
+    }
+    case kIROp_AtomicStore:
+    {
+        m_writer->emit("atomicStore(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicExchange(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicCompareExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicCompareExchangeWeak(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(").old_value;\n");
+        return true;
+    }
+    case kIROp_AtomicAdd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicSub:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicSub(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicAnd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAnd(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicOr:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicOr(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicXor:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicXor(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMin:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicMin(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMax:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicMax(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicInc:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitType(inst->getDataType());
+        m_writer->emit("(1));\n");
+        return true;
+    }
+    case kIROp_AtomicDec:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicSub(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitType(inst->getDataType());
+        m_writer->emit("(1));\n");
+        return true;
+    }
+    }
+}
+
 bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -865,6 +1029,17 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         }
         m_writer->emit(")");
+        return true;
+    }
+    break;
+
+    case kIROp_RWStructuredBufferGetElementPtr:
+    {
+        m_writer->emit("(*");
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, getInfo(EmitOp::Postfix)));
+        m_writer->emit(")[");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit("]");
         return true;
     }
     break;
