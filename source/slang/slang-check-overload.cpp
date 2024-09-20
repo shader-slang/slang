@@ -2395,7 +2395,9 @@ namespace Slang
     /// but none exist. Note, we cannot just create a default initializer for every variable
     /// since then we are introducing initialization to every variable through an indirect
     /// init returning data. Instead we will call `$DefaultInit` through this logic below.
-    Expr* _tryToSpecialCaseOverloadDefaultConstructWithoutInit(SemanticsVisitor* visitor, SemanticsVisitor::OverloadResolveContext& context, Expr* expr, OverloadCandidate* bestCandidate)
+    ///     struct S { int x; }
+    ///     S s = S(); // This will call S.$DefaultInit().
+    Expr* _tryOverloadWithDefaultInit(SemanticsVisitor* visitor, SemanticsVisitor::OverloadResolveContext& context, Expr* expr, OverloadCandidate* bestCandidate)
     {
         if (context.argCount == 0)
         {
@@ -2595,7 +2597,7 @@ namespace Slang
         }
         else if (context.bestCandidate)
         {
-            if (auto specialCase = _tryToSpecialCaseOverloadDefaultConstructWithoutInit(this, context, expr, context.bestCandidate))
+            if (auto specialCase = _tryOverloadWithDefaultInit(this, context, expr, context.bestCandidate))
                 return specialCase;
 
             // There was one best candidate, even if it might not have been
