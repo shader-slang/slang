@@ -23,16 +23,16 @@ void computeMain()
         result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].or(3) != 1)
-    {} // result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].and(2) != 3)
-    {} //result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].xor(3) != 2)
-    {} //result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].exchange(4) != 1)
-    {} //result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].compareExchange(4, 5) != 4)
     {} //result = false;
