@@ -4949,9 +4949,9 @@ struct SPIRVEmitContext
         return nullptr;
     }
 
-    void maybeEmitPointerDecoration(SpvInst* varInst, IRInst* inst)
+    void maybeEmitPointerDecoration(SpvInst* varInst, IRType* type, bool isVar, IROp op)
     {
-        auto ptrType = as<IRPtrType>(unwrapArray(inst->getDataType()));
+        auto ptrType = as<IRPtrType>(unwrapArray(type));
         if (!ptrType)
             return;
         if (addressSpaceToStorageClass(ptrType->getAddressSpace()) == SpvStorageClassPhysicalStorageBuffer)
@@ -4962,7 +4962,7 @@ struct SPIRVEmitContext
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
                 varInst,
-                (as<IRVar>(inst) ? SpvDecorationAliasedPointer : SpvDecorationAliased)
+                (isVar ? SpvDecorationAliasedPointer : SpvDecorationAliased)
             );
         }
         else
@@ -4978,11 +4978,20 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_Var || inst->getOp() == kIROp_DebugVar
+                    (op == kIROp_GlobalVar || op == kIROp_Var || op == kIROp_DebugVar
                         ? SpvDecorationAliasedPointer : SpvDecorationAliased)
                 );
             }
         }
+    }
+
+    void maybeEmitPointerDecoration(SpvInst* varInst, IRInst* inst)
+    {
+        maybeEmitPointerDecoration(
+            varInst,
+            inst->getDataType(),
+            as<IRVar>(inst),
+            inst->getOp());
     }
 
     SpvInst* emitParam(SpvInstParent* parent, IRInst* inst)
