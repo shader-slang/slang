@@ -2764,6 +2764,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
             case $(SLANG_TEXTURE_3D):
                 __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
             }
+            return T();
         }
     }
 
