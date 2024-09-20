@@ -123,17 +123,13 @@ bool TEST_texture(
     constexpr const float ddy = 0.0f;
 
     uint width = 0, height = 0, depth = 0;
-    float fwidth = 0.0f, fheight = 0.0f, fdepth = 0.0f;
-    uint numLevels = 0, elements = 0, sampleCount = 0;
-    float fnumLevels = 0.0f, felements = 0.0f;
+    uint elements = 0;
 
     bool voidResult = true;
 
     // ======================
     //  void GetDimensions()
     // ======================
-
-    // WGSL doesn't support the mip level query;
 
     // WGSL: textureDimensions({{\(*}}t1D
     t1D.GetDimensions(width);
