@@ -38,13 +38,13 @@ void computeMain()
     {} //result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].load() != 5)
-    {} //result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].increment() != 5)
-    {} //result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].decrement() != 6)
-    {} //result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     // CHECK: 6
 
@@ -55,7 +55,7 @@ void computeMain()
     outputBuffer[0].store(6);
     AllMemoryBarrierWithGroupSync();
     if (outputBuffer[0].load() != 6)
-    {} //result = false;
+        result = false;
     AllMemoryBarrierWithGroupSync();
     // CHECK: 1
     // CHECK_MTL: 1
