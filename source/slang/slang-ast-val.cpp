@@ -461,7 +461,7 @@ Val* DeclaredSubtypeWitness::_resolveImplOverride()
 
 ConversionCost DeclaredSubtypeWitness::_getOverloadResolutionCostOverride()
 {
-    return kConversionCost_GenericParamUpcast;
+    return kConversionCost_None;
 }
 
 Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
@@ -611,7 +611,7 @@ Val* TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, S
 
 ConversionCost TransitiveSubtypeWitness::_getOverloadResolutionCostOverride()
 {
-    return getSubToMid()->getOverloadResolutionCost() + getMidToSup()->getOverloadResolutionCost();
+    return getSubToMid()->getOverloadResolutionCost() + getMidToSup()->getOverloadResolutionCost() + kConversionCost_GenericParamUpcast;
 }
 
 void TransitiveSubtypeWitness::_toTextOverride(StringBuilder& out)

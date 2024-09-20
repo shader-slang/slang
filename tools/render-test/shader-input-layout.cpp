@@ -19,9 +19,15 @@ namespace renderer_test
 
     Format _getFormatFromName(const UnownedStringSlice& slice)
     {
-#define SLANG_FORMAT_CASE(name, blockSizeInBytes, pixelsPerBlock) if (slice == #name) return Format::name; else 
-
-        SLANG_RHI_FORMAT(SLANG_FORMAT_CASE)
+        for (int i = 0; i < int(Format::_Count); ++i)
+        {
+            FormatInfo info;
+            rhiGetFormatInfo(Format(i), &info);
+            if (slice == info.name)
+            {
+                return Format(i);
+            }
+        }
         return Format::Unknown;
     }
 

@@ -105,6 +105,7 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     ParameterBlockTransposeInfo splitAndTransposeParameterBlock(
         IRBuilder* builder,
         IRFunc* diffFunc,
+        SourceLoc primalLoc,
         bool isResultDifferentiable);
     
     void writeBackDerivativeToInOutParams(ParameterBlockTransposeInfo& info, IRFunc* diffFunc);

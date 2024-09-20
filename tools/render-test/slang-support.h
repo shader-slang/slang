@@ -10,8 +10,6 @@
 
 namespace renderer_test {
 
-rhi::StageType translateStage(SlangStage slangStage);
-
 struct ShaderCompileRequest
 {
     struct SourceInfo
@@ -71,7 +69,7 @@ struct ShaderCompilerUtil
         }
 
         ComPtr<slang::IComponentType> slangProgram;
-        IShaderProgram::Desc desc = {};
+        ShaderProgramDesc desc = {};
 
             /// Compile request that owns the lifetime of compiled kernel code.
         ComPtr<SlangCompileRequest> m_requestForKernels = nullptr;

@@ -53,6 +53,13 @@ public:
         IRInst* inst, const EmitOpInfo& outerPrec
     ) SLANG_OVERRIDE;
 
+    virtual void emitIntrinsicCallExprImpl(
+        IRCall* inst,
+        UnownedStringSlice intrinsicDefinition,
+        IRInst* intrinsicInst,
+        EmitOpInfo const& inOuterPrec
+    ) SLANG_OVERRIDE;
+
     void emit(const AddressSpace addressSpace);
 
 private:

@@ -274,9 +274,14 @@ namespace Slang
         return isInterfaceType(type);
     }
 
-    bool SemanticsVisitor::isTypeDifferentiable(Type* type)
+    SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)
     {
-        return isSubtype(type, m_astBuilder->getDiffInterfaceType(), IsSubTypeOptions::None);
+        if (auto valueWitness = isSubtype(type, m_astBuilder->getDiffInterfaceType(), IsSubTypeOptions::None))
+            return valueWitness;
+        else if (auto ptrWitness = isSubtype(type, m_astBuilder->getDifferentiableRefInterfaceType(), IsSubTypeOptions::None))
+            return ptrWitness;
+        
+        return nullptr;
     }
 
     bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)

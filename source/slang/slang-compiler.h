@@ -40,7 +40,9 @@
 namespace Slang
 {
     struct PathInfo;
-    struct IncludeHandler;
+    struct IncludeHandler;    
+    struct SharedSemanticsContext;
+
     class ProgramLayout;
     class PtrType;
     class TargetProgram;
@@ -418,11 +420,11 @@ namespace Slang
             String const&   typeStr,
             DiagnosticSink* sink);
 
-        DeclRef<Decl> findDeclFromString(
+        Expr* findDeclFromString(
             String const& name,
             DiagnosticSink* sink);
         
-        DeclRef<Decl> findDeclFromStringInType(
+        Expr* findDeclFromStringInType(
             Type* type,
             String const& name,
             LookupMask mask,
@@ -574,7 +576,7 @@ namespace Slang
         Dictionary<String, Type*> m_types;
 
         // Any decls looked up dynamically using `findDeclFromString`.
-        Dictionary<String, DeclRef<Decl>> m_decls;
+        Dictionary<String, Expr*> m_decls;
 
         Scope* m_lookupScope = nullptr;
         std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;
@@ -2170,6 +2172,11 @@ namespace Slang
             DeclRef<Decl>                       declRef,
             List<Expr*>                         argExprs,
             DiagnosticSink*                     sink);
+        
+        DeclRef<Decl> specializeWithArgTypes(
+            Expr*               funcExpr,
+            List<Type*>         argTypes,
+            DiagnosticSink*     sink);
 
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
 
@@ -2182,6 +2189,9 @@ namespace Slang
         {
             m_retainedSession = nullptr;
         }
+
+        // Get shared semantics information for reflection purposes.
+        SharedSemanticsContext* getSemanticsForReflection();
 
     private:
             /// The global Slang library session that this linkage is a child of
@@ -2235,6 +2245,8 @@ namespace Slang
             DiagnosticSink*     sink);
 
         List<Type*> m_specializedTypes;
+
+        RefPtr<SharedSemanticsContext> m_semanticsForReflection;
 
     };
 
@@ -2716,6 +2728,7 @@ namespace Slang
 
         bool shouldValidateIR();
         bool shouldDumpIR();
+        bool shouldReportCheckpointIntermediates();
 
         bool shouldTrackLiveness();
 

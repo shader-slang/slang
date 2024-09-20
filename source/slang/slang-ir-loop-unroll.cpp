@@ -526,6 +526,7 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     // we will now introduce a breakable region for each iteration.
 
     IRBuilder builder(module);
+    IRBuilderSourceLocRAII sourceLocationScope(&builder, loopInst->sourceLoc);
    
     auto targetBlock = loopInst->getTargetBlock();
 

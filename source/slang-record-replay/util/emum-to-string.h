@@ -149,6 +149,7 @@ namespace SlangRecord
         CASE(EmitIr);
         CASE(ReportDownstreamTime);
         CASE(ReportPerfBenchmark);
+        CASE(ReportCheckpointIntermediates);
         CASE(SkipSPIRVValidation);
         CASE(SourceEmbedStyle);
         CASE(SourceEmbedName);

@@ -86,3 +86,8 @@ vkd3d-proton.cache
 vkd3d-proton.cache.write
 *_d3d11.log
 *_dxgi.log
+
+# Vim temporary files
+*~
+.*.swp
+.*.swo

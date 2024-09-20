@@ -625,7 +625,7 @@ public:
             }
         }
 
-        if (!sharedContext.isInterfaceAvailable)
+        if (!sharedContext.isInterfaceAvailable && !sharedContext.isPtrInterfaceAvailable)
             return;
 
         for (auto inst : module->getGlobalInsts())

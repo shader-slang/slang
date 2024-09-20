@@ -637,6 +637,7 @@ extern "C"
         SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
         SLANG_PASS_THROUGH_SPIRV_OPT,               ///< SPIRV-opt
         SLANG_PASS_THROUGH_METAL,                   ///< Metal compiler
+        SLANG_PASS_THROUGH_WGSL,                    ///< WGSL compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -851,6 +852,7 @@ extern "C"
             EmitIr,                // bool
             ReportDownstreamTime,  // bool
             ReportPerfBenchmark,   // bool
+            ReportCheckpointIntermediates, // bool
             SkipSPIRVValidation,   // bool
             SourceEmbedStyle,
             SourceEmbedName,
@@ -2589,6 +2591,10 @@ extern "C"
     SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* func);
     SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(SlangReflectionFunction* func);
     SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(SlangReflectionFunction* func, SlangReflectionGeneric* generic);
+    SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(SlangReflectionFunction* func, SlangInt argTypeCount, SlangReflectionType* const* argTypes);
+    SLANG_API bool spReflectionFunction_isOverloaded(SlangReflectionFunction* func);
+    SLANG_API unsigned int spReflectionFunction_getOverloadCount(SlangReflectionFunction* func);
+    SLANG_API SlangReflectionFunction* spReflectionFunction_getOverload(SlangReflectionFunction* func, unsigned int index);
 
     // Abstract Decl Reflection
 
@@ -3586,6 +3592,26 @@ namespace slang
         FunctionReflection* applySpecializations(GenericReflection* generic)
         {
             return (FunctionReflection*)spReflectionFunction_applySpecializations((SlangReflectionFunction*)this, (SlangReflectionGeneric*)generic);
+        }
+
+        FunctionReflection* specializeWithArgTypes(unsigned int argCount, TypeReflection* const* types)
+        {
+            return (FunctionReflection*)spReflectionFunction_specializeWithArgTypes((SlangReflectionFunction*)this, argCount, (SlangReflectionType* const*)types);
+        }
+
+        bool isOverloaded()
+        {
+            return spReflectionFunction_isOverloaded((SlangReflectionFunction*)this);
+        }
+
+        unsigned int getOverloadCount()
+        {
+            return spReflectionFunction_getOverloadCount((SlangReflectionFunction*)this);
+        }
+
+        FunctionReflection* getOverload(unsigned int index)
+        {
+            return (FunctionReflection*)spReflectionFunction_getOverload((SlangReflectionFunction*)this, index);
         }
     };
 

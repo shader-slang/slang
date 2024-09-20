@@ -757,6 +757,8 @@ class Expr : public SyntaxNode
 
     QualType type;
 
+    bool checked = false;
+
     void accept(IExprVisitor* visitor, void* extra);
 };
 

@@ -69,30 +69,28 @@ struct AddressInstEliminationContext
         }
     }
 
-    void transformLoadAddr(IRUse* use)
+    void transformLoadAddr(IRBuilder& builder, IRUse* use)
     {
         auto addr = use->get();
         auto load = as<IRLoad>(use->getUser());
 
-        IRBuilder builder(module);
         builder.setInsertBefore(use->getUser());
         auto value = getValue(builder, addr);
         load->replaceUsesWith(value);
         load->removeAndDeallocate();
     }
 
-    void transformStoreAddr(IRUse* use)
+    void transformStoreAddr(IRBuilder& builder, IRUse* use)
     {
         auto addr = use->get();
         auto store = as<IRStore>(use->getUser());
 
-        IRBuilder builder(module);
         builder.setInsertBefore(use->getUser());
         storeValue(builder, addr, store->getVal());
         store->removeAndDeallocate();
     }
 
-    void transformCallAddr(IRUse* use)
+    void transformCallAddr(IRBuilder& builder, IRUse* use)
     {
         auto addr = use->get();
         auto call = as<IRCall>(use->getUser());
@@ -103,7 +101,6 @@ struct AddressInstEliminationContext
             return;
         }
 
-        IRBuilder builder(module);
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
 
@@ -155,17 +152,20 @@ struct AddressInstEliminationContext
                     use = nextUse;
                     continue;
                 }
+                    
+                IRBuilder transformBuilder(module);
+                IRBuilderSourceLocRAII sourceLocationScope(&transformBuilder, use->getUser()->sourceLoc);
 
                 switch (use->getUser()->getOp())
                 {
                 case kIROp_Load:
-                    transformLoadAddr(use);
+                    transformLoadAddr(transformBuilder, use);
                     break;
                 case kIROp_Store:
-                    transformStoreAddr(use);
+                    transformStoreAddr(transformBuilder, use);
                     break;
                 case kIROp_Call:
-                    transformCallAddr(use);
+                    transformCallAddr(transformBuilder, use);
                     break;
                 case kIROp_GetElementPtr:
                 case kIROp_FieldAddress:

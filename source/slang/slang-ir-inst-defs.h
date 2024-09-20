@@ -61,7 +61,8 @@ INST(Nop, nop, 0, 0)
 
     INST(DifferentialPairType, DiffPair, 1, HOISTABLE)
     INST(DifferentialPairUserCodeType, DiffPairUserCode, 1, HOISTABLE)
-    INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPairUserCodeType)
+    INST(DifferentialPtrPairType, DiffRefPair, 1, HOISTABLE)
+    INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPtrPairType)
 
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 
@@ -325,15 +326,18 @@ INST(DefaultConstruct, defaultConstruct, 0, 0)
 
 INST(MakeDifferentialPair, MakeDiffPair, 2, 0)
 INST(MakeDifferentialPairUserCode, MakeDiffPairUserCode, 2, 0)
-INST_RANGE(MakeDifferentialPairBase, MakeDifferentialPair, MakeDifferentialPairUserCode)
+INST(MakeDifferentialPtrPair, MakeDiffRefPair, 2, 0)
+INST_RANGE(MakeDifferentialPairBase, MakeDifferentialPair, MakeDifferentialPtrPair)
 
 INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
 INST(DifferentialPairGetDifferentialUserCode, GetDifferentialUserCode, 1, 0)
-INST_RANGE(DifferentialPairGetDifferentialBase, DifferentialPairGetDifferential, DifferentialPairGetDifferentialUserCode)
+INST(DifferentialPtrPairGetDifferential, GetDifferentialPtr, 1, 0)
+INST_RANGE(DifferentialPairGetDifferentialBase, DifferentialPairGetDifferential, DifferentialPtrPairGetDifferential)
 
 INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
 INST(DifferentialPairGetPrimalUserCode, GetPrimalUserCode, 1, 0)
-INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, DifferentialPairGetPrimalUserCode)
+INST(DifferentialPtrPairGetPrimal, GetPrimalRef, 1, 0)
+INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, DifferentialPtrPairGetPrimal)
 
 INST(Specialize, specialize, 2, HOISTABLE)
 INST(LookupWitness, lookupWitness, 2, HOISTABLE)
@@ -772,6 +776,11 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         needs to be special cased for lookup. */
     INST(TransitoryDecoration,              transitory,             0, 0)
 
+    // The result witness table that the functon's return type is a subtype of an interface.
+    // This is used to keep track of the original witness table in a function that used to
+    // return an existential value but now returns a concrete type after specialization.
+    INST(ResultWitnessDecoration,           ResultWitness,          1, 0)
+
     INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
     INST(VulkanRayPayloadInDecoration,      vulkanRayPayloadIn,       0, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
@@ -1051,6 +1060,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
         /// Hint that the result from a call to the decorated function should be recomputed in backward prop function.
     INST(PreferRecomputeDecoration, PreferRecomputeDecoration, 0, 0)
+
+        /// Hint that a struct is used for reverse mode checkpointing
+    INST(CheckpointIntermediateDecoration, CheckpointIntermediateDecoration, 1, 0)
 
     INST_RANGE(CheckpointHintDecoration, PreferCheckpointDecoration, PreferRecomputeDecoration)
 

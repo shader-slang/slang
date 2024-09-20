@@ -16,7 +16,7 @@ verbose=true
 $verbose && echo "Reminder: PLEASE make sure your local repo is up-to-date before running the script." >&2
 
 gh=""
-for candidate in "$(which gh.exe)" "/mnt/c/Program Files/GitHub CLI/gh.exe" "/c/Program Files/GitHub CLI/gh.exe"
+for candidate in "$(which gh.exe)" "/mnt/c/Program Files/GitHub CLI/gh.exe" "/c/Program Files/GitHub CLI/gh.exe" "/cygdrive/c/Program Files/GitHub CLI/gh.exe"
 do
 	if [ -x "$candidate" ]
 	then
@@ -51,7 +51,7 @@ do
 
 	# Get PR number from the git commit title
 	pr="$(echo "$line" | grep '#[1-9][0-9][0-9][0-9][0-9]*' | sed 's|.* (\#\([1-9][0-9][0-9][0-9][0-9]*\))|\1|')"
-	[ "x$pr" = "x" ] && break
+	[ "x$pr" = "x" ] && continue
 
 	# Check if the PR is marked as a breaking change
 	if "$gh" issue view $pr --json labels | grep -q 'pr: breaking change'

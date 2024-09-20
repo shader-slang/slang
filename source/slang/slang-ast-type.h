@@ -462,9 +462,20 @@ class DifferentialPairType : public ArithmeticExpressionType
     Type* getPrimalType();
 };
 
+class DifferentialPtrPairType : public ArithmeticExpressionType 
+{
+    SLANG_AST_CLASS(DifferentialPtrPairType)
+    Type* getPrimalRefType();
+};
+
 class DifferentiableType : public BuiltinType
 {
     SLANG_AST_CLASS(DifferentiableType)
+};
+
+class DifferentiablePtrType : public BuiltinType
+{
+    SLANG_AST_CLASS(DifferentiablePtrType)
 };
 
 class DefaultInitializableType : public BuiltinType

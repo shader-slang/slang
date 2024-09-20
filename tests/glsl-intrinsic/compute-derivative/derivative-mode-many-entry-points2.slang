@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV_SYNTAX): -allow-glsl -fvk-use-entrypoint-name -target spirv
-// CHECK_SPV_SYNTAX: DerivativeGroupQuadsNV
-// CHECK_SPV_SYNTAX: DerivativeGroupLinearNV
+// CHECK_SPV_SYNTAX: DerivativeGroupQuads{{NV|KHR}}
+// CHECK_SPV_SYNTAX: DerivativeGroupLinear{{NV|KHR}}
 
 #ifdef GLSL_SYNTAX
 layout(derivative_group_quadsNV) in;

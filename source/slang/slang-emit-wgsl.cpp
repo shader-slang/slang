@@ -1002,4 +1002,22 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
     }
 }
 
+void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
+    IRCall* inst,
+    UnownedStringSlice intrinsicDefinition,
+    IRInst* intrinsicInst,
+    EmitOpInfo const& inOuterPrec
+    )
+{
+    // The f16 constructor is generated for f32tof16
+    if (intrinsicDefinition.startsWith("f16"))
+    {
+        m_f16ExtensionEnabled = true;
+    }
+
+    CLikeSourceEmitter::emitIntrinsicCallExprImpl(
+        inst, intrinsicDefinition, intrinsicInst, inOuterPrec
+    );
+}
+
 } // namespace Slang

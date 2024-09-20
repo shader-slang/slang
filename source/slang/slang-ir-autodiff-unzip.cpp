@@ -75,6 +75,9 @@ struct ExtractPrimalFuncContext
         builder.setInsertBefore(destFunc);
         IRFuncType* originalFuncType = nullptr;
         outIntermediateType = createIntermediateType(destFunc);
+        
+        builder.addCheckpointIntermediateDecoration(outIntermediateType, originalFunc);
+        outIntermediateType->sourceLoc = originalFunc->sourceLoc;
 
         GenericChildrenMigrationContext migrationContext;
         migrationContext.init(as<IRGeneric>(findOuterGeneric(originalFunc)), as<IRGeneric>(findOuterGeneric(destFunc)), destFunc);
@@ -141,7 +144,10 @@ struct ExtractPrimalFuncContext
         }
         auto structField = genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
       
-        if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(&genTypeBuilder, (IRType*)fieldType))
+        if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(
+                &genTypeBuilder,
+                (IRType*)fieldType,
+                DiffConformanceKind::Value))
         {
             genTypeBuilder.addIntermediateContextFieldDifferentialTypeDecoration(structField, witness);
         }
@@ -154,6 +160,7 @@ struct ExtractPrimalFuncContext
         IRInst* intermediateOutput)
     {
         auto field = addIntermediateContextField(inst->getDataType(), intermediateOutput);
+        field->sourceLoc = inst->sourceLoc;
         auto key = field->getKey();
         if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
             cloneDecoration(nameHint, key);
@@ -219,6 +226,10 @@ struct ExtractPrimalFuncContext
                         if (inst->hasUses())
                         {
                             auto field = addIntermediateContextField(cast<IRPtrTypeBase>(inst->getDataType())->getValueType(), outIntermediary);
+                            field->sourceLoc = inst->sourceLoc;
+                            if (inst->findDecoration<IRLoopCounterDecoration>())
+                                builder.addLoopCounterDecoration(field);
+
                             builder.setInsertBefore(inst);
                             auto fieldAddr = builder.emitFieldAddress(
                                 inst->getFullType(), outIntermediary, field->getKey());
@@ -379,12 +390,16 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                             use->set(builder.getVoidValue());
                             continue;
                         }
+
+                        IRBuilderSourceLocRAII sourceLocationScope(&builder, use->getUser()->sourceLoc);
+
                         builder.setInsertBefore(use->getUser());
                         auto valType = cast<IRPtrTypeBase>(inst->getFullType())->getValueType();
                         auto val = builder.emitFieldExtract(
                             valType,
                             intermediateVar,
                             structKeyDecor->getStructKey());
+
                         if (use->getUser()->getOp() == kIROp_Load)
                         {
                             use->getUser()->replaceUsesWith(val);
@@ -392,8 +407,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                         }
                         else
                         {
-                            auto tempVar =
-                                builder.emitVar(valType);
+                            auto tempVar = builder.emitVar(valType);
                             builder.emitStore(tempVar, val);
                             use->set(tempVar);
                         }
@@ -401,7 +415,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                 }
                 else
                 {
-                    // Orindary value.
+                    // Ordinary value.
                     // We insert a fieldExtract at each use site instead of before `inst`,
                     // since at this stage of autodiff pass, `inst` does not necessarily
                     // dominate all the use sites if `inst` is defined in partial branch
@@ -417,6 +431,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                             inst->getFullType(),
                             intermediateVar,
                             structKeyDecor->getStructKey());
+                        val->sourceLoc = user->sourceLoc;
                         builder.replaceOperand(iuse, val);
                     }
                 }

@@ -57,6 +57,14 @@ struct DiffTranscriberSet
     AutoDiffTranscriberBase* backwardTranscriber = nullptr;
 };
 
+
+enum class DiffConformanceKind
+{
+    Any = 0,    // Perform actions for any conformance (infer from context)
+    Ptr = 1,    // Perform actions for IDifferentiablePtrType
+    Value = 2   // Perform actions for IDifferentiable
+};
+
 struct AutoDiffSharedContext
 {
     TargetProgram* targetProgram = nullptr;
@@ -78,6 +86,7 @@ struct AutoDiffSharedContext
     // The struct key for the witness that `Differential` associated type conforms to
     // `IDifferential`.
     IRStructKey* differentialAssocTypeWitnessStructKey = nullptr;
+    IRWitnessTableType* differentialAssocTypeWitnessTableType = nullptr;
 
 
     // The struct key for the 'zero()' associated type
@@ -85,12 +94,14 @@ struct AutoDiffSharedContext
     // implementation of zero() for a given type.
     // 
     IRStructKey* zeroMethodStructKey = nullptr;
+    IRFuncType* zeroMethodType = nullptr;
 
     // The struct key for the 'add()' associated type
     // defined inside IDifferential. We use this to lookup the 
     // implementation of add() for a given type.
     // 
     IRStructKey* addMethodStructKey = nullptr;
+    IRFuncType* addMethodType = nullptr;
 
     IRStructKey* mulMethodStructKey = nullptr;
 
@@ -104,12 +115,27 @@ struct AutoDiffSharedContext
     //
     IRInst* nullDifferentialWitness = nullptr;
 
+    
+    // A reference to the builtin IDifferentiablePtrType interface type.
+    IRInterfaceType* differentiablePtrInterfaceType = nullptr;
+
+    // The struct key for the 'Differential' associated type
+    // defined inside IDifferentialPtrType. We use this to lookup the differential
+    // type in the conformance table associated with the concrete type.
+    // 
+    IRStructKey* differentialAssocRefTypeStructKey = nullptr;
+
+    // The struct key for the witness that `Differential` associated type conforms to
+    // `IDifferentialPtrType`.
+    IRStructKey* differentialAssocRefTypeWitnessStructKey = nullptr;
+    IRWitnessTableType* differentialAssocRefTypeWitnessTableType = nullptr;
 
     // Modules that don't use differentiable types
     // won't have the IDifferentiable interface type available. 
     // Set to false to indicate that we are uninitialized.
     // 
     bool                                    isInterfaceAvailable = false;
+    bool                                    isPtrInterfaceAvailable = false;
 
     List<FuncBodyTranscriptionTask>         followUpFunctionsToTranscribe;
 
@@ -127,38 +153,70 @@ private:
 
     IRStructKey* findDifferentialTypeStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(0);
+        return cast<IRStructKey>(
+            getInterfaceEntryAtIndex(differentiableInterfaceType, 0)->getRequirementKey());
     }
 
     IRStructKey* findDifferentialTypeWitnessStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(1);
+        return cast<IRStructKey>(
+            getInterfaceEntryAtIndex(differentiableInterfaceType, 1)->getRequirementKey());
+    }
+
+    IRWitnessTableType* findDifferentialTypeWitnessTableType()
+    {
+        return cast<IRWitnessTableType>(
+            getInterfaceEntryAtIndex(differentiableInterfaceType, 1)->getRequirementVal());
     }
 
     IRStructKey* findZeroMethodStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(2);
+        return cast<IRStructKey>(
+            getInterfaceEntryAtIndex(differentiableInterfaceType, 2)->getRequirementKey());
     }
 
     IRStructKey* findAddMethodStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(3);
+        return cast<IRStructKey>(
+            getInterfaceEntryAtIndex(differentiableInterfaceType, 3)->getRequirementKey());
     }
 
     IRStructKey* findMulMethodStructKey()
     {
-        return getIDifferentiableStructKeyAtIndex(4);
+        return cast<IRStructKey>(
+            getInterfaceEntryAtIndex(differentiableInterfaceType, 4)->getRequirementKey());
     }
 
-    IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index);
+    
+    IRStructKey* findDifferentialPtrTypeStructKey()
+    {
+        return cast<IRStructKey>(
+            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 0)->getRequirementKey());
+    }
+
+    IRStructKey* findDifferentialPtrTypeWitnessStructKey()
+    {
+        return cast<IRStructKey>(
+            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 1)->getRequirementKey());
+    }
+
+    IRWitnessTableType* findDifferentialPtrTypeWitnessTableType()
+    {
+        return cast<IRWitnessTableType>(
+            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 1)->getRequirementVal());
+    }
+
+    //IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index);
+    IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(IRInterfaceType* interface, UInt index);
 };
+
 
 struct DifferentiableTypeConformanceContext
 {
     AutoDiffSharedContext* sharedContext;
 
     IRGlobalValueWithCode* parentFunc = nullptr;
-    OrderedDictionary<IRType*, IRInst*> differentiableWitnessDictionary;
+    OrderedDictionary<IRType*, IRInst*> differentiableTypeWitnessDictionary;
 
     IRFunc* existentialDAddFunc = nullptr;
 
@@ -167,7 +225,7 @@ struct DifferentiableTypeConformanceContext
     {
         // Populate dictionary with null differential type.
         if (sharedContext->nullDifferentialStructType)
-            differentiableWitnessDictionary.add(
+            differentiableTypeWitnessDictionary.add(
                 sharedContext->nullDifferentialStructType,
                 sharedContext->nullDifferentialWitness);
     }
@@ -179,21 +237,13 @@ struct DifferentiableTypeConformanceContext
     // Lookup a witness table for the concreteType. One should exist if concreteType
     // inherits (successfully) from IDifferentiable.
     // 
-    IRInst* lookUpConformanceForType(IRInst* type);
+    IRInst* lookUpConformanceForType(IRInst* type, DiffConformanceKind kind);
 
-    IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key);
+    IRInst* lookUpInterfaceMethod(IRBuilder* builder, IRType* origType, IRStructKey* key, IRType* resultType = nullptr);
 
     IRType* differentiateType(IRBuilder* builder, IRInst* primalType);
 
-    IRInst* tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType);
-
-    IRInst* getOrCreateDifferentiablePairWitness(IRBuilder* builder, IRDifferentialPairTypeBase* pairType);
-
-    IRInst* getArrayWitness(IRBuilder* builder, IRArrayType* pairType);
-
-    IRInst* getTupleWitness(IRBuilder* builder, IRInst* tupleType);
-
-    IRInst* getExtractExistensialTypeWitness(IRBuilder* builder, IRExtractExistentialType* extractExistentialType);
+    IRInst* tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType, DiffConformanceKind kind);
 
     IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness);
     
@@ -207,17 +257,21 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getDiffAddMethodFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
 
+    void addTypeToDictionary(IRType* type, IRInst* witness);
+
+    IRInterfaceType* getConformanceTypeFromWitness(IRInst* witness);
+
     IRInst* tryExtractConformanceFromInterfaceType(
         IRBuilder* builder,
         IRInterfaceType* interfaceType,
         IRWitnessTable* witnessTable);
     
-    List<IRInterfaceRequirementEntry*> findDifferentiableInterfaceLookupPath(
-        IRInterfaceType* idiffType,
+    List<IRInterfaceRequirementEntry*> findInterfaceLookupPath(
+        IRInterfaceType* supType,
         IRInterfaceType* type);
 
     // Lookup and return the 'Differential' type declared in the concrete type
-    // in order to conform to the IDifferentiable interface.
+    // in order to conform to the IDifferentiable/IDifferentiablePtrType interfaces
     // Note that inside a generic block, this will be a witness table lookup instruction
     // that gets resolved during the specialization pass.
     // 
@@ -227,8 +281,10 @@ struct DifferentiableTypeConformanceContext
         {
         case kIROp_InterfaceType:
         {
-            if (isDifferentiableType(origType))
+            if (isDifferentiableValueType(origType))
                 return this->sharedContext->differentiableInterfaceType;
+            else if (isDifferentiablePtrType(origType))
+                return this->sharedContext->differentiablePtrInterfaceType;
             else
                 return nullptr;
         }
@@ -254,12 +310,29 @@ struct DifferentiableTypeConformanceContext
             auto diffWitness = getDiffTypeWitnessFromPairType(builder, diffPairType);
             return builder->getDifferentialPairUserCodeType((IRType*)diffType, diffWitness);
         }
+        case kIROp_DifferentialPtrPairType:
+        {
+            auto diffPairType = as<IRDifferentialPairTypeBase>(origType);
+            auto diffType = getDiffTypeFromPairType(builder, diffPairType);
+            auto diffWitness = getDiffTypeWitnessFromPairType(builder, diffPairType);
+            return builder->getDifferentialPtrPairType((IRType*)diffType, diffWitness);
+        }
         default:
-            return lookUpInterfaceMethod(builder, origType, sharedContext->differentialAssocTypeStructKey);
+            if (isDifferentiableValueType(origType))
+                return lookUpInterfaceMethod(builder, origType, sharedContext->differentialAssocTypeStructKey, builder->getTypeKind());
+            else if (isDifferentiablePtrType(origType))
+                return lookUpInterfaceMethod(builder, origType, sharedContext->differentialAssocRefTypeStructKey, builder->getTypeKind());
+            else
+                return nullptr;
         }
     }
 
     bool isDifferentiableType(IRType* origType)
+    {
+        return isDifferentiableValueType(origType) || isDifferentiablePtrType(origType);
+    }
+    
+    bool isDifferentiableValueType(IRType* origType)
     {
         for (; origType;)
         {
@@ -279,7 +352,27 @@ struct DifferentiableTypeConformanceContext
                 origType = (IRType*)origType->getOperand(0);
                 continue;
             default:
-                return lookUpConformanceForType(origType) != nullptr;
+                return lookUpConformanceForType(origType, DiffConformanceKind::Value) != nullptr;
+            }
+        }
+        return false;
+    }
+
+    bool isDifferentiablePtrType(IRType* origType)
+    {
+        for (; origType;)
+        {
+            switch (origType->getOp())
+            {
+            case kIROp_VectorType:
+            case kIROp_ArrayType:
+            case kIROp_PtrType:
+            case kIROp_OutType:
+            case kIROp_InOutType:
+                origType = (IRType*)origType->getOperand(0);
+                continue;
+            default:
+                return lookUpConformanceForType(origType, DiffConformanceKind::Ptr) != nullptr;
             }
         }
         return false;
@@ -287,13 +380,13 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
-        auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey);
+        auto result = lookUpInterfaceMethod(builder, origType, sharedContext->zeroMethodStructKey, sharedContext->zeroMethodType);
         return result;
     }
 
     IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
     {
-        auto result = lookUpInterfaceMethod(builder, origType, sharedContext->addMethodStructKey);
+        auto result = lookUpInterfaceMethod(builder, origType, sharedContext->addMethodStructKey, sharedContext->addMethodType);
         return result;
     }
 
@@ -307,7 +400,27 @@ struct DifferentiableTypeConformanceContext
 
     IRFunc* getOrCreateExistentialDAddMethod();
     
+    IRInst* buildDifferentiablePairWitness(
+        IRBuilder* builder,
+        IRDifferentialPairTypeBase* pairType,
+        DiffConformanceKind target);
+
+    IRInst* buildArrayWitness(
+        IRBuilder* builder,
+        IRArrayType* pairType,
+        DiffConformanceKind target);
+    
+    IRInst* buildTupleWitness(
+        IRBuilder* builder,
+        IRInst* tupleType,
+        DiffConformanceKind target);
+    
+    IRInst* buildExtractExistensialTypeWitness(
+        IRBuilder* builder,
+        IRExtractExistentialType* extractExistentialType,
+        DiffConformanceKind target);
 };
+
 
 struct DifferentialPairTypeBuilder
 {

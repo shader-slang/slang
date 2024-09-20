@@ -462,6 +462,7 @@ struct PhiEliminationContext
                 // to the temporary that will replace it.
                 //
                 param->transferDecorationsTo(temp);
+                temp->sourceLoc = param->sourceLoc;
             }
 
             // The other main auxilliary sxtructure is used to track
@@ -550,6 +551,7 @@ struct PhiEliminationContext
                 auto user = use->getUser();
                 m_builder.setInsertBefore(user);
                 auto newVal = m_builder.emitLoad(temp);
+                newVal->sourceLoc = param->sourceLoc;
                 m_builder.replaceOperand(use, newVal);
             }
 
@@ -938,6 +940,7 @@ struct PhiEliminationContext
             newOperands.getCount(),
             newOperands.getArrayView().getBuffer());
         oldBranch->transferDecorationsTo(newBranch);
+        newBranch->sourceLoc = oldBranch->sourceLoc;
 
         // TODO: We could consider just modifying `branch` in-place by clearing
         // the relevant operands for the phi arguments and setting its operand

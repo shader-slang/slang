@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -73,3 +74,5 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         outputBuffer[1] = dpx.d;
     }
 }
+
+//CHK: (0): note: no checkpoint contexts to report
