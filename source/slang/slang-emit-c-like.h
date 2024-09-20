@@ -534,6 +534,11 @@ public:
 
     virtual void emitFuncDecorationsImpl(IRFunc* func);
 
+    bool tryGetIntInfo(IRType* elementType, bool &isSigned, int &bitWidth);
+    void emitVecNOrScalar(IRVectorType* vectorType, std::function<void()> func);
+    virtual void emitBitfieldExtractImpl(IRInst* inst);
+    virtual void emitBitfieldInsertImpl(IRInst* inst);
+
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
 
