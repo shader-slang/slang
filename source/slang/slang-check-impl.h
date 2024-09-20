@@ -748,6 +748,11 @@ namespace Slang
         {
             return m_isCStyleStruct.tryGetValue(structDecl);
         }
+
+        // Get the inner most generic decl that a decl-ref is dependent on.
+        // For example, `Foo<T>` depends on the generic decl that defines `T`.
+        //
+        DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
     private:
             /// Mapping from type declarations to the known extensiosn that apply to them
         Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -774,10 +779,6 @@ namespace Slang
         InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
         InheritanceInfo _calcInheritanceInfo(DeclRef<Decl> declRef, DeclRefType* correspondingType, InheritanceCircularityInfo* circularityInfo);
 
-        // Get the inner most generic decl that a decl-ref is dependent on.
-        // For example, `Foo<T>` depends on the generic decl that defines `T`.
-        //
-        DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
         void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
 
         struct DirectBaseInfo
@@ -1756,6 +1757,12 @@ namespace Slang
             CallableDecl* synthesized,
             List<Expr*>& synArgs);
 
+        CallableDecl* synthesizeMethodSignatureForRequirementWitnessInner(
+            ConformanceCheckingContext* context,
+            DeclRef<CallableDecl> requiredMemberDeclRef,
+            List<Expr*>& synArgs,
+            ThisExpr*& synThis);
+
         CallableDecl* synthesizeMethodSignatureForRequirementWitness(
             ConformanceCheckingContext* context,
             DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -1816,6 +1823,7 @@ namespace Slang
 
         bool trySynthesizeSubscriptRequirementWitness(
             ConformanceCheckingContext* context,
+            const LookupResult& lookupResult,
             DeclRef<SubscriptDecl>      requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 

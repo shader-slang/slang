@@ -519,6 +519,7 @@ DIAGNOSTIC(39901, Fatal , cannotProcessInclude, "internal compiler error: cannot
 // 304xx: generics
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
 DIAGNOSTIC(30401, Error, invalidTypeForConstraint, "type '$0' cannot be used as a constraint.")
+DIAGNOSTIC(30402, Error, invalidConstraintSubType, "type '$0' is not a valid left hand side of a type constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, cannotFindMatchingInitListToConstructorCount, "cannot find matching constructor to call with arguments count of '$0' for '$1'")

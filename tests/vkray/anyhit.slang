@@ -12,6 +12,7 @@ struct SphereHitAttributes
 struct ShadowRay
 {
     float4 hitDistance;
+    float3 dummyOut;
 };
 
 struct Params
@@ -42,13 +43,13 @@ void main(
     }
 
     uint index = 0U;
-	HitTriangleVertexPosition(index);
+    ioPayload.dummyOut = HitTriangleVertexPosition(index);
 
-	index = 1U;
-	HitTriangleVertexPosition(index);
+    index = 1U;
+    ioPayload.dummyOut += HitTriangleVertexPosition(index);
 
-	index = 2U;
-	HitTriangleVertexPosition(index);
+    index = 2U;
+    ioPayload.dummyOut += HitTriangleVertexPosition(index);
 }
 
 // SPIRV-DAG: OpCapability RayTracing

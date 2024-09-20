@@ -36,6 +36,9 @@ SLANG_UNIT_TEST(functionReflection)
         {
             return pos;
         }
+
+        float foo(float x) { return x; }
+        float foo(float x, uint i) { return x + i; }
         )";
 
     auto moduleName = "moduleG" + String(Process::getId());
@@ -90,5 +93,34 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(result == SLANG_OK);
     SLANG_CHECK(val == 1024);
     SLANG_CHECK(funcReflection->findUserAttributeByName(globalSession.get(), "MyFuncProperty") == userAttribute);
+
+    // Check overloaded method resolution
+    auto overloadReflection = module->getLayout()->findFunctionByName("foo");
+    SLANG_CHECK(overloadReflection != nullptr);
+    SLANG_CHECK(overloadReflection->isOverloaded() == true);
+    SLANG_CHECK(overloadReflection->getOverloadCount() == 2);
+
+    auto firstOverload = overloadReflection->getOverload(0);
+    SLANG_CHECK(firstOverload != nullptr);
+    SLANG_CHECK(UnownedStringSlice(firstOverload->getName()) == "foo");
+    SLANG_CHECK(firstOverload->getParameterCount() == 2);
+    SLANG_CHECK(UnownedStringSlice(firstOverload->getParameterByIndex(0)->getName()) == "x");
+    SLANG_CHECK(getTypeFullName(firstOverload->getParameterByIndex(0)->getType()) == "float");
+    SLANG_CHECK(UnownedStringSlice(firstOverload->getParameterByIndex(1)->getName()) == "i");
+    SLANG_CHECK(getTypeFullName(firstOverload->getParameterByIndex(1)->getType()) == "uint");
+
+    auto secondOverload = overloadReflection->getOverload(1);
+    SLANG_CHECK(secondOverload != nullptr);
+    SLANG_CHECK(UnownedStringSlice(secondOverload->getName()) == "foo");
+    SLANG_CHECK(secondOverload->getParameterCount() == 1);
+    SLANG_CHECK(UnownedStringSlice(secondOverload->getParameterByIndex(0)->getName()) == "x");
+
+    // Check overload resolution via argument types.
+    slang::TypeReflection* argTypes[] = {
+        module->getLayout()->findTypeByName("float"),
+        module->getLayout()->findTypeByName("uint"),
+    };
+    auto resolvedFunctionReflection = overloadReflection->specializeWithArgTypes(2, argTypes);
+    SLANG_CHECK(resolvedFunctionReflection == firstOverload);
 }
 
