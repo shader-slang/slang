@@ -320,14 +320,15 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicCompareExchange:
     {
-        m_writer->emit("{\n");
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n{\n");
         emitType(inst->getDataType(), "_metal_cas_comparand");
         m_writer->emit(" = ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(";\n");
 
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_compare_exchange_weak_explicit(");
+        m_writer->emit(getName(inst));
+        m_writer->emit(" = atomic_compare_exchange_weak_explicit(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", &_metal_cas_comparand, ");
         emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
@@ -335,7 +336,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         emitMemoryOrderOperand(inst->getOperand(3));
         m_writer->emit(", ");
         emitMemoryOrderOperand(inst->getOperand(4));
-        m_writer->emit(");\n");
+        m_writer->emit(");\n}\n");
         return true;
     }
     case kIROp_AtomicAdd:
@@ -428,7 +429,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         m_writer->emit("atomic_fetch_add_explicit(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", 1, ");
-        emitMemoryOrderOperand(inst->getOperand(2));
+        emitMemoryOrderOperand(inst->getOperand(1));
         m_writer->emit(");\n");
         return true;
     }
@@ -438,7 +439,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         m_writer->emit("atomic_fetch_sub_explicit(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", 1, ");
-        emitMemoryOrderOperand(inst->getOperand(2));
+        emitMemoryOrderOperand(inst->getOperand(1));
         m_writer->emit(");\n");
         return true;
     }
