@@ -1646,16 +1646,11 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     return true;
 }
 
-bool CLikeSourceEmitter::isPointerSyntaxRequiredImpl(IRInst* /* inst */)
-{
-    return doesTargetSupportPtrTypes();
-}
-
 void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec)
 {
     EmitOpInfo newOuterPrec = outerPrec;
 
-    if (isPointerSyntaxRequiredImpl(inst))
+    if (doesTargetSupportPtrTypes())
     {
         switch (inst->getOp())
         {
@@ -1754,7 +1749,7 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
 
 void CLikeSourceEmitter::emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec)
 {
-    if (isPointerSyntaxRequiredImpl(inst))
+    if (doesTargetSupportPtrTypes())
     {
         auto prec = getInfo(EmitOp::Prefix);
         auto newOuterPrec = outerPrec;
@@ -2003,6 +1998,11 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     }
 }
 
+void CLikeSourceEmitter::emitCallArg(IRInst* inst)
+{
+    emitOperand(inst, getInfo(EmitOp::General));
+}
+
 void CLikeSourceEmitter::_emitCallArgList(IRCall* inst, int startingOperandIndex)
 {
     bool isFirstArg = true;
@@ -2023,7 +2023,7 @@ void CLikeSourceEmitter::_emitCallArgList(IRCall* inst, int startingOperandIndex
             m_writer->emit(", ");
         else
             isFirstArg = false;
-        emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+        emitCallArg(inst->getOperand(aa));
     }
     m_writer->emit(")");
 }
@@ -2296,7 +2296,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
         IRFieldAddress* ii = (IRFieldAddress*) inst;
 
-        if (isPointerSyntaxRequiredImpl(inst))
+        if (doesTargetSupportPtrTypes())
         {
             auto prec = getInfo(EmitOp::Prefix);
             needClose = maybeEmitParens(outerPrec, prec);
@@ -4206,7 +4206,7 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
 
     emitRateQualifiersAndAddressSpace(varDecl);
     emitVarKeyword(varType, varDecl);
-    emitGlobalParamType(varType, getName(varDecl));
+    emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
 

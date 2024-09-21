@@ -23,12 +23,13 @@
 // 'transpose' calls, or else perform more complicated transformations that
 // end up duplicating expressions many times.
 
-namespace Slang {
+namespace Slang
+{
 
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     IRBasicType *const switchConditionType,
-    const SwitchRegion::Case *const currentCase, const bool isDefault
-    )
+    const SwitchRegion::Case *const currentCase,
+    const bool isDefault)
 {
     // WGSL has special syntax for blocks sharing case labels:
     // "case 2, 3, 4: ...;" instead of the C-like syntax
@@ -80,8 +81,8 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
 }
 
 void WGSLSourceEmitter::emitParameterGroupImpl(
-    IRGlobalParam* varDecl, IRUniformParameterGroupType* type
-)
+    IRGlobalParam* varDecl,
+    IRUniformParameterGroupType* type)
 {
     auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
@@ -140,8 +141,8 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
 }
 
 void WGSLSourceEmitter::emitEntryPointAttributesImpl(
-    IRFunc* irFunc, IREntryPointDecoration* entryPointDecor
-    )
+    IRFunc* irFunc,
+    IREntryPointDecoration* entryPointDecor)
 {
     auto stage = entryPointDecor->getProfile().getStage();
 
@@ -238,9 +239,7 @@ static bool isPowerOf2(const uint32_t n)
     return (n != 0U) && ((n - 1U) & n) == 0U;
 }
 
-void WGSLSourceEmitter::emitStructFieldAttributes(
-    IRStructType * structType, IRStructField * field
-    )
+void WGSLSourceEmitter::emitStructFieldAttributes(IRStructType * structType, IRStructField * field)
 {
     // Tint emits errors unless we explicitly spell out the layout in some cases, so emit
     // offset and align attribtues for all fields.
@@ -271,26 +270,6 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
     m_writer->emit("@align(");
     m_writer->emit(fieldAlignment);
     m_writer->emit(")");
-}
-
-bool WGSLSourceEmitter::isPointerSyntaxRequiredImpl(IRInst* inst)
-{
-    if (inst->getOp() == kIROp_RWStructuredBufferGetElementPtr)
-        return false;
-
-    // Don't emit "->" to access fields in resource structs
-    if (inst->getOp() == kIROp_FieldAddress)
-        return false;
-
-    // Don't emit "*" to access fields in resource structs
-    if (inst->getOp() == kIROp_GlobalParam)
-        return false;
-
-    // Emit 'globalVar' instead of  "*&globalVar"
-    if (inst->getOp() == kIROp_GlobalVar)
-        return false;
-
-    return true;
 }
 
 void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
@@ -325,31 +304,13 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     {
 
     case kIROp_HLSLRWStructuredBufferType:
-    {
-        auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-        m_writer->emit("ptr<");
-        emit(AddressSpace::StorageBuffer);
-        m_writer->emit(", ");
-        m_writer->emit("array");
-        m_writer->emit("<");
-        emitType(structuredBufferType->getElementType());
-        m_writer->emit(">");
-        m_writer->emit(", read_write");
-        m_writer->emit(">");
-    }
-    break;
-
     case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
     {
         auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-        m_writer->emit("ptr<");
-        emit(AddressSpace::StorageBuffer);
-        m_writer->emit(", ");
         m_writer->emit("array");
         m_writer->emit("<");
         emitType(structuredBufferType->getElementType());
-        m_writer->emit(">");
-        m_writer->emit(", read");
         m_writer->emit(">");
     }
     break;
@@ -582,7 +543,8 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType * type, IRInst* varDecl)
     {
         m_writer->emit("<workgroup>");
     }
-    else if (type->getOp() == kIROp_HLSLRWStructuredBufferType)
+    else if (type->getOp() == kIROp_HLSLRWStructuredBufferType ||
+        type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType)
     {
         m_writer->emit("<");
         m_writer->emit("storage, read_write");
@@ -692,9 +654,26 @@ void WGSLSourceEmitter::emitDeclaratorImpl(DeclaratorInfo* declarator)
     }
 }
 
+void WGSLSourceEmitter::emitOperandImpl(IRInst* operand, EmitOpInfo const& outerPrec)
+{
+    if (operand->getOp() == kIROp_Param && as<IRPtrTypeBase>(operand->getDataType()))
+    {
+        // If we are emitting a reference to a pointer typed operand, then
+        // we should dereference it now since we want to treat all the remaining
+        // part of wgsl as pointer-free target.
+        m_writer->emit("(*");
+        m_writer->emit(getName(operand));
+        m_writer->emit(")");
+    }
+    else
+    {
+        CLikeSourceEmitter::emitOperandImpl(operand, outerPrec);
+    }
+}
+
 void WGSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(
-    IRType* type, DeclaratorInfo* declarator
-    )
+    IRType* type,
+    DeclaratorInfo* declarator)
 {
     if (declarator)
     {
@@ -999,13 +978,29 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
 }
 
+void WGSLSourceEmitter::emitCallArg(IRInst* inst)
+{
+    if (as<IRPtrTypeBase>(inst->getDataType()))
+    {
+        // If we are calling a function with a pointer-typed argument, we need to
+        // explicitly prefix the argument with `&` to pass a pointer.
+        //
+        m_writer->emit("&(");
+        emitOperand(inst, getInfo(EmitOp::General));
+        m_writer->emit(")");
+    }
+    else
+    {
+        emitOperand(inst, getInfo(EmitOp::General));
+    }
+}
+
 bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
 
     switch (inst->getOp())
     {
-
     case kIROp_MakeVectorFromScalar:
     {
         // In WGSL this is done by calling the vec* overloads listed in [1]
@@ -1079,25 +1074,13 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     }
     break;
 
-    case kIROp_RWStructuredBufferGetElementPtr:
-    {
-        m_writer->emit("(*");
-        emitOperand(inst->getOperand(0), leftSide(outerPrec, getInfo(EmitOp::Postfix)));
-        m_writer->emit(")[");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit("]");
-        return true;
-    }
-    break;
-
     case kIROp_StructuredBufferLoad:
     case kIROp_RWStructuredBufferLoad:
+    case kIROp_RWStructuredBufferGetElementPtr:
     {
-        // Structured buffers are just arrays in WGSL
-        auto base = inst->getOperand(0);
-        emitOperand(base, outerPrec);
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, getInfo(EmitOp::Postfix)));
         m_writer->emit("[");
-        emitOperand(inst->getOperand(1), EmitOpInfo());
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit("]");
         return true;
     }
@@ -1134,15 +1117,12 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     }
     break;
-
     }
 
     return false;
 }
 
-void WGSLSourceEmitter::emitVectorTypeNameImpl(
-    IRType* elementType, IRIntegerValue elementCount
-    )
+void WGSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
 
     if (elementCount > 1)
@@ -1157,61 +1137,6 @@ void WGSLSourceEmitter::emitVectorTypeNameImpl(
     {
         emitSimpleType(elementType);
     }
-}
-
-void WGSLSourceEmitter::emitOperandImpl(IRInst* inst, const EmitOpInfo& outerPrec)
-{
-    // In WGSL, the structured buffer types are converted to ptr<AS, array<E>, AM>
-    // everywhere, except for the global parameter declaration.
-    // Thus, when these globals are used in expressions, we need an ampersand.
-
-    if (inst->getOp() == kIROp_GlobalParam)
-    {
-        switch (inst->getDataType()->getOp())
-        {
-        case kIROp_HLSLStructuredBufferType:
-        case kIROp_HLSLRWStructuredBufferType:
-
-            m_writer->emit("(&");
-            CLikeSourceEmitter::emitOperandImpl(inst, outerPrec);
-            m_writer->emit(")");
-            return;
-        }
-    }
-
-    CLikeSourceEmitter::emitOperandImpl(inst, outerPrec);
-}
-
-void WGSLSourceEmitter::emitGlobalParamType(IRType* type, const String& name)
-{
-    // In WGSL, the structured buffer types are converted to ptr<AS, array<E>, AM>
-    // everywhere, except for the global parameter declaration.
-
-    switch (type->getOp())
-    {
-
-    case kIROp_HLSLStructuredBufferType:
-    case kIROp_HLSLRWStructuredBufferType:
-    {
-        StringSliceLoc nameAndLoc(name.getUnownedSlice());
-        NameDeclaratorInfo nameDeclarator(&nameAndLoc);
-        emitDeclarator(&nameDeclarator);
-        m_writer->emit(" : ");
-        auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-        m_writer->emit("array");
-        m_writer->emit("<");
-        emitType(structuredBufferType->getElementType());
-        m_writer->emit(">");
-    }
-    break;
-
-    default:
-
-        emitType(type, name);
-        break;
-
-    }
-
 }
 
 void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
