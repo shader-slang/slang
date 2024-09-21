@@ -7,7 +7,7 @@ Status
 
 Author: Yong He
 
-Status: Implementation in review.
+Status: Implemented.
 
 Implementation: [PR 5125](https://github.com/shader-slang/slang/pull/5125)
 
@@ -99,8 +99,8 @@ T operator&=(__ref Atomic<T> v, T operand); // returns new value.
 T operator^=(__ref Atomic<T> v, T operand); // returns new value.
 ```
 
-We allow `Atomic<T>` to be defined anywhere: as struct fields, as array elements, as elements of `RWStructuredBuffer` types,
-or as local, global and groupshared variable types or function parameter types. For example, in global memory:
+We allow `Atomic<T>` to be defined in struct fields, as array elements, as elements of `RWStructuredBuffer` types,
+or as groupshared variable types or `__ref` function parameter types. For example:
 
 ```hlsl
 struct MyType
@@ -128,9 +128,10 @@ void main()
 }
 ```
 
-When generating WGSL code where `atomic<T>` isn't allowed on local variables or other illegal address spaces, we will lower the type
-into its underlying type. The use of atomic type in these positions will simply have no meaning. A caveat is what the semantics should be
-when there is a function that takes `inout Atomic<T>` as parameter. This likely need to be a warning or error.
+Note that in many targets, it is invalid to use `atomic<T>` type to define a local variable or a function parameter, or in any way
+to cause a `atomic<T>` to reside in local/function/private address space. Slang should be able to lower the type
+into its underlying type. The use of atomic type in these positions will simply have no meaning. However, we are going to leave
+this legalization as future work and leave such situation as undefined behavior for now.
 
 This should be handled by a legalization pass similar to `lowerBufferElementTypeToStorageType` but operates
 in the opposite direction: the "loaded" value from a buffer is converted into an atomic-free type, and storing a value leads to an
@@ -144,3 +145,9 @@ For non-WGSL/Metal targets, we can simply lower the type out of existence into i
 architectures that have different memory models. WGSL and Metal follows this trend to require atomic operations being expressed
 this way. This proposal is to make Slang follow this trend and make `Atomic<T>` the recommened way to express atomic operation
 going forward.
+
+# Future Work
+
+As discussed in previous sections, we should consider adding a legalization pass to allow `Atomic<T>` type to be used anywhere in
+any memory space, and legalize them out to just normal types if they are used in memory spaces where atomic semantic has no/trivial
+meaning.
