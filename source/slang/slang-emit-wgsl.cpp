@@ -430,6 +430,52 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(">");
         return;
     }
+    case kIROp_TextureType:
+        if (auto texType = as<IRTextureType>(type))
+        {
+            switch (texType->getAccess())
+            {
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                m_writer->emit("texture_storage");
+                break;
+            default:
+                m_writer->emit("texture");
+                break;
+            }
+
+            if (texType->isShadow())
+            {
+                m_writer->emit("_depth");
+            }
+
+            if (texType->isMultisample())
+            {
+                m_writer->emit("_multisampled");
+            }
+
+            switch (texType->GetBaseShape())
+            {
+            case SLANG_TEXTURE_1D:   m_writer->emit("_1d");   break;
+            case SLANG_TEXTURE_2D:   m_writer->emit("_2d");   break;
+            case SLANG_TEXTURE_3D:   m_writer->emit("_3d");   break;
+            case SLANG_TEXTURE_CUBE: m_writer->emit("_cube"); break;
+            }
+
+            if (texType->isArray())
+                m_writer->emit("_array");
+
+            if (!texType->isShadow())
+            {
+                m_writer->emit("<");
+                auto elemType = texType->getElementType();
+                if (auto vecElemType = as<IRVectorType>(elemType))
+                    emitSimpleType(vecElemType->getElementType());
+                else
+                    emitType(elemType);
+                m_writer->emit(">");
+            }
+        }
+        return;
 
     case kIROp_AtomicType:
     {
