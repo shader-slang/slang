@@ -15,10 +15,18 @@ void test(inout float x)
     inner(x);
 }
 
-[numthreads(1,1,1)]
-void computeMain()
+struct MyType
 {
-    float x = 0.0;
-    test(x);
-    outputBuffer[0] = x;
+    float myField[3];
+}
+
+[numthreads(1,1,1)]
+void computeMain(int id : SV_DispatchThreadID)
+{
+    MyType v;
+    v.myField[id] = 0.0f;
+    // CHECK: test{{.*}}(&({{.*}}));
+    test(v.myField[id]);
+    v.myField[1] = 2.0;
+    outputBuffer[0] = v.myField[id];
 }
