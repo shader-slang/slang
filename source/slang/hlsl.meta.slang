@@ -610,7 +610,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
         __requireComputeDerivative();
@@ -661,12 +661,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                return __getTexture().Sample(__getSampler(), location);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -689,6 +691,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                return __getTexture().Sample(__getSampler(), location, offset);
         }
     }
 
@@ -740,7 +744,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __requireComputeDerivative();
@@ -763,12 +767,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     __truncate $$T result __sampledType(T) %sampled;
 
                 };
+            case wgsl:
+                return __getTexture().SampleBias(__getSampler(), location, bias);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -790,12 +796,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                return __getTexture().SampleBias(__getSampler(), location, bias, offset);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __requireComputeDerivative();
@@ -826,12 +834,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue;
             };
+        case wgsl:
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -858,12 +868,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Lod $zeroFloat;
             };
+        case wgsl:
+            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
         }
     }
 
     [__readNone] 
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -890,12 +902,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue ConstOffset $offset;
             };
+        case wgsl:
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -922,12 +936,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $zeroFloat $offset;
             };
+        case wgsl:
+            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -940,21 +956,22 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case cpp:
             case metal:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
-
             case glsl:
-            __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
+                __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
             case spirv:
                 return spirv_asm
                 {
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
@@ -968,13 +985,15 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case metal:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
             case glsl:
-            __intrinsic_asm "$ctextureGradOffset($0, $1, $2, $3, $4)$z";
+                __intrinsic_asm "$ctextureGradOffset($0, $1, $2, $3, $4)$z";
             case spirv:
                 return spirv_asm
                 {
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
         }
     }
 
@@ -1008,7 +1027,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -1060,12 +1079,14 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod $level;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                return __getTexture().SampleLevel(__getSampler(), location, level);
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1078,7 +1099,6 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case cpp:
             case metal:
                 return __getTexture().SampleLevel(__getSampler(), location, level, offset);
-
             case glsl:
                 __intrinsic_asm "$ctextureLodOffset($0, $1, $2, $3)$z";
             case spirv:
@@ -1087,6 +1107,8 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                return __getTexture().SampleLevel(__getSampler(), location, level, offset);
         }
     }
 }
@@ -1147,7 +1169,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
         __requireComputeDerivative();
@@ -1226,12 +1248,29 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureSample($0, $1, ($2).x, i32(($2).y))$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z))$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w))$z";
+                    }
+                }
+                __intrinsic_asm "textureSample($0, $1, $2)$z";
         }
     }
 
+
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1267,12 +1306,28 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
                 __intrinsic_asm "$ctextureOffset($p, $2, $3)$z";
             case spirv:
-            return spirv_asm
-            {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset $offset;
-                __truncate $$T result __sampledType(T) %sampled;
-            };
+                return spirv_asm
+                {
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset $offset;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureSample($0, $1, ($2).x, i32(($2).y), $3)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z), $3)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    }
+                }
+                __intrinsic_asm "textureSample($0, $1, $2, $3)$z";
         }
     }
 
@@ -1344,7 +1399,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
         __requireComputeDerivative();
@@ -1381,20 +1436,36 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 // TODO: This needs to be handled by the capability system
                 __intrinsic_asm "<invalid intrinsic>";
             case glsl:
-            __intrinsic_asm "$ctexture($p, $2, $3)$z";
+                __intrinsic_asm "$ctexture($p, $2, $3)$z";
             case spirv:
-            return spirv_asm
-            {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias $bias;
-                __truncate $$T result __sampledType(T) %sampled;
-            };
+                return spirv_asm
+                {
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias $bias;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    }
+                }
+                __intrinsic_asm "textureSampleBias($0, $1, $2, $3)$z";
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1428,20 +1499,36 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 // TODO: This needs to be handled by the capability system
                 __intrinsic_asm "<invalid intrinsic>";
             case glsl:
-            __intrinsic_asm "$ctextureOffset($p, $2, $4, $3)$z";
+                __intrinsic_asm "$ctextureOffset($p, $2, $4, $3)$z";
             case spirv:
-            return spirv_asm
-            {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias|ConstOffset $bias $offset;
-                __truncate $$T result __sampledType(T) %sampled;
-            };
+                return spirv_asm
+                {
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias|ConstOffset $bias $offset;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    }
+                }
+                __intrinsic_asm "textureSampleBias($0, $1, $2, $3, $4)$z";
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __requireComputeDerivative();
@@ -1492,12 +1579,28 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue;
             };
+        case wgsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                , "WGSL supports only f32 type textures");
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3)";
+                case $(SLANG_TEXTURE_CUBE):
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3)";
+                }
+            }
+            __intrinsic_asm "textureSampleCompare($0, $1, $2, $3)";
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -1544,12 +1647,28 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod $zeroFloat;
             };
+        case wgsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                , "WGSL supports only f32 type textures");
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3)";
+                case $(SLANG_TEXTURE_CUBE):
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3)";
+                }
+            }
+            __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3)";
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1593,12 +1712,28 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue ConstOffset $offset;
             };
+        case wgsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                , "WGSL supports only f32 type textures");
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3, $4)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3, $4)";
+                case $(SLANG_TEXTURE_CUBE):
+                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
+                }
+            }
+            __intrinsic_asm "textureSampleCompare($0, $1, $2, $3, $4)";
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1644,12 +1779,28 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $zeroFloat $offset;
             };
+        case wgsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                , "WGSL supports only f32 type textures");
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3, $4)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)";
+                case $(SLANG_TEXTURE_CUBE):
+                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
+                }
+            }
+            __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3, $4)";
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -1695,12 +1846,28 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad $gradX $gradY;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    }
+                }
+                __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4)$z";
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
     {
         __target_switch
@@ -1743,6 +1910,22 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
 
                 };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4, $5)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4, $5)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4, $5)$z";
+                    }
+                }
+                __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4, $5)$z";
         }
     }
 
@@ -1797,7 +1980,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
         __target_switch
@@ -1870,19 +2053,35 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
             case spirv:
-            return spirv_asm
-            {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod $level;
-                __truncate $$T result __sampledType(T) %sampled;
-            };
+                return spirv_asm
+                {
+                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod $level;
+                    __truncate $$T result __sampledType(T) %sampled;
+                };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    }
+                }
+                __intrinsic_asm "textureSampleLevel($0, $1, $2, $3)$z";
         }
     }
 
     [__readNone]
     [ForceInline]
 
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1925,6 +2124,22 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod|ConstOffset $level $offset;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    }
+                }
+                __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)$z";
         }
     }
 }
@@ -2433,7 +2648,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -2525,13 +2740,38 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             }
+        case wgsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                , "WGSL supports only f32 type textures");
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
+                || Shape.flavor == $(SLANG_TEXTURE_2D)
+                || Shape.flavor == $(SLANG_TEXTURE_3D)
+                , "WGSL supports textureLoad only for 1D, 2D and 3D textures");
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z), ($1).w)$z";
+                }
+            }
+            switch (Shape.flavor)
+            {
+            case $(SLANG_TEXTURE_1D):
+                __intrinsic_asm "textureLoad($0, ($1).x, ($1).y)$z";
+            case $(SLANG_TEXTURE_2D):
+                __intrinsic_asm "textureLoad($0, ($1).xy, ($1).z)$z";
+            case $(SLANG_TEXTURE_3D):
+                __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
+            }
+            return T();
         }
     }
 
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -2562,6 +2802,22 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                         __truncate $$T result __sampledType(T) %sampled;
                     };
                 }
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureLoad($0, ($1).x, i32(($1).y), $2)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z), $2)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureLoad($0, ($1).xyz, i32(($1).w), $2)$z";
+                    }
+                }
+                __intrinsic_asm "textureLoad($0, $1, $2)$z";
         }
     }
 
@@ -2584,7 +2840,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
         __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -2614,6 +2870,8 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
                             __truncate $$T result __sampledType(T) %sampled;
                         };
                     }
+                case wgsl:
+                    return Load(__makeVector(location, 0));
             }
         }
     }
@@ -2630,7 +2888,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -2686,12 +2944,28 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                         __truncate $$T result __sampledType(T) %sampled;
                     };
                 }
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureLoad($0, ($1).x, i32(($1).y), $2)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z), $2)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureLoad($0, ($1).xyz, i32(($1).w), $2)$z";
+                    }
+                }
+                __intrinsic_asm "textureLoad($0, $1, $2)$z";
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions + isArray + 1> locationAndSampleIndex)
     {
         return Load(__vectorReshape<Shape.dimensions + isArray>(locationAndSampleIndex), locationAndSampleIndex[Shape.dimensions + isArray]);
@@ -2707,9 +2981,9 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".Load";
+                __intrinsic_asm ".Load";
             case glsl:
-            __intrinsic_asm "$ctexelFetchOffset($0, $1, ($2), ($3))$z";
+                __intrinsic_asm "$ctexelFetchOffset($0, $1, ($2), ($3))$z";
             case spirv:
                 if (isCombined != 0)
                 {
@@ -2750,7 +3024,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -2761,6 +3035,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                 case metal:
                 case glsl:
                 case spirv:
+                case wgsl:
                     return Load(location, 0);
             }
         }
@@ -2770,7 +3045,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
         __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -2781,6 +3056,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,form
                 case metal:
                 case glsl:
                 case spirv:
+                case wgsl:
                     return Load(location, sampleIndex);
             }
         }
@@ -2800,7 +3076,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 {
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location)
     {
         __target_switch
@@ -2906,6 +3182,22 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                 }
                 static_assert(false, "Unsupported 'Load' of 'texture' for 'metal' target");
                 __intrinsic_asm "<invalid intrinsics>";
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureLoad($0, ($1).x, i32(($1).y))$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z))$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureLoad($0, ($1).xyz, i32(($1).w))$z";
+                    }
+                }
+                __intrinsic_asm "textureLoad($0, $1)$z";
         }
     }
 
@@ -2955,7 +3247,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -2967,20 +3259,21 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                 case spirv:
                 case cuda:
                 case metal:
+                case wgsl:
                     return Load(location);
             }
         }
 
         [nonmutating]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_metal_spirv, texture_sm_4_1)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         set(T newValue)
         {
             __target_switch
             {
                 case cpp:
                 case hlsl:
-                __intrinsic_asm ".operator[]";
+                    __intrinsic_asm ".operator[]";
                 case glsl:
                     __glslImageStore(location, newValue);
                 case cuda:
@@ -3068,6 +3361,22 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         }
                         break;
                     }
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureStore($0, ($1).x, i32(($1).y), $2)$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), $2)$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureStore($0, ($1).xyz, i32(($1).w), $2)$z";
+                    }
+                }
+                __intrinsic_asm "textureStore($0, $1, $2)$z";
             }
         }
 
@@ -3087,7 +3396,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
 {
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_compute_fragment)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_compute_fragment)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -3131,6 +3440,22 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                     %sampled:__sampledType(T) = OpImageRead $this $location Sample $sampleIndex;
                     __truncate $$T result __sampledType(T) %sampled;
                 };
+            case wgsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    , "WGSL supports only f32 type textures");
+                if (isArray == 1)
+                {
+                    switch (Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "textureLoad($0, ($1).x, i32(($1).y))$z";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z))$z";
+                    case $(SLANG_TEXTURE_CUBE):
+                        __intrinsic_asm "textureLoad($0, ($1).xyz, i32(($1).w))$z";
+                    }
+                }
+                __intrinsic_asm "textureLoad($0, $1)$z";
         }
     }
 
@@ -3180,7 +3505,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_compute_fragment)]
+        [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1_compute_fragment)]
         get
         {
             __target_switch
@@ -3190,6 +3515,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
                     __intrinsic_asm "$0.sample[$2][$1]";
                 case glsl:
                 case spirv:
+                case wgsl:
                     return Load(location, sampleIndex);
             }
         }
@@ -3203,7 +3529,7 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,form
             {
                 case cpp:
                 case hlsl:
-                __intrinsic_asm "$0.sample[$2][$1]";
+                    __intrinsic_asm "$0.sample[$2][$1]";
                 case glsl:
                     __glslImageStore(location, sampleIndex, newValue);
                 case spirv:

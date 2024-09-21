@@ -337,6 +337,10 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << intLit->getValue();
             return SLANG_OK;
         }
+        case kIROp_AtomicType:
+        {
+            return calcTypeName((IRType*)type->getOperand(0), target, out);
+        }
         default:
         {
             if (isNominalOp(type->getOp()))

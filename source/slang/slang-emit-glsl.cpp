@@ -2156,44 +2156,152 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_AtomicCounterIncrement:
-        {
-            auto oldValName = getName(inst);
-            m_writer->emit("int ");
-            m_writer->emit(oldValName);
-            m_writer->emit(" = ");
-            m_writer->emit("atomicAdd(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", 1);\n");
-            return true;
-        }
-    case kIROp_AtomicCounterDecrement:
-        {
-            auto oldValName = getName(inst);
-            m_writer->emit("int ");
-            m_writer->emit(oldValName);
-            m_writer->emit(" = ");
-            m_writer->emit("atomicAdd(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", -1);\n");
-            return true;
-        }
     case kIROp_StructuredBufferGetDimensions:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("uvec2(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("._data.length(), ");
+        auto elementType = as<IRHLSLStructuredBufferTypeBase>(inst->getOperand(0)->getDataType())->getElementType();
+        IRIntegerValue stride = 0;
+        if (auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>())
         {
-            emitInstResultDecl(inst);
-            m_writer->emit("uvec2(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit("._data.length(), ");
-            auto elementType = as<IRHLSLStructuredBufferTypeBase>(inst->getOperand(0)->getDataType())->getElementType();
-            IRIntegerValue stride = 0;
-            if (auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>())
-            {
-                stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
-            }
-            m_writer->emit(stride);
-            m_writer->emit(");\n");
-            return true;
+            stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
         }
+        m_writer->emit(stride);
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicLoad:
+    {
+        emitInstResultDecl(inst);
+        emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return true;
+    }
+    case kIROp_AtomicStore:
+    {
+        emitInstResultDecl(inst);
+        emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(" = ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return true;
+    }
+    case kIROp_AtomicExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicExchange(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicCompareExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicCompSwap(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicAdd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicSub:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", -(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit("));\n");
+        return true;
+    }
+    case kIROp_AtomicAnd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAnd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicOr:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicOr(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicXor:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicXor(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMin:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicMin(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMax:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicMax(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicInc:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitType(inst->getDataType());
+        m_writer->emit("(1)");
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicDec:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitType(inst->getDataType());
+        m_writer->emit("(-1)");
+        m_writer->emit(");\n");
+        return true;
+    }
     default:
         return false;
     }
@@ -2570,6 +2678,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             if (intLit)
                 m_writer->emit(intLit->getValue());
             m_writer->emit("DNV");
+            return;
+        }
+        case kIROp_AtomicType:
+        {
+            emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
             return;
         }
         default: break;

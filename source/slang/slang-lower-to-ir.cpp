@@ -7130,9 +7130,19 @@ top:
             // The `left` value is just a pointer, so we can emit
             // a store to it directly.
             //
-            builder->emitStore(
-                left.val,
-                getSimpleVal(context, right));
+            if (as<IRAtomicType>(tryGetPointedToType(builder, left.val->getDataType())))
+            {
+                builder->emitAtomicStore(
+                    left.val,
+                    getSimpleVal(context, right),
+                    builder->getIntValue(builder->getIntType(), kIRMemoryOrder_Relaxed));
+            }
+            else
+            {
+                builder->emitStore(
+                    left.val,
+                    getSimpleVal(context, right));
+            }
         }
         break;
 

@@ -26,6 +26,7 @@ protected:
 
     void ensurePrelude(const char* preludeText);
 
+    void emitMemoryOrderOperand(IRInst* inst);
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
     

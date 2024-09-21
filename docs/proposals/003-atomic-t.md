@@ -7,11 +7,11 @@ Status
 
 Author: Yong He
 
-Status: Design Discussion.
+Status: Implemented.
 
-Implementation: N/A
+Implementation: [PR 5125](https://github.com/shader-slang/slang/pull/5125)
 
-Reviewed by: N/A
+Reviewed by: Theresa Foley, Jay Kwak
 
 Background
 ----------
@@ -31,46 +31,76 @@ Proposed Approach
 -----------------
 
 We define an `Atomic<T>` type that functions as a wrapper of `T` and provides atomic operations:
-```
+```csharp
+enum MemoryOrder
+{
+    Relaxed = 0,
+    Acquire = 1,
+    Release = 2,
+    AcquireRelease = 3,
+    SeqCst = 4,
+}
+
 [sealed] interface IAtomicable {}
-[sealed] interface IArithmeticAtomicable : IAtomicable {}
-[sealed] interface IBitAtomicable : IArithmeticAtomicable {}
+[sealed] interface IArithmeticAtomicable : IAtomicable, IArithmetic {}
+[sealed] interface IBitAtomicable : IArithmeticAtomicable, IInteger {}
+
+[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+struct Atomic<T : IAtomicable>
+{
+    T load(MemoryOrder order = MemoryOrder.Relaxed);
+
+    [__ref] void store(T newValue, MemoryOrder order = MemoryOrder.Relaxed);
+
+    [__ref] T exchange(T newValue, MemoryOrder order = MemoryOrder.Relaxed); // returns old value
+
+    [__ref] T compareExchange(
+        T compareValue,
+        T newValue,
+        MemoryOrder successOrder = MemoryOrder.Relaxed,
+        MemoryOrder failOrder = MemoryOrder.Relaxed);
+}
+
+extension<T : IArithmeticAtomicable> Atomic<T>
+{
+    [__ref] T add(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T sub(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T max(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+}
+
+extension<T : IBitAtomicable> Atomic<T>
+{
+    [__ref] T and(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T or(T value, MemoryOrder order = MemoryOrder.Relaxed);  // returns original value
+    [__ref] T xor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T increment(MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+}
 
 extension int : IArithmeticAtomicable {}
 extension uint : IArithmeticAtomicable {}
 extension int64_t : IBitAtomicable {}
 extension uint64_t : IBitAtomicable {}
+extension double : IArithmeticAtomicable {}
 extension float : IArithmeticAtomicable {}
 extension half : IArithmeticAtomicable {}
 
-struct Atomic<T : IAtomicable>
-{
-    T load();
-    [ref] void store(T newValue); // Question: do we really need this?
-    [ref] T exchange(T newValue); // returns old value
-    [ref] T compareExchange(T compareValue, T newValue); // returns old value.
-}
-
-extension<T:IArithmeticAtomicable> Atomic<T>
-{
-    [ref] T atomicAdd(T value); // returns original value
-    [ref] T atomicSub(T value); // returns original value
-    [ref] T atomicMax(T value); // returns original value
-    [ref] T atomicMin(T value); // returns original value
-    [ref] T atomicIncrement();
-    [ref] T atomicDecrement();
-}
-
-extension<T:IBitAtomicable> Atomic<T>
-{
-    [ref] T atomicAnd(T value); // returns original value
-    [ref] T atomicOr(T value); // returns original value
-    [ref] T atomicXor(T value); // returns original value
-}
+// Operator overloads:
+// All operator overloads are using MemoryOrder.Relaxed semantics.
+__prefix T operator++<T>(__ref Atomic<T> v); // returns new value.
+__postfix T operator++<T>(__ref Atomic<T> v); // returns original value.
+__prefix T operator--<T>(__ref Atomic<T> v); // returns new value.
+__postfix T operator--<T>(__ref Atomic<T> v); // returns original value.
+T operator+=(__ref Atomic<T> v, T operand); // returns new value.
+T operator-=(__ref Atomic<T> v, T operand); // returns new value.
+T operator|=(__ref Atomic<T> v, T operand); // returns new value.
+T operator&=(__ref Atomic<T> v, T operand); // returns new value.
+T operator^=(__ref Atomic<T> v, T operand); // returns new value.
 ```
 
-We allow `Atomic<T>` to be defined anywhere: as struct fields, as array elements, as elements of `RWStructuredBuffer` types,
-or as local, global and groupshared variable types or function parameter types. For example, in global memory:
+We allow `Atomic<T>` to be defined in struct fields, as array elements, as elements of `RWStructuredBuffer` types,
+or as groupshared variable types or `__ref` function parameter types. For example:
 
 ```hlsl
 struct MyType
@@ -98,9 +128,10 @@ void main()
 }
 ```
 
-When generating WGSL code where `atomic<T>` isn't allowed on local variables or other illegal address spaces, we will lower the type
-into its underlying type. The use of atomic type in these positions will simply have no meaning. A caveat is what the semantics should be
-when there is a function that takes `inout Atomic<T>` as parameter. This likely need to be a warning or error.
+Note that in many targets, it is invalid to use `atomic<T>` type to define a local variable or a function parameter, or in any way
+to cause a `atomic<T>` to reside in local/function/private address space. Slang should be able to lower the type
+into its underlying type. The use of atomic type in these positions will simply have no meaning. However, we are going to leave
+this legalization as future work and leave such situation as undefined behavior for now.
 
 This should be handled by a legalization pass similar to `lowerBufferElementTypeToStorageType` but operates
 in the opposite direction: the "loaded" value from a buffer is converted into an atomic-free type, and storing a value leads to an
@@ -114,3 +145,9 @@ For non-WGSL/Metal targets, we can simply lower the type out of existence into i
 architectures that have different memory models. WGSL and Metal follows this trend to require atomic operations being expressed
 this way. This proposal is to make Slang follow this trend and make `Atomic<T>` the recommened way to express atomic operation
 going forward.
+
+# Future Work
+
+As discussed in previous sections, we should consider adding a legalization pass to allow `Atomic<T>` type to be used anywhere in
+any memory space, and legalize them out to just normal types if they are used in memory spaces where atomic semantic has no/trivial
+meaning.
