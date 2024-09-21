@@ -1857,8 +1857,6 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 }
 
 // WGSL Family
-// Currently the setting is same to GLSL except "getConstantBufferRules()".
-// TODO: We need to figure out what layout WGSL uses.
 
 LayoutRulesImpl kWGSLConstantBufferLayoutRulesImpl_ = {
     &kWGSLLayoutRulesFamilyImpl, &kStd140LayoutRulesImpl, &kWGSLObjectLayoutRulesImpl,
