@@ -9039,7 +9039,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(wgsl)]
 void __wgsl_frexp(T x, out T fract, out int exp)
 {
-    __intrinsic_asm "{ var s = frexp($0); (*($1)) = s.fract; (*($2)) = s.exp; }";
+    __intrinsic_asm "{ var s = frexp($0); ($1) = s.fract; ($2) = s.exp; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -9071,7 +9071,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(wgsl)]
 void __wgsl_frexp(vector<T, N> x, out vector<T, N> fract, out vector<int, N> exp)
 {
-    __intrinsic_asm "{ var s = frexp($0); (*($1)) = s.fract; (*($2)) = s.exp; }";
+    __intrinsic_asm "{ var s = frexp($0); ($1) = s.fract; ($2) = s.exp; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
@@ -11469,7 +11469,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(wgsl)]
 void __wgsl_modf(T x, out T fract, out T whole)
 {
-    __intrinsic_asm "{ var s = modf($0); (*($1)) = s.fract; (*($2)) = s.whole; }";
+    __intrinsic_asm "{ var s = modf($0); ($1) = s.fract; ($2) = s.whole; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -11501,7 +11501,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(wgsl)]
 void __wgsl_modf(vector<T,N> x, out vector<T,N> fract, out vector<T,N> whole)
 {
-    __intrinsic_asm "{ var s = modf($0); (*($1)) = s.fract; (*($2)) = s.whole; }";
+    __intrinsic_asm "{ var s = modf($0); ($1) = s.fract; ($2) = s.whole; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
