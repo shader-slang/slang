@@ -19,6 +19,7 @@ namespace Slang
     struct LowerCombinedSamplerContext
     {
         Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapTypeToLoweredInfo;
+        CodeGenTarget codeGenTarget;
 
         LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
         {
@@ -57,8 +58,16 @@ namespace Slang
             builder.createStructField(structType, info.sampler, info.samplerType);
 
             // Type layout.
-            
-            auto textureResourceKind = isMutable ? LayoutResourceKind::UnorderedAccess : LayoutResourceKind::ShaderResource;
+
+            bool isWGSLTarget = codeGenTarget == CodeGenTarget::WGSL;
+            LayoutResourceKind textureResourceKind = isMutable ? LayoutResourceKind::UnorderedAccess : LayoutResourceKind::ShaderResource;
+            LayoutResourceKind samplerResourceKind = LayoutResourceKind::SamplerState;
+            if (isWGSLTarget)
+            {
+                textureResourceKind = LayoutResourceKind::DescriptorTableSlot;
+                samplerResourceKind = LayoutResourceKind::DescriptorTableSlot;
+            }
+
             IRTypeLayout::Builder textureTypeLayoutBuilder(&builder);
             textureTypeLayoutBuilder.addResourceUsage(
                 textureResourceKind,
@@ -67,7 +76,7 @@ namespace Slang
 
             IRTypeLayout::Builder samplerTypeLayoutBuilder(&builder);
             samplerTypeLayoutBuilder.addResourceUsage(
-                LayoutResourceKind::SamplerState,
+                samplerResourceKind,
                 LayoutSize(1));
             auto samplerTypeLayout = samplerTypeLayoutBuilder.build();
 
@@ -76,7 +85,7 @@ namespace Slang
             auto textureVarLayout = textureVarLayoutBuilder.build();
 
             IRVarLayout::Builder samplerVarLayoutBuilder(&builder, samplerTypeLayout);
-            samplerVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::SamplerState)->offset = 0;
+            samplerVarLayoutBuilder.findOrAddResourceInfo(samplerResourceKind)->offset = isWGSLTarget ? 1 : 0;
             auto samplerVarLayout = samplerVarLayoutBuilder.build();
             
             IRStructTypeLayout::Builder layoutBuilder(&builder);
@@ -91,12 +100,14 @@ namespace Slang
     };
 
     void lowerCombinedTextureSamplers(
+        CodeGenContext* codeGenContext,
         IRModule* module,
         DiagnosticSink* sink)
     {
         SLANG_UNUSED(sink);
 
         LowerCombinedSamplerContext context;
+        context.codeGenTarget = codeGenContext->getTargetFormat();
 
         // Lower combined texture sampler type into a struct type.
         for (auto globalInst : module->getGlobalInsts())
@@ -127,12 +138,13 @@ namespace Slang
 
                 for (auto offsetAttr : varLayout->getOffsetAttrs())
                 {
-                    if (offsetAttr->getResourceKind() == LayoutResourceKind::UnorderedAccess ||
-                        offsetAttr->getResourceKind() == LayoutResourceKind::ShaderResource)
+                    LayoutResourceKind resKind = offsetAttr->getResourceKind();
+                    if (resKind == LayoutResourceKind::UnorderedAccess ||
+                        resKind == LayoutResourceKind::ShaderResource)
                         resOffsetAttr = offsetAttr;
-                    else if (offsetAttr->getResourceKind() == LayoutResourceKind::DescriptorTableSlot)
+                    else if (resKind == LayoutResourceKind::DescriptorTableSlot)
                         descriptorTableSlotOffsetAttr = offsetAttr;
-                    auto info = newVarLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+                    auto info = newVarLayoutBuilder.findOrAddResourceInfo(resKind);
                     info->offset = offsetAttr->getOffset();
                     info->space = offsetAttr->getSpace();
                     info->kind = offsetAttr->getResourceKind();

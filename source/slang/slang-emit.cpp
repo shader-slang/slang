@@ -973,8 +973,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
+    case CodeGenTarget::WGSL:
         if (requiredLoweringPassSet.combinedTextureSamplers)
-            lowerCombinedTextureSamplers(irModule, sink);
+            lowerCombinedTextureSamplers(codeGenContext, irModule, sink);
         break;
     }
 
