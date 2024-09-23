@@ -9992,7 +9992,7 @@ namespace Slang
             imaginaryArguments.add(arg);
             directions.add(getParameterDirection(param));
         }
-        return { imaginaryArguments, directions };
+        return { imaginaryArguments, directions, nullptr, ParameterDirection::kParameterDirection_In };
     }
 
     Type* getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)

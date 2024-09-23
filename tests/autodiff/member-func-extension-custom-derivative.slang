@@ -20,7 +20,7 @@ extension A
     DifferentialPair<float> diff_f(DifferentialPair<float> v)
     {
         return diffPair(v.p * v.p, v.p * v.d * 2.0);
-   }
+    }
 }
 
 struct Foo<T : IDifferentiable>
