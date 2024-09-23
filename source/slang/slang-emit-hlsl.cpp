@@ -496,6 +496,171 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
     }
 }
 
+bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicLoad:
+    {
+        emitInstResultDecl(inst);
+        emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return true;
+    }
+    case kIROp_AtomicStore:
+    {
+        emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(" = ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return true;
+    }
+    case kIROp_AtomicExchange:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedExchange(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicCompareExchange:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedCompareExchange(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicAdd:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicSub:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", -(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicAnd:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedAnd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicOr:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedOr(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicXor:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedXor(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMin:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedMin(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMax:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedMax(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicInc:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", 1, ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicDec:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n");
+        m_writer->emit("InterlockedAdd(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", -1, ");
+        m_writer->emit(getName(inst));
+        m_writer->emit(");");
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
 bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->getOp())
@@ -755,7 +920,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
         break;
-
         default: break;
     }
     // Not handled
@@ -1028,6 +1192,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_TextureFootprintType:
         {
             m_writer->emit("uint4");
+            return;
+        }
+        case kIROp_AtomicType:
+        {
+            emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
             return;
         }
         default: break;

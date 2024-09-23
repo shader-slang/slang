@@ -5084,6 +5084,23 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitAtomicStore(
+        IRInst* dstPtr,
+        IRInst* srcVal,
+        IRInst* memoryOrder)
+    {
+        auto inst = createInst<IRAtomicStore>(
+            this,
+            kIROp_AtomicStore,
+            nullptr,
+            dstPtr,
+            srcVal,
+            memoryOrder);
+
+        addInst(inst);
+        return inst;
+    }
+
     /// @param params An ordered list of imageLoad parameters { image, coord, [optional] seperateArrayCoord, [optional] seperateSampleCoord }
     IRInst* IRBuilder::emitImageLoad(IRType* type, ShortList<IRInst*> params)
     {

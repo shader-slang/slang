@@ -2274,10 +2274,14 @@ namespace Slang
 
         expr->left = maybeOpenRef(expr->left);
         auto type = expr->left->type;
+        if (auto atomicType = as<AtomicType>(type))
+        {
+            type = atomicType->getElementType();
+        }
         auto right = maybeOpenRef(expr->right);
         expr->right = coerce(CoercionSite::Assignment, type, right);
 
-        if (!type.isLeftValue)
+        if (!expr->left->type.isLeftValue)
         {
             if (as<ErrorType>(type))
             {

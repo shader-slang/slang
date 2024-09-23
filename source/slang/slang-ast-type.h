@@ -436,6 +436,13 @@ class ArrayExpressionType : public DeclRefType
     IntVal* getElementCount();
 };
 
+class AtomicType : public DeclRefType
+{
+    SLANG_AST_CLASS(AtomicType)
+
+    Type* getElementType();
+};
+
 // The "type" of an expression that resolves to a type.
 // For example, in the expression `float(2)` the sub-expression,
 // `float` would have the type `TypeType(float)`.

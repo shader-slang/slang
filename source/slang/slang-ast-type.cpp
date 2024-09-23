@@ -328,6 +328,12 @@ bool ArrayExpressionType::isUnsized()
     return false;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AtomicType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Type* AtomicType::getElementType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypeType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void TypeType::_toTextOverride(StringBuilder& out)

@@ -211,6 +211,14 @@ case kIROp_##TYPE##Type:                                        \
     }
     break;
 
+    case kIROp_AtomicType:
+    {
+        auto atomicType = cast<IRAtomicType>(type);
+        _calcSizeAndAlignment(optionSet, rules, atomicType->getElementType(), outSizeAndAlignment);
+        return SLANG_OK;
+    }
+    break;
+
     case kIROp_UnsizedArrayType:
     {
         auto unsizedArrayType = cast<IRUnsizedArrayType>(type);

@@ -2354,6 +2354,152 @@ SpvInst* emitOpExecutionModeIdLocalSizeId(
 }
 
 template<typename T1, typename T2, typename T3, typename T4>
+SpvInst* emitOpAtomicLoad(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semantics
+)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicLoad,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semantics
+    );
+}
+
+template<typename T1, typename T2, typename T3, typename T4>
+SpvInst* emitOpAtomicStore(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& pointer,
+    const T2& memory,
+    const T3& semantics,
+    const T4& value
+)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicStore,
+        pointer,
+        memory,
+        semantics,
+        value
+    );
+}
+
+template<typename T1, typename T2, typename T3, typename T4, typename T5>
+SpvInst* emitOpAtomicExchange(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semantics,
+    const T5& value
+)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    static_assert(isSingular<T5>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicExchange,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semantics,
+        value
+    );
+}
+
+template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
+SpvInst* emitOpAtomicCompareExchange(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semanticsEqual,
+    const T5& semanticsUnequal,
+    const T6& value,
+    const T7& comparator
+)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    static_assert(isSingular<T5>);
+    static_assert(isSingular<T6>);
+    static_assert(isSingular<T7>);
+
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicCompareExchange,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semanticsEqual,
+        semanticsUnequal,
+        value,
+        comparator
+    );
+}
+
+template<typename T1, typename T2, typename T3, typename T4, typename T5>
+SpvInst* emitOpAtomicOp(
+    SpvInstParent* parent,
+    IRInst* inst,
+    SpvOp op,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semantics,
+    const T5& value
+)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    static_assert(isSingular<T5>);
+    return emitInst(
+        parent,
+        inst,
+        op,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semantics,
+        value
+    );
+}
+
+template<typename T1, typename T2, typename T3, typename T4>
 SpvInst* emitOpAtomicIIncrement(
     SpvInstParent* parent,
     IRInst* inst,

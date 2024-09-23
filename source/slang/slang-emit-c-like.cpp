@@ -500,32 +500,6 @@ void CLikeSourceEmitter::defaultEmitInstStmt(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_AtomicCounterIncrement:
-        {
-            auto oldValName = getName(inst);
-            m_writer->emit("int ");
-            m_writer->emit(oldValName);
-            m_writer->emit(";\n");
-            m_writer->emit("InterlockedAdd(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", 1, ");
-            m_writer->emit(oldValName);
-            m_writer->emit(");\n");
-        }
-        break;
-    case kIROp_AtomicCounterDecrement:
-        {
-            auto oldValName = getName(inst);
-            m_writer->emit("int ");
-            m_writer->emit(oldValName);
-            m_writer->emit(";\n");
-            m_writer->emit("InterlockedAdd(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", -1, ");
-            m_writer->emit(oldValName);
-            m_writer->emit(");\n");
-        }
-        break;
     case kIROp_StructuredBufferGetDimensions:
         {
             auto count = _generateUniqueName(UnownedStringSlice("_elementCount"));
@@ -1672,16 +1646,11 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     return true;
 }
 
-bool CLikeSourceEmitter::isPointerSyntaxRequiredImpl(IRInst* /* inst */)
-{
-    return doesTargetSupportPtrTypes();
-}
-
 void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec)
 {
     EmitOpInfo newOuterPrec = outerPrec;
 
-    if (isPointerSyntaxRequiredImpl(inst))
+    if (doesTargetSupportPtrTypes())
     {
         switch (inst->getOp())
         {
@@ -1780,7 +1749,7 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
 
 void CLikeSourceEmitter::emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec)
 {
-    if (isPointerSyntaxRequiredImpl(inst))
+    if (doesTargetSupportPtrTypes())
     {
         auto prec = getInfo(EmitOp::Prefix);
         auto newOuterPrec = outerPrec;
@@ -1862,8 +1831,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     emitRateQualifiers(inst);
 
-    bool isConstant(as<IRModuleInst>(inst->getParent()));
-    if(isConstant)
+    if (as<IRModuleInst>(inst->getParent()))
     {
         // "Ordinary" instructions at module scope are constants
 
@@ -1888,7 +1856,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     }
 
-    emitVarKeyword(type, isConstant);
+    emitVarKeyword(type, inst);
 
     emitType(type, getName(inst));
     m_writer->emit(" = ");
@@ -2030,6 +1998,11 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     }
 }
 
+void CLikeSourceEmitter::emitCallArg(IRInst* inst)
+{
+    emitOperand(inst, getInfo(EmitOp::General));
+}
+
 void CLikeSourceEmitter::_emitCallArgList(IRCall* inst, int startingOperandIndex)
 {
     bool isFirstArg = true;
@@ -2050,7 +2023,7 @@ void CLikeSourceEmitter::_emitCallArgList(IRCall* inst, int startingOperandIndex
             m_writer->emit(", ");
         else
             isFirstArg = false;
-        emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+        emitCallArg(inst->getOperand(aa));
     }
     m_writer->emit(")");
 }
@@ -2323,7 +2296,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
         IRFieldAddress* ii = (IRFieldAddress*) inst;
 
-        if (isPointerSyntaxRequiredImpl(inst))
+        if (doesTargetSupportPtrTypes())
         {
             auto prec = getInfo(EmitOp::Prefix);
             needClose = maybeEmitParens(outerPrec, prec);
@@ -2920,8 +2893,19 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
         // Insts that needs to be emitted as code blocks.
     case kIROp_CudaKernelLaunch:
-    case kIROp_AtomicCounterIncrement:
-    case kIROp_AtomicCounterDecrement:
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicStore:
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicAnd:
+    case kIROp_AtomicOr:
+    case kIROp_AtomicXor:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
     case kIROp_StructuredBufferGetDimensions:
     case kIROp_MetalAtomicCast:
         emitInstStmt(inst);
@@ -3143,7 +3127,7 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
 
 void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* type)
 {
-    emitVarKeyword(type, /* isConstant */ false);
+    emitVarKeyword(type, inst);
 
     emitType(type, getName(inst));
 
@@ -3975,7 +3959,7 @@ void CLikeSourceEmitter::emitParameterGroup(IRGlobalParam* varDecl, IRUniformPar
     emitParameterGroupImpl(varDecl, type);
 }
 
-void CLikeSourceEmitter::emitVarKeywordImpl(IRType * /* type */, bool /* isConstant */) {}
+void CLikeSourceEmitter::emitVarKeywordImpl(IRType * /* type */, IRInst* /* varDecl */) {}
 
 void CLikeSourceEmitter::emitVar(IRVar* varDecl)
 {
@@ -4015,7 +3999,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
 #endif
     emitRateQualifiersAndAddressSpace(varDecl);
 
-    emitVarKeyword(varType, /* isConstant */ false);
+    emitVarKeyword(varType, varDecl);
 
     emitType(varType, getName(varDecl));
 
@@ -4147,7 +4131,7 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     emitVarModifiers(layout, varDecl, varType);
 
     emitRateQualifiersAndAddressSpace(varDecl);
-    emitVarKeyword(varType, /* isConstant */ true);
+    emitVarKeyword(varType, varDecl);
     emitType(varType, getName(varDecl));
 
     // TODO: These shouldn't be needed for ordinary
@@ -4221,8 +4205,8 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     emitDecorationLayoutSemantics(varDecl, "register");
 
     emitRateQualifiersAndAddressSpace(varDecl);
-    emitVarKeyword(varType, /* isConstant */ false);
-    emitGlobalParamType(varType, getName(varDecl));
+    emitVarKeyword(varType, varDecl);
+    emitType(varType, getName(varDecl));
 
     emitSemantics(varDecl);
 
