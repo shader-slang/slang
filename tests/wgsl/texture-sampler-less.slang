@@ -5,13 +5,16 @@
 // But the keyword, `constexpr`, doesn't seem to work for the combined-textures
 #define TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET 0
 
-//TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
-RWStructuredBuffer<int> outputBuffer;
-
+//WGSL:@binding(0) {{.*}}t1D_f32v3{{.*}} : texture_1d<f32>;
+//WGSL:@binding(1) {{.*}}t1D_f32v3{{.*}} : sampler;
 //TEST_INPUT: TextureSampler1D(size=4, content = zero):name t1D_f32v3
 Sampler1D<float3> t1D_f32v3;
+
+//WGSL:@binding(2) {{.*}}t2D_f32v3{{.*}} : texture_2d<f32>;
+//WGSL:@binding(3) {{.*}}t2D_f32v3{{.*}} : sampler;
 //TEST_INPUT: TextureSampler2D(size=4, content = zero):name t2D_f32v3
 Sampler2D<float3> t2D_f32v3;
+
 //TEST_INPUT: TextureSampler3D(size=4, content = zero):name t3D_f32v3
 Sampler3D<float3> t3D_f32v3;
 //TEST_INPUT: TextureSamplerCube(size=4, content = zero):name tCube_f32v3
@@ -100,6 +103,9 @@ CombinedDepthcube<float> dCube;
 CombinedDepth2d_array<float> d2DArray;
 //TEST_INPUT: TextureSamplerCube(size=4, content = zero, arrayLength=2):name dCubeArray
 CombinedDepthcube_array<float> dCubeArray;
+
+//TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
+RWStructuredBuffer<int> outputBuffer;
 
 
 __generic<T:__BuiltinArithmeticType, let N:int>

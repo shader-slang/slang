@@ -1875,11 +1875,6 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptio
 
 LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet& compilerOptions)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCConstantBufferLayoutRulesFamilyImpl;
-
     return &kStd140LayoutRulesImpl_;
 }
 
@@ -1895,11 +1890,6 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 
 LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet& compilerOptions)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCConstantBufferLayoutRulesFamilyImpl;
-
     return &kStd430LayoutRulesImpl_;
 }
 
@@ -1920,11 +1910,6 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getSpecializationConstantRules()
 
 LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet& compilerOptions)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCShaderResourceLayoutRulesFamilyImpl;
-
     return &kStd430LayoutRulesImpl_;
 }
 
@@ -1945,11 +1930,6 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 
 LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet& compilerOptions)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCShaderResourceLayoutRulesFamilyImpl;
-
     return &kGLSLStructuredBufferLayoutRulesImpl_;
 }
 
