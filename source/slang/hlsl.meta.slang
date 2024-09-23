@@ -2190,11 +2190,11 @@ Array<T,4> __makeArray<T>(T v0, T v1, T v2, T v3);
 
 
 // Beginning of Texture Gather
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<TElement,4> __texture_gather(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 0, 0, format> texture,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
     int component)
@@ -2243,11 +2243,11 @@ vector<TElement,4> __texture_gather(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gather(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 0, 1, format> sampler,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     int component)
 {
@@ -2262,11 +2262,11 @@ vector<TElement,4> __texture_gather(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<TElement,4> __texture_gather_offset(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 0, 0, format> texture,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     constexpr vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset,
@@ -2307,11 +2307,11 @@ vector<TElement,4> __texture_gather_offset(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gather_offset(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 0, 1, format> sampler,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset,
     int component)
@@ -2327,11 +2327,11 @@ vector<TElement,4> __texture_gather_offset(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gather_offsets(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 0, 0, format> texture,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
@@ -2354,11 +2354,11 @@ vector<TElement,4> __texture_gather_offsets(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gather_offsets(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 0, 1, format> sampler,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
     constexpr vector<int, Shape.planeDimensions> offset2,
@@ -2379,11 +2379,11 @@ vector<TElement,4> __texture_gather_offsets(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<TElement,4> __texture_gatherCmp(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 1, 0, format> texture,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue)
@@ -2427,11 +2427,11 @@ vector<TElement,4> __texture_gatherCmp(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 1, 1, format> sampler,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue)
 {
@@ -2446,11 +2446,11 @@ vector<TElement,4> __texture_gatherCmp(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offset(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 1, 0, format> texture,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
@@ -2491,11 +2491,11 @@ vector<TElement,4> __texture_gatherCmp_offset(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offset(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 1, 1, format> sampler,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
     constexpr vector<int, Shape.planeDimensions> offset)
@@ -2511,11 +2511,11 @@ vector<TElement,4> __texture_gatherCmp_offset(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offsets(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 1, 0, format> texture,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
@@ -2537,11 +2537,11 @@ vector<TElement,4> __texture_gatherCmp_offsets(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let format:int>
+__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offsets(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, 1, 1, format> sampler,
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
@@ -2564,32 +2564,30 @@ vector<TElement,4> __texture_gatherCmp_offsets(
 
 ${{{{
 for (int isCombined = 0; isCombined < 2; isCombined++)
-for (int isShadow = 0; isShadow < 2; isShadow++)
 for (int isScalarTexture = 0; isScalarTexture < 2; isScalarTexture++)
 {
-    if (isShadow && isScalarTexture == 0) continue;
-
     const char* extSizeParam = isScalarTexture ? "" : ", let N:int";
     const char* extTexType = isScalarTexture ? "T" : "vector<T,N>";
 
-    const char* compareFunc = isShadow ? "Cmp" : "";
-    const char* compareParam = isShadow ? ", T compareValue" : "";
-    const char* compareArg = isShadow ? ", compareValue" : "";
-
-    // Some targets support the combined texture natively
-    const char* samplerParam = isCombined ? "" : (isShadow ? "SamplerComparisonState s," : "SamplerState s,");
-    const char* samplerArg = isCombined ? "" : ", s";
-    const char* getTexture = isCombined ? "__getTexture()" : "this";
-    const char* getSampler = isCombined ? (isShadow ? ", __getComparisonSampler()" : ", __getSampler()") : samplerArg;
-
 }}}}
-// Gather for [TextureType = $(extTexType), isShadow = $(isShadow), isCombined = $(isCombined)]
-__generic<T:__BuiltinArithmeticType $(extSizeParam), Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
-extension __TextureImpl<$(extTexType),Shape,isArray,0,sampleCount,0,$(isShadow),$(isCombined),format>
+// Gather for [TextureType = $(extTexType), isCombined = $(isCombined)]
+__generic<T:__BuiltinArithmeticType $(extSizeParam), Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+extension __TextureImpl<$(extTexType),Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
 {
 ${{{{
+    for (int isShadow = 0; isShadow < 2; isShadow++)
     for (auto componentId = 0;  componentId < 5; componentId++)
     {
+        const char* compareFunc = isShadow ? "Cmp" : "";
+        const char* compareParam = isShadow ? ", T compareValue" : "";
+        const char* compareArg = isShadow ? ", compareValue" : "";
+
+        // Some targets support the combined texture natively
+        const char* samplerParam = isCombined ? "" : (isShadow ? "SamplerComparisonState s," : "SamplerState s,");
+        const char* samplerArg = isCombined ? "" : ", s";
+        const char* getTexture = isCombined ? "__getTexture()" : "this";
+        const char* getSampler = isCombined ? (isShadow ? ", __getComparisonSampler()" : ", __getSampler()") : samplerArg;
+
         const char* componentFuncString[] = { "", "Red", "Green", "Blue", "Alpha"};
         const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
         const char* componentFunc = componentFuncString[componentId];
@@ -2722,7 +2720,7 @@ ${{{{
 ${{{{
     } // for (componentId)
 }}}}
-} // End of: Gather for [TextureType = $(extTexType), isShadow = $(isShadow), isCombined = $(isCombined)]
+} // End of: Gather for [TextureType = $(extTexType), isCombined = $(isCombined)]
 
 ${{{{
 } // for (isScalarTexture)
