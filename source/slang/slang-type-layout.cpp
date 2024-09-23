@@ -1867,13 +1867,12 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getAnyValueRules()
     return &kGLSLAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet& compilerOptions)
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&)
 {
-    (void) compilerOptions;
     return &kWGSLConstantBufferLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet& compilerOptions)
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {
     return &kStd140LayoutRulesImpl_;
 }
@@ -1888,7 +1887,7 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
     return &kGLSLShaderRecordLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet& compilerOptions)
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
 {
     return &kStd430LayoutRulesImpl_;
 }
@@ -1908,7 +1907,7 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getSpecializationConstantRules()
     return &kGLSLSpecializationConstantLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet& compilerOptions)
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
     return &kStd430LayoutRulesImpl_;
 }
@@ -1928,7 +1927,7 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return &kGLSLHitAttributesParameterLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet& compilerOptions)
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
     return &kGLSLStructuredBufferLayoutRulesImpl_;
 }
