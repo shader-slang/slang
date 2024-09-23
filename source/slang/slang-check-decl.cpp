@@ -9730,6 +9730,32 @@ namespace Slang
         return false;
     }
 
+    Type* getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)
+    {
+        ThisExpr* expr = visitor->getASTBuilder()->create<ThisExpr>();
+        expr->scope = funcDecl->ownedScope;
+        expr->loc = funcDecl->loc;
+
+        DiagnosticSink dummySink;
+        auto tempVisitor = SemanticsVisitor(visitor->withSink(&dummySink));
+
+        auto checkedExpr = tempVisitor.CheckTerm(expr);
+        
+        return !(as<ErrorType>(checkedExpr->type.type)) ? (checkedExpr->type.type) : nullptr;
+    }
+
+    Type* getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef)
+    {
+        auto type = getTypeForThisExpr(visitor, funcDeclRef.getDecl());
+        if (type)
+            return substituteType(
+                SubstitutionSet(funcDeclRef.declRefBase),
+                visitor->getASTBuilder(),
+                type);
+        return nullptr;
+    }
+
+
     struct ArgsWithDirectionInfo
     {
         List<Expr*> args;
@@ -9993,31 +10019,6 @@ namespace Slang
             directions.add(getParameterDirection(param));
         }
         return { imaginaryArguments, directions, nullptr, ParameterDirection::kParameterDirection_In };
-    }
-
-    Type* getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)
-    {
-        ThisExpr* expr = visitor->getASTBuilder()->create<ThisExpr>();
-        expr->scope = funcDecl->ownedScope;
-        expr->loc = funcDecl->loc;
-
-        DiagnosticSink dummySink;
-        auto tempVisitor = SemanticsVisitor(visitor->withSink(&dummySink));
-
-        auto checkedExpr = tempVisitor.CheckTerm(expr);
-        
-        return !(as<ErrorType>(checkedExpr->type.type)) ? (checkedExpr->type.type) : nullptr;
-    }
-
-    Type* getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef)
-    {
-        auto type = getTypeForThisExpr(visitor, funcDeclRef.getDecl());
-        if (type)
-            return substituteType(
-                SubstitutionSet(funcDeclRef.declRefBase),
-                visitor->getASTBuilder(),
-                type);
-        return nullptr;
     }
 
     ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
