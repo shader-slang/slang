@@ -9908,7 +9908,7 @@ namespace Slang
                     
                     DeclRef<FunctionDeclBase> funcDeclRef = defaultFuncDeclRef.as<FunctionDeclBase>();
                     auto funcThisType = getTypeForThisExpr(visitor, funcDeclRef);
-                    DeclRef<FunctionDeclBase> calleeFuncDeclRef = calleeDeclRef->declRef.as<FunctionDeclBase>();
+                    DeclRef<FunctionDeclBase> calleeFuncDeclRef = calleeDeclRef->declRef.template as<FunctionDeclBase>();
                     auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
 
                     // If the function is a member function, we need to check that the
