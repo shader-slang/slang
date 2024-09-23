@@ -9906,8 +9906,10 @@ namespace Slang
                         visitor,
                         makeDeclRef(funcDecl));
                     
-                    auto funcThisType = getTypeForThisExpr(visitor, defaultFuncDeclRef.as<FunctionDeclBase>());
-                    auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeDeclRef->declRef.as<FunctionDeclBase>());
+                    DeclRef<FunctionDeclBase> funcDeclRef = defaultFuncDeclRef.as<FunctionDeclBase>();
+                    auto funcThisType = getTypeForThisExpr(visitor, funcDeclRef);
+                    DeclRef<FunctionDeclBase> calleeFuncDeclRef = calleeDeclRef->declRef.as<FunctionDeclBase>();
+                    auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
 
                     // If the function is a member function, we need to check that the
                     // `this` type matches the expected type. This will ensure that after lowering to IR, 
