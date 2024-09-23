@@ -224,7 +224,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 ++paramCount;
                 params << t << "width";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width(" << String(metalMipLevel) << ")),";
-                wgsl << "*($" << String(paramCount) << ") = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
+                wgsl << "($" << String(paramCount) << ") = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
 
                 sizeDimCount = 1;
                 break;
@@ -235,12 +235,12 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width(" << String(metalMipLevel) << ")),";
                 wgsl << "var dim = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
-                wgsl << "(*$" << String(paramCount) << ") = dim.x;";
+                wgsl << "($" << String(paramCount) << ") = dim.x;";
 
                 ++paramCount;
                 params << t << "height";
                 metal << "(*($" << String(paramCount) << ") = $0.get_height(" << String(metalMipLevel) << ")),";
-                wgsl << "(*$" << String(paramCount) << ") = dim.y;";
+                wgsl << "($" << String(paramCount) << ") = dim.y;";
 
                 sizeDimCount = 2;
                 break;
@@ -250,17 +250,17 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width(" << String(metalMipLevel) << ")),";
                 wgsl << "var dim = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
-                wgsl << "(*$" << String(paramCount) << ") = dim.x;";
+                wgsl << "($" << String(paramCount) << ") = dim.x;";
 
                 ++paramCount;
                 params << t << "height,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_height(" << String(metalMipLevel) << ")),";
-                wgsl << "(*$" << String(paramCount) << ") = dim.y;";
+                wgsl << "($" << String(paramCount) << ") = dim.y;";
 
                 ++paramCount;
                 params << t << "depth";
                 metal << "(*($" << String(paramCount) << ") = $0.get_depth(" << String(metalMipLevel) << ")),";
-                wgsl << "(*$" << String(paramCount) << ") = dim.z;";
+                wgsl << "($" << String(paramCount) << ") = dim.z;";
 
                 sizeDimCount = 3;
                 break;
@@ -276,7 +276,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 ++paramCount;
                 params << ", " << t << "elements";
                 metal << "(*($" << String(paramCount) << ") = $0.get_array_size()),";
-                wgsl << "(*$" << String(paramCount) << ") = textureNumLayers($0);";
+                wgsl << "($" << String(paramCount) << ") = textureNumLayers($0);";
             }
 
             if (isMultisample)
@@ -284,7 +284,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 ++paramCount;
                 params << ", " << t << "sampleCount";
                 metal << "(*($" << String(paramCount) << ") = $0.get_num_samples()),";
-                wgsl << "(*$" << String(paramCount) << ") = textureNumSamples($0);";
+                wgsl << "($" << String(paramCount) << ") = textureNumSamples($0);";
             }
 
             if (includeMipInfo)
@@ -292,7 +292,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 ++paramCount;
                 params << ", " << t << "numberOfLevels";
                 metal << "(*($" << String(paramCount) << ") = $0.get_num_mip_levels()),";
-                wgsl << "(*$" << String(paramCount) << ") = textureNumLevels($0);";
+                wgsl << "($" << String(paramCount) << ") = textureNumLevels($0);";
             }
 
             metal.reduceLength(metal.getLength() - 1); // drop the last comma
