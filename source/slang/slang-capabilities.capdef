@@ -374,6 +374,10 @@ alias glsl_hlsl_metal_spirv_wgsl = glsl | hlsl | metal | spirv | wgsl;
 /// [Compound]
 alias glsl_metal_spirv = glsl | metal | spirv;
 
+/// GLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias glsl_metal_spirv_wgsl = glsl | metal | spirv | wgsl;
+
 /// GLSL, and SPIRV code-gen targets
 /// [Compound]
 alias glsl_spirv = glsl | spirv;
