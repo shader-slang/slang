@@ -896,6 +896,25 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 };
 HLSLObjectLayoutRulesImpl kHLSLObjectLayoutRulesImpl;
 
+struct WGSLObjectLayoutRulesImpl : GLSLObjectLayoutRulesImpl
+{
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) override
+    {
+        ObjectLayoutInfo info = GLSLObjectLayoutRulesImpl::GetObjectLayout(kind, options);
+
+        switch (kind)
+        {
+        case ShaderParameterKind::TextureSampler:
+        case ShaderParameterKind::MutableTextureSampler:
+            info.layoutInfos.add(SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1));
+            break;
+        }
+
+        return info;
+    }
+};
+WGSLObjectLayoutRulesImpl kWGSLObjectLayoutRulesImpl;
+
 // HACK: Treating ray-tracing input/output as if it was another
 // case of varying input/output when it really needs to be
 // based on byte storage/layout.
@@ -1053,11 +1072,32 @@ struct MetalLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getAnyValueRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules()      override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
+};
+
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
+WGSLLayoutRulesFamilyImpl kWGSLLayoutRulesFamilyImpl;
 
 // CPU case
 
@@ -1816,6 +1856,82 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getHitAttributesParameterRules()
     return nullptr;
 }
 
+// WGSL Family
+
+LayoutRulesImpl kWGSLConstantBufferLayoutRulesImpl_ = {
+    &kWGSLLayoutRulesFamilyImpl, &kStd140LayoutRulesImpl, &kWGSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kGLSLAnyValueLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&)
+{
+    return &kWGSLConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
+{
+    return &kStd140LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kGLSLPushConstantLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return &kGLSLShaderRecordLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
+{
+    return &kStd430LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return &kGLSLVaryingInputLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return &kGLSLVaryingOutputLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return &kGLSLSpecializationConstantLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
+{
+    return &kStd430LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return &kGLSLRayPayloadParameterLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return &kGLSLCallablePayloadParameterLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return &kGLSLHitAttributesParameterLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
+{
+    return &kGLSLStructuredBufferLayoutRulesImpl_;
+}
+
 
 LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targetReq)
 {
@@ -1831,8 +1947,10 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-    case CodeGenTarget::WGSL:
         return &kGLSLLayoutRulesFamilyImpl;
+
+    case CodeGenTarget::WGSL:
+        return &kWGSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:

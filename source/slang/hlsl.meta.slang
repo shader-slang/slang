@@ -2188,60 +2188,68 @@ extension __TextureImpl<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined
 __intrinsic_op($(kIROp_MakeArray))
 Array<T,4> __makeArray<T>(T v0, T v1, T v2, T v3);
 
-// Gather for scalar textures.
+
+// Beginning of Texture Gather
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_metal_spirv, texture_gather)]
-vector<TElement,4> __texture_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location, int component)
+[require(glsl_metal_spirv_wgsl, texture_gather)]
+vector<TElement,4> __texture_gather(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    SamplerState s,
+    vector<float, Shape.dimensions+isArray> location,
+    int component)
 {
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGather($p, $2, $3)";
+        __intrinsic_asm "textureGather($0, $1, $2, $3)";
     case metal:
-        if (isShadow == 0)
+        if (isArray == 1)
         {
             switch (Shape.flavor)
             {
             case $(SLANG_TEXTURE_2D):
-                if (isArray == 1)
-                {
-                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), int2(0), metal::component($3))";
-                }
-                else
-                {
-                    // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, $2, int2(0), metal::component($3))";
-                }
-                break;
+                // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
+                __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), int2(0), metal::component($3))";
             case $(SLANG_TEXTURE_CUBE):
-                if (isArray == 1)
-                {
-                    // Tv gather(sampler s, float3 coord, uint array, component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, ($2).xyz, uint(($2).w), metal::component($3))";
-                }
-                else
-                {
-                    // Tv gather(sampler s, float3 coord, component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, $2, metal::component($3))";
-                }
-                break;
+                // Tv gather(sampler s, float3 coord, uint array, component c = component::x) const
+                __intrinsic_asm "$0.gather($1, ($2).xyz, uint(($2).w), metal::component($3))";
             }
         }
-        // TODO: This needs to be handled by the capability system
-        __intrinsic_asm "<invalid intrinsic>";
+        if (Shape.flavor == $(SLANG_TEXTURE_CUBE))
+        {
+            // Tv gather(sampler s, float3 coord, component c = component::x) const
+            __intrinsic_asm "$0.gather($1, $2, metal::component($3))";
+        }
+        // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
+        __intrinsic_asm "$0.gather($1, $2, int2(0), metal::component($3))";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component;
         };
+    case wgsl:
+        if (isArray == 1)
+        {
+            switch (Shape.flavor)
+            {
+            case $(SLANG_TEXTURE_2D):
+                __intrinsic_asm "textureGather($3, $0, $1, ($2).xy, u32(($2).z))";
+            case $(SLANG_TEXTURE_CUBE):
+                __intrinsic_asm "textureGather($3, $0, $1, ($2).xyz, u32(($2).w))";
+            }
+        }
+        __intrinsic_asm "textureGather($3, $0, $1, $2)";
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gather(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, int component)
+vector<TElement,4> __texture_gather(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    vector<float, Shape.dimensions+isArray> location,
+    int component)
 {
     __target_switch
     {
@@ -2253,45 +2261,60 @@ vector<TElement,4> __texture_gather(__TextureImpl<T, Shape, isArray, 0, sampleCo
         };
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_metal_spirv, texture_gather)]
-vector<TElement,4> __texture_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, constexpr vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, int component)
+[require(glsl_metal_spirv_wgsl, texture_gather)]
+vector<TElement,4> __texture_gather_offset(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    SamplerState s,
+    constexpr vector<float, Shape.dimensions+isArray> location,
+    constexpr vector<int, Shape.planeDimensions> offset,
+    int component)
 {
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffset($p, $2, $3, $4)";
+        __intrinsic_asm "textureGatherOffset($0, $1, $2, $3, $4)";
     case metal:
-        if (Shape.flavor == $(SLANG_TEXTURE_2D))
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D),
+            "Metal supports offset variant of Gather only for 2D textures");
+
+        if (isArray == 1)
         {
-            if (isShadow == 0)
-            {
-                if (isArray == 1)
-                {
-                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), $3, metal::component($4))";
-                }
-                else
-                {
-                    // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
-                    __intrinsic_asm "$0.gather($1, $2, $3, metal::component($4))";
-                }
-            }
+            // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
+            __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), $3, metal::component($4))";
         }
-        // TODO: This needs to be handled by the capability system
-        __intrinsic_asm "<Metal support gather with offset only for 2D>";
+        // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
+        __intrinsic_asm "$0.gather($1, $2, $3, metal::component($4))";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component ConstOffset $offset;
         };
+    case wgsl:
+        if (isArray == 1)
+        {
+            switch (Shape.flavor)
+            {
+            case $(SLANG_TEXTURE_2D):
+                __intrinsic_asm "textureGather($4, $0, $1, ($2).xy, u32(($2).z), $3)";
+            case $(SLANG_TEXTURE_CUBE):
+                __intrinsic_asm "textureGather($4, $0, $1, ($2).xyz, u32(($2).w), $3)";
+            }
+        }
+        __intrinsic_asm "textureGather($4, $0, $1, $2, $3)";
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gather_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, int component)
+vector<TElement,4> __texture_gather_offset(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    vector<float, Shape.dimensions+isArray> location,
+    constexpr vector<int, Shape.planeDimensions> offset,
+    int component)
 {
     __target_switch
     {
@@ -2303,10 +2326,14 @@ vector<TElement,4> __texture_gather_offset(__TextureImpl<T, Shape, isArray, 0, s
         };
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerState s, vector<float, Shape.dimensions+isArray> location,
+vector<TElement,4> __texture_gather_offsets(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    SamplerState s,
+    vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
     constexpr vector<int, Shape.planeDimensions> offset2,
     constexpr vector<int, Shape.planeDimensions> offset3,
@@ -2316,7 +2343,7 @@ vector<TElement,4> __texture_gather_offsets(__TextureImpl<T, Shape, isArray, 0, 
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffsets($p, $2, $T3[]($3, $4, $5, $6)), $7";
+        __intrinsic_asm "textureGatherOffsets($0, $1, $2, $T3[]($3, $4, $5, $6)), $7";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         return spirv_asm {
@@ -2326,11 +2353,13 @@ vector<TElement,4> __texture_gather_offsets(__TextureImpl<T, Shape, isArray, 0, 
         };
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gather_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location,
-
+vector<TElement,4> __texture_gather_offsets(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
     constexpr vector<int, Shape.planeDimensions> offset2,
     constexpr vector<int, Shape.planeDimensions> offset3,
@@ -2349,58 +2378,62 @@ vector<TElement,4> __texture_gather_offsets(__TextureImpl<T, Shape, isArray, 0, 
         };
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_metal_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue)
+[require(glsl_metal_spirv_wgsl, texture_gather)]
+vector<TElement,4> __texture_gatherCmp(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    SamplerComparisonState s,
+    vector<float, Shape.dimensions+isArray> location,
+    TElement compareValue)
 {
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGather($p, $2, $3)";
+        __intrinsic_asm "textureGather($0, $1, $2, $3)";
     case metal:
-        if (isShadow == 1)
+        if (isArray == 1)
         {
-            if (Shape.flavor == $(SLANG_TEXTURE_2D))
+            switch (Shape.flavor)
             {
-                if (isArray == 1)
-                {
-                    // Tv gather_compare(sampler s, float2 coord, uint array, float compare_value, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather_compare($1, ($2).xy, uint(($2).z), $3)";
-                }
-                else
-                {
-                    // Tv gather_compare(sampler s, float2 coord, float compare_value, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather_compare($1, $2, $3)";
-                }
-            }
-            else if (Shape.flavor == $(SLANG_TEXTURE_CUBE))
-            {
-                if (isArray == 1)
-                {
-                    // Tv gather_compare(sampler s, float3 coord, uint array, float compare_value) const
-                    __intrinsic_asm "$0.gather_compare($1, ($2).xyz, uint(($2).w), $3)";
-                }
-                else
-                {
-                    // Tv gather_compare(sampler s, float3 coord, float compare_value) const
-                    __intrinsic_asm "$0.gather_compare($1, $2, $3)";
-                }
+            case $(SLANG_TEXTURE_2D):
+                // Tv gather_compare(sampler s, float2 coord, uint array, float compare_value, int2 offset = int2(0)) const
+                __intrinsic_asm "$0.gather_compare($1, ($2).xy, uint(($2).z), $3)";
+            case $(SLANG_TEXTURE_CUBE):
+                // Tv gather_compare(sampler s, float3 coord, uint array, float compare_value) const
+                __intrinsic_asm "$0.gather_compare($1, ($2).xyz, uint(($2).w), $3)";
             }
         }
-        // TODO: This needs to be handled by the capability system
-        __intrinsic_asm "<invalid intrinsics>";
+        // Tv gather_compare(sampler s, float2 coord, float compare_value, int2 offset = int2(0)) const
+        __intrinsic_asm "$0.gather_compare($1, $2, $3)";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue;
         };
+    case wgsl:
+        if (isArray == 1)
+        {
+            switch (Shape.flavor)
+            {
+            case $(SLANG_TEXTURE_2D):
+                __intrinsic_asm "textureGatherCompare($0, $1, ($2).xy, u32(($2).z), $3)";
+            case $(SLANG_TEXTURE_CUBE):
+                __intrinsic_asm "textureGatherCompare($0, $1, ($2).xyz, u32(($2).w), $3)";
+            }
+        }
+        __intrinsic_asm "textureGatherCompare($0, $1, $2, $3)";
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue)
+vector<TElement,4> __texture_gatherCmp(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    vector<float, Shape.dimensions+isArray> location,
+    TElement compareValue)
 {
     __target_switch
     {
@@ -2412,45 +2445,60 @@ vector<TElement,4> __texture_gatherCmp(__TextureImpl<T, Shape, isArray, 0, sampl
         };
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
-[require(glsl_metal_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+[require(glsl_metal_spirv_wgsl, texture_gather)]
+vector<TElement,4> __texture_gatherCmp_offset(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    SamplerComparisonState s,
+    vector<float, Shape.dimensions+isArray> location,
+    TElement compareValue,
+    constexpr vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffset($p, $2, $3, $4)";
+        __intrinsic_asm "textureGatherOffset($0, $1, $2, $3, $4)";
     case metal:
-        if (isShadow == 1)
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D),
+            "Metal supports depth compare Gather only for 2D texture");
+
+        if (isArray == 1)
         {
-            if (Shape.flavor == $(SLANG_TEXTURE_2D))
-            {
-                if (isArray == 1)
-                {
-                    // Tv gather_compare(sampler s, float2 coord, uint array, float compare_value, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather_compare($1, ($2).xy, uint(($2).z), $3, $4)";
-                }
-                else
-                {
-                    // Tv gather_compare(sampler s, float2 coord, float compare_value, int2 offset = int2(0)) const
-                    __intrinsic_asm "$0.gather_compare($1, $2, $3, $4)";
-                }
-            }
+            // Tv gather_compare(sampler s, float2 coord, uint array, float compare_value, int2 offset = int2(0)) const
+            __intrinsic_asm "$0.gather_compare($1, ($2).xy, uint(($2).z), $3, $4)";
         }
-        // TODO: This needs to be handled by the capability system
-        __intrinsic_asm "<invalid intrinsics>";
+        // Tv gather_compare(sampler s, float2 coord, float compare_value, int2 offset = int2(0)) const
+        __intrinsic_asm "$0.gather_compare($1, $2, $3, $4)";
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
             result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffset $offset;
         };
+    case wgsl:
+        if (isArray == 1)
+        {
+            switch (Shape.flavor)
+            {
+            case $(SLANG_TEXTURE_2D):
+                __intrinsic_asm "textureGatherCompare($0, $1, ($2).xy, u32(($2).z), $3, $4)";
+            case $(SLANG_TEXTURE_CUBE):
+                __intrinsic_asm "textureGatherCompare($0, $1, ($2).xyz, u32(($2).w), $3, $4)";
+            }
+        }
+        __intrinsic_asm "textureGatherCompare($0, $1, $2, $3, $4)";
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+vector<TElement,4> __texture_gatherCmp_offset(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    vector<float, Shape.dimensions+isArray> location,
+    TElement compareValue,
+    constexpr vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
     {
@@ -2462,10 +2510,14 @@ vector<TElement,4> __texture_gatherCmp_offset(__TextureImpl<T, Shape, isArray, 0
         };
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, TElement compareValue,
+vector<TElement,4> __texture_gatherCmp_offsets(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location,
+    TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
     vector<int, Shape.planeDimensions> offset3,
@@ -2474,7 +2526,7 @@ vector<TElement,4> __texture_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffsets($p, $2, $3, $T4[]($4, $5, $6, $7))";
+        __intrinsic_asm "textureGatherOffsets($0, $1, $2, $3, $T4[]($4, $5, $6, $7))";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         return spirv_asm {
@@ -2484,10 +2536,14 @@ vector<TElement,4> __texture_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 
         };
     }
 }
+
 __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp_offsets(__TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler, vector<float, Shape.dimensions+isArray> location, TElement compareValue,
+vector<TElement,4> __texture_gatherCmp_offsets(
+    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    vector<float, Shape.dimensions+isArray> location,
+    TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
     vector<int, Shape.planeDimensions> offset3,
@@ -2510,124 +2566,167 @@ ${{{{
 for (int isCombined = 0; isCombined < 2; isCombined++)
 for (int isScalarTexture = 0; isScalarTexture < 2; isScalarTexture++)
 {
-    if (isScalarTexture == 0)
-    {
-        sb << "__generic<T:__BuiltinArithmeticType, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>\n";
-        sb << "extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow," << isCombined << ",format>\n";
-    }
-    else
-    {
-        sb << "__generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>\n";
-        sb << "extension __TextureImpl<vector<T,N>,Shape,isArray,0,sampleCount,0,isShadow," << isCombined << ",format>\n";
-    }
+    const char* extSizeParam = isScalarTexture ? "" : ", let N:int";
+    const char* extTexType = isScalarTexture ? "T" : "vector<T,N>";
+
 }}}}
-{ // begin extension for gather
+// Gather for [TextureType = $(extTexType), isCombined = $(isCombined)]
+__generic<T:__BuiltinArithmeticType $(extSizeParam), Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+extension __TextureImpl<$(extTexType),Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
+{
 ${{{{
-
-    // Gather component
-    const char* samplerStateParam = isCombined ? "" : " s,";
-    const char* getTexture = isCombined ? "__getTexture()" : "this";
-    for (int isCmp = 0; isCmp < 2; ++isCmp)
+    for (int isShadow = 0; isShadow < 2; isShadow++)
+    for (auto componentId = 0;  componentId < 5; componentId++)
     {
-        const char* cmp = isCmp ? "Cmp" : "";
-        const char* cmpParam = isCmp ? ", T compareValue" : "";
-        const char* compareArg = isCmp ? ", compareValue" : "";
-        const char* samplerStateType = isCombined ? "" : (isCmp ? "SamplerComparisonState" : "SamplerState");
-        const char* getSampler = isCombined ? (isCmp ? " __getComparisonSampler()," : " __getSampler(),") : samplerStateParam;
-        const char* componentNames[] = { "", "Red", "Green", "Blue", "Alpha"};
-        const char* glslComponentNames[] = { ", 0", ", 1", ", 2", ", 3" };
+        const char* compareFunc = isShadow ? "Cmp" : "";
+        const char* compareParam = isShadow ? ", T compareValue" : "";
+        const char* compareArg = isShadow ? ", compareValue" : "";
 
-        for (auto componentId = 0;  componentId < 5; componentId++)
-        {
-            auto componentName = componentNames[componentId];
-            auto glslComponent = (isCmp ? "" :glslComponentNames[componentId == 0 ? 0 : componentId - 1]);
-    
-            for (bool isStatus : { false, true })
-            {
-                const char* statusDecl = isStatus ? ", out uint status" : "";
-                const char* statusInit = isStatus ? " status = 0;\n" : "";
-                const char* statusCapWithMetal = isStatus ? "hlsl" : "glsl_hlsl_metal_spirv";
-                const char* statusCapWithoutMetal = isStatus ? "hlsl" : "glsl_hlsl_spirv";
+        // Some targets support the combined texture natively
+        const char* samplerParam = isCombined ? "" : (isShadow ? "SamplerComparisonState s," : "SamplerState s,");
+        const char* samplerArg = isCombined ? "" : ", s";
+        const char* getTexture = isCombined ? "__getTexture()" : "this";
+        const char* getSampler = isCombined ? (isShadow ? ", __getComparisonSampler()" : ", __getSampler()") : samplerArg;
+
+        const char* componentFuncString[] = { "", "Red", "Green", "Blue", "Alpha"};
+        const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
+        const char* componentFunc = componentFuncString[componentId];
+        const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
 }}}}
     [ForceInline]
-    [require($(statusCapWithMetal), texture_gather)]
-    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam) $(statusDecl))
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+        $(samplerParam)
+        vector<float, Shape.dimensions+isArray> location
+        $(compareParam))
     {
-        $(statusInit)
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+            "Gather is supported only for 2D and 3D textures");
+
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
-${{{{
-                if (!isStatus)
-                {
-}}}}
+        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
         case metal:
-            return __texture_gather$(cmp)<T>($(getTexture),$(getSampler) location $(compareArg) $(glslComponent));
+        case wgsl:
+            return __texture_gather$(compareFunc)<T>($(getTexture) $(getSampler), location $(compareArg) $(componentArg));
         case glsl:
         case spirv:
-            return __texture_gather$(cmp)<T>(this,$(samplerStateParam) location $(compareArg) $(glslComponent));
-${{{{
-                } // if(!isStatus)
-}}}}
+            return __texture_gather$(compareFunc)<T>(this $(samplerArg), location $(compareArg) $(componentArg));
         }
     }
+
     [ForceInline]
-    [require($(statusCapWithMetal), texture_gather)]
-    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam), constexpr vector<int, Shape.planeDimensions> offset $(statusDecl))
+    [require(hlsl, texture_gather)]
+    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+        $(samplerParam)
+        vector<float, Shape.dimensions+isArray> location
+        $(compareParam),
+        out uint status)
     {
-        $(statusInit)
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+            "Gather is supported only for 2D and 3D textures");
+
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
-${{{{
-                if (!isStatus)
-                {
-}}}}
-        case metal:
-            return __texture_gather$(cmp)_offset<T>($(getTexture),$(getSampler) location $(compareArg), offset $(glslComponent));
-        case glsl:
-        case spirv:
-            return __texture_gather$(cmp)_offset<T>(this,$(samplerStateParam) location $(compareArg), offset $(glslComponent));
-${{{{
-                } // if(!isStatus)
-}}}}
+        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
         }
     }
+
     [ForceInline]
-    [require($(statusCapWithoutMetal), texture_gather)]
-    vector<T,4> Gather$(cmp)$(componentName)($(samplerStateType)$(samplerStateParam) vector<float, Shape.dimensions+isArray> location $(cmpParam),
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+        $(samplerParam)
+        vector<float, Shape.dimensions+isArray> location
+        $(compareParam),
+        constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+            "Gather is supported only for 2D and 3D textures");
+
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        case metal:
+        case wgsl:
+            return __texture_gather$(compareFunc)_offset<T>($(getTexture) $(getSampler), location $(compareArg), offset $(componentArg));
+        case glsl:
+        case spirv:
+            return __texture_gather$(compareFunc)_offset<T>(this $(samplerArg), location $(compareArg), offset $(componentArg));
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, texture_gather)]
+    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+        $(samplerParam)
+        vector<float, Shape.dimensions+isArray> location
+        $(compareParam),
+        constexpr vector<int, Shape.planeDimensions> offset,
+        out uint status)
+    {
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+            "Gather is supported only for 2D and 3D textures");
+
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        }
+    }
+
+    [ForceInline]
+    [require(glsl_hlsl_spirv, texture_gather)]
+    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+        $(samplerParam)
+        vector<float, Shape.dimensions+isArray> location
+        $(compareParam),
         constexpr vector<int, Shape.planeDimensions> offset1,
         constexpr vector<int, Shape.planeDimensions> offset2,
         constexpr vector<int, Shape.planeDimensions> offset3,
-        constexpr vector<int, Shape.planeDimensions> offset4
-        $(statusDecl))
+        constexpr vector<int, Shape.planeDimensions> offset4)
     {
-        $(statusInit)
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+            "Gather is supported only for 2D and 3D textures");
+
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Gather$(cmp)$(componentName)";
-${{{{
-                if (!isStatus)
-                {
-}}}}
+        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
         case glsl:
         case spirv:
-            return __texture_gather$(cmp)_offsets<T>(this,$(samplerStateParam) location $(compareArg), offset1,offset2,offset3,offset4 $(glslComponent));
-${{{{
-                } // if(!isStatus)
-}}}}
+            return __texture_gather$(compareFunc)_offsets<T>(this $(samplerArg), location $(compareArg), offset1,offset2,offset3,offset4 $(componentArg));
         }
     }
+
+    [ForceInline]
+    [require(hlsl, texture_gather)]
+    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+        $(samplerParam)
+        vector<float, Shape.dimensions+isArray> location
+        $(compareParam),
+        constexpr vector<int, Shape.planeDimensions> offset1,
+        constexpr vector<int, Shape.planeDimensions> offset2,
+        constexpr vector<int, Shape.planeDimensions> offset3,
+        constexpr vector<int, Shape.planeDimensions> offset4,
+        out uint status)
+    {
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+            "Gather is supported only for 2D and 3D textures");
+
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        }
+    }
+
 ${{{{
-            } // for (isStatus)
-        } // for (componentId)
-    } // for (isCmp)
+    } // for (componentId)
 }}}}
-} // end extension for gather
+} // End of: Gather for [TextureType = $(extTexType), isCombined = $(isCombined)]
 
 ${{{{
 } // for (isScalarTexture)
 }}}}
+// End of all Texture Gather
+
 
 // Load/Subscript for readonly, no MS textures
 
@@ -8995,7 +9094,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(wgsl)]
 void __wgsl_frexp(T x, out T fract, out int exp)
 {
-    __intrinsic_asm "{ var s = frexp($0); (*($1)) = s.fract; (*($2)) = s.exp; }";
+    __intrinsic_asm "{ var s = frexp($0); ($1) = s.fract; ($2) = s.exp; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -9027,7 +9126,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(wgsl)]
 void __wgsl_frexp(vector<T, N> x, out vector<T, N> fract, out vector<int, N> exp)
 {
-    __intrinsic_asm "{ var s = frexp($0); (*($1)) = s.fract; (*($2)) = s.exp; }";
+    __intrinsic_asm "{ var s = frexp($0); ($1) = s.fract; ($2) = s.exp; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
@@ -11425,7 +11524,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(wgsl)]
 void __wgsl_modf(T x, out T fract, out T whole)
 {
-    __intrinsic_asm "{ var s = modf($0); (*($1)) = s.fract; (*($2)) = s.whole; }";
+    __intrinsic_asm "{ var s = modf($0); ($1) = s.fract; ($2) = s.whole; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -11457,7 +11556,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(wgsl)]
 void __wgsl_modf(vector<T,N> x, out vector<T,N> fract, out vector<T,N> whole)
 {
-    __intrinsic_asm "{ var s = modf($0); (*($1)) = s.fract; (*($2)) = s.whole; }";
+    __intrinsic_asm "{ var s = modf($0); ($1) = s.fract; ($2) = s.whole; }";
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>

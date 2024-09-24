@@ -346,21 +346,25 @@ bool TEST_texture(
         // https://www.w3.org/TR/WGSL/#texturegather
         // ==================================
 
-#if 0
+        // WGSL: textureGather({{.*}}t2D
         && all(Tv4(T(0)) == t2D.Gather(samplerState, float2(u, u)))
 
+        // WGSL: textureGather({{.*}}tCube
         && all(Tv4(T(0)) == tCube.Gather(samplerState, normalize(float3(u, 1 - u, u))))
 
+        // WGSL: textureGather({{.*}}t2DArray
         && all(Tv4(T(0)) == t2DArray.Gather(samplerState, float3(u, u, 0)))
 
+        // WGSL: textureGather({{.*}}tCubeArray
         && all(Tv4(T(0)) == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // Offset variant
 
+        // WGSL: textureGather({{.*}}t2D
         && all(Tv4(T(0)) == t2D.Gather(samplerState, float2(u2, u), int2(0, 0)))
 
+        // WGSL: textureGather({{.*}}t2DArray
         && all(Tv4(T(0)) == t2DArray.Gather(samplerState, float3(u2, u, 0), int2(0, 0)))
-#endif
 
         // =====================================
         // T SampleGrad()
