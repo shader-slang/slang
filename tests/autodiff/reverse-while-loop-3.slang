@@ -14,7 +14,7 @@ typedef float.Differential dfloat;
 
 struct P
 {
-    bool terminated;
+    bool terminated = {};
     bool isTerminated() { return terminated; }
     bool isHit() { return !terminated; }
 };
@@ -25,7 +25,7 @@ struct Data
     {
         this.t = dataIn;
     }
-    float t;
+    float t = {};
 };
 
 void updateData(Data data)

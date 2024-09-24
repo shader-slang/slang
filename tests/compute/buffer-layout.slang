@@ -14,8 +14,8 @@ RWStructuredBuffer<int> outputBuffer;
 
 struct A
 {
-    float x;
-    float y;
+    float x = {};
+    float y = {};
 }
 
 struct S
@@ -29,7 +29,7 @@ struct S
     //
     //          0       4       4
     //
-    float z;
+    float z = {};
 
     // The `std140` and D3D constant buffer ruless both
     // ensure a minimum of 16-byte alignment on `struct`
@@ -62,7 +62,7 @@ struct S
     // struct   12      4       4
     // std430   12      4       4
     //
-    int    b;
+    int    b = {};
 
     // As our next stress-test case, we will insert an
     // array with elements that aren't a multiple of
@@ -89,7 +89,7 @@ struct S
     // struct   16      16      4
     // std430   16      16      8
     //
-    float2 c[2];
+    float2 c[2] = {};
 
     // Now we put in one more ordinary `int` field
     // just to probe the offset computed so far.

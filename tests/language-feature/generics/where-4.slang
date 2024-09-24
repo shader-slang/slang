@@ -19,7 +19,7 @@ interface IFoo
 struct BarImpl : IBar
 {
     typealias TB = int;
-    int x;
+    int x = 0;
     int get() { return x; }
 }
 

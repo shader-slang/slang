@@ -13,7 +13,7 @@
 struct Params
 {
     RWStructuredBuffer<int> buffer;
-    int a[2];
+    int a[2] = {};
 };
 
 //TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out,name=outputBuffer

@@ -42,7 +42,7 @@ SLANG_UNIT_TEST(declTreeReflection)
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
         [__AttributeUsage(_AttributeTargets.Function)]
-        struct MyFuncPropertyAttribute {int v;}
+        struct MyFuncPropertyAttribute {int v = {};}
 
         [MyFuncProperty(1024)]
         [Differentiable]
@@ -57,13 +57,13 @@ SLANG_UNIT_TEST(declTreeReflection)
 
         struct MyType
         {
-            int x;
+            int x = {};
             float f(float x) { return x; }
         }
 
         struct MyGenericType<T : IArithmetic & IFloat>
         {
-            T z;
+            T z = {};
 
             __init(T _z) { z = _z; }
             
@@ -79,7 +79,7 @@ SLANG_UNIT_TEST(declTreeReflection)
         {
             struct MyStruct
             {
-                int x;
+                int x = {};
             }
         }
 
@@ -118,10 +118,10 @@ SLANG_UNIT_TEST(declTreeReflection)
     SLANG_CHECK(moduleDeclReflection->getKind() == slang::DeclReflection::Kind::Module);
     SLANG_CHECK(moduleDeclReflection->getChildrenCount() == 9);
 
-    // First declaration should be a struct with 1 variable, 1 constructor (memberwise ctor), 1 funcDecl ($ZeroInit)
+    // First declaration should be a struct with 1 variable, 1 constructor (memberwise ctor), 1 funcDecl ($ZeroInit), 1 default ctor
     auto firstDecl = moduleDeclReflection->getChild(0);
     SLANG_CHECK(firstDecl->getKind() == slang::DeclReflection::Kind::Struct);
-    SLANG_CHECK(firstDecl->getChildrenCount() == 3);
+    SLANG_CHECK(firstDecl->getChildrenCount() == 4);
 
     {
         slang::TypeReflection* type = firstDecl->getType();

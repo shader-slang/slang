@@ -22,7 +22,7 @@ interface IAddAndSub
 
 struct Simple : IAdd
 {
-    float base;
+    float base = {};
     float addf(float u, float v)
     {
         return u+v;

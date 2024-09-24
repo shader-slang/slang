@@ -5,7 +5,7 @@
 
 struct LargeStruct
 {
-    int values[4096];
+    int values[4096] = {};
 };
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

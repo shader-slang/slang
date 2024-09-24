@@ -5,8 +5,8 @@ int test(int r)
 {
     struct Val
     {
-        int a;
-        int b;
+        int a = 0;
+        int b = 0;
     }
     Val a;
     a.a = 1;

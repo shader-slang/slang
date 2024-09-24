@@ -4,13 +4,13 @@
 
 struct Something
 {
-	int4 field0;
-	int field1;
+	int4 field0 = {};
+	int field1 = {};
 };
 
 struct ArrayType
 {
-	Something data[2];
+	Something data[2] = {};
 };
 
 ArrayType getArray()

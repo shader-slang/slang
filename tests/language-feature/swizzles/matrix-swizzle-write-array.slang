@@ -11,7 +11,7 @@ RWStructuredBuffer<float2x2> outputBuffer;
 
 struct MySubscriptable
 {
-    float2x2 m;
+    float2x2 m = {};
     __subscript() -> float2x2
     {
         get { return m; }

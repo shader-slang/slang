@@ -7,7 +7,7 @@
 
 struct A
 {
-	float x;
+	float x = {};
 
 	float addWith(float y)
 	{

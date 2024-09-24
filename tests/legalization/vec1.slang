@@ -15,13 +15,13 @@ RWStructuredBuffer<float> outputBuffer;
 struct V
 {
     // 1-vector of 1-vector
-    vector<vector<float, 1>, 1> oo;
+    vector<vector<float, 1>, 1> oo = {};
 
     // 1-vector of n-vector
-    vector<vector<float, 4>, 1> on;
+    vector<vector<float, 4>, 1> on = {};
 
     // n-vector of 1-vector
-    vector<vector<float, 1>, 4> no;
+    vector<vector<float, 1>, 4> no = {};
 };
 
 vector<int, 1> get1Vec(int x)

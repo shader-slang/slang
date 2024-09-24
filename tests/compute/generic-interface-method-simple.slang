@@ -22,7 +22,7 @@ struct StandardVertexInterpolant : IVertexInterpolant
 
 struct MaterialPattern1 : IBRDFPattern
 {
-    float base;
+    float base = {};
     __generic<TVertexInterpolant:IVertexInterpolant>
     float evalPattern(TVertexInterpolant interpolants)
     {

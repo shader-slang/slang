@@ -14,18 +14,18 @@ RWStructuredBuffer<float> outputBuffer;
 
 struct LinkedNode
 {
-    float value;
+    float value = {};
 
     //SPV: [[TYPE_float:%[1-9][0-9]*]] = OpExtInst %void %{{[0-9]*}} DebugTypeBasic [[STRING_float]]
     //SPV: [[TYPE_float_ptr:%[1-9][0-9]*]] = OpExtInst %void %{{[0-9]*}} DebugTypePointer [[TYPE_float]]
     //SPV: DebugTypeMember [[STRING_pValue]] [[TYPE_float_ptr]]
-    float *pValue;
+    float *pValue = {};
 
     // "MEMBER_pNext" hasn't been declared yet, but OpExtInstWithForwardRefs requires at least one of these "forward declared ID".
     //SPV: [[FORWARD_LinkedNode:%[1-9][0-9]*]] = OpExtInstWithForwardRefsKHR %void %{{[0-9]*}} DebugTypeComposite [[STRING_LinkedNode]] {{.*}} [[MEMBER_pNext:%[1-9][0-9]*]]
     //SPV: [[TYPE_pLinkedNode:%[1-9][0-9]*]] = OpExtInst %void %{{[0-9]*}} DebugTypePointer [[FORWARD_LinkedNode]]
     //SPV: [[MEMBER_pNext]] = {{.*}} DebugTypeMember [[STRING_pNext]] [[TYPE_pLinkedNode]]
-    LinkedNode *pNext;
+    LinkedNode *pNext = {};
 };
 
 //SPV:  OpExtInst %void %{{[0-9]*}} DebugTypeComposite [[STRING_LinkedNode]] {{.*}} [[MEMBER_pNext]]

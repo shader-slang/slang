@@ -13,7 +13,7 @@ bool test<T>(IEqlTestable<T> v0, T v1)
 
 struct MyType : IEqlTestable<MyType>
 {
-    int val;
+    int val = 0;
     bool testEql(MyType v1)
     {
         return val == v1.val;

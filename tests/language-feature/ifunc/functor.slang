@@ -5,7 +5,7 @@
 
 struct Functor : IMutatingFunc<float, float>
 {
-    int context;
+    int context = 0;
 
     [mutating]
     float operator()(float p)

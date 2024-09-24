@@ -11,7 +11,7 @@ interface IAccumulator
 
 struct Accumulator : IAccumulator
 {
-    int state;
+    int state = {};
 
 	[mutating] void accumulate(int v)
 	{

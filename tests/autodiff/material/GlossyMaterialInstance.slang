@@ -5,7 +5,7 @@ __exported import IBSDF;
 
 public struct GlossyBSDF : IBSDF
 {
-    public float3 albedo;
+    public float3 albedo = {};
 
     public float3 getAlbedo()
     {

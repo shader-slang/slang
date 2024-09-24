@@ -4,7 +4,7 @@
 
 struct TestInner
 {
-    float4 a;
+    float4 a = {};
 };
 
 TestInner makeTestInner(float v)

@@ -6,25 +6,27 @@ RWStructuredBuffer<float> outputBuffer;
 
 struct DisneyBRDFPattern
 {
-    float3 baseColor;
-    float3 normal;
-    float specular, metallic, roughness;
-    float opacity;
-    float3 emmissive;
-    float ambientOcclusion;  
+    float3 baseColor = {};
+    float3 normal = {};
+    float specular = {};
+    float metallic = {};
+    float roughness = {};
+    float opacity = {};
+    float3 emmissive = {};
+    float ambientOcclusion = {};
 };
 
 struct VertexPosition
 {
-    float3 pos;
-    float3 normal;
-    float2 uv;
+    float3 pos = {};
+    float3 normal = {};
+    float2 uv = {};
 };
 
 struct CameraView
 {
-    float3 camPos;
-    float3 camDir;
+    float3 camPos = {};
+    float3 camDir = {};
 };
 
 interface IVertexInterpolant

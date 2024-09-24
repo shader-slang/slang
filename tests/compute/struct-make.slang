@@ -7,7 +7,7 @@
 
 struct Thing
 {
-    int a;
+    int a = {};
     static Thing make(int v)
     {
         Thing thing;

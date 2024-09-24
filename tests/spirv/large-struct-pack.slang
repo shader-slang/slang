@@ -8,7 +8,7 @@
 
 struct WorkData
 {
-    int B[1024];
+    int B[1024] = {};
 };
 
 //TEST_INPUT:set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4, count=1024)

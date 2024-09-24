@@ -8,7 +8,7 @@
 
 struct P
 {
-	uint4 			c;
+	uint4 			c = {};
 	Texture2D 		t;
 	SamplerState 	s;
 };

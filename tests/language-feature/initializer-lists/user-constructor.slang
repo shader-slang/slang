@@ -5,8 +5,8 @@
 
 public struct TestNested
 {
-    public int val1;
-    public int val2;
+    public int val1 = {};
+    public int val2 = {};
 }
 
 public struct Test

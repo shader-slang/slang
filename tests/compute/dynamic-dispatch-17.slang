@@ -17,8 +17,8 @@ interface IInterface
 
 struct UserDefinedPackedType
 {
-    float3 val;
-    uint flags;
+    float3 val = {};
+    uint flags = {};
 };
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=gOutputBuffer
@@ -49,14 +49,14 @@ struct ReturnsZero : IReturnsZero
 }
 struct FloatVal : IInterface
 {
-    float val;
+    float val = {};
     float run<Z:IReturnsZero>()
     {
         Z z = Z();
         return val + z.get();
     }
 };
-struct Float4Struct { float4 val; }
+struct Float4Struct { float4 val = {}; }
 struct Float4Val : IInterface
 {
     Float4Struct val;

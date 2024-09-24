@@ -18,7 +18,7 @@ interface IFoo
 //TEST_INPUT: type_conformance Impl1:IFoo = 0
 struct Impl1 : IFoo
 {
-    int data;
+    int data = 0;
     int method() { return data; }
 }
 

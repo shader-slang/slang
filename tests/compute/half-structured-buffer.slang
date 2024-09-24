@@ -6,9 +6,9 @@
 
 struct Thing
 {
-    uint pos;
-    float radius;
-    half4 color;
+    uint pos = {};
+    float radius = {};
+    half4 color = {};
 };
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out,name outputBuffer

@@ -6,7 +6,7 @@ interface IFoo
     void foo();
 }
 
-struct S : IFoo { int x; void foo(); }
+struct S : IFoo { int x = {}; void foo(); }
 
 struct P
 {

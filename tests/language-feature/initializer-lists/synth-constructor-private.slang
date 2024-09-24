@@ -2,8 +2,8 @@
 
 public struct TestNested
 {
-    private int val1;
-    private int val2;
+    private int val1 = {};
+    private int val2 = {};
 
     int getVal1()
     {

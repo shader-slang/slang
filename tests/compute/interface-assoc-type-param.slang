@@ -18,10 +18,10 @@ interface IEval
 
 export struct Impl : IInterface
 {
-    uint val;
+    uint val = {};
     struct TEval : IEval
     {
-        uint val;
+        uint val = {};
         uint eval()
         {
             return val;

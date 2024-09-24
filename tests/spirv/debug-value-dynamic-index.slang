@@ -2,9 +2,9 @@
 
 struct TestType
 {
-    float memberA;
-    float3 memberB;
-    float arrayVal[10];
+    float memberA = {};
+    float3 memberB = {};
+    float arrayVal[10] = {};
     RWStructuredBuffer<float> memberC;
     float getValue()
     {

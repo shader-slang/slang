@@ -18,7 +18,7 @@ interface ISimple
 struct Val : IBase
 {
     typedef int V;
-    int base;
+    int base = {};
     V sub(V a0, V a1)
     {
         return a0 - a1 + base;

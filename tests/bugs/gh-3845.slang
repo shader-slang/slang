@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -vk -output-using-type
 
 
-struct Foo {float v;};
+struct Foo {float v = {};};
 
 namespace foo {
     typedef Foo Foo; // cyclic reference 'Foo'; allowed in dxc/hlsl

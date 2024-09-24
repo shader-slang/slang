@@ -10,12 +10,12 @@ RWStructuredBuffer<uint> resultBuffer;
 
 struct Data
 {
-    uint arr[4];
+    uint arr[4] = {};
 }
 
 struct Data2
 {
-    uint arr[4u];
+    uint arr[4u] = {};
 }
 
 //TEST_INPUT: set Uniforms.d = new Data{{1,2,3,4}};
