@@ -311,23 +311,27 @@ bool TEST_texture(
         // https://www.w3.org/TR/WGSL/#texturegather
         // ==================================
 
-#if 0
+        // WGSL: textureGather({{.*}}t2D
         && all(Tv4(T(0)) == t2D.Gather(float2(u, u)))
 
+        // WGSL: textureGather({{.*}}tCube
         && all(Tv4(T(0)) == tCube.Gather(normalize(float3(u, 1 - u, u))))
 
+        // WGSL: textureGather({{.*}}t2DArray
         && all(Tv4(T(0)) == t2DArray.Gather(float3(u, u, 0)))
 
+        // WGSL: textureGather({{.*}}tCubeArray
         && all(Tv4(T(0)) == tCubeArray.Gather(float4(normalize(float3(u, 1 - u, u)), 0)))
 
 #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
         // Offset variant
 
+        // W-GSL: textureGather({{.*}}t2D
         && all(Tv4(T(0)) == t2D.Gather(float2(u2, u), int2(0, 0)))
 
+        // W-GSL: textureGather({{.*}}t2DArray
         && all(Tv4(T(0)) == t2DArray.Gather(float3(u2, u, 0), int2(0, 0)))
 #endif // #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
-#endif
 
         // =====================================
         // T SampleGrad()
