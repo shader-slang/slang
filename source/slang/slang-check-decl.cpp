@@ -9021,26 +9021,6 @@ namespace Slang
             seqStmt->stmts.insert(ctorInfo.m_insertOffset++, seqStmtChild);
         }
 
-        // Compiler generated ctor may be destroyed
-        bool destroyedDefaultCtor = false;
-        if(structDeclInfo.m_defaultCtor
-            && structDeclInfo.m_defaultCtor->containsOption(ConstructorTags::Synthesized))
-        {
-            if (!structDeclInfo.m_defaultCtor->body)
-                destroyedDefaultCtor = true;
-            else if (auto block = as<BlockStmt>(structDeclInfo.m_defaultCtor->body))
-            {
-                if (as<SeqStmt>(block->body)->stmts.getCount() == 0)
-                    destroyedDefaultCtor = true;
-            }
-            if (destroyedDefaultCtor)
-            {
-                structDecl->members.remove(structDeclInfo.m_defaultCtor);
-                structDecl->invalidateMemberDictionary();
-                structDecl->buildMemberDictionary();
-            }
-        }
-
         // Fill in our $DefaultInit
         if (auto defaultInitListFunc = findDefaultInitListFunc(structDecl))
         {
