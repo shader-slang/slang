@@ -1,7 +1,7 @@
 SP #004: Initialization
 =================
 
-This proposal documents the desired behavior of initialization related language semantics, including defualt constructor, initialization list and variable initialization.
+This proposal documents the desired behavior of initialization related language semantics, including default constructor, initialization list and variable initialization.
 
 Status
 ------
@@ -17,10 +17,10 @@ Reviewer:
 Background
 ----------
 
-Slang has introduced several different syntax around initialization to provide syntactic compatibility with HLSL/C++. As the language evolve, there aree many corners where
+Slang has introduced several different syntax around initialization to provide syntactic compatibility with HLSL/C++. As the language evolve, there are many corners where
 the semantics around initialization are not well-defined, and causing confusion or leading to surprising behaviors.
 
-This proposal attempts to provide a design on where we want to language to be in turns of how initialization is handled in all different places.
+This proposal attempts to provide a design on where we want the language to be in terms of how initialization is handled in all different places.
 
 Related Work
 ------------
@@ -100,7 +100,7 @@ void foo<T>()
 ## Automatic Synthesis of Default-Initializer
 
 If a `struct` type is determined to be default-initializable but a default constructor isn't explicitly provided by the user, the Slang compiler should
-synthesize such a constructor for the type. The synthesis logic should be recursively invoke defualt initialization on all members.
+synthesize such a constructor for the type. The synthesis logic should be recursively invoke default initializer on all members.
 
 ## Automatic Synthesis of `IDefaultInitializable` Conformance
 
@@ -168,6 +168,20 @@ type is default-initializable. If the member type is not default-initializable a
 synthesis will fail and the constructor will not be added to the type. Failure to synthesis a constructor is not an error, and an error will appear
 if the user is trying to initialize a value of the type in question assuming such a constructor exist.
 
+
+Q&A
+-----------
+
+## Should global static and groupshared variables be defualt initialized?
+
+It is difficult to efficiently initialized global variables safely and correctly in a general way on platforms such as Vulkan.
+To avoid the performance issues, the current decision is to not to default initialized these global variables.
+
+## Should `out` parameters be default initialized?
+
+The source of an `out` parameter is either comming from a local variable that is already default-initialized, or from a 
+global variable where we can't default-initialize efficiently. For this reason, we should leave `out` parameter to not
+be default initialized implicitly by the compiler.
 
 Alternatives Considered
 -----------------------
