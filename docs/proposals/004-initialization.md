@@ -33,10 +33,9 @@ On the other hand, languages like C# and Swift has a set of well defined rules t
 Proposed Approach
 -----------------
 
-The high level direction for Slang is it needs to help ensuring all decls are properly initialized at its declaration site, while still providing a reasonable level
-of backward compatibility with existing Slang/HLSL code. In this section, we document all concepts and rules to achieve this goal.
+The high level direction for Slang is it needs to help ensuring variables are properly initialized at its declaration site, while still providing a reasonable level of backward compatibility with existing Slang/HLSL code and avoid initialization behaviors that may have non-trivial performance impact. In this section, we document all concepts and rules to achieve this goal.
 
-## `IDefaultInitializable` interface
+### `IDefaultInitializable` interface
 
 The builtin `IDefaultInitializable` interface is defined as:
 ```csharp
@@ -50,7 +49,7 @@ Any type that conforms to `IDefaultInitializable` is treated as having the *defa
 types, such as `int`, `float[]`, `float4` are default-initializable. The values for builtin numeric types after default-initialization are 0.
 The default value for pointers is `nullptr`, and default value for `Optional<T>` is `none`.
 
-## Default-Initializable Type
+### Default-Initializable Type
 
 A type X is default initializable if:
 - It explicitly declares that `X` implements `IDefaultInitializable`.
@@ -62,11 +61,11 @@ A type X is default initializable if:
 - It is a tuple type where all element types are default-initializable.
 - It is an `Optional<T>` type for any `T`.
 
-This means that an unsized-array type or an existential type, or any composite type that contains such types without providing an explicit default constructor
-are not considered default-initializable.
+This means that an unsized-array type or an existential type, or any composite type that contains such types without providing an explicit default constructor are not considered default-initializable.
 
+Note that `void` type should be treated as default initializable, since `void` type can have only one value that is `()` (empty tuple).
 
-## Variable Initialization
+### Variable Initialization
 
 If the type of a local variable is default-initializable, then its default initializer will be invoked at its declaration site implicitly to intialize its value:
 ```c++
@@ -87,7 +86,7 @@ V v; // error: `v` must be initialized at declaration.
 
 For backward compatibility, we will introduce a compiler option to turn this error into a warning, but we may deprecate this option in the future.
 
-## Generic Type Parameter
+### Generic Type Parameter
 
 A generic type parameter is not considered default-initializable by-default. As a result, the following code should produce error:
 ```csharp
@@ -97,17 +96,17 @@ void foo<T>()
 }
 ```
 
-## Automatic Synthesis of Default-Initializer
+### Automatic Synthesis of Default-Initializer
 
 If a `struct` type is determined to be default-initializable but a default constructor isn't explicitly provided by the user, the Slang compiler should
 synthesize such a constructor for the type. The synthesis logic should be recursively invoke default initializer on all members.
 
-## Automatic Synthesis of `IDefaultInitializable` Conformance
+### Automatic Synthesis of `IDefaultInitializable` Conformance
 
 If a `struct` type provides an explicit default constructor, the compiler should automatically add `IDefaultIinitializable` to the conformance list of
 the type, so it can be used for any generic parameters constrained on `IDefaultInitializble`.
 
-## Initialization List
+### Initialization List
 
 Slang allows initialization of a variable by assigning it with an initialization list. 
 Generally, Slang will always try to resolve initialization list coercion as if it is an explicit constructor invocation.
@@ -137,7 +136,8 @@ A type is a "legacy C-Style struct" iff:
 - It does not define any initialization expressions on its members.
 - All its members are legacy C-Style structs or arrays of legacy C-style structs.
 In such case, we perform a legacy "read data" style consumption of the initializer list, so that the following behavior is valid:
-```
+
+```csharp
 struct Inner { int x; int y; };
 struct Outer { Inner i; Inner j; }
 
@@ -172,12 +172,12 @@ if the user is trying to initialize a value of the type in question assuming suc
 Q&A
 -----------
 
-## Should global static and groupshared variables be defualt initialized?
+### Should global static and groupshared variables be defualt initialized?
 
 It is difficult to efficiently initialized global variables safely and correctly in a general way on platforms such as Vulkan.
 To avoid the performance issues, the current decision is to not to default initialized these global variables.
 
-## Should `out` parameters be default initialized?
+### Should `out` parameters be default initialized?
 
 The source of an `out` parameter is either comming from a local variable that is already default-initialized, or from a 
 global variable where we can't default-initialize efficiently. For this reason, we should leave `out` parameter to not
