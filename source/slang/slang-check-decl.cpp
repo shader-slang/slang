@@ -1619,6 +1619,23 @@ namespace Slang
                     default: break;
                     }
                     break;
+                case BaseType::Float:
+                case BaseType::Double:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r32f; break;
+                    case 2: format = ImageFormat::rg32f; break;
+                    case 4: format = ImageFormat::rgba32f; break;
+                    }
+                    break;
+                case BaseType::Half:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r16f; break;
+                    case 2: format = ImageFormat::rg16f; break;
+                    case 4: format = ImageFormat::rgba16f; break;
+                    }
+                    break;
                 }
             }
         }
