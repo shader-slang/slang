@@ -53,6 +53,6 @@ SLANG_UNIT_TEST(imageFormatReflection)
 
     auto layout = compositeProgram->getLayout(0);
     auto format = layout->getGlobalParamsTypeLayout()->getBindingRangeImageFormat(0);
-    SLANG_CHECK(format == SLANG_IMAGE_FORMAT_rgba32i);
+    SLANG_CHECK(format == SLANG_IMAGE_FORMAT_rgba32ui);
 }
 
