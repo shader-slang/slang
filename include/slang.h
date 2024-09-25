@@ -111,6 +111,8 @@ Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSyst
 #        define SLANG_PSP2 1
 #    elif defined(__ghs__)
 #        define SLANG_WIIU 1
+#    elif defined(__EMSCRIPTEN__)
+#        define SLANG_WASM 1
 #    else
 #        error "unknown target platform"
 #    endif
@@ -417,7 +419,9 @@ convention for interface methods.
 #   define SLANG_PROCESSOR_ARM 1
 #elif defined(_M_ARM64) || defined(__aarch64__)
 #   define SLANG_PROCESSOR_ARM_64 1
-#endif 
+#elif defined(__EMSCRIPTEN__)
+#   define SLANG_PROCESSOR_WASM 1
+#endif
 
 #ifndef SLANG_PROCESSOR_ARM
 #   define SLANG_PROCESSOR_ARM 0
@@ -465,6 +469,8 @@ convention for interface methods.
 #   endif
 #elif SLANG_PROCESSOR_FAMILY_POWER_PC
 #       define SLANG_BIG_ENDIAN 1
+#elif SLANG_WASM
+#       define SLANG_LITTLE_ENDIAN 1
 #endif
 
 #ifndef SLANG_LITTLE_ENDIAN
