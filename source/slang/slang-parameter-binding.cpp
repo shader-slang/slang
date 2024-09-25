@@ -3748,7 +3748,7 @@ static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
         ioBuf << "[ " << start << " ... ";
         if (size.isFinite())
         {
-            ioBuf << start + size.getFiniteValue() << ")";
+            ioBuf << start + (Index)size.getFiniteValue() << ")";
         }
         else
         {
