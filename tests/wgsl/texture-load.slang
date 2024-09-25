@@ -3,14 +3,6 @@
 // In WGSL, `textureSample` and other variants work only for f32 type.
 // But textureLoad works for i32, u32 and f32.
 
-// Workaround: the format value is not properly handled
-#define FORMAT_rg32f 3
-#define FORMAT_rgba8 10
-#define FORMAT_rg32i 24
-#define FORMAT_rgba32i 21
-#define FORMAT_rg32ui 34
-#define FORMAT_rgba16ui 31
-
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
