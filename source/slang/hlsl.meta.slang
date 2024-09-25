@@ -2202,7 +2202,7 @@ vector<TElement,4> __texture_gather(
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGather($0, $1, $2, $3)";
+        __intrinsic_asm "textureGather($p, $2, $3)";
     case metal:
         if (isArray == 1)
         {
@@ -2275,7 +2275,7 @@ vector<TElement,4> __texture_gather_offset(
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffset($0, $1, $2, $3, $4)";
+        __intrinsic_asm "textureGatherOffset($p, $2, $3, $4)";
     case metal:
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D),
             "Metal supports offset variant of Gather only for 2D textures");
@@ -2343,7 +2343,7 @@ vector<TElement,4> __texture_gather_offsets(
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffsets($0, $1, $2, $T3[]($3, $4, $5, $6)), $7";
+        __intrinsic_asm "textureGatherOffsets($p, $2, $T3[]($3, $4, $5, $6)), $7";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         return spirv_asm {
@@ -2391,7 +2391,7 @@ vector<TElement,4> __texture_gatherCmp(
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGather($0, $1, $2, $3)";
+        __intrinsic_asm "textureGather($p, $2, $3)";
     case metal:
         if (isArray == 1)
         {
@@ -2459,7 +2459,7 @@ vector<TElement,4> __texture_gatherCmp_offset(
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffset($0, $1, $2, $3, $4)";
+        __intrinsic_asm "textureGatherOffset($p, $2, $3, $4)";
     case metal:
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D),
             "Metal supports depth compare Gather only for 2D texture");
@@ -2516,7 +2516,8 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offsets(
     __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
-    SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location,
+    SamplerComparisonState s,
+    vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
@@ -2526,7 +2527,7 @@ vector<TElement,4> __texture_gatherCmp_offsets(
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "textureGatherOffsets($0, $1, $2, $3, $T4[]($4, $5, $6, $7))";
+        __intrinsic_asm "textureGatherOffsets($p, $2, $3, $T4[]($4, $5, $6, $7))";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         return spirv_asm {
