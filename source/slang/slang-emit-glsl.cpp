@@ -488,6 +488,8 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
 
 void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
 {
+    SLANG_UNUSED(resourceType);
+
     // If the user specified a format manually, using `[format(...)]`,
     // then we will respect that format and emit a matching `layout` modifier.
     //
