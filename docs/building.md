@@ -47,6 +47,20 @@ cmake --build --preset release # to build from the CLI
 
 The `vs2022-dev` preset turns on features that makes debugging easy.
 
+### WebAssembly build
+
+First do a native build of the `all-generators` target, so that you get the generator executables in a path like `build\generators\Debug\bin` under the
+Slang source tree.
+
+For an [emscripten](https://emscripten.org) -based build targeting [WebAssembly](https://webassembly.org), run:
+```bash
+emcmake cmake -DSLANG_GENERATORS_PATH=%SLANG_SRC_PATH%\build\generators\Debug\bin --preset emscripten -G "Ninja"
+cmake --build --preset emscripten --target slang
+```
+
+**Note:** `emcmake` is a `cmake` wrapper that comes with [`emsdk`](https://emscripten.org/docs/getting_started/downloads.html), it will wrap your `cmake` calls with setup options that add support for emscripten.
+**Note:** If this fails, try running the command that `emcmake` outputs, directly.
+
 ## Testing
 
 ```bash
