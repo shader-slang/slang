@@ -694,6 +694,8 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
                 emitOperand(setIndices->getIndex(), getInfo(EmitOp::General));
                 m_writer->emit("*");
                 m_writer->emitUInt64(numIndices);
+                m_writer->emit("+");
+                m_writer->emitUInt64(i);
                 m_writer->emit(",(");
                 emitOperand(setIndices->getElementValue(), getInfo(EmitOp::General));
                 m_writer->emit(")[");
