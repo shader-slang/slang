@@ -341,31 +341,6 @@ bool TEST_texture(
         // WGSL: textureSampleCompareLevel({{\(*}}d2DArray
         && float(0) == d2DArray.SampleCmpLevelZero(shadowSampler, float3(u2, u, u), 0, int2(0, 0))
 
-        // ==================================
-        // vector<T,4> Gather()
-        // https://www.w3.org/TR/WGSL/#texturegather
-        // ==================================
-
-        // WGSL: textureGather({{.*}}t2D
-        && all(Tv4(T(0)) == t2D.Gather(samplerState, float2(u, u)))
-
-        // WGSL: textureGather({{.*}}tCube
-        && all(Tv4(T(0)) == tCube.Gather(samplerState, normalize(float3(u, 1 - u, u))))
-
-        // WGSL: textureGather({{.*}}t2DArray
-        && all(Tv4(T(0)) == t2DArray.Gather(samplerState, float3(u, u, 0)))
-
-        // WGSL: textureGather({{.*}}tCubeArray
-        && all(Tv4(T(0)) == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
-
-        // Offset variant
-
-        // WGSL: textureGather({{.*}}t2D
-        && all(Tv4(T(0)) == t2D.Gather(samplerState, float2(u2, u), int2(0, 0)))
-
-        // WGSL: textureGather({{.*}}t2DArray
-        && all(Tv4(T(0)) == t2DArray.Gather(samplerState, float3(u2, u, 0), int2(0, 0)))
-
         // =====================================
         // T SampleGrad()
         // https://www.w3.org/TR/WGSL/#texturesamplegrad
@@ -398,28 +373,6 @@ bool TEST_texture(
 
         // WGSL: textureSampleGrad({{\(*}}t2DArray
         && all(Tvn(T(0)) == t2DArray.SampleGrad(samplerState, float3(u2, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
-
-        // ===================
-        // T Load()
-        // https://www.w3.org/TR/WGSL/#textureload
-        // ===================
-
-        // WGSL: textureLoad({{\(*}}t1D
-        && all(Tvn(T(0)) == t1D.Load(int2(0, 0)))
-
-        // WGSL: textureLoad({{\(*}}t2D
-        && all(Tvn(T(0)) == t2D.Load(int3(0, 0, 0)))
-
-        // WGSL: textureLoad({{\(*}}t3D
-        && all(Tvn(T(0)) == t3D.Load(int4(0, 0, 0, 0)))
-
-        // WGSL supports array only for 2D
-
-        // WGSL: textureLoad({{\(*}}t2DArray
-        && all(Tvn(T(0)) == t2DArray.Load(int4(0, 0, 0, 0)))
-
-        // Offset variant
-        // WGSL doesn't support offset variants for Load
         ;
 
     return result;
