@@ -179,6 +179,7 @@ class TextureTypeBase : public ResourceType
     SLANG_ABSTRACT_AST_CLASS(TextureTypeBase)
 
     Val* getSampleCount();
+    Val* getFormat();
 };
 
 class TextureType : public TextureTypeBase 

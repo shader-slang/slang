@@ -4846,6 +4846,7 @@ namespace Slang
         List<Val*> modifierVals;
         for( auto modifier : expr->modifiers )
         {
+#if 0
             if (auto matrixLayoutModifier = as<MatrixLayoutModifier>(modifier))
             {
                 if (auto matrixType = as<MatrixExpressionType>(baseType))
@@ -4868,6 +4869,7 @@ namespace Slang
                 }
                 continue;
             }
+#endif
             auto modifierVal = checkTypeModifier(modifier, baseType);
             if(!modifierVal)
                 continue;
