@@ -3345,7 +3345,11 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
     
     [require(metal, texture_sm_4_1)]
     __intrinsic_op($(kIROp_ImageStore))
-    static void __metalImageStore(This val, vector<uint, Shape.dimensions> location, T value, uint arrayIndex);
+    static void __metalImageStoreArray(This val, vector<uint, Shape.dimensions> location, T value, uint arrayIndex);
+
+    [require(metal, texture_sm_4_1)]
+    __intrinsic_op($(kIROp_ImageStore))
+    static void __metalImageStore(This val, vector<uint, Shape.dimensions+isArray> location, T value);
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
@@ -3415,8 +3419,15 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         OpImageWrite $this $location __convertTexel(newValue);
                     };
                 case metal:
-                    // last arg will be replaced with the split off array index
-                    __metalImageStore(this, __vectorReshape<Shape.dimensions>(location), newValue, location[Shape.dimensions+isArray-1]);
+                    if (isArray != 0)
+                    {
+                        // last arg will be replaced with the split off array index
+                        __metalImageStoreArray(this, __vectorReshape<Shape.dimensions>(location), newValue, location[Shape.dimensions + isArray - 1]);
+                    }
+                    else
+                    {
+                        __metalImageStore(this, location, newValue);
+                    }
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
