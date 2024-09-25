@@ -10032,7 +10032,9 @@ namespace Slang
             thisArgExpr->type = thisType;
             thisArgExpr->loc = loc;
 
-            if (visitor->isTypeDifferentiable(thisType) && !originalFuncDecl->findModifier<NoDiffThisAttribute>())
+            if (visitor->isTypeDifferentiable(thisType) &&
+                !originalFuncDecl->findModifier<NoDiffThisAttribute>() && 
+                !isEffectivelyStatic(originalFuncDecl))
             {
                 auto pairType = visitor->getDifferentialPairType(thisType);
                 thisArgExpr->type.type = pairType;
@@ -10085,7 +10087,9 @@ namespace Slang
             thisArgExpr->type = thisType;
             thisArgExpr->loc = loc;
 
-            if (visitor->isTypeDifferentiable(thisType) && !originalFuncDecl->findModifier<NoDiffThisAttribute>())
+            if (visitor->isTypeDifferentiable(thisType) &&
+                !originalFuncDecl->findModifier<NoDiffThisAttribute>() && 
+                !isEffectivelyStatic(originalFuncDecl))
             {
                 auto pairType = visitor->getDifferentialPairType(thisType);
                 thisArgExpr->type.type = pairType;
