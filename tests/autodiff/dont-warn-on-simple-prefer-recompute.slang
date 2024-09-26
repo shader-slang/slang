@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -line-directive-mode none -stage compute -entry computeMain
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -7,7 +7,7 @@ RWStructuredBuffer<float> outputBuffer;
 [PreferRecompute]
 float comp(float a, float b)
 {
-    // CHECK: 
+    //CHECK: warn
     return a * b;
 }
 
