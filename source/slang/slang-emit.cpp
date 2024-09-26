@@ -63,6 +63,7 @@
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
+#include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-arrays.h"
@@ -1248,6 +1249,15 @@ Result linkAndOptimizeIR(
         break;
 
     default:
+        break;
+    }
+
+    switch (target)
+    {
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::WGSL:
+        resolveTextureFormat(irModule);
         break;
     }
 
