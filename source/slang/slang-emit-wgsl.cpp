@@ -298,6 +298,31 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
     }
 }
 
+static const char* getWgslImageFormat(IRTextureTypeBase* type)
+{
+    ImageFormat imageFormat = type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
+    switch (imageFormat)
+    {
+    case ImageFormat::rgba8:       return "rgba8unorm";
+    case ImageFormat::rgba8_snorm: return "rgba8snorm";
+    case ImageFormat::rgba8ui:     return "rgba8uint";
+    case ImageFormat::rgba8i:      return "rgba8sint";
+    case ImageFormat::rgba16ui:    return "rgba16uint";
+    case ImageFormat::rgba16i:     return "rgba16sint";
+    case ImageFormat::rgba16f:     return "rgba16float";
+    case ImageFormat::r32ui:       return "r32uint";
+    case ImageFormat::r32i:        return "r32sint";
+    case ImageFormat::r32f:        return "r32float";
+    case ImageFormat::rg32ui:      return "rg32uint";
+    case ImageFormat::rg32i:       return "rg32sint";
+    case ImageFormat::rg32f:       return "rg32float";
+    case ImageFormat::rgba32ui:    return "rgba32uint";
+    case ImageFormat::rgba32i:     return "rgba32sint";
+    case ImageFormat::rgba32f:     return "rgba32float";
+    default:                       return "rgba8unorm";
+    }
+}
+
 void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())
@@ -467,11 +492,24 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             if (!texType->isShadow())
             {
                 m_writer->emit("<");
+
                 auto elemType = texType->getElementType();
-                if (auto vecElemType = as<IRVectorType>(elemType))
-                    emitSimpleType(vecElemType->getElementType());
-                else
-                    emitType(elemType);
+
+                switch (texType->getAccess())
+                {
+                case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                    m_writer->emit(getWgslImageFormat(texType));
+                    m_writer->emit(", read_write");
+                    break;
+
+                default:
+                    if (auto vecElemType = as<IRVectorType>(elemType))
+                        emitSimpleType(vecElemType->getElementType());
+                    else
+                        emitType(elemType);
+                    break;
+                }
+
                 m_writer->emit(">");
             }
         }
