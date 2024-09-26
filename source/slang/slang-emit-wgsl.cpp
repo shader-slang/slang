@@ -300,6 +300,9 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
 
 static const char* getWgslImageFormat(IRTextureTypeBase* type)
 {
+    // You can find the supported WGSL texel format from the URL:
+    // https://www.w3.org/TR/WGSL/#storage-texel-formats
+    //
     ImageFormat imageFormat = type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
     switch (imageFormat)
     {
@@ -319,7 +322,12 @@ static const char* getWgslImageFormat(IRTextureTypeBase* type)
     case ImageFormat::rgba32ui:    return "rgba32uint";
     case ImageFormat::rgba32i:     return "rgba32sint";
     case ImageFormat::rgba32f:     return "rgba32float";
-    default:                       return "rgba8unorm";
+    case ImageFormat::unknown:
+        // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
+        return "rgba32float";
+    default:
+        // We may need to print a warning for types WGSL doesn't support
+        return "rgba32float";
     }
 }
 
