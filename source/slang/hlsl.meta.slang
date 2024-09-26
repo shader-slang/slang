@@ -3300,7 +3300,7 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                     || Shape.flavor == $(SLANG_TEXTURE_3D)
                     , "WGSL doesn't supports textureLoad for Cube texture.");
                 static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
-                    , "WGSL supports textureLoad for texture_storage_2d_array but not for array of 1D, 3D or Cube.");
+                    , "WGSL supports textureLoad for 2d_array but not for array of 1D, 3D or Cube.");
                 static_assert(isShadow == 0 || T is float
                     , "WGSL supports only f32 depth textures");
 
@@ -3477,21 +3477,43 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
                         break;
                     }
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
+                    || Shape.flavor == $(SLANG_TEXTURE_2D)
+                    || Shape.flavor == $(SLANG_TEXTURE_3D)
+                    , "WGSL doesn't supports textureStore for Cube texture.");
+                static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
+                    , "WGSL supports textureStore for texture_store_2d_array but not for array of 1D, 3D or Cube.");
+
+                // WGSL requires the value type to be always `vec4`
                 if (isArray == 1)
                 {
-                    switch (Shape.flavor)
-                    {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureStore($0, ($1).x, i32(($1).y), $2)$z";
-                    case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), $2)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureStore($0, ($1).xyz, i32(($1).w), $2)$z";
-                    }
+                    if (T is int32_t   || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($2, 0, 0, 1))";
+                    if (T is int32_t2  || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($2, 0, 1))";
+                    if (T is int32_t3  || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($2, 1))";
+                    if (T is uint32_t  || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 0, 0, 1))";
+                    if (T is uint32_t2 || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 0, 1))";
+                    if (T is uint32_t3 || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 1))";
+                    if (T is half)   __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 0, 0, 1))";
+                    if (T is half2)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 0, 1))";
+                    if (T is half3)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 1))";
+                    if (T is float)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 0, 0, 1))";
+                    if (T is float2) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 0, 1))";
+                    if (T is float3) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 1))";
+                    __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), $2)";
                 }
-                __intrinsic_asm "textureStore($0, $1, $2)$z";
+                if (T is int32_t   || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 0, 0, 1))";
+                if (T is int32_t2  || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 0, 1))";
+                if (T is int32_t3  || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 1))";
+                if (T is uint32_t  || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 0, 0, 1))";
+                if (T is uint32_t2 || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 0, 1))";
+                if (T is uint32_t3 || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 1))";
+                if (T is half)   __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 0, 0, 1))";
+                if (T is half2)  __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 0, 1))";
+                if (T is half3)  __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 1))";
+                if (T is float)  __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 0, 0, 1))";
+                if (T is float2) __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 0, 1))";
+                if (T is float3) __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 1))";
+                __intrinsic_asm "textureStore($0, $1, $2)";
             }
         }
 
