@@ -834,12 +834,10 @@ Result linkAndOptimizeIR(
     if (codeGenContext->shouldReportCheckpointIntermediates())
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
 
-    if (requiredLoweringPassSet.autodiff)
-        finalizeAutoDiffPass(targetProgram, irModule);
-
-    // Remove auto-diff related decorations.
-    // We may have an autodiff decoration regardless of if autodiff is being used.
-    stripAutoDiffDecorations(irModule);
+    // Finalization is always run so AD-related instructions can be removed,
+    // even the AD pass itself is not run.
+    // 
+    finalizeAutoDiffPass(targetProgram, irModule);
 
     finalizeSpecialization(irModule);
 
