@@ -519,6 +519,7 @@ DIAGNOSTIC(39901, Fatal , cannotProcessInclude, "internal compiler error: cannot
 // 304xx: generics
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
 DIAGNOSTIC(30401, Error, invalidTypeForConstraint, "type '$0' cannot be used as a constraint.")
+DIAGNOSTIC(30402, Error, invalidConstraintSubType, "type '$0' is not a valid left hand side of a type constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -893,6 +894,12 @@ DIAGNOSTIC(58001, Error, entryPointMustReturnVoidWhenGlobalOutputPresent, "entry
 DIAGNOSTIC(58002, Error, unhandledGLSLSSBOType, "Unhandled GLSL Shader Storage Buffer Object contents, unsized arrays as a final parameter must be the only parameter")
 
 DIAGNOSTIC(58003, Error, inconsistentPointerAddressSpace, "'$0': use of pointer with inconsistent address space.")
+
+// Autodiff checkpoint reporting
+DIAGNOSTIC(-1, Note, reportCheckpointIntermediates, "checkpointing context of $1 bytes associated with function: '$0'")
+DIAGNOSTIC(-1, Note, reportCheckpointVariable, "$0 bytes ($1) used to checkpoint the following item:")
+DIAGNOSTIC(-1, Note, reportCheckpointCounter, "$0 bytes ($1) used for a loop counter here:")
+DIAGNOSTIC(-1, Note, reportCheckpointNone, "no checkpoint contexts to report")
 
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.

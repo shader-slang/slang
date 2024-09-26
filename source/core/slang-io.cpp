@@ -20,7 +20,8 @@
 #   include <shellapi.h>
 #endif
 
-#if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY
+#if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY || SLANG_WASM
+#   include <fcntl.h>
 #   include <unistd.h>
 // For Path::find
 #   include <fnmatch.h>
@@ -1012,6 +1013,7 @@ namespace Slang
         }
         return SLANG_FAIL;
 #else
+        SLANG_UNUSED(outPath);
         return SLANG_E_NOT_IMPLEMENTED;
 #endif
     }

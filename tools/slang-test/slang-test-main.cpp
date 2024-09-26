@@ -968,6 +968,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         case SLANG_HOST_CPP_SOURCE:
         case SLANG_CUDA_SOURCE:
         case SLANG_METAL:
+        case SLANG_WGSL:
         {
             return 0;
         }

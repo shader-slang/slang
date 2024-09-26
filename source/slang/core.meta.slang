@@ -285,6 +285,13 @@ interface IDifferentiable
     static Differential dmul(T, Differential);
 };
 
+__magic_type(DifferentiablePtrType)
+interface IDifferentiablePtrType
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
+    associatedtype Differential : IDifferentiablePtrType;
+};
+
 
 /// Pair type that serves to wrap the primal and
 /// differential types of an arbitrary type T.
@@ -357,6 +364,36 @@ struct DifferentialPair : IDifferentiable
     }
 };
 
+__generic<T : IDifferentiablePtrType>
+__magic_type(DifferentialPtrPairType)
+__intrinsic_type($(kIROp_DifferentialPtrPairType))
+struct DifferentialPtrPair : IDifferentiablePtrType
+{
+    typedef DifferentialPtrPair<T.Differential> Differential;
+    typedef T.Differential DifferentialElementType;
+
+    __intrinsic_op($(kIROp_MakeDifferentialPtrPair))
+    __init(T _primal, T.Differential _differential);
+
+    property p : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetPrimal))
+        get;
+    }
+
+    property v : T
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetPrimal))
+        get;
+    }
+
+    property d : T.Differential
+    {
+        __intrinsic_op($(kIROp_DifferentialPtrPairGetDifferential))
+        get;
+    }
+};
+
 
 /// A type that uses a floating-point representation
 [sealed]
@@ -393,6 +430,15 @@ interface IArray<T>
     __subscript(int index) -> T
     {
         get;
+    }
+}
+
+interface IRWArray<T> : IArray<T>
+{
+    __subscript(int index)->T
+    {
+        get;
+        set;
     }
 }
 
@@ -1148,21 +1194,15 @@ extension int16_t : IRangedValue
 
 __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
-struct Array : IArray<T>
+struct Array : IRWArray<T>
 {
     __intrinsic_op($(kIROp_GetArrayLength))
     int getCount();
-
-    __subscript(int index) -> T
-    {
-        __intrinsic_op($(kIROp_GetElement))
-        get;
-    }
 }
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)
-struct vector : IArray<T>
+struct vector : IRWArray<T>
 {
         /// The element type of the vector
     typedef T Element;
@@ -1182,8 +1222,6 @@ struct vector : IArray<T>
 
     [ForceInline]
     int getCount() { return N; }
-
-    __subscript(int index) -> T { __intrinsic_op($(kIROp_GetElement)) get; }
 }
 
 const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
@@ -1192,7 +1230,7 @@ const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
     /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 __generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
 __magic_type(MatrixExpressionType)
-struct matrix : IArray<vector<T,C>>
+struct matrix : IRWArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
@@ -1207,8 +1245,6 @@ struct matrix : IArray<vector<T,C>>
 
     [ForceInline]
     int getCount() { return R; }
-
-    __subscript(int index) -> vector<T,C> { __intrinsic_op($(kIROp_GetElement)) get; }
 }
 
 __intrinsic_op($(kIROp_Eql))
@@ -2685,6 +2721,132 @@ __Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
 
+// Atomic<T>
+
+enum MemoryOrder
+{
+    Relaxed = $(kIRMemoryOrder_Relaxed),
+    Acquire = $(kIRMemoryOrder_Acquire),
+    Release = $(kIRMemoryOrder_Release),
+    AcquireRelease = $(kIRMemoryOrder_AcquireRelease),
+    SeqCst = $(kIRMemoryOrder_SeqCst),
+}
+
+[sealed] interface IAtomicable {}
+[sealed] interface IArithmeticAtomicable : IAtomicable, IArithmetic {}
+[sealed] interface IBitAtomicable : IArithmeticAtomicable, IInteger {}
+
+extension int : IBitAtomicable {}
+extension uint : IBitAtomicable {}
+extension int64_t : IBitAtomicable {}
+extension uint64_t : IBitAtomicable {}
+extension double : IArithmeticAtomicable {}
+extension float : IArithmeticAtomicable {}
+extension half : IArithmeticAtomicable {}
+
+__magic_type(AtomicType)
+__intrinsic_type($(kIROp_AtomicType))
+[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+struct Atomic<T : IAtomicable>
+{
+    __intrinsic_op($(kIROp_AtomicLoad))
+    [__ref] T load(MemoryOrder order = MemoryOrder.Relaxed);
+
+    __intrinsic_op($(kIROp_AtomicStore))
+    [__ref] void store(T newValue, MemoryOrder order = MemoryOrder.Relaxed);
+
+    __intrinsic_op($(kIROp_AtomicExchange))
+    [__ref] T exchange(T newValue, MemoryOrder order = MemoryOrder.Relaxed); // returns old value
+
+    __intrinsic_op($(kIROp_AtomicCompareExchange))
+    [__ref] T compareExchange(
+        T compareValue,
+        T newValue,
+        MemoryOrder successOrder = MemoryOrder.Relaxed,
+        MemoryOrder failOrder = MemoryOrder.Relaxed);
+}
+
+extension<T : IArithmeticAtomicable> Atomic<T>
+{
+    __intrinsic_op($(kIROp_AtomicAdd))
+    [__ref] T add(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    __intrinsic_op($(kIROp_AtomicSub))
+    [__ref] T sub(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    __intrinsic_op($(kIROp_AtomicMax))
+    [__ref] T max(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    __intrinsic_op($(kIROp_AtomicMin))
+    [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+}
+
+extension<T : IBitAtomicable> Atomic<T>
+{
+    __intrinsic_op($(kIROp_AtomicAnd))
+    [__ref] T and(T value, MemoryOrder order = MemoryOrder.Relaxed);      // returns original value
+    __intrinsic_op($(kIROp_AtomicOr))
+    [__ref] T or(T value, MemoryOrder order = MemoryOrder.Relaxed);         // returns original value
+    __intrinsic_op($(kIROp_AtomicXor))
+    [__ref] T xor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    __intrinsic_op($(kIROp_AtomicInc))
+    [__ref] T increment(MemoryOrder order = MemoryOrder.Relaxed);
+    __intrinsic_op($(kIROp_AtomicDec))
+    [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed);
+}
+
+__generic<T : IArithmeticAtomicable>
+[ForceInline]
+T operator +=(__ref Atomic<T> v, T value)
+{
+    return v.add(value) + value;
+}
+__generic<T : IArithmeticAtomicable>
+[ForceInline]
+T operator -=(__ref Atomic<T> v, T value)
+{
+    return v.sub(value) - value;
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+T operator &=(__ref Atomic<T> v, T value)
+{
+    return v.and(value) & value;
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+T operator |=(__ref Atomic<T> v, T value)
+{
+    return v.or(value) | value;
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+T operator ^=(__ref Atomic<T> v, T value)
+{
+    return v.xor(value) ^ value;
+}
+
+__generic<T : IBitAtomicable>
+[ForceInline]
+__prefix T operator ++(__ref Atomic<T> v)
+{
+    return v.increment() + T(1);
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+__postfix T operator ++(__ref Atomic<T> v)
+{
+    return v.increment();
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+__prefix T operator --(__ref Atomic<T> v)
+{
+    return v.decrement() - T(1);
+}
+__generic<T : IBitAtomicable>
+[ForceInline]
+__postfix T operator --(__ref Atomic<T> v)
+{
+    return v.decrement();
+}
 // Binding Attributes
 
 __attributeTarget(DeclBase)

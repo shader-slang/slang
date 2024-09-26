@@ -947,6 +947,16 @@ struct IRPreferCheckpointDecoration : IRCheckpointHintDecoration
     IR_LEAF_ISA(PreferCheckpointDecoration)
 };
 
+struct IRCheckpointIntermediateDecoration : IRCheckpointHintDecoration
+{
+    enum
+    {
+        kOp = kIROp_CheckpointIntermediateDecoration
+    };
+    IR_LEAF_ISA(CheckpointIntermediateDecoration)
+
+    IRInst* getSourceFunction() { return getOperand(0); }
+};
 
 struct IRLoopCounterDecoration : IRDecoration
 {
@@ -2348,11 +2358,32 @@ struct IRLoad : IRInst
     IRInst* getPtr() { return ptr.get(); }
 };
 
+struct IRAtomicLoad : IRInst
+{
+    IRUse ptr;
+    IR_LEAF_ISA(AtomicLoad)
+
+    IRInst* getPtr() { return ptr.get(); }
+};
+
 struct IRStore : IRInst
 {
     IRUse ptr;
     IRUse val;
     IR_LEAF_ISA(Store)
+
+    IRInst* getPtr() { return ptr.get(); }
+    IRInst* getVal() { return val.get(); }
+
+    IRUse* getPtrUse() { return &ptr; }
+    IRUse* getValUse() { return &val; }
+};
+
+struct IRAtomicStore : IRInst
+{
+    IRUse ptr;
+    IRUse val;
+    IR_LEAF_ISA(AtomicStore)
 
     IRInst* getPtr() { return ptr.get(); }
     IRInst* getVal() { return val.get(); }
@@ -2949,6 +2980,10 @@ struct IRMakeDifferentialPairUserCode : IRMakeDifferentialPairBase
 {
     IR_LEAF_ISA(MakeDifferentialPairUserCode)
 };
+struct IRMakeDifferentialPtrPair : IRMakeDifferentialPairBase
+{
+    IR_LEAF_ISA(MakeDifferentialPtrPair)
+};
 
 struct IRDifferentialPairGetDifferentialBase : IRInst
 {
@@ -2963,6 +2998,10 @@ struct IRDifferentialPairGetDifferentialUserCode : IRDifferentialPairGetDifferen
 {
     IR_LEAF_ISA(DifferentialPairGetDifferentialUserCode)
 };
+struct IRDifferentialPtrPairGetDifferential : IRDifferentialPairGetDifferentialBase
+{
+    IR_LEAF_ISA(DifferentialPtrPairGetDifferential)
+};
 
 struct IRDifferentialPairGetPrimalBase : IRInst
 {
@@ -2976,6 +3015,10 @@ struct IRDifferentialPairGetPrimal : IRDifferentialPairGetPrimalBase
 struct IRDifferentialPairGetPrimalUserCode : IRDifferentialPairGetPrimalBase
 {
     IR_LEAF_ISA(DifferentialPairGetPrimalUserCode)
+};
+struct IRDifferentialPtrPairGetPrimal : IRDifferentialPairGetPrimalBase
+{
+    IR_LEAF_ISA(DifferentialPtrPairGetPrimal)
 };
 
 struct IRDetachDerivative : IRInst
@@ -3647,6 +3690,10 @@ public:
     IRDifferentialPairType* getDifferentialPairType(
         IRType* valueType,
         IRInst* witnessTable);
+    
+    IRDifferentialPtrPairType* getDifferentialPtrPairType(
+        IRType* valueType,
+        IRInst* witnessTable);
 
     IRDifferentialPairUserCodeType* getDifferentialPairUserCodeType(
         IRType* valueType,
@@ -3787,6 +3834,8 @@ public:
     IRInst* emitGetTorchCudaStream();
 
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
+    IRInst* emitMakeDifferentialValuePair(IRType* type, IRInst* primal, IRInst* differential);
+    IRInst* emitMakeDifferentialPtrPair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
 
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
@@ -3969,9 +4018,19 @@ public:
     IRInst* emitGetOptionalValue(IRInst* optValue);
     IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
     IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
+    
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialValuePairGetDifferential(IRType* diffType, IRInst* diffPair);
+    IRInst* emitDifferentialPtrPairGetDifferential(IRType* diffType, IRInst* diffPair);
+
     IRInst* emitDifferentialPairGetPrimal(IRInst* diffPair);
+    IRInst* emitDifferentialValuePairGetPrimal(IRInst* diffPair);
+    IRInst* emitDifferentialPtrPairGetPrimal(IRInst* diffPair);
+
     IRInst* emitDifferentialPairGetPrimal(IRType* primalType, IRInst* diffPair);
+    IRInst* emitDifferentialValuePairGetPrimal(IRType* primalType, IRInst* diffPair);
+    IRInst* emitDifferentialPtrPairGetPrimal(IRType* primalType, IRInst* diffPair);
+
     IRInst* emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialPairGetPrimalUserCode(IRInst* diffPair);
     IRInst* emitMakeVector(
@@ -4196,6 +4255,11 @@ public:
     IRInst* emitStore(
         IRInst*    dstPtr,
         IRInst*    srcVal);
+
+    IRInst* emitAtomicStore(
+        IRInst* dstPtr,
+        IRInst* srcVal,
+        IRInst* memoryOrder);
 
     IRInst* emitImageLoad(
         IRType* type,
@@ -5151,6 +5215,11 @@ public:
     void addMemoryQualifierSetDecoration(IRInst* inst, IRIntegerValue flags)
     {
         addDecoration(inst, kIROp_MemoryQualifierSetDecoration, getIntValue(getIntType(), flags));
+    }
+
+    void addCheckpointIntermediateDecoration(IRInst* inst, IRGlobalValueWithCode *func)
+    {
+        addDecoration(inst, kIROp_CheckpointIntermediateDecoration, func);
     }
 };
 

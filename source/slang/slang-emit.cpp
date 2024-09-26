@@ -34,6 +34,7 @@
 #include "slang-ir-wgsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-varying-params.h"
@@ -62,6 +63,7 @@
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
+#include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-arrays.h"
@@ -212,6 +214,68 @@ static void dumpIRIfEnabled(
         dumpIR(irModule, codeGenContext->getIRDumpOptions(), label, codeGenContext->getSourceManager(), &writer);
         //fclose(f);
     }
+}
+
+static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, DiagnosticSink* sink, IRModule* irModule)
+{
+    // Report checkpointing information
+    CompilerOptionSet& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
+    SourceManager* sourceManager = sink->getSourceManager();
+    
+    SourceWriter typeWriter(sourceManager, LineDirectiveMode::None, nullptr);
+
+    CLikeSourceEmitter::Desc description;
+    description.codeGenContext = codeGenContext;
+    description.sourceWriter = &typeWriter;
+
+    CPPSourceEmitter emitter(description);
+
+    int nonEmptyStructs = 0;
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        IRStructType *structType = as<IRStructType>(inst);
+        if (!structType)
+            continue;
+
+        auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
+        if (!checkpointDecoration)
+            continue;
+
+        IRSizeAndAlignment structSize;
+        getNaturalSizeAndAlignment(optionSet, structType, &structSize);
+
+        // Reporting happens before empty structs are optimized out
+        // and we still want to keep the checkpointing decorations,
+        // so we end up needing to check for non-zero-ness
+        if (structSize.size == 0)
+            continue;
+
+        auto func = checkpointDecoration->getSourceFunction();
+        sink->diagnose(structType, Diagnostics::reportCheckpointIntermediates, func, structSize.size);
+        nonEmptyStructs++;
+
+        for (auto field : structType->getFields())
+        {
+            IRType *fieldType = field->getFieldType();
+            IRSizeAndAlignment fieldSize;
+            getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
+            if (fieldSize.size == 0)
+                continue;
+
+            typeWriter.clearContent();
+            emitter.emitType(fieldType);
+
+            sink->diagnose(field->sourceLoc,
+                field->findDecoration<IRLoopCounterDecoration>()
+                    ? Diagnostics::reportCheckpointCounter
+                    : Diagnostics::reportCheckpointVariable,
+                fieldSize.size,
+                typeWriter.getContent());
+        }
+    }
+
+    if (nonEmptyStructs == 0)
+        sink->diagnose(SourceLoc(), Diagnostics::reportCheckpointNone);
 }
 
 struct LinkingAndOptimizationOptions
@@ -767,12 +831,14 @@ Result linkAndOptimizeIR(
             break;
     }
 
-    if (requiredLoweringPassSet.autodiff)
-        finalizeAutoDiffPass(targetProgram, irModule);
+    // Report checkpointing information
+    if (codeGenContext->shouldReportCheckpointIntermediates())
+        reportCheckpointIntermediates(codeGenContext, sink, irModule);
 
-    // Remove auto-diff related decorations.
-    // We may have an autodiff decoration regardless of if autodiff is being used.
-    stripAutoDiffDecorations(irModule);
+    // Finalization is always run so AD-related instructions can be removed,
+    // even the AD pass itself is not run.
+    // 
+    finalizeAutoDiffPass(targetProgram, irModule);
 
     finalizeSpecialization(irModule);
 
@@ -906,8 +972,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
+    case CodeGenTarget::WGSL:
         if (requiredLoweringPassSet.combinedTextureSamplers)
-            lowerCombinedTextureSamplers(irModule, sink);
+            lowerCombinedTextureSamplers(codeGenContext, irModule, sink);
         break;
     }
 
@@ -1182,6 +1249,15 @@ Result linkAndOptimizeIR(
         break;
 
     default:
+        break;
+    }
+
+    switch (target)
+    {
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::WGSL:
+        resolveTextureFormat(irModule);
         break;
     }
 
