@@ -38,9 +38,9 @@ namespace Slang
         ArrayView<Index> getUTF8Boundaries(Index line);
 
         void oneBasedUTF8LocToZeroBasedUTF16Loc(
-            Index inLine, Index inCol, Index& outLine, Index& outCol);
+            Index inLine, Index inCol, int64_t& outLine, int64_t& outCol);
         void oneBasedUTF8LocToZeroBasedUTF16Loc(
-            Index inLine, Index inCol, int& outLine, int& outCol);
+            Index inLine, Index inCol, int32_t& outLine, int32_t& outCol);
         void zeroBasedUTF16LocToOneBasedUTF8Loc(
             Index inLine, Index inCol, Index& outLine, Index& outCol);
 

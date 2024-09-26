@@ -23,6 +23,8 @@ namespace Slang
 
     void registerBuiltinDecls(Session* session, Decl* decl);
 
+    Type* unwrapArrayType(Type* type);
+
     OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
         ASTBuilder* builder, DeclRef<ContainerDecl> genericDecl);
 }

@@ -111,6 +111,8 @@ Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSyst
 #        define SLANG_PSP2 1
 #    elif defined(__ghs__)
 #        define SLANG_WIIU 1
+#    elif defined(__EMSCRIPTEN__)
+#        define SLANG_WASM 1
 #    else
 #        error "unknown target platform"
 #    endif
@@ -417,7 +419,9 @@ convention for interface methods.
 #   define SLANG_PROCESSOR_ARM 1
 #elif defined(_M_ARM64) || defined(__aarch64__)
 #   define SLANG_PROCESSOR_ARM_64 1
-#endif 
+#elif defined(__EMSCRIPTEN__)
+#   define SLANG_PROCESSOR_WASM 1
+#endif
 
 #ifndef SLANG_PROCESSOR_ARM
 #   define SLANG_PROCESSOR_ARM 0
@@ -465,6 +469,8 @@ convention for interface methods.
 #   endif
 #elif SLANG_PROCESSOR_FAMILY_POWER_PC
 #       define SLANG_BIG_ENDIAN 1
+#elif SLANG_WASM
+#       define SLANG_LITTLE_ENDIAN 1
 #endif
 
 #ifndef SLANG_LITTLE_ENDIAN
@@ -2427,6 +2433,14 @@ extern "C"
         SLANG_MODIFIER_INOUT
     };
 
+    typedef SlangUInt32 SlangImageFormatIntegral;
+    enum SlangImageFormat : SlangImageFormatIntegral
+    {
+#define SLANG_FORMAT(NAME, DESC) SLANG_IMAGE_FORMAT_##NAME,
+#include "slang-image-format-defs.h"
+#undef SLANG_FORMAT
+    };
+
     // User Attribute
     SLANG_API char const* spReflectionUserAttribute_GetName(SlangReflectionUserAttribute* attrib);
     SLANG_API unsigned int spReflectionUserAttribute_GetArgumentCount(SlangReflectionUserAttribute* attrib);
@@ -2520,6 +2534,7 @@ extern "C"
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafTypeLayout(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVariable(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangImageFormat spReflectionTypeLayout_getBindingRangeImageFormat(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getFieldBindingRangeOffset(SlangReflectionTypeLayout* typeLayout, SlangInt fieldIndex);
     SLANG_API SlangInt spReflectionTypeLayout_getExplicitCounterBindingRangeOffset(SlangReflectionTypeLayout* inTypeLayout);
 
@@ -3290,6 +3305,12 @@ namespace slang
         VariableReflection* getBindingRangeLeafVariable(SlangInt index)
         {
             return (VariableReflection*)spReflectionTypeLayout_getBindingRangeLeafVariable(
+                (SlangReflectionTypeLayout*)this, index);
+        }
+
+        SlangImageFormat getBindingRangeImageFormat(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeImageFormat(
                 (SlangReflectionTypeLayout*)this, index);
         }
 

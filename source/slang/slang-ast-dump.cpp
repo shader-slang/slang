@@ -304,9 +304,9 @@ struct ASTDumpContext
 
     void dump(uint32_t v)
     {
-        m_writer->emit(UInt(v));
+        m_writer->emit((uint64_t)v);
     }
-    void dump(UInt v)
+    void dump(uint64_t v)
     {
         m_writer->emit(v);
     }

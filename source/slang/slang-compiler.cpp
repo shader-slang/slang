@@ -547,6 +547,7 @@ namespace Slang
             case CodeGenTarget::PyTorchCppBinding:
             case CodeGenTarget::CSource:
             case CodeGenTarget::Metal:
+            case CodeGenTarget::WGSL:
             {
                 return PassThroughMode::None;
             }
