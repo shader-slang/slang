@@ -889,8 +889,7 @@ void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
     auto pipelineType = PipelineType::Graphics;
     applyBinding(pipelineType, encoder);
 
-	encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-    encoder->setVertexBuffer(0, m_vertexBuffer);
+	encoder->setVertexBuffer(0, m_vertexBuffer);
 
 	encoder->draw(3);
 }
