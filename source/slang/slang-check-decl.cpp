@@ -1657,7 +1657,7 @@ namespace Slang
                 varDecl->type.type = newMatrixType;
             }
         }
-        else if (auto textureType = as<TextureTypeBase>(varDecl->type.type))
+        else if (auto textureType = as<TextureTypeBase>(unwrapArrayType(varDecl->type.type)))
         {
             if (getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown))
                 return;
@@ -2980,6 +2980,17 @@ namespace Slang
     void registerBuiltinDecls(Session* session, Decl* decl)
     {
         _registerBuiltinDeclsRec(session, decl);
+    }
+
+    Type* unwrapArrayType(Type* type)
+    {
+        for (;;)
+        {
+            if (auto arrayType = as<ArrayExpressionType>(type))
+                type = arrayType->getElementType();
+            else
+                return type;
+        }
     }
 
     void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)

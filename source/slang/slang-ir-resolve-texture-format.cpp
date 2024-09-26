@@ -130,6 +130,13 @@ namespace Slang
             {
                 resolveTextureFormatForParameter(globalInst, (IRTextureTypeBase*)globalInst->getDataType());
             }
+            else if (auto arrayType = as<IRArrayTypeBase>(globalInst->getDataType()))
+            {
+                if (as<IRTextureTypeBase>(arrayType->getElementType()))
+                {
+                    resolveTextureFormatForParameter(globalInst, (IRTextureTypeBase*)arrayType->getElementType());
+                }
+            }
         }
     }
 }
