@@ -55,6 +55,12 @@ jobs:
         latest: true
         repository: "shader-slang/VK-GL-CTS"
         fileName: "VK-GL-CTS_WithSlang-0.0.3-win64.zip"
+    - name: Sync submodules
+      run: |
+        cd external/spirv-headers
+        git checkout 2acb319af38d43be3ea76bfabf3998e5281d8d12
+        cd ../spirv-tools
+        git checkout ce46482db7ab3ea9c52fce832d27ca40b14f8e87
     - name: vkcts setup
       shell: pwsh
       run: |
