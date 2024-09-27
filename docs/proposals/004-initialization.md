@@ -112,7 +112,7 @@ type is default-initializable. If the member type is not default-initializable a
 synthesis will fail and the constructor will not be added to the type. Failure to synthesis a constructor is not an error, and an error will appear
 if the user is trying to initialize a value of the type in question assuming such a constructor exist.
 
-Note that if every member of a struct contains a default expression, the synthesized `__init` method can be called with 0 arguments.
+Note that if every member of a struct contains a default expression, the synthesized `__init` method can be called with 0 arguments, however, this will not cause a variable declaration to be implicitly initialized. Implicit initialization is a backward compatibility feature that only work for user-defined `__init()` methods.
 
 ### Single argument constructor call
 
@@ -189,7 +189,7 @@ struct Empty {}
 void test()
 {
   Empty s0 = {}; // Works, `s` is considered initialized.
-  Empty s1; // `s1` is considered initialized bcause `Empty` is `IDefaultInitializable`.
+  Empty s1; // `s1` is considered uninitialized.
 }
 
 struct CLike {int x; int y; }
@@ -219,9 +219,10 @@ struct DefaultMember {
 }
 void test3()
 {
-  DefaultMember m; // `m` is initialized to `{0, 1}`.
-  DefaultMember m1 = {1}; // calls `__init(1)`, initialized to `{1,1}`.
-  DefaultMember m2 = {1,2}; // calls `__init(1,2)`, initialized to `{1,2}`.
+  DefaultMember m; // `m` is uninitialized.
+  DefaultMember m1 = {}; // `m1` is initialized to `{0,1}`.
+  DefaultMember m2 = {1}; // calls `__init(1)`, initialized to `{1,1}`.
+  DefaultMember m3 = {1,2}; // calls `__init(1,2)`, initialized to `{1,2}`.
 }
 
 struct PartialInit {
@@ -276,7 +277,7 @@ internal struct Visibility3
   internal int x;
   internal int y = 2;
 }
-internal void test7()
+internal void test8()
 {
   Visibility3 t = {0, 0}; // OK, initialized to {0,0} via legacy C-Style initialization.
   Visibility3 t1 = {1}; // OK, initialized to {1,2} via legacy logic.
@@ -287,7 +288,7 @@ internal struct Visibility4
   internal int x = 1;
   internal int y = 2;
 }
-internal void test7()
+internal void test9()
 {
   Visibility4 t = {0, 0}; // OK, initialized to {0,0} via legacy C-Style initialization.
   Visibility4 t1 = {1}; // OK, initialized to {1,2} via legacy logic.
