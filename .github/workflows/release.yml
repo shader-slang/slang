@@ -71,11 +71,13 @@ jobs:
             export CC=aarch64-linux-gnu-gcc
             export CXX=aarch64-linux-gnu-g++
           fi
+          CMAKE_SYSTEM_PROCESSOR="${{matrix.platform}}"
           CMAKE_OSX_ARCHITECTURES="${{matrix.platform}}"
           CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES//aarch64/arm64}
 
           echo "CC=$CC" >> "$GITHUB_ENV"
           echo "CXX=$CXX" >> "$GITHUB_ENV"
+          echo "CMAKE_SYSTEM_PROCESSOR=$CMAKE_SYSTEM_PROCESSOR" >> "$GITHUB_ENV"
           echo "CMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES" >> "$GITHUB_ENV"
 
       - name: Build Slang
