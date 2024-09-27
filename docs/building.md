@@ -49,17 +49,37 @@ The `vs2022-dev` preset turns on features that makes debugging easy.
 
 ### WebAssembly build
 
-First do a native build of the `all-generators` target, so that you get the generator executables in a path like `build\generators\Debug\bin` under the
-Slang source tree.
+In order to build WebAssembly build of Slang, Slang needs to be compiled with [Emscripten SDK](https://github.com/emscripten-core/emsdk).
+You can find more information about [Emscripten](https://emscripten.org/).
 
-For an [emscripten](https://emscripten.org) -based build targeting [WebAssembly](https://webassembly.org), run:
+You need to clone the EMSDK repo. And you need to install and activate the latest.
 ```bash
-emcmake cmake -DSLANG_GENERATORS_PATH=%SLANG_SRC_PATH%\build\generators\Debug\bin --preset emscripten -G "Ninja"
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest  # For Windows, emsdk.bat install latest
+./emsdk activate latest # For Windows, emsdk.bat activate latest
+```
+
+After EMSDK is activated, Slang needs to be built in three steps: build "generators", configure the build with "emcmake" and build.
+For more information about "generators", please refer to the later part of the documentation about [cross-compiling](docs/building.md#cross-compiling).
+```bash
+# Build generators.
+cmake --workflow --preset generators --fresh
+mkdir generators
+cmake --install build --prefix generators --component generators
+
+# Configure the build with emcmake.
+# emcmake is available only when emsdk_env setup the environment correctly.
+pushd ../emsdk
+source ./emsdk_env # For Windows, emsdk_env.bat
+popd
+emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja"
+
+# Build build.em/Release/bin/libslang.a
 cmake --build --preset emscripten --target slang
 ```
 
-**Note:** `emcmake` is a `cmake` wrapper that comes with [`emsdk`](https://emscripten.org/docs/getting_started/downloads.html), it will wrap your `cmake` calls with setup options that add support for emscripten.
-**Note:** If this fails, try running the command that `emcmake` outputs, directly.
+**Note:** If the last build step fails, try running the command that `emcmake` outputs, directly.
 
 ## Testing
 
