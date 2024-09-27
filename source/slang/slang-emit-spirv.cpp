@@ -2054,7 +2054,7 @@ struct SPIRVEmitContext
 
     SpvInst* ensureTextureType(IRInst* assignee, IRTextureTypeBase* inst)
     {
-        IRType* sampledType = inst->getElementType();
+        IRInst* sampledType = inst->getElementType();
         SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
         switch(inst->GetBaseShape())
         {
@@ -2098,7 +2098,7 @@ struct SPIRVEmitContext
         // unorm or snorm attributes on the sampled type.
         if (auto attribType = as<IRAttributedType>(sampledType))
         {
-            sampledType = as<IRType>(unwrapAttributedType(sampledType));
+            sampledType = unwrapAttributedType(sampledType);
             if (format == SpvImageFormatUnknown)
             {
                 IRIntegerValue vectorSize = 1;
