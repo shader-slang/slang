@@ -99,6 +99,7 @@ jobs:
           build-llvm: true
       - name: Build Slang
         run: |
+          export
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
               pushd emsdk
