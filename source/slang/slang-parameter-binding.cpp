@@ -1227,7 +1227,8 @@ static void addExplicitParameterBindings_GLSL(
 
     // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
     // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
-    info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
+    
+    info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
 
     if (warnedMissingVulkanLayoutModifier)
     {

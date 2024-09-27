@@ -5280,6 +5280,22 @@ namespace slang
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
 
+    struct IMetadata : public ISlangCastable
+    {
+        SLANG_COM_INTERFACE(0x8044a8a3, 0xddc0, 0x4b7f, { 0xaf, 0x8e, 0x2, 0x6e, 0x90, 0x5d, 0x73, 0x32 })
+
+        /*
+        Returns whether a resource parameter at the specifieid binding location is actually being used
+        in the compiled shader.
+        */
+        virtual SlangResult isParameterLocationUsed(
+            SlangParameterCategory category, // is this a `t` register? `s` register?
+            SlangUInt spaceIndex,      // `space` for D3D12, `set` for Vulkan
+            SlangUInt registerIndex,   // `register` for D3D12, `binding` for Vulkan
+            bool& outUsed) = 0;
+    };
+    #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
         /** A component type is a unit of shader code layout, reflection, and linking.
 
         A component type is a unit of shader code that can be included into
@@ -5491,6 +5507,17 @@ namespace slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
             SlangInt targetIndex,
             IBlob** outCode,
+            IBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt targetIndex,
+            IMetadata** outMetadata,
+            IBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            IMetadata** outMetadata,
             IBlob** outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
