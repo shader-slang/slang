@@ -147,16 +147,16 @@ S obj = {};
 S obj = S();
 ```
 
-Note that initializer list of a single argument still translates directly into a constructor call and not a type cast. For example:
+Note that initializer list of a single argument does not translate into a type cast, unlike the constructor call syntax. Initializing with a single element in the intializer list always translates directly into a constructor call. For example:
 ```csharp
 void test()
 {
   MyType t = {1};
-  // translates to:
+  // translates to direct constructor call:
   // MyType t = MyType.__init(1);
-  // which is not
+  // which is NOT the same as:
   // MyType t = MyType(t)
-  // or
+  // or:
   // MyType t = (MyType)t;
 }
 ```
@@ -169,6 +169,7 @@ A type is a "legacy C-Style struct" if all of the following conditions are met:
 - It does not contain any explicit constructors defined by the user.
 - All its members have the same visibility as the type itself.
 - All its members are legacy C-Style structs or arrays of legacy C-style structs.
+Note that C-Style structs are allowed to have member default values.
 In such case, we perform a legacy "read data" style consumption of the initializer list, so that the following behavior is valid:
 
 ```csharp
@@ -190,7 +191,7 @@ Examples
 struct Empty {}
 void test()
 {
-  Empty s0 = {}; // Works, `s` is considered initialized.
+  Empty s0 = {}; // Works, `s` is considered initialized via ctor call.
   Empty s1; // `s1` is considered uninitialized.
 }
 
@@ -222,7 +223,7 @@ struct DefaultMember {
 void test3()
 {
   DefaultMember m; // `m` is uninitialized.
-  DefaultMember m1 = {}; // `m1` is initialized to `{0,1}`.
+  DefaultMember m1 = {}; // calls `__init()`, initialized to `{0,1}`.
   DefaultMember m2 = {1}; // calls `__init(1)`, initialized to `{1,1}`.
   DefaultMember m3 = {1,2}; // calls `__init(1,2)`, initialized to `{1,2}`.
 }
@@ -265,6 +266,10 @@ void test6()
 
 public struct Visibility2
 {
+  // Visibility2 type contains members of different visibility,
+  // which disqualifies it from being considered as C-style struct.
+  // Therefore we will not attempt the legacy fallback logic for
+  // initializer-list syntax.
   internal int x = 1;
   public int y = 0;
 }
@@ -276,6 +281,11 @@ void test7()
 
 internal struct Visibility3
 {
+  // Visibility3 type is considered as C-style struct.
+  // Because all members have the same visibility as the type.
+  // Therefore we will attempt the legacy fallback logic for
+  // initializer-list syntax.
+  // Note that c-style structs can still have init exprs on members.
   internal int x;
   internal int y = 2;
 }
@@ -287,6 +297,10 @@ internal void test8()
 
 internal struct Visibility4
 {
+  // Visibility4 type is considered as C-style struct.
+  // And we still synthesize a ctor for member initialization.
+  // Because Visiblity4 has no public members, the synthesized
+  // ctor will take 0 arguments.
   internal int x = 1;
   internal int y = 2;
 }
