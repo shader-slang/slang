@@ -6,7 +6,7 @@ This proposal documents the desired behavior of initialization related language 
 Status
 ------
 
-Status: Design Review
+Status: Design Approved, implementation in-progress.
 
 Implemtation: N/A
 
