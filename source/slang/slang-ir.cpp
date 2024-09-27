@@ -5195,7 +5195,7 @@ namespace Slang
         IRInst* index)
     {
         AddressSpace addrSpace = AddressSpace::Generic;
-        IRType* valueType = nullptr;
+        IRInst* valueType = nullptr;
         auto basePtrType = unwrapAttributedType(basePtr->getDataType());
         if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
         {
@@ -5207,7 +5207,7 @@ namespace Slang
             valueType = ptrLikeType->getElementType();
         }
         IRType* type = nullptr;
-        valueType = as<IRType>(unwrapAttributedType(valueType));
+        valueType = unwrapAttributedType(valueType);
         if (auto arrayType = as<IRArrayTypeBase>(valueType))
         {
             type = arrayType->getElementType();
