@@ -98,15 +98,17 @@ for the type must exactly match one of the explicitly defined constructors.
 If the type doesn't provide any explicit constructors, the compiler need to synthesize the constructors for the calls that that the intializer
 lists translate into, so that an initializer list expression can be used to initialize a variable of the type.
 
-For each type, we will synthesize one `public` constructor:
+For each type, we will synthesize one constructor at the same visibility of the type itself:
 
-The signature for the synthesized initializer for type `T` is:
+The signature for the synthesized initializer for type `V struct T` is:
 ```csharp
-public T.__init(member0: typeof(member0) = default(member0), member1 : typeof(member1) = default(member1), ...)
+V T.__init(member0: typeof(member0) = default(member0), member1 : typeof(member1) = default(member1), ...)
 ```
-where `(member0, member1, ... memberN)` is the set of members of `public` visibility, and `default(member0)`
+where `V` is a visibility modifier, `(member0, member1, ... memberN)` is the set of members that has visibility `V`, and `default(member0)`
 is the value defined by the initialization expression in `member0` if it exist, or the default value of `member0`'s type.
 If `member0`'s type is not default initializable and the the member doesn't provide an initial value, then the parameter will not have a default value.
+
+The synthesized constructor will be marked as `[Synthesized]` by the compiler, so the call site can inject additional compatibility logic when calling a synthesized constructor.
 
 The body of the constructor will initialize each member with the value comming from the corresponding constructor argument if such argument exists,
 otherwise the member will be initialized to its default value either defined by the init expr of the member, or the default value of the type if the 
@@ -163,24 +165,43 @@ void test()
 
 If the above code passes type check, then it will be used as the way to initialize `obj`.
 
-If the above code does not pass type check, Slang continues to check if `S` meets the standard of a "legacy C-style struct` type.
+If the above code does not pass type check, and if there is only one constructor for`MyType` that is synthesized as described in the previous section (and therefore marked as `[Synthesized]`, Slang continues to check if `S` meets the standard of a "legacy C-style struct` type.
 A type is a "legacy C-Style struct" if all of the following conditions are met:
 - It is a user-defined struct type or a basic scalar, vector or matrix type, e.g. `int`, `float4x4`.
 - It does not contain any explicit constructors defined by the user.
 - All its members have the same visibility as the type itself.
 - All its members are legacy C-Style structs or arrays of legacy C-style structs.
 Note that C-Style structs are allowed to have member default values.
-In such case, we perform a legacy "read data" style consumption of the initializer list, so that the following behavior is valid:
+In such case, we perform a legacy "read data" style consumption of the initializer list to synthesize the arguments to call the constructor, so that the following behavior is valid:
 
 ```csharp
 struct Inner { int x; int y; };
 struct Outer { Inner i; Inner j; }
 
-Outer o = {1, 2, 3}; // Initializes `o` into `{ Inner{1,2}, Inner{3,0} }`.
+// Initializes `o` into `{ Inner{1,2}, Inner{3,0} }`, by synthesizing the
+// arguments to call `Outer.__init(Inner(1,2), Inner(3, 0))`.
+Outer o = {1, 2, 3};
 ```
 
 If the type is not a legacy C-Style struct, Slang should produce an error.
 
+### Legacy HLSL syntax to cast from 0
+
+HLSL allows a legacy syntax to cast from literal `0` to a struct type, for example:
+```hlsl
+MyStruct s { int x; }
+void test()
+{
+  MyStruct s = (MyStruct)0;
+}
+```
+
+Slang treats this as equivalent to a empty-initialization:
+```csharp
+MyStruct s = (MyStruct)0;
+// is equivalent to
+MyStruct s = {};
+```
 
 Examples
 -------------------
@@ -188,26 +209,46 @@ Examples
 
 // Assume everything below is public unless explicitly declared.
 
-struct Empty {}
+struct Empty
+{
+  // compiler synthesizes:
+  // __init();
+}
 void test()
 {
   Empty s0 = {}; // Works, `s` is considered initialized via ctor call.
   Empty s1; // `s1` is considered uninitialized.
 }
 
-struct CLike {int x; int y; }
+struct CLike
+{
+  int x; int y;
+  // compiler synthesizes:
+  // __init(int x, int y);
+}
 void test1()
 {
   CLike c0; // `c0` is uninitialized.
-  CLike c1 = {}; // initialized with legacy initializaer list logic, `c1` is now `{0,0}`.
-  CLike c2 = {1}; // initialized with legacy initializaer list logic, `c1` is now `{1,0}`.
-  CLike c3 = {1, 2}; // initilaized with ctor call `CLike(1,2)`, `c3` is now `{1,2}`.
+
+  // case 1: initialized with synthesized ctor call using legacy logic to form arguments,
+  // and `c1` is now `{0,0}`.
+  // (we will refer to this scenario as "initialized with legacy logic" for
+  // the rest of the examples):
+  CLike c1 = {}; 
+
+  // case 2: initialized with legacy initializaer list logic, `c1` is now `{1,0}`:
+  CLike c2 = {1}; 
+
+  // case 3: initilaized with ctor call `CLike(1,2)`, `c3` is now `{1,2}`:
+  CLike c3 = {1, 2};
 }
 
-struct ExplicitCtor {
+struct ExplicitCtor
+{
    int x;
    int y;
    __init(int x) {...}
+  // compiler does not synthesize any ctors.
 }
 void test2()
 {
@@ -219,6 +260,8 @@ void test2()
 struct DefaultMember {
   int x = 0;
   int y = 1;
+  // compiler synthesizes:
+  // __init(int x = 0, int y = 1);
 }
 void test3()
 {
@@ -234,6 +277,8 @@ struct PartialInit {
   // default expr.
   int x;
   int y = 1;
+  // compiler synthesizes:
+  // __init(int x, int y = 1);
 }
 void test4()
 {
@@ -245,6 +290,8 @@ void test4()
 struct PartialInit2 {
   int x = 1;
   int y; // warning: not all members are initialized.
+  // compiler synthesizes:
+  // __init(int x, int y);
 }
 void test5()
 {
@@ -257,11 +304,18 @@ public struct Visibility1
 {
   internal int x;
   public int y = 0;
+  // the compiler does not synthesize any ctor.
+  // the compiler will try to synthesize:
+  //     public __init(int y);
+  // but then it will find that `x` cannot be initialized.
+  // so this synthesis will fail and no ctor will be added
+  // to the type.
 }
 void test6()
 {
   Visibility1 t = {0, 0}; // error, no matching ctor
   Visibility1 t1 = {}; // error, no matching ctor
+  Visibility1 t2 = {1}; // error, no matching ctor
 }
 
 public struct Visibility2
@@ -272,11 +326,14 @@ public struct Visibility2
   // initializer-list syntax.
   internal int x = 1;
   public int y = 0;
+  // compiler synthesizes:
+  // public __init(int y = 0);
 }
 void test7()
 {
-  Visibility2 t = {0, 0}; // error, no matching ctor
-  Visibility2 t1 = {}; // OK, initialized to {1,0}
+  Visibility2 t = {0, 0}; // error, no matching ctor.
+  Visibility2 t1 = {}; // OK, initialized to {1,0} via ctor call.
+  Visibility2 t2 = {1}; // OK, initialized to {1,1} via ctor call.
 }
 
 internal struct Visibility3
@@ -288,11 +345,14 @@ internal struct Visibility3
   // Note that c-style structs can still have init exprs on members.
   internal int x;
   internal int y = 2;
+  // compiler synthesizes:
+  // internal __init(int x, int y = 2);
 }
 internal void test8()
 {
-  Visibility3 t = {0, 0}; // OK, initialized to {0,0} via legacy C-Style initialization.
-  Visibility3 t1 = {1}; // OK, initialized to {1,2} via legacy logic.
+  Visibility3 t = {0, 0}; // OK, initialized to {0,0} via ctor call.
+  Visibility3 t1 = {1}; // OK, initialized to {1,2} via ctor call.
+  Visibility3 t2 = {}; // OK, initialized to {0, 2} via legacy logic.
 }
 
 internal struct Visibility4
@@ -303,12 +363,14 @@ internal struct Visibility4
   // ctor will take 0 arguments.
   internal int x = 1;
   internal int y = 2;
+  // compiler synthesizes:
+  // internal __init(int x = 1, int y = 2);
 }
 internal void test9()
 {
-  Visibility4 t = {0, 0}; // OK, initialized to {0,0} via legacy C-Style initialization.
-  Visibility4 t1 = {1}; // OK, initialized to {1,2} via legacy logic.
-  Visibility4 t2 = {}; // OK, initialized to {1,2} via ctor match.
+  Visibility4 t = {0, 0}; // OK, initialized to {0,0} via ctor call.
+  Visibility4 t1 = {3}; // OK, initialized to {3,2} via ctor call.
+  Visibility4 t2 = {}; // OK, initialized to {1,2} via ctor call.
 }
 ```
 
@@ -341,6 +403,6 @@ Following the same philosphy of not initializing any declarations, `out` paramet
 Alternatives Considered
 -----------------------
 
-One important decision point is whether or not Slang should allow variables to be left in uninitialized state after its declaration as it is allowed in C++.
-Our opinion is that this is not what we want to have in the long term and Slang should take the opportunity as a new language to not inherit from this
-undesired C++ legacy behavior.
+One important decision point is whether or not Slang should allow variables to be left in uninitialized state after its declaration as it is allowed in C++. In contrast, C# forces everything to be default initialized at its declaration site, which come at the cost of incurring the burden to developers to come up with a way to define the default value for each type.
+Our opinion is we want to allow things as uninitialized, and to have the compiler validation checks to inform
+the developer something is wrong if they try to use a variable in uninitialized state. We believe it is desirable to tell the developer what's wrong instead of using a heavyweight mechanism to ensure everything is initialized at declaration sites, which can have non-trivial performance consequences for GPU programs, especially when the variable is declared in groupshared memory.
