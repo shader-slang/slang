@@ -46,9 +46,11 @@ A type is considered "default-initializable" if it provides a constructor that c
 Generally, a variable is considered uninitialized at its declaration site without an explicit value expression.
 For example,
 ```csharp
+struct MyType { int x ; }
+
 void foo()
 {
-  MyType t; // t is considered uninitialized.
+  MyType t; // t is uninitialized.
   var t1 : MyType; // same in modern syntax, t1 is uninitialized.
 }
 ```
@@ -165,7 +167,7 @@ If the above code does not pass type check, Slang continues to check if `S` meet
 A type is a "legacy C-Style struct" if all of the following conditions are met:
 - It is a user-defined struct type or a basic scalar, vector or matrix type, e.g. `int`, `float4x4`.
 - It does not contain any explicit constructors defined by the user.
-- All its members have higher or equal visibility than the type.
+- All its members have the same visibility as the type itself.
 - All its members are legacy C-Style structs or arrays of legacy C-style structs.
 In such case, we perform a legacy "read data" style consumption of the initializer list, so that the following behavior is valid:
 
