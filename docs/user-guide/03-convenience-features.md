@@ -537,45 +537,6 @@ Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is e
 
 - Slang currently does not support pointers to immutable values, i.e. `const T*`.
 
-## `struct` inheritance (limited)
-
-Slang supports a limited form of inheritance. A derived `struct` type has all the members defined in the base type it is inherited from:
-
-```csharp
-struct Base
-{
-    int a;
-    void method() {}
-} 
-
-struct Derived : Base { int b; }
-
-void test()
-{
-    Derived c;
-    c.a = 1;  // OK, a is inherited from `Base`.
-    c.b = 2;
-    c.method(); // OK, `method` is inherited from `Base`.
-}
-```
-
-A derived type can be implicitly casted to its base type:
-```csharp
-void acceptBase(Base b) { ... }
-void test()
-{
-    Derived c;
-    acceptBase(c); // OK, c is implicitly casted to `Base`.    
-}
-```
-
-Slang supports controlling whether a type can be inherited from with `[sealed]` and `[open]` attributes on types.
-If a base type is marked as `[sealed]`, then inheritance from the type is not allowed anywhere outside the same module (file) that is defining the base type. If a base type is marked as `[open]`, then inheritance is allowed regardless of the location of the derived type. By default, a type is `[sealed]` if no attributes are declared, which means the type can only be inherited by other types in the same module.
-
-### Limitations
-
-Please note that the support for inheritance is currently very limited. Common features that come with inheritance, such as `virtual` functions and multiple inheritance are not supported by the Slang compiler. Implicit down-casting to the base type and use the result as a `mutable` argument in a function call is also not supported.
-
 Extensions
 --------------------
 Slang allows defining additional methods for a type outside its initial definition. For example, suppose we already have a type defined:

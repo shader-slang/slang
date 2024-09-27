@@ -328,6 +328,12 @@ bool ArrayExpressionType::isUnsized()
     return false;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AtomicType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Type* AtomicType::getElementType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypeType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void TypeType::_toTextOverride(StringBuilder& out)
@@ -1208,6 +1214,11 @@ void ResourceType::_toTextOverride(StringBuilder& out)
 Val* TextureTypeBase::getSampleCount()
 {
     return as<Type>(_getGenericTypeArg(this, 4));
+}
+
+Val* TextureTypeBase::getFormat()
+{
+    return as<Type>(_getGenericTypeArg(this, 8));
 }
 
 Type* removeParamDirType(Type* type)

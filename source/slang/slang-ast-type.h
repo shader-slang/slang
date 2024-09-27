@@ -179,6 +179,7 @@ class TextureTypeBase : public ResourceType
     SLANG_ABSTRACT_AST_CLASS(TextureTypeBase)
 
     Val* getSampleCount();
+    Val* getFormat();
 };
 
 class TextureType : public TextureTypeBase 
@@ -434,6 +435,13 @@ class ArrayExpressionType : public DeclRefType
     void _toTextOverride(StringBuilder& out);
     Type* getElementType();
     IntVal* getElementCount();
+};
+
+class AtomicType : public DeclRefType
+{
+    SLANG_AST_CLASS(AtomicType)
+
+    Type* getElementType();
 };
 
 // The "type" of an expression that resolves to a type.

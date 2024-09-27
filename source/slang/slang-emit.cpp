@@ -63,6 +63,7 @@
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
+#include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-arrays.h"
@@ -834,12 +835,10 @@ Result linkAndOptimizeIR(
     if (codeGenContext->shouldReportCheckpointIntermediates())
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
 
-    if (requiredLoweringPassSet.autodiff)
-        finalizeAutoDiffPass(targetProgram, irModule);
-
-    // Remove auto-diff related decorations.
-    // We may have an autodiff decoration regardless of if autodiff is being used.
-    stripAutoDiffDecorations(irModule);
+    // Finalization is always run so AD-related instructions can be removed,
+    // even the AD pass itself is not run.
+    // 
+    finalizeAutoDiffPass(targetProgram, irModule);
 
     finalizeSpecialization(irModule);
 
@@ -973,8 +972,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
+    case CodeGenTarget::WGSL:
         if (requiredLoweringPassSet.combinedTextureSamplers)
-            lowerCombinedTextureSamplers(irModule, sink);
+            lowerCombinedTextureSamplers(codeGenContext, irModule, sink);
         break;
     }
 
@@ -1249,6 +1249,15 @@ Result linkAndOptimizeIR(
         break;
 
     default:
+        break;
+    }
+
+    switch (target)
+    {
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::WGSL:
+        resolveTextureFormat(irModule);
         break;
     }
 

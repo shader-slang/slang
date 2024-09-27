@@ -298,9 +298,17 @@ alias cpp_glsl = cpp | glsl;
 /// [Compound]
 alias cpp_glsl_hlsl_spirv = cpp | glsl | hlsl | spirv;
 
+/// CPP, GLSL, HLSL, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_spirv_wgsl = cpp | glsl | hlsl | spirv | wgsl;
+
 /// CPP, GLSL, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cpp_glsl_hlsl_metal_spirv = cpp | glsl | hlsl | metal | spirv;
+
+/// CPP, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_metal_spirv_wgsl = cpp | glsl | hlsl | metal | spirv | wgsl;
 
 /// CPP, and HLSL code-gen targets
 /// [Compound]
@@ -365,6 +373,10 @@ alias glsl_hlsl_metal_spirv_wgsl = glsl | hlsl | metal | spirv | wgsl;
 /// GLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias glsl_metal_spirv = glsl | metal | spirv;
+
+/// GLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias glsl_metal_spirv_wgsl = glsl | metal | spirv | wgsl;
 
 /// GLSL, and SPIRV code-gen targets
 /// [Compound]

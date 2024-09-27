@@ -23,12 +23,13 @@
 // 'transpose' calls, or else perform more complicated transformations that
 // end up duplicating expressions many times.
 
-namespace Slang {
+namespace Slang
+{
 
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     IRBasicType *const switchConditionType,
-    const SwitchRegion::Case *const currentCase, const bool isDefault
-    )
+    const SwitchRegion::Case *const currentCase,
+    const bool isDefault)
 {
     // WGSL has special syntax for blocks sharing case labels:
     // "case 2, 3, 4: ...;" instead of the C-like syntax
@@ -80,8 +81,8 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
 }
 
 void WGSLSourceEmitter::emitParameterGroupImpl(
-    IRGlobalParam* varDecl, IRUniformParameterGroupType* type
-)
+    IRGlobalParam* varDecl,
+    IRUniformParameterGroupType* type)
 {
     auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
@@ -140,8 +141,8 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
 }
 
 void WGSLSourceEmitter::emitEntryPointAttributesImpl(
-    IRFunc* irFunc, IREntryPointDecoration* entryPointDecor
-    )
+    IRFunc* irFunc,
+    IREntryPointDecoration* entryPointDecor)
 {
     auto stage = entryPointDecor->getProfile().getStage();
 
@@ -238,9 +239,7 @@ static bool isPowerOf2(const uint32_t n)
     return (n != 0U) && ((n - 1U) & n) == 0U;
 }
 
-void WGSLSourceEmitter::emitStructFieldAttributes(
-    IRStructType * structType, IRStructField * field
-    )
+void WGSLSourceEmitter::emitStructFieldAttributes(IRStructType * structType, IRStructField * field)
 {
     // Tint emits errors unless we explicitly spell out the layout in some cases, so emit
     // offset and align attribtues for all fields.
@@ -273,27 +272,6 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
     m_writer->emit(")");
 }
 
-bool WGSLSourceEmitter::isPointerSyntaxRequiredImpl(IRInst* inst)
-{
-    // Structured buffers are mapped to 'array' types, which don't need dereferencing
-    if (inst->getOp() == kIROp_RWStructuredBufferGetElementPtr)
-        return false;
-
-    // Don't emit "->" to access fields in resource structs
-    if (inst->getOp() == kIROp_FieldAddress)
-        return false;
-
-    // Don't emit "*" to access fields in resource structs
-    if (inst->getOp() == kIROp_GlobalParam)
-        return false;
-
-    // Emit 'globalVar' instead of  "*&globalVar"
-    if (inst->getOp() == kIROp_GlobalVar)
-        return false;
-
-    return true;
-}
-
 void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
 {
     switch (addressSpace)
@@ -320,37 +298,52 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
     }
 }
 
+static const char* getWgslImageFormat(IRTextureTypeBase* type)
+{
+    // You can find the supported WGSL texel format from the URL:
+    // https://www.w3.org/TR/WGSL/#storage-texel-formats
+    //
+    ImageFormat imageFormat = type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
+    switch (imageFormat)
+    {
+    case ImageFormat::rgba8:       return "rgba8unorm";
+    case ImageFormat::rgba8_snorm: return "rgba8snorm";
+    case ImageFormat::rgba8ui:     return "rgba8uint";
+    case ImageFormat::rgba8i:      return "rgba8sint";
+    case ImageFormat::rgba16ui:    return "rgba16uint";
+    case ImageFormat::rgba16i:     return "rgba16sint";
+    case ImageFormat::rgba16f:     return "rgba16float";
+    case ImageFormat::r32ui:       return "r32uint";
+    case ImageFormat::r32i:        return "r32sint";
+    case ImageFormat::r32f:        return "r32float";
+    case ImageFormat::rg32ui:      return "rg32uint";
+    case ImageFormat::rg32i:       return "rg32sint";
+    case ImageFormat::rg32f:       return "rg32float";
+    case ImageFormat::rgba32ui:    return "rgba32uint";
+    case ImageFormat::rgba32i:     return "rgba32sint";
+    case ImageFormat::rgba32f:     return "rgba32float";
+    case ImageFormat::unknown:
+        // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
+        return "rgba32float";
+    default:
+        // We may need to print a warning for types WGSL doesn't support
+        return "rgba32float";
+    }
+}
+
 void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())
     {
 
     case kIROp_HLSLRWStructuredBufferType:
-    {
-        auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-        m_writer->emit("ptr<");
-        emit(AddressSpace::StorageBuffer);
-        m_writer->emit(", ");
-        m_writer->emit("array");
-        m_writer->emit("<");
-        emitType(structuredBufferType->getElementType());
-        m_writer->emit(">");
-        m_writer->emit(", read_write");
-        m_writer->emit(">");
-    }
-    break;
-
     case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
     {
         auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-        m_writer->emit("ptr<");
-        emit(AddressSpace::StorageBuffer);
-        m_writer->emit(", ");
         m_writer->emit("array");
         m_writer->emit("<");
         emitType(structuredBufferType->getElementType());
-        m_writer->emit(">");
-        m_writer->emit(", read");
         m_writer->emit(">");
     }
     break;
@@ -470,6 +463,73 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(">");
         return;
     }
+    case kIROp_TextureType:
+        if (auto texType = as<IRTextureType>(type))
+        {
+            switch (texType->getAccess())
+            {
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                m_writer->emit("texture_storage");
+                break;
+            default:
+                m_writer->emit("texture");
+                break;
+            }
+
+            if (texType->isShadow())
+            {
+                m_writer->emit("_depth");
+            }
+
+            if (texType->isMultisample())
+            {
+                m_writer->emit("_multisampled");
+            }
+
+            switch (texType->GetBaseShape())
+            {
+            case SLANG_TEXTURE_1D:   m_writer->emit("_1d");   break;
+            case SLANG_TEXTURE_2D:   m_writer->emit("_2d");   break;
+            case SLANG_TEXTURE_3D:   m_writer->emit("_3d");   break;
+            case SLANG_TEXTURE_CUBE: m_writer->emit("_cube"); break;
+            }
+
+            if (texType->isArray())
+                m_writer->emit("_array");
+
+            if (!texType->isShadow())
+            {
+                m_writer->emit("<");
+
+                auto elemType = texType->getElementType();
+
+                switch (texType->getAccess())
+                {
+                case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                    m_writer->emit(getWgslImageFormat(texType));
+                    m_writer->emit(", read_write");
+                    break;
+
+                default:
+                    if (auto vecElemType = as<IRVectorType>(elemType))
+                        emitSimpleType(vecElemType->getElementType());
+                    else
+                        emitType(elemType);
+                    break;
+                }
+
+                m_writer->emit(">");
+            }
+        }
+        return;
+
+    case kIROp_AtomicType:
+    {
+        m_writer->emit("atomic<");
+        emitType(cast<IRAtomicType>(type)->getElementType());
+        m_writer->emit(">");
+        return;
+    }
     default:
         break;
 
@@ -504,13 +564,33 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 }
 
-void WGSLSourceEmitter::emitVarKeywordImpl(IRType * type, const bool isConstant)
+void WGSLSourceEmitter::emitVarKeywordImpl(IRType * type, IRInst* varDecl)
 {
-    if (isConstant)
-        m_writer->emit("const");
-    else
+    switch (varDecl->getOp())
+    {
+    case kIROp_GlobalParam:
+    case kIROp_GlobalVar:
+    case kIROp_Var:
         m_writer->emit("var");
-    if (type->getOp() == kIROp_HLSLRWStructuredBufferType)
+        break;
+    default:
+        if (as<IRModuleInst>(varDecl->getParent()))
+        {
+            m_writer->emit("const");
+        }
+        else
+        {
+            m_writer->emit("var");
+        }
+        break;
+    }
+
+    if (as<IRGroupSharedRate>(varDecl->getRate()))
+    {
+        m_writer->emit("<workgroup>");
+    }
+    else if (type->getOp() == kIROp_HLSLRWStructuredBufferType ||
+        type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType)
     {
         m_writer->emit("<");
         m_writer->emit("storage, read_write");
@@ -620,9 +700,26 @@ void WGSLSourceEmitter::emitDeclaratorImpl(DeclaratorInfo* declarator)
     }
 }
 
+void WGSLSourceEmitter::emitOperandImpl(IRInst* operand, EmitOpInfo const& outerPrec)
+{
+    if (operand->getOp() == kIROp_Param && as<IRPtrTypeBase>(operand->getDataType()))
+    {
+        // If we are emitting a reference to a pointer typed operand, then
+        // we should dereference it now since we want to treat all the remaining
+        // part of wgsl as pointer-free target.
+        m_writer->emit("(*");
+        m_writer->emit(getName(operand));
+        m_writer->emit(")");
+    }
+    else
+    {
+        CLikeSourceEmitter::emitOperandImpl(operand, outerPrec);
+    }
+}
+
 void WGSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(
-    IRType* type, DeclaratorInfo* declarator
-    )
+    IRType* type,
+    DeclaratorInfo* declarator)
 {
     if (declarator)
     {
@@ -789,13 +886,167 @@ void WGSLSourceEmitter::emitParamTypeImpl(IRType* type, const String& name)
     emitType(type, name);
 }
 
+bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    default:
+        return false;
+    case kIROp_AtomicLoad:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicLoad(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("));\n");
+        return true;
+    }
+    case kIROp_AtomicStore:
+    {
+        m_writer->emit("atomicStore(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicExchange(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicCompareExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicCompareExchangeWeak(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(").old_value;\n");
+        return true;
+    }
+    case kIROp_AtomicAdd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicSub:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicSub(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicAnd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAnd(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicOr:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicOr(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicXor:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicXor(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMin:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicMin(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMax:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicMax(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicInc:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicAdd(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitType(inst->getDataType());
+        m_writer->emit("(1));\n");
+        return true;
+    }
+    case kIROp_AtomicDec:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomicSub(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), ");
+        emitType(inst->getDataType());
+        m_writer->emit("(1));\n");
+        return true;
+    }
+    }
+}
+
+void WGSLSourceEmitter::emitCallArg(IRInst* inst)
+{
+    if (as<IRPtrTypeBase>(inst->getDataType()))
+    {
+        // If we are calling a function with a pointer-typed argument, we need to
+        // explicitly prefix the argument with `&` to pass a pointer.
+        //
+        m_writer->emit("&(");
+        emitOperand(inst, getInfo(EmitOp::General));
+        m_writer->emit(")");
+    }
+    else
+    {
+        emitOperand(inst, getInfo(EmitOp::General));
+    }
+}
+
 bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
 
     switch (inst->getOp())
     {
-
     case kIROp_MakeVectorFromScalar:
     {
         // In WGSL this is done by calling the vec* overloads listed in [1]
@@ -871,12 +1122,11 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
     case kIROp_StructuredBufferLoad:
     case kIROp_RWStructuredBufferLoad:
+    case kIROp_RWStructuredBufferGetElementPtr:
     {
-        // Structured buffers are just arrays in WGSL
-        auto base = inst->getOperand(0);
-        emitOperand(base, outerPrec);
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, getInfo(EmitOp::Postfix)));
         m_writer->emit("[");
-        emitOperand(inst->getOperand(1), EmitOpInfo());
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit("]");
         return true;
     }
@@ -913,15 +1163,12 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     }
     break;
-
     }
 
     return false;
 }
 
-void WGSLSourceEmitter::emitVectorTypeNameImpl(
-    IRType* elementType, IRIntegerValue elementCount
-    )
+void WGSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
 
     if (elementCount > 1)
@@ -936,61 +1183,6 @@ void WGSLSourceEmitter::emitVectorTypeNameImpl(
     {
         emitSimpleType(elementType);
     }
-}
-
-void WGSLSourceEmitter::emitOperandImpl(IRInst* inst, const EmitOpInfo& outerPrec)
-{
-    // In WGSL, the structured buffer types are converted to ptr<AS, array<E>, AM>
-    // everywhere, except for the global parameter declaration.
-    // Thus, when these globals are used in expressions, we need an ampersand.
-
-    if (inst->getOp() == kIROp_GlobalParam)
-    {
-        switch (inst->getDataType()->getOp())
-        {
-        case kIROp_HLSLStructuredBufferType:
-        case kIROp_HLSLRWStructuredBufferType:
-
-            m_writer->emit("(&");
-            CLikeSourceEmitter::emitOperandImpl(inst, outerPrec);
-            m_writer->emit(")");
-            return;
-        }
-    }
-
-    CLikeSourceEmitter::emitOperandImpl(inst, outerPrec);
-}
-
-void WGSLSourceEmitter::emitGlobalParamType(IRType* type, const String& name)
-{
-    // In WGSL, the structured buffer types are converted to ptr<AS, array<E>, AM>
-    // everywhere, except for the global parameter declaration.
-
-    switch (type->getOp())
-    {
-
-    case kIROp_HLSLStructuredBufferType:
-    case kIROp_HLSLRWStructuredBufferType:
-    {
-        StringSliceLoc nameAndLoc(name.getUnownedSlice());
-        NameDeclaratorInfo nameDeclarator(&nameAndLoc);
-        emitDeclarator(&nameDeclarator);
-        m_writer->emit(" : ");
-        auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
-        m_writer->emit("array");
-        m_writer->emit("<");
-        emitType(structuredBufferType->getElementType());
-        m_writer->emit(">");
-    }
-    break;
-
-    default:
-
-        emitType(type, name);
-        break;
-
-    }
-
 }
 
 void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)

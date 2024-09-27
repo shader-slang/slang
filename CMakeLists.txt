@@ -284,6 +284,13 @@ add_custom_target(
     all-generators
     COMMENT "meta target which depends on all generators"
 )
+
+if(CMAKE_HOST_WIN32)
+  set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
+else()
+  set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
+endif()
+
 set_target_properties(all-generators PROPERTIES FOLDER generators)
 function(generator dir)
     if(SLANG_GENERATORS_PATH)
@@ -298,7 +305,7 @@ function(generator dir)
             TARGET ${target}
             PROPERTY
                 IMPORTED_LOCATION
-                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_EXECUTABLE_SUFFIX}"
+                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_HOST_EXECUTABLE_SUFFIX}"
         )
     else()
         slang_add_target(
