@@ -1664,7 +1664,7 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     args.add("-Xgenericcpp");
     args.add("-I./include");
     args.add("-Xgenericcpp");
-    args.add("-I/home/e/work/slang-external/external/unordered_dense/include");
+    args.add("-I./external/unordered_dense/include");
     for (auto arg : args)
     {
         // If unescaping is needed, do it
