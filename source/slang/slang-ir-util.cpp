@@ -175,9 +175,7 @@ IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecaili
 // Returns true if is not possible to produce side-effect from a value of `dataType`.
 bool isValueType(IRInst* dataType)
 {
-    if(auto t = as<IRType>(dataType))
-        dataType = unwrapAttributedType(t);
-    dataType = getResolvedInstForDecorations(dataType);
+    dataType = getResolvedInstForDecorations(unwrapAttributedType(dataType));
     if (as<IRBasicType>(dataType))
         return true;
     switch (dataType->getOp())

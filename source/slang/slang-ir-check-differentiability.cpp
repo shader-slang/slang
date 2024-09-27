@@ -209,7 +209,7 @@ public:
 
     bool checkType(IRType* type)
     {
-        type = unwrapAttributedType(type);
+        type = as<IRType>(unwrapAttributedType(type));
         if (as<IRTorchTensorType>(type))
             return false;
         else if (auto arrayType = as<IRArrayTypeBase>(type))

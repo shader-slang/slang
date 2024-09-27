@@ -2098,7 +2098,7 @@ struct SPIRVEmitContext
         // unorm or snorm attributes on the sampled type.
         if (auto attribType = as<IRAttributedType>(sampledType))
         {
-            sampledType = unwrapAttributedType(sampledType);
+            sampledType = as<IRType>(unwrapAttributedType(sampledType));
             if (format == SpvImageFormatUnknown)
             {
                 IRIntegerValue vectorSize = 1;

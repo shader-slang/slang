@@ -5207,7 +5207,7 @@ namespace Slang
             valueType = ptrLikeType->getElementType();
         }
         IRType* type = nullptr;
-        valueType = unwrapAttributedType(valueType);
+        valueType = as<IRType>(unwrapAttributedType(valueType));
         if (auto arrayType = as<IRArrayTypeBase>(valueType))
         {
             type = arrayType->getElementType();
