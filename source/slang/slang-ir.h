@@ -2034,7 +2034,7 @@ struct IRAnyValueType : IRType
 
 struct IRWitnessTableTypeBase : IRType
 {
-    IRType* getConformanceType() { return (IRType*)getOperand(0); }
+    IRInst* getConformanceType() { return getOperand(0); }
     IR_PARENT_ISA(WitnessTableTypeBase);
 };
 
