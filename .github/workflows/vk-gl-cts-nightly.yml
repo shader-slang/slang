@@ -1,8 +1,8 @@
 name: VK-GL-CTS Nightly
 
 on:
-  schedule:
-    - cron: '00 07 * * *'
+  pull_request:
+    branches: [master]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -55,14 +55,6 @@ jobs:
         latest: true
         repository: "shader-slang/VK-GL-CTS"
         fileName: "VK-GL-CTS_WithSlang-0.0.3-win64.zip"
-    - uses: actions/checkout@v4
-      with:
-        repository: "shader-slang/VK-GL-CTS"
-        sparse-checkout: |
-          test-lists/slang-passing-tests.txt
-          test-lists/slang-waiver-tests.xml
-        path: test-lists
-        sparse-checkout-cone-mode: false
     - name: vkcts setup
       shell: pwsh
       run: |
@@ -72,14 +64,19 @@ jobs:
         copy ${{ github.workspace }}\build\Release\bin\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-glslang.dll
         copy ${{ github.workspace }}\build\Release\bin\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
 
-        copy ${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
-        copy ${{ github.workspace }}\test-lists\test-lists\slang-waiver-tests.xml ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
+        copy ${{ github.workspace }}\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
+        copy ${{ github.workspace }}\slang-waiver-tests.xml ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
 
     - name: vkcts run
       shell: pwsh
       working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
       run: |
         .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt --deqp-waiver-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
+    - name: Dump TestResults.qpa if failed
+      shell: pwsh
+      if: ${{ !success() }}
+      working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
+      run: Get-Content TestResults.qpa -Tail 1000
     - name: success notification
       id: slack-notify-success
       if: ${{ success() }}
