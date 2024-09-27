@@ -312,6 +312,18 @@ internal void test9()
 }
 ```
 
+### Zero Initialization
+
+The Slang compiler supported an option to force zero-initialization of all local variables.
+This is currently implemented by adding `IDefaultInitializable` conformance to all user
+defined types. With the direction we are heading, we should remove this option in the future.
+For now we can continue to provide this functionality but through an IR rewrite pass instead
+of changing the frontend semantics. 
+
+When users specifies `-zero-initialize`, we should still use the same front-end logic for
+all the checking. After lowering to IR, we should insert a `store` after all `IRVar : T` to
+initialize them to `defaultConstruct(T)`.
+
 
 Q&A
 -----------
