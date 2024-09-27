@@ -95,7 +95,7 @@ runs:
       # hosted runners or ARM
       continue-on-error: true
 
-    - name: Set environment variable for CMake
+    - name: Set environment variable for CMake and sccache
       shell: bash
       run: |
         if [ "${{inputs.build-llvm}}" == "true" ]; then
@@ -108,6 +108,7 @@ runs:
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
         fi
+        echo SCCACHE_IGNORE_SERVER_IO_ERROR=1 >> "$GITHUB_ENV"
 
     # Install swiftshader
     - uses: robinraju/release-downloader@v1.8
