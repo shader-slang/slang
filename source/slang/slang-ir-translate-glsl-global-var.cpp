@@ -17,6 +17,8 @@ namespace Slang
             buildEntryPointReferenceGraph(referencingEntryPoints, module);
 
             List<IRInst*> entryPoints;
+            List<IRInst*> getWorkGroupSizeInsts;
+
             // Traverse the module to find all entry points.
             // If we see a `GetWorkGroupSize` instruction, we will materialize it.
             // 
@@ -25,9 +27,10 @@ namespace Slang
                 if (inst->getOp() == kIROp_Func && inst->findDecoration<IREntryPointDecoration>())
                     entryPoints.add(inst);
                 else if (inst->getOp() == kIROp_GetWorkGroupSize)
-                    materializeGetWorkGroupSize(module, referencingEntryPoints, inst);
+                    getWorkGroupSizeInsts.add(inst);
             }
-
+            for (auto inst : getWorkGroupSizeInsts)
+                materializeGetWorkGroupSize(module, referencingEntryPoints, inst);
             IRBuilder builder(module);
 
             for (auto entryPoint : entryPoints)
