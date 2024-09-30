@@ -87,10 +87,7 @@ runs:
     # Run this after building llvm, it's pointless to fill the caches with
     # infrequent llvm build products
     - name: Set up sccache
-      uses: hendrikmuhs/ccache-action@v1.2
-      with:
-        key: ${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
-        variant: sccache
+      uses: mozilla-actions/sccache-action@v0.0.6
       # Opportunistically use sccache, it's not available for example on self
       # hosted runners or ARM
       continue-on-error: true
@@ -105,6 +102,7 @@ runs:
 
         # Set CMake to use sccache if it's available
         if command -v sccache; then
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
         fi
