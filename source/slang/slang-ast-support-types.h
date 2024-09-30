@@ -9,7 +9,7 @@
 
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
-#include "slang.h"
+#include "../../include/slang.h"
 
 #include "../core/slang-semantic-version.h"
 
@@ -187,8 +187,9 @@ namespace Slang
 
     enum class ImageFormat
     {
-#define FORMAT(NAME, OTHER) NAME,
+#define SLANG_FORMAT(NAME, OTHER) NAME,
 #include "slang-image-format-defs.h"
+#undef SLANG_FORMAT
     };
 
     struct ImageFormatInfo
@@ -1606,6 +1607,7 @@ namespace Slang
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
 
         DifferentialType, ///< The `IDifferentiable.Differential` associated type requirement 
+        DifferentialPtrType, ///< The `IDifferentiable.DifferentialPtr` associated type requirement
         DZeroFunc, ///< The `IDifferentiable.dzero` function requirement 
         DAddFunc, ///< The `IDifferentiable.dadd` function requirement 
         DMulFunc, ///< The `IDifferentiable.dmul` function requirement 

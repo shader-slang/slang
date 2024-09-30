@@ -93,7 +93,7 @@ namespace Slang
         void checkDerivativeMemberAttributeParent(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
         void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
         void checkMeshOutputDecl(VarDeclBase* varDecl);
-        void maybeApplyMatrixLayoutModifier(VarDeclBase* varDecl);
+        void maybeApplyLayoutModifier(VarDeclBase* varDecl);
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
         void visitVarDecl(VarDecl* varDecl)
@@ -115,6 +115,8 @@ namespace Slang
         void visitGenericValueParamDecl(GenericValueParamDecl* decl);
 
         void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
+
+        void validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type);
 
         void visitGenericDecl(GenericDecl* genericDecl);
 
@@ -1516,7 +1518,122 @@ namespace Slang
             }
         }
     }
-    void SemanticsDeclHeaderVisitor::maybeApplyMatrixLayoutModifier(VarDeclBase* varDecl)
+
+    ImageFormat inferImageFormatFromTextureType(VarDeclBase* varDecl, TextureTypeBase* textureType, bool &outIsInferred)
+    {
+        outIsInferred = false;
+        ImageFormat format = ImageFormat::unknown;
+        if (auto formatVal = as<ConstantIntVal>(textureType->getFormat()))
+        {
+            format = (ImageFormat)formatVal->getValue();
+        }
+        if (format != ImageFormat::unknown)
+            return format;
+
+        if (auto formatAttrib = varDecl->findModifier<FormatAttribute>())
+        {
+            format = formatAttrib->format;
+        }
+        else
+        {
+            // If format is not specified explicitly through format attribute, we will derive a default
+            // value from the element format.
+            outIsInferred = true;
+            auto elementType = textureType->getElementType();
+            Int vectorWidth = 1;
+            if (auto elementVecType = as<VectorExpressionType>(elementType))
+            {
+                if (auto intLitVal = as<ConstantIntVal>(elementVecType->getElementCount()))
+                {
+                    vectorWidth = (Int)intLitVal->getValue();
+                }
+                else
+                {
+                    vectorWidth = 1;
+                }
+                elementType = elementVecType->getElementType();
+            }
+            if (auto basicType = as<BasicExpressionType>(elementType))
+            {
+                switch (basicType->getBaseType())
+                {
+                case BaseType::UInt:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r32ui; break;
+                    case 2: format = ImageFormat::rg32ui; break;
+                    case 4: format = ImageFormat::rgba32ui; break;
+                    }
+                    break;
+                case BaseType::Int:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r32i; break;
+                    case 2: format = ImageFormat::rg32i; break;
+                    case 4: format = ImageFormat::rgba32i; break;
+                    }
+                    break;
+                case BaseType::UInt16:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r16ui; break;
+                    case 2: format = ImageFormat::rg16ui; break;
+                    case 4: format = ImageFormat::rgba16ui; break;
+                    }
+                    break;
+                case BaseType::Int16:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r16i; break;
+                    case 2: format = ImageFormat::rg16i; break;
+                    case 4: format = ImageFormat::rgba16i; break;
+                    }
+                    break;
+                case BaseType::UInt8:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r8ui; break;
+                    case 2: format = ImageFormat::rg8ui; break;
+                    case 4: format = ImageFormat::rgba8ui; break;
+                    }
+                    break;
+                case BaseType::Int8:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r8i; break;
+                    case 2: format = ImageFormat::rg8i; break;
+                    case 4: format = ImageFormat::rgba8i; break;
+                    }
+                    break;
+                case BaseType::Int64:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r64i; break;
+                    default: break;
+                    }
+                    break;
+                case BaseType::UInt64:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r64ui; break;
+                    default: break;
+                    }
+                    break;
+                case BaseType::Half:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r16f; break;
+                    case 2: format = ImageFormat::rg16f; break;
+                    case 4: format = ImageFormat::rgba16f; break;
+                    }
+                    break;
+                }
+            }
+        }
+        return format;
+    }
+
+    void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
     {
         if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
         {
@@ -1529,6 +1646,23 @@ namespace Slang
                     matrixType->getColumnCount(),
                     getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
                 varDecl->type.type = newMatrixType;
+            }
+        }
+        else if (auto textureType = as<TextureTypeBase>(unwrapArrayType(varDecl->type.type)))
+        {
+            if (getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown))
+                return;
+
+            // For texture types, we will ensure there is a [format] attribute declared on the decl,
+            // if not, we will infer the format from the texture type if it is not specified.
+            //
+            bool isInferred = false;
+            auto format = inferImageFormatFromTextureType(varDecl, textureType, isInferred);
+            if (format != ImageFormat::unknown && isInferred)
+            {
+                auto formatAttrib = m_astBuilder->create<FormatAttribute>();
+                formatAttrib->format = format;
+                addModifier(varDecl, formatAttrib);
             }
         }
     }
@@ -1613,8 +1747,8 @@ namespace Slang
             validateArraySizeForVariable(varDecl);
         }
 
-        // If there is a matrix layout modifier, we will modify the matrix type now.
-        maybeApplyMatrixLayoutModifier(varDecl);
+        // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
+        maybeApplyLayoutModifier(varDecl);
 
         if (varDecl->initExpr)
         {
@@ -2487,6 +2621,69 @@ namespace Slang
         return true;
     }
 
+    void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type)
+    {
+        // Validate that the sub type of a constraint is in valid form.
+        //
+        if (auto subDeclRef = isDeclRefTypeOf<Decl>(type.type))
+        {
+            if (subDeclRef.getDecl()->parentDecl == decl->parentDecl)
+            {
+                // OK, sub type is one of the generic parameter type.
+                return;
+            }
+            if (as<GenericDecl>(decl->parentDecl))
+            {
+                // If the constraint is in a generic decl, then the sub type must be dependent on at least one
+                // of the generic type parameters defined in the same generic decl.
+                // For example, it is invalid to define a constraint like `void foo<T>() where int : float` since
+                // `int` isn't dependent on any generic type parameter.
+                auto dependentGeneric = getShared()->getDependentGenericParent(subDeclRef);
+                if (dependentGeneric.getDecl() != decl->parentDecl)
+                {
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                    return;
+                }
+            }
+            else if (as<AssocTypeDecl>(decl->parentDecl))
+            {
+                // If the constraint is on an associated type, then it should either be the associated type itself,
+                // or a associated type of the associated type.
+                // For example,
+                // ```
+                // interface IFoo {
+                //    associatedtype T
+                //        where T : IFoo  // OK, constraint is on the associatedtype T itself.
+                //        where T.T == X  // OK, constraint is on the associated type of T.
+                //        where int == X; // Error, int is not a valid left hand side of a constraint.
+                //  }
+                // ```
+                auto lookupDeclRef = as<LookupDeclRef>(subDeclRef.declRefBase);
+                if (!lookupDeclRef)
+                {
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                    return;
+                }
+
+                // We allow `associatedtype T where This.T : ...`.
+                // In this case, the left hand side will be in the form of
+                // LookupDeclRef(ThisType, T). i.e. lookupDeclRef->getDecl() == T.
+                //
+                if (lookupDeclRef->getDecl()->parentDecl == decl->parentDecl ||
+                    lookupDeclRef->getDecl() == decl->parentDecl)
+                    return;
+                auto baseType = as<Type>(lookupDeclRef->getLookupSource());
+                if (!baseType)
+                {
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                    return;
+                }
+                type.type = baseType;
+                validateGenericConstraintSubType(decl, type);
+            }
+        }
+    }
+
     void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
     {
         // TODO: are there any other validations we can do at this point?
@@ -2496,8 +2693,17 @@ namespace Slang
         // of the parameters of the generic.
         //
         CheckConstraintSubType(decl->sub);
-        decl->sub = TranslateTypeNodeForced(decl->sub);
-        decl->sup = TranslateTypeNodeForced(decl->sup);
+
+        if (!decl->sub.type)
+            decl->sub = TranslateTypeNodeForced(decl->sub);
+        if (!decl->sup.type)
+            decl->sup = TranslateTypeNodeForced(decl->sup);
+
+        if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+        {
+            validateGenericConstraintSubType(decl, decl->sub);
+        }
+
         if (!decl->isEqualityConstraint && !isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sub.type))
         {
             getSink()->diagnose(decl->sup.exp, Diagnostics::invalidTypeForConstraint, decl->sup);
@@ -2765,6 +2971,17 @@ namespace Slang
     void registerBuiltinDecls(Session* session, Decl* decl)
     {
         _registerBuiltinDeclsRec(session, decl);
+    }
+
+    Type* unwrapArrayType(Type* type)
+    {
+        for (;;)
+        {
+            if (auto arrayType = as<ArrayExpressionType>(type))
+                type = arrayType->getElementType();
+            else
+                return type;
+        }
     }
 
     void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)
@@ -3762,6 +3979,10 @@ namespace Slang
         ThisExpr*& synThis)
     {
         auto synGenericDecl = m_astBuilder->create<GenericDecl>();
+        synGenericDecl->parentDecl = context->parentDecl;
+        synGenericDecl->ownedScope = m_astBuilder->create<Scope>();
+        synGenericDecl->ownedScope->containerDecl = synGenericDecl;
+        synGenericDecl->ownedScope->parent = getScope(context->parentDecl);
 
         // For now our synthesized method will use the name and source
         // location of the requirement we are trying to satisfy.
@@ -3779,7 +4000,7 @@ namespace Slang
         }
 
         // Dictionary to map from the original type parameters to the synthesized ones.
-        Dictionary<GenericTypeParamDecl*, GenericTypeParamDecl*> mapOrigToSynTypeParams;
+        Dictionary<Decl*, Decl*> mapOrigToSynTypeParams;
 
         // Our synthesized method will have parameters matching the names
         // and types of those on the requirement, and it will use expressions
@@ -3788,27 +4009,77 @@ namespace Slang
         // 
         for (auto member : requiredMemberDeclRef.getDecl()->members)
         {
-            if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
+            if (auto typeParamDeclBase = as<GenericTypeParamDeclBase>(member))
             {
-                auto synTypeParamDecl = m_astBuilder->create<GenericTypeParamDecl>();
-                synTypeParamDecl->nameAndLoc = typeParamDecl->getNameAndLoc();
-                synTypeParamDecl->initType = typeParamDecl->initType;
-                synTypeParamDecl->parentDecl = synGenericDecl;
-                synGenericDecl->members.add(synTypeParamDecl);
+                auto synTypeParamDeclBase = (GenericTypeParamDeclBase*)m_astBuilder->createByNodeType(typeParamDeclBase->astNodeType);
+                synTypeParamDeclBase->nameAndLoc = typeParamDeclBase->getNameAndLoc();
+                synTypeParamDeclBase->parameterIndex = typeParamDeclBase->parameterIndex;
+                synTypeParamDeclBase->parentDecl = synGenericDecl;
 
-                mapOrigToSynTypeParams.add(typeParamDecl, synTypeParamDecl);
+                // Note: we intentionally do not copy GenericTypeParamDecl::initType here,
+                // because initType maybe dependent on the original type parameters,
+                // and if we copy we must also substitute all the original type parameters with the synthesized ones.
+                // It shouldn't be required for the implementing declaration to define initType anyways, so we'll just
+                // save ourselves from the trouble.
+                //
+                synGenericDecl->members.add(synTypeParamDeclBase);
+
+                mapOrigToSynTypeParams.add(typeParamDeclBase, synTypeParamDeclBase);
                 
                 // Construct a DeclRefExpr from the type parameter.
-                auto synTypeParamDeclRef = makeDeclRef(synTypeParamDecl);
+                auto synTypeParamDeclRef = makeDeclRef(synTypeParamDeclBase);
 
                 auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
                 synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
                 synTypeParamDeclRefExpr->type = getTypeForDeclRef(m_astBuilder, synTypeParamDeclRef, SourceLoc());
                 
                 synGenericArgs.add(synTypeParamDeclRefExpr);
-            } 
+            }
+            else if (auto valParamDecl = as<GenericValueParamDecl>(member))
+            {
+                auto synValParamDecl = m_astBuilder->create<GenericValueParamDecl>();
+                synValParamDecl->nameAndLoc = valParamDecl->nameAndLoc;
+                synValParamDecl->parentDecl = synGenericDecl;
+                synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
+                synValParamDecl->type = valParamDecl->type;
+
+                // Note: we intentionally do not copy GenericValueParamDecl::initExpr here,
+                // because initType maybe dependent on the original type/value parameters,
+                // and if we copy we must also substitute all the original type parameters with the synthesized ones.
+                // It shouldn't be required for the implementing declaration to define initType anyways, so we'll just
+                // save ourselves from the trouble.
+                //
+                synGenericDecl->members.add(synValParamDecl);
+
+                mapOrigToSynTypeParams.add(valParamDecl, synGenericDecl);
+
+                // Construct a DeclRefExpr from the value parameter.
+                auto synValParamDeclRef = makeDeclRef(synValParamDecl);
+
+                auto synValParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                synValParamDeclRefExpr->declRef = synValParamDeclRef;
+                synValParamDeclRefExpr->type = synValParamDecl->type.type;
+
+                synGenericArgs.add(synValParamDeclRefExpr);
+            }
         }
 
+        // With all generic parameters in place, we can now form a partial substitution argument list
+        // without taking into account all the generic constraints.
+
+        // Given `requiredMemberDeclRef` that is `Lookup(ConcreteType:IFoo<int>, IFoo::bar)`, we can now
+        // form a partial specialized declref to `IFoo<int>::bar` with substitution args comming
+        // from the synthesized generic decl, i.e. we want to form:
+        // `Lookup(ConcreteType:IFoo<int>, IFoo::bar)<UImpl>` where `UImpl` is a synthesized generic parameter.
+        //
+        auto partialDefaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
+        DeclRef<CallableDecl> partiallySpecializedRequiredGenericDeclRef = m_astBuilder->getGenericAppDeclRef(
+            requiredMemberDeclRef, partialDefaultArgs.getArrayView()).as<CallableDecl>();
+
+        // With `partiallySpecializedRequiredGenericDeclRef`, we can obtain the right specialized types
+        // from the original requirement decl. For example, we can simply apply declref substituion on
+        // the original type constraint `U:IDerived` to get `UImpl : IDerived`.
+        //
         for (auto member : requiredMemberDeclRef.getDecl()->members)
         {
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
@@ -3817,28 +4088,16 @@ namespace Slang
                 synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
                 synConstraintDecl->parentDecl = synGenericDecl;
                 
-                // For constraints of type T : Interface, where T is a simple type parameter, 
-                // find the declaration of T
-                // 
-                if (auto typeParamDecl = as<DeclRefType>(constraintDecl->sub.type)->getDeclRef().as<GenericTypeParamDecl>().getDecl())
-                {  
-                    auto synTypeParamDecl = mapOrigToSynTypeParams.getValue(typeParamDecl);
-
-                    // Construct a DeclRefExpr from the type parameter.
-                    auto synTypeParamDeclRef = makeDeclRef(synTypeParamDecl);
-
-                    auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
-                    synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
-                    synTypeParamDeclRefExpr->type = getTypeForDeclRef(m_astBuilder, synTypeParamDeclRef, SourceLoc());
-
-                    synConstraintDecl->sub = TypeExp(synTypeParamDeclRefExpr);
-                    synConstraintDecl->sup = constraintDecl->sup;
-                    synGenericDecl->members.add(synConstraintDecl);
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("Cannot perform synthesis for requirements with complex type constraints.");
-                }
+                // For generic constraint Sub : Sup, we need to substitute them with
+                // synthesized generic parameters.
+                //
+                synConstraintDecl->sub = TypeExp(
+                    (Type*)constraintDecl->sub.type->substitute(m_astBuilder,
+                        SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+                synConstraintDecl->sup = TypeExp(
+                    (Type*)constraintDecl->sup.type->substitute(m_astBuilder,
+                        SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+                synGenericDecl->members.add(synConstraintDecl);
             }
         }
 
@@ -3847,25 +4106,25 @@ namespace Slang
         // original parameters.
         //
         auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
-        DeclRef<FuncDecl> requiredFuncDeclRef = m_astBuilder->getGenericAppDeclRef(
-                requiredMemberDeclRef, defaultArgs.getArrayView()).as<FuncDecl>();
+        DeclRef<CallableDecl> requiredFuncDeclRef = m_astBuilder->getGenericAppDeclRef(
+            requiredMemberDeclRef, defaultArgs.getArrayView()).as<CallableDecl>();
 
         SLANG_ASSERT(requiredFuncDeclRef);
+        ConformanceCheckingContext subContext = *context;
+        subContext.parentDecl = synGenericDecl;
 
-        synGenericDecl->inner = synthesizeMethodSignatureForRequirementWitness(
-            context,
+        synGenericDecl->inner = synthesizeMethodSignatureForRequirementWitnessInner(
+            &subContext,
             requiredFuncDeclRef,
             synArgs,
             synThis);
-        synGenericDecl->inner->parentDecl = synGenericDecl;
-
         return synGenericDecl;
     }
 
     void SemanticsVisitor::addModifiersToSynthesizedDecl(
         ConformanceCheckingContext* context,
         DeclRef<Decl> requiredMemberDeclRef,
-        FunctionDeclBase* synthesized,
+        CallableDecl* synthesized,
         ThisExpr*& synThis)
     {
         // Required interface methods can be `static` or non-`static`,
@@ -4018,17 +4277,43 @@ namespace Slang
         }
     }
 
-    FunctionDeclBase* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitness(
+    CallableDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitness(
         ConformanceCheckingContext* context,
-        DeclRef<FunctionDeclBase> requiredMemberDeclRef,
+        DeclRef<CallableDecl> requiredMemberDeclRef,
         List<Expr*>& synArgs,
         ThisExpr*& synThis)
     {
-        FunctionDeclBase* synFuncDecl = as<FunctionDeclBase>(m_astBuilder->createByNodeType(requiredMemberDeclRef.getDecl()->astNodeType));
+        if (auto genericDeclRef = as<GenericDecl>(requiredMemberDeclRef.getParent()))
+        {
+            List<Expr*> synGenericArgs;
+            auto genericDecl = synthesizeGenericSignatureForRequirementWitness(
+                context,
+                genericDeclRef,
+                synArgs,
+                synGenericArgs,
+                synThis);
+            return (CallableDecl*)genericDecl->inner;
+        }
+        return synthesizeMethodSignatureForRequirementWitnessInner(
+            context,
+            requiredMemberDeclRef,
+            synArgs,
+            synThis);
+    }
+
+    CallableDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitnessInner(
+        ConformanceCheckingContext* context,
+        DeclRef<CallableDecl> requiredMemberDeclRef,
+        List<Expr*>& synArgs,
+        ThisExpr*& synThis)
+    {
+        CallableDecl* synFuncDecl = as<CallableDecl>(m_astBuilder->createByNodeType(requiredMemberDeclRef.getDecl()->astNodeType));
         SLANG_ASSERT(synFuncDecl);
+        
         synFuncDecl->ownedScope = m_astBuilder->create<Scope>();
         synFuncDecl->ownedScope->containerDecl = synFuncDecl;
         synFuncDecl->ownedScope->parent = getScope(context->parentDecl);
+        synFuncDecl->parentDecl = context->parentDecl;
 
         // For now our synthesized method will use the name and source
         // location of the requirement we are trying to satisfy.
@@ -4165,8 +4450,8 @@ namespace Slang
 
         ThisExpr* synThis = nullptr;
         List<Expr*> synArgs;
-        auto synFuncDecl = synthesizeMethodSignatureForRequirementWitness(
-            context, requiredMemberDeclRef, synArgs, synThis);
+        auto synFuncDecl = as<FunctionDeclBase>(synthesizeMethodSignatureForRequirementWitness(
+            context, requiredMemberDeclRef, synArgs, synThis));
 
         auto resultType = synFuncDecl->returnType.type;
 
@@ -4179,16 +4464,16 @@ namespace Slang
         // and we really just need to wrap that result up as an overloaded
         // expression.
         //
-        auto synBase = m_astBuilder->create<OverloadedExpr>();
-        synBase->name = requiredMemberDeclRef.getDecl()->getName();
+        auto baseOverloadedExpr = m_astBuilder->create<OverloadedExpr>();
+        baseOverloadedExpr->name = requiredMemberDeclRef.getDecl()->getName();
 
         if (isInWrapperType)
         {
             auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
-            synBase->lookupResult2 = lookUpMember(
+            baseOverloadedExpr->lookupResult2 = lookUpMember(
                 m_astBuilder,
                 this,
-                synBase->name,
+                baseOverloadedExpr->name,
                 aggTypeDecl->wrappedType.type,
                 aggTypeDecl->ownedScope,
                 LookupMask::Default,
@@ -4199,7 +4484,7 @@ namespace Slang
         }
         else
         {
-            synBase->lookupResult2 = lookupResult;
+            baseOverloadedExpr->lookupResult2 = lookupResult;
         }
 
         // If `synThis` is non-null, then we will use it as the base of
@@ -4217,23 +4502,16 @@ namespace Slang
                 auto innerExpr = m_astBuilder->create<VarExpr>();
                 innerExpr->scope = synThis->scope;
                 innerExpr->name = getName("inner");
-                synBase->base = CheckExpr(innerExpr);
+                baseOverloadedExpr->base = CheckExpr(innerExpr);
                 SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
-                bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, synBase->base->type);
+                bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, baseOverloadedExpr->base->type);
             }
             else
             {
-                synBase->base = synThis;
+                baseOverloadedExpr->base = synThis;
             }
         }
 
-        // We now have the reference to the overload group we plan to call,
-        // and we already built up the argument list, so we can construct
-        // an `InvokeExpr` that represents the call we want to make.
-        //
-        auto synCall = m_astBuilder->create<InvokeExpr>();
-        synCall->functionExpr = synBase;
-        synCall->arguments = synArgs;
 
         // In order to know if our call is well-formed, we need to run
         // the semantic checking logic for overload resolution. If it
@@ -4247,6 +4525,48 @@ namespace Slang
         DiagnosticSink tempSink(getSourceManager(), nullptr);
         ExprLocalScope localScope;
         SemanticsVisitor subVisitor(withSink(&tempSink).withParentFunc(synFuncDecl).withExprLocalScope(&localScope));
+
+        Expr* synBase = baseOverloadedExpr;
+
+        // If the requirement is a generic decl, fill in all generic arguments explicitly.
+        if (auto genericDeclRef = as<GenericDecl>(synFuncDecl->parentDecl))
+        {
+            auto genericAppExpr = m_astBuilder->create<GenericAppExpr>();
+            genericAppExpr->functionExpr = synBase;
+            for (auto member : genericDeclRef->members)
+            {
+                if (auto typeParamDecl = as<GenericTypeParamDeclBase>(member))
+                {
+                    auto synTypeParamDeclRef = makeDeclRef(typeParamDecl);
+                    auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                    synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
+                    synTypeParamDeclRefExpr->type = getTypeForDeclRef(m_astBuilder, synTypeParamDeclRef, SourceLoc());
+                    genericAppExpr->arguments.add(synTypeParamDeclRefExpr);
+                }
+                else if (auto valParamDecl = as<GenericValueParamDecl>(member))
+                {
+                    auto synValParamDeclRef = makeDeclRef(valParamDecl);
+                    auto synValParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                    synValParamDeclRefExpr->declRef = synValParamDeclRef;
+                    synValParamDeclRefExpr->type = getType(m_astBuilder, synValParamDeclRef);
+                    genericAppExpr->arguments.add(synValParamDeclRefExpr);
+                }
+            }
+            synBase = subVisitor.checkGenericAppWithCheckedArgs(genericAppExpr);
+
+            // If checking the generic app failed, we can't synthesize the witness.
+            //
+            if (tempSink.getErrorCount() != 0)
+                return false;
+        }
+
+        // We now have the reference to the overload group we plan to call,
+        // and we already built up the argument list, so we can construct
+        // an `InvokeExpr` that represents the call we want to make.
+        //
+        auto synCall = m_astBuilder->create<InvokeExpr>();
+        synCall->functionExpr = synBase;
+        synCall->arguments = synArgs;
 
         // With our temporary diagnostic sink soaking up any messages
         // from overload resolution, we can now try to resolve
@@ -4294,17 +4614,16 @@ namespace Slang
 
         synFuncDecl->body = synReturn;
 
-        // Once we are sure that we want to use the declaration
-        // we've synthesized, aew can go ahead and wire it up
-        // to the AST so that subsequent stages can generate
-        // IR code from it.
-        //
         // Note: we set the parent of the synthesized declaration
         // to the parent of the inheritance declaration being
         // validated (which is either a type declaration or
         // an `extension`), but we do *not* add the syntehsized
         // declaration to the list of child declarations at
         // this point.
+        // 
+        // The synthesized decl already has its parent set to
+        // the current parent decl, so we don't need more actions
+        // to wire it up to the AST hierarchy.
         //
         // By leaving the synthesized declaration off of the list
         // of members, we ensure that it doesn't get found
@@ -4317,7 +4636,6 @@ namespace Slang
         // declaration into the hierarchy, but then attach a modifier
         // to it to indicate that it should be ignored by things like lookup.
         //
-        synFuncDecl->parentDecl = context->parentDecl;
 
         // If the synthesized func is differentiable, make sure to populate its
         // differential type dictionary.
@@ -4332,7 +4650,10 @@ namespace Slang
         // difference between our synthetic method and a hand-written
         // one with the same behavior.
         //
-        _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(synFuncDecl));
+        auto containerDecl = getParentDecl(synFuncDecl);
+        auto containerDeclRef = getDefaultDeclRef(containerDecl);
+        auto synDeclRef = m_astBuilder->getMemberDeclRef(containerDeclRef, synFuncDecl);
+        _addMethodWitness(witnessTable, requiredMemberDeclRef, synDeclRef);
         return true;
     }
 
@@ -4354,31 +4675,28 @@ namespace Slang
 
         bool isDefaultInitializableType = requiredMemberDeclRef.getParent() == getASTBuilder()->getDefaultInitializableTypeInterfaceDecl();
         bool isInWrapperType = isWrapperTypeDecl(context->parentDecl);
-        if (!isInWrapperType && !isDefaultInitializableType)
+        if (!isInWrapperType && !isDefaultInitializableType && !satisfyingMemberLookupResult.isValid())
         {
             return false;
         }
 
-        auto ctorDecl = m_astBuilder->create<ConstructorDecl>();
-        ctorDecl->ownedScope = m_astBuilder->create<Scope>();
-        ctorDecl->ownedScope->containerDecl = ctorDecl;
-        ctorDecl->ownedScope->parent = getScope(context->parentDecl);
+        List<Expr*> synArgs;
+        ThisExpr* synThis = nullptr;
+
+        auto ctorDecl = (ConstructorDecl*)synthesizeMethodSignatureForRequirementWitness(
+            context,
+            requiredMemberDeclRef,
+            synArgs,
+            synThis);
         ctorDecl->loc = context->parentDecl->loc;
         ctorDecl->closingSourceLoc = ctorDecl->loc;
-        ctorDecl->parentDecl = context->parentDecl;
         auto ctorName = getName("$init");
         ctorDecl->nameAndLoc.name = ctorName;
-        ctorDecl->nameAndLoc.loc = ctorDecl->loc;
+        ctorDecl->nameAndLoc.loc = context->parentDecl->loc;
 
         auto seqStmt = m_astBuilder->create<SeqStmt>();
         ctorDecl->body = seqStmt;
-        ctorDecl->returnType.type = DeclRefType::create(m_astBuilder, makeDeclRef(context->parentDecl));
-        
-        List<Expr*> synArgs;
-        addRequiredParamsToSynthesizedDecl(requiredMemberDeclRef, ctorDecl, synArgs);
 
-        ThisExpr* synThis = nullptr;
-        addModifiersToSynthesizedDecl(context, requiredMemberDeclRef, ctorDecl, synThis);
 
         if (isInWrapperType)
         {
@@ -4424,11 +4742,69 @@ namespace Slang
                 }
             }
         }
+        else if (synArgs.getCount())
+        {
+            // The body of our synthesized method is going to try to
+            // make a ctor call with the specified arguments (e.g.,
+            // the name `increment` in our example at the top of this function).
+            //
+            auto synBase = m_astBuilder->create<OverloadedExpr>();
+            synBase->name = requiredMemberDeclRef.getDecl()->getName();
+
+            synBase->lookupResult2 = satisfyingMemberLookupResult;
+
+            // We now have the reference to the overload group we plan to call,
+            // and we already built up the argument list, so we can construct
+            // an `InvokeExpr` that represents the call we want to make.
+            //
+            auto synCall = m_astBuilder->create<InvokeExpr>();
+            synCall->functionExpr = synBase;
+            synCall->arguments = synArgs;
+
+            // In order to know if our call is well-formed, we need to run
+            // the semantic checking logic for overload resolution. If it
+            // runs into an error, we don't want that being reported back
+            // to the user as some kind of overload-resolution failure.
+            //
+            // In order to protect the user from whatever errors might
+            // occur, we will perform the checking in the context of
+            // a temporary diagnostic sink.
+            //
+            DiagnosticSink tempSink(getSourceManager(), nullptr);
+            ExprLocalScope localScope;
+            SemanticsVisitor subVisitor(withSink(&tempSink).withParentFunc(ctorDecl).withExprLocalScope(&localScope));
+
+            // With our temporary diagnostic sink soaking up any messages
+            // from overload resolution, we can now try to resolve
+            // the call to see what happens.
+            //
+            auto checkedCall = subVisitor.ResolveInvoke(synCall);
+
+            // If any error occurs during overload resolution, we can't synthesize the witness.
+            if (tempSink.getErrorCount() != 0)
+                return false;
+
+            // If we were able to type-check the call, then we should
+            // be able to finish construction of a suitable ctor witness,
+            // by emitting `this = resolvedCtorCall()`.
+            //
+            AssignExpr* assignExpr = m_astBuilder->create<AssignExpr>();
+            assignExpr->left = synThis;
+            assignExpr->right = checkedCall;
+            assignExpr->type = m_astBuilder->getVoidType();
+            ExpressionStmt* exprStmt = m_astBuilder->create<ExpressionStmt>();
+            exprStmt->expression = assignExpr;
+            seqStmt->stmts.add(exprStmt);
+        }
+
         if (isDefaultInitializableType)
             context->parentDecl->addMember(ctorDecl);
-        
-        _addMethodWitness(witnessTable, requiredMemberDeclRef, makeDeclRef(ctorDecl));
-        
+
+        auto containerDecl = getParentDecl(ctorDecl);
+        auto containerDeclRef = getDefaultDeclRef(containerDecl);
+        auto synDeclRef = m_astBuilder->getMemberDeclRef(containerDeclRef, ctorDecl);
+        _addMethodWitness(witnessTable, requiredMemberDeclRef, synDeclRef);
+
         return true;
     }
 
@@ -4494,277 +4870,99 @@ namespace Slang
         // Synthesize the property name with a prefix to avoid name clashing.
         synPropertyDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
         synPropertyDecl->nameAndLoc.name = getName(String("$syn_property_") + getText(requiredMemberDeclRef.getName()));
+        synPropertyDecl->parentDecl = context->parentDecl;
 
 
-        // The type of our synthesized property will be the expected type
-        // of the interface requirement.
-        //
-        // TODO: This logic can/will run into problems if the type is,
-        // or uses, an associated type or `This`.
-        //
-        // Ideally we should be looking up the type using a `DeclRef` that
-        // refers to the interface requirement using a `LookupDeclRef`
-        // that refers to the satisfying type declaration, and requirement
-        // checking for non-associated-type requirements should be done *after*
-        // requirement checking for associated-type requirements.
+        // The type of our synthesized property can be derived from the
+        // specialized declref to the requirement decl.
         //
         auto propertyType = getType(m_astBuilder, requiredMemberDeclRef);
         synPropertyDecl->type.type = propertyType;
 
-        // Our synthesized property will have an accessor declaration for
-        // each accessor of the requirement.
+
+        // We start by constructing an expression that represents
+        // `this.name` where `name` is the name of the required
+        // member. The caller already passed in a `lookupResult`
+        // that should indicate all the declarations found by
+        // looking up `name`, so we can start with that.
         //
-        // TODO: If we ever start to support synthesis for subscript requirements,
-        // then we probably want to factor the accessor-related logic into
-        // a subroutine so that it can be shared between properties and subscripts.
+        // TODO: Note that there are many cases for member lookup
+        // that are not handled just by using `createLookupResultExpr`
+        // because they are currently being special-cased (the most
+        // notable cases are swizzles, as well as lookup of static
+        // members in types).
         //
-        Dictionary<DeclRef<AccessorDecl>, AccessorDecl*> mapRequiredAccessorToSynAccessor;
-        for( auto requiredAccessorDeclRef : getMembersOfType<AccessorDecl>(m_astBuilder, requiredMemberDeclRef) )
-        {
-            // The synthesized accessor will be an AST node of the same class as
-            // the required accessor.
-            //
-            auto synAccessorDecl = (AccessorDecl*) m_astBuilder->createByNodeType(requiredAccessorDeclRef.getDecl()->astNodeType);
-            synAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
-            synAccessorDecl->ownedScope->containerDecl = synAccessorDecl;
-            synAccessorDecl->ownedScope->parent = getScope(context->parentDecl);
+        // The main result here is that we will not be able to synthesize
+        // a requirement for a built-in scalar/vector/matrix type to
+        // a property with a name like `.xy` based on the presence of
+        // swizles, even though it seems like such a thing should Just Work.
+        //
+        // If this is important we could "fix" it by allowing this
+        // code to dispatch to the special-case logic used when doing
+        // semantic checking for member expressions.
+        //
+        // Note: an alternative would be to change the stdlib declarations
+        // of vectors/matrices so that all the swizzles are defined as
+        // `property` declarations. There are some C++ math libraries (like GLM)
+        // that implement swizzle syntax by a similar approach of statically
+        // enumerating all possible swizzles. The down-side to such an
+        // approach is that the combinatorial space of swizzles is quite
+        // large (especially for matrices) so that supporting them via
+        // general-purpose language features is unlikely to be as efficient
+        // as special-case logic.
+        //
+        // We are going to synthesize an expression and then perform
+        // semantic checking on it, but if there are semantic errors
+        // we do *not* want to report them to the user as such, and
+        // instead want the result to be a failure to synthesize
+        // a valid witness.
+        //
+        // We will buffer up diagnostics into a temporary sink and
+        // then throw them away when we are done.
+        //
+        // TODO: This behavior might be something we want to make
+        // into a more fundamental capability of `DiagnosticSink` and/or
+        // `SemanticsVisitor` so that code can push/pop the emission
+        // of diagnostics more easily.
+        //
+        DiagnosticSink tempSink(getSourceManager(), nullptr);
+        SemanticsVisitor subVisitor(withSink(&tempSink));
 
-            // Whatever the required accessor returns, that is what our synthesized accessor will return.
-            //
-            synAccessorDecl->returnType.type = getResultType(m_astBuilder, requiredAccessorDeclRef);
+        // We need to create a `this` expression to be used in the body
+        // of the synthesized accessor.
+        //
+        // TODO: if we ever allow `static` properties or subscripts,
+        // we will need to handle that case here, by *not* creating
+        // a `this` expression.
+        //
+        ThisExpr* synThis = m_astBuilder->create<ThisExpr>();
+        synThis->scope = synPropertyDecl->ownedScope;
 
-            // Similarly, our synthesized accessor will have parameters matching those of the requirement.
-            //
-            // Note: in practice we expect that only `set` accessors will have any parameters,
-            // and they will only have a single parameter.
-            //
-            List<Expr*> synArgs;
-            for( auto requiredParamDeclRef : getParameters(m_astBuilder, requiredAccessorDeclRef) )
-            {
-                auto paramType = getType(m_astBuilder, requiredParamDeclRef);
+        // The type of `this` in our accessor will be the type for
+        // which we are synthesizing a conformance.
+        //
+        synThis->type.type = context->conformingType;
+        synThis->type.isLeftValue = true;
+        auto synMemberRef = subVisitor.createLookupResultExpr(
+            requiredMemberDeclRef.getName(),
+            lookupResult,
+            synThis,
+            requiredMemberDeclRef.getLoc(),
+            nullptr);
+        synMemberRef->loc = requiredMemberDeclRef.getLoc();
 
-                // The synthesized parameter will ahve the same name and
-                // type as the parameter of the requirement.
-                //
-                auto synParamDecl = m_astBuilder->create<ParamDecl>();
-                synParamDecl->nameAndLoc = requiredParamDeclRef.getDecl()->nameAndLoc;
-                synParamDecl->type.type = paramType;
+        bool canSynAccessors = synthesizeAccessorRequirements(
+            context,
+            requiredMemberDeclRef,
+            propertyType,
+            synMemberRef,
+            synPropertyDecl,
+            witnessTable);
+        if (!canSynAccessors)
+            return false;
+        
 
-                // We need to add the parameter as a child declaration of
-                // the accessor we are building.
-                //
-                synParamDecl->parentDecl = synAccessorDecl;
-                synAccessorDecl->members.add(synParamDecl);
 
-                // For each paramter, we will create an argument expression
-                // to represent it in the body of the accessor.
-                //
-                auto synArg = m_astBuilder->create<VarExpr>();
-                synArg->declRef = makeDeclRef(synParamDecl);
-                synArg->type = paramType;
-                synArgs.add(synArg);
-            }
-
-            // We need to create a `this` expression to be used in the body
-            // of the synthesized accessor.
-            //
-            // TODO: if we ever allow `static` properties or subscripts,
-            // we will need to handle that case here, by *not* creating
-            // a `this` expression.
-            //
-            ThisExpr* synThis = m_astBuilder->create<ThisExpr>();
-            synThis->scope = synAccessorDecl->ownedScope;
-
-            // The type of `this` in our accessor will be the type for
-            // which we are synthesizing a conformance.
-            //
-            synThis->type.type = context->conformingType;
-
-            // A `get` accessor should default to an immutable `this`,
-            // while other accessors default to mutable `this`.
-            //
-            // TODO: If we ever add other kinds of accessors, we will
-            // need to check that this assumption stays valid.
-            //
-            synThis->type.isLeftValue = true;
-            if(as<GetterDecl>(requiredAccessorDeclRef))
-                synThis->type.isLeftValue = false;
-
-            // If the accessor requirement is `[nonmutating]` then our
-            // synthesized accessor should be too, and also the `this`
-            // parameter should *not* be an l-value.
-            //
-            if( requiredAccessorDeclRef.getDecl()->hasModifier<NonmutatingAttribute>() )
-            {
-                synThis->type.isLeftValue = false;
-
-                auto synAttr = m_astBuilder->create<NonmutatingAttribute>();
-                synAccessorDecl->modifiers.first = synAttr;
-            }
-            //
-            // Note: we don't currently support `[mutating] get` accessors,
-            // but the desired behavior in that case is clear, so we go
-            // ahead and future-proof this code a bit:
-            //
-            else if( requiredAccessorDeclRef.getDecl()->hasModifier<MutatingAttribute>() )
-            {
-                synThis->type.isLeftValue = true;
-
-                auto synAttr = m_astBuilder->create<MutatingAttribute>();
-                synAccessorDecl->modifiers.first = synAttr;
-            }
-            else if (requiredAccessorDeclRef.getDecl()->hasModifier<RefAttribute>())
-            {
-                synThis->type.isLeftValue = true;
-
-                auto synAttr = m_astBuilder->create<RefAttribute>();
-                synAccessorDecl->modifiers.first = synAttr;
-            }
-            else if (requiredAccessorDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
-            {
-                auto synAttr = m_astBuilder->create<ConstRefAttribute>();
-                synAccessorDecl->modifiers.first = synAttr;
-            }
-            // We are going to synthesize an expression and then perform
-            // semantic checking on it, but if there are semantic errors
-            // we do *not* want to report them to the user as such, and
-            // instead want the result to be a failure to synthesize
-            // a valid witness.
-            //
-            // We will buffer up diagnostics into a temporary sink and
-            // then throw them away when we are done.
-            //
-            // TODO: This behavior might be something we want to make
-            // into a more fundamental capability of `DiagnosticSink` and/or
-            // `SemanticsVisitor` so that code can push/pop the emission
-            // of diagnostics more easily.
-            //
-            DiagnosticSink tempSink(getSourceManager(), nullptr);
-            SemanticsVisitor subVisitor(withSink(&tempSink));
-
-            // We start by constructing an expression that represents
-            // `this.name` where `name` is the name of the required
-            // member. The caller already passed in a `lookupResult`
-            // that should indicate all the declarations found by
-            // looking up `name`, so we can start with that.
-            //
-            // TODO: Note that there are many cases for member lookup
-            // that are not handled just by using `createLookupResultExpr`
-            // because they are currently being special-cased (the most
-            // notable cases are swizzles, as well as lookup of static
-            // members in types).
-            //
-            // The main result here is that we will not be able to synthesize
-            // a requirement for a built-in scalar/vector/matrix type to
-            // a property with a name like `.xy` based on the presence of
-            // swizles, even though it seems like such a thing should Just Work.
-            //
-            // If this is important we could "fix" it by allowing this
-            // code to dispatch to the special-case logic used when doing
-            // semantic checking for member expressions.
-            //
-            // Note: an alternative would be to change the stdlib declarations
-            // of vectors/matrices so that all the swizzles are defined as
-            // `property` declarations. There are some C++ math libraries (like GLM)
-            // that implement swizzle syntax by a similar approach of statically
-            // enumerating all possible swizzles. The down-side to such an
-            // approach is that the combinatorial space of swizzles is quite
-            // large (especially for matrices) so that supporting them via
-            // general-purpose language features is unlikely to be as efficient
-            // as special-case logic.
-            //
-            auto synMemberRef = subVisitor.createLookupResultExpr(
-                requiredMemberDeclRef.getName(),
-                lookupResult,
-                synThis,
-                requiredMemberDeclRef.getLoc(),
-                nullptr);
-            synMemberRef->loc = requiredMemberDeclRef.getLoc();
-
-            // The body of the accessor will depend on the class of the accessor
-            // we are synthesizing (e.g., `get` vs. `set`).
-            //
-            Stmt* synBodyStmt = nullptr;
-            if( as<GetterDecl>(requiredAccessorDeclRef) )
-            {
-                // A `get` accessor will simply perform:
-                //
-                //      return this.name;
-                //
-                // which involves coercing the member access `this.name` to
-                // the expected type of the property.
-                //
-                auto coercedMemberRef = subVisitor.coerce(CoercionSite::Return, propertyType, synMemberRef);
-                auto synReturn = m_astBuilder->create<ReturnStmt>();
-                synReturn->expression = coercedMemberRef;
-
-                synBodyStmt = synReturn;
-            }
-            else if( as<SetterDecl>(requiredAccessorDeclRef) )
-            {
-                // We expect all `set` accessors to have a single argument,
-                // but we will defensively bail out if that is somehow
-                // not the case.
-                //
-                SLANG_ASSERT(synArgs.getCount() == 1);
-                if(synArgs.getCount() != 1)
-                    return false;
-
-                // A `set` accessor will simply perform:
-                //
-                //      this.name = newValue;
-                //
-                // which involves creating and checking an assignment
-                // expression.
-
-                auto synAssign = m_astBuilder->create<AssignExpr>();
-                synAssign->left = synMemberRef;
-                synAssign->right = synArgs[0];
-
-                auto synCheckedAssign = subVisitor.checkAssignWithCheckedOperands(synAssign);
-
-                auto synExprStmt = m_astBuilder->create<ExpressionStmt>();
-                synExprStmt->expression = synCheckedAssign;
-
-                synBodyStmt = synExprStmt;
-            }
-            else
-            {
-                // While there are other kinds of accessors than `get` and `set`,
-                // those are currently only reserved for stdlib-internal use.
-                // We will not bother with synthesis for those cases.
-                //
-                return false;
-            }
-
-            // We bail out if we ran into any errors (meaning that the synthesized
-            // accessor is not usable).
-            //
-            // TODO: If there were *warnings* emitted to the sink, it would probably
-            // be good to show those warnings to the user, since they might indicate
-            // real issues. E.g., with the current logic a `float` field could
-            // satisfying an `int` property requirement, but the user would probably
-            // want to be warned when they do such a thing.
-            //
-            if(tempSink.getErrorCount() != 0)
-                return false;
-
-            synAccessorDecl->body = synBodyStmt;
-
-            synAccessorDecl->parentDecl = synPropertyDecl;
-            synPropertyDecl->members.add(synAccessorDecl);
-
-            // If synthesis of an accessor worked, then we will record it into
-            // a local dictionary. We do *not* install the accessor into the
-            // witness table yet, because it is possible that synthesis will
-            // succeed for some accessors but not others, and we don't want
-            // to leave the witness table in a state where a requirement is
-            // "partially satisfied."
-            //
-            mapRequiredAccessorToSynAccessor.add(requiredAccessorDeclRef, synAccessorDecl);
-        }
-
-        synPropertyDecl->parentDecl = context->parentDecl;
 
         // The visibility of synthesized decl should be the min of the parent decl and the requirement.
         if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
@@ -4774,21 +4972,6 @@ namespace Slang
             auto visibility = Math::Min(thisVisibility, requirementVisibility);
             addVisibilityModifier(m_astBuilder, synPropertyDecl, visibility);
         }
-
-        // Once our synthesized declaration is complete, we need
-        // to install it as the witness that satifies the given
-        // requirement.
-        //
-        // Subsequent code generation should not be able to tell the
-        // difference between our synthetic property and a hand-written
-        // one with the same behavior.
-        //
-        for(auto& [key, value] : mapRequiredAccessorToSynAccessor)
-        {
-            witnessTable->add(key.getDecl(), RequirementWitness(makeDeclRef(value)));
-        }
-        witnessTable->add(requiredMemberDeclRef.getDecl(),
-            RequirementWitness(makeDeclRef(synPropertyDecl)));
         return true;
     }
 
@@ -5020,6 +5203,434 @@ namespace Slang
         return true;
     }
 
+    bool SemanticsVisitor::synthesizeAccessorRequirements(
+        ConformanceCheckingContext* context,
+        DeclRef<ContainerDecl> requiredMemberDeclRef,
+        Type* resultType,
+        Expr* synBoundStorageExpr,
+        ContainerDecl* synAccesorContainer,
+        RefPtr<WitnessTable> witnessTable)
+    {
+        Dictionary<DeclRef<AccessorDecl>, AccessorDecl*> mapRequiredAccessorToSynAccessor;
+        for (auto requiredAccessorDeclRef : getMembersOfType<AccessorDecl>(m_astBuilder, requiredMemberDeclRef))
+        {
+            // The synthesized accessor will be an AST node of the same class as
+            // the required accessor.
+            //
+            auto synAccessorDecl = (AccessorDecl*)m_astBuilder->createByNodeType(requiredAccessorDeclRef.getDecl()->astNodeType);
+            synAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
+            synAccessorDecl->ownedScope->containerDecl = synAccessorDecl;
+            synAccessorDecl->ownedScope->parent = getScope(context->parentDecl);
+
+            // Whatever the required accessor returns, that is what our synthesized accessor will return.
+            //
+            synAccessorDecl->returnType.type = resultType;
+
+            // Similarly, our synthesized accessor will have parameters matching those of the requirement.
+            //
+            // Note: in practice we expect that only `set` accessors will have any parameters,
+            // and they will only have a single parameter.
+            //
+            List<Expr*> synArgs;
+            for (auto requiredParamDeclRef : getParameters(m_astBuilder, requiredAccessorDeclRef))
+            {
+                auto paramType = getType(m_astBuilder, requiredParamDeclRef);
+
+                // The synthesized parameter will ahve the same name and
+                // type as the parameter of the requirement.
+                //
+                auto synParamDecl = m_astBuilder->create<ParamDecl>();
+                synParamDecl->nameAndLoc = requiredParamDeclRef.getDecl()->nameAndLoc;
+                synParamDecl->type.type = paramType;
+
+                // We need to add the parameter as a child declaration of
+                // the accessor we are building.
+                //
+                synParamDecl->parentDecl = synAccessorDecl;
+                synAccessorDecl->members.add(synParamDecl);
+
+                // For each paramter, we will create an argument expression
+                // to represent it in the body of the accessor.
+                //
+                auto synArg = m_astBuilder->create<VarExpr>();
+                synArg->declRef = makeDeclRef(synParamDecl);
+                synArg->type = paramType;
+                synArgs.add(synArg);
+            }
+
+            // We need to create a `this` expression to be used in the body
+            // of the synthesized accessor.
+            //
+            // TODO: if we ever allow `static` properties or subscripts,
+            // we will need to handle that case here, by *not* creating
+            // a `this` expression.
+            //
+            ThisExpr* synThis = m_astBuilder->create<ThisExpr>();
+            synThis->scope = synAccessorDecl->ownedScope;
+
+            // The type of `this` in our accessor will be the type for
+            // which we are synthesizing a conformance.
+            //
+            synThis->type.type = context->conformingType;
+
+            // A `get` accessor should default to an immutable `this`,
+            // while other accessors default to mutable `this`.
+            //
+            // TODO: If we ever add other kinds of accessors, we will
+            // need to check that this assumption stays valid.
+            //
+            synThis->type.isLeftValue = true;
+            if (as<GetterDecl>(requiredAccessorDeclRef))
+                synThis->type.isLeftValue = false;
+
+            // If the accessor requirement is `[nonmutating]` then our
+            // synthesized accessor should be too, and also the `this`
+            // parameter should *not* be an l-value.
+            //
+            if (requiredAccessorDeclRef.getDecl()->hasModifier<NonmutatingAttribute>())
+            {
+                synThis->type.isLeftValue = false;
+
+                auto synAttr = m_astBuilder->create<NonmutatingAttribute>();
+                synAccessorDecl->modifiers.first = synAttr;
+            }
+            //
+            // Note: we don't currently support `[mutating] get` accessors,
+            // but the desired behavior in that case is clear, so we go
+            // ahead and future-proof this code a bit:
+            //
+            else if (requiredAccessorDeclRef.getDecl()->hasModifier<MutatingAttribute>())
+            {
+                synThis->type.isLeftValue = true;
+
+                auto synAttr = m_astBuilder->create<MutatingAttribute>();
+                synAccessorDecl->modifiers.first = synAttr;
+            }
+            else if (requiredAccessorDeclRef.getDecl()->hasModifier<RefAttribute>())
+            {
+                synThis->type.isLeftValue = true;
+
+                auto synAttr = m_astBuilder->create<RefAttribute>();
+                synAccessorDecl->modifiers.first = synAttr;
+            }
+            else if (requiredAccessorDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
+            {
+                auto synAttr = m_astBuilder->create<ConstRefAttribute>();
+                synAccessorDecl->modifiers.first = synAttr;
+            }
+            // We are going to synthesize an expression and then perform
+            // semantic checking on it, but if there are semantic errors
+            // we do *not* want to report them to the user as such, and
+            // instead want the result to be a failure to synthesize
+            // a valid witness.
+            //
+            // We will buffer up diagnostics into a temporary sink and
+            // then throw them away when we are done.
+            //
+            // TODO: This behavior might be something we want to make
+            // into a more fundamental capability of `DiagnosticSink` and/or
+            // `SemanticsVisitor` so that code can push/pop the emission
+            // of diagnostics more easily.
+            //
+            DiagnosticSink tempSink(getSourceManager(), nullptr);
+            SemanticsVisitor subVisitor(withSink(&tempSink));
+
+            // The body of the accessor will depend on the class of the accessor
+            // we are synthesizing (e.g., `get` vs. `set`).
+            //
+            Stmt* synBodyStmt = nullptr;
+            if (as<GetterDecl>(requiredAccessorDeclRef))
+            {
+                // A `get` accessor will simply perform:
+                //
+                //      return this.name;
+                //
+                // which involves coercing the member access `this.name` to
+                // the expected type of the property.
+                //
+                auto coercedMemberRef = subVisitor.coerce(CoercionSite::Return, resultType, synBoundStorageExpr);
+                auto synReturn = m_astBuilder->create<ReturnStmt>();
+                synReturn->expression = coercedMemberRef;
+
+                synBodyStmt = synReturn;
+            }
+            else if (as<SetterDecl>(requiredAccessorDeclRef))
+            {
+                // We expect all `set` accessors to have a single argument,
+                // but we will defensively bail out if that is somehow
+                // not the case.
+                //
+                SLANG_ASSERT(synArgs.getCount() == 1);
+                if (synArgs.getCount() != 1)
+                    return false;
+
+                // A `set` accessor will simply perform:
+                //
+                //      this.name = newValue;
+                //
+                // which involves creating and checking an assignment
+                // expression.
+
+                auto synAssign = m_astBuilder->create<AssignExpr>();
+                synAssign->left = synBoundStorageExpr;
+                synAssign->right = synArgs[0];
+
+                auto synCheckedAssign = subVisitor.checkAssignWithCheckedOperands(synAssign);
+
+                auto synExprStmt = m_astBuilder->create<ExpressionStmt>();
+                synExprStmt->expression = synCheckedAssign;
+
+                synBodyStmt = synExprStmt;
+            }
+            else
+            {
+                // While there are other kinds of accessors than `get` and `set`,
+                // those are currently only reserved for stdlib-internal use.
+                // We will not bother with synthesis for those cases.
+                //
+                return false;
+            }
+
+            // We bail out if we ran into any errors (meaning that the synthesized
+            // accessor is not usable).
+            //
+            // TODO: If there were *warnings* emitted to the sink, it would probably
+            // be good to show those warnings to the user, since they might indicate
+            // real issues. E.g., with the current logic a `float` field could
+            // satisfying an `int` property requirement, but the user would probably
+            // want to be warned when they do such a thing.
+            //
+            if (tempSink.getErrorCount() != 0)
+                return false;
+
+            synAccessorDecl->body = synBodyStmt;
+
+            synAccessorDecl->parentDecl = synAccesorContainer;
+            synAccesorContainer->members.add(synAccessorDecl);
+
+            // If synthesis of an accessor worked, then we will record it into
+            // a local dictionary. We do *not* install the accessor into the
+            // witness table yet, because it is possible that synthesis will
+            // succeed for some accessors but not others, and we don't want
+            // to leave the witness table in a state where a requirement is
+            // "partially satisfied."
+            //
+            mapRequiredAccessorToSynAccessor.add(requiredAccessorDeclRef, synAccessorDecl);
+        }
+
+        // Once our synthesized declaration is complete, we need
+        // to install it as the witness that satifies the given
+        // requirement.
+        //
+        // Subsequent code generation should not be able to tell the
+        // difference between our synthetic property and a hand-written
+        // one with the same behavior.
+        //
+        auto containerDecl = getParentDecl(synAccesorContainer);
+        auto containerDeclRef = getDefaultDeclRef(containerDecl);
+        for (auto& [key, value] : mapRequiredAccessorToSynAccessor)
+        {
+            witnessTable->add(
+                key.getDecl(),
+                RequirementWitness(
+                    m_astBuilder->getMemberDeclRef(containerDeclRef, value)));
+        }
+
+        witnessTable->add(requiredMemberDeclRef.getDecl(),
+            RequirementWitness(m_astBuilder->getMemberDeclRef(containerDeclRef, synAccesorContainer)));
+        return true;
+    }
+
+    bool SemanticsVisitor::trySynthesizeWrapperTypeSubscriptRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<SubscriptDecl>      requiredMemberDeclRef,
+        RefPtr<WitnessTable>        witnessTable)
+    {
+        // We are synthesizing the subscript requirement for a wrapper type:
+        // struct Wrapper
+        // {
+        //      Inner inner;
+        //      subscript(int index)->int { get { return inner[index]; }
+        //                                  set { inner[index] = newValue; }
+        //                                }
+        // }
+        // 
+        // // Find the witness that FooImpl : IFoo.
+        auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
+        auto innerType = aggTypeDecl->wrappedType.type;
+        DeclRef<Decl> innerProperty;
+        auto innerWitness = tryGetSubtypeWitness(innerType, witnessTable->baseType);
+        if (!innerWitness)
+            return false;
+        //
+        List<Expr*> synArgs;
+        ThisExpr* synThis;
+        auto synSubscriptDecl = synthesizeMethodSignatureForRequirementWitness(
+            context,
+            requiredMemberDeclRef,
+            synArgs,
+            synThis);
+        auto declType = getType(m_astBuilder, getDefaultDeclRef(synSubscriptDecl).as<SubscriptDecl>());
+        synThis->checked = true;
+
+        // Form a `this[args...]` expression that we will use to coerce from
+        // in the synthesized subscript accessors.
+        //
+        DiagnosticSink tempSink(getSourceManager(), nullptr);
+        SemanticsVisitor subVisitor(withSink(&tempSink));
+        auto base = m_astBuilder->create<VarExpr>();
+        base->scope = synThis->scope;
+        base->name = getName("inner");
+
+        IndexExpr* indexExpr = m_astBuilder->create<IndexExpr>();
+        indexExpr->baseExpression = base;
+        indexExpr->indexExprs = _Move(synArgs);
+        auto synBaseStorageExpr = subVisitor.CheckTerm(indexExpr);
+
+        if (tempSink.getErrorCount() != 0)
+            return false;
+
+        // Our synthesized subscript will have an accessor declaration for
+        // each accessor of the requirement.
+        //
+        bool canSynAccessors = synthesizeAccessorRequirements(
+            context,
+            requiredMemberDeclRef,
+            declType,
+            synBaseStorageExpr,
+            synSubscriptDecl, witnessTable);
+        if (!canSynAccessors)
+            return false;
+
+        // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+        if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
+            auto thisVisibility = getDeclVisibility(context->parentDecl);
+            auto visibility = Math::Min(thisVisibility, requirementVisibility);
+            addVisibilityModifier(m_astBuilder, synSubscriptDecl, visibility);
+        }
+
+        return true;
+    }
+
+    bool SemanticsVisitor::trySynthesizeSubscriptRequirementWitness(
+        ConformanceCheckingContext* context,
+        const LookupResult&         lookupResult,
+        DeclRef<SubscriptDecl>      requiredMemberDeclRef,
+        RefPtr<WitnessTable>        witnessTable)
+    {
+        if (isWrapperTypeDecl(context->parentDecl))
+            return trySynthesizeWrapperTypeSubscriptRequirementWitness(context, requiredMemberDeclRef, witnessTable);
+
+        // The situation here is that the context of an inheritance
+        // declaration didn't provide an exact match for a required
+        // subscript. E.g.:
+        //
+        //      interface ICell { subscript(int index)->int {get;} }
+        //      struct MyCell : ICell
+        //      {
+        //          subscript(uint index)->int {ref;}
+        //      }
+        //
+        // It is clear in this case that the `MyCell` type *can*
+        // satisfy the signature required by `ICell`, if we consider
+        // all the allowed type coercion rules, and use `ref` accessor
+        // to implement `get`.
+        //
+        // The approach in this function will be to construct a
+        // synthesized `subscript` along the lines of:
+        //
+        //      struct MyCell ...
+        //      {
+        //          ...
+        //          subscript(int index)->int {get;}
+        //          {
+        //              get { return this.origianl_subscript[index]; }
+        //          }
+        //      }
+        //
+        // That is, we construct a `subscript` with the correct type
+        // and with an accessor for each requirement, where the accesors
+        // all try to dispatch to the original subscript decl.
+        //
+        // If those synthesized accessors all type-check, then we can
+        // say that the type must satisfy the requirement structurally,
+        // even if there isn't an exact signature match. More
+        // importantly, the `property` we just synthesized can be
+        // used as a witness to the fact that the requirement is
+        // satisfied.
+        //
+        // The big-picture flow of the logic here is similar to
+        // `trySynthesizePropertyRequirementWitness()` above, and we
+        // will not comment this code as exhaustively, under the
+        // assumption that readers of the code don't benefit from
+        // having the exact same information stated twice.
+        //
+
+        List<Expr*> synArgs;
+        ThisExpr* synThis;
+        auto synSubscriptDecl = synthesizeMethodSignatureForRequirementWitness(
+            context,
+            requiredMemberDeclRef,
+            synArgs,
+            synThis);
+        synThis->type.isLeftValue = true;
+        synThis->checked = true;
+
+        auto declType = getType(m_astBuilder, getDefaultDeclRef(synSubscriptDecl).as<SubscriptDecl>());
+
+        // Form a `this[args...]` expression that we will use to coerce from
+        // in the synthesized subscript accessors.
+        //
+        DiagnosticSink tempSink(getSourceManager(), nullptr);
+        SemanticsVisitor subVisitor(withSink(&tempSink));
+        Expr* synBaseStorageExpr = nullptr;
+        if (lookupResult.isValid())
+        {
+            auto calleeExpr = m_astBuilder->create<OverloadedExpr>();
+            calleeExpr->base = synThis;
+            calleeExpr->lookupResult2 = lookupResult;
+            auto invokeExpr = m_astBuilder->create<InvokeExpr>();
+            invokeExpr->functionExpr = calleeExpr;
+            invokeExpr->arguments = _Move(synArgs);
+            synBaseStorageExpr = subVisitor.ResolveInvoke(invokeExpr);
+        }
+        else
+        {
+            IndexExpr* indexExpr = m_astBuilder->create<IndexExpr>();
+            indexExpr->baseExpression = synThis;
+            indexExpr->indexExprs = _Move(synArgs);
+            synBaseStorageExpr = subVisitor.CheckTerm(indexExpr);
+        }
+        if (tempSink.getErrorCount() != 0)
+            return false;
+
+        // Our synthesized subscript will have an accessor declaration for
+        // each accessor of the requirement.
+        //
+        bool canSynAccessors = synthesizeAccessorRequirements(
+            context,
+            requiredMemberDeclRef,
+            declType,
+            synBaseStorageExpr,
+            synSubscriptDecl, witnessTable);
+        if (!canSynAccessors)
+            return false;
+
+
+        // The visibility of synthesized decl should be the min of the parent decl and the requirement.
+        if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
+        {
+            auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
+            auto thisVisibility = getDeclVisibility(context->parentDecl);
+            auto visibility = Math::Min(thisVisibility, requirementVisibility);
+            addVisibilityModifier(m_astBuilder, synSubscriptDecl, visibility);
+        }
+
+        return true;
+    }
+
     bool SemanticsVisitor::trySynthesizeRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const&         lookupResult,
@@ -5074,7 +5685,10 @@ namespace Slang
         // For generic decl, check if we match DMulFunc, and synthesize the method.
         if (auto requiredGenericDeclRef = requiredMemberDeclRef.as<GenericDecl>())
         {
-            if (auto builtinAttr = getInner(requiredGenericDeclRef)->findModifier<BuiltinRequirementModifier>())
+            auto inner = getInner(requiredGenericDeclRef);
+
+            // TODO: we should be able to remove DMul synthesis logic.
+            if (auto builtinAttr = inner->findModifier<BuiltinRequirementModifier>())
             {
                 switch (builtinAttr->kind)
                 {
@@ -5086,6 +5700,15 @@ namespace Slang
                         SynthesisPattern::FixedFirstArg);
                 }
             }
+
+            if (as<CallableDecl>(inner))
+            {
+                return trySynthesizeRequirementWitness(
+                    context,
+                    lookupResult,
+                    m_astBuilder->getMemberDeclRef(requiredGenericDeclRef, inner),
+                    witnessTable);
+            }
             return false;
         }
 
@@ -5095,6 +5718,15 @@ namespace Slang
                 context,
                 lookupResult,
                 requiredPropertyDeclRef,
+                witnessTable);
+        }
+
+        if (auto requiredSubscriptDeclRef = requiredMemberDeclRef.as<SubscriptDecl>())
+        {
+            return trySynthesizeSubscriptRequirementWitness(
+                context,
+                lookupResult,
+                requiredSubscriptDeclRef,
                 witnessTable);
         }
 
@@ -5266,7 +5898,6 @@ namespace Slang
         default:
             SLANG_ASSERT("unknown builtin requirement kind.");
         }
-        synFunc->parentDecl = context->parentDecl;
         synFunc->loc = context->parentDecl->closingSourceLoc;
         synFunc->nameAndLoc.loc = synFunc->loc;
         context->parentDecl->members.add(synFunc);
@@ -5346,10 +5977,6 @@ namespace Slang
 
         addModifier(synFunc, m_astBuilder->create<BackwardDifferentiableAttribute>());
 
-        if (synGeneric)
-            synGeneric->parentDecl = context->parentDecl;
-        else
-            synFunc->parentDecl = context->parentDecl;
 
         synth.pushContainerScope(synFunc);
         auto blockStmt = m_astBuilder->create<BlockStmt>();
@@ -5635,9 +6262,19 @@ namespace Slang
                 // requirement, it may be possible that we can still synthesis the
                 // implementation if this is one of the known builtin requirements.
                 // Otherwise, report diagnostic now.
-                if (!requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() &&
-                    !(requiredMemberDeclRef.as<GenericDecl>() &&
+
+                if (requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() ||
+                    (requiredMemberDeclRef.as<GenericDecl>() &&
                         getInner(requiredMemberDeclRef.as<GenericDecl>())->hasModifier<BuiltinRequirementModifier>()))
+                {
+                }
+                else if (requiredMemberDeclRef.as<SubscriptDecl>() &&
+                        (as<ArrayExpressionType>(context->conformingType) ||
+                         as<VectorExpressionType>(context->conformingType) ||
+                         as<MatrixExpressionType>(context->conformingType)))
+                {
+                }
+                else
                 {
                     getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
                     getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
@@ -7696,7 +8333,7 @@ namespace Slang
             }
         }
 
-        maybeApplyMatrixLayoutModifier(paramDecl);
+        maybeApplyLayoutModifier(paramDecl);
 
         // Only texture types are allowed to have memory qualifiers on parameters
         if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
@@ -10131,7 +10768,8 @@ namespace Slang
             bool isDiffParam = (!param->findModifier<NoDiffModifier>());
             if (isDiffParam)
             {
-                if (auto pairType = as<DifferentialPairType>(visitor->getDifferentialPairType(param->getType())))
+                auto diffPair = visitor->getDifferentialPairType(param->getType());
+                if (auto pairType = as<DifferentialPairType>(diffPair))
                 {
                     arg->type.type = pairType;
                     arg->type.isLeftValue = true;
@@ -10151,6 +10789,11 @@ namespace Slang
                         // inout T : IDifferentiable -> inout DifferentialPair<T>
                         direction = ParameterDirection::kParameterDirection_InOut;
                     }
+                }
+                else if (auto refPairType = as<DifferentialPtrPairType>(diffPair))
+                {
+                    // no need to change direction of ref-pairs.
+                    arg->type.type = refPairType;
                 }
                 else
                 {

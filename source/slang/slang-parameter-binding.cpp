@@ -1225,10 +1225,6 @@ static void addExplicitParameterBindings_GLSL(
         }
     }
 
-    // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
-    // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
-    info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
-
     if (warnedMissingVulkanLayoutModifier)
     {
         // If we warn due to invalid bindings and user did not set how to interpret 'hlsl style bindings', we should map 
@@ -1236,7 +1232,7 @@ static void addExplicitParameterBindings_GLSL(
         if(!hlslToVulkanLayoutOptions
             || hlslToVulkanLayoutOptions->getKindShiftEnabledFlags() == HLSLToVulkanLayoutOptions::KindFlag::None)
         {
-            info[kResInfo].resInfo->kind = LayoutResourceKind::DescriptorTableSlot;
+            info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
             info[kResInfo].resInfo->count = 1;
         }
         else
@@ -1244,6 +1240,11 @@ static void addExplicitParameterBindings_GLSL(
             return;
         }
     }
+
+    // We use the HLSL binding directly (even though this notionally for GLSL/Vulkan)
+    // We'll do the shifting at later later point in _maybeApplyHLSLToVulkanShifts
+    if (!info[kResInfo].resInfo)
+        info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
 
     info[kResInfo].semanticInfo.kind = info[kResInfo].resInfo->kind;
     info[kResInfo].semanticInfo.index = UInt(hlslInfo.index);
@@ -3748,7 +3749,7 @@ static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
         ioBuf << "[ " << start << " ... ";
         if (size.isFinite())
         {
-            ioBuf << start + size.getFiniteValue() << ")";
+            ioBuf << start + (Index)size.getFiniteValue() << ")";
         }
         else
         {

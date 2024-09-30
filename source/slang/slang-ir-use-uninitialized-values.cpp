@@ -297,6 +297,7 @@ namespace Slang
         case kIROp_Store:
         case kIROp_SwizzledStore:
         case kIROp_SPIRVAsm:
+        case kIROp_AtomicStore:
             return Store;
 
         case kIROp_SPIRVAsmOperandInst:
@@ -448,21 +449,6 @@ namespace Slang
         return false;
     }
 
-    static bool isWrittenTo(IRInst* inst)
-    {
-        for (auto alias : getAliasableInstructions(inst))
-        {
-            for (auto use = alias->firstUse; use; use = use->nextUse)
-            {
-                InstructionUsageType usage = getInstructionUsageType(use->getUser(), alias);
-                if (usage == Store || usage == StoreParent)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
     static bool isDirectlyWrittenTo(IRInst* inst)
     {
         for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -580,36 +566,6 @@ namespace Slang
         }
     }
 
-    static void checkParameterAsInOut(IRParam* param, IRFunc* func, bool isThis, DiagnosticSink* sink)
-    {
-        // If the inout is used for the sake of interface conformance, let it be
-        for (auto use = func->firstUse; use; use = use->nextUse)
-        {
-            if (as<IRWitnessTableEntry>(use->getUser()))
-                return;
-        }
-
-        // If there is at least one write...
-        if (isWrittenTo(param))
-            return;
-
-        // ...or if there is an intrinsic_asm instruction
-        for (const auto& b : func->getBlocks())
-        {
-            for (auto inst = b->getFirstInst(); inst; inst = inst->next)
-            {
-                if (as<IRGenericAsm>(inst))
-                    return;
-            }
-        }
-
-        sink->diagnose(param,
-            isThis
-            ? Diagnostics::methodNeverMutates
-            : Diagnostics::inOutNeverStoredInto,
-            param);
-    }
-
     static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     {
         // Differentiable functions will generate undefined values
@@ -631,22 +587,15 @@ namespace Slang
         if (auto entry = func->findDecoration<IREntryPointDecoration>())
             stage = entry->getProfile().getStage();
 
-        bool structMethod = func->findDecoration<IRMethodDecoration>();
-
         // Check out parameters
         if (!isUnmodifying(func))
         {
             int index = 0;
             for (auto param : firstBlock->getParams())
             {
-                bool isThis = structMethod && (index == 0);
-
                 ParameterCheckType checkType = isPotentiallyUnintended(param, stage, index);
                 if (checkType == AsOut)
                     checkParameterAsOut(reachability, func, param, sink);
-                else if (checkType == AsInOut)
-                    checkParameterAsInOut(param, func, isThis, sink);
-
                 index++;
             }
         }

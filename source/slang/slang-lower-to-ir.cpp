@@ -6622,8 +6622,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
         context->shared->breakLabels.remove(stmt);
         builder->setInsertInto(initialBlock);
+    
+        auto parentFunc = initialBlock->getParent();
+        parentFunc->addBlock(breakLabel);
+
         builder->emitIntrinsicInst(nullptr, kIROp_TargetSwitch, (UInt)args.getCount(), args.getBuffer());
-        insertBlock(breakLabel);
+
+        builder->setInsertInto(breakLabel);
     }
 
     void visitTargetCaseStmt(TargetCaseStmt*)
@@ -7130,9 +7135,19 @@ top:
             // The `left` value is just a pointer, so we can emit
             // a store to it directly.
             //
-            builder->emitStore(
-                left.val,
-                getSimpleVal(context, right));
+            if (as<IRAtomicType>(tryGetPointedToType(builder, left.val->getDataType())))
+            {
+                builder->emitAtomicStore(
+                    left.val,
+                    getSimpleVal(context, right),
+                    builder->getIntValue(builder->getIntType(), kIRMemoryOrder_Relaxed));
+            }
+            else
+            {
+                builder->emitStore(
+                    left.val,
+                    getSimpleVal(context, right));
+            }
         }
         break;
 

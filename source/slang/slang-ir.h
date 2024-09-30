@@ -93,6 +93,15 @@ enum IROpMask : std::underlying_type_t<IROp>
     kIROpMask_OpMask = 0x3ff, ///< Mask for just opcode
 };
 
+enum IRMemoryOrder
+{
+    kIRMemoryOrder_Relaxed = 0,
+    kIRMemoryOrder_Acquire = 1,
+    kIRMemoryOrder_Release = 2,
+    kIRMemoryOrder_AcquireRelease = 3,
+    kIRMemoryOrder_SeqCst = 4,
+};
+
 inline int32_t operator&(const IROpMask m, const IROp o)
 {
 #if defined(__cpp_lib_bit_cast)
@@ -1614,6 +1623,13 @@ struct IRArrayType: IRArrayTypeBase
 
 SIMPLE_IR_TYPE(UnsizedArrayType, ArrayTypeBase)
 
+struct IRAtomicType : IRType
+{
+    IR_LEAF_ISA(AtomicType)
+
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+};
+
 SIMPLE_IR_PARENT_TYPE(Rate, Type)
 SIMPLE_IR_TYPE(ConstExprRate, Rate)
 SIMPLE_IR_TYPE(GroupSharedRate, Rate)
@@ -1658,6 +1674,11 @@ struct IRDifferentialPairTypeBase : IRType
 struct IRDifferentialPairType : IRDifferentialPairTypeBase
 {
     IR_LEAF_ISA(DifferentialPairType)
+};
+
+struct IRDifferentialPtrPairType : IRDifferentialPairTypeBase
+{
+    IR_LEAF_ISA(DifferentialPtrPairType)
 };
 
 struct IRDifferentialPairUserCodeType : IRDifferentialPairTypeBase

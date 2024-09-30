@@ -436,6 +436,26 @@ namespace Slang
                     // of a GLSL buffer interface block which isn't marked as
                     // read_only
                     expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) && (expr->type.hasReadOnlyOnTarget == false);
+
+                    // Another exception is if we are accessing a property
+                    // that provides a [nonmutating] setter.
+                    if (!expr->type.isLeftValue &&
+                        as<PropertyDecl>(declRef.getDecl()))
+                    {
+                        bool isLValue = false;
+                        for (auto member : as<ContainerDecl>(declRef.getDecl())->members)
+                        {
+                            if (as<SetterDecl>(member) || as< RefAccessorDecl>(member))
+                            {
+                                if (member->findModifier<NonmutatingAttribute>())
+                                {
+                                    isLValue = true;
+                                }
+                                break;
+                            }
+                        }
+                        expr->type.isLeftValue = isLValue;
+                    }
                 }
                 else
                 {
@@ -1131,7 +1151,8 @@ namespace Slang
         {
             if (auto builtinRequirement = declRefType->getDeclRef().getDecl()->findModifier<BuiltinRequirementModifier>())
             {
-                if (builtinRequirement->kind == BuiltinRequirementKind::DifferentialType)
+                if (builtinRequirement->kind == BuiltinRequirementKind::DifferentialType
+                    || builtinRequirement->kind == BuiltinRequirementKind::DifferentialPtrType)
                 {
                     // We are trying to get differential type from a differential type.
                     // The result is itself.
@@ -1139,7 +1160,10 @@ namespace Slang
                 }
             }
             type = resolveType(type);
-            if (const auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterfaceType())))
+            auto witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterfaceType()));
+            if (!witness)
+                witness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(type, builder->getDifferentiableRefInterfaceType()));
+            if (witness)
             {
                 auto diffTypeLookupResult = lookUpMember(
                     getASTBuilder(),
@@ -1367,6 +1391,13 @@ namespace Slang
             {
                 addDifferentiableTypeToDiffTypeRegistry((DeclRefType*)type, subtypeWitness);
             }
+
+            if (auto subtypeWitness = as<SubtypeWitness>(
+                tryGetInterfaceConformanceWitness(type, getASTBuilder()->getDifferentiableRefInterfaceType())))
+            {
+                addDifferentiableTypeToDiffTypeRegistry((DeclRefType*)type, subtypeWitness);
+            }
+
             if (auto aggTypeDeclRef = declRefType->getDeclRef().as<AggTypeDecl>())
             {
                 foreachDirectOrExtensionMemberOfType<InheritanceDecl>(this, aggTypeDeclRef, [&](DeclRef<InheritanceDecl> member)
@@ -1401,7 +1432,15 @@ namespace Slang
 
     Expr* SemanticsVisitor::CheckTerm(Expr* term)
     {
+        // If we have already checked the expr, don't check again.
+        if (term->checked)
+        {
+            return term;
+        }
+        
         auto checkedTerm = _CheckTerm(term);
+        checkedTerm->checked = true;
+
         // Differentiable type checking.
         // TODO: This can be super slow.
         if (this->m_parentFunc &&
@@ -2255,10 +2294,14 @@ namespace Slang
 
         expr->left = maybeOpenRef(expr->left);
         auto type = expr->left->type;
+        if (auto atomicType = as<AtomicType>(type))
+        {
+            type = atomicType->getElementType();
+        }
         auto right = maybeOpenRef(expr->right);
         expr->right = coerce(CoercionSite::Assignment, type, right);
 
-        if (!type.isLeftValue)
+        if (!expr->left->type.isLeftValue)
         {
             if (as<ErrorType>(type))
             {
@@ -2891,18 +2934,25 @@ namespace Slang
                 return m_astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalType));
             }
         }
+
         // Get a reference to the builtin 'IDifferentiable' interface
         auto differentiableInterface = getASTBuilder()->getDifferentiableInterfaceType();
+        auto differentiableRefInterface = getASTBuilder()->getDifferentiableRefInterfaceType();
 
-        auto conformanceWitness = as<Witness>(isSubtype(primalType, differentiableInterface, IsSubTypeOptions::None));
         // Check if the provided type inherits from IDifferentiable.
         // If not, return the original type.
-        if (conformanceWitness)
+        if (auto conformanceWitness = isTypeDifferentiable(primalType))
         {
-            return m_astBuilder->getDifferentialPairType(primalType, conformanceWitness);
+            if (conformanceWitness->getSup() == differentiableInterface)
+            {
+                return m_astBuilder->getDifferentialPairType(primalType, conformanceWitness);
+            }
+            else if (conformanceWitness->getSup() == differentiableRefInterface)
+            {
+                return m_astBuilder->getDifferentialPtrPairType(primalType, conformanceWitness);
+            }
         }
-        else
-            return primalType;
+        return primalType;
     }
 
     Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType)
