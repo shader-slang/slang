@@ -747,6 +747,7 @@ struct Ptr
     {
         // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
         __intrinsic_op($(kIROp_GetOffsetPtr))
+        [nonmutating]
         ref;
     }
 };
@@ -2996,7 +2997,7 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
 
-__attributeTarget(SetterDecl)
+__attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
 __attributeTarget(FunctionDeclBase)

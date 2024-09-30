@@ -187,8 +187,9 @@ namespace Slang
 
     enum class ImageFormat
     {
-#define FORMAT(NAME, OTHER) NAME,
+#define SLANG_FORMAT(NAME, OTHER) NAME,
 #include "slang-image-format-defs.h"
+#undef SLANG_FORMAT
     };
 
     struct ImageFormatInfo

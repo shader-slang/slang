@@ -488,6 +488,8 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
 
 void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
 {
+    SLANG_UNUSED(resourceType);
+
     // If the user specified a format manually, using `[format(...)]`,
     // then we will respect that format and emit a matching `layout` modifier.
     //
@@ -585,72 +587,72 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
         m_writer->emit("layout(");
         switch (vectorWidth)
         {
-            default: m_writer->emit("rgba");  break;
+        default: m_writer->emit("rgba");  break;
 
-            case 3:
-            {
-                // TODO: GLSL doesn't support 3-component formats so for now we are going to
-                // default to rgba
-                //
-                // The SPIR-V spec (https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.pdf)
-                // section 3.11 on Image Formats it does not list rgbf32.
-                //
-                // It seems SPIR-V can support having an image with an unknown-at-compile-time
-                // format, so long as the underlying API supports it. Ideally this would mean that we can
-                // just drop all these qualifiers when emitting GLSL for Vulkan targets.
-                //
-                // This raises the question of what to do more long term. For Vulkan hopefully we can just
-                // drop the layout. For OpenGL targets it would seem reasonable to have well-defined rules
-                // for inferring the format (and just document that 3-component formats map to 4-component formats,
-                // but that shouldn't matter because the API wouldn't let the user allocate those 3-component formats anyway),
-                // and add an attribute for specifying the format manually if you really want to override our
-                // inference (e.g., to specify r11fg11fb10f).
+        case 3:
+        {
+            // TODO: GLSL doesn't support 3-component formats so for now we are going to
+            // default to rgba
+            //
+            // The SPIR-V spec (https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.pdf)
+            // section 3.11 on Image Formats it does not list rgbf32.
+            //
+            // It seems SPIR-V can support having an image with an unknown-at-compile-time
+            // format, so long as the underlying API supports it. Ideally this would mean that we can
+            // just drop all these qualifiers when emitting GLSL for Vulkan targets.
+            //
+            // This raises the question of what to do more long term. For Vulkan hopefully we can just
+            // drop the layout. For OpenGL targets it would seem reasonable to have well-defined rules
+            // for inferring the format (and just document that 3-component formats map to 4-component formats,
+            // but that shouldn't matter because the API wouldn't let the user allocate those 3-component formats anyway),
+            // and add an attribute for specifying the format manually if you really want to override our
+            // inference (e.g., to specify r11fg11fb10f).
 
-                m_writer->emit("rgba");
-                //Emit("rgb");
-                break;
-            }
+            m_writer->emit("rgba");
+            //Emit("rgb");
+            break;
+        }
 
-            case 2:  m_writer->emit("rg");    break;
-            case 1:  m_writer->emit("r");     break;
+        case 2:  m_writer->emit("rg");    break;
+        case 1:  m_writer->emit("r");     break;
         }
         switch (elementBasicType->getBaseType())
         {
-            default:
-            case BaseType::Float:   m_writer->emit("32f");  break;
-            case BaseType::Half:    m_writer->emit("16f");  break;
-            case BaseType::UInt:    m_writer->emit("32ui"); break;
-            case BaseType::Int:     m_writer->emit("32i"); break;
-            case BaseType::Int8:    m_writer->emit("8i"); break;
-            case BaseType::Int16:   m_writer->emit("16i"); break;
-            case BaseType::Int64:   m_writer->emit("64i"); break;
-            case BaseType::IntPtr:  m_writer->emit("64i"); break;
-            case BaseType::UInt8:   m_writer->emit("8ui"); break;
-            case BaseType::UInt16:  m_writer->emit("16ui"); break;
-            case BaseType::UInt64:  m_writer->emit("64ui"); break;
-            case BaseType::UIntPtr: m_writer->emit("64ui"); break;
+        default:
+        case BaseType::Float:   m_writer->emit("32f");  break;
+        case BaseType::Half:    m_writer->emit("16f");  break;
+        case BaseType::UInt:    m_writer->emit("32ui"); break;
+        case BaseType::Int:     m_writer->emit("32i"); break;
+        case BaseType::Int8:    m_writer->emit("8i"); break;
+        case BaseType::Int16:   m_writer->emit("16i"); break;
+        case BaseType::Int64:   m_writer->emit("64i"); break;
+        case BaseType::IntPtr:  m_writer->emit("64i"); break;
+        case BaseType::UInt8:   m_writer->emit("8ui"); break;
+        case BaseType::UInt16:  m_writer->emit("16ui"); break;
+        case BaseType::UInt64:  m_writer->emit("64ui"); break;
+        case BaseType::UIntPtr: m_writer->emit("64ui"); break;
 
-                // TODO: Here are formats that are available in GLSL,
-                // but that are not handled by the above cases.
-                //
-                // r11f_g11f_b10f
-                //
-                // rgba16
-                // rgb10_a2
-                // rgba8
-                // rg16
-                // rg8
-                // r16
-                // r8
-                //
-                // rgba16_snorm
-                // rgba8_snorm
-                // rg16_snorm
-                // rg8_snorm
-                // r16_snorm
-                // r8_snorm
-                //
-                // rgb10_a2ui
+            // TODO: Here are formats that are available in GLSL,
+            // but that are not handled by the above cases.
+            //
+            // r11f_g11f_b10f
+            //
+            // rgba16
+            // rgb10_a2
+            // rgba8
+            // rg16
+            // rg8
+            // r16
+            // r8
+            //
+            // rgba16_snorm
+            // rgba8_snorm
+            // rg16_snorm
+            // rg8_snorm
+            // r16_snorm
+            // r8_snorm
+            //
+            // rgb10_a2ui
         }
         m_writer->emit(")\n");
     }

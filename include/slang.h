@@ -2433,6 +2433,14 @@ extern "C"
         SLANG_MODIFIER_INOUT
     };
 
+    typedef SlangUInt32 SlangImageFormatIntegral;
+    enum SlangImageFormat : SlangImageFormatIntegral
+    {
+#define SLANG_FORMAT(NAME, DESC) SLANG_IMAGE_FORMAT_##NAME,
+#include "slang-image-format-defs.h"
+#undef SLANG_FORMAT
+    };
+
     // User Attribute
     SLANG_API char const* spReflectionUserAttribute_GetName(SlangReflectionUserAttribute* attrib);
     SLANG_API unsigned int spReflectionUserAttribute_GetArgumentCount(SlangReflectionUserAttribute* attrib);
@@ -2526,6 +2534,7 @@ extern "C"
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafTypeLayout(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVariable(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangImageFormat spReflectionTypeLayout_getBindingRangeImageFormat(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getFieldBindingRangeOffset(SlangReflectionTypeLayout* typeLayout, SlangInt fieldIndex);
     SLANG_API SlangInt spReflectionTypeLayout_getExplicitCounterBindingRangeOffset(SlangReflectionTypeLayout* inTypeLayout);
 
@@ -3296,6 +3305,12 @@ namespace slang
         VariableReflection* getBindingRangeLeafVariable(SlangInt index)
         {
             return (VariableReflection*)spReflectionTypeLayout_getBindingRangeLeafVariable(
+                (SlangReflectionTypeLayout*)this, index);
+        }
+
+        SlangImageFormat getBindingRangeImageFormat(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeImageFormat(
                 (SlangReflectionTypeLayout*)this, index);
         }
 

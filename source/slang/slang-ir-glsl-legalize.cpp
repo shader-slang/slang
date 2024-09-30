@@ -951,7 +951,7 @@ IRInst* getOrCreateBuiltinParamForHullShader(GLSLLegalizationContext* context, U
         {
             IRBuilder builder(context->entryPointFunc);
             auto paramType = builder.getIntType();
-            builder.setInsertInto(context->entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+            builder.setInsertBefore(context->entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
             outputControlPointIdParam = builder.emitParam(paramType);
             IRStructTypeLayout::Builder typeBuilder(&builder);
             auto typeLayout = typeBuilder.build();

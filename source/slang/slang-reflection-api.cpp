@@ -2421,6 +2421,24 @@ SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVar
     return convert(DeclRef<Decl>(bindingRange.leafVariable));
 }
 
+SLANG_API SlangImageFormat spReflectionTypeLayout_getBindingRangeImageFormat(SlangReflectionTypeLayout* typeLayout, SlangInt index)
+{
+    auto typeLayout_ = convert(typeLayout);
+    if (!typeLayout_) return SLANG_IMAGE_FORMAT_unknown;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout_);
+    if (index < 0) return SLANG_IMAGE_FORMAT_unknown;
+    if (index >= extTypeLayout->m_bindingRanges.getCount()) return SLANG_IMAGE_FORMAT_unknown;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+
+    auto leafVar = bindingRange.leafVariable;
+    if (auto formatAttrib = leafVar->findModifier<FormatAttribute>())
+    {
+        return (SlangImageFormat)formatAttrib->format;
+    }
+    return SLANG_IMAGE_FORMAT_unknown;
+}
+
 
 SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
 {
