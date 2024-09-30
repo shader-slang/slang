@@ -134,6 +134,7 @@ struct ShaderBindingRange
         case slang::ShaderResource:
         case slang::UnorderedAccess:
         case slang::SamplerState:
+        case slang::DescriptorTableSlot:
             return true;
         default:
             return false;
@@ -156,6 +157,13 @@ public:
     // IArtifactPostEmitMetadata
     SLANG_NO_THROW virtual Slice<ShaderBindingRange> SLANG_MCALL getUsedBindingRanges() SLANG_OVERRIDE;
     SLANG_NO_THROW virtual Slice<String> SLANG_MCALL getExportedFunctionMangledNames() SLANG_OVERRIDE;
+
+    // IMetadata
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL isParameterLocationUsed(
+        SlangParameterCategory category, // is this a `t` register? `s` register?
+        SlangUInt spaceIndex,      // `space` for D3D12, `set` for Vulkan
+        SlangUInt registerIndex,   // `register` for D3D12, `binding` for Vulkan
+        bool& outUsed) SLANG_OVERRIDE;
 
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);

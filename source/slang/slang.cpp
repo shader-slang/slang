@@ -4704,6 +4704,38 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
     return artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
+    SlangInt        entryPointIndex,
+    Int             targetIndex,
+    slang::IMetadata** outMetadata,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
+    if (!metadata)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outMetadata = static_cast<slang::IMetadata*>(metadata);
+    (*outMetadata)->addRef();
+    return SLANG_OK;
+}
+
 RefPtr<ComponentType> ComponentType::specialize(
     SpecializationArg const*    inSpecializationArgs,
     SlangInt                    specializationArgCount,
@@ -4933,14 +4965,16 @@ void ComponentType::enumerateIRModules(EnumerateIRModulesCallback callback, void
     acceptVisitor(&visitor, nullptr);
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
-    Int             targetIndex,
-    slang::IBlob** outCode,
-    slang::IBlob** outDiagnostics)
+IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outDiagnostics)
 {
     auto linkage = getLinkage();
     if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
-        return SLANG_E_INVALID_ARG;
+        return nullptr;
+    ComPtr<IArtifact> artifact;
+    if (m_targetArtifacts.tryGetValue(targetIndex, artifact))
+    {
+        return artifact.get();
+    }
 
     // If the user hasn't specified any entry points, then we should
     // discover all entrypoints that are defined in linked modules, and
@@ -4964,8 +4998,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
         }
         RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
         ComPtr<IComponentType> linkedComponentType;
-        SLANG_RETURN_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
-        return linkedComponentType->getTargetCode(targetIndex, outCode, outDiagnostics);
+        SLANG_RETURN_NULL_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
+        auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())->getTargetArtifact(targetIndex, outDiagnostics);
+        if (targetArtifact)
+        {
+            m_targetArtifacts[targetIndex] = targetArtifact;
+        }
+        return targetArtifact;
     }
 
     auto target = linkage->targets[targetIndex];
@@ -4975,13 +5014,41 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-    IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
+    IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
     sink.getBlobIfNeeded(outDiagnostics);
+    m_targetArtifacts[targetIndex] = ComPtr<IArtifact>(targetArtifact);
+    return targetArtifact;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
+    Int             targetIndex,
+    slang::IBlob** outCode,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
 
     if (artifact == nullptr)
         return SLANG_FAIL;
 
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetMetadata(
+    Int             targetIndex,
+    slang::IMetadata** outMetadata,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
+
+    if (artifact == nullptr)
+        return SLANG_FAIL;
+
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
+    if (!metadata)
+        return SLANG_E_NOT_AVAILABLE;
+    *outMetadata = static_cast<slang::IMetadata*>(metadata);
+    (*outMetadata)->addRef();
+    return SLANG_OK;
 }
 
 //
@@ -6888,19 +6955,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 
-
-    // TODO: optimize this with a binary search through a sorted list
-    for (const auto& range : metadata->getUsedBindingRanges())
-    {
-        if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
-        {
-            outUsed = true;
-            return SLANG_OK;
-        }
-    }
-
-    outUsed = false;
-    return SLANG_OK;
+    return metadata->isParameterLocationUsed(category, spaceIndex, registerIndex, outUsed);
 }
 
 } // namespace Slang
