@@ -661,7 +661,7 @@ void RenderTestApp::_initializeRenderPass()
     depthBufferDesc.size.width = gWindowWidth;
     depthBufferDesc.size.height = gWindowHeight;
     depthBufferDesc.size.depth = 1;
-    depthBufferDesc.numMipLevels = 1;
+    depthBufferDesc.mipLevelCount = 1;
     depthBufferDesc.format = Format::D32_FLOAT;
     depthBufferDesc.usage = TextureUsage::DepthWrite;
     depthBufferDesc.defaultState = ResourceState::DepthWrite;
@@ -675,7 +675,7 @@ void RenderTestApp::_initializeRenderPass()
     colorBufferDesc.size.width = gWindowWidth;
     colorBufferDesc.size.height = gWindowHeight;
     colorBufferDesc.size.depth = 1;
-    colorBufferDesc.numMipLevels = 1;
+    colorBufferDesc.mipLevelCount = 1;
     colorBufferDesc.format = Format::R8G8B8A8_UNORM;
     colorBufferDesc.usage = TextureUsage::RenderTarget;
     colorBufferDesc.defaultState = ResourceState::RenderTarget;
