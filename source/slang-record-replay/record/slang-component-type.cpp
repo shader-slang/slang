@@ -127,6 +127,25 @@ namespace SlangRecord
         return res;
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL IComponentTypeRecorder::getEntryPointMetadata(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::IMetadata** outMetadata,
+        slang::IBlob** outDiagnostics)
+    {
+        // No need to record this call.
+        return m_actualComponentType->getEntryPointMetadata(entryPointIndex, targetIndex, outMetadata, outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL IComponentTypeRecorder::getTargetMetadata(
+        SlangInt targetIndex,
+        slang::IMetadata** outMetadata,
+        slang::IBlob** outDiagnostics)
+    {
+        // No need to record this call.
+        return m_actualComponentType->getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
+    }
+
     SLANG_NO_THROW SlangResult IComponentTypeRecorder::getResultAsFileSystem(
         SlangInt    entryPointIndex,
         SlangInt    targetIndex,
