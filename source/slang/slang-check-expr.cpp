@@ -3393,6 +3393,7 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
         auto valueExpr = dispatch(sizeOfLikeExpr->value);
+        sizeOfLikeExpr->type = m_astBuilder->getIntType();
         
         Type* type = nullptr;
 
