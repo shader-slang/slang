@@ -1781,7 +1781,7 @@ namespace Slang
             if (expr->typeExpr)
                 expr->typeExpr->accept(this, nullptr);
         }
-        void visiSizeOfLikeExpr(SizeOfLikeExpr* expr)
+        void visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
         {
             if (expr->value)
                 expr->value->accept(this, nullptr);
