@@ -1216,6 +1216,11 @@ Val* TextureTypeBase::getSampleCount()
     return as<Type>(_getGenericTypeArg(this, 4));
 }
 
+Val* TextureTypeBase::getFormat()
+{
+    return as<Type>(_getGenericTypeArg(this, 8));
+}
+
 Type* removeParamDirType(Type* type)
 {
     for (auto paramDirType = as<ParamDirectionType>(type); paramDirType;)

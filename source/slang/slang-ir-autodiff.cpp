@@ -2565,6 +2565,8 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
 
     stripNoDiffTypeAttribute(module);
 
+    stripAutoDiffDecorations(module);
+
     return modified;
 }
 

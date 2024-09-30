@@ -455,7 +455,6 @@ class ColumnMajorLayoutModifier : public MatrixLayoutModifier
     SLANG_AST_CLASS(ColumnMajorLayoutModifier)
 };
 
-
 // The HLSL flavor of those modifiers
 class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier 
 {

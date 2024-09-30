@@ -6622,8 +6622,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
         context->shared->breakLabels.remove(stmt);
         builder->setInsertInto(initialBlock);
+    
+        auto parentFunc = initialBlock->getParent();
+        parentFunc->addBlock(breakLabel);
+
         builder->emitIntrinsicInst(nullptr, kIROp_TargetSwitch, (UInt)args.getCount(), args.getBuffer());
-        insertBlock(breakLabel);
+
+        builder->setInsertInto(breakLabel);
     }
 
     void visitTargetCaseStmt(TargetCaseStmt*)

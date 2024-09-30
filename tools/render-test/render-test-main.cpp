@@ -661,7 +661,7 @@ void RenderTestApp::_initializeRenderPass()
     depthBufferDesc.size.width = gWindowWidth;
     depthBufferDesc.size.height = gWindowHeight;
     depthBufferDesc.size.depth = 1;
-    depthBufferDesc.numMipLevels = 1;
+    depthBufferDesc.mipLevelCount = 1;
     depthBufferDesc.format = Format::D32_FLOAT;
     depthBufferDesc.usage = TextureUsage::DepthWrite;
     depthBufferDesc.defaultState = ResourceState::DepthWrite;
@@ -675,7 +675,7 @@ void RenderTestApp::_initializeRenderPass()
     colorBufferDesc.size.width = gWindowWidth;
     colorBufferDesc.size.height = gWindowHeight;
     colorBufferDesc.size.depth = 1;
-    colorBufferDesc.numMipLevels = 1;
+    colorBufferDesc.mipLevelCount = 1;
     colorBufferDesc.format = Format::R8G8B8A8_UNORM;
     colorBufferDesc.usage = TextureUsage::RenderTarget;
     colorBufferDesc.defaultState = ResourceState::RenderTarget;
@@ -889,8 +889,7 @@ void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
     auto pipelineType = PipelineType::Graphics;
     applyBinding(pipelineType, encoder);
 
-	encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-    encoder->setVertexBuffer(0, m_vertexBuffer);
+	encoder->setVertexBuffer(0, m_vertexBuffer);
 
 	encoder->draw(3);
 }
@@ -960,8 +959,7 @@ Result RenderTestApp::writeScreen(const String& filename)
 {
     size_t rowPitch, pixelSize;
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(m_device->readTexture(
-        m_colorBuffer, ResourceState::RenderTarget, blob.writeRef(), &rowPitch, &pixelSize));
+    SLANG_RETURN_ON_FAIL(m_device->readTexture(m_colorBuffer, blob.writeRef(), &rowPitch, &pixelSize));
     auto bufferSize = blob->getBufferSize();
     uint32_t width = static_cast<uint32_t>(rowPitch / pixelSize);
     uint32_t height = static_cast<uint32_t>(bufferSize / rowPitch);
@@ -983,14 +981,10 @@ Result RenderTestApp::update()
         colorAttachment.view = m_colorBufferView;
         colorAttachment.loadOp = LoadOp::Clear;
         colorAttachment.storeOp = StoreOp::Store;
-        colorAttachment.initialState = ResourceState::Undefined;
-        colorAttachment.finalState = ResourceState::RenderTarget;
         RenderPassDepthStencilAttachment depthStencilAttachment = {};
         depthStencilAttachment.view = m_depthBufferView;
         depthStencilAttachment.depthLoadOp = LoadOp::Clear;
         depthStencilAttachment.depthStoreOp = StoreOp::Store;
-        depthStencilAttachment.initialState = ResourceState::Undefined;
-        depthStencilAttachment.finalState = ResourceState::DepthWrite;
         RenderPassDesc renderPass = {};
         renderPass.colorAttachments = &colorAttachment;
         renderPass.colorAttachmentCount = 1;
