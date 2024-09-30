@@ -8,6 +8,10 @@ concurrency:
   cancel-in-progress: true
 env:
   DISABLE_CTS_SLANG: 0
+  ACTIONS_RUNNER_DEBUG: true
+  ACTIONS_STEP_DEBUG: true
+  DISABLE_CTS_SLANG_SERVER_MODE: 1
+
 jobs:
   build:
     strategy:
@@ -77,7 +81,6 @@ jobs:
       shell: pwsh
       working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64
       run: |
-        export DISABLE_CTS_SLANG_SERVER_MODE=1
         .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt --deqp-waiver-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
     - name: Dump TestResults.qpa if failed
       shell: pwsh
