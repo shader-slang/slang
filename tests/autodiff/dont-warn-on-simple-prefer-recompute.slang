@@ -7,7 +7,8 @@ RWStructuredBuffer<float> outputBuffer;
 [PreferRecompute]
 float comp(float a, float b)
 {
-    //CHECK: warn
+    // CHECK: standard error = {
+    // CHECK-NEXT: }
     return a * b;
 }
 
