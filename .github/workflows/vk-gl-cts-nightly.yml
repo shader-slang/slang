@@ -1,8 +1,8 @@
 name: VK-GL-CTS Nightly
 
 on:
-  schedule:
-    - cron: '00 07 * * *'
+  pull_request:
+    branches: [master]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -10,6 +10,8 @@ env:
   DISABLE_CTS_SLANG: 0
   ACTIONS_RUNNER_DEBUG: true
   ACTIONS_STEP_DEBUG: true
+  DISABLE_CTS_SLANG_SERVER_MODE: 1
+
 jobs:
   build:
     strategy:
@@ -57,14 +59,12 @@ jobs:
         latest: true
         repository: "shader-slang/VK-GL-CTS"
         fileName: "VK-GL-CTS_WithSlang-0.0.3-win64.zip"
-    - uses: actions/checkout@v4
-      with:
-        repository: "shader-slang/VK-GL-CTS"
-        sparse-checkout: |
-          test-lists/slang-passing-tests.txt
-          test-lists/slang-waiver-tests.xml
-        path: test-lists
-        sparse-checkout-cone-mode: false
+    - name: Sync submodules
+      run: |
+        cd external/spirv-headers
+        git checkout 2acb319af38d43be3ea76bfabf3998e5281d8d12
+        cd ../spirv-tools
+        git checkout ce46482db7ab3ea9c52fce832d27ca40b14f8e87
     - name: vkcts setup
       shell: pwsh
       run: |
@@ -74,8 +74,8 @@ jobs:
         copy ${{ github.workspace }}\build\Release\bin\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-glslang.dll
         copy ${{ github.workspace }}\build\Release\bin\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\test-server.exe
 
-        copy ${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
-        copy ${{ github.workspace }}\test-lists\test-lists\slang-waiver-tests.xml ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
+        copy ${{ github.workspace }}\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-passing-tests.txt
+        copy ${{ github.workspace }}\slang-waiver-tests.xml ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.3-win64\VK-GL-CTS_WithSlang-0.0.3-win64\slang-waiver-tests.xml
 
     - name: vkcts run
       shell: pwsh
