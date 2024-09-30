@@ -959,8 +959,7 @@ Result RenderTestApp::writeScreen(const String& filename)
 {
     size_t rowPitch, pixelSize;
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(m_device->readTexture(
-        m_colorBuffer, ResourceState::RenderTarget, blob.writeRef(), &rowPitch, &pixelSize));
+    SLANG_RETURN_ON_FAIL(m_device->readTexture(m_colorBuffer, blob.writeRef(), &rowPitch, &pixelSize));
     auto bufferSize = blob->getBufferSize();
     uint32_t width = static_cast<uint32_t>(rowPitch / pixelSize);
     uint32_t height = static_cast<uint32_t>(bufferSize / rowPitch);
@@ -982,14 +981,10 @@ Result RenderTestApp::update()
         colorAttachment.view = m_colorBufferView;
         colorAttachment.loadOp = LoadOp::Clear;
         colorAttachment.storeOp = StoreOp::Store;
-        colorAttachment.initialState = ResourceState::Undefined;
-        colorAttachment.finalState = ResourceState::RenderTarget;
         RenderPassDepthStencilAttachment depthStencilAttachment = {};
         depthStencilAttachment.view = m_depthBufferView;
         depthStencilAttachment.depthLoadOp = LoadOp::Clear;
         depthStencilAttachment.depthStoreOp = StoreOp::Store;
-        depthStencilAttachment.initialState = ResourceState::Undefined;
-        depthStencilAttachment.finalState = ResourceState::DepthWrite;
         RenderPassDesc renderPass = {};
         renderPass.colorAttachments = &colorAttachment;
         renderPass.colorAttachmentCount = 1;
