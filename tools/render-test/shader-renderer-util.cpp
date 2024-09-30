@@ -73,7 +73,7 @@ inline int calcNumMipLevels(TextureType type, Extents size)
 
     textureDesc.sampleCount = inputDesc.sampleCount;
     textureDesc.format = format;
-    textureDesc.numMipLevels = texData.m_mipLevels;
+    textureDesc.mipLevelCount = texData.m_mipLevels;
     textureDesc.arrayLength = inputDesc.arrayLength > 0 ? inputDesc.arrayLength : 1;
     textureDesc.usage = TextureUsage::CopyDestination | TextureUsage::CopySource;
     switch (defaultState)
@@ -119,9 +119,9 @@ inline int calcNumMipLevels(TextureType type, Extents size)
         }
     }
 
-    if (textureDesc.numMipLevels == 0)
+    if (textureDesc.mipLevelCount == 0)
     {
-        textureDesc.numMipLevels = calcNumMipLevels(textureDesc.type, textureDesc.size);
+        textureDesc.mipLevelCount = calcNumMipLevels(textureDesc.type, textureDesc.size);
     }
 
     List<SubresourceData> initSubresources;
@@ -129,7 +129,7 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     int subResourceCounter = 0;
     for( int a = 0; a < arrayLayerCount; ++a )
     {
-        for( int m = 0; m < textureDesc.numMipLevels; ++m )
+        for( int m = 0; m < textureDesc.mipLevelCount; ++m )
         {
             int subResourceIndex = subResourceCounter++;
             const int mipWidth = calcMipSize(textureDesc.size.width, m);
