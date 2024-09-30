@@ -419,7 +419,7 @@ GenericAppDeclRef* SubstitutionSet::findGenericAppDeclRef() const
         {
             return genApp;
         }
-        else if (auto lookup = as<LookupDeclRef>(s))
+        else if (as<LookupDeclRef>(s))
         {
             return nullptr;
         }
