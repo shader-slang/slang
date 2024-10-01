@@ -530,10 +530,12 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
             auto textureArg = m_args[0].get();
             IRType* elementType  = nullptr;
+            bool isShadowTexture = false;
 
             if (auto baseTextureType = as<IRTextureTypeBase>(textureArg->getDataType()))
             {
                 elementType = baseTextureType->getElementType();
+                isShadowTexture = baseTextureType->isShadow();
             }
             else
             {
@@ -548,7 +550,14 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             if (const auto basicType = as<IRBasicType>(elementType))
             {
                 // A scalar result is expected
-                m_writer->emit(".x");
+
+                // If the texture type is a scalar type, the return type from the target intrinsic
+                // probably returns a scalar type already. For GLSL, ".x" swizzling happened to
+                // work fine on a scalar value like "1.x", but it is invalid for WGSL.
+                if (!isShadowTexture)
+                {
+                    m_writer->emit(".x");
+                }
             }
             else if (auto vectorType = as<IRVectorType>(elementType))
             {

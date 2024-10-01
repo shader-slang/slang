@@ -93,7 +93,7 @@ namespace Slang
         void checkDerivativeMemberAttributeParent(VarDeclBase* varDecl, DerivativeMemberAttribute* attr);
         void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
         void checkMeshOutputDecl(VarDeclBase* varDecl);
-        void maybeApplyMatrixLayoutModifier(VarDeclBase* varDecl);
+        void maybeApplyLayoutModifier(VarDeclBase* varDecl);
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
         void visitVarDecl(VarDecl* varDecl)
@@ -1518,7 +1518,122 @@ namespace Slang
             }
         }
     }
-    void SemanticsDeclHeaderVisitor::maybeApplyMatrixLayoutModifier(VarDeclBase* varDecl)
+
+    ImageFormat inferImageFormatFromTextureType(VarDeclBase* varDecl, TextureTypeBase* textureType, bool &outIsInferred)
+    {
+        outIsInferred = false;
+        ImageFormat format = ImageFormat::unknown;
+        if (auto formatVal = as<ConstantIntVal>(textureType->getFormat()))
+        {
+            format = (ImageFormat)formatVal->getValue();
+        }
+        if (format != ImageFormat::unknown)
+            return format;
+
+        if (auto formatAttrib = varDecl->findModifier<FormatAttribute>())
+        {
+            format = formatAttrib->format;
+        }
+        else
+        {
+            // If format is not specified explicitly through format attribute, we will derive a default
+            // value from the element format.
+            outIsInferred = true;
+            auto elementType = textureType->getElementType();
+            Int vectorWidth = 1;
+            if (auto elementVecType = as<VectorExpressionType>(elementType))
+            {
+                if (auto intLitVal = as<ConstantIntVal>(elementVecType->getElementCount()))
+                {
+                    vectorWidth = (Int)intLitVal->getValue();
+                }
+                else
+                {
+                    vectorWidth = 1;
+                }
+                elementType = elementVecType->getElementType();
+            }
+            if (auto basicType = as<BasicExpressionType>(elementType))
+            {
+                switch (basicType->getBaseType())
+                {
+                case BaseType::UInt:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r32ui; break;
+                    case 2: format = ImageFormat::rg32ui; break;
+                    case 4: format = ImageFormat::rgba32ui; break;
+                    }
+                    break;
+                case BaseType::Int:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r32i; break;
+                    case 2: format = ImageFormat::rg32i; break;
+                    case 4: format = ImageFormat::rgba32i; break;
+                    }
+                    break;
+                case BaseType::UInt16:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r16ui; break;
+                    case 2: format = ImageFormat::rg16ui; break;
+                    case 4: format = ImageFormat::rgba16ui; break;
+                    }
+                    break;
+                case BaseType::Int16:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r16i; break;
+                    case 2: format = ImageFormat::rg16i; break;
+                    case 4: format = ImageFormat::rgba16i; break;
+                    }
+                    break;
+                case BaseType::UInt8:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r8ui; break;
+                    case 2: format = ImageFormat::rg8ui; break;
+                    case 4: format = ImageFormat::rgba8ui; break;
+                    }
+                    break;
+                case BaseType::Int8:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r8i; break;
+                    case 2: format = ImageFormat::rg8i; break;
+                    case 4: format = ImageFormat::rgba8i; break;
+                    }
+                    break;
+                case BaseType::Int64:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r64i; break;
+                    default: break;
+                    }
+                    break;
+                case BaseType::UInt64:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r64ui; break;
+                    default: break;
+                    }
+                    break;
+                case BaseType::Half:
+                    switch (vectorWidth)
+                    {
+                    case 1: format = ImageFormat::r16f; break;
+                    case 2: format = ImageFormat::rg16f; break;
+                    case 4: format = ImageFormat::rgba16f; break;
+                    }
+                    break;
+                }
+            }
+        }
+        return format;
+    }
+
+    void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
     {
         if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
         {
@@ -1531,6 +1646,23 @@ namespace Slang
                     matrixType->getColumnCount(),
                     getASTBuilder()->getIntVal(getASTBuilder()->getIntType(), matrixLayout));
                 varDecl->type.type = newMatrixType;
+            }
+        }
+        else if (auto textureType = as<TextureTypeBase>(unwrapArrayType(varDecl->type.type)))
+        {
+            if (getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown))
+                return;
+
+            // For texture types, we will ensure there is a [format] attribute declared on the decl,
+            // if not, we will infer the format from the texture type if it is not specified.
+            //
+            bool isInferred = false;
+            auto format = inferImageFormatFromTextureType(varDecl, textureType, isInferred);
+            if (format != ImageFormat::unknown && isInferred)
+            {
+                auto formatAttrib = m_astBuilder->create<FormatAttribute>();
+                formatAttrib->format = format;
+                addModifier(varDecl, formatAttrib);
             }
         }
     }
@@ -1615,8 +1747,8 @@ namespace Slang
             validateArraySizeForVariable(varDecl);
         }
 
-        // If there is a matrix layout modifier, we will modify the matrix type now.
-        maybeApplyMatrixLayoutModifier(varDecl);
+        // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
+        maybeApplyLayoutModifier(varDecl);
 
         if (varDecl->initExpr)
         {
@@ -2839,6 +2971,17 @@ namespace Slang
     void registerBuiltinDecls(Session* session, Decl* decl)
     {
         _registerBuiltinDeclsRec(session, decl);
+    }
+
+    Type* unwrapArrayType(Type* type)
+    {
+        for (;;)
+        {
+            if (auto arrayType = as<ArrayExpressionType>(type))
+                type = arrayType->getElementType();
+            else
+                return type;
+        }
     }
 
     void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)
@@ -8190,7 +8333,7 @@ namespace Slang
             }
         }
 
-        maybeApplyMatrixLayoutModifier(paramDecl);
+        maybeApplyLayoutModifier(paramDecl);
 
         // Only texture types are allowed to have memory qualifiers on parameters
         if(!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)

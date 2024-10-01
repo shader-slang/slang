@@ -2374,6 +2374,9 @@ struct IRStore : IRInst
 
     IRInst* getPtr() { return ptr.get(); }
     IRInst* getVal() { return val.get(); }
+
+    IRUse* getPtrUse() { return &ptr; }
+    IRUse* getValUse() { return &val; }
 };
 
 struct IRAtomicStore : IRInst

@@ -64,11 +64,11 @@ standard output = {
                 },
                 {
                     "name": "t",
-                    "binding": {"kind": "descriptorTableSlot", "index": 0}
+                    "binding": {"kind": "descriptorTableSlot", "index": 0, "used": 1}
                 },
                 {
                     "name": "sampler",
-                    "binding": {"kind": "descriptorTableSlot", "index": 1}
+                    "binding": {"kind": "descriptorTableSlot", "index": 1, "used": 1}
                 }
             ]
         }

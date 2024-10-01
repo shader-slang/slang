@@ -2416,9 +2416,15 @@ void checkAutodiffPatterns(
         if (auto func = as<IRFunc>(inst))
         {
             if (func->sourceLoc.isValid() && // Don't diagnose for synthesized functions
-                func->findDecoration<IRPreferRecomputeDecoration>() &&
-                !func->findDecoration<IRNoSideEffectDecoration>())
+                func->findDecoration<IRPreferRecomputeDecoration>())
             {
+                // If we don't have any side-effect behavior, we should warn (note: read-none is a stronger 
+                // guarantee than no-side-effect)
+                //
+                if (func->findDecoration<IRNoSideEffectDecoration>() ||
+                    func->findDecoration<IRReadNoneDecoration>())
+                    continue;
+
                 auto preferRecomputeDecor = func->findDecoration<IRPreferRecomputeDecoration>();
                 auto sideEffectBehavior = as<IRIntLit>(preferRecomputeDecor->getOperand(0))->getValue();
 
@@ -2558,6 +2564,8 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
     lowerNullCheckInsts(module, &autodiffContext);
 
     stripNoDiffTypeAttribute(module);
+
+    stripAutoDiffDecorations(module);
 
     return modified;
 }

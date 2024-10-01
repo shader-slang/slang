@@ -16,6 +16,7 @@
 .gdb_history
 .vimspector
 .vimspector.json
+compile_commands.json
 
 bin/
 intermediate/
