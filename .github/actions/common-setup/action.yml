@@ -74,10 +74,23 @@ runs:
         path: ${{ github.workspace }}/build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+    - name: Fetch LLVM
+      id: fetch-llvm
+      uses: actions/checkout@v4
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
+      with:
+        repository: llvm/llvm-project
+        ref: llvmorg-13.0.1
+        path: build/llvm-source
+        fetch-tags: true
     - name: Build LLVM
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
-      run: ./external/build-llvm.sh --install-prefix "${{ github.workspace }}/build/llvm-project-install"
+      run: |
+        ./external/build-llvm.sh \
+          --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
+          --repo "${{github.workspace}}/build/llvm-source" \
+          --branch "${{ steps.fetch-llvm.outputs.commit }}"
     - uses: actions/cache/save@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
