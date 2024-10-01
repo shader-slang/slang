@@ -79,7 +79,7 @@ runs:
       uses: actions/checkout@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
-        repository: llvm/llvm-project
+        repository: https://git.home.monoid.al/llvm-project
         ref: llvmorg-13.0.1
         path: build/llvm-source
         fetch-tags: true
