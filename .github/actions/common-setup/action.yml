@@ -17,10 +17,10 @@ runs:
   using: composite
   steps:
     - name: Add bash to PATH
-        shell: pwsh
-        run: |
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+      shell: pwsh
+      run: |
+        Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+        Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
 
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
