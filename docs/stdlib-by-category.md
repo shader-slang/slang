@@ -83,7 +83,7 @@
 | IDifferentiable | none | Used for denote types that are differentiable. |
 | IDifferentiableFunc | IFunc<br>IDifferentiableMutatingFunc | Same as `IFunc` but for Auto-diff. |
 | IDifferentiableMutatingFunc | IMutatingFunc | Same as `IMutatingFunc` but for Auto-diff. |
-| IDifferentiablePtrType | none | Same as `IDifferentiable` but for memory pointers. |
+| IDifferentiablePtrType | none | Memory Pointer type for Auto-diff. |
 
 # Types
 
@@ -100,97 +100,76 @@
 
 | Type name | Implements | Description |
 |--|--|--|
-| FeedbackTexture2D | | |
-| FeedbackTexture2DArray | | |
-| RWTexture1D | | |
-| RWTexture1DArray | | |
-| RWTexture2D | | |
-| RWTexture2DArray | | |
-| RWTexture2DMS | | |
-| RWTexture2DMSArray | | |
-| RWTexture3D | | |
-| RasterizerOrderedTexture1D | | |
-| RasterizerOrderedTexture1DArray | | |
-| RasterizerOrderedTexture2D | | |
-| RasterizerOrderedTexture2DArray | | |
-| RasterizerOrderedTexture3D | | |
-| Texture1D | | |
-| Texture1DArray | | |
-| Texture2D | | |
-| Texture2DArray | | |
-| Texture2DMS | | |
-| Texture2DMSArray | | |
-| Texture3D | | |
-| TextureCube | | |
-| TextureCubeArray | | |
-| TextureFootprint | | |
+| FeedbackTexture2D | none | Feedback texture resource type for 2D. |
+| FeedbackTexture2DArray | none | Feedback texture resource type for 2D array. |
+| RWTexture1D | none | Read-write texture resource type for 1D. |
+| RWTexture1DArray | none | Read-write texture resource type for 1D Array. |
+| RWTexture2D | none | Read-write texture resource type for 2D. |
+| RWTexture2DArray | none | Read-write texture resource type for 2D Array. |
+| RWTexture2DMS | none | Read-write texture resource type for 2D Multi-sample. |
+| RWTexture2DMSArray | none | Read-write texture resource type for 2D Multi-sample Array. |
+| RWTexture3D | none | Read-write texture resource type for 3D. |
+| RasterizerOrderedTexture1D | none | Rasterizer-Ordered texture resource type for 1D. |
+| RasterizerOrderedTexture1DArray | none | Rasterizer-Ordered texture resource type for 1D Array. |
+| RasterizerOrderedTexture2D | none | Rasterizer-Ordered texture resource type for 2D. |
+| RasterizerOrderedTexture2DArray | none | Rasterizer-Ordered texture resource type for 2D Array. |
+| RasterizerOrderedTexture3D | none | Rasterizer-Ordered texture resource type for 3D. |
+| Texture1D | none | Read-only texture resource type for 1D. |
+| Texture1DArray | none | Read-only texture resource type for 1D Array. |
+| Texture2D | none | Read-only texture resource type for 2D. |
+| Texture2DArray | none | Read-only texture resource type for 2D Array. |
+| Texture2DMS | none | Read-only texture resource type for 2D Multi-sample. |
+| Texture2DMSArray | none | Read-only texture resource type for 2D Multi-sample Array. |
+| Texture3D | none | Read-only texture resource type for 3D. |
+| TextureCube | none | Read-only texture resource type for Cube. |
+| TextureCubeArray | none | Read-only texture resource type for Cube Array. |
+| TextureFootprint | none | Read-only texture resource type for Footprint/feedback. |
 
 ## Sampler Types
 
 | Type name | Implements | Description |
 |--|--|--|
-| RWSampler1D | | |
-| RWSampler1DArray | | |
-| RWSampler2D | | |
-| RWSampler2DArray | | |
-| RWSampler2DMS | | |
-| RWSampler2DMSArray | | |
-| RWSampler3D | | |
-| RasterizerOrderedSampler1D | | |
-| RasterizerOrderedSampler1DArray | | |
-| RasterizerOrderedSampler2D | | |
-| RasterizerOrderedSampler2DArray | | |
-| RasterizerOrderedSampler3D | | |
-| Sampler1D | | |
-| Sampler1DArray | | |
-| Sampler2D | | |
-| Sampler2DArray | | |
-| Sampler2DMS | | |
-| Sampler2DMSArray | | |
-| Sampler3D | | |
-| SamplerComparisonState | | |
-| SamplerCube | | |
-| SamplerCubeArray | | |
-| SamplerState | | |
+| SamplerComparisonState | none | Sampler resource type for sampling a depth texture. |
+| SamplerState | none | Sampler resource type for sampling a texture. |
 
 ## Uniform Buffer Types
 
 | Type name | Implements | Description |
 |--|--|--|
-| AppendStructuredBuffer | | |
-| ByteAddressBuffer | | |
-| ConstantBuffer | | |
-| ConsumeStructuredBuffer | | |
-| ParameterBlock | | |
-| RWByteAddressBuffer | | |
-| RWStructuredBuffer | | |
-| RasterizerOrderedByteAddressBuffer | | |
-| RasterizerOrderedStructuredBuffer | | |
-| StructuredBuffer | | |
-| TextureBuffer | | |
+| AppendStructuredBuffer | none | Buffer resource type that allows the shader to append data to. |
+| ByteAddressBuffer | none | Read-only byte address buffer resource type. |
+| ConstantBuffer | none | Read-only Constant Buffer resource type. |
+| ConsumeStructuredBuffer | none | Buffer resource type that can read data coming from AppendStructuredBuffer. |
+| ParameterBlock | none | Buffer resource type that can hold a mix of constant data resources with descriptor resources. |
+| RWByteAddressBuffer | none | Read-write byte address buffer resource type. |
+| RWStructuredBuffer | IRWArray | Read-write structured buffer resource type. |
+| RasterizerOrderedByteAddressBuffer | none | Rasterizer-Ordered byte address buffer resource type. |
+| RasterizerOrderedStructuredBuffer | IRWArray | Rasterizer-Ordered structured buffer resource type. |
+| StructuredBuffer | IArray | Read-only structured buffer resource type. |
+| TextureBuffer | none | TODO |
 
 ## Pointer Types
 
 | Type name | Implements | Description |
 |--|--|--|
-| ConstBufferPointer | | |
-| NullPtr | | |
-| Ptr | | |
+| ConstBufferPointer | none | Pointer type for a constant buffer. |
+| NullPtr | none | TODO |
+| Ptr | none | Pointer type for a given Type `T`. |
 
 ## Atomic Types
 
 | Type name | Implements | Description |
 |--|--|--|
-| Atomic | | |
-| AtomicAdd | | |
+| Atomic | none | Provides atomic operators: `load`, `store`, `exchange` and `compareExchange`. |
 
 ## Auto-diff Types
 
 | Type name | Implements | Description |
 |--|--|--|
-| DifferentialPair | | |
-| DifferentialPtrPair | | |
-| DiffTensorView | | |
+| AtomicAdd | IDiffTensorWrapper | Type that provides atomic operators for Auto-diff. |
+| DifferentialPair | IDifferentiable | Pair type that serves to wrap the primal and differential types of an arbitrary type `T`. |
+| DifferentialPtrPair | IDifferentiablePtrType | Pair type similar to DifferentialPair but for memory pointer. |
+| DiffTensorView | none | TODO |
 
 ## Misc Types
 
@@ -387,51 +366,51 @@
 | WaveActiveMin() | Computes the minimum value of the expression across all active lanes in the wave. |
 | WaveActiveProduct() | Computes the product of the expression across all active lanes in the wave. |
 | WaveActiveSum() | Computes the sum of the expression across all active lanes in the wave. |
-| WaveBroadcastLaneAt() | |
-| WaveGetActiveMask() | |
-| WaveGetActiveMulti() | |
-| WaveGetConvergedMask() | |
-| WaveGetConvergedMulti() | |
+| WaveBroadcastLaneAt() | Provides an access to subgroupBroadcast which can only take a constexpr laneId. |
+| WaveGetActiveMask() | TODO |
+| WaveGetActiveMulti() | TODO |
+| WaveGetConvergedMask() | TODO |
+| WaveGetConvergedMulti() | TODO |
 | WaveGetLaneCount() | Returns the number of lanes in a wave on the current architecture. |
 | WaveGetLaneIndex() | Returns the index of the current lane within the current wave. |
 | WaveIsFirstLane() | Returns true if the current lane is the first active lane in the wave. |
-| WaveMaskBroadcastLaneAt() | |
-| WaveMaskIsFirstLane() | |
-| WaveMaskAllEqual() | |
-| WaveMaskAllTrue() | |
-| WaveMaskAnyTrue() | |
-| WaveMaskBallot() | |
-| WaveMaskBitAnd() | |
-| WaveMaskBitOr() | |
-| WaveMaskBitXor() | |
-| WaveMaskCountBits() | |
-| WaveMaskMatch() | |
-| WaveMaskMax() | |
-| WaveMaskMin() | |
-| WaveMaskPrefixBitAnd() | |
-| WaveMaskPrefixBitOr() | |
-| WaveMaskPrefixBitXor() | |
-| WaveMaskPrefixCountBits() | |
-| WaveMaskPrefixProduct() | |
-| WaveMaskPrefixSum() | |
-| WaveMaskProduct() | |
-| WaveMaskReadLaneAt() | | 
-| WaveMaskReadLaneFirst() | |
-| WaveMaskShuffle() | |
-| WaveMaskSum() | |
-| WaveMatch() | |
-| WaveMultiPrefixBitAnd() | |
-| WaveMultiPrefixBitOr() | |
-| WaveMultiPrefixBitXor() | |
-| WaveMultiPrefixCountBits() | |
-| WaveMultiPrefixProduct() | |
-| WaveMultiPrefixSum() | |
+| WaveMaskBroadcastLaneAt() | TODO |
+| WaveMaskIsFirstLane() | TODO |
+| WaveMaskAllEqual() | TODO |
+| WaveMaskAllTrue() | TODO |
+| WaveMaskAnyTrue() | TODO |
+| WaveMaskBallot() | TODO |
+| WaveMaskBitAnd() | TODO |
+| WaveMaskBitOr() | TODO |
+| WaveMaskBitXor() | TODO |
+| WaveMaskCountBits() | TODO |
+| WaveMaskMatch() | TODO |
+| WaveMaskMax() | TODO |
+| WaveMaskMin() | TODO |
+| WaveMaskPrefixBitAnd() | TODO |
+| WaveMaskPrefixBitOr() | TODO |
+| WaveMaskPrefixBitXor() | TODO |
+| WaveMaskPrefixCountBits() | TODO |
+| WaveMaskPrefixProduct() | TODO |
+| WaveMaskPrefixSum() | TODO |
+| WaveMaskProduct() | TODO |
+| WaveMaskReadLaneAt() | TODO |
+| WaveMaskReadLaneFirst() | TODO |
+| WaveMaskShuffle() | TODO |
+| WaveMaskSum() | TODO |
+| WaveMatch() | TODO |
+| WaveMultiPrefixBitAnd() | TODO |
+| WaveMultiPrefixBitOr() | TODO |
+| WaveMultiPrefixBitXor() | TODO |
+| WaveMultiPrefixCountBits() | TODO |
+| WaveMultiPrefixProduct() | TODO |
+| WaveMultiPrefixSum() | TODO |
 | WavePrefixCountBits() | Computes the prefix sum of the number of bits set to 1 across all active lanes in the wave. |
 | WavePrefixProduct() | Computes the prefix product of the expression across all active lanes in the wave. |
 | WavePrefixSum() | Computes the prefix sum of the expression across all active lanes in the wave. |
 | WaveReadLaneAt() | Returns the value of the expression for the specified lane index within the wave1. |
 | WaveReadLaneFirst() | Returns the value of the expression for the active lane with the smallest index in the wave. |
-| WaveShuffle() | |
+| WaveShuffle() | TODO |
 
 ## Auto-diff Functions
 
@@ -452,15 +431,15 @@
 | GetRenderTargetSampleCount() | Returns the number of samples for a render target. |
 | GetRenderTargetSamplePosition() | Gets the sampling position (x, y) for a given sample index. |
 | NonUniformResourceIndex() | Indicate if the resource index is divergent. |
-| asDynamicUniform() | | 
-| clock2x32ARB() | |
-| clockARB() | |
+| asDynamicUniform() | TODO | 
+| clock2x32ARB() | TODO |
+| clockARB() | TODO |
 | concat() | Concatnate Tuple types. |
 | createDynamicObject() | Create Existential object. |
-| getRealtimeClockLow(): | |
-| getRealtimeClock() | |
-| makeArrayFromElement() | |
-| makeTuple() | |
+| getRealtimeClockLow(): | TODO |
+| getRealtimeClock() | TODO |
+| makeArrayFromElement() | Make an `Array` type variable from the given element. |
+| makeTuple() | Make a `Tuple` type variable from the given values. |
 | reinterpret() | Changes the type from one to another. |
 | static_assert() | Error out when a compile-time value evaluates to false. |
 | unmodified() | Silence the warning message about not writing to an inout parameter. |
@@ -529,9 +508,9 @@
 
 | Type name | Description |
 |--|--|
-| LineStream | |
-| PointStream | |
-| TriangleStream | |
+| LineStream | Provides an access to a vertex stream for a line primitives. |
+| PointStream | Provides an access to a vertex stream for a point primitives. |
+| TriangleStream | Provides an access to a vertex stream for a triangle primitives. |
 
 ## Mesh Shader Functions
 
@@ -567,13 +546,13 @@
 | ObjectToWorld3x4() | A matrix for transforming from object-space to world-space. Object-space refers to the space of the current bottom-level acceleration structure. |
 | ObjectToWorld4x3() | A matrix for transforming from object-space to world-space. Object-space refers to the space of the current bottom-level acceleration structure. |
 | PrimitiveIndex() | Retrieves the autogenerated index of the primitive within the geometry inside the bottom-level acceleration structure instance. |
-| RayCurrentTime() | |
+| RayCurrentTime() | TODO |
 | RayFlags() | Returns the current ray flag values. |
 | RayTCurrent() | The current parametric ending point for the ray. |
 | RayTMin() | The current parametric starting point for the ray. |
 | ReorderThread() | Reorders threads based on a coherence hint value. |
 | ReportHit() | Reports a hit during ray traversal. |
-| TraceMotionRay() | |
+| TraceMotionRay() | TODO |
 | TraceRay() | Traces a ray and returns the hit information. |
 | WorldRayDirection() | The world-space direction for the current ray. |
 | WorldRayOrigin() | The world-space origin of the current ray. |
@@ -584,9 +563,9 @@
 
 | Type name | Description |
 |--|--|
-| RayDesc | |
-| RaytracingAccelerationStructure | |
-| BuiltInTriangleIntersectionAttributes
-| RayQuery | |
-| HitObject | |
+| RayDesc | Ray Description structure. |
+| RaytracingAccelerationStructure | Ray Acceleration structure. |
+| BuiltInTriangleIntersectionAttributes | Intersection Attributes structure. |
+| RayQuery | Ray-tracing resource type for an in-progress ray-tracing query. |
+| HitObject | Immutable data type representing a ray hit or miss. |
 
