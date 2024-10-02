@@ -16,103 +16,115 @@
 
 1. Common Interfaces
 
-IArray interface
-IBufferDataLayout interface
-IFunc interface
-IMutatingFunc interface
-IRWArray interface
+| Interface name | Description |
+|--|--|
+| IArray | |
+| IBufferDataLayout | |
+| IFunc | |
+| IMutatingFunc | |
+| IRWArray | |
 
 1. Common Types
 
-Array struct
-ConstRef struct
-InOut struct
-InputPatch struct
-Optional struct
-Out struct
-OutputIndices struct
-OutputPatch struct
-OutputPrimitives struct
-OutputVertices struct
-Ref struct
-TensorView struct
-TorchTensor struct
-Tuple struct
-matrix struct
-vector struct
+| Type name | Description |
+|--|--|
+| Array | |
+| ConstRef | |
+| InOut | |
+| InputPatch | |
+| Optional | |
+| Out | |
+| OutputIndices | |
+| OutputPatch | |
+| OutputPrimitives | |
+| OutputVertices | |
+| Ref | |
+| TensorView | |
+| TorchTensor | |
+| Tuple | |
+| matrix | |
+| vector | |
 
 1. Texture Types
 
-FeedbackTexture2D struct
-FeedbackTexture2DArray struct
-RWTexture1D struct
-RWTexture1DArray struct
-RWTexture2D struct
-RWTexture2DArray struct
-RWTexture2DMS struct
-RWTexture2DMSArray struct
-RWTexture3D struct
-RasterizerOrderedTexture1D struct
-RasterizerOrderedTexture1DArray struct
-RasterizerOrderedTexture2D struct
-RasterizerOrderedTexture2DArray struct
-RasterizerOrderedTexture3D struct
-Texture1D struct
-Texture1DArray struct
-Texture2D struct
-Texture2DArray struct
-Texture2DMS struct
-Texture2DMSArray struct
-Texture3D struct
-TextureCube struct
-TextureCubeArray struct
-TextureFootprint struct
+| Type name | Description |
+|--|--|
+| FeedbackTexture2D | |
+| FeedbackTexture2DArray | |
+| RWTexture1D | |
+| RWTexture1DArray | |
+| RWTexture2D | |
+| RWTexture2DArray | |
+| RWTexture2DMS | |
+| RWTexture2DMSArray | |
+| RWTexture3D | |
+| RasterizerOrderedTexture1D | |
+| RasterizerOrderedTexture1DArray | |
+| RasterizerOrderedTexture2D | |
+| RasterizerOrderedTexture2DArray | |
+| RasterizerOrderedTexture3D | |
+| Texture1D | |
+| Texture1DArray | |
+| Texture2D | |
+| Texture2DArray | |
+| Texture2DMS | |
+| Texture2DMSArray | |
+| Texture3D | |
+| TextureCube | |
+| TextureCubeArray | |
+| TextureFootprint | |
 
 1. Sampler Types
 
-RWSampler1D struct
-RWSampler1DArray struct
-RWSampler2D struct
-RWSampler2DArray struct
-RWSampler2DMS struct
-RWSampler2DMSArray struct
-RWSampler3D struct
-RasterizerOrderedSampler1D struct
-RasterizerOrderedSampler1DArray struct
-RasterizerOrderedSampler2D struct
-RasterizerOrderedSampler2DArray struct
-RasterizerOrderedSampler3D struct
-Sampler1D struct
-Sampler1DArray struct
-Sampler2D struct
-Sampler2DArray struct
-Sampler2DMS struct
-Sampler2DMSArray struct
-Sampler3D struct
-SamplerComparisonState struct
-SamplerCube struct
-SamplerCubeArray struct
-SamplerState struct
+| Type name | Description |
+|--|--|
+| RWSampler1D | |
+| RWSampler1DArray | |
+| RWSampler2D | |
+| RWSampler2DArray | |
+| RWSampler2DMS | |
+| RWSampler2DMSArray | |
+| RWSampler3D | |
+| RasterizerOrderedSampler1D | |
+| RasterizerOrderedSampler1DArray | |
+| RasterizerOrderedSampler2D | |
+| RasterizerOrderedSampler2DArray | |
+| RasterizerOrderedSampler3D | |
+| Sampler1D | |
+| Sampler1DArray | |
+| Sampler2D | |
+| Sampler2DArray | |
+| Sampler2DMS | |
+| Sampler2DMSArray | |
+| Sampler3D | |
+| SamplerComparisonState | |
+| SamplerCube | |
+| SamplerCubeArray | |
+| SamplerState | |
 
 1. Uniform Buffer Types
 
-AppendStructuredBuffer struct
-ByteAddressBuffer struct
-ConstantBuffer struct
-ConsumeStructuredBuffer struct
-ParameterBlock struct
-RWByteAddressBuffer struct
-RWStructuredBuffer struct
-RasterizerOrderedByteAddressBuffer struct
-RasterizerOrderedStructuredBuffer struct
-StructuredBuffer struct
-TextureBuffer struct
+| Type name | Description |
+|--|--|
+| AppendStructuredBuffer | |
+| ByteAddressBuffer | |
+| ConstantBuffer | |
+| ConsumeStructuredBuffer | |
+| ParameterBlock | |
+| RWByteAddressBuffer | |
+| RWStructuredBuffer | |
+| RasterizerOrderedByteAddressBuffer | |
+| RasterizerOrderedStructuredBuffer | |
+| StructuredBuffer | |
+| TextureBuffer | |
 
 1. Pointer Types
 
-ConstBufferPointer struct
-NullPtr struct
-Ptr struct
+| Type name | Description |
+|--|--|
+| ConstBufferPointer | |
+| NullPtr | |
+| Ptr | |
 
 1. Relational Functions
 
@@ -201,12 +213,14 @@ Ptr struct
 
 1. Math Interfaces
 
-IArithmetic interface
-ICompareable interface
-IFloat interface
-IInteger interface
-ILogical interface
-IRangedValue interface
+| Interface name | Description |
+|--|--|
+| IArithmetic | |
+| ICompareable | |
+| IFloat | |
+| IInteger | |
+| ILogical | |
+| IRangedValue | |
 
 1. Geometric Functions
 
@@ -255,14 +269,18 @@ IRangedValue interface
 
 1. Atomic Interfaces
 
-IAtomicable interface
-IArithmeticAtomicable interface
-IBitAtomicable interface
+| Interface name | Description |
+|--|--|
+| IAtomicable | |
+| IArithmeticAtomicable | |
+| IBitAtomicable | |
 
 1. Atomic Types
 
-Atomic struct
-AtomicAdd struct
+| Type name | Description |
+|--|--|
+| Atomic | |
+| AtomicAdd | |
 
 1. Synchronization Functions
 
@@ -360,17 +378,21 @@ AtomicAdd struct
 
 1. Auto-diff Interfaces
 
-IDifferentiable interface
-IDifferentiablePtrType interface
-IDifferentiableMutatingFunc
-IDifferentiableFunc
-IDiffTensorWrapper
+| Interface name | Description |
+|--|--|
+| IDifferentiable | |
+| IDifferentiablePtrType | |
+| IDifferentiableMutatingFunc
+| IDifferentiableFunc
+| IDiffTensorWrapper
 
 1. Auto-diff Types
 
-DifferentialPair struct
-DifferentialPtrPair struct
-DiffTensorView struct
+| Type name | Description |
+|--|--|
+| DifferentialPair | |
+| DifferentialPtrPair | |
+| DiffTensorView | |
 
 1. Misc Functions
 
@@ -444,9 +466,11 @@ DiffTensorView struct
 
 1. Stage specific - Geometry Shader Types
 
-LineStream struct
-PointStream struct
-TriangleStream struct
+| Type name | Description |
+|--|--|
+| LineStream | |
+| PointStream | |
+| TriangleStream | |
 
 1. Stage specific - Mesh Shader Functions
 
@@ -489,9 +513,11 @@ TriangleStream struct
 
 1. Stage specific - Ray-tracing Types
 
-RayDesc struct
-RaytracingAccelerationStructure struct
-BuiltInTriangleIntersectionAttributes
-RayQuery struct
-HitObject struct
+| Type name | Description |
+|--|--|
+| RayDesc | |
+| RaytracingAccelerationStructure | |
+| BuiltInTriangleIntersectionAttributes
+| RayQuery | |
+| HitObject | |
 
