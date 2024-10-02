@@ -46,161 +46,161 @@
 
 ## Common Interfaces
 
-| Interface name | Description |
-|--|--|
-| IArray | |
-| IBufferDataLayout | |
-| IFunc | |
-| IMutatingFunc | |
-| IRWArray | |
+| Interface name | Inherits from | Description |
+|--|--|--|
+| IArray | none | Provides operators to access elements in an array. |
+| IBufferDataLayout | none | TODO |
+| IFunc | IMutatingFunc | Provides an `operator()` to make a Functor. |
+| IMutatingFunc | none | Same as `IFunc` but with mutability. |
+| IRWArray | IArray | Same as `IArray` but with mutability. |
 
 ## Math Interfaces
 
-| Interface name | Description |
-|--|--|
-| IArithmetic | |
-| ICompareable | |
-| IFloat | |
-| IInteger | |
-| ILogical | |
-| IRangedValue | |
+| Interface name | Inherits from | Description |
+|--|--|--|
+| IArithmetic | IComparable | Provides basic arithmetic operators: `add`, `sub`, `mul`, `div`, `mod`, and `neg`. |
+| ICompareable | Provides comparison operators: `equals`, `lessThan` and `lessThanOrEquals`. |
+| IFloat | IArithmetic<br>IDifferentiable | Provides basic arithmetic operators for floating-point types and also provides operators required by Auto-diff feature. |
+| IInteger | IArithmetic<br>ILogical | Provides logical operators and basic arithmetic operators for integer types. |
+| ILogical | IComparable | Provides Logical operators: `And`, `Or`, `Xor`, `Not`, `shift-left` and `shift-right`. |
+| IRangedValue | none | Provides the limit the type can represent: `maxValue` and `minValue`. |
 
 ## Atomic Interfaces
 
-| Interface name | Description |
-|--|--|
-| IAtomicable | |
-| IArithmeticAtomicable | |
-| IBitAtomicable | |
+| Interface name | Inherits from | Description |
+|--|--|--|
+| IAtomicable | | |
+| IArithmeticAtomicable | | |
+| IBitAtomicable | | |
 
 ## Auto-diff Interfaces
 
-| Interface name | Description |
-|--|--|
-| IDifferentiable | |
-| IDifferentiablePtrType | |
-| IDifferentiableMutatingFunc
-| IDifferentiableFunc
-| IDiffTensorWrapper
+| Interface name | Inherits from | Description |
+|--|--|--|
+| IDifferentiable | | |
+| IDifferentiablePtrType | | |
+| IDifferentiableMutatingFunc | | |
+| IDifferentiableFunc | | |
+| IDiffTensorWrapper | | |
 
 # Types
 
 ## Common Types
 
-| Type name | Description |
-|--|--|
-| Array | |
-| ConstRef | |
-| InOut | |
-| InputPatch | |
-| Optional | |
-| Out | |
-| OutputIndices | |
-| OutputPatch | |
-| OutputPrimitives | |
-| OutputVertices | |
-| Ref | |
-| TensorView | |
-| TorchTensor | |
-| Tuple | |
-| matrix | |
-| vector | |
+| Type name | Implements | Description |
+|--|--|--|
+| Array | | |
+| ConstRef | | |
+| InOut | | |
+| InputPatch | | |
+| Optional | | |
+| Out | | |
+| OutputIndices | | |
+| OutputPatch | | |
+| OutputPrimitives | | |
+| OutputVertices | | |
+| Ref | | |
+| TensorView | | |
+| TorchTensor | | |
+| Tuple | | |
+| matrix | | |
+| vector | | |
 
 ## Texture Types
 
-| Type name | Description |
-|--|--|
-| FeedbackTexture2D | |
-| FeedbackTexture2DArray | |
-| RWTexture1D | |
-| RWTexture1DArray | |
-| RWTexture2D | |
-| RWTexture2DArray | |
-| RWTexture2DMS | |
-| RWTexture2DMSArray | |
-| RWTexture3D | |
-| RasterizerOrderedTexture1D | |
-| RasterizerOrderedTexture1DArray | |
-| RasterizerOrderedTexture2D | |
-| RasterizerOrderedTexture2DArray | |
-| RasterizerOrderedTexture3D | |
-| Texture1D | |
-| Texture1DArray | |
-| Texture2D | |
-| Texture2DArray | |
-| Texture2DMS | |
-| Texture2DMSArray | |
-| Texture3D | |
-| TextureCube | |
-| TextureCubeArray | |
-| TextureFootprint | |
+| Type name | Implements | Description |
+|--|--|--|
+| FeedbackTexture2D | | |
+| FeedbackTexture2DArray | | |
+| RWTexture1D | | |
+| RWTexture1DArray | | |
+| RWTexture2D | | |
+| RWTexture2DArray | | |
+| RWTexture2DMS | | |
+| RWTexture2DMSArray | | |
+| RWTexture3D | | |
+| RasterizerOrderedTexture1D | | |
+| RasterizerOrderedTexture1DArray | | |
+| RasterizerOrderedTexture2D | | |
+| RasterizerOrderedTexture2DArray | | |
+| RasterizerOrderedTexture3D | | |
+| Texture1D | | |
+| Texture1DArray | | |
+| Texture2D | | |
+| Texture2DArray | | |
+| Texture2DMS | | |
+| Texture2DMSArray | | |
+| Texture3D | | |
+| TextureCube | | |
+| TextureCubeArray | | |
+| TextureFootprint | | |
 
 ## Sampler Types
 
-| Type name | Description |
-|--|--|
-| RWSampler1D | |
-| RWSampler1DArray | |
-| RWSampler2D | |
-| RWSampler2DArray | |
-| RWSampler2DMS | |
-| RWSampler2DMSArray | |
-| RWSampler3D | |
-| RasterizerOrderedSampler1D | |
-| RasterizerOrderedSampler1DArray | |
-| RasterizerOrderedSampler2D | |
-| RasterizerOrderedSampler2DArray | |
-| RasterizerOrderedSampler3D | |
-| Sampler1D | |
-| Sampler1DArray | |
-| Sampler2D | |
-| Sampler2DArray | |
-| Sampler2DMS | |
-| Sampler2DMSArray | |
-| Sampler3D | |
-| SamplerComparisonState | |
-| SamplerCube | |
-| SamplerCubeArray | |
-| SamplerState | |
+| Type name | Implements | Description |
+|--|--|--|
+| RWSampler1D | | |
+| RWSampler1DArray | | |
+| RWSampler2D | | |
+| RWSampler2DArray | | |
+| RWSampler2DMS | | |
+| RWSampler2DMSArray | | |
+| RWSampler3D | | |
+| RasterizerOrderedSampler1D | | |
+| RasterizerOrderedSampler1DArray | | |
+| RasterizerOrderedSampler2D | | |
+| RasterizerOrderedSampler2DArray | | |
+| RasterizerOrderedSampler3D | | |
+| Sampler1D | | |
+| Sampler1DArray | | |
+| Sampler2D | | |
+| Sampler2DArray | | |
+| Sampler2DMS | | |
+| Sampler2DMSArray | | |
+| Sampler3D | | |
+| SamplerComparisonState | | |
+| SamplerCube | | |
+| SamplerCubeArray | | |
+| SamplerState | | |
 
 ## Uniform Buffer Types
 
-| Type name | Description |
-|--|--|
-| AppendStructuredBuffer | |
-| ByteAddressBuffer | |
-| ConstantBuffer | |
-| ConsumeStructuredBuffer | |
-| ParameterBlock | |
-| RWByteAddressBuffer | |
-| RWStructuredBuffer | |
-| RasterizerOrderedByteAddressBuffer | |
-| RasterizerOrderedStructuredBuffer | |
-| StructuredBuffer | |
-| TextureBuffer | |
+| Type name | Implements | Description |
+|--|--|--|
+| AppendStructuredBuffer | | |
+| ByteAddressBuffer | | |
+| ConstantBuffer | | |
+| ConsumeStructuredBuffer | | |
+| ParameterBlock | | |
+| RWByteAddressBuffer | | |
+| RWStructuredBuffer | | |
+| RasterizerOrderedByteAddressBuffer | | |
+| RasterizerOrderedStructuredBuffer | | |
+| StructuredBuffer | | |
+| TextureBuffer | | |
 
 ## Pointer Types
 
-| Type name | Description |
-|--|--|
-| ConstBufferPointer | |
-| NullPtr | |
-| Ptr | |
+| Type name | Implements | Description |
+|--|--|--|
+| ConstBufferPointer | | |
+| NullPtr | | |
+| Ptr | | |
 
 ## Atomic Types
 
-| Type name | Description |
-|--|--|
-| Atomic | |
-| AtomicAdd | |
+| Type name | Implements | Description |
+|--|--|--|
+| Atomic | | |
+| AtomicAdd | | |
 
 ## Auto-diff Types
 
-| Type name | Description |
-|--|--|
-| DifferentialPair | |
-| DifferentialPtrPair | |
-| DiffTensorView | |
+| Type name | Implements | Description |
+|--|--|--|
+| DifferentialPair | | |
+| DifferentialPtrPair | | |
+| DiffTensorView | | |
 
 # Global Functions
 
