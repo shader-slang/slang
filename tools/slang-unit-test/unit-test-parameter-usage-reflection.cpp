@@ -1,4 +1,4 @@
-// unit-test-image-format-reflection.cpp
+// unit-test-parameter-usage-reflection.cpp
 
 #include "slang.h"
 
@@ -12,16 +12,17 @@
 
 using namespace Slang;
 
-// Test that the getBindingRangeImageFormat API works.
+// Test that the isParameterLocationUsed API works.
 
-SLANG_UNIT_TEST(imageFormatReflection)
+SLANG_UNIT_TEST(isParameterLocationUsedReflection)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
-        Texture2D<uint4> g_tex : register(t0);
-        float4 fragMain(float4 pos:SV_Position) : SV_Position
+        Texture2D g_tex : register(t0);
+        [shader("fragment")]
+        float4 fragMain(float4 pos:SV_Position) : SV_Target
         {
-            return pos;
+            return g_tex.Load(int3(0, 0, 0));
         }
         )";
 
@@ -30,8 +31,8 @@ SLANG_UNIT_TEST(imageFormatReflection)
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_HLSL;
-    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
@@ -51,8 +52,17 @@ SLANG_UNIT_TEST(imageFormatReflection)
     session->createCompositeComponentType(components, 2, compositeProgram.writeRef(), diagnosticBlob.writeRef());
     SLANG_CHECK(compositeProgram != nullptr);
 
-    auto layout = compositeProgram->getLayout(0);
-    auto format = layout->getGlobalParamsTypeLayout()->getBindingRangeImageFormat(0);
-    SLANG_CHECK(format == SLANG_IMAGE_FORMAT_rgba32ui);
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), nullptr);
+
+    ComPtr<slang::IMetadata> metadata;
+    linkedProgram->getTargetMetadata(0, metadata.writeRef(), nullptr);
+
+    bool isUsed = false;
+    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 0, isUsed);
+    SLANG_CHECK(isUsed);
+
+    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, isUsed);
+    SLANG_CHECK(!isUsed);
 }
 
