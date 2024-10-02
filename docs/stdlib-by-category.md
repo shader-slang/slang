@@ -59,7 +59,7 @@
 | Interface name | Inherits from | Description |
 |--|--|--|
 | IArithmetic | IComparable | Provides basic arithmetic operators: `add`, `sub`, `mul`, `div`, `mod`, and `neg`. |
-| ICompareable | Provides comparison operators: `equals`, `lessThan` and `lessThanOrEquals`. |
+| ICompareable | none | Provides comparison operators: `equals`, `lessThan` and `lessThanOrEquals`. |
 | IFloat | IArithmetic<br>IDifferentiable | Provides basic arithmetic operators for floating-point types and also provides operators required by Auto-diff feature. |
 | IInteger | IArithmetic<br>ILogical | Provides logical operators and basic arithmetic operators for integer types. |
 | ILogical | IComparable | Provides Logical operators: `And`, `Or`, `Xor`, `Not`, `shift-left` and `shift-right`. |
@@ -69,19 +69,19 @@
 
 | Interface name | Inherits from | Description |
 |--|--|--|
-| IAtomicable | | |
-| IArithmeticAtomicable | | |
-| IBitAtomicable | | |
+| IAtomicable | none | Used for denote types allowed for the atomic operations. |
+| IArithmeticAtomicable | IAtomicable<br>IArithmetic | Provides basic arithmetic operators atomically. |
+| IBitAtomicable | IArithmeticAtomicable<br>IInteger | Provides bit-wise operators atomically. |
 
 ## Auto-diff Interfaces
 
 | Interface name | Inherits from | Description |
 |--|--|--|
-| IDifferentiable | | |
-| IDifferentiablePtrType | | |
-| IDifferentiableMutatingFunc | | |
-| IDifferentiableFunc | | |
-| IDiffTensorWrapper | | |
+| IDiffTensorWrapper | none | TODO |
+| IDifferentiable | none | Used for denote types that are differentiable. |
+| IDifferentiableFunc | IFunc<br>IDifferentiableMutatingFunc | Same as `IFunc` but for Auto-diff. |
+| IDifferentiableMutatingFunc | IMutatingFunc | Same as `IMutatingFunc` but for Auto-diff. |
+| IDifferentiablePtrType | none | Same as `IDifferentiable` but for memory pointers. |
 
 # Types
 
