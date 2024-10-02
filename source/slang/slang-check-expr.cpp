@@ -2726,7 +2726,8 @@ namespace Slang
 
         if (auto varExpr = as<VarExpr>(expr->functionExpr))
         {
-            if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
+            if (varExpr->name &&
+                ((varExpr->name->text == "&&") || (varExpr->name->text == "||")))
             {
                 // We only use short-circuiting in scalar input, will fall back
                 // to non-short-circuiting in vector input.
