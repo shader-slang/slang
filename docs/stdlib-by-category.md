@@ -1,4 +1,5 @@
 1. Common Functions
+
 | Function name | Description |
 |--|--|
 | GetRenderTargetSampleCount() | Returns the number of samples for a render target. |
@@ -108,12 +109,14 @@ NullPtr struct
 Ptr struct
 
 1. Relational Functions
+
 | Function name | Description |
 |--|--|
 | all() | True if all components are non-zero. |
 | any() | True if any component is non-zero. |
 
 1. Bitwise Functions
+
 | Function name | Description |
 |--|--|
 | and() | Component-wise logical AND. |
@@ -125,6 +128,7 @@ Ptr struct
 | reversebits() | Reverses the order of bits in an integer. |
 
 1. Trigonometry Functions
+
 | Function name | Description |
 |--|--|
 | acos() | Inverse cosine. |
@@ -145,6 +149,7 @@ Ptr struct
 | tanh() | Hyperbolic tangent. |
 
 1. Exponential Functions
+
 | Function name | Description |
 |--|--|
 | exp() | Exponential (e^x). |
@@ -158,6 +163,7 @@ Ptr struct
 | sqrt() | Square root. |
 
 1. Matrix Functions
+
 | Function name | Description |
 |--|--|
 | determinant() | Returns the determinant of a matrix. |
@@ -165,6 +171,7 @@ Ptr struct
 | transpose() | Transposes a matrix. |
 
 1. Math Functions
+
 | Function name | Description |
 |--|--|
 | abs() | Absolute value. |
@@ -195,6 +202,7 @@ ILogical interface
 IRangedValue interface
 
 1. Geometric Functions
+
 | Function name | Description |
 |--|--|
 | cross() | Cross product of two 3D vectors. |
@@ -208,6 +216,7 @@ IRangedValue interface
 | refract() | Computes the refraction vector. |
 
 1. Conversion Functions
+
 | Function name | Description |
 |--|--|
 | asdouble() | Converts two uint32_t into a double. |
@@ -222,6 +231,7 @@ IRangedValue interface
 | f32tof16() | Converts a float to a float16 type. |
 
 1. Atomic Functions
+
 | Function name | Description |
 |--|--|
 | InterlockedAdd() | Atomic addition. |
@@ -246,6 +256,7 @@ Atomic struct
 AtomicAdd struct
 
 1. Synchronization Functions
+
 | Function name | Description |
 |--|--|
 | AllMemoryBarrier() | Ensures all threads in a group are synchronized. |
@@ -258,6 +269,7 @@ AtomicAdd struct
 | endInvocationInterlock() | Mark end of "interlocked" operations. |
 
 1. Wave Functions
+
 | Function name | Description |
 |--|--|
 | AllMemoryBarrierWithWaveMaskSync() | Same to AllMemoryBarrierWithWaveSync() but limits to the threads marked in the mask. |
@@ -327,6 +339,7 @@ AtomicAdd struct
 | WaveShuffle() | |
 
 1. Auto-diff Functions
+
 | Function name | Description |
 |--|--|
 | isDifferentialNull() | existential check for null differential type. |
@@ -349,6 +362,7 @@ DifferentialPtrPair struct
 DiffTensorView struct
 
 1. Misc Functions
+
 | Function name | Description |
 |--|--|
 | CheckAccessFullyMapped() | Check access status to tiled resource. |
@@ -367,6 +381,7 @@ DiffTensorView struct
 | unmodified() | Silence the warning message about not writing to an inout parameter. |
 
 1. Stage specific - Fragment Shader Functions
+
 | Function name | Description |
 |--|--|
 | EvaluateAttributeAtCentroid() | Evaluates an attribute at the pixel centroid. |
@@ -385,11 +400,13 @@ DiffTensorView struct
 | fwidth() | Absolute sum of derivatives in x and y. |
 
 1. Stage specific - Compute Shader Functions
+
 | Function name | Description |
 |--|--|
 | WorkgroupSize() | Returns the workgroup size of the calling entry point. |
 
 1. Stage specific - Hull Shader Functions
+
 | Function name | Description |
 |--|--|
 | Process2DQuadTessFactorsAvg() | Processes 2D quad tessellation factors using the average method. |
@@ -404,6 +421,7 @@ DiffTensorView struct
 | ProcessTriTessFactorsMin() | Processes triangle tessellation factors using the minimum method. |
 
 1. Stage specific - Geometry Shader Functions
+
 | Function name | Description |
 |--|--|
 | LineStream::Append() | Appends a vertex to the current line primitive. |
@@ -419,12 +437,14 @@ PointStream struct
 TriangleStream struct
 
 1. Stage specific - Mesh Shader Functions
+
 | Function name | Description |
 |--|--|
 | DispatchMesh() | Dispatches work for mesh shaders. |
 | SetMeshOutputCounts() | Sets the number of vertices and primitives to emit. |
 
 1. Stage specific - Ray-Tracing Functions
+
 | Function name | Description |
 |--|--|
 | AcceptHitAndEndSearch() | Stops ray traversal upon a hit. |
