@@ -1,74 +1,46 @@
 # Table of Contents
-1. Interfaces
 
-  1.1. [Common Interfaces](#common-interfaces)
+<!-- toc -->
 
-  1.2. [Math Interfaces](#math-interfaces)
+- [Interface](#interface)
+  * [Common Interfaces](#common-interfaces)
+  * [Math Interfaces](#math-interfaces)
+  * [Atomic Interfaces](#atomic-interfaces)
+  * [Auto-diff Interfaces](#auto-diff-interfaces)
+- [Types](#types)
+  * [Common Types](#common-types)
+  * [Texture Types](#texture-types)
+  * [Sampler Types](#sampler-types)
+  * [Uniform Buffer Types](#uniform-buffer-types)
+  * [Pointer Types](#pointer-types)
+  * [Atomic Types](#atomic-types)
+  * [Auto-diff Types](#auto-diff-types)
+- [Global Functions](#global-functions)
+  * [Common Functions](#common-functions)
+  * [Relational Functions](#relational-functions)
+  * [Bitwise Functions](#bitwise-functions)
+  * [Trigonometry Functions](#trigonometry-functions)
+  * [Exponential Functions](#exponential-functions)
+  * [Matrix Functions](#matrix-functions)
+  * [Math Functions](#math-functions)
+  * [Geometric Functions](#geometric-functions)
+  * [Conversion Functions](#conversion-functions)
+  * [Atomic Functions](#atomic-functions)
+  * [Synchronization Functions](#synchronization-functions)
+  * [Wave Functions](#wave-functions)
+  * [Auto-diff Functions](#auto-diff-functions)
+  * [Misc Functions](#misc-functions)
+- [Stage specific](#stage-specific)
+  * [Fragment Shader Functions](#fragment-shader-functions)
+  * [Compute Shader Functions](#compute-shader-functions)
+  * [Hull Shader Functions](#hull-shader-functions)
+  * [Geometry Shader Functions](#geometry-shader-functions)
+  * [Geometry Shader Types](#geometry-shader-types)
+  * [Mesh Shader Functions](#mesh-shader-functions)
+  * [Ray-Tracing Functions](#ray-tracing-functions)
+  * [Ray-tracing Types](#ray-tracing-types)
 
-  1.3. [Atomic Interfaces](#atomic-interfaces)
-
-  1.4. [Auto-diff Interfaces](#auto-diff-interfaces)
-
-2. Types
-
-  2.1. [Common Types](#common-types)
-
-  2.2. [Texture Types](#texture-types)
-
-  2.3. [Sampler Types](#sampler-types)
-
-  2.4. [Uniform Buffer Types](#uniform-buffer-types)
-
-  2.5. [Pointer Types](#pointer-types)
-
-  2.6. [Atomic Types](#atomic-types)
-
-  2.7. [Auto-diff Types](#auto-diff-types)
-
-3. Global Functions
-
-  3.1. [Common Functions](#common-functions)
-
-  3.2. [Relational Functions](#relational-functions)
-
-  3.3. [Bitwise Functions](#bitwise-functions)
-
-  3.4. [Trigonometry Functions](#trigonometry-functions)
-
-  3.5. [Exponential Functions](#exponential-functions)
-
-  3.6. [Matrix Functions](#matrix-functions)
-
-  3.7. [Math Functions](#math-functions)
-
-  3.8. [Geometric Functions](#geometric-functions)
-
-  3.9. [Conversion Functions](#conversion-functions)
-
-  3.10. [Atomic Functions](#atomic-functions)
-
-  3.11. [Synchronization Functions](#synchronization-functions)
-
-  3.12. [Wave Functions](#wave-functions)
-
-  3.13. [Auto-diff Functions](#auto-diff-functions)
-
-  3.14. [Misc Functions](#misc-functions)
-
-  3.15. [Synchronization Functions](#synchronization-functions)
-
-  3.16. [Misc Functions](#misc-functions)
-
-4. Stage specific
-
-  4.1. [Fragment Shader Functions](#fragment-shader-functions)
-  4.1. [Compute Shader Functions](#compute-shader-functions)
-  4.1. [Hull Shader Functions](#hull-shader-functions)
-  4.1. [Geometry Shader Functions](#geometry-shader-functions)
-  4.1. [Geometry Shader Types](#geometry-shader-types)
-  4.1. [Mesh Shader Functions](#mesh-shader-functions)
-  4.1. [Ray-Tracing Functions](#ray-tracing-functions)
-  4.1. [Ray-tracing Types](#ray-tracing-types)
+<!-- tocstop -->
 
 # Interface
 
