@@ -16,7 +16,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Add PATH to bash
+    - name: Add bash to PATH
         shell: pwsh
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
