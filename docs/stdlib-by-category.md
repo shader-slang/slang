@@ -34,9 +34,11 @@
   * [Fragment Shader Functions](#fragment-shader-functions)
   * [Compute Shader Functions](#compute-shader-functions)
   * [Hull Shader Functions](#hull-shader-functions)
+  * [Hull Shader Types](#hull-shader-types)
   * [Geometry Shader Functions](#geometry-shader-functions)
   * [Geometry Shader Types](#geometry-shader-types)
   * [Mesh Shader Functions](#mesh-shader-functions)
+  * [Mesh Shader Types](#mesh-shader-types)
   * [Ray-Tracing Functions](#ray-tracing-functions)
   * [Ray-tracing Types](#ray-tracing-types)
 
@@ -89,22 +91,10 @@
 
 | Type name | Implements | Description |
 |--|--|--|
-| Array | | |
-| ConstRef | | |
-| InOut | | |
-| InputPatch | | |
-| Optional | | |
-| Out | | |
-| OutputIndices | | |
-| OutputPatch | | |
-| OutputPrimitives | | |
-| OutputVertices | | |
-| Ref | | |
-| TensorView | | |
-| TorchTensor | | |
-| Tuple | | |
-| matrix | | |
-| vector | | |
+| Optional | none | Provides a way to represent an optional value that may or may not be valid. |
+| Tuple | ICompare<br>IDifferentiable | A container type that can hold any number of different types. |
+| matrix | IRWArray<br>IFloat | A matrix type with `R` rows, `C` columns and elemnt type `T`. |
+| vector | IRWArray<br>IFloat | A vector type with `N` component and element type `T`. |
 
 ## Texture Types
 
@@ -201,6 +191,18 @@
 | DifferentialPair | | |
 | DifferentialPtrPair | | |
 | DiffTensorView | | |
+
+## Misc Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| Array | IRWArray | TODO |
+| ConstRef | none | TODO |
+| InOut | none | TODO |
+| Out | none | TODO |
+| Ref | none | TODO |
+| TensorView | none | TODO |
+| TorchTensor | none | TODO |
 
 # Global Functions
 
@@ -505,6 +507,13 @@
 | ProcessTriTessFactorsMax() | Processes triangle tessellation factors using the maximum method. |
 | ProcessTriTessFactorsMin() | Processes triangle tessellation factors using the minimum method. |
 
+# Hull Shader Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| InputPatch | none | Provides operators to access the input patch in Hull shader. |
+| OutputPatch | none | Provides operators to access the output patch in Domain or Hull shader. |
+
 ## Geometry Shader Functions
 
 | Function name | Description |
@@ -530,6 +539,14 @@
 |--|--|
 | DispatchMesh() | Dispatches work for mesh shaders. |
 | SetMeshOutputCounts() | Sets the number of vertices and primitives to emit. |
+
+## Mesh Shader Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| OutputIndices | none | Provides operators to access the output indices in Mesh shader. |
+| OutputPrimitives | none | Provides operators to access the output primitives in Mesh shader. |
+| OutputVertices | none | Provides operators to access the output vertices in Mesh shader. |
 
 ## Ray-Tracing Functions
 
