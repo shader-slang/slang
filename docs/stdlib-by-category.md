@@ -15,6 +15,7 @@
 | step() | Returns 0 if less than a threshold and 1 otherwise. |
 
 1. Common Interfaces
+
 IArray interface
 IBufferDataLayout interface
 IFunc interface
@@ -22,6 +23,7 @@ IMutatingFunc interface
 IRWArray interface
 
 1. Common Types
+
 Array struct
 ConstRef struct
 InOut struct
@@ -40,6 +42,7 @@ matrix struct
 vector struct
 
 1. Texture Types
+
 FeedbackTexture2D struct
 FeedbackTexture2DArray struct
 RWTexture1D struct
@@ -66,6 +69,7 @@ TextureCubeArray struct
 TextureFootprint struct
 
 1. Sampler Types
+
 RWSampler1D struct
 RWSampler1DArray struct
 RWSampler2D struct
@@ -91,6 +95,7 @@ SamplerCubeArray struct
 SamplerState struct
 
 1. Uniform Buffer Types
+
 AppendStructuredBuffer struct
 ByteAddressBuffer struct
 ConstantBuffer struct
@@ -104,6 +109,7 @@ StructuredBuffer struct
 TextureBuffer struct
 
 1. Pointer Types
+
 ConstBufferPointer struct
 NullPtr struct
 Ptr struct
@@ -194,6 +200,7 @@ Ptr struct
 | trunc() | Truncates the fractional part. |
 
 1. Math Interfaces
+
 IArithmetic interface
 ICompareable interface
 IFloat interface
@@ -247,11 +254,13 @@ IRangedValue interface
 | InterlockedXor() | Atomic bitwise XOR. |
 
 1. Atomic Interfaces
+
 IAtomicable interface
 IArithmeticAtomicable interface
 IBitAtomicable interface
 
 1. Atomic Types
+
 Atomic struct
 AtomicAdd struct
 
@@ -350,6 +359,7 @@ AtomicAdd struct
 | updatePair() | Changes both primal and diff values in a DifferentialPair type. |
 
 1. Auto-diff Interfaces
+
 IDifferentiable interface
 IDifferentiablePtrType interface
 IDifferentiableMutatingFunc
@@ -357,6 +367,7 @@ IDifferentiableFunc
 IDiffTensorWrapper
 
 1. Auto-diff Types
+
 DifferentialPair struct
 DifferentialPtrPair struct
 DiffTensorView struct
@@ -432,6 +443,7 @@ DiffTensorView struct
 | TriangleStream::RestartStrip() | Completes the current triangle strip and starts a new one. |
 
 1. Stage specific - Geometry Shader Types
+
 LineStream struct
 PointStream struct
 TriangleStream struct
@@ -476,6 +488,7 @@ TriangleStream struct
 | WorldToObject4x3() | A matrix for transforming from world-space to object-space. Object-space refers to the space of the current bottom-level acceleration structure. |
 
 1. Stage specific - Ray-tracing Types
+
 RayDesc struct
 RaytracingAccelerationStructure struct
 BuiltInTriangleIntersectionAttributes
