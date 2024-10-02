@@ -1,20 +1,37 @@
-1. Common Functions
+# Table of Contents
+1. Interfaces
 
-| Function name | Description |
-|--|--|
-| GetRenderTargetSampleCount() | Returns the number of samples for a render target. |
-| GetRenderTargetSamplePosition() | Gets the sampling position (x, y) for a given sample index. |
-| clamp() | Clamps a value between a minimum and maximum. |
-| isfinite() | Returns true if value is finite. |
-| isinf() | Returns true if the value is infinite. |
-| isnan() | Returns true if the value is NaN. |
-| lerp() | Linear interpolation between two values. |
-| saturate() | Clamps the input to the range [0,1]. |
-| sign() | Returns the sign of a value (-1, 0, 1). |
-| smoothstep() | Smooth Hermite interpolation between 0 and 1. |
-| step() | Returns 0 if less than a threshold and 1 otherwise. |
+  1.1. [Common Interfaces](#common-interfaces)
+  1.2. [Math Interfaces](#math-interfaces)
+  1.3. [Atomic Interfaces](#atomic-interfaces)
+  1.4. [Auto-diff Interfaces](#auto-diff-interfaces)
 
-1. Common Interfaces
+2. Types
+  2.1. [Common Types](#common-types)
+  2.2. [Texture Types](#texture-types)
+  2.3. [Sampler Types](#sampler-types)
+  2.4. [Uniform Buffer Types](#uniform-buffer-types)
+  2.5. [Pointer Types](#pointer-types)
+  2.6. [Atomic Types](#atomic-types)
+  2.7. [Auto-diff Types](#auto-diff-types)
+
+3. Global Functions
+
+  3.1. [Common Functions](#common-functions)
+  3.2. [Relational Functions](#relational-functions)
+  3.3. [Geometric Functions](#geometric-functions)
+  3.4. [Synchronization Functions](#synchronization-functions)
+  3.5. [Misc Functions](#misc-functions)
+
+4. Stage specific
+
+  4.1. [Geometry Shader Types](#stage-specific---geometry-shader-types)
+  4.2. [Mesh Shader Functions](#stage-specific---mesh-shader-functions)
+  4.3. [Ray-tracing Types](#stage-specific---ray-tracing-types)
+
+## Interface
+
+### Common Interfaces
 
 | Interface name | Description |
 |--|--|
@@ -24,7 +41,38 @@
 | IMutatingFunc | |
 | IRWArray | |
 
-1. Common Types
+### Math Interfaces
+
+| Interface name | Description |
+|--|--|
+| IArithmetic | |
+| ICompareable | |
+| IFloat | |
+| IInteger | |
+| ILogical | |
+| IRangedValue | |
+
+### Atomic Interfaces
+
+| Interface name | Description |
+|--|--|
+| IAtomicable | |
+| IArithmeticAtomicable | |
+| IBitAtomicable | |
+
+### Auto-diff Interfaces
+
+| Interface name | Description |
+|--|--|
+| IDifferentiable | |
+| IDifferentiablePtrType | |
+| IDifferentiableMutatingFunc
+| IDifferentiableFunc
+| IDiffTensorWrapper
+
+## Types
+
+### Common Types
 
 | Type name | Description |
 |--|--|
@@ -45,7 +93,7 @@
 | matrix | |
 | vector | |
 
-1. Texture Types
+### Texture Types
 
 | Type name | Description |
 |--|--|
@@ -74,7 +122,7 @@
 | TextureCubeArray | |
 | TextureFootprint | |
 
-1. Sampler Types
+### Sampler Types
 
 | Type name | Description |
 |--|--|
@@ -102,7 +150,7 @@
 | SamplerCubeArray | |
 | SamplerState | |
 
-1. Uniform Buffer Types
+### Uniform Buffer Types
 
 | Type name | Description |
 |--|--|
@@ -118,7 +166,7 @@
 | StructuredBuffer | |
 | TextureBuffer | |
 
-1. Pointer Types
+### Pointer Types
 
 | Type name | Description |
 |--|--|
@@ -126,14 +174,47 @@
 | NullPtr | |
 | Ptr | |
 
-1. Relational Functions
+### Atomic Types
+
+| Type name | Description |
+|--|--|
+| Atomic | |
+| AtomicAdd | |
+
+### Auto-diff Types
+
+| Type name | Description |
+|--|--|
+| DifferentialPair | |
+| DifferentialPtrPair | |
+| DiffTensorView | |
+
+## Global Functions
+
+### Common Functions
+
+| Function name | Description |
+|--|--|
+| GetRenderTargetSampleCount() | Returns the number of samples for a render target. |
+| GetRenderTargetSamplePosition() | Gets the sampling position (x, y) for a given sample index. |
+| clamp() | Clamps a value between a minimum and maximum. |
+| isfinite() | Returns true if value is finite. |
+| isinf() | Returns true if the value is infinite. |
+| isnan() | Returns true if the value is NaN. |
+| lerp() | Linear interpolation between two values. |
+| saturate() | Clamps the input to the range [0,1]. |
+| sign() | Returns the sign of a value (-1, 0, 1). |
+| smoothstep() | Smooth Hermite interpolation between 0 and 1. |
+| step() | Returns 0 if less than a threshold and 1 otherwise. |
+
+### Relational Functions
 
 | Function name | Description |
 |--|--|
 | all() | True if all components are non-zero. |
 | any() | True if any component is non-zero. |
 
-1. Bitwise Functions
+### Bitwise Functions
 
 | Function name | Description |
 |--|--|
@@ -145,7 +226,7 @@
 | or() | Component-wise logical OR. |
 | reversebits() | Reverses the order of bits in an integer. |
 
-1. Trigonometry Functions
+### Trigonometry Functions
 
 | Function name | Description |
 |--|--|
@@ -166,7 +247,7 @@
 | tan() | Tangent. |
 | tanh() | Hyperbolic tangent. |
 
-1. Exponential Functions
+### Exponential Functions
 
 | Function name | Description |
 |--|--|
@@ -180,7 +261,7 @@
 | rsqrt() | Reciprocal square root. |
 | sqrt() | Square root. |
 
-1. Matrix Functions
+### Matrix Functions
 
 | Function name | Description |
 |--|--|
@@ -188,7 +269,7 @@
 | mul() | Multiplication. |
 | transpose() | Transposes a matrix. |
 
-1. Math Functions
+### Math Functions
 
 | Function name | Description |
 |--|--|
@@ -211,18 +292,7 @@
 | round() | Rounds to the nearest whole number. |
 | trunc() | Truncates the fractional part. |
 
-1. Math Interfaces
-
-| Interface name | Description |
-|--|--|
-| IArithmetic | |
-| ICompareable | |
-| IFloat | |
-| IInteger | |
-| ILogical | |
-| IRangedValue | |
-
-1. Geometric Functions
+### Geometric Functions
 
 | Function name | Description |
 |--|--|
@@ -236,7 +306,7 @@
 | reflect() | Reflects a vector around a normal. |
 | refract() | Computes the refraction vector. |
 
-1. Conversion Functions
+### Conversion Functions
 
 | Function name | Description |
 |--|--|
@@ -251,7 +321,7 @@
 | f16tof32() | Converts a float16 stored in the low-half of a uint to a float. |
 | f32tof16() | Converts a float to a float16 type. |
 
-1. Atomic Functions
+### Atomic Functions
 
 | Function name | Description |
 |--|--|
@@ -267,22 +337,7 @@
 | InterlockedOr() | Atomic bitwise OR. |
 | InterlockedXor() | Atomic bitwise XOR. |
 
-1. Atomic Interfaces
-
-| Interface name | Description |
-|--|--|
-| IAtomicable | |
-| IArithmeticAtomicable | |
-| IBitAtomicable | |
-
-1. Atomic Types
-
-| Type name | Description |
-|--|--|
-| Atomic | |
-| AtomicAdd | |
-
-1. Synchronization Functions
+### Synchronization Functions
 
 | Function name | Description |
 |--|--|
@@ -295,7 +350,7 @@
 | beginInvocationInterlock() | Mark beginning of "interlocked" operations. |
 | endInvocationInterlock() | Mark end of "interlocked" operations. |
 
-1. Wave Functions
+### Wave Functions
 
 | Function name | Description |
 |--|--|
@@ -365,7 +420,7 @@
 | WaveReadLaneFirst() | Returns the value of the expression for the active lane with the smallest index in the wave. |
 | WaveShuffle() | |
 
-1. Auto-diff Functions
+### Auto-diff Functions
 
 | Function name | Description |
 |--|--|
@@ -376,25 +431,7 @@
 | updateDiff() | Changes the diff value in a DifferentialPair type. |
 | updatePair() | Changes both primal and diff values in a DifferentialPair type. |
 
-1. Auto-diff Interfaces
-
-| Interface name | Description |
-|--|--|
-| IDifferentiable | |
-| IDifferentiablePtrType | |
-| IDifferentiableMutatingFunc
-| IDifferentiableFunc
-| IDiffTensorWrapper
-
-1. Auto-diff Types
-
-| Type name | Description |
-|--|--|
-| DifferentialPair | |
-| DifferentialPtrPair | |
-| DiffTensorView | |
-
-1. Misc Functions
+### Misc Functions
 
 | Function name | Description |
 |--|--|
@@ -413,7 +450,7 @@
 | static_assert() | Error out when a compile-time value evaluates to false. |
 | unmodified() | Silence the warning message about not writing to an inout parameter. |
 
-1. Stage specific - Fragment Shader Functions
+### Stage specific - Fragment Shader Functions
 
 | Function name | Description |
 |--|--|
@@ -432,13 +469,13 @@
 | discard() | Discards a pixel in a fragment shader. |
 | fwidth() | Absolute sum of derivatives in x and y. |
 
-1. Stage specific - Compute Shader Functions
+### Stage specific - Compute Shader Functions
 
 | Function name | Description |
 |--|--|
 | WorkgroupSize() | Returns the workgroup size of the calling entry point. |
 
-1. Stage specific - Hull Shader Functions
+### Stage specific - Hull Shader Functions
 
 | Function name | Description |
 |--|--|
@@ -453,7 +490,7 @@
 | ProcessTriTessFactorsMax() | Processes triangle tessellation factors using the maximum method. |
 | ProcessTriTessFactorsMin() | Processes triangle tessellation factors using the minimum method. |
 
-1. Stage specific - Geometry Shader Functions
+### Stage specific - Geometry Shader Functions
 
 | Function name | Description |
 |--|--|
@@ -464,7 +501,7 @@
 | TriangleStream::Append() | Appends a vertex to the current triangle primitive. |
 | TriangleStream::RestartStrip() | Completes the current triangle strip and starts a new one. |
 
-1. Stage specific - Geometry Shader Types
+### Stage specific - Geometry Shader Types
 
 | Type name | Description |
 |--|--|
@@ -472,14 +509,14 @@
 | PointStream | |
 | TriangleStream | |
 
-1. Stage specific - Mesh Shader Functions
+### Stage specific - Mesh Shader Functions
 
 | Function name | Description |
 |--|--|
 | DispatchMesh() | Dispatches work for mesh shaders. |
 | SetMeshOutputCounts() | Sets the number of vertices and primitives to emit. |
 
-1. Stage specific - Ray-Tracing Functions
+### Stage specific - Ray-Tracing Functions
 
 | Function name | Description |
 |--|--|
@@ -511,7 +548,7 @@
 | WorldToObject3x4() | A matrix for transforming from world-space to object-space. Object-space refers to the space of the current bottom-level acceleration structure. |
 | WorldToObject4x3() | A matrix for transforming from world-space to object-space. Object-space refers to the space of the current bottom-level acceleration structure. |
 
-1. Stage specific - Ray-tracing Types
+### Stage specific - Ray-tracing Types
 
 | Type name | Description |
 |--|--|
