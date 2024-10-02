@@ -53,8 +53,8 @@ namespace gfx_test
                 return SLANG_FAIL;
             }
 
-            ComPtr<slang::IModulePrecompileService> precompileService;
-            if (module->queryInterface(slang::SLANG_UUID_IModulePrecompileService, (void**)precompileService.writeRef()) == SLANG_OK)
+            ComPtr<slang::IModulePrecompileService_Experimental> precompileService;
+            if (module->queryInterface(slang::SLANG_UUID_IModulePrecompileService_Experimental, (void**)precompileService.writeRef()) == SLANG_OK)
             {
                 Slang::ComPtr<slang::IBlob> diagnosticsBlob;
                 precompileService->precompileForTarget(target, diagnosticsBlob.writeRef());

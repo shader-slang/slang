@@ -5579,7 +5579,7 @@ namespace slang
     #define SLANG_UUID_IModule IModule::getTypeGuid()
 
     /* Experimental interface for doing target precompilation of slang modules */
-    struct IModulePrecompileService : public ISlangUnknown
+    struct IModulePrecompileService_Experimental : public ISlangUnknown
     {
         //uuidgen output:     8e12e8e3 -  5fcd -  433e -    afcb -      13a088bc5ee5
         SLANG_COM_INTERFACE(0x8e12e8e3, 0x5fcd, 0x433e, { 0xaf, 0xcb, 0x13, 0xa0, 0x88, 0xbc, 0x5e, 0xe5 })        
@@ -5601,7 +5601,7 @@ namespace slang
             IBlob** outDiagnostics = nullptr) = 0;        
     };
 
-    #define SLANG_UUID_IModulePrecompileService IModulePrecompileService::getTypeGuid()
+    #define SLANG_UUID_IModulePrecompileService_Experimental IModulePrecompileService_Experimental::getTypeGuid()
 
         /** Argument used for specialization to types/values.
         */

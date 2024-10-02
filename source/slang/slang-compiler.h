@@ -294,7 +294,7 @@ namespace Slang
         /// Base class for "component types" that represent the pieces a final
         /// shader program gets linked together from.
         ///
-    class ComponentType : public RefObject, public slang::IComponentType, public slang::IModulePrecompileService
+    class ComponentType : public RefObject, public slang::IComponentType, public slang::IModulePrecompileService_Experimental
     {
     public:
         //
@@ -1507,7 +1507,7 @@ namespace Slang
             SlangInt32 index) override;
 
 
-        // IModulePrecompileService
+        // IModulePrecompileService_Experimental
         /// Precompile TU to target language
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
             SlangCompileTarget target,
