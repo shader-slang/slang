@@ -2,36 +2,77 @@
 1. Interfaces
 
   1.1. [Common Interfaces](#common-interfaces)
+
   1.2. [Math Interfaces](#math-interfaces)
+
   1.3. [Atomic Interfaces](#atomic-interfaces)
+
   1.4. [Auto-diff Interfaces](#auto-diff-interfaces)
 
 2. Types
+
   2.1. [Common Types](#common-types)
+
   2.2. [Texture Types](#texture-types)
+
   2.3. [Sampler Types](#sampler-types)
+
   2.4. [Uniform Buffer Types](#uniform-buffer-types)
+
   2.5. [Pointer Types](#pointer-types)
+
   2.6. [Atomic Types](#atomic-types)
+
   2.7. [Auto-diff Types](#auto-diff-types)
 
 3. Global Functions
 
   3.1. [Common Functions](#common-functions)
+
   3.2. [Relational Functions](#relational-functions)
-  3.3. [Geometric Functions](#geometric-functions)
-  3.4. [Synchronization Functions](#synchronization-functions)
-  3.5. [Misc Functions](#misc-functions)
+
+  3.3. [Bitwise Functions](#bitwise-functions)
+
+  3.4. [Trigonometry Functions](#trigonometry-functions)
+
+  3.5. [Exponential Functions](#exponential-functions)
+
+  3.6. [Matrix Functions](#matrix-functions)
+
+  3.7. [Math Functions](#math-functions)
+
+  3.8. [Geometric Functions](#geometric-functions)
+
+  3.9. [Conversion Functions](#conversion-functions)
+
+  3.10. [Atomic Functions](#atomic-functions)
+
+  3.11. [Synchronization Functions](#synchronization-functions)
+
+  3.12. [Wave Functions](#wave-functions)
+
+  3.13. [Auto-diff Functions](#auto-diff-functions)
+
+  3.14. [Misc Functions](#misc-functions)
+
+  3.15. [Synchronization Functions](#synchronization-functions)
+
+  3.16. [Misc Functions](#misc-functions)
 
 4. Stage specific
 
-  4.1. [Geometry Shader Types](#stage-specific---geometry-shader-types)
-  4.2. [Mesh Shader Functions](#stage-specific---mesh-shader-functions)
-  4.3. [Ray-tracing Types](#stage-specific---ray-tracing-types)
+  4.1. [Fragment Shader Functions](#fragment-shader-functions)
+  4.1. [Compute Shader Functions](#compute-shader-functions)
+  4.1. [Hull Shader Functions](#hull-shader-functions)
+  4.1. [Geometry Shader Functions](#geometry-shader-functions)
+  4.1. [Geometry Shader Types](#geometry-shader-types)
+  4.1. [Mesh Shader Functions](#mesh-shader-functions)
+  4.1. [Ray-Tracing Functions](#ray-tracing-functions)
+  4.1. [Ray-tracing Types](#ray-tracing-types)
 
-## Interface
+# Interface
 
-### Common Interfaces
+## Common Interfaces
 
 | Interface name | Description |
 |--|--|
@@ -41,7 +82,7 @@
 | IMutatingFunc | |
 | IRWArray | |
 
-### Math Interfaces
+## Math Interfaces
 
 | Interface name | Description |
 |--|--|
@@ -52,7 +93,7 @@
 | ILogical | |
 | IRangedValue | |
 
-### Atomic Interfaces
+## Atomic Interfaces
 
 | Interface name | Description |
 |--|--|
@@ -60,7 +101,7 @@
 | IArithmeticAtomicable | |
 | IBitAtomicable | |
 
-### Auto-diff Interfaces
+## Auto-diff Interfaces
 
 | Interface name | Description |
 |--|--|
@@ -70,9 +111,9 @@
 | IDifferentiableFunc
 | IDiffTensorWrapper
 
-## Types
+# Types
 
-### Common Types
+## Common Types
 
 | Type name | Description |
 |--|--|
@@ -93,7 +134,7 @@
 | matrix | |
 | vector | |
 
-### Texture Types
+## Texture Types
 
 | Type name | Description |
 |--|--|
@@ -122,7 +163,7 @@
 | TextureCubeArray | |
 | TextureFootprint | |
 
-### Sampler Types
+## Sampler Types
 
 | Type name | Description |
 |--|--|
@@ -150,7 +191,7 @@
 | SamplerCubeArray | |
 | SamplerState | |
 
-### Uniform Buffer Types
+## Uniform Buffer Types
 
 | Type name | Description |
 |--|--|
@@ -166,7 +207,7 @@
 | StructuredBuffer | |
 | TextureBuffer | |
 
-### Pointer Types
+## Pointer Types
 
 | Type name | Description |
 |--|--|
@@ -174,14 +215,14 @@
 | NullPtr | |
 | Ptr | |
 
-### Atomic Types
+## Atomic Types
 
 | Type name | Description |
 |--|--|
 | Atomic | |
 | AtomicAdd | |
 
-### Auto-diff Types
+## Auto-diff Types
 
 | Type name | Description |
 |--|--|
@@ -189,14 +230,12 @@
 | DifferentialPtrPair | |
 | DiffTensorView | |
 
-## Global Functions
+# Global Functions
 
-### Common Functions
+## Common Functions
 
 | Function name | Description |
 |--|--|
-| GetRenderTargetSampleCount() | Returns the number of samples for a render target. |
-| GetRenderTargetSamplePosition() | Gets the sampling position (x, y) for a given sample index. |
 | clamp() | Clamps a value between a minimum and maximum. |
 | isfinite() | Returns true if value is finite. |
 | isinf() | Returns true if the value is infinite. |
@@ -207,14 +246,14 @@
 | smoothstep() | Smooth Hermite interpolation between 0 and 1. |
 | step() | Returns 0 if less than a threshold and 1 otherwise. |
 
-### Relational Functions
+## Relational Functions
 
 | Function name | Description |
 |--|--|
 | all() | True if all components are non-zero. |
 | any() | True if any component is non-zero. |
 
-### Bitwise Functions
+## Bitwise Functions
 
 | Function name | Description |
 |--|--|
@@ -226,7 +265,7 @@
 | or() | Component-wise logical OR. |
 | reversebits() | Reverses the order of bits in an integer. |
 
-### Trigonometry Functions
+## Trigonometry Functions
 
 | Function name | Description |
 |--|--|
@@ -247,7 +286,7 @@
 | tan() | Tangent. |
 | tanh() | Hyperbolic tangent. |
 
-### Exponential Functions
+## Exponential Functions
 
 | Function name | Description |
 |--|--|
@@ -261,7 +300,7 @@
 | rsqrt() | Reciprocal square root. |
 | sqrt() | Square root. |
 
-### Matrix Functions
+## Matrix Functions
 
 | Function name | Description |
 |--|--|
@@ -269,7 +308,7 @@
 | mul() | Multiplication. |
 | transpose() | Transposes a matrix. |
 
-### Math Functions
+## Math Functions
 
 | Function name | Description |
 |--|--|
@@ -292,7 +331,7 @@
 | round() | Rounds to the nearest whole number. |
 | trunc() | Truncates the fractional part. |
 
-### Geometric Functions
+## Geometric Functions
 
 | Function name | Description |
 |--|--|
@@ -306,7 +345,7 @@
 | reflect() | Reflects a vector around a normal. |
 | refract() | Computes the refraction vector. |
 
-### Conversion Functions
+## Conversion Functions
 
 | Function name | Description |
 |--|--|
@@ -321,7 +360,7 @@
 | f16tof32() | Converts a float16 stored in the low-half of a uint to a float. |
 | f32tof16() | Converts a float to a float16 type. |
 
-### Atomic Functions
+## Atomic Functions
 
 | Function name | Description |
 |--|--|
@@ -337,7 +376,7 @@
 | InterlockedOr() | Atomic bitwise OR. |
 | InterlockedXor() | Atomic bitwise XOR. |
 
-### Synchronization Functions
+## Synchronization Functions
 
 | Function name | Description |
 |--|--|
@@ -350,7 +389,7 @@
 | beginInvocationInterlock() | Mark beginning of "interlocked" operations. |
 | endInvocationInterlock() | Mark end of "interlocked" operations. |
 
-### Wave Functions
+## Wave Functions
 
 | Function name | Description |
 |--|--|
@@ -420,7 +459,7 @@
 | WaveReadLaneFirst() | Returns the value of the expression for the active lane with the smallest index in the wave. |
 | WaveShuffle() | |
 
-### Auto-diff Functions
+## Auto-diff Functions
 
 | Function name | Description |
 |--|--|
@@ -431,11 +470,13 @@
 | updateDiff() | Changes the diff value in a DifferentialPair type. |
 | updatePair() | Changes both primal and diff values in a DifferentialPair type. |
 
-### Misc Functions
+## Misc Functions
 
 | Function name | Description |
 |--|--|
 | CheckAccessFullyMapped() | Check access status to tiled resource. |
+| GetRenderTargetSampleCount() | Returns the number of samples for a render target. |
+| GetRenderTargetSamplePosition() | Gets the sampling position (x, y) for a given sample index. |
 | NonUniformResourceIndex() | Indicate if the resource index is divergent. |
 | asDynamicUniform() | | 
 | clock2x32ARB() | |
@@ -450,7 +491,9 @@
 | static_assert() | Error out when a compile-time value evaluates to false. |
 | unmodified() | Silence the warning message about not writing to an inout parameter. |
 
-### Stage specific - Fragment Shader Functions
+# Stage specific
+
+## Fragment Shader Functions
 
 | Function name | Description |
 |--|--|
@@ -469,13 +512,13 @@
 | discard() | Discards a pixel in a fragment shader. |
 | fwidth() | Absolute sum of derivatives in x and y. |
 
-### Stage specific - Compute Shader Functions
+## Compute Shader Functions
 
 | Function name | Description |
 |--|--|
 | WorkgroupSize() | Returns the workgroup size of the calling entry point. |
 
-### Stage specific - Hull Shader Functions
+## Hull Shader Functions
 
 | Function name | Description |
 |--|--|
@@ -490,7 +533,7 @@
 | ProcessTriTessFactorsMax() | Processes triangle tessellation factors using the maximum method. |
 | ProcessTriTessFactorsMin() | Processes triangle tessellation factors using the minimum method. |
 
-### Stage specific - Geometry Shader Functions
+## Geometry Shader Functions
 
 | Function name | Description |
 |--|--|
@@ -501,7 +544,7 @@
 | TriangleStream::Append() | Appends a vertex to the current triangle primitive. |
 | TriangleStream::RestartStrip() | Completes the current triangle strip and starts a new one. |
 
-### Stage specific - Geometry Shader Types
+## Geometry Shader Types
 
 | Type name | Description |
 |--|--|
@@ -509,14 +552,14 @@
 | PointStream | |
 | TriangleStream | |
 
-### Stage specific - Mesh Shader Functions
+## Mesh Shader Functions
 
 | Function name | Description |
 |--|--|
 | DispatchMesh() | Dispatches work for mesh shaders. |
 | SetMeshOutputCounts() | Sets the number of vertices and primitives to emit. |
 
-### Stage specific - Ray-Tracing Functions
+## Ray-Tracing Functions
 
 | Function name | Description |
 |--|--|
@@ -548,7 +591,7 @@
 | WorldToObject3x4() | A matrix for transforming from world-space to object-space. Object-space refers to the space of the current bottom-level acceleration structure. |
 | WorldToObject4x3() | A matrix for transforming from world-space to object-space. Object-space refers to the space of the current bottom-level acceleration structure. |
 
-### Stage specific - Ray-tracing Types
+## Ray-tracing Types
 
 | Type name | Description |
 |--|--|
