@@ -61,6 +61,15 @@ namespace SlangRecord
             SlangInt    targetIndex,
             slang::IBlob** outCode,
             slang::IBlob** outDiagnostics = nullptr) override;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) override;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics = nullptr) override;
     protected:
         virtual ApiClassId getClassId() = 0;
         virtual SessionRecorder* getSessionRecorder() = 0;

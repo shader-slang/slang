@@ -317,9 +317,21 @@ namespace Slang
             SlangInt        targetIndex,
             slang::IBlob**  outCode,
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
+
+        IArtifact* getTargetArtifact(SlangInt targetIndex, slang::IBlob** outDiagnostics);
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
             SlangInt targetIndex,
             slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt targetIndex,
+            slang::IMetadata** outMetadata,
             slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
@@ -601,6 +613,8 @@ namespace Slang
 
         Scope* m_lookupScope = nullptr;
         std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;
+
+        Dictionary<Int, ComPtr<IArtifact>> m_targetArtifacts;
     };
 
         /// A component type built up from other component types.
@@ -935,6 +949,23 @@ namespace Slang
             return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointMetadata(entryPointIndex, targetIndex, outMetadata, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt        entryPointIndex,
             SlangInt        targetIndex,
@@ -1178,6 +1209,23 @@ namespace Slang
             slang::IBlob** outDiagnostics) SLANG_OVERRIDE
         {
             return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointMetadata(entryPointIndex, targetIndex, outMetadata, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
@@ -1479,6 +1527,23 @@ namespace Slang
             slang::IBlob** outHash) SLANG_OVERRIDE
         {
             return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointMetadata(entryPointIndex, targetIndex, outMetadata, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
         }
 
         /// Get a serialized representation of the checked module.
