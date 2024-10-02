@@ -6403,11 +6403,11 @@ namespace Slang
     {
         // We could have a type or a variable or an expression
         SizeOfExpr* sizeOfExpr = parser->astBuilder->create<SizeOfExpr>();
-      
+
         parser->ReadMatchingToken(TokenType::LParent);
 
-        // The return type is always a UInt
-        sizeOfExpr->type = parser->astBuilder->getUIntType();
+        // The return type is always a Int
+        sizeOfExpr->type = parser->astBuilder->getIntType();
 
         sizeOfExpr->value = parser->ParseExpression();
 
@@ -6423,8 +6423,8 @@ namespace Slang
 
         parser->ReadMatchingToken(TokenType::LParent);
 
-        // The return type is always a UInt
-        alignOfExpr->type = parser->astBuilder->getUIntType();
+        // The return type is always a Int
+        alignOfExpr->type = parser->astBuilder->getIntType();
 
         alignOfExpr->value = parser->ParseExpression();
 

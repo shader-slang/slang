@@ -5982,7 +5982,7 @@ namespace Slang
         auto inst = createInst<IRInst>(
             this,
             kIROp_SizeOf,
-            getUIntType(),
+            getIntType(),
             sizedType);
         addInst(inst);
         return inst;
@@ -5994,7 +5994,7 @@ namespace Slang
         auto inst = createInst<IRInst>(
             this,
             kIROp_AlignOf,
-            getUIntType(),
+            getIntType(),
             sizedType);
         addInst(inst);
         return inst;
