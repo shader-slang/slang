@@ -47,6 +47,40 @@ cmake --build --preset release # to build from the CLI
 
 The `vs2022-dev` preset turns on features that makes debugging easy.
 
+### WebAssembly build
+
+In order to build WebAssembly build of Slang, Slang needs to be compiled with [Emscripten SDK](https://github.com/emscripten-core/emsdk).
+You can find more information about [Emscripten](https://emscripten.org/).
+
+You need to clone the EMSDK repo. And you need to install and activate the latest.
+```bash
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest  # For Windows, emsdk.bat install latest
+./emsdk activate latest # For Windows, emsdk.bat activate latest
+```
+
+After EMSDK is activated, Slang needs to be built in three steps: build "generators", configure the build with "emcmake" and build.
+For more information about "generators", please refer to the later part of the documentation about [cross-compiling](docs/building.md#cross-compiling).
+```bash
+# Build generators.
+cmake --workflow --preset generators --fresh
+mkdir generators
+cmake --install build --prefix generators --component generators
+
+# Configure the build with emcmake.
+# emcmake is available only when emsdk_env setup the environment correctly.
+pushd ../emsdk
+source ./emsdk_env # For Windows, emsdk_env.bat
+popd
+emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja"
+
+# Build build.em/Release/bin/libslang.a
+cmake --build --preset emscripten --target slang
+```
+
+**Note:** If the last build step fails, try running the command that `emcmake` outputs, directly.
+
 ## Testing
 
 ```bash

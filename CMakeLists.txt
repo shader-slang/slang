@@ -101,6 +101,8 @@ option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENA
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
+option(SLANG_GITHUB_TOKEN "Use a given token value for accessing Github REST API" "")
+
 enum_option(
     SLANG_LIB_TYPE
     # Default
@@ -136,7 +138,7 @@ enum_option(
 if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     # If the user didn't specify a URL, find the best one now
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
-        get_best_slang_binary_release_url(url)
+        get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
         if(NOT DEFINED url)
             message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
         endif()
@@ -251,6 +253,13 @@ add_custom_target(
     all-generators
     COMMENT "meta target which depends on all generators"
 )
+
+if(CMAKE_HOST_WIN32)
+  set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
+else()
+  set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
+endif()
+
 set_target_properties(all-generators PROPERTIES FOLDER generators)
 function(generator dir)
     if(SLANG_GENERATORS_PATH)
@@ -265,7 +274,7 @@ function(generator dir)
             TARGET ${target}
             PROPERTY
                 IMPORTED_LOCATION
-                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_EXECUTABLE_SUFFIX}"
+                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_HOST_EXECUTABLE_SUFFIX}"
         )
     else()
         slang_add_target(

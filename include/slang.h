@@ -111,6 +111,8 @@ Operating system defines, see http://sourceforge.net/p/predef/wiki/OperatingSyst
 #        define SLANG_PSP2 1
 #    elif defined(__ghs__)
 #        define SLANG_WIIU 1
+#    elif defined(__EMSCRIPTEN__)
+#        define SLANG_WASM 1
 #    else
 #        error "unknown target platform"
 #    endif
@@ -417,7 +419,9 @@ convention for interface methods.
 #   define SLANG_PROCESSOR_ARM 1
 #elif defined(_M_ARM64) || defined(__aarch64__)
 #   define SLANG_PROCESSOR_ARM_64 1
-#endif 
+#elif defined(__EMSCRIPTEN__)
+#   define SLANG_PROCESSOR_WASM 1
+#endif
 
 #ifndef SLANG_PROCESSOR_ARM
 #   define SLANG_PROCESSOR_ARM 0
@@ -465,6 +469,8 @@ convention for interface methods.
 #   endif
 #elif SLANG_PROCESSOR_FAMILY_POWER_PC
 #       define SLANG_BIG_ENDIAN 1
+#elif SLANG_WASM
+#       define SLANG_LITTLE_ENDIAN 1
 #endif
 
 #ifndef SLANG_LITTLE_ENDIAN
@@ -637,6 +643,7 @@ extern "C"
         SLANG_PASS_THROUGH_LLVM,                    ///< LLVM 'compiler' - includes LLVM and Clang
         SLANG_PASS_THROUGH_SPIRV_OPT,               ///< SPIRV-opt
         SLANG_PASS_THROUGH_METAL,                   ///< Metal compiler
+        SLANG_PASS_THROUGH_WGSL,                    ///< WGSL compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -851,6 +858,7 @@ extern "C"
             EmitIr,                // bool
             ReportDownstreamTime,  // bool
             ReportPerfBenchmark,   // bool
+            ReportCheckpointIntermediates, // bool
             SkipSPIRVValidation,   // bool
             SourceEmbedStyle,
             SourceEmbedName,
@@ -2425,6 +2433,14 @@ extern "C"
         SLANG_MODIFIER_INOUT
     };
 
+    typedef SlangUInt32 SlangImageFormatIntegral;
+    enum SlangImageFormat : SlangImageFormatIntegral
+    {
+#define SLANG_FORMAT(NAME, DESC) SLANG_IMAGE_FORMAT_##NAME,
+#include "slang-image-format-defs.h"
+#undef SLANG_FORMAT
+    };
+
     // User Attribute
     SLANG_API char const* spReflectionUserAttribute_GetName(SlangReflectionUserAttribute* attrib);
     SLANG_API unsigned int spReflectionUserAttribute_GetArgumentCount(SlangReflectionUserAttribute* attrib);
@@ -2518,6 +2534,7 @@ extern "C"
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafTypeLayout(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangReflectionVariable* spReflectionTypeLayout_getBindingRangeLeafVariable(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangImageFormat spReflectionTypeLayout_getBindingRangeImageFormat(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getFieldBindingRangeOffset(SlangReflectionTypeLayout* typeLayout, SlangInt fieldIndex);
     SLANG_API SlangInt spReflectionTypeLayout_getExplicitCounterBindingRangeOffset(SlangReflectionTypeLayout* inTypeLayout);
 
@@ -2590,6 +2607,9 @@ extern "C"
     SLANG_API SlangReflectionGeneric* spReflectionFunction_GetGenericContainer(SlangReflectionFunction* func);
     SLANG_API SlangReflectionFunction* spReflectionFunction_applySpecializations(SlangReflectionFunction* func, SlangReflectionGeneric* generic);
     SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(SlangReflectionFunction* func, SlangInt argTypeCount, SlangReflectionType* const* argTypes);
+    SLANG_API bool spReflectionFunction_isOverloaded(SlangReflectionFunction* func);
+    SLANG_API unsigned int spReflectionFunction_getOverloadCount(SlangReflectionFunction* func);
+    SLANG_API SlangReflectionFunction* spReflectionFunction_getOverload(SlangReflectionFunction* func, unsigned int index);
 
     // Abstract Decl Reflection
 
@@ -3288,6 +3308,12 @@ namespace slang
                 (SlangReflectionTypeLayout*)this, index);
         }
 
+        SlangImageFormat getBindingRangeImageFormat(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeImageFormat(
+                (SlangReflectionTypeLayout*)this, index);
+        }
+
         SlangInt getBindingRangeDescriptorSetIndex(SlangInt index)
         {
             return spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(
@@ -3592,6 +3618,21 @@ namespace slang
         FunctionReflection* specializeWithArgTypes(unsigned int argCount, TypeReflection* const* types)
         {
             return (FunctionReflection*)spReflectionFunction_specializeWithArgTypes((SlangReflectionFunction*)this, argCount, (SlangReflectionType* const*)types);
+        }
+
+        bool isOverloaded()
+        {
+            return spReflectionFunction_isOverloaded((SlangReflectionFunction*)this);
+        }
+
+        unsigned int getOverloadCount()
+        {
+            return spReflectionFunction_getOverloadCount((SlangReflectionFunction*)this);
+        }
+
+        FunctionReflection* getOverload(unsigned int index)
+        {
+            return (FunctionReflection*)spReflectionFunction_getOverload((SlangReflectionFunction*)this, index);
         }
     };
 
@@ -5239,6 +5280,22 @@ namespace slang
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
 
+    struct IMetadata : public ISlangCastable
+    {
+        SLANG_COM_INTERFACE(0x8044a8a3, 0xddc0, 0x4b7f, { 0xaf, 0x8e, 0x2, 0x6e, 0x90, 0x5d, 0x73, 0x32 })
+
+        /*
+        Returns whether a resource parameter at the specifieid binding location is actually being used
+        in the compiled shader.
+        */
+        virtual SlangResult isParameterLocationUsed(
+            SlangParameterCategory category, // is this a `t` register? `s` register?
+            SlangUInt spaceIndex,      // `space` for D3D12, `set` for Vulkan
+            SlangUInt registerIndex,   // `register` for D3D12, `binding` for Vulkan
+            bool& outUsed) = 0;
+    };
+    #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
         /** A component type is a unit of shader code layout, reflection, and linking.
 
         A component type is a unit of shader code that can be included into
@@ -5450,6 +5507,17 @@ namespace slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
             SlangInt targetIndex,
             IBlob** outCode,
+            IBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt targetIndex,
+            IMetadata** outMetadata,
+            IBlob** outDiagnostics = nullptr) = 0;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            IMetadata** outMetadata,
             IBlob** outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()

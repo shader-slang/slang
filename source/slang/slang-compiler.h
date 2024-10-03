@@ -317,9 +317,21 @@ namespace Slang
             SlangInt        targetIndex,
             slang::IBlob**  outCode,
             slang::IBlob**  outDiagnostics) SLANG_OVERRIDE;
+
+        IArtifact* getTargetArtifact(SlangInt targetIndex, slang::IBlob** outDiagnostics);
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCode(
             SlangInt targetIndex,
             slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt targetIndex,
+            slang::IMetadata** outMetadata,
             slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
@@ -420,11 +432,11 @@ namespace Slang
             String const&   typeStr,
             DiagnosticSink* sink);
 
-        DeclRef<Decl> findDeclFromString(
+        Expr* findDeclFromString(
             String const& name,
             DiagnosticSink* sink);
         
-        DeclRef<Decl> findDeclFromStringInType(
+        Expr* findDeclFromStringInType(
             Type* type,
             String const& name,
             LookupMask mask,
@@ -576,10 +588,12 @@ namespace Slang
         Dictionary<String, Type*> m_types;
 
         // Any decls looked up dynamically using `findDeclFromString`.
-        Dictionary<String, DeclRef<Decl>> m_decls;
+        Dictionary<String, Expr*> m_decls;
 
         Scope* m_lookupScope = nullptr;
         std::unique_ptr<Dictionary<String, IntVal*>> m_mapMangledNameToIntVal;
+
+        Dictionary<Int, ComPtr<IArtifact>> m_targetArtifacts;
     };
 
         /// A component type built up from other component types.
@@ -914,6 +928,23 @@ namespace Slang
             return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointMetadata(entryPointIndex, targetIndex, outMetadata, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
             SlangInt        entryPointIndex,
             SlangInt        targetIndex,
@@ -1157,6 +1188,23 @@ namespace Slang
             slang::IBlob** outDiagnostics) SLANG_OVERRIDE
         {
             return Super::getTargetCode(targetIndex, outCode, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointMetadata(entryPointIndex, targetIndex, outMetadata, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
@@ -1458,6 +1506,23 @@ namespace Slang
             slang::IBlob** outHash) SLANG_OVERRIDE
         {
             return Super::getEntryPointHash(entryPointIndex, targetIndex, outHash);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointMetadata(entryPointIndex, targetIndex, outMetadata, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
+            SlangInt        targetIndex,
+            slang::IMetadata** outMetadata,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
         }
 
         /// Get a serialized representation of the checked module.
@@ -2174,7 +2239,7 @@ namespace Slang
             DiagnosticSink*                     sink);
         
         DeclRef<Decl> specializeWithArgTypes(
-            DeclRef<Decl>   funcDeclRef,
+            Expr*               funcExpr,
             List<Type*>         argTypes,
             DiagnosticSink*     sink);
 
@@ -2728,6 +2793,7 @@ namespace Slang
 
         bool shouldValidateIR();
         bool shouldDumpIR();
+        bool shouldReportCheckpointIntermediates();
 
         bool shouldTrackLiveness();
 

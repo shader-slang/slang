@@ -40,17 +40,16 @@ namespace Slang
 
         std::optional<SystemValLegalizationWorkItem> makeSystemValWorkItem(IRInst* var);
         void legalizeSystemValue(
-            EntryPointInfo entryPoint, SystemValLegalizationWorkItem& workItem
-        );
+            EntryPointInfo entryPoint, SystemValLegalizationWorkItem& workItem);
         List<SystemValLegalizationWorkItem> collectSystemValFromEntryPoint(
-            EntryPointInfo entryPoint
-        );
+            EntryPointInfo entryPoint);
         void legalizeSystemValueParameters(EntryPointInfo entryPoint);
         void legalizeEntryPointForWGSL(EntryPointInfo entryPoint);
         IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType);
         WGSLSystemValueInfo getSystemValueInfo(
-            String inSemanticName, String* optionalSemanticIndex, IRInst* parentVar
-        );
+            String inSemanticName, String* optionalSemanticIndex, IRInst* parentVar);
+        void legalizeCall(IRCall* call);
+        void processInst(IRInst* inst);
     };
 
     IRInst* LegalizeWGSLEntryPointContext::tryConvertValue(
@@ -321,6 +320,74 @@ namespace Slang
         legalizeSystemValueParameters(entryPoint);
     }
 
+    void LegalizeWGSLEntryPointContext::legalizeCall(IRCall* call)
+    {
+        // WGSL does not allow forming a pointer to a sub part of a composite value.
+        // For example, if we have
+        // ```
+        // struct S { float x; float y; };
+        // void foo(inout float v) { v = 1.0f; }
+        // void main() { S s; foo(s.x); }
+        // ```
+        // The call to `foo(s.x)` is illegal in WGSL because `s.x` is a sub part of `s`.
+        // And trying to form `&s.x` in WGSL is illegal.
+        // To work around this, we will create a local variable to hold the sub part of
+        // the composite value.
+        // And then pass the local variable to the function.
+        // After the call, we will write back the local variable to the sub part of the
+        // composite value.
+        //
+        IRBuilder builder(call);
+        builder.setInsertBefore(call);
+        struct WritebackPair { IRInst* dest; IRInst* value; };
+        ShortList<WritebackPair> pendingWritebacks;
+
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            auto arg = call->getArg(i);
+            auto ptrType = as<IRPtrTypeBase>(arg->getDataType());
+            if (!ptrType)
+                continue;
+            switch (arg->getOp())
+            {
+            case kIROp_Var:
+            case kIROp_Param:
+                continue;
+            default:
+                break;
+            }
+
+            // Create a local variable to hold the input argument.
+            auto var = builder.emitVar(
+                ptrType->getValueType(),
+                AddressSpace::Function);
+
+            // Store the input argument into the local variable.
+            builder.emitStore(var, builder.emitLoad(arg));
+            builder.replaceOperand(call->getArgs() + i, var);
+            pendingWritebacks.add({ arg, var });
+        }
+
+        // Perform writebacks after the call.
+        builder.setInsertAfter(call);
+        for (auto& pair : pendingWritebacks)
+        {
+            builder.emitStore(pair.dest, builder.emitLoad(pair.value));
+        }
+    }
+
+    void LegalizeWGSLEntryPointContext::processInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Call:
+            legalizeCall(static_cast<IRCall*>(inst));
+            break;
+        default:
+            for (auto child : inst->getModifiableChildren())
+                processInst(child);
+        }
+    }
     void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
     {
         List<EntryPointInfo> entryPoints;
@@ -342,6 +409,9 @@ namespace Slang
         LegalizeWGSLEntryPointContext context(sink, module);
         for (auto entryPoint : entryPoints)
             context.legalizeEntryPointForWGSL(entryPoint);
+
+        // Go through every instruction in the module and legalize them as needed.
+        context.processInst(module->getModuleInst());
     }
 
 }

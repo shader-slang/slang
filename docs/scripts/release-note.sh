@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # This script generates a release note.
 # It prints information about breaking-changes first and the rest.
 # The content is mostly based on `git log --oneline --since 202X-YY-ZZ`.

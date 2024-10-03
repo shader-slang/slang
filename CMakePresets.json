@@ -16,6 +16,16 @@
       }
     },
     {
+      "name": "emscripten",
+      "description": "Emscripten-based Wasm build",
+      "generator": "ninja",
+      "binaryDir": "${sourceDir}/build.em",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "CMAKE_EXE_LINKER_FLAGS": "-sASSERTIONS -sALLOW_MEMORY_GROWTH"
+      }
+    },
+    {
       "name": "msvc-base",
       "hidden": true,
       "inherits": "default",
@@ -73,6 +83,14 @@
       "name": "release",
       "configurePreset": "default",
       "configuration": "Release"
+    },
+    {
+      "name": "emscripten",
+      "configurePreset": "emscripten",
+      "configuration": "Release",
+      "targets": [
+        "slang"
+      ]
     },
     {
       "name": "generators",

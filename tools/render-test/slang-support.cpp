@@ -23,36 +23,6 @@ static const char rtEntryPointName[] = "raygenMain";
 static const char taskEntryPointName[] = "taskMain";
 static const char meshEntryPointName[] = "meshMain";
 
-rhi::StageType translateStage(SlangStage slangStage)
-{
-    switch(slangStage)
-    {
-    default:
-        SLANG_ASSERT(!"unhandled case");
-        return rhi::StageType::Unknown;
-
-#define CASE(FROM, TO) \
-    case SLANG_STAGE_##FROM: return rhi::StageType::TO
-
-    CASE(VERTEX,    Vertex);
-    CASE(HULL,      Hull);
-    CASE(DOMAIN,    Domain);
-    CASE(GEOMETRY,  Geometry);
-    CASE(FRAGMENT,  Fragment);
-
-    CASE(COMPUTE,   Compute);
-
-    CASE(RAY_GENERATION,    RayGeneration);
-    CASE(INTERSECTION,      Intersection);
-    CASE(ANY_HIT,           AnyHit);
-    CASE(CLOSEST_HIT,       ClosestHit);
-    CASE(MISS,              Miss);
-    CASE(CALLABLE,          Callable);
-
-#undef CASE
-    }
-}
-
 void ShaderCompilerUtil::Output::set(
     slang::IComponentType*              inSlangProgram)
 {
