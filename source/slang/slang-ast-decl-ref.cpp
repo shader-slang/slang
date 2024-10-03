@@ -419,6 +419,10 @@ GenericAppDeclRef* SubstitutionSet::findGenericAppDeclRef() const
         {
             return genApp;
         }
+        else if (as<LookupDeclRef>(s))
+        {
+            return nullptr;
+        }
     }
     return nullptr;
 }
