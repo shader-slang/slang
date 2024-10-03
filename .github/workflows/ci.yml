@@ -96,7 +96,7 @@ jobs:
           compiler: ${{matrix.compiler}}
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
-          build-llvm: true
+          build-llvm: ${{ matrix.platform != 'wasm' }}
       - name: Build Slang
         run: |
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
@@ -109,7 +109,7 @@ jobs:
               cmake --workflow --preset generators --fresh
               mkdir generators
               cmake --install build --prefix generators --component generators
-              emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja"
+              emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja" -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
               cmake --build --preset emscripten --target slang
               [ -f "build.em/Release/lib/libslang.a" ]
               [ -f "build.em/Release/lib/libcompiler-core.a" ]
