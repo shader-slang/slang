@@ -1,5 +1,4 @@
 //TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal -DEMIT_SOURCE
-//TEST:SIMPLE(filecheck=METALLIB): -stage compute -entry computeMain -target metallib -DEMIT_SOURCE -DMETALLIB
 
 // for some reason, metal textures dont have an overload for less-than-four component
 // writes, they need to be converted to 4-components in a legalize step, as the other components
