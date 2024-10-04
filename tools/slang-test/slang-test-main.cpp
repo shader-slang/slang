@@ -1668,6 +1668,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     args.add("exe");
     args.add("-Xgenericcpp");
     args.add("-I./include");
+    args.add("-Xgenericcpp");
+    args.add("-I./external/unordered_dense/include");
     for (auto arg : args)
     {
         // If unescaping is needed, do it
@@ -2435,7 +2437,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     TerminatedCharSlice includePaths[] = { TerminatedCharSlice(".") };
 
     options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
-    options.includePaths = makeSlice(includePaths, 1);
+    options.includePaths = makeSlice(includePaths, SLANG_COUNT_OF(includePaths));
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
