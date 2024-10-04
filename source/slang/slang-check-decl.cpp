@@ -23,7 +23,7 @@ namespace Slang
 {
     static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl);
     static List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut);
-    static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl);
+    static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
         /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
     struct SemanticsDeclModifiersVisitor
@@ -229,8 +229,8 @@ namespace Slang
         //
         // We will defer the actual implementation of the constructor to the body visit, because
         // we will have full information about each field in the struct during that stage.
-        void _synthesizeEmptyConstructor(StructDecl* structDecl);
-        void _searchMembersWithHigherVisibility(StructDecl* structDecl, const DeclVisibility& ctorVisibility, List<VarDeclBase*>& resultMembers);
+        void _synthesizeCtorSignature(StructDecl* structDecl);
+        void _searchMembersWithHigherVisibility(StructDecl* structDecl, const DeclVisibility ctorVisibility, List<VarDeclBase*>& resultMembers);
     };
 
     struct SemanticsDeclTypeResolutionVisitor
@@ -2158,7 +2158,7 @@ namespace Slang
         return true;
     }
 
-    static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+    static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl)
     {
         if (!varDecl->type || !varDecl->type.type)
             return nullptr;
@@ -2201,7 +2201,7 @@ namespace Slang
             && as<VarDecl>(varDecl)
             )
         {
-            varDecl->initExpr = constructDefaultInitExprForVar(this, varDecl);
+            varDecl->initExpr = constructDefaultInitExprForType(this, varDecl);
         }
         
         if (auto initExpr = varDecl->initExpr)
@@ -6967,7 +6967,7 @@ namespace Slang
         }
     }
 
-    void SemanticsDeclBasesVisitor::_searchMembersWithHigherVisibility(StructDecl* structDecl, const DeclVisibility& ctorVisibility, List<VarDeclBase*>& resultMembers)
+    void SemanticsDeclBasesVisitor::_searchMembersWithHigherVisibility(StructDecl* structDecl, const DeclVisibility ctorVisibility, List<VarDeclBase*>& resultMembers)
     {
         auto findMembers = [&](StructDecl* structDecl)
         {
@@ -6983,15 +6983,10 @@ namespace Slang
 
         for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
         {
-            auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
-            if (!declRefType)
-                continue;
-
-            auto structOfInheritance = as<StructDecl>(declRefType->getDeclRef().getDecl());
-            if (!structOfInheritance)
-                continue;
-
-            findMembers(structOfInheritance);
+            // TODO: We might need to use the parameters of the base type's constructor instead of the members.
+            // But the problem is base type could have more than one constructor, which one should we use?
+            if (auto baseTypeDecl = isDeclRefTypeOf<StructDecl>(inheritanceMember->base.type))
+                findMembers(baseTypeDecl.getDecl());
         }
 
         findMembers(structDecl);
@@ -7016,10 +7011,10 @@ namespace Slang
 
         // For the 2nd condition, we need to check if the type is default initializable, if so,
         // we can use the default constructor.
-        return constructDefaultInitExprForVar(visitor, varDecl);
+        return constructDefaultInitExprForType(visitor, varDecl);
     }
 
-    void SemanticsDeclBasesVisitor::_synthesizeEmptyConstructor(StructDecl* structDecl)
+    void SemanticsDeclBasesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
     {
         // If a type already defines any explicit constructors, do not synthesize any constructors.
         if (_hasExplicitConstructor(structDecl))
@@ -7041,7 +7036,6 @@ namespace Slang
         ctor->members.reserve(resultMembers.getCount());
 
         // 2. Add the parameter list
-        uint32_t paramIndex = 0;
         bool stopProcessingDefaultValues = false;
         for (SlangInt i = resultMembers.getCount() - 1; i >= 0; i--)
         {
@@ -7056,14 +7050,7 @@ namespace Slang
                 stopProcessingDefaultValues = true;
 
             ctorParam->parentDecl = ctor;
-            StringBuilder prefix;
-            prefix << "param_" << paramIndex++ << "_";
-
-            Name* paramName = member->getName() ?
-                getName(prefix + member->getName()->text) :
-                getName(prefix);
-
-            ctorParam->nameAndLoc = NameLoc(paramName, ctor->loc);
+            ctorParam->nameAndLoc = NameLoc(member->getName(), ctor->loc);
             ctor->members.add(ctorParam);
         }
         ctor->members.reverse();
@@ -7159,7 +7146,7 @@ namespace Slang
         }
 
         if (!isFromStdLib(decl))
-            _synthesizeEmptyConstructor(decl);
+            _synthesizeCtorSignature(decl);
     }
 
     void SemanticsDeclBasesVisitor::visitClassDecl(ClassDecl* decl)
@@ -7308,17 +7295,15 @@ namespace Slang
 
     bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl)
     {
-        bool result = false;
         for (auto ctor : getMembersOfType<ConstructorDecl>(getASTBuilder(), structDecl, MemberFilterStyle::All))
         {
             // constructor that is not synthesized must be user defined.
             if (ctor.getDecl()->findModifier<SynthesizedModifier>() == nullptr)
             {
-                result = true;
-                break;
+                return true;
             }
         }
-        return result;
+        return false;
     }
 
     void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
@@ -8787,7 +8772,7 @@ namespace Slang
             if (!isDefaultInitializableType
                 || varDeclBase->initExpr)
                 continue;
-            varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase);
+            varDeclBase->initExpr = constructDefaultInitExprForType(this, varDeclBase);
         }
 
         synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);

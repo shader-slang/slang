@@ -323,7 +323,7 @@ namespace Slang
         return true;
     }
 
-    Expr* SemanticsVisitor::_prepareCtorInvokeExpr(Type* toType, const SourceLoc& loc, const List<Expr*>& coercedArgs)
+    Expr* SemanticsVisitor::_createCtorInvokeExpr(Type* toType, const SourceLoc& loc, const List<Expr*>& coercedArgs)
     {
         auto* varExpr = getASTBuilder()->create<VarExpr>();
         varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
@@ -339,10 +339,10 @@ namespace Slang
     // translation from initializer list to constructor invocation if the struct has constructor.
     bool SemanticsVisitor::_invokeExprForExplicitCtor(Type* toType, InitializerListExpr* fromInitializerListExpr, Expr** outExpr)
     {
-        if(auto toDeclRefType = as<DeclRefType>(toType))
+        if (auto toDeclRefType = as<DeclRefType>(toType))
         {
             auto toTypeDeclRef = toDeclRefType->getDeclRef();
-            if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
+            if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
             {
                 if (isFromStdLib(toStructDeclRef.getDecl()))
                 {
@@ -352,7 +352,7 @@ namespace Slang
 
                 if (_hasExplicitConstructor(toStructDeclRef.getDecl()))
                 {
-                    auto ctorInvokeExpr = _prepareCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
+                    auto ctorInvokeExpr = _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
                     ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
                     if (outExpr && ctorInvokeExpr)
                     {
@@ -371,10 +371,10 @@ namespace Slang
         Expr**                  outExpr)
     {
         StructDecl* structDecl = nullptr;
-        if(auto toDeclRefType = as<DeclRefType>(toType))
+        if (auto toDeclRefType = as<DeclRefType>(toType))
         {
             auto toTypeDeclRef = toDeclRefType->getDeclRef();
-            if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
+            if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
             {
                 structDecl = toStructDeclRef.getDecl();
             }
@@ -388,7 +388,7 @@ namespace Slang
         SLANG_ASSERT(synthesizedConstructor);
 
         List<Expr*> coercedArgs;
-        auto ctorInvokeExpr = _prepareCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
+        auto ctorInvokeExpr = _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
 
         DiagnosticSink tempSink(getSourceManager(), nullptr);
         SemanticsVisitor subVisitor(withSink(&tempSink));
@@ -452,12 +452,12 @@ namespace Slang
         // we will collect the new arguments here
         List<Expr*> coercedArgs;
 
-        if(isEffectivelyScalarForInitializerLists(toType))
+        if (isEffectivelyScalarForInitializerLists(toType))
         {
             // For any type that is effectively a non-aggregate,
             // we expect to read a single value from the initializer list
             //
-            if(ioArgIndex < argCount)
+            if (ioArgIndex < argCount)
             {
                 auto arg = fromInitializerListExpr->args[ioArgIndex++];
                 return _coerce(
@@ -502,7 +502,7 @@ namespace Slang
                 return false;
             }
 
-            for(UInt ee = 0; ee < elementCount; ++ee)
+            for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 Expr* coercedArg = nullptr;
                 bool argResult = _readValueFromInitializerList(
@@ -521,7 +521,7 @@ namespace Slang
                 }
             }
         }
-        else if(auto toArrayType = as<ArrayExpressionType>(toType))
+        else if (auto toArrayType = as<ArrayExpressionType>(toType))
         {
             // TODO(tfoley): If we can compute the size of the array statically,
             // then we want to check that there aren't too many initializers present
@@ -781,12 +781,12 @@ namespace Slang
         // If this isn't prohibited, then we can proceed to try and coerce from
         // the initializer list itself; assuming that coercion is closed under
         // composition this shouldn't fail.
-        if(!as<InitializerListType>(fromInitializerListExpr->type) &&
+        if (!as<InitializerListType>(fromInitializerListExpr->type) &&
            !canCoerce(toType, fromInitializerListExpr->type, nullptr))
             return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
 
         // try to invoke the user-defined constructor if it exists
-        if(_invokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
+        if (_invokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
         {
             return true;
         }
@@ -798,14 +798,14 @@ namespace Slang
         }
 
         // We will fall back to the legacy logic of initialize list.
-        if(!_readAggregateValueFromInitializerList(toType, outToExpr, fromInitializerListExpr, argIndex))
+        if (!_readAggregateValueFromInitializerList(toType, outToExpr, fromInitializerListExpr, argIndex))
         {
             return false;
         }
 
-        if(argIndex != argCount)
+        if (argIndex != argCount)
         {
-            if( outToExpr )
+            if ( outToExpr )
             {
                 getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argIndex, argCount);
             }

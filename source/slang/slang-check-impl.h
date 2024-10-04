@@ -2769,7 +2769,7 @@ namespace Slang
 
         bool _invokeExprForExplicitCtor(Type* toType, InitializerListExpr* fromInitializerListExpr, Expr** outExpr);
         bool _invokeExprForSynthesizedCtor(Type* toType, InitializerListExpr* fromInitializerListExpr, Expr** outExpr);
-        Expr* _prepareCtorInvokeExpr(Type* toType, const SourceLoc& loc, const List<Expr*>& coercedArgs);
+        Expr* _createCtorInvokeExpr(Type* toType, const SourceLoc& loc, const List<Expr*>& coercedArgs);
         bool _hasExplicitConstructor(StructDecl* structDecl);
         ConstructorDecl* _getSynthesizedConstructor(StructDecl* structDecl);
         bool isCStyleStruct(StructDecl* structDecl);
