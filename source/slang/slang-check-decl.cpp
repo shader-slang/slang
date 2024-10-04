@@ -7306,6 +7306,21 @@ namespace Slang
         getSink()->diagnose(loc, Diagnostics::invalidEnumTagType, type);
     }
 
+    bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl)
+    {
+        bool result = false;
+        for (auto ctor : getMembersOfType<ConstructorDecl>(getASTBuilder(), structDecl, MemberFilterStyle::All))
+        {
+            // constructor that is not synthesized must be user defined.
+            if (ctor.getDecl()->findModifier<SynthesizedModifier>() == nullptr)
+            {
+                result = true;
+                break;
+            }
+        }
+        return result;
+    }
+
     void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     {
         SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
@@ -11229,6 +11244,10 @@ namespace Slang
         auto defaultCtor = _getDefaultCtor(structDecl);
         if (!defaultCtor)
             _createCtor(this, m_astBuilder, structDecl);
+
+
+        // ConstructorDecl* defaultCtorDecl = nullptr;
+        // _getCtorList(getASTBuilder(), this, structDecl, nullptr);
 
         int backingWidth = 0;
         [[maybe_unused]]
