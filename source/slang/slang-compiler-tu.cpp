@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-capability.h"
+#include "slang-check-impl.h"
 
 namespace Slang
 {
@@ -116,6 +117,8 @@ namespace Slang
         auto composite = CompositeComponentType::create(
             linkage,
             allComponentTypes);
+
+        composite = fillRequirements(composite);
 
         TargetProgram tp(composite, targetReq);
         tp.getOrCreateLayout(&sink);
