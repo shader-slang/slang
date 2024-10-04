@@ -2,7 +2,7 @@
 
 // This tests that writing to individual components of the output struct works
 
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv-assembly -entry main -stage mesh -profile glsl_450+spirv_1_4
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-assembly -entry main -stage mesh -profile glsl_450+GL_EXT_mesh_shader
 
 // DXC is stricter than we are about passing references to individual mesh shader outputs
 // We could get around this by doing what we do for GLSL, i.e. use a temporary

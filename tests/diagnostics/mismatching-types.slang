@@ -1,5 +1,5 @@
 // mismatching-types.slang
-//DIAGNOSTIC_TEST:SIMPLE:-target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 Texture1D<float> tex;
 
@@ -47,21 +47,21 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     NonGenericOuter c;
     NonGenericOuter.GenericInner<int> d;
     
-    // expected an expression of type 'GenericOuter<int>', got 'int'
+//CHECK: tests/diagnostics/mismatching-types.slang(51): error 30019: expected an expression of type 'GenericOuter<int>', got 'int'
     a = 0;
-    // expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'int'
+//CHECK: tests/diagnostics/mismatching-types.slang(53): error 30019: expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'int'
     a.g = 0;
-    // expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'int'
+//CHECK: tests/diagnostics/mismatching-types.slang(55): error 30019: expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'int'
     a.ng = 0;
-    // expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'GenericOuter<float>.GenericInner<float>'
+//CHECK: tests/diagnostics/mismatching-types.slang(57): error 30019: expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'GenericOuter<float>.GenericInner<float>'
     a.g = b.g;
-    // expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'GenericOuter<float>.NonGenericInner'
+//CHECK: tests/diagnostics/mismatching-types.slang(59): error 30019: expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'GenericOuter<float>.NonGenericInner'
     a.ng = b.ng;
-    // expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'int'
+//CHECK: tests/diagnostics/mismatching-types.slang(61): error 30019: expected an expression of type 'GenericInner<int>', got 'int'
     c.i = 0;
-    // expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'NonGenericOuter.GenericInner<float>'
+//CHECK: tests/diagnostics/mismatching-types.slang(63): error 30019: expected an expression of type 'GenericInner<int>', got 'GenericInner<float>'
     c.i = c.f;
-    // expected an expression of type 'NonGenericOuter.GenericInner<int>.ReallyNested', got 'int'
+//CHECK: tests/diagnostics/mismatching-types.slang(65): error 30019: expected an expression of type 'GenericInner<int>.ReallyNested', got 'int'
     c.i.n = 0;
     // OK
     c.i.n.val = 0;
@@ -70,8 +70,8 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     // OK
     c.i = d;
 
-    // expected an expression of type 'Texture1D<int>', got 'Texture1D<float>'
+//CHECK: tests/diagnostics/mismatching-types.slang(74): error 30019: expected an expression of type 'Texture1D<int>', got 'Texture1D<float>'
     Texture1D<int> t1 = tex;
-    // expected an expression of type 'Texture2D<float>', got 'Texture1D<float>'
+//CHECK: tests/diagnostics/mismatching-types.slang(76): error 30019: expected an expression of type 'Texture2D<float>', got 'Texture1D<float>'
     Texture2D<float> t2 = tex;
 }

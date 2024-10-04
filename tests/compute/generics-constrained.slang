@@ -10,7 +10,7 @@ interface Helper
 
 struct A : Helper
 {
-	float a;
+	float a = {};
 
 	float getHelp()
 	{

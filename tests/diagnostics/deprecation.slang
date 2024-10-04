@@ -20,7 +20,7 @@ const int pi = 3;
 struct Billiards
 {
     [deprecated("puns")]
-    bool bs[22];
+    bool bs[22] = {};
 }
 
 int main()

@@ -20222,6 +20222,11 @@ struct TextureFootprint<let ND:int> : __TextureFootprintData<ND>
 {
     bool _isSingleLevel;
 
+    __init(__TextureFootprintData<ND> data, bool _isSingleLevelIn)
+    {
+        _isSingleLevel = _isSingleLevelIn;
+    }
+
     property isSingleLevel : bool
     {
         [__NoSideEffect]

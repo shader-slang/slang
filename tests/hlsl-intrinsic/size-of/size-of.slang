@@ -15,14 +15,14 @@ enum Enum : int8_t
 
 struct Hey
 {
-    double b;
-    Enum e;
+    double b = {};
+    Enum e = {};
 };
 
 struct Thing : Hey
 {
-    int a;
-    float b;
+    int a = {};
+    float b = {};
 };
 
 [numthreads(4, 1, 1)]

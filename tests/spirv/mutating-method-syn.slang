@@ -10,7 +10,7 @@ interface IFoo
 
 struct Val : IFoo
 {
-    int x;
+    int x = {};
 
     int bar(int y)
     {

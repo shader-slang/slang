@@ -12,8 +12,8 @@ interface IInterface
 
 struct UserDefinedPackedType
 {
-    float3 val;
-    uint flags;
+    float3 val = {};
+    uint flags = {};
 };
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=gOutputBuffer
@@ -40,14 +40,14 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 
 struct FloatVal : IInterface
 {
-    float val;
+    float val = {};
     float run()
     {
         return val;
     }
 };
 interface ISomething{void g();}
-struct Float4Struct : ISomething { float4 val; void g() {} }
+struct Float4Struct : ISomething { float4 val = {}; void g() {} }
 struct Float4Val : IInterface
 {
     Float4Struct val;

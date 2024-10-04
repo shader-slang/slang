@@ -3841,8 +3841,19 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_DefaultConstruct, 0, nullptr);
     }
 
-    IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
+    IRInst* IRBuilder::_emitDefaultConstruct(IRType* type, bool fallback, HashSet<IRType*> visitedTypes)
     {
+        // Slang generally detects recursive type-uses in IR,
+        // This means that DefaultConstruct may crash unless we 
+        // track visited types with `visitedTypes.contains(type)`
+        // to avoid infinite looping of type-checks.
+        //
+        // Slang may be asked to default init a `RWTexture2D`,
+        // if so, adding `isResourceType(type)` ensures we don't
+        // generate garbage for resource types.
+        if (visitedTypes.contains(type) || isResourceType(type))
+            return emitUndefined(type);
+        visitedTypes.add(type);
         IRType* actualType = type;
         for (;;)
         {
@@ -3889,7 +3900,7 @@ namespace Slang
             return getNullPtrValue(type);
         case kIROp_OptionalType:
         {
-            auto inner = emitDefaultConstruct(as<IROptionalType>(actualType)->getValueType(), fallback);
+            auto inner = _emitDefaultConstruct(as<IROptionalType>(actualType)->getValueType(), fallback, visitedTypes);
             if (!inner)
                 return nullptr;
             return emitMakeOptionalNone(type, inner);
@@ -3903,7 +3914,7 @@ namespace Slang
                 auto operand = tupleType->getOperand(i);
                 if (as<IRAttr>(operand))
                     break;
-                auto inner = emitDefaultConstruct((IRType*)operand, fallback);
+                auto inner = _emitDefaultConstruct((IRType*)operand, fallback, visitedTypes);
                 if (!inner)
                     return nullptr;
                 elements.add(inner);
@@ -3917,7 +3928,7 @@ namespace Slang
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
-                auto inner = emitDefaultConstruct(fieldType, fallback);
+                auto inner = _emitDefaultConstruct(fieldType, fallback, visitedTypes);
                 if (!inner)
                     return nullptr;
                 elements.add(inner);
@@ -3929,7 +3940,7 @@ namespace Slang
             auto arrayType = as<IRArrayType>(actualType);
             if (auto count = as<IRIntLit>(arrayType->getElementCount()))
             {
-                auto element = emitDefaultConstruct(arrayType->getElementType(), fallback);
+                auto element = _emitDefaultConstruct(arrayType->getElementType(), fallback, visitedTypes);
                 if (!element)
                     return nullptr;
                 List<IRInst*> elements;
@@ -3946,14 +3957,14 @@ namespace Slang
         }
         case kIROp_VectorType:
         {
-            auto inner = emitDefaultConstruct(as<IRVectorType>(actualType)->getElementType(), fallback);
+            auto inner = _emitDefaultConstruct(as<IRVectorType>(actualType)->getElementType(), fallback, visitedTypes);
             if (!inner)
                 return nullptr;
             return emitIntrinsicInst(type, kIROp_MakeVectorFromScalar, 1, &inner);
         }
         case kIROp_MatrixType:
         {
-            auto inner = emitDefaultConstruct(as<IRMatrixType>(actualType)->getElementType(), fallback);
+            auto inner = _emitDefaultConstruct(as<IRMatrixType>(actualType)->getElementType(), fallback, visitedTypes);
             if (!inner)
                 return nullptr;
             return emitIntrinsicInst(type, kIROp_MakeMatrixFromScalar, 1, &inner);
@@ -3967,6 +3978,12 @@ namespace Slang
         }
         return nullptr;
     }
+    
+    IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
+    {
+        return _emitDefaultConstruct(type, fallback, {});
+    }
+    
 
     IRInst* IRBuilder::emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob *blob)
     {

@@ -7,8 +7,8 @@
 // struct declaration
 struct Foo
 {
-	float3 a;
-	float3 b;
+	float3 a = {};
+	float3 b = {};
 };
 
 // function on a struct

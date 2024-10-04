@@ -30,20 +30,20 @@ cbuffer Uniforms
 
 struct AssembledVertex
 {
-	float3	position;
-	float3	color;
-    float2  uv;
+	float3	position = {};
+	float3	color = {};
+    float2  uv   = {};
 };
 
 struct CoarseVertex
 {
-	float3	color;
-    float2  uv;
+	float3	color = {};
+    float2  uv = {};
 };
 
 struct Fragment
 {
-	float4 color;
+	float4 color = {};
 };
 
 
@@ -57,7 +57,7 @@ struct VertexStageInput
 struct VertexStageOutput
 {
 	CoarseVertex	coarseVertex	: CoarseVertex;
-	float4			sv_position		: SV_Position;
+	float4			sv_position		: SV_Position = {};
 };
 
 VertexStageOutput vertexMain(VertexStageInput input)

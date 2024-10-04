@@ -5,7 +5,7 @@ __exported import IBSDF;
 
 public struct DiffuseBSDF : IBSDF
 {
-    public float3 albedo;
+    public float3 albedo = {};
 
     [TreatAsDifferentiable]
     public float3 eval(const float3 wiLocal, const float3 woLocal)

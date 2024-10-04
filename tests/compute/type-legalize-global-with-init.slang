@@ -14,19 +14,15 @@ RWStructuredBuffer<uint> inputBuffer;
 
 static const RWStructuredBuffer<uint> gBuffer = inputBuffer;
 
-struct Stuff
-{
-    RWStructuredBuffer<uint> a;
-    RWStructuredBuffer<uint> b;
-}
-
-static const Stuff gStuff = { inputBuffer, inputBuffer };
+// Note: due to #4874 we cannot assign functions to globals
+// which contain resource types.
+static const RWStructuredBuffer<uint> gStuff = inputBuffer;
 
 uint test(uint x)
 {
     return gBuffer[x]
-        + gStuff.a[x + 1] * 16
-        + gStuff.b[x + 2] * 256;
+        + gStuff[x + 1] * 16
+        + gStuff[x + 2] * 256;
 }
 
 [numthreads(4, 1, 1)]

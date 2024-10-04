@@ -15,7 +15,7 @@ enum Flag
 }
 struct Data
 {
-    uint flags;
+    uint flags = {};
     [mutating] void setFlag(Flag g, bool v)
     {
         const uint bit = uint(g) << 8;

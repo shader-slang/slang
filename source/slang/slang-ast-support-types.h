@@ -471,7 +471,6 @@ namespace Slang
             /// functions, so it belongs in the last phase of checking.
             ///
         DefinitionChecked,
-        DefaultConstructorReadyForUse = DefinitionChecked,
 
             /// The capabilities required by the decl is infered and validated.
             ///
@@ -492,6 +491,8 @@ namespace Slang
         CanUseFuncSignature = ReadyForReference,
         CanSpecializeGeneric = ReadyForReference,
         CanReadInterfaceRequirements = ReadyForLookup,
+        DefaultConstructorReadyForUse = ReadyForConformances,
+        VarInitExprAreChecked = DefinitionChecked,
     };
 
         /// A `DeclCheckState` plus a bit to track whether a declaration is currently being checked.

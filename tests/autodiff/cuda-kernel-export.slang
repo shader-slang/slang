@@ -10,8 +10,8 @@ struct MySubType
 
 struct MyType
 {
-    float2 v;
-    MySubType sub[2];
+    float2 v = {};
+    MySubType sub[2] = {};
 }
 
 struct MyInput

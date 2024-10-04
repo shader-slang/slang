@@ -525,11 +525,12 @@ DIAGNOSTIC(30401, Error, invalidTypeForConstraint, "type '$0' cannot be used as 
 DIAGNOSTIC(30402, Error, invalidConstraintSubType, "type '$0' is not a valid left hand side of a type constraint.")
 
 // 305xx: initializer lists
-DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
+DIAGNOSTIC(30500, Error, cannotFindMatchingInitListToConstructorCount, "cannot find matching constructor to call with arguments count of '$0' for '$1'")
 DIAGNOSTIC(30501, Error, cannotUseInitializerListForArrayOfUnknownSize, "cannot use initializer list for array of statically unknown size '$0'")
 DIAGNOSTIC(30502, Error, cannotUseInitializerListForVectorOfUnknownSize, "cannot use initializer list for vector of statically unknown size '$0'")
 DIAGNOSTIC(30503, Error, cannotUseInitializerListForMatrixOfUnknownSize, "cannot use initializer list for matrix of statically unknown size '$0' rows")
 DIAGNOSTIC(30504, Error, cannotUseInitializerListForType, "cannot use initializer list for type '$0'")
+DIAGNOSTIC(30505, Warning, usingLegacyInitListStructLogic, "detected deprecated legacy initializer-list (`{...}`) resolution logic, we advise following proper initializer-list rules as per Slang's user-guide")
 
 // 3062x: variables
 DIAGNOSTIC(30620, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
@@ -665,7 +666,7 @@ DIAGNOSTIC(38027, Error, mismatchExistentialSlotArgCount, "expected $0 existenti
 DIAGNOSTIC(38029, Error, typeArgumentDoesNotConformToInterface, "type argument '$0' does not conform to the required interface '$1'")
 
 DIAGNOSTIC(38031, Error, invalidUseOfNoDiff, "'no_diff' can only be used to decorate a call or a subscript operation")
-DIAGNOSTIC(38032, Error, useOfNoDiffOnDifferentiableFunc, "use 'no_diff' on a call to a differentiable function has no meaning.")
+DIAGNOSTIC(38032, Error, useOfNoDiffOnDifferentiableFunc, "using 'no_diff' on a call to a differentiable function has no meaning.")
 DIAGNOSTIC(38033, Error, cannotUseNoDiffInNonDifferentiableFunc, "cannot use 'no_diff' in a non-differentiable function.")
 DIAGNOSTIC(38034, Error, cannotUseConstRefOnDifferentiableParameter, "cannot use '__constref' on a differentiable parameter.")
 DIAGNOSTIC(38034, Error, cannotUseConstRefOnDifferentiableMemberMethod, "cannot use '[constref]' on a differentiable member method of a differentiable type.")

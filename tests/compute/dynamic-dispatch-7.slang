@@ -45,7 +45,7 @@ struct Impl : IInterface
 {
     struct TAssoc : IAssoc
     {
-        int base;
+        int base = {};
         int Compute()
         {
             return base;

@@ -1044,9 +1044,14 @@ struct DiffTensorView
     }
 };
 
+// Note: we need `TorchTensorType` so Slang is aware
+// of when we use `TorchTensorType` in a synthisized
+// function. This is important since `[CudaHost]` is 
+// required for any function using `TorchTensorType`
 /// Represents the handle of a Torch tensor object.
 __generic<T>
 __intrinsic_type($(kIROp_TorchTensorType))
+__magic_type(TorchTensorType)
 struct TorchTensor
 {
     __intrinsic_op($(kIROp_TorchTensorGetView))

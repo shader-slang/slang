@@ -17,10 +17,10 @@ enum Color
 
 struct Thing 
 {
-    int a; 
+    int a = {}; 
     struct Another
     {
-        int b;
+        int b = {};
     }
 };
 

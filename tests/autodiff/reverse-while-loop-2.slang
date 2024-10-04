@@ -10,7 +10,7 @@ typedef float.Differential dfloat;
 
 struct P
 {
-    bool terminated;
+    bool terminated = {};
     bool isTerminated() { return terminated; }
     bool isHit() { return !terminated; }
 }

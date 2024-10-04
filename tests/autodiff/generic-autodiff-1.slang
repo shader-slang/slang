@@ -15,7 +15,7 @@ interface IInterface
 
 struct A : IInterface
 {
-    float z;
+    float z = {};
     [mutating]
     float sample() { z = z + 1.0; return 1.0; }
 };

@@ -8,7 +8,7 @@ typedef float.Differential dfloat;
 
 struct Params
 {
-    float vv;
+    float vv = {};
 }
 
 [Differentiable]

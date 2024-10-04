@@ -38,11 +38,11 @@ struct Impl : IInterface
 {
     struct Assoc : IAssoc
     {
-        int val;
+        int val = {};
         int get() { return val; }
         static int getBase<T:IGetter>(T t) { return t.getVal(); }
     };
-    int base;
+    int base = {};
 	int Compute(int inVal) { return base + inVal * inVal; }
 };
 

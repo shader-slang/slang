@@ -11,7 +11,7 @@
 
 struct CB
 {
-    uint4 value;
+    uint4 value = {};
 }
 
 struct MaterialSystem

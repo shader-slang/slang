@@ -1,6 +1,6 @@
 // init-list-defaults.slang
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj
 
 // Confirm that initializer lists correctly default-initialize elements past those specified.
 
@@ -34,5 +34,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 	int inVal = int(tid);
 	int outVal = test(inVal);
 
+//BUF: 1142
+//BUF: 2453
+//BUF: 3060
+//BUF: 4000
 	outputBuffer[tid] = outVal;
 }

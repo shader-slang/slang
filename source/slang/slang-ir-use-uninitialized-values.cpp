@@ -154,6 +154,10 @@ namespace Slang
         if (!type)
             return true;
 
+        // In case we have a resource type (which can be assigned values in many unpredictable ways)
+        if (isResourceType(type))
+            return true;
+
         if (as<IRVoidType>(type))
             return true;
 

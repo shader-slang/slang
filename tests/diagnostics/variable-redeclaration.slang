@@ -1,6 +1,6 @@
 // variable-redeclaration.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 
 // This test confirms that the compiler produces
@@ -52,3 +52,15 @@ int testParameterRedeclaration(
 {
 	return size;
 }
+
+//CHECK: tests/diagnostics/variable-redeclaration.slang(14): error 30200: declaration of 'gA' conflicts with existing declaration
+//CHECK: tests/diagnostics/variable-redeclaration.slang(12): note: see previous declaration of 'gA'
+//CHECK: tests/diagnostics/variable-redeclaration.slang(44): error 30200: declaration of 'f' conflicts with existing declaration
+//CHECK: tests/diagnostics/variable-redeclaration.slang(43): note: see previous declaration of 'f'
+//CHECK: tests/diagnostics/variable-redeclaration.slang(51): error 30200: declaration of 'size' conflicts with existing declaration
+//CHECK: tests/diagnostics/variable-redeclaration.slang(50): note: see previous declaration of 'size'
+//CHECK: tests/diagnostics/variable-redeclaration.slang(21): error 30200: declaration of 'y' conflicts with existing declaration
+//CHECK: tests/diagnostics/variable-redeclaration.slang(20): note: see previous declaration of 'y'
+//CHECK: tests/diagnostics/variable-redeclaration.slang(53): error 39999: ambiguous reference to 'size'
+//CHECK: tests/diagnostics/variable-redeclaration.slang(51): note 39999: candidate: float size
+//CHECK: tests/diagnostics/variable-redeclaration.slang(50): note 39999: candidate: int size

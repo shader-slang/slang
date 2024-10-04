@@ -47,10 +47,10 @@ void computeMain(int3       dispatchThreadID : SV_DispatchThreadID)
 // Type must be marked `public` to ensure it is visible in the generated DLL.
 export struct MyImpl : IInterface
 {
-    int val;
+    int val = {};
     export struct TAssoc : IAssoc
     {
-        int val;
+        int val = {};
         int eval() { return val; }
     }
     TAssoc run(int input)
@@ -63,10 +63,10 @@ export struct MyImpl : IInterface
 
 export struct MyImpl2 : IInterface
 {
-    int val;
+    int val = {};
     export struct TAssoc : IAssoc
     {
-        int val;
+        int val = {};
         int eval() { return val; }
     }
     TAssoc run(int input)

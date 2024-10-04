@@ -15,7 +15,7 @@ namespace Slang
     ConversionCost SemanticsVisitor::getImplicitConversionCost(
         Decl* decl)
     {
-        if(auto modifier = decl->findModifier<ImplicitConversionModifier>())
+        if (auto modifier = decl->findModifier<ImplicitConversionModifier>())
         {
             return modifier->cost;
         }
@@ -35,46 +35,55 @@ namespace Slang
     }
 
     bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(
-        Type*    type)
+        Type* type)
     {
-        if(as<ArrayExpressionType>(type)) return false;
-        if(as<VectorExpressionType>(type)) return false;
-        if(as<MatrixExpressionType>(type)) return false;
+        if (as<ArrayExpressionType>(type)) return false;
+        if (as<VectorExpressionType>(type)) return false;
+        if (as<MatrixExpressionType>(type)) return false;
 
-        if(as<BasicExpressionType>(type))
-        {
-            return true;
-        }
-
-        if(as<ResourceType>(type))
-        {
-            return true;
-        }
-        if(as<UntypedBufferResourceType>(type))
-        {
-            return true;
-        }
-        if(as<SamplerStateType>(type))
+        if (as<BasicExpressionType>(type))
         {
             return true;
         }
 
-        if(auto declRefType = as<DeclRefType>(type))
+        if (as<ResourceType>(type))
         {
-            if(as<StructDecl>(declRefType->getDeclRef()))
+            return true;
+        }
+        if (as<UntypedBufferResourceType>(type))
+        {
+            return true;
+        }
+        if (as<SamplerStateType>(type))
+        {
+            return true;
+        }
+
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (as<StructDecl>(declRefType->getDeclRef()))
                 return false;
         }
 
         return true;
     }
 
+    bool isSameSimpleExprType(Type* type1, Type* type2)
+    {
+        if (as<BasicExpressionType>(type1) && as<BasicExpressionType>(type2)) return true;
+        if (as<ArrayExpressionType>(type1) && as<ArrayExpressionType>(type2)) return true;
+        if (as<VectorExpressionType>(type1) && as<VectorExpressionType>(type2)) return true;
+        if (as<MatrixExpressionType>(type1) && as<MatrixExpressionType>(type2)) return true;
+        return false;
+    }
+
     bool SemanticsVisitor::shouldUseInitializerDirectly(
-        Type*    toType,
-        Expr*    fromExpr)
+        Type* toType,
+        Expr* fromExpr)
     {
         // A nested initializer list should always be used directly.
         //
-        if(as<InitializerListExpr>(fromExpr))
+        if (as<InitializerListExpr>(fromExpr))
         {
             return true;
         }
@@ -82,34 +91,45 @@ namespace Slang
         // If the desired type is a scalar, then we should always initialize
         // directly, since it isn't an aggregate.
         //
-        if(isEffectivelyScalarForInitializerLists(toType))
+        if (isEffectivelyScalarForInitializerLists(toType))
             return true;
 
         // If the type we are initializing isn't effectively scalar,
         // but the initialization expression *is*, then it doesn't
         // seem like direct initialization is intended.
         //
-        if(isEffectivelyScalarForInitializerLists(fromExpr->type))
+        if (isEffectivelyScalarForInitializerLists(fromExpr->type))
             return false;
 
-        // Once the above cases are handled, the main thing
-        // we want to check for is whether a direct initialization
-        // is possible (a type conversion exists).
-        //
-        return canCoerce(toType, fromExpr->type, fromExpr);
+        // If 2 types are "broadly equal" we know the types can be coerced directly
+        // since otherwise trying to solve `float3 tmp[2] = {float3(val), float3(val)};` will break down into searching for `float`
+        // (which we don't have in our init-list argument list, this will error).
+        // 
+        // This logic should be completly cleaned up at some point by only using constructors for `{...}` and attempting to use 
+        // constructors before fallback coerce logic is tried.
+        if (toType->equals(fromExpr->type))
+            return true;
+
+        // `vector<T,N>` and `vector<T,U>` may not be equal types, but, we have no choice in this senario but to assume coerce logic
+        // can resolve such situations, otherwise we need to fail
+        if (isSameSimpleExprType(toType, fromExpr->type))
+            return true;
+
+        return false;
     }
 
+    template<bool UseLegacyLogic>
     bool SemanticsVisitor::_readValueFromInitializerList(
-        Type*                toType,
-        Expr**               outToExpr,
+        Type* toType,
+        Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr,
-        UInt                       &ioInitArgIndex)
+        UInt& ioInitArgIndex)
     {
         // First, we will check if we have run out of arguments
         // on the initializer list.
         //
         UInt initArgCount = fromInitializerListExpr->args.getCount();
-        if(ioInitArgIndex >= initArgCount)
+        if (ioInitArgIndex >= initArgCount)
         {
             // If we are at the end of the initializer list,
             // then our ability to read an argument depends
@@ -128,7 +148,7 @@ namespace Slang
         // for aggregate initialization.
         //
         auto firstInitExpr = fromInitializerListExpr->args[ioInitArgIndex];
-        if(shouldUseInitializerDirectly(toType, firstInitExpr))
+        if (shouldUseInitializerDirectly(toType, firstInitExpr) && canCoerce(toType, firstInitExpr->type, firstInitExpr))
         {
             ioInitArgIndex++;
             return _coerce(
@@ -144,7 +164,7 @@ namespace Slang
         // expressions, then everything could be thrown off and we
         // shouldn't keep trying to read arguments.
         //
-        if( IsErrorExpr(firstInitExpr) )
+        if (IsErrorExpr(firstInitExpr))
         {
             // Stop reading arguments, as if we'd reached
             // the end of the list.
@@ -156,7 +176,7 @@ namespace Slang
         // The fallback case is to recursively read the
         // type from the same list as an aggregate.
         //
-        return _readAggregateValueFromInitializerList(
+        return _readAggregateValueFromInitializerList<UseLegacyLogic>(
             toType,
             outToExpr,
             fromInitializerListExpr,
@@ -166,17 +186,17 @@ namespace Slang
     DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef)
     {
         auto inheritanceDecl = getMembersOfType<InheritanceDecl>(astBuilder, structTypeDeclRef).getFirstOrNull();
-        if(!inheritanceDecl)
+        if (!inheritanceDecl)
             return nullptr;
 
         auto baseType = getBaseType(astBuilder, inheritanceDecl);
         auto baseDeclRefType = as<DeclRefType>(baseType);
-        if(!baseDeclRefType)
+        if (!baseDeclRefType)
             return nullptr;
 
         auto baseDeclRef = baseDeclRefType->getDeclRef();
         auto baseStructDeclRef = baseDeclRef.as<StructDecl>();
-        if(!baseStructDeclRef)
+        if (!baseStructDeclRef)
             return nullptr;
 
         return baseDeclRefType;
@@ -201,11 +221,24 @@ namespace Slang
         return baseStructDeclRef;
     }
 
+    GenericAppDeclRef* _getGenericAppDeclRefType(Type* argType)
+    {
+        auto argDeclRefType = as<DeclRefType>(argType);
+        if (argDeclRefType)
+        {
+            if (auto genericType = as<GenericAppDeclRef>(argDeclRefType->getDeclRefBase()))
+                return genericType;
+        }
+
+        return nullptr;
+    }
+
+    template<bool UseLegacyLogic>
     bool SemanticsVisitor::_readAggregateValueFromInitializerList(
-        Type*                inToType,
-        Expr**               outToExpr,
+        Type* inToType,
+        Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr,
-        UInt                       &ioArgIndex)
+        UInt& ioArgIndex)
     {
         auto toType = inToType;
         UInt argCount = fromInitializerListExpr->args.getCount();
@@ -214,14 +247,22 @@ namespace Slang
         // we will collect the new arguments here
         List<Expr*> coercedArgs;
 
-        if(isEffectivelyScalarForInitializerLists(toType))
+        if (isEffectivelyScalarForInitializerLists(toType))
         {
             // For any type that is effectively a non-aggregate,
             // we expect to read a single value from the initializer list
             //
-            if(ioArgIndex < argCount)
+            if (ioArgIndex < argCount)
             {
                 auto arg = fromInitializerListExpr->args[ioArgIndex++];
+
+                if (!canCoerce(toType, arg->type, nullptr))
+                {
+                    if (outToExpr)
+                        *outToExpr = arg;
+                    return true;
+                }
+
                 return _coerce(
                     CoercionSite::Initializer,
                     toType,
@@ -250,46 +291,46 @@ namespace Slang
             UInt elementCount = 0;
             if (auto constElementCount = as<ConstantIntVal>(toElementCount))
             {
-                elementCount = (UInt) constElementCount->getValue();
+                elementCount = (UInt)constElementCount->getValue();
             }
             else
             {
                 // We don't know the element count statically,
                 // so what are we supposed to be doing?
                 //
-                if(outToExpr)
+                if (outToExpr)
                 {
                     getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForVectorOfUnknownSize, toElementCount);
                 }
                 return false;
             }
 
-            for(UInt ee = 0; ee < elementCount; ++ee)
+            for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 Expr* coercedArg = nullptr;
-                bool argResult = _readValueFromInitializerList(
+                bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
                     toElementType,
                     outToExpr ? &coercedArg : nullptr,
                     fromInitializerListExpr,
                     ioArgIndex);
 
                 // No point in trying further if any argument fails
-                if(!argResult)
+                if (!argResult)
                     return false;
 
-                if( coercedArg )
+                if (coercedArg)
                 {
                     coercedArgs.add(coercedArg);
                 }
             }
         }
-        else if(auto toArrayType = as<ArrayExpressionType>(toType))
+        else if (auto toArrayType = as<ArrayExpressionType>(toType))
         {
             // TODO(tfoley): If we can compute the size of the array statically,
             // then we want to check that there aren't too many initializers present
 
             auto toElementType = toArrayType->getElementType();
-            if(!toArrayType->isUnsized())
+            if (!toArrayType->isUnsized())
             {
                 auto toElementCount = toArrayType->getElementCount();
 
@@ -299,34 +340,34 @@ namespace Slang
                 UInt elementCount = 0;
                 if (auto constElementCount = as<ConstantIntVal>(toElementCount))
                 {
-                    elementCount = (UInt) constElementCount->getValue();
+                    elementCount = (UInt)constElementCount->getValue();
                 }
                 else
                 {
                     // We don't know the element count statically,
                     // so what are we supposed to be doing?
                     //
-                    if(outToExpr)
+                    if (outToExpr)
                     {
                         getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForArrayOfUnknownSize, toElementCount);
                     }
                     return false;
                 }
 
-                for(UInt ee = 0; ee < elementCount; ++ee)
+                for (UInt ee = 0; ee < elementCount; ++ee)
                 {
                     Expr* coercedArg = nullptr;
-                    bool argResult = _readValueFromInitializerList(
+                    bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
                         toElementType,
                         outToExpr ? &coercedArg : nullptr,
                         fromInitializerListExpr,
                         ioArgIndex);
 
                     // No point in trying further if any argument fails
-                    if(!argResult)
+                    if (!argResult)
                         return false;
 
-                    if( coercedArg )
+                    if (coercedArg)
                     {
                         coercedArgs.add(coercedArg);
                     }
@@ -339,22 +380,22 @@ namespace Slang
                 // the element count.
                 //
                 UInt elementCount = 0;
-                while(ioArgIndex < argCount)
+                while (ioArgIndex < argCount)
                 {
                     Expr* coercedArg = nullptr;
-                    bool argResult = _readValueFromInitializerList(
+                    bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
                         toElementType,
                         outToExpr ? &coercedArg : nullptr,
                         fromInitializerListExpr,
                         ioArgIndex);
 
                     // No point in trying further if any argument fails
-                    if(!argResult)
+                    if (!argResult)
                         return false;
 
                     elementCount++;
 
-                    if( coercedArg )
+                    if (coercedArg)
                     {
                         coercedArgs.add(coercedArg);
                     }
@@ -366,7 +407,7 @@ namespace Slang
                     m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount));
             }
         }
-        else if(auto toMatrixType = as<MatrixExpressionType>(toType))
+        else if (auto toMatrixType = as<MatrixExpressionType>(toType))
         {
             // In the general case, the initializer list might comprise
             // both vectors and scalars.
@@ -388,88 +429,246 @@ namespace Slang
 
             if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
             {
-                rowCount = (UInt) constRowCount->getValue();
+                rowCount = (UInt)constRowCount->getValue();
             }
             else
             {
                 // We don't know the element count statically,
                 // so what are we supposed to be doing?
                 //
-                if(outToExpr)
+                if (outToExpr)
                 {
                     getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForMatrixOfUnknownSize, toMatrixType->getRowCount());
                 }
                 return false;
             }
 
-            for(UInt rr = 0; rr < rowCount; ++rr)
+            for (UInt rr = 0; rr < rowCount; ++rr)
             {
                 Expr* coercedArg = nullptr;
-                bool argResult = _readValueFromInitializerList(
+                bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
                     toRowType,
                     outToExpr ? &coercedArg : nullptr,
                     fromInitializerListExpr,
                     ioArgIndex);
 
                 // No point in trying further if any argument fails
-                if(!argResult)
+                if (!argResult)
                     return false;
 
-                if( coercedArg )
+                if (coercedArg)
                 {
                     coercedArgs.add(coercedArg);
                 }
             }
         }
-        else if(auto toDeclRefType = as<DeclRefType>(toType))
+        else if (auto toDeclRefType = as<DeclRefType>(toType))
         {
-            auto toTypeDeclRef = toDeclRefType->getDeclRef();
-            if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
+            // We allow using legacy "init list" logic as a backup if something fails
+            if constexpr (UseLegacyLogic)
             {
-                // Trying to initialize a `struct` type given an initializer list.
-                //
-                // Before we iterate over the fields, we want to check if this struct
-                // inherits from another `struct` type. If so, we want to read
-                // an initializer for that base type first.
-                //
-                if (auto baseStructType = findBaseStructType(m_astBuilder, toStructDeclRef))
+                auto toTypeDeclRef = toDeclRefType->getDeclRef();
+                if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
                 {
-                    Expr* coercedArg = nullptr;
-                    bool argResult = _readValueFromInitializerList(
-                        baseStructType,
-                        outToExpr ? &coercedArg : nullptr,
-                        fromInitializerListExpr,
-                        ioArgIndex);
-
-                    // No point in trying further if any argument fails
-                    if (!argResult)
-                        return false;
-
-                    if (coercedArg)
+                    // Trying to initialize a `struct` type given an initializer list.
+                    //
+                    // Before we iterate over the fields, we want to check if this struct
+                    // inherits from another `struct` type. If so, we want to read
+                    // an initializer for that base type first.
+                    //
+                    if (auto baseStructType = findBaseStructType(m_astBuilder, toStructDeclRef))
                     {
-                        coercedArgs.add(coercedArg);
+                        Expr* coercedArg = nullptr;
+                        bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
+                            baseStructType,
+                            outToExpr ? &coercedArg : nullptr,
+                            fromInitializerListExpr,
+                            ioArgIndex);
+
+                        // No point in trying further if any argument fails
+                        if (!argResult)
+                            return false;
+
+                        if (coercedArg)
+                        {
+                            coercedArgs.add(coercedArg);
+                        }
+                    }
+
+                    // We will go through the fields in order and try to match them
+                    // up with initializer arguments.
+                    //
+                    for (auto fieldDeclRef : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
+                    {
+                        Expr* coercedArg = nullptr;
+                        bool argResult = _readValueFromInitializerList<UseLegacyLogic>(
+                            getType(m_astBuilder, fieldDeclRef),
+                            outToExpr ? &coercedArg : nullptr,
+                            fromInitializerListExpr,
+                            ioArgIndex);
+
+                        // No point in trying further if any argument fails
+                        if (!argResult)
+                            return false;
+
+                        if (coercedArg)
+                        {
+                            coercedArgs.add(coercedArg);
+                        }
                     }
                 }
-
-                // We will go through the fields in order and try to match them
-                // up with initializer arguments.
-                //
-                for(auto fieldDeclRef : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
+            }
+            else
+            {
+                auto toTypeDeclRef = toDeclRefType->getDeclRef();
+                if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
                 {
-                    Expr* coercedArg = nullptr;
-                    bool argResult = _readValueFromInitializerList(
-                        getType(m_astBuilder, fieldDeclRef),
-                        outToExpr ? &coercedArg : nullptr,
-                        fromInitializerListExpr,
-                        ioArgIndex);
+                    // We will try to coerce the initializer list into a struct following these steps:
+                    // 1. Ensure our `StructDecl` has declaratations created for all auto-generated constructors
+                    // 2. We have a `{}` (0 arguments), try to coerce
+                    // 3. We have a `{arg1, arg2...}`, try to coerce
 
-                    // No point in trying further if any argument fails
-                    if(!argResult)
-                        return false;
+                    auto toStructDecl = toStructDeclRef.getDecl();
+                    // 1. Ensure our `StructDecl` has declaratations created for all auto-generated constructors
+                    ensureDecl(toStructDecl, DeclCheckState::DefaultConstructorReadyForUse);
 
-                    if( coercedArg )
+                    // 2. We have a `{}` (0 arguments), try to coerce
+                    if (argCount == 0)
                     {
-                        coercedArgs.add(coercedArg);
+                        if (outToExpr)
+                        {
+                            *outToExpr = constructDefaultInitListFunc(this, toStructDecl, toType, ConstructDefaultInitListOptions::CheckToAvoidRecursion);
+                            (*outToExpr)->loc = fromInitializerListExpr->loc;
+                        }
+                        return true;
+                    }
+
+                    // 3. We have a `{arg1, arg2...}`, try to coerce
+                    //
+                    // For this situation we have more steps:
+                    // a. Find constructor candidate for our particular init-list
+                    // b. Collect and coerce init-list arguments into constructor parameters
+                    // c. Create InvokeExpr for our valid ConstructorDecl 
+                    List<ConstructorDecl*> ctorList = _getCtorList(this->getASTBuilder(), this, toStructDecl, nullptr);
+                    bool allowCStyleInitList = isCStyleStructDecl(this, toStructDecl, ctorList);
+
+                    List<Expr*> maybeArgList;
+                    maybeArgList.reserve(argCount);
+                    Index ioArgIndexMirror = ioArgIndex;
+                    UInt ioArgIndexCandidate = 0;
+
+                    for (auto& ctor : ctorList)
+                    {
+                        // a. Find constructor candidate for our particular init-list
+
+                        // Don't try to init default ctor with this logic
+                        auto ctorParamCount = ctor->getParameters().getCount();
+                        if (ctorParamCount == 0)
+                            continue;
+
+                        ioArgIndexCandidate = ioArgIndexMirror;
+                        ioArgIndex = ctorParamCount;
+
+                        // if allowCStyleInitList, process any ctor which comes next using the most members possible. ioArgIndex may not be 0.
+                        // if !allowCStyleInitList, process any ctor that exactly matched our argument count. ioArgIndex must start at 0.
+                        if (!allowCStyleInitList && ctorParamCount != Index(argCount))
+                            continue;
+
+                        // b. Collect and coerce init-list arguments into constructor parameters
+                        List<ConstructorDecl*> maybeCandidate;
+                        auto parameters = getParameters(m_astBuilder, ctor);
+                        auto parametersCount = parameters.getCount();
+
+                        for (auto index = coercedArgs.getCount(); index < parametersCount; index++)
+                        {
+                            // If we ran out of elements and allow using a c-style-partial-initialization-list, end early.
+                            if ((Index)ioArgIndexCandidate > fromInitializerListExpr->args.getCount())
+                                break;
+
+                            auto ctorParam = parameters[index];
+                            auto paramType = ctorParam.getDecl()->type.type;
+                            for (auto i : getMembersOfType<VarDecl>(m_astBuilder, toStructDeclRef, MemberFilterStyle::Instance))
+                                if (i.getDecl()->type.type == paramType)
+                                    paramType = getType(m_astBuilder, i);
+
+                            Expr* coercedArg = nullptr;
+                            _readValueFromInitializerList<UseLegacyLogic>(
+                                paramType,
+                                &coercedArg,
+                                fromInitializerListExpr,
+                                ioArgIndexCandidate);
+
+                            if (coercedArg)
+                                maybeArgList.add(coercedArg);
+                            else
+                                break;
+                        }
+
+                        if (!allowCStyleInitList && maybeArgList.getCount() != ctorParamCount)
+                            continue;
+
+                        // Skip non-visible constructors.
+                        if (!isDeclVisible(ctor))
+                        {
+                            // if an exact argument match with our init-list we know the user meant to use a
+                            // member-wise constructor, error
+                            if (ctorParamCount == Index(argCount))
+                                getSink()->diagnose(fromInitializerListExpr, Diagnostics::declIsNotVisible, ctor);
+                            continue;
+                        }
+
+                        // c. Create InvokeExpr for our valid ConstructorDecl 
+                        // We cannot fail anymore, set `ioArgIndex` to the 'used up arg count'.
+                        if (outToExpr)
+                        {
+                            ioArgIndex = ioArgIndexCandidate;
+
+                            for (auto i : maybeArgList)
+                                coercedArgs.add(i);
+
+                            List<Type*> argTypes;
+                            for (auto i : coercedArgs)
+                                argTypes.add(i->type);
+
+                            auto* varExpr = getASTBuilder()->create<VarExpr>();
+                            varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
+                            varExpr->declRef = isDeclRefTypeOf<Decl>(toType);
+                            auto* constructorExpr = getASTBuilder()->create<InvokeExpr>();
+                            constructorExpr->functionExpr = varExpr;
+                            constructorExpr->arguments.addRange(coercedArgs);
+                            auto resolvedConstructorExpr = CheckExpr(constructorExpr);
+
+                            *outToExpr = resolvedConstructorExpr;
+                        }
+                        return true;
+                    }
+
+                    // If we have a generic being compared to another generic (with different generic arguments) 
+                    // coerce logic will fail regardless of if generics are valid together. Example is below:
+                    //
+                    // MyStruct<T> tmp = {MyStructBase<U>(), 1}; // Assume 'U' is unresolved at this point in time but equal to T 
+                    //
+                    // To handle this since this is not verifiable coerce logic:
+                    // 1. We need to ensure we don't have any matching constructors
+                    // 2. if '1.' is true we can assign the possibly compatible generics and let generic resolution 
+                    //    diagnose an error down the line if types are in-compatible
+
+                    if (auto toGenericType = _getGenericAppDeclRefType(toType))
+                    {
+                        auto arg = fromInitializerListExpr->args[ioArgIndexMirror];
+                        if (auto fromGenericType = _getGenericAppDeclRefType(getType(m_astBuilder, arg)))
+                        {
+                            for (;;)
+                            {
+                                if (toGenericType->getBase() != fromGenericType->getBase())
+                                    break;
+
+                                ioArgIndex = ioArgIndexMirror;
+                                *outToExpr = arg;
+                                ioArgIndex++;
+                                return true;
+                            }
+                        }
                     }
                 }
             }
@@ -481,7 +680,7 @@ namespace Slang
             // list invalid if we are trying to read something
             // off of it that wasn't handled by the cases above.
             //
-            if(outToExpr)
+            if (outToExpr)
             {
                 getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotUseInitializerListForType, inToType);
             }
@@ -491,7 +690,7 @@ namespace Slang
         // We were able to coerce all the arguments given, and so
         // we need to construct a suitable expression to remember the result
         //
-        if(outToExpr)
+        if (outToExpr)
         {
             auto toInitializerListExpr = m_astBuilder->create<InitializerListExpr>();
             toInitializerListExpr->loc = fromInitializerListExpr->loc;
@@ -503,10 +702,10 @@ namespace Slang
             // 
             if (auto func = getParentFuncOfVisitor())
             {
-                if (func->findModifier<DifferentiableAttribute>() && 
+                if (func->findModifier<DifferentiableAttribute>() &&
                     !isTypeDifferentiable(toType))
                 {
-                    for (auto &arg : toInitializerListExpr->args)
+                    for (auto& arg : toInitializerListExpr->args)
                     {
                         if (isTypeDifferentiable(arg->type.type))
                         {
@@ -525,9 +724,32 @@ namespace Slang
         return true;
     }
 
+    void _maybeRunLegacyLogic(
+        SemanticsVisitor* visitor,
+        Type* toType,
+        Expr** outToExpr,
+        InitializerListExpr* fromInitializerListExpr,
+        bool& result,
+        UInt& argIndex,
+        bool& ranLegacyLogic
+        )
+    {
+        // Try to use legacy struct logic if we have a 'struct' toType for Slang backwards compatability
+        // Note: if we remove this entire `if` block, "LegacyLogic" will be no-longer be enabled 
+        if (auto declRefType = as<DeclRefType>(toType))
+        {
+            if (declRefType->getDeclRef().as<StructDecl>())
+            {
+                argIndex = 0;
+                ranLegacyLogic = true;
+                result = visitor->_readAggregateValueFromInitializerList<true>(toType, outToExpr, fromInitializerListExpr, argIndex);
+            }
+        }
+    }
+
     bool SemanticsVisitor::_coerceInitializerList(
-        Type*                toType,
-        Expr**               outToExpr,
+        Type* toType,
+        Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr)
     {
         UInt argCount = fromInitializerListExpr->args.getCount();
@@ -543,20 +765,37 @@ namespace Slang
         // If this isn't prohibited, then we can proceed to try and coerce from
         // the initializer list itself; assuming that coercion is closed under
         // composition this shouldn't fail.
-        if(!as<InitializerListType>(fromInitializerListExpr->type) &&
-           !canCoerce(toType, fromInitializerListExpr->type, nullptr))
+        if (!as<InitializerListType>(fromInitializerListExpr->type) &&
+            !canCoerce(toType, fromInitializerListExpr->type, nullptr))
             return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
 
-        if(!_readAggregateValueFromInitializerList(toType, outToExpr, fromInitializerListExpr, argIndex))
-            return false;
+        // If we fail, try to run legacy logic.
+        bool usedLegacy = false;
+        bool result = _readAggregateValueFromInitializerList<false>(toType, outToExpr, fromInitializerListExpr, argIndex);
+        // Note: if we remove this entire `if` block for a `return false`, "LegacyLogic" will be no-longer be enabled for "failed" case
+        if(!result)
+        {
+            _maybeRunLegacyLogic(this, toType, outToExpr, fromInitializerListExpr, result, argIndex, usedLegacy);
+            if (!result)
+                return false;
+        }
 
         if(argIndex != argCount)
         {
             if( outToExpr )
             {
-                getSink()->diagnose(fromInitializerListExpr, Diagnostics::tooManyInitializers, argIndex, argCount);
+                // Note: if we remove this entire `if` block, "LegacyLogic" will be no-longer be enabled for "too-many-arg" case
+                if (!usedLegacy)
+                    _maybeRunLegacyLogic(this, toType, outToExpr, fromInitializerListExpr, result, argIndex, usedLegacy);
+                // If we fail without/with legacy logic, error as usual
+                if (argIndex != argCount)
+                    getSink()->diagnose(fromInitializerListExpr, Diagnostics::cannotFindMatchingInitListToConstructorCount, argCount, toType);
             }
         }
+
+        // Warn that legacy logic is the reason for code to compile
+        if (usedLegacy)
+            getSink()->diagnose(fromInitializerListExpr, Diagnostics::usingLegacyInitListStructLogic);
 
         return true;
     }
@@ -925,9 +1164,7 @@ namespace Slang
             }
             if (outToExpr)
             {
-                auto* defaultExpr = getASTBuilder()->create<DefaultConstructExpr>();
-                defaultExpr->type = QualType(toType);
-                *outToExpr = defaultExpr;
+                *outToExpr = createDefaultConstructExprForType(getASTBuilder(), QualType(toType), {});
             }
             return true;
         }

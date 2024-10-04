@@ -12,7 +12,7 @@ interface ISimple
 
 struct Simple : ISimple
 {
-	int val;
+	int val = {};
 
 	int getVal() { return val; }
 };

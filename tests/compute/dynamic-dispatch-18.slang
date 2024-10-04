@@ -19,10 +19,10 @@ interface IInterface
 
 struct Impl : IInterface
 {
-    int data;
+    int data = {};
     struct Getter : IReturnsZero
     {
-        bool data;
+        bool data = {};
         float get() { if (data) return 0.0; else return 1.0;}
     }
     Getter createGetter() { Getter g; g.data = true; return g; }

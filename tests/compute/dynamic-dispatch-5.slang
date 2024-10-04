@@ -17,7 +17,7 @@ int GenericCompute<T:IInterface>(int inVal, T obj, T other)
 
 struct Impl : IInterface
 {
-    int base;
+    int base = {};
 	int Compute(int inVal, This other) { return other.base + base + inVal; }
 };
 int test(int inVal)

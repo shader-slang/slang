@@ -1,4 +1,13 @@
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+
+//CHECK: tests/diagnostics/autodiff.slang({{..}}): error 38031:
+//CHECK-NEXT: float x1 = no_diff x;
+
+//CHECK: tests/diagnostics/autodiff.slang({{..}}): error 38032:
+//CHECK-NEXT: return no_diff f(x);
+
+//CHECK: tests/diagnostics/autodiff.slang({{..}}): error 38033: 
+//CHECK-NEXT: return no_diff nonDiff(x);
 
 float nonDiff(float x)
 {
