@@ -5778,6 +5778,7 @@ struct $(item.name)
         //
         // This allows call's to stay aware that the input is from a 'Buffer'.
         [__NoSideEffect]
+        [nonmutating]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
         ref;
     }
@@ -16113,6 +16114,7 @@ ${{{{
             // If a 'Texture[index]' is referred to by a '__ref', call 'kIROp_ImageSubscript(index)'.
             // This allows call's to stay aware that the input is from a 'Texture'.
             __intrinsic_op($(kIROp_ImageSubscript))
+            [nonmutating]
             ref;
 ${{{{
         } // access != SLANG_RESOURCE_ACCESS_READ

@@ -436,6 +436,26 @@ namespace Slang
                     // of a GLSL buffer interface block which isn't marked as
                     // read_only
                     expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) && (expr->type.hasReadOnlyOnTarget == false);
+
+                    // Another exception is if we are accessing a property
+                    // that provides a [nonmutating] setter.
+                    if (!expr->type.isLeftValue &&
+                        as<PropertyDecl>(declRef.getDecl()))
+                    {
+                        bool isLValue = false;
+                        for (auto member : as<ContainerDecl>(declRef.getDecl())->members)
+                        {
+                            if (as<SetterDecl>(member) || as< RefAccessorDecl>(member))
+                            {
+                                if (member->findModifier<NonmutatingAttribute>())
+                                {
+                                    isLValue = true;
+                                }
+                                break;
+                            }
+                        }
+                        expr->type.isLeftValue = isLValue;
+                    }
                 }
                 else
                 {
@@ -3373,6 +3393,7 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
         auto valueExpr = dispatch(sizeOfLikeExpr->value);
+        sizeOfLikeExpr->type = m_astBuilder->getIntType();
         
         Type* type = nullptr;
 
@@ -4733,7 +4754,9 @@ namespace Slang
             scope = scope->parent;
         }
 
-        getSink()->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
+        if (auto sink = getSink())
+            sink->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
+            
         return CreateErrorExpr(expr);
     }
 

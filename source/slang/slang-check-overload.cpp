@@ -1070,10 +1070,29 @@ namespace Slang
                     if(auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                     {
                         const auto& decl = subscriptDeclRef.getDecl();
-                        if (decl->getMembersOfType<SetterDecl>().isNonEmpty() ||
-                            decl->getMembersOfType<RefAccessorDecl>().isNonEmpty())
+                        for (auto member : decl->members)
                         {
-                            callExpr->type.isLeftValue = true;
+                            if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
+                            {
+                                // If the subscript decl has a setter,
+                                // then the call is an l-value if base is l-value.
+                                if (auto base = GetBaseExpr(baseExpr))
+                                {
+                                    if (base->type.isLeftValue)
+                                    {
+                                        callExpr->type.isLeftValue = true;
+                                        break;
+                                    }
+                                }
+                                // Otherwise, if the accessor is [nonmutating], we can
+                                // also consider the result of the subscript call as l-value
+                                // regardless of the base.
+                                if (member->findModifier<NonmutatingAttribute>())
+                                {
+                                    callExpr->type.isLeftValue = true;
+                                    break;
+                                }
+                            }
                         }
                     }
 
@@ -2613,7 +2632,7 @@ namespace Slang
 
         // If absolutely no viable candidates were extracted from the overloaded expression,
         // we may be dealing with a composite type or an overloaded expression with composite types.
-        // 
+        //
 
         auto typeExpr = funcExpr;
         if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
