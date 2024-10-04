@@ -25,6 +25,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     TARGET_NAME prelude
     INCLUDE_DIRECTORIES_PUBLIC ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/../include
+    LINK_WITH_PRIVATE unordered_dense::unordered_dense
     PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/slang*.h
     # It's an object library, so the install step only installs the headers
     INSTALL

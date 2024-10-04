@@ -4754,7 +4754,9 @@ namespace Slang
             scope = scope->parent;
         }
 
-        getSink()->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
+        if (auto sink = getSink())
+            sink->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
+            
         return CreateErrorExpr(expr);
     }
 
