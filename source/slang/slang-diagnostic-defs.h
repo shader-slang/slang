@@ -904,6 +904,9 @@ DIAGNOSTIC(-1, Note, reportCheckpointVariable, "$0 bytes ($1) used to checkpoint
 DIAGNOSTIC(-1, Note, reportCheckpointCounter, "$0 bytes ($1) used for a loop counter here:")
 DIAGNOSTIC(-1, Note, reportCheckpointNone, "no checkpoint contexts to report")
 
+// 9xxxx - Documentation generation
+DIAGNOSTIC(90001, Warning, ignoredDocumentationOnOverloadCandidate, "documentation comment on overload candidate '$0' is ignored")
+
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.
 //

@@ -20,6 +20,11 @@ public:
             ModuleName = 0x02,                  ///< Writes out module names
             NoInternalKeywords = 0x04,          ///< Omits internal decoration keywords (e.g. __target_intrinsic).
             SimplifiedBuiltinType = 0x08,       ///< Prints simplified builtin generic types (e.g. float3) instead of its generic form.
+
+            /// Use the original generic type name instead of the specialized
+            /// type name defined on an extension when
+            /// printing the target type of an extension decl.
+            NoSpecializedExtensionTypeName = 0x10,
         };
     };
 

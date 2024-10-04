@@ -11,10 +11,88 @@ namespace Slang {
 
 class ASTBuilder;
 
+struct DocumentPage : public RefObject
+{
+    String title;
+    String shortName;
+    String path;
+    StringBuilder contentSB;
+    Decl* decl;
+    bool skipWrite = false;
+    DocumentPage* parentPage = nullptr;
+    DocumentPage* findChildByShortName(const UnownedStringSlice& shortName);
+    StringBuilder& get() { return contentSB; }
+    List<RefPtr<DocumentPage>> children;
+
+    // List of entries to document on this page.
+    OrderedHashSet<ASTMarkup::Entry*> entries;
+    ASTMarkup::Entry* getFirstEntry() { return *entries.begin(); }
+    void writeToDisk();
+};
+
+struct DocumentationConfig
+{
+    String preamble;
+    String title;
+    String libName;
+    String rootDir;
+    HashSet<String> visibleDeclNames;
+    void parse(UnownedStringSlice configStr);
+};
+
+enum DocumentationSpanKind
+{
+    OrdinaryText,
+    InlineCode,
+};
+struct ParsedDocumentationSpan
+{
+    String text;
+    DocumentationSpanKind kind;
+};
+struct DocMarkdownWriter;
+
+struct ParsedDescription
+{
+    String ownedText;
+    List<ParsedDocumentationSpan> spans;
+    void parse(UnownedStringSlice text);
+    void write(DocMarkdownWriter* writer, StringBuilder& out);
+};
+
+struct ParamDocumentation
+{
+    String name;
+    String direction;
+    ParsedDescription description;
+};
+
+enum class DocPageSection
+{
+    Description,
+    Parameter,
+    ReturnInfo,
+    Remarks,
+    Example,
+    SeeAlso,
+};
+
+struct FuncDocumentation
+{
+    Dictionary<String, ParamDocumentation> parameters;
+    Dictionary<DocPageSection, ParsedDescription> sections;
+    void parse(const UnownedStringSlice& text);
+};
+
 struct DocMarkdownWriter
 {
     typedef ASTPrinter::Part Part;
     typedef ASTPrinter::PartPair PartPair;
+
+    enum WriteDeclMode
+    {
+        Header, Content
+    };
 
     struct Signature
     {
@@ -34,46 +112,59 @@ struct DocMarkdownWriter
     {
         typedef Requirement ThisType;
 
-        bool operator<(const ThisType& rhs) const { return Index(target) < Index(rhs.target) || (target == rhs.target && value < rhs.value); } 
+        bool operator==(const ThisType& rhs) const { return capabilitySet == rhs.capabilitySet; }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(capabilitySet == rhs.capabilitySet); }
 
-        bool operator==(const ThisType& rhs) const { return target == rhs.target && value == rhs.value; }
-        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-            /// Using CodeGenTarget may not be most appropriate, perhaps it should use a CapabilityAtom
-            /// For now use target, and since we always go through Source -> byte code it is fairly straight forward to understand the
-            /// meaning.
-        CodeGenTarget target;
-            /// The 'value' requirement associated with a target. If it's empty it's just the target that is a requirement.
-        String value;
+        CapabilitySet capabilitySet;
     };
 
         /// Write out all documentation to the output buffer
-    void writeAll();
+    DocumentPage* writeAll(UnownedStringSlice configStr);
+    String writeTOC();
+
+    void ensureDeclPageCreated(ASTMarkup::Entry& entry);
+    String translateToHTMLWithLinks(String text);
+    String translateToMarkdownWithLinks(String text, bool strictChildLookup = false);
+    String escapeMarkdownText(String text);
+    void generateSectionIndexPage(DocumentPage* page);
+    void writePageRecursive(DocumentPage* page);
+    void writePage(DocumentPage* page);
 
         /// This will write information about *all* of the overridden versions of a function/method
-    void writeCallableOverridable(const ASTMarkup::Entry& entry, CallableDecl* callable);
+    void writeCallableOverridable(DocumentPage* page, const ASTMarkup::Entry& entry, CallableDecl* callable);
 
     void writeEnum(const ASTMarkup::Entry& entry, EnumDecl* enumDecl);
-    void writeAggType(const ASTMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl);
-    void writeDecl(const ASTMarkup::Entry& entry, Decl* decl);
+    void writeAggType(DocumentPage* page, const ASTMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl);
     void writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl);
+    void writeProperty(const ASTMarkup::Entry& entry, PropertyDecl* propertyDecl);
+    void writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl* typeDefDecl);
 
-    void writePreamble(const ASTMarkup::Entry& entry);
-    void writeDescription(const ASTMarkup::Entry& entry);
+    void createPage(WriteDeclMode mode, ASTMarkup::Entry& entry, Decl* decl);
+
+    void writePreamble();
+    bool writeDescription(const ASTMarkup::Entry& entry);
 
     void writeSignature(CallableDecl* callableDecl);
+    void writeExtensionConditions(StringBuilder& sb, ExtensionDecl* decl, const char* prefix, bool isHtml);
 
     bool isVisible(const ASTMarkup::Entry& entry);
     bool isVisible(Decl* decl);
     bool isVisible(const Name* name);
 
+    DocumentPage* findPageForToken(DocumentPage* currentPage, String token);
+    String findLinkForToken(DocumentPage* currentPage, String token);
+
         /// Get the output string
-    const StringBuilder& getOutput() const { return m_builder; }
+    Dictionary<String, RefPtr<DocumentPage>>& getOutput() { return m_output; }
+
+    DocumentPage* getPage(Decl* decl);
+    StringBuilder* getBuilder(Decl* decl);
 
         /// Ctor.
-    DocMarkdownWriter(ASTMarkup* markup, ASTBuilder* astBuilder) :
+    DocMarkdownWriter(ASTMarkup* markup, ASTBuilder* astBuilder, DiagnosticSink* sink) :
         m_markup(markup),
-        m_astBuilder(astBuilder)
+        m_astBuilder(astBuilder),
+        m_sink(sink)
     {
     }
 
@@ -88,9 +179,11 @@ struct DocMarkdownWriter
         String text;
     };
 
-    List<NameAndText> _getUniqueParams(const List<Decl*>& decls);
+    List<NameAndText> _getUniqueParams(const List<Decl*>& decls, FuncDocumentation* funcDoc);
 
     String _getName(Decl* decl);
+    String _getFullName(Decl* decl);
+    String _getDocFilePath(Decl* decl);
     String _getName(InheritanceDecl* decl);
 
     NameAndText _getNameAndText(ASTMarkup::Entry* entry, Decl* decl);
@@ -120,24 +213,34 @@ struct DocMarkdownWriter
     List<NameAndText> _getAsNameAndTextList(const List<Decl*>& in);
     List<String> _getAsStringList(const List<Decl*>& in);
 
-    void _appendAsBullets(const List<NameAndText>& values, char wrapChar);
+    void _appendAsBullets(const List<NameAndText>& values, bool insertLinkForName, char wrapChar);
     void _appendAsBullets(const List<String>& values, char wrapChar);
 
     void _appendCommaList(const List<String>& strings, char wrapChar);
 
-    void _appendRequirements(const List<DocMarkdownWriter::Requirement>& requirements);
-    void _maybeAppendRequirements(const UnownedStringSlice& title, const List<List<DocMarkdownWriter::Requirement>>& uniqueRequirements);
-    void _writeTargetRequirements(const Requirement* reqs, Index reqsCount);
+    void _appendRequirements(const DocMarkdownWriter::Requirement& requirements);
+    void _maybeAppendRequirements(const UnownedStringSlice& title, const List<DocMarkdownWriter::Requirement>& uniqueRequirements);
+
+    void _appendExpr(StringBuilder& sb, Expr* expr);
 
         /// Appends prefix and the list of types derived from
     void _appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl);
     void _appendEscaped(const UnownedStringSlice& text);
 
-    void _appendAggTypeName(AggTypeDeclBase* aggTypeDecl);
+    void _appendAggTypeName(const ASTMarkup::Entry& entry, Decl* aggTypeDecl);
 
     ASTMarkup* m_markup;
     ASTBuilder* m_astBuilder;
-    StringBuilder m_builder;
+    DiagnosticSink* m_sink;
+    StringBuilder* m_builder = nullptr;
+    DocumentPage* m_currentPage = nullptr;
+    Dictionary<String, RefPtr<DocumentPage>> m_output;
+    RefPtr<DocumentPage> m_rootPage;
+    RefPtr<DocumentPage> m_typesPage;
+    RefPtr<DocumentPage> m_interfacesPage;
+    RefPtr<DocumentPage> m_globalDeclsPage;
+
+    DocumentationConfig m_config;
 };
 
 } // namespace Slang
