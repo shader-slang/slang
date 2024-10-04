@@ -8476,7 +8476,7 @@ namespace Slang
         {
             getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
         }
-    
+
         auto structDecl = as<StructDecl>(aggTypeDecl);
         if (!structDecl)
             return;
@@ -8525,13 +8525,17 @@ namespace Slang
             varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase);
         }
 
-        Index insertOffset = 0;
         Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
         for (auto ctor : structDeclInfo.ctorList)
         {
             auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
             auto seqStmtChild = m_astBuilder->create<SeqStmt>();
-            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount());
+            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount() + structDecl->members.getCount());
+
+            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+            thisExpr->scope = ctor->ownedScope;
+            thisExpr->type = ctor->returnType.type;
+
             for (auto& declInfo : inheritanceDefaultCtorList)
             {
                 if (!declInfo.defaultCtor)
@@ -8546,9 +8550,9 @@ namespace Slang
                 auto invoke = m_astBuilder->create<InvokeExpr>();
                 invoke->functionExpr = ctorToInvoke;
 
-                ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-                thisExpr->scope = ctor->ownedScope;
-                thisExpr->type = ctor->returnType.type;
+                // ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+                // thisExpr->scope = ctor->ownedScope;
+                // thisExpr->type = ctor->returnType.type;
 
                 auto assign = m_astBuilder->create<AssignExpr>();
                 assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
@@ -8560,22 +8564,6 @@ namespace Slang
                 seqStmtChild->stmts.add(stmt);
             }
 
-            if (seqStmtChild->stmts.getCount() == 0)
-                continue;
-
-            seqStmt->stmts.insert(0, seqStmtChild);
-            insertOffset = 1;
-        }
-
-        for (auto ctor : structDeclInfo.ctorList)
-        {
-            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-            thisExpr->scope = ctor->ownedScope;
-            thisExpr->type = ctor->returnType.type;
-
-            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
-            seqStmtChild->stmts.reserve(structDecl->members.getCount());
             for (auto& m : structDecl->members)
             {
                 auto varDeclBase = as<VarDeclBase>(m);
@@ -8616,9 +8604,11 @@ namespace Slang
 
                 seqStmtChild->stmts.add(stmt);
             }
-            if (seqStmtChild->stmts.getCount() == 0)
-                continue;
-            seqStmt->stmts.insert(insertOffset, seqStmtChild);
+
+            if (seqStmtChild->stmts.getCount() != 0)
+            {
+                seqStmt->stmts.insert(0, seqStmtChild);
+            }
         }
 
         if (structDeclInfo.defaultCtor)
