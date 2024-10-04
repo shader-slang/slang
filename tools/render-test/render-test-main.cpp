@@ -707,67 +707,50 @@ void RenderTestApp::_initializeAccelerationStructure()
 
     // Build bottom level acceleration structure.
     {
-        IAccelerationStructure::BuildInputs accelerationStructureBuildInputs = {};
-        IAccelerationStructure::PrebuildInfo accelerationStructurePrebuildInfo = {};
-        accelerationStructureBuildInputs.descCount = 1;
-        accelerationStructureBuildInputs.kind = IAccelerationStructure::Kind::BottomLevel;
-        accelerationStructureBuildInputs.flags =
-            IAccelerationStructure::BuildFlags::AllowCompaction;
-        IAccelerationStructure::GeometryDesc geomDesc = {};
-        geomDesc.flags = IAccelerationStructure::GeometryFlags::Opaque;
-        geomDesc.type = IAccelerationStructure::GeometryType::Triangles;
-        geomDesc.content.triangles.indexCount = 0;
-        geomDesc.content.triangles.indexData = 0;
-        geomDesc.content.triangles.indexFormat = Format::Unknown;
-        geomDesc.content.triangles.vertexCount = kVertexCount;
-        geomDesc.content.triangles.vertexData = vertexBuffer->getDeviceAddress();
-        geomDesc.content.triangles.vertexFormat = Format::R32G32B32_FLOAT;
-        geomDesc.content.triangles.vertexStride = sizeof(Vertex);
-        geomDesc.content.triangles.transform3x4 = transformBuffer->getDeviceAddress();
-        accelerationStructureBuildInputs.geometryDescs = &geomDesc;
+        AccelerationStructureBuildInputTriangles triangles = {};
+        BufferWithOffset vertexBufferWithOffset = vertexBuffer;
+        triangles.vertexBuffers = &vertexBufferWithOffset;
+        triangles.vertexBufferCount = 1;
+        triangles.vertexFormat = Format::R32G32B32_FLOAT;
+        triangles.vertexCount = kVertexCount;
+        triangles.vertexStride = sizeof(Vertex);
+        triangles.preTransformBuffer = transformBuffer;
+        triangles.flags = AccelerationStructureGeometryFlags::Opaque;
+        AccelerationStructureBuildDesc buildDesc = {};
+        buildDesc.inputs = &triangles;
+        buildDesc.inputCount = 1;
+        buildDesc.flags = AccelerationStructureBuildFlags::AllowCompaction;
 
         // Query buffer size for acceleration structure build.
-        m_device->getAccelerationStructurePrebuildInfo(
-            accelerationStructureBuildInputs, &accelerationStructurePrebuildInfo);
-        // Allocate buffers for acceleration structure.
-        BufferDesc asDraftBufferDesc = {};
-        asDraftBufferDesc.usage = BufferUsage::AccelerationStructure;
-        asDraftBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asDraftBufferDesc.size = accelerationStructurePrebuildInfo.resultDataMaxSize;
-        ComPtr<IBuffer> draftBuffer = m_device->createBuffer(asDraftBufferDesc);
+        AccelerationStructureSizes accelerationStructureSizes = {};
+        m_device->getAccelerationStructureSizes(buildDesc, &accelerationStructureSizes);
+
         BufferDesc scratchBufferDesc = {};
         scratchBufferDesc.usage = BufferUsage::UnorderedAccess;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-        scratchBufferDesc.size = accelerationStructurePrebuildInfo.scratchDataSize;
+        scratchBufferDesc.size = accelerationStructureSizes.scratchSize;
         ComPtr<IBuffer> scratchBuffer = m_device->createBuffer(scratchBufferDesc);
 
-        // Build acceleration structure.
         ComPtr<IQueryPool> compactedSizeQuery;
         QueryPoolDesc queryPoolDesc = {};
         queryPoolDesc.count = 1;
         queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
         m_device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef());
 
+        // Build acceleration structure.
         ComPtr<IAccelerationStructure> draftAS;
-        IAccelerationStructure::CreateDesc draftCreateDesc = {};
-        draftCreateDesc.buffer = draftBuffer;
-        draftCreateDesc.kind = IAccelerationStructure::Kind::BottomLevel;
-        draftCreateDesc.offset = 0;
-        draftCreateDesc.size = accelerationStructurePrebuildInfo.resultDataMaxSize;
-        m_device->createAccelerationStructure(draftCreateDesc, draftAS.writeRef());
+        AccelerationStructureDesc draftDesc = {};
+        draftDesc.size = accelerationStructureSizes.accelerationStructureSize;
+        m_device->createAccelerationStructure(draftDesc, draftAS.writeRef());
 
         compactedSizeQuery->reset();
 
         auto commandBuffer = m_transientHeap->createCommandBuffer();
         auto encoder = commandBuffer->encodeRayTracingCommands();
-        IAccelerationStructure::BuildDesc buildDesc = {};
-        buildDesc.dest = draftAS;
-        buildDesc.inputs = accelerationStructureBuildInputs;
-        buildDesc.scratchData = scratchBuffer->getDeviceAddress();
         AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
         compactedSizeQueryDesc.queryPool = compactedSizeQuery;
         compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-        encoder->buildAccelerationStructure(buildDesc, 1, &compactedSizeQueryDesc);
+        encoder->buildAccelerationStructure(buildDesc, draftAS, nullptr, scratchBuffer, 1, &compactedSizeQueryDesc);
         encoder->endEncoding();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
@@ -775,17 +758,9 @@ void RenderTestApp::_initializeAccelerationStructure()
 
         uint64_t compactedSize = 0;
         compactedSizeQuery->getResult(0, 1, &compactedSize);
-        BufferDesc asBufferDesc = {};
-        asBufferDesc.usage = BufferUsage::AccelerationStructure;
-        asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.size = (Size)compactedSize;
-        m_blasBuffer = m_device->createBuffer(asBufferDesc);
-        IAccelerationStructure::CreateDesc createDesc;
-        createDesc.buffer = m_blasBuffer;
-        createDesc.kind = IAccelerationStructure::Kind::BottomLevel;
-        createDesc.offset = 0;
-        createDesc.size = (Size)compactedSize;
-        m_device->createAccelerationStructure(createDesc, m_bottomLevelAccelerationStructure.writeRef());
+        AccelerationStructureDesc finalDesc;
+        finalDesc.size = compactedSize;
+        m_device->createAccelerationStructure(finalDesc, m_bottomLevelAccelerationStructure.writeRef());
 
         commandBuffer = m_transientHeap->createCommandBuffer();
         encoder = commandBuffer->encodeRayTracingCommands();
@@ -799,12 +774,10 @@ void RenderTestApp::_initializeAccelerationStructure()
 
     // Build top level acceleration structure.
     {
-        List<IAccelerationStructure::InstanceDesc> instanceDescs;
+        List<AccelerationStructureInstanceDesc> instanceDescs;
         instanceDescs.setCount(1);
-        instanceDescs[0].accelerationStructure =
-            m_bottomLevelAccelerationStructure->getDeviceAddress();
-        instanceDescs[0].flags =
-            IAccelerationStructure::GeometryInstanceFlags::TriangleFacingCullDisable;
+        instanceDescs[0].accelerationStructure = m_bottomLevelAccelerationStructure->getHandle();
+        instanceDescs[0].flags = AccelerationStructureInstanceFlags::TriangleFacingCullDisable;
         instanceDescs[0].instanceContributionToHitGroupIndex = 0;
         instanceDescs[0].instanceID = 0;
         instanceDescs[0].instanceMask = 0xFF;
@@ -814,49 +787,38 @@ void RenderTestApp::_initializeAccelerationStructure()
 
         BufferDesc instanceBufferDesc = {};
         instanceBufferDesc.size =
-            instanceDescs.getCount() * sizeof(IAccelerationStructure::InstanceDesc);
+            instanceDescs.getCount() * sizeof(AccelerationStructureInstanceDesc);
         instanceBufferDesc.usage = BufferUsage::AccelerationStructureBuildInput;
         instanceBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
         ComPtr<IBuffer> instanceBuffer =
             m_device->createBuffer(instanceBufferDesc, instanceDescs.getBuffer());
 
-        IAccelerationStructure::BuildInputs accelerationStructureBuildInputs = {};
-        IAccelerationStructure::PrebuildInfo accelerationStructurePrebuildInfo = {};
-        accelerationStructureBuildInputs.descCount = 1;
-        accelerationStructureBuildInputs.kind = IAccelerationStructure::Kind::TopLevel;
-        accelerationStructureBuildInputs.instanceDescs = instanceBuffer->getDeviceAddress();
+        AccelerationStructureBuildInputInstances instances = {};
+        instances.instanceBuffer = instanceBuffer;
+        instances.instanceCount = 1;
+        instances.instanceStride = sizeof(AccelerationStructureInstanceDesc);
+        AccelerationStructureBuildDesc buildDesc = {};
+        buildDesc.inputs = &instances;
+        buildDesc.inputCount = 1;
 
         // Query buffer size for acceleration structure build.
-        m_device->getAccelerationStructurePrebuildInfo(
-            accelerationStructureBuildInputs, &accelerationStructurePrebuildInfo);
-
-        BufferDesc asBufferDesc = {};
-        asBufferDesc.usage = BufferUsage::AccelerationStructure;
-        asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.size = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
-        m_tlasBuffer = m_device->createBuffer(asBufferDesc);
+        AccelerationStructureSizes accelerationStructureSizes = {};
+        m_device->getAccelerationStructureSizes(buildDesc, &accelerationStructureSizes);
 
         BufferDesc scratchBufferDesc = {};
         scratchBufferDesc.usage = BufferUsage::UnorderedAccess;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-        scratchBufferDesc.size = (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
+        scratchBufferDesc.size = (size_t)accelerationStructureSizes.scratchSize;
         ComPtr<IBuffer> scratchBuffer = m_device->createBuffer(scratchBufferDesc);
 
-        IAccelerationStructure::CreateDesc createDesc = {};
-        createDesc.buffer = m_tlasBuffer;
-        createDesc.kind = IAccelerationStructure::Kind::TopLevel;
-        createDesc.offset = 0;
-        createDesc.size = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        AccelerationStructureDesc createDesc = {};
+        createDesc.size = accelerationStructureSizes.accelerationStructureSize;
         m_device->createAccelerationStructure(
             createDesc, m_topLevelAccelerationStructure.writeRef());
 
         auto commandBuffer = m_transientHeap->createCommandBuffer();
         auto encoder = commandBuffer->encodeRayTracingCommands();
-        IAccelerationStructure::BuildDesc buildDesc = {};
-        buildDesc.dest = m_topLevelAccelerationStructure;
-        buildDesc.inputs = accelerationStructureBuildInputs;
-        buildDesc.scratchData = scratchBuffer->getDeviceAddress();
-        encoder->buildAccelerationStructure(buildDesc, 0, nullptr);
+        encoder->buildAccelerationStructure(buildDesc, m_topLevelAccelerationStructure, nullptr, scratchBuffer, 0, nullptr);
         encoder->endEncoding();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);

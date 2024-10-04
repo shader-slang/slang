@@ -4284,6 +4284,8 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 {
     if(guid == IModule::getTypeGuid())
         return asExternal(this);
+    if (guid == IModulePrecompileService_Experimental::getTypeGuid())
+        return static_cast<slang::IModulePrecompileService_Experimental*>(this);
     return Super::getInterface(guid);
 }
 
@@ -4500,6 +4502,8 @@ ISlangUnknown* ComponentType::getInterface(Guid const& guid)
     {
         return static_cast<slang::IComponentType*>(this);
     }
+    if(guid == IModulePrecompileService_Experimental::getTypeGuid())    
+        return static_cast<slang::IModulePrecompileService_Experimental*>(this);
     return nullptr;
 }
 
