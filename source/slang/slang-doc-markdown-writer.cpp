@@ -1530,7 +1530,7 @@ void DocMarkdownWriter::_appendAggTypeName(const ASTMarkup::Entry& entry, Decl* 
         out << toSlice("extension ") << escapeMarkdownText(extensionDecl->targetType->toString());
         _appendDerivedFrom(toSlice(" : "), extensionDecl);
     }
-    else if (TypeDefDecl* typeDefDecl = as<TypeDefDecl>(aggTypeDecl))
+    else if (as<TypeDefDecl>(aggTypeDecl))
     {
         out << toSlice("typealias ") << escapeMarkdownText(printer.getStringBuilder().produceString());
     }
@@ -2024,28 +2024,28 @@ void DocMarkdownWriter::createPage(DocMarkdownWriter::WriteDeclMode mode, ASTMar
                 ensureDeclPageCreated(entry);
         }
     }
-    else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
+    else if (as<EnumDecl>(decl))
     {
         if (mode == WriteDeclMode::Header)
             ensureDeclPageCreated(entry);
     }
-    else if (AggTypeDeclBase* aggType = as<AggTypeDeclBase>(decl))
+    else if (as<AggTypeDeclBase>(decl))
     {
         if (mode == WriteDeclMode::Header)
             ensureDeclPageCreated(entry);
     }
-    else if (VarDecl* varDecl = as<VarDecl>(decl))
+    else if (as<VarDecl>(decl))
     {
         // If part of aggregate type will be output there.
         if (mode == WriteDeclMode::Header)
             ensureDeclPageCreated(entry);
     }
-    else if (TypeDefDecl* typeDefDecl = as<TypeDefDecl>(decl))
+    else if (as<TypeDefDecl>(decl))
     {
         if (mode == WriteDeclMode::Header)
             ensureDeclPageCreated(entry);
     }
-    else if (PropertyDecl* propertyDecl = as<PropertyDecl>(decl))
+    else if (as<PropertyDecl>(decl))
     {
         if (mode == WriteDeclMode::Header)
             ensureDeclPageCreated(entry);
