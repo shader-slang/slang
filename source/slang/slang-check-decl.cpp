@@ -21,6 +21,9 @@
 
 namespace Slang
 {
+    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl);
+    static List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut);
+
         /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
     struct SemanticsDeclModifiersVisitor
         : public SemanticsDeclVisitorBase
@@ -316,6 +319,26 @@ namespace Slang
 
         SemanticsContext registerDifferentiableTypesForFunc(FunctionDeclBase* funcDecl);
 
+        struct DeclAndCtorInfo
+        {
+            StructDecl* parent = nullptr;
+            ConstructorDecl* defaultCtor = nullptr;
+            List<ConstructorDecl*> ctorList;
+            DeclAndCtorInfo()
+            {
+            }
+            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
+            {
+                if (getOnlyDefault)
+                    defaultCtor = _getDefaultCtor(parent);
+                else
+                    ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
+            }
+        };
+
+        void synthesizeCtorBody(DeclAndCtorInfo& structDeclInfo, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, StructDecl* structDecl);
+        void synthesizeCtorBodyForBases(ConstructorDecl* ctor, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, ThisExpr* thisExpr, SeqStmt* seqStmtChild);
+        void synthesizeCtorBodyForMember(ConstructorDecl* ctor, Decl* member, ThisExpr* thisExpr, Dictionary<Decl*, Expr*>& cachedDeclToCheckedVar, SeqStmt* seqStmtChild);
     };
 
     template<typename VisitorType>
@@ -8470,6 +8493,107 @@ namespace Slang
         return as<SeqStmt>(stmt->body);
     }
 
+    void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(ConstructorDecl* ctor, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, ThisExpr* thisExpr, SeqStmt* seqStmtChild)
+    {
+        // e.g. this->base = BaseType();
+        for (auto& declInfo : inheritanceDefaultCtorList)
+        {
+            if (!declInfo.defaultCtor)
+                continue;
+
+            auto ctorToInvoke = m_astBuilder->create<VarExpr>();
+            ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
+            ctorToInvoke->name = declInfo.defaultCtor->getName();
+            ctorToInvoke->loc = declInfo.defaultCtor->loc;
+            ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), ctor->returnType.type);
+
+            auto invoke = m_astBuilder->create<InvokeExpr>();
+            invoke->functionExpr = ctorToInvoke;
+
+            auto assign = m_astBuilder->create<AssignExpr>();
+            assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+            assign->right = invoke;
+            auto stmt = m_astBuilder->create<ExpressionStmt>();
+            stmt->expression = assign;
+            stmt->loc = ctor->loc;
+
+            seqStmtChild->stmts.add(stmt);
+        }
+    }
+
+    void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(ConstructorDecl* ctor, Decl* member, ThisExpr* thisExpr, Dictionary<Decl*, Expr*>& cachedDeclToCheckedVar, SeqStmt* seqStmtChild)
+    {
+        auto varDeclBase = as<VarDeclBase>(member);
+
+        // Static variables are initialized at start of runtime, not inside a constructor
+        if (!varDeclBase
+            || !varDeclBase->initExpr
+            || varDeclBase->hasModifier<HLSLStaticModifier>())
+            return;
+
+        MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
+        memberExpr->baseExpression = thisExpr;
+        memberExpr->declRef = member->getDefaultDeclRef();
+        memberExpr->scope = ctor->ownedScope;
+        memberExpr->loc = member->loc;
+        memberExpr->name = member->getName();
+        memberExpr->type = DeclRefType::create(getASTBuilder(), member->getDefaultDeclRef());
+
+        auto assign = m_astBuilder->create<AssignExpr>();
+        assign->left = memberExpr;
+        assign->right = varDeclBase->initExpr;
+        assign->loc = member->loc;
+
+        auto stmt = m_astBuilder->create<ExpressionStmt>();
+        stmt->expression = assign;
+        stmt->loc = member->loc;
+
+        Expr* checkedMemberVarExpr;
+        if (cachedDeclToCheckedVar.containsKey(member))
+            checkedMemberVarExpr = cachedDeclToCheckedVar[member];
+        else
+        {
+            checkedMemberVarExpr = CheckTerm(memberExpr);
+            cachedDeclToCheckedVar.add({ member, checkedMemberVarExpr });
+        }
+
+        if (!checkedMemberVarExpr->type.isLeftValue)
+            return;
+
+        seqStmtChild->stmts.add(stmt);
+    }
+
+
+    void SemanticsDeclBodyVisitor::synthesizeCtorBody(DeclAndCtorInfo& structDeclInfo, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, StructDecl* structDecl)
+    {
+        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
+        for (auto ctor : structDeclInfo.ctorList)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount() + structDecl->members.getCount());
+
+            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+            thisExpr->scope = ctor->ownedScope;
+            thisExpr->type = ctor->returnType.type;
+
+            // Initialize base type by using its default constructor if it has one.
+            synthesizeCtorBodyForBases(ctor, inheritanceDefaultCtorList, thisExpr, seqStmtChild);
+
+            // Initialize member variables by using their default value if they have one
+            // e.g. this->member = default_value
+            for (auto& m : structDecl->members)
+            {
+                synthesizeCtorBodyForMember(ctor, m, thisExpr, cachedDeclToCheckedVar, seqStmtChild);
+            }
+
+            if (seqStmtChild->stmts.getCount() != 0)
+            {
+                seqStmt->stmts.insert(0, seqStmtChild);
+            }
+        }
+    }
+
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     {
         if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
@@ -8481,22 +8605,6 @@ namespace Slang
         if (!structDecl)
             return;
 
-        struct DeclAndCtorInfo
-        {
-            StructDecl* parent = nullptr;
-            ConstructorDecl* defaultCtor = nullptr;
-            List<ConstructorDecl*> ctorList;
-            DeclAndCtorInfo()
-            {
-            }
-            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
-            {
-                if (getOnlyDefault)
-                    defaultCtor = _getDefaultCtor(parent);
-                else
-                    ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
-            }
-        };
         List<DeclAndCtorInfo> inheritanceDefaultCtorList{};
         for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
         {
@@ -8525,91 +8633,7 @@ namespace Slang
             varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase);
         }
 
-        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
-        for (auto ctor : structDeclInfo.ctorList)
-        {
-            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
-            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount() + structDecl->members.getCount());
-
-            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-            thisExpr->scope = ctor->ownedScope;
-            thisExpr->type = ctor->returnType.type;
-
-            for (auto& declInfo : inheritanceDefaultCtorList)
-            {
-                if (!declInfo.defaultCtor)
-                    continue;
-
-                auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-                ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
-                ctorToInvoke->name = declInfo.defaultCtor->getName();
-                ctorToInvoke->loc = declInfo.defaultCtor->loc;
-                ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), structDeclInfo.defaultCtor->returnType.type);
-
-                auto invoke = m_astBuilder->create<InvokeExpr>();
-                invoke->functionExpr = ctorToInvoke;
-
-                // ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-                // thisExpr->scope = ctor->ownedScope;
-                // thisExpr->type = ctor->returnType.type;
-
-                auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
-                assign->right = invoke;
-                auto stmt = m_astBuilder->create<ExpressionStmt>();
-                stmt->expression = assign;
-                stmt->loc = ctor->loc;
-
-                seqStmtChild->stmts.add(stmt);
-            }
-
-            for (auto& m : structDecl->members)
-            {
-                auto varDeclBase = as<VarDeclBase>(m);
-
-                // Static variables are initialized at start of runtime, not inside a constructor
-                if (!varDeclBase
-                    || !varDeclBase->initExpr
-                    || varDeclBase->hasModifier<HLSLStaticModifier>())
-                    continue;
-
-                MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
-                memberExpr->baseExpression = thisExpr;
-                memberExpr->declRef = m->getDefaultDeclRef();
-                memberExpr->scope = ctor->ownedScope;
-                memberExpr->loc = m->loc;
-                memberExpr->name = m->getName();
-                memberExpr->type = DeclRefType::create(getASTBuilder(), m->getDefaultDeclRef());
-
-                auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = memberExpr;
-                assign->right = varDeclBase->initExpr;
-                assign->loc = m->loc;
-
-                auto stmt = m_astBuilder->create<ExpressionStmt>();
-                stmt->expression = assign;
-                stmt->loc = m->loc;
-
-                Expr* checkedMemberVarExpr;
-                if (cachedDeclToCheckedVar.containsKey(m))
-                    checkedMemberVarExpr = cachedDeclToCheckedVar[m];
-                else
-                {
-                    checkedMemberVarExpr = CheckTerm(memberExpr);
-                    cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
-                }
-                if (!checkedMemberVarExpr->type.isLeftValue)
-                    continue;
-
-                seqStmtChild->stmts.add(stmt);
-            }
-
-            if (seqStmtChild->stmts.getCount() != 0)
-            {
-                seqStmt->stmts.insert(0, seqStmtChild);
-            }
-        }
+        synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);
 
         if (structDeclInfo.defaultCtor)
         {
