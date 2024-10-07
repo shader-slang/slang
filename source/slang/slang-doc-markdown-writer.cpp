@@ -1679,6 +1679,17 @@ void DocMarkdownWriter::writeAggType(DocumentPage* page, const ASTMarkup::Entry&
                         }
                     }
                 }
+
+                if (paramList[i].text.getLength() == 0)
+                {
+                    ParamDocumentation paramDoc;
+                    if (declDoc.parameters.tryGetValue(getText(param->getName()), paramDoc))
+                    {
+                        StringBuilder sb;
+                        sb << paramDoc.description.ownedText;
+                        paramList[i].text = sb.produceString();
+                    }
+                }
             }
             _appendAsBullets(paramList, false, 0);
             out << toSlice("\n");
@@ -1849,6 +1860,16 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
     for (; !reader.IsEnd(); )
     {
         auto token = reader.ReadToken();
+
+        // If the token is a string literal, we want to treat it as an identifier.
+        if (token.Type == Slang::Misc::TokenType::StringLiteral)
+        {
+            token.Type = Slang::Misc::TokenType::Identifier;
+            StringBuilder stringSB;
+            StringEscapeUtil::appendQuoted(StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp), token.Content.getUnownedSlice(), stringSB);
+            token.Content = stringSB.produceString();
+        }
+
         if (token.Type == Slang::Misc::TokenType::Identifier)
         {
             if (requireSpaceBeforeNextToken)
@@ -2083,7 +2104,7 @@ void DeclDocumentation::writeSection(StringBuilder& out, DocMarkdownWriter* writ
     }
     if (sectionDoc && sectionDoc->ownedText.getLength() > 0)
     {
-        out << "## \"" << getSectionTitle(section) << "\n\n";
+        out << "## " << getSectionTitle(section) << "\n\n";
         sectionDoc->write(writer, out);
     }
 }

@@ -380,15 +380,16 @@ vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 /// @see `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`, `Texture1DArray`,
 /// `Texture2DArray`, `TextureCubeArray`, `Sampler1D`, `Sampler2D`, `Sampler3D`, `SamplerCube`, `Sampler1DArray`, `Sampler2DArray`, `SamplerCubeArray`,
 /// `Texture2DMS`, `Texture2DMSArray`, `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray`, `RWTexture2DArray`,
-/// `RWTexture2DMS`, `RWTexture2DMSArray`, `RWTextureBuffer`, `FeedbackTexture2D`, `FeedbackTexture2DArray`.
+/// `RWTexture2DMS`, `RWTexture2DMSArray`, `Buffer`, `RWBuffer`, `FeedbackTexture2D`, `FeedbackTexture2DArray`.
 /// @remarks
 /// HLSL texture types are implemented as typealiases to the builtin `_Texture` type. Users
 /// are advised to use the HLSL-specific texture types instead of `_Texture` directly.
 ///
 /// For read-write textures, Slang will automatically infer `format` from `T`.
 /// To explicitly specify texel storage formats for read-write textures,
-/// use the `[format("...")]` attribute on the texture parameter declaration.
-/// Allowed `format` values are:
+/// use the `[format("formatString")]` attribute on the texture parameter declaration.
+/// Allowed `formatString` values are:
+///
 /// |id | Format string        | Meaning           |
 /// |:--|:---------------------|:------------------|
 /// |1  |`"rgba32f"`           | 4 channel 32-bit floating point texture |
