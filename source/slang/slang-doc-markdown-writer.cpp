@@ -2066,16 +2066,19 @@ void DeclDocumentation::writeSection(StringBuilder& out, DocMarkdownWriter* writ
         out << "> #### Deprecated Feature\n";
         out << "> The feature described in this page is marked as deprecated, and may be removed in a future release.\n";
         out << "> Users are advised to avoid using this feature, and to migrate to a newer alternative.\n";
+        out << "\n";
         return;
     case DocPageSection::ExperimentalCallout:
         out << "> #### Experimental Feature\n";
         out << "> The feature described in this page is marked as experimental, and may be subject to change in future releases.\n";
         out << "> Users are advised that any code that depend on this feature may not be compilable by future versions of the compiler.\n";
+        out << "\n";
         return;
     case DocPageSection::InternalCallout:
         out << "> #### Internal Feature\n";
         out << "> The feature described in this page is marked as an internal implementation detail, and is not intended for use by end-users.\n";
         out << "> Users are advised to avoid using this declaration directly, as it may be removed or changed in future releases.\n";
+        out << "\n";
         return;
     }
     if (sectionDoc && sectionDoc->ownedText.getLength() > 0)
