@@ -363,7 +363,6 @@ __generic<T, let N:int>
 vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 
 //@public:
-/// @internal
 /// A parameterized type that represents all flavors of texture types supported by the Slang language.
 /// Please note that this type is not intended to be used directly in user code, and not all combinations
 /// of the generic arguments are valid.
@@ -395,7 +394,7 @@ vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 /// |1  |`"rgba32f"`           | 4 channel 32-bit floating point texture |
 /// |2  |`"rgba16f"`           | 4 channel 16-bit floating point texture |
 /// |3  |`"rg32f"`             | 2 channel 32-bit floating point texture |
-/// |4  |`"rg16f"`             | 2 channel 16-bit floating point texture | 
+/// |4  |`"rg16f"`             | 2 channel 16-bit floating point texture |
 /// |5  |`"r11f_g11f_b10f"`    | 3 channel 11/11/10-bit floating point texture |
 /// |6  |`"r32f"`              | 1 channel 32-bit floating point texture |
 /// |7  |`"r16f"`              | 1 channel 16-bit floating point texture |
@@ -433,6 +432,7 @@ vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 /// |39 |`"r8ui"`              | 1 channel 8-bit unsigned integer texture |
 /// |40 |`"r64ui"`             | 1 channel 64-bit unsigned integer texture |
 /// |41 |`"r64i"`              | 1 channel 64-bit signed integer texture |
+/// @internal
 __magic_type(TextureType)
 __intrinsic_type($(kIROp_TextureType))
 struct _Texture<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
