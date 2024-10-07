@@ -139,14 +139,25 @@ void DocMarkdownWriter::_appendAsBullets(const List<NameAndText>& values, bool i
                 }
             }
         }
-
+        if (value.decl)
+        {
+            // Add anchor ID for the decl.
+            if (as<GenericTypeParamDeclBase>(value.decl))
+            {
+                out << " {#typeparam-" << getText(value.decl->getName()) << "}";
+            }
+            else
+            {
+                out << " {#decl-" << getText(value.decl->getName()) << "}";
+            }
+        }
         if (value.text.getLength())
         {
             out.appendChar('\n');
 
             ParsedDescription desc;
             desc.parse(value.text.getUnownedSlice());
-            desc.write(this, out);
+            desc.write(this, value.decl, out);
         }
         else
         {
@@ -302,6 +313,7 @@ DocMarkdownWriter::NameAndText DocMarkdownWriter::_getNameAndText(ASTMarkup::Ent
 {
     NameAndText nameAndText;
 
+    nameAndText.decl = decl;
     nameAndText.name = _getName(decl);
 
     StringBuilder sb;
@@ -313,6 +325,46 @@ DocMarkdownWriter::NameAndText DocMarkdownWriter::_getNameAndText(ASTMarkup::Ent
         {
             sb << " = ";
             _appendExpr(sb, varDeclBase->initExpr);
+        }
+    }
+    else if (auto typeParam = as<GenericTypeParamDeclBase>(decl))
+    {
+        bool isFirst = true;
+        for (auto member : decl->parentDecl->members)
+        {
+            if (auto constraint = as<TypeConstraintDecl>(member))
+            {
+                if (isDeclRefTypeOf<Decl>(getSub(m_astBuilder, constraint)).getDecl() == typeParam)
+                {
+                    if (isFirst)
+                    {
+                        sb << ": ";
+                        isFirst = false;
+                    }
+                    else
+                    {
+                        sb << ", ";
+                    }
+                    sb << constraint->getSup().type->toString();
+                    break;
+                }
+            }
+        }
+        if (auto genericTypeParam = as<GenericTypeParamDecl>(decl))
+        {
+            if (genericTypeParam->initType.type)
+            {
+                sb << " = ";
+                sb << genericTypeParam->initType.type->toString();
+            }
+        }
+    }
+    else if (auto enumCase = as<EnumCaseDecl>(decl))
+    {
+        if (enumCase->tagExpr)
+        {
+            sb << " = ";
+            _appendExpr(sb, enumCase->tagExpr);
         }
     }
     nameAndText.name.append(sb.produceString());
@@ -476,8 +528,8 @@ void DocMarkdownWriter::writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl
     }
     StringBuilder typeSB;
     varDecl->type->toText(typeSB);
-    out << translateToHTMLWithLinks(typeSB.produceString()) << toSlice(" ");
-    out << translateToHTMLWithLinks(printer.getSlice());
+    out << translateToHTMLWithLinks(varDecl, typeSB.produceString()) << toSlice(" ");
+    out << translateToHTMLWithLinks(varDecl, printer.getSlice());
 
     if (varDecl->initExpr)
     {
@@ -508,11 +560,11 @@ void DocMarkdownWriter::writeProperty(const ASTMarkup::Entry& entry, PropertyDec
     out << toSlice("## Signature\n\n");
 
     out << toSlice("<pre>\n<span class='code_keyword'>property</span> ");
-    out << translateToHTMLWithLinks(printer.getSlice());
+    out << translateToHTMLWithLinks(propertyDecl, printer.getSlice());
     out << toSlice(" : ");
     StringBuilder typeSB;
     propertyDecl->type->toText(typeSB);
-    out << translateToHTMLWithLinks(typeSB.produceString());
+    out << translateToHTMLWithLinks(propertyDecl, typeSB.produceString());
     out << "\n{\n";
     for (auto member : propertyDecl->members)
     {
@@ -555,7 +607,7 @@ void DocMarkdownWriter::writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl*
     out << toSlice("<pre>\n<span class='code_keyword'>typealias</span> ");
     ASTPrinter printer(m_astBuilder);
     printer.addDeclPath(typeDefDecl);
-    out << translateToHTMLWithLinks(printer.getSlice());
+    out << translateToHTMLWithLinks(typeDefDecl, printer.getSlice());
     out << toSlice(" = ");
 
     // Insert a line break if the type name is already long.
@@ -563,8 +615,10 @@ void DocMarkdownWriter::writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl*
     {
         out << "\n    ";
     }
-    out << translateToHTMLWithLinks(typeDefDecl->type->toString());
+    out << translateToHTMLWithLinks(typeDefDecl, typeDefDecl->type->toString());
     out << ";\n</pre>\n\n";
+
+    declDoc.writeGenericParameters(out, this, typeDefDecl);
 
     declDoc.writeSection(out, this, typeDefDecl, DocPageSection::Remarks);
     declDoc.writeSection(out, this, typeDefDecl, DocPageSection::Example);
@@ -660,7 +714,7 @@ void DocMarkdownWriter::writeExtensionConditions(StringBuilder& out, ExtensionDe
             {
                 out << prefix;
                 if (isHtml)
-                    out << translateToHTMLWithLinks(originalParamDecl->getName()->text);
+                    out << translateToHTMLWithLinks(originalParamDecl, originalParamDecl->getName()->text);
                 else
                     out << translateToMarkdownWithLinks(originalParamDecl->getName()->text);
                 if (isEqualityConstraint)
@@ -668,7 +722,7 @@ void DocMarkdownWriter::writeExtensionConditions(StringBuilder& out, ExtensionDe
                 else
                     out << " : ";
                 if (isHtml)
-                    out << translateToHTMLWithLinks(constraintVal->toString());
+                    out << translateToHTMLWithLinks(originalParamDecl, constraintVal->toString());
                 else
                     out << translateToMarkdownWithLinks(constraintVal->toString());
             }
@@ -700,11 +754,11 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
         const UnownedStringSlice returnType = printer.getPartSlice(signature.returnType);
         if (returnType.getLength() > 0)
         {
-            out << translateToHTMLWithLinks(returnType) << toSlice(" ");
+            out << translateToHTMLWithLinks(callableDecl, returnType) << toSlice(" ");
         }
     }
 
-    out << translateToHTMLWithLinks(printer.getPartSlice(signature.name));
+    out << translateToHTMLWithLinks(callableDecl, printer.getPartSlice(signature.name));
 
     switch (paramCount)
     {
@@ -721,10 +775,8 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
                 // Place all on single line
                 out.appendChar('(');
                 const auto& param = signature.params[0];
-                out << translateToHTMLWithLinks(printer.getPartSlice(param.first)) << toSlice(" ");
-                out << "<span class='code_param'>";
-                escapeHTMLContent(out, printer.getPartSlice(param.second));
-                out << "</span>";
+                out << translateToHTMLWithLinks(callableDecl, printer.getPartSlice(param.first)) << toSlice(" ");
+                out << translateToHTMLWithLinks(callableDecl, printer.getPartSlice(param.second));
                 out << ")";
                 break;
             }
@@ -741,12 +793,10 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
                 const auto& param = signature.params[i];
                 line.clear();
 
-                line << "    " << translateToHTMLWithLinks(printer.getPartSlice(param.first));
+                line << "    " << translateToHTMLWithLinks(callableDecl, printer.getPartSlice(param.first));
 
                 line.appendChar(' ');
-                line << "<span class='code_param'>";
-                escapeHTMLContent(line, printer.getPartSlice(param.second));
-                line << "</span>";
+                line << translateToHTMLWithLinks(callableDecl, printer.getPartSlice(param.second));
                 if (i < paramCount - 1)
                 {
                     line << ",\n";
@@ -783,12 +833,12 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
                 if (auto typeConstraint = as<GenericTypeConstraintDecl>(member))
                 {
                     out << toSlice("\n    <span class='code_keyword'>where</span> ");
-                    out << translateToHTMLWithLinks(getSub(m_astBuilder, typeConstraint)->toString());
+                    out << translateToHTMLWithLinks(parentDecl, getSub(m_astBuilder, typeConstraint)->toString());
                     if (typeConstraint->isEqualityConstraint)
                         out << " == ";
                     else
                         out << toSlice(" : ");
-                    out << translateToHTMLWithLinks(getSup(m_astBuilder, typeConstraint)->toString());
+                    out << translateToHTMLWithLinks(parentDecl, getSup(m_astBuilder, typeConstraint)->toString());
                 }
             }
         }
@@ -1045,7 +1095,7 @@ static bool _isFirstOverridden(Decl* decl)
     return false;
 }
 
-void ParsedDescription::write(DocMarkdownWriter* writer, StringBuilder& out)
+void ParsedDescription::write(DocMarkdownWriter* writer, Decl* decl, StringBuilder& out)
 {
     for (auto span : spans)
     {
@@ -1058,7 +1108,7 @@ void ParsedDescription::write(DocMarkdownWriter* writer, StringBuilder& out)
             }
             case DocumentationSpanKind::InlineCode:
             {
-                out << "<span class='code'>" << writer->translateToHTMLWithLinks(span.text) << "</span>";
+                out << "<span class='code'>" << writer->translateToHTMLWithLinks(decl, span.text) << "</span>";
                 break;
             }
         }
@@ -1208,10 +1258,21 @@ void DeclDocumentation::parse(const UnownedStringSlice& text)
         }
         else if (line.startsWith("@deprecated"))
         {
-            currentSection = DocPageSection::InternalCallout;
+            currentSection = DocPageSection::DeprecatedCallout;
             line = line.tail(11).trim();
         }
         sectionBuilders[currentSection] << line << "\n";
+
+        // If the current directive is a callout, set currentSection back
+        // to Description after processing the directive line.
+        switch (currentSection)
+        {
+        case DocPageSection::ExperimentalCallout:
+        case DocPageSection::InternalCallout:
+        case DocPageSection::DeprecatedCallout:
+            currentSection = DocPageSection::Description;
+            break;
+        }
     }
     for (auto& kv : sectionBuilders)
     {
@@ -1267,7 +1328,7 @@ void DocMarkdownWriter::writeCallableOverridable(DocumentPage* page, const ASTMa
     if (descSection.ownedText.getLength() > 0)
     {
         out << toSlice("## Description\n\n");
-        descSection.write(this, out);
+        descSection.write(this, callableDecl, out);
     }
 
     // Collect all overloads from all entries on the page.
@@ -1348,6 +1409,8 @@ void DocMarkdownWriter::writeCallableOverridable(DocumentPage* page, const ASTMa
         out << "</pre>\n\n";
     }
 
+    funcDoc.writeGenericParameters(out, this, callableDecl);
+
     {
         // We will use the first documentation found for each parameter type
         {
@@ -1380,13 +1443,21 @@ void DocMarkdownWriter::writeCallableOverridable(DocumentPage* page, const ASTMa
                 }
             }
 
-            if (paramDecls.getCount() > 0 || paramDecls.getCount() > 0)
+            if (genericDecls.getCount() > 0)
+            {
+                out << "## Generic Parameters\n\n";
+
+                // Document generic parameters
+                _appendAsBullets(_getUniqueParams(genericDecls, &funcDoc), false, 0);
+
+                out << toSlice("\n");
+            }
+
+            if (paramDecls.getCount() > 0)
             {
                 out << "## Parameters\n\n";
 
-                // Get the unique generics
-                _appendAsBullets(_getUniqueParams(genericDecls, &funcDoc), false, 0);
-                // And parameters
+                // Document ordinary parameters
                 _appendAsBullets(_getUniqueParams(paramDecls, &funcDoc), false, 0);
 
                 out << toSlice("\n");
@@ -1398,21 +1469,21 @@ void DocMarkdownWriter::writeCallableOverridable(DocumentPage* page, const ASTMa
     if (returnsSection.ownedText.getLength() > 0)
     {
         out << toSlice("## Return value\n");
-        returnsSection.write(this, out);
+        returnsSection.write(this, callableDecl, out);
     }
 
     auto& remarksSection = funcDoc.sections[DocPageSection::Remarks];
     if (remarksSection.ownedText.getLength() > 0)
     {
         out << toSlice("## Remarks\n");
-        remarksSection.write(this, out);
+        remarksSection.write(this, callableDecl, out);
     }
 
     auto& exampleSection = funcDoc.sections[DocPageSection::Example];
     if (exampleSection.ownedText.getLength() > 0)
     {
         out << toSlice("## Example\n");
-        exampleSection.write(this, out);
+        exampleSection.write(this, callableDecl, out);
     }
 
     _maybeAppendRequirements(toSlice("## Availability and Requirements\n\n"), requirements);
@@ -1421,7 +1492,7 @@ void DocMarkdownWriter::writeCallableOverridable(DocumentPage* page, const ASTMa
     if (seeAlsoSection.ownedText.getLength() > 0)
     {
         out << toSlice("## See Also\n");
-        seeAlsoSection.write(this, out);
+        seeAlsoSection.write(this, callableDecl, out);
     }
 }
 
@@ -1634,67 +1705,7 @@ void DocMarkdownWriter::writeAggType(DocumentPage* page, const ASTMarkup::Entry&
     declDoc.parse(primaryEntry.m_markup.getUnownedSlice());
     declDoc.writeDescription(out, this, aggTypeDecl);
 
-    if (GenericDecl* genericDecl = as<GenericDecl>(aggTypeDecl->parentDecl))
-    {
-        // The parameters, in order
-        List<Decl*> params;
-        for (Decl* decl : genericDecl->members)
-        {
-            if (as<GenericTypeParamDecl>(decl) ||
-                as<GenericValueParamDecl>(decl))
-            {
-                params.add(decl);
-            }
-        }
-
-        if (params.getCount())
-        {
-            out << toSlice("## Generic Parameters\n\n");
-            auto paramList = _getAsNameAndTextList(params);
-            // Append names with constraints if any.
-            for (Index i = 0; i < paramList.getCount(); i++)
-            {
-                auto param = params[i];
-                if (auto typeParam = as<GenericTypeParamDecl>(param))
-                {
-                    bool isFirst = true;
-                    for (auto member : param->parentDecl->members)
-                    {
-                        if (auto constraint = as<TypeConstraintDecl>(member))
-                        {
-                            if (isDeclRefTypeOf<Decl>(getSub(m_astBuilder, constraint)).getDecl() == typeParam)
-                            {
-                                if (isFirst)
-                                {
-                                    paramList[i].name.append(": ");
-                                    isFirst = false;
-                                }
-                                else
-                                {
-                                    paramList[i].name.append(", ");
-                                }
-                                paramList[i].name.append(constraint->getSup().type->toString());
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (paramList[i].text.getLength() == 0)
-                {
-                    ParamDocumentation paramDoc;
-                    if (declDoc.parameters.tryGetValue(getText(param->getName()), paramDoc))
-                    {
-                        StringBuilder sb;
-                        sb << paramDoc.description.ownedText;
-                        paramList[i].text = sb.produceString();
-                    }
-                }
-            }
-            _appendAsBullets(paramList, false, 0);
-            out << toSlice("\n");
-        }
-    }
+    declDoc.writeGenericParameters(out, this, aggTypeDecl);
 
     {
         List<AssocTypeDecl*> assocTypeDecls;
@@ -1849,6 +1860,24 @@ void DocMarkdownWriter::ensureDeclPageCreated(ASTMarkup::Entry& entry)
     page->entries.add(&entry);
 }
 
+Slang::Misc::Token treatLiteralsAsIdentifier(Slang::Misc::Token token)
+{
+    // If the token is a literal, we want to treat it as an identifier.
+    if (token.Type == Slang::Misc::TokenType::StringLiteral)
+    {
+        token.Type = Slang::Misc::TokenType::Identifier;
+        StringBuilder stringSB;
+        StringEscapeUtil::appendQuoted(StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp), token.Content.getUnownedSlice(), stringSB);
+        token.Content = stringSB.produceString();
+    }
+    else if (token.Type == Slang::Misc::TokenType::IntLiteral ||
+        token.Type == Slang::Misc::TokenType::DoubleLiteral)
+    {
+        token.Type = Slang::Misc::TokenType::Identifier;
+    }
+    return token;
+}
+
 String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictChildLookup)
 {
     StringBuilder sb;
@@ -1859,16 +1888,8 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
     bool isFirstToken = true;
     for (; !reader.IsEnd(); )
     {
-        auto token = reader.ReadToken();
+        auto token = treatLiteralsAsIdentifier(reader.ReadToken());
 
-        // If the token is a string literal, we want to treat it as an identifier.
-        if (token.Type == Slang::Misc::TokenType::StringLiteral)
-        {
-            token.Type = Slang::Misc::TokenType::Identifier;
-            StringBuilder stringSB;
-            StringEscapeUtil::appendQuoted(StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp), token.Content.getUnownedSlice(), stringSB);
-            token.Content = stringSB.produceString();
-        }
 
         if (token.Type == Slang::Misc::TokenType::Identifier)
         {
@@ -1888,7 +1909,9 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
                     }
                 }
             }
-            auto page = findPageForToken(currentPage.getLast(), tokenContent);
+            String sectionName;
+            Decl* referencedDecl = nullptr;
+            auto page = findPageForToken(currentPage.getLast(), tokenContent, sectionName, referencedDecl);
 
             if (isFirstToken && strictChildLookup && page && page->parentPage != m_currentPage)
             {
@@ -1903,6 +1926,8 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
                 sb << escapeMarkdownText(tokenContent.getUnownedSlice());
                 sb.append("](");
                 sb.append(getDocPath(m_config, page->path));
+                if (sectionName.getLength())
+                    sb << "#" << sectionName;
                 sb.append(")");
                 currentPage.getLast() = page;
                 continue;
@@ -1964,8 +1989,9 @@ bool isKeyword(const UnownedStringSlice& slice)
     return false;
 }
 
-String DocMarkdownWriter::translateToHTMLWithLinks(String text)
+String DocMarkdownWriter::translateToHTMLWithLinks(Decl* decl, String text)
 {
+    SLANG_UNUSED(decl);
     StringBuilder sb;
     List<DocumentPage*> currentPage;
     currentPage.add(m_currentPage);
@@ -1973,22 +1999,31 @@ String DocMarkdownWriter::translateToHTMLWithLinks(String text)
     bool prevIsIdentifier = false;
     for (; !reader.IsEnd(); )
     {
-        auto token = reader.ReadToken();
+        auto token = treatLiteralsAsIdentifier(reader.ReadToken());
+
         if (token.Type == Slang::Misc::TokenType::Identifier)
         {
             if (prevIsIdentifier)
                 sb.append(' ');
-            auto page = findPageForToken(currentPage.getLast(), token.Content);
+            String sectionName;
+            Decl* referencedDecl = nullptr;
+            auto page = findPageForToken(currentPage.getLast(), token.Content, sectionName, referencedDecl);
             if (page)
             {
                 sb.append("<a href=\"");
                 sb.append(getDocPath(m_config, page->path));
+                if (sectionName.getLength())
+                    sb << "#" << sectionName;
                 sb.append("\"");
                 if (isKeyword(token.Content.getUnownedSlice()))
                     sb.append(" class=\"code_keyword\"");
-                else if (as<AggTypeDeclBase>(page->getFirstEntry()->m_node) ||
-                    as<SimpleTypeDecl>(page->getFirstEntry()->m_node))
+                else if (as<AggTypeDeclBase>(referencedDecl) ||
+                    as<SimpleTypeDecl>(referencedDecl))
                     sb.append(" class=\"code_type\"");
+                else if (as<ParamDecl>(referencedDecl))
+                    sb.append(" class=\"code_param\"");
+                else if (as<VarDeclBase>(referencedDecl) || as<EnumCaseDecl>(referencedDecl))
+                    sb.append(" class=\"code_var\"");
                 sb.append(">");
                 escapeHTMLContent(sb, token.Content.getUnownedSlice());
                 sb.append("</a>");
@@ -2007,32 +2042,22 @@ String DocMarkdownWriter::translateToHTMLWithLinks(String text)
         // see `<` and pop the stack when we see `>`.
         if (token.Type == Slang::Misc::TokenType::OpLess)
         {
-            currentPage.add(currentPage.getLast());
+            currentPage.add(m_currentPage);
         }
         else if (token.Type == Slang::Misc::TokenType::OpGreater)
         {
             if (currentPage.getCount() > 1)
                 currentPage.removeLast();
         }
-        if (token.Type == Slang::Misc::TokenType::Identifier)
+        bool shouldCloseSpan = false;
+        if (isKeyword(token.Content.getUnownedSlice()))
         {
-            if (isKeyword(token.Content.getUnownedSlice()))
-            {
-                sb.append("<span class=\"code_keyword\">");
-                escapeHTMLContent(sb, token.Content.getUnownedSlice());
-                sb.append("</span>");
-                continue;
-            }
-            else if (token.Content == "This" ||
-                token.Content == "T")
-            {
-                sb.append("<span class=\"code_type\">");
-                escapeHTMLContent(sb, token.Content.getUnownedSlice());
-                sb.append("</span>");
-                continue;
-            }
+            sb.append("<span class=\"code_keyword\">");
+            shouldCloseSpan = true;
         }
         escapeHTMLContent(sb, token.Content.getUnownedSlice());
+        if (shouldCloseSpan)
+            sb.append("</span>");
         if (token.Type == Slang::Misc::TokenType::Comma)
             sb.appendChar(' ');
     }
@@ -2074,6 +2099,48 @@ void DeclDocumentation::writeDescription(StringBuilder& out, DocMarkdownWriter* 
     writeSection(out, writer, decl, DocPageSection::Description);
 }
 
+void DeclDocumentation::writeGenericParameters(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl)
+{
+    GenericDecl* genericDecl = as<GenericDecl>(decl->parentDecl);
+    if (!genericDecl)
+        return;
+
+    // The parameters, in order
+    List<Decl*> params;
+    for (Decl* member : genericDecl->members)
+    {
+        if (as<GenericTypeParamDeclBase>(member) ||
+            as<GenericValueParamDecl>(member))
+        {
+            params.add(member);
+        }
+    }
+
+    if (params.getCount())
+    {
+        out << toSlice("## Generic Parameters\n\n");
+        auto paramList = writer->_getAsNameAndTextList(params);
+
+        // Append names with constraints if any.
+        for (Index i = 0; i < paramList.getCount(); i++)
+        {
+            auto param = params[i];
+            if (paramList[i].text.getLength() == 0)
+            {
+                ParamDocumentation paramDoc;
+                if (parameters.tryGetValue(getText(param->getName()), paramDoc))
+                {
+                    StringBuilder sb;
+                    sb << paramDoc.description.ownedText;
+                    paramList[i].text = sb.produceString();
+                }
+            }
+        }
+        writer->_appendAsBullets(paramList, false, 0);
+        out << toSlice("\n");
+    }
+}
+
 void DeclDocumentation::writeSection(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl, DocPageSection section)
 {
     SLANG_UNUSED(decl);
@@ -2105,7 +2172,7 @@ void DeclDocumentation::writeSection(StringBuilder& out, DocMarkdownWriter* writ
     if (sectionDoc && sectionDoc->ownedText.getLength() > 0)
     {
         out << "## " << getSectionTitle(section) << "\n\n";
-        sectionDoc->write(writer, out);
+        sectionDoc->write(writer, decl, out);
     }
 }
 
@@ -2168,32 +2235,92 @@ bool DocMarkdownWriter::isVisible(const Name* name)
         || m_config.visibleDeclNames.contains(getText((Name*)name));
 }
 
-DocumentPage* DocMarkdownWriter::findPageForToken(DocumentPage* currentPage, String token)
+DocumentPage* DocMarkdownWriter::findPageForToken(DocumentPage* currentPage, String token, String& outSectionName, Decl*& outDecl)
 {
     while (currentPage)
     {
         // Are there any children pages whose short title matches `token`?
         // If so, return the path of that page.
         if (currentPage->shortName == token)
+        {
+            outDecl = currentPage->decl;
             return currentPage;
+        }
         if (auto rs = currentPage->findChildByShortName(token.getUnownedSlice()))
+        {
+            outDecl = rs->decl;
             return rs;
+        }
+        // Is `token` documented as a section on current page?
+        // This will be the case for parameters and generic parameters.
+        if (currentPage->decl)
+        {
+            for (auto entry : currentPage->entries)
+            {
+                auto containerDecl = as<ContainerDecl>(entry->m_node);
+                if (!containerDecl)
+                    continue;
+                if (auto genericParent = as<GenericDecl>(containerDecl->parentDecl))
+                {
+                    for (auto member : genericParent->members)
+                    {
+                        if (getText(member->getName()) == token)
+                        {
+                            outDecl = member;
+                            if (as<GenericTypeParamDeclBase>(member))
+                                outSectionName = String("typeparam-") + token;
+                            else if (as<GenericValueParamDecl>(member))
+                                outSectionName = String("decl-") + token;
+                            return currentPage;
+                        }
+                    }
+                }
+                for (auto member : containerDecl->members)
+                {
+                    if (as<ParamDecl>(member) || as<EnumCaseDecl>(member))
+                    {
+                        if (getText(member->getName()) == token)
+                        {
+                            outDecl = member;
+                            outSectionName = String("decl-") + token;
+                            return currentPage;
+                        }
+                    }
+                }
+            }
+        }
+
         currentPage = currentPage->parentPage;
     }
     // Otherwise, try find in global decls.
     if (auto rs = m_typesPage->findChildByShortName(token.getUnownedSlice()))
+    {
+        outDecl = rs->decl;
         return rs;
+    }
     if (auto rs = m_interfacesPage->findChildByShortName(token.getUnownedSlice()))
+    {
+        outDecl = rs->decl;
         return rs;
+    }
     if (auto rs = m_globalDeclsPage->findChildByShortName(token.getUnownedSlice()))
+    {
+        outDecl = rs->decl;
         return rs;
+    }
     return nullptr;
 }
 
 String DocMarkdownWriter::findLinkForToken(DocumentPage* currentPage, String token)
 {
-    if (auto page = findPageForToken(currentPage, token))
-        return page->path;
+    String sectionName;
+    Decl* decl = nullptr;
+    if (auto page = findPageForToken(currentPage, token, sectionName, decl))
+    {
+        if (sectionName.getLength() == 0)
+            return page->path;
+        return page->path + "#" + sectionName;
+    }
     return String();
 }
 

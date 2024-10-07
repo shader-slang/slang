@@ -57,7 +57,7 @@ struct ParsedDescription
     String ownedText;
     List<ParsedDocumentationSpan> spans;
     void parse(UnownedStringSlice text);
-    void write(DocMarkdownWriter* writer, StringBuilder& out);
+    void write(DocMarkdownWriter* writer, Decl* decl, StringBuilder& out);
 };
 
 struct ParamDocumentation
@@ -86,6 +86,7 @@ struct DeclDocumentation
     Dictionary<DocPageSection, ParsedDescription> sections;
     void parse(const UnownedStringSlice& text);
     void writeDescription(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl);
+    void writeGenericParameters(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl);
     void writeSection(StringBuilder& sb, DocMarkdownWriter* writer, Decl* decl, DocPageSection section);
 };
 
@@ -128,7 +129,7 @@ struct DocMarkdownWriter
     String writeTOC();
 
     void ensureDeclPageCreated(ASTMarkup::Entry& entry);
-    String translateToHTMLWithLinks(String text);
+    String translateToHTMLWithLinks(Decl* decl, String text);
     String translateToMarkdownWithLinks(String text, bool strictChildLookup = false);
     String escapeMarkdownText(String text);
     void generateSectionIndexPage(DocumentPage* page);
@@ -155,7 +156,7 @@ struct DocMarkdownWriter
     bool isVisible(Decl* decl);
     bool isVisible(const Name* name);
 
-    DocumentPage* findPageForToken(DocumentPage* currentPage, String token);
+    DocumentPage* findPageForToken(DocumentPage* currentPage, String token, String& outSectionName, Decl*& outDecl);
     String findLinkForToken(DocumentPage* currentPage, String token);
 
         /// Get the output string
@@ -179,6 +180,7 @@ struct DocMarkdownWriter
 
     struct NameAndText
     {
+        Decl* decl = nullptr;
         String name;
         String text;
     };

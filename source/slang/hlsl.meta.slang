@@ -61,6 +61,24 @@ __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
 //@public:
+/**
+Represents an opaque handle to an append structured buffer allocated in global memory.
+A structured buffer can be viewed as an array of the specified element type.
+An append structure buffer internally maintains an atomic counter to keep track of the number of elements in the buffer,
+and provide an atomic operation to append a new element to the buffer.
+@param T The element type of the buffer.
+@param L The memory layout of the buffer.
+@remarks
+This type is supported natively when targeting HLSL.
+When generating code for other targets, this type is translated into a pair or an ordinary `RWStructuredBuffer` and
+a separate `RWStructuredBuffer` that holds the atomic counter.
+The `L` generic parameter is used to specify the memory layout of the buffer when
+generating SPIRV.
+`L` must be one of `DefaultDataLayout`, `Std140DataLayout`, `Std430DataLayout` or `ScalarDataLayout`.
+The default value is `DefaultDataLayout`.
+When generating code for other targets, this parameter is ignored and has no effect on the generated code.
+@see `RWStructuredBuffer`, `ConsumeStructuredBuffer`, `RasterizerOrderedStructuredBuffer`.
+**/
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
@@ -433,6 +451,10 @@ vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 /// |39 |`"r8ui"`              | 1 channel 8-bit unsigned integer texture |
 /// |40 |`"r64ui"`             | 1 channel 64-bit unsigned integer texture |
 /// |41 |`"r64i"`              | 1 channel 64-bit signed integer texture |
+///
+/// When targeting Vulkan, a combined-texture-sampler type (`isCombined==1`) translates to a `OpTypeSampledImage` type in SPIR-V.
+/// For other targets, the combined-texture-sampler type is translated to a pair of a `Texture` and `SamplerState`.
+/// `isShadow` is only applicable to combined-texture-sampler types and must be `0` for non-combined texture types.
 /// @internal
 __magic_type(TextureType)
 __intrinsic_type($(kIROp_TextureType))
@@ -4404,6 +4426,19 @@ __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment, T value);
 
+/**
+Represents an opaque handle to a read-only structured buffer allocated in global memory.
+A structured buffer can be viewed as an array of the specified element type.
+@param T The element type of the buffer.
+@param L The memory layout of the buffer.
+@remarks
+The `L` generic parameter is used to specify the memory layout of the buffer when
+generating SPIRV.
+`L` must be one of `DefaultDataLayout`, `Std140DataLayout`, `Std430DataLayout` or `ScalarDataLayout`.
+The default value is `DefaultDataLayout`.
+When generating code for other targets, this parameter is ignored and has no effect on the generated code.
+@see `RWStructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`, `RasterizerOrderedStructuredBuffer`.
+**/
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
@@ -4439,6 +4474,24 @@ struct StructuredBuffer
     };
 };
 
+/**
+Represents an opaque handle to a consume structured buffer allocated in global memory.
+A structured buffer can be viewed as an array of the specified element type.
+An append structure buffer internally maintains an atomic counter to keep track of the number of elements in the buffer,
+and provide an atomic operation to append a new element to the buffer.
+@param T The element type of the buffer.
+@param L The memory layout of the buffer.
+@remarks
+This type is supported natively when targeting HLSL.
+When generating code for other targets, this type is translated into a pair or an ordinary `StructuredBuffer` and
+a separate `RWStructuredBuffer` that holds the atomic counter.
+The `L` generic parameter is used to specify the memory layout of the buffer when
+generating SPIRV.
+`L` must be one of `DefaultDataLayout`, `Std140DataLayout`, `Std430DataLayout` or `ScalarDataLayout`.
+The default value is `DefaultDataLayout`.
+When generating code for other targets, this parameter is ignored and has no effect on the generated code.
+@see `StructuredBuffer`, `AppendStructuredBuffer`, `RWStructuredBuffer`, `RasterizerOrderedStructuredBuffer`.
+**/
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLConsumeStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
@@ -5851,6 +5904,19 @@ __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+/**
+Represents an opaque handle to a mutable structured buffer allocated in global memory.
+A structured buffer can be viewed as an array of the specified element type.
+@param T The element type of the buffer.
+@param L The memory layout of the buffer.
+@remarks
+The `L` generic parameter is used to specify the memory layout of the buffer when
+generating SPIRV.
+`L` must be one of `DefaultDataLayout`, `Std140DataLayout`, `Std430DataLayout` or `ScalarDataLayout`.
+The default value is `DefaultDataLayout`.
+When generating code for other targets, this parameter is ignored and has no effect on the generated code.
+@see `StructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`
+**/
 struct $(item.name)
 {
     uint DecrementCounter();
