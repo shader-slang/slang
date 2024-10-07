@@ -348,7 +348,14 @@ private:
         };
 
         void synthesizeCtorBody(DeclAndCtorInfo& structDeclInfo, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, StructDecl* structDecl);
-        void synthesizeCtorBodyForBases(ConstructorDecl* ctor, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, ThisExpr* thisExpr, SeqStmt* seqStmtChild);
+        void synthesizeCtorBodyForBases(
+                ConstructorDecl*            ctor,
+                List<DeclAndCtorInfo>&      inheritanceDefaultCtorList,
+                ThisExpr*                   thisExpr,
+                SeqStmt*                    seqStmtChild,
+                bool                        isMemberInitCtor,
+                Index                       &paramIndex );
+
         void synthesizeCtorBodyForMember(
                 ConstructorDecl*            ctor,
                 Decl*                       member,
@@ -359,6 +366,7 @@ private:
                 Index                       &ioArgIndex);
 
         MemberExpr* createMemberExpr(ThisExpr* thisExpr, Scope* scope, Decl* member);
+        Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
     };
 
     template<typename VisitorType>
@@ -1998,7 +2006,7 @@ private:
         body->closingSourceLoc = ctor->closingSourceLoc;
         ctor->body = body;
         body->body = m_astBuilder->create<SeqStmt>();
-        ctor->isSynthesized = true;
+        ctor->addTag(ConstructorDecl::ConstructorTags::Synthesized);
         decl->addMember(ctor);
         return ctor;
     }
@@ -6991,14 +6999,31 @@ private:
             }
         };
 
+        // Find the base type's members first
         for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
         {
-            // TODO: We might need to use the parameters of the base type's constructor instead of the members.
-            // But the problem is base type could have more than one constructor, which one should we use?
-            if (auto baseTypeDecl = isDeclRefTypeOf<StructDecl>(inheritanceMember->base.type))
-                findMembers(baseTypeDecl.getDecl());
+            // For base types, we need to pick their parameters of the constructor to the derived type's constructor
+            if (auto baseTypeDeclRef = isDeclRefTypeOf<StructDecl>(inheritanceMember->base.type))
+            {
+                // We should only find the member initialization constructor because it is the constructor has parameters
+                ConstructorDecl *ctor = _getSynthesizedConstructor(baseTypeDeclRef.getDecl(), ConstructorDecl::ConstructorTags::MemberInitCtor);
+
+                // The constructor has to have higher or equal visibility level than the struct itself, otherwise, it's not accessible
+                // so we will not pick up.
+                if (ctor && getDeclVisibility(ctor) >= ctorVisibility)
+                {
+                    for(auto param: ctor->getParameters())
+                    {
+                        if (getDeclVisibility(param) >= ctorVisibility)
+                        {
+                            resultMembers.add(param);
+                        }
+                    }
+                }
+            }
         }
 
+        // Find the struct's members
         findMembers(structDecl);
     }
 
@@ -7026,8 +7051,9 @@ private:
 
     void SemanticsDeclBasesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
     {
-        // If a type already defines any explicit constructors, do not synthesize any constructors.
-        if (_hasExplicitConstructor(structDecl))
+        // If a type or its base type already defines any explicit constructors, do not synthesize any constructors.
+        // see: https://github.com/shader-slang/slang/blob/master/docs/proposals/004-initialization.md#inheritance-initialization
+        if (_hasExplicitConstructor(structDecl, true))
             return;
 
         // synthesize the signature first.
@@ -7043,6 +7069,8 @@ private:
         // synthesize the constructor signature:
         // 1. The constructor's name is always `$init`, we create one without parameters now.
         ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl);
+        ctor->addTag(ConstructorDecl::ConstructorTags::MemberInitCtor);
+
         ctor->members.reserve(resultMembers.getCount());
 
         // 2. Add the parameter list
@@ -7303,17 +7331,36 @@ private:
         getSink()->diagnose(loc, Diagnostics::invalidEnumTagType, type);
     }
 
-    bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl)
+    bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl, bool checkBaseType)
     {
         if (!structDecl)
             return false;
 
-        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+        auto _hasExplicitCtor = [](StructDecl* structDecl) -> bool
         {
-            // constructor that is not synthesized must be user defined.
-            if (ctor->findModifier<SynthesizedModifier>() == nullptr)
+            for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
             {
-                return true;
+                // constructor that is not synthesized must be user defined.
+                if (ctor->findModifier<SynthesizedModifier>() == nullptr)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if(_hasExplicitCtor(structDecl))
+            return true;
+
+        if (!checkBaseType)
+            return false;
+
+        for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
+        {
+            if (auto baseTypeDecl = isDeclRefTypeOf<StructDecl>(inheritanceMember->base.type))
+            {
+                if(_hasExplicitCtor(baseTypeDecl.getDecl()))
+                    return true;
             }
         }
         return false;
@@ -8648,25 +8695,46 @@ private:
         return as<SeqStmt>(stmt->body);
     }
 
-    void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(ConstructorDecl* ctor, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, ThisExpr* thisExpr, SeqStmt* seqStmtChild)
+    void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
+        ConstructorDecl*            ctor,
+        List<DeclAndCtorInfo>&      inheritanceDefaultCtorList,
+        ThisExpr*                   thisExpr,
+        SeqStmt*                    seqStmtChild,
+        bool                        isMemberInitCtor,
+        Index                       &paramIndex)
     {
         // e.g. this->base = BaseType();
         for (auto& declInfo : inheritanceDefaultCtorList)
         {
-            if (!declInfo.defaultCtor)
+            ConstructorDecl* baseCtor = nullptr;
+
+            if (!isMemberInitCtor)
+            {
+                if (!declInfo.defaultCtor)
+                    continue;
+                baseCtor = declInfo.defaultCtor;
+            }
+            else
+            {
+                // TODO: read parameters for the baseCtor
+                // 1. get baseCtor's parameters list
+                // 2. for loop on `createCtorParamExpr()` to get each parameter
+                // 3. fill the argument list for the baseCtor
+                (void) paramIndex;
                 continue;
+            }
 
             auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-            ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
-            ctorToInvoke->name = declInfo.defaultCtor->getName();
-            ctorToInvoke->loc = declInfo.defaultCtor->loc;
+            ctorToInvoke->declRef = baseCtor->getDefaultDeclRef();
+            ctorToInvoke->name = baseCtor->getName();
+            ctorToInvoke->loc = baseCtor->loc;
             ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), ctor->returnType.type);
 
             auto invoke = m_astBuilder->create<InvokeExpr>();
             invoke->functionExpr = ctorToInvoke;
 
             auto assign = m_astBuilder->create<AssignExpr>();
-            assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+            assign->left = coerce(CoercionSite::Initializer, baseCtor->returnType.type, thisExpr);
             assign->right = invoke;
             auto stmt = m_astBuilder->create<ExpressionStmt>();
             stmt->expression = assign;
@@ -8689,14 +8757,39 @@ private:
         return memberExpr;
     }
 
+    Expr* SemanticsDeclBodyVisitor::createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex)
+    {
+        if (paramIndex < ctor->members.getCount())
+        {
+            if (auto param = as<ParamDecl>(ctor->members[paramIndex]))
+            {
+                if (param->initExpr)
+                {
+                    return param->initExpr;
+                }
+                else
+                {
+                    auto paramType = param->getType();
+                    auto paramExpr = m_astBuilder->create<VarExpr>();
+                    paramExpr->scope = ctor->ownedScope;
+                    paramExpr->declRef = param;
+                    paramExpr->type = paramType;
+                    paramExpr->loc = param->loc;
+                    return paramExpr;
+                }
+            }
+        }
+        return nullptr;
+    }
+
     void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
         ConstructorDecl*            ctor,
         Decl*                       member,
         ThisExpr*                   thisExpr,
         Dictionary<Decl*, Expr*>&   cachedDeclToCheckedVar,
         SeqStmt*                    seqStmtChild,
-        bool                        isDefaultCtor,
-        Index                       &ioArgIndex)
+        bool                        isMemberInitCtor,
+        Index                       &paramIndex)
     {
         auto varDeclBase = as<VarDeclBase>(member);
 
@@ -8704,38 +8797,23 @@ private:
         if (!varDeclBase || varDeclBase->hasModifier<HLSLStaticModifier>())
             return;
 
-        // For default ctor, we can only initialize the member when it has an initExpr
-        if (isDefaultCtor && !varDeclBase->initExpr)
-            return;
-
         Expr* initExpr = nullptr;
-        if (isDefaultCtor)
+        if (!isMemberInitCtor)
         {
+            // For non-member initialization ctor (explicit ctor or synthesized default ctor),
+            // we can only initialize the member when it has an initExpr.
+            if (!varDeclBase->initExpr)
+                return;
             initExpr = varDeclBase->initExpr;
         }
         else
         {
-            // TODO: find the corresponding parameter
-            if (ioArgIndex < ctor->members.getCount())
-            {
-                if (auto param = as<ParamDecl>(ctor->members[ioArgIndex++]))
-                {
-                    if (param->initExpr)
-                    {
-                        initExpr = param->initExpr;
-                    }
-                    else
-                    {
-                        auto paramType = param->getType();
-                        auto paramExpr = m_astBuilder->create<VarExpr>();
-                        paramExpr->scope = ctor->ownedScope;
-                        paramExpr->declRef = param;
-                        paramExpr->type = paramType;
-                        paramExpr->loc = param->loc;
-                        initExpr = paramExpr;
-                    }
-                }
-            }
+            // TODO: find the corresponding parameter, if we can't find it, there
+            // must be something wrong, it indicates that the ctor signature
+            // is incorrect that the parameter list doesn't match the member list.
+            // initExpr = createCtorParamExpr(ctor, paramIndex++);
+            // SLANG_RELEASE_ASSERT(initExpr);
+            return;
         }
 
         MemberExpr* memberExpr = createMemberExpr(thisExpr, ctor->ownedScope, member);
@@ -8778,25 +8856,17 @@ private:
             thisExpr->scope = ctor->ownedScope;
             thisExpr->type = ctor->returnType.type;
 
-            // We treat the ctor with parameters and all parameters have default value as default ctor as well,
-            // but the method to synthesize them are totally different, therefore, we need to differentiate them
-            // here.
-            bool isDefaultCtor = _isDefaultCtor(ctor) && (ctor->getParameters().getCount() == 0);
-            Index ioArgIndex = 0;
+            bool isMemberInitCtor = ctor->containsTag(ConstructorDecl::ConstructorTags::MemberInitCtor);
+            Index ioParamIndex = 0;
 
-            // For non-default constructor, we won't initialize the base by using the default constructor, instead
-            // we will be the parameter list to initialize it, so we can skip this step below.
-            if (isDefaultCtor)
-            {
-                // Initialize base type by using its default constructor if it has one.
-                synthesizeCtorBodyForBases(ctor, inheritanceDefaultCtorList, thisExpr, seqStmtChild);
-            }
+            // Initialize base type by using its default constructor if it has one.
+            synthesizeCtorBodyForBases(ctor, inheritanceDefaultCtorList, thisExpr, seqStmtChild, isMemberInitCtor, ioParamIndex);
 
             // Initialize member variables by using their default value if they have one
             // e.g. this->member = default_value
             for (auto& m : structDecl->members)
             {
-                synthesizeCtorBodyForMember(ctor, m, thisExpr, cachedDeclToCheckedVar, seqStmtChild, isDefaultCtor, ioArgIndex);
+                synthesizeCtorBodyForMember(ctor, m, thisExpr, cachedDeclToCheckedVar, seqStmtChild, isMemberInitCtor, ioParamIndex);
             }
 
             if (seqStmtChild->stmts.getCount() != 0)

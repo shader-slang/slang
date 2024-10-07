@@ -202,13 +202,13 @@ namespace Slang
     }
 
     // TODO: We might need to find a good way to get the synthesized constructor instead of traversing all of constructors.
-    ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(StructDecl* structDecl)
+    ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(StructDecl* structDecl, ConstructorDecl::ConstructorTags tags)
     {
-        for (auto ctor : getMembersOfType<ConstructorDecl>(getASTBuilder(), structDecl, MemberFilterStyle::All))
+        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
         {
-            if (ctor.getDecl()->findModifier<SynthesizedModifier>() != nullptr)
+            if (ctor->containsTag(tags))
             {
-                return ctor.getDecl();
+                return ctor;
             }
         }
 
@@ -260,7 +260,7 @@ namespace Slang
             return false;
 
         // 3. It cannot have explicit constructor
-        if (_hasExplicitConstructor(structDecl))
+        if (_hasExplicitConstructor(structDecl, true))
             return false;
 
         // 4. All of its members have to have the same visibility as the struct itself.
@@ -339,26 +339,24 @@ namespace Slang
     // translation from initializer list to constructor invocation if the struct has constructor.
     bool SemanticsVisitor::_invokeExprForExplicitCtor(Type* toType, InitializerListExpr* fromInitializerListExpr, Expr** outExpr)
     {
-        if (auto toDeclRefType = as<DeclRefType>(toType))
+        if (auto toStructDeclRef = isDeclRefTypeOf<StructDecl>(toType))
         {
-            auto toTypeDeclRef = toDeclRefType->getDeclRef();
-            if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
+            if (isFromStdLib(toStructDeclRef.getDecl()))
             {
-                if (isFromStdLib(toStructDeclRef.getDecl()))
-                {
-                    // If the struct is from stdlib, we will not try to create a constructor.
-                    return false;
-                }
+                // If the struct is from stdlib, we will not try to create a constructor.
+                return false;
+            }
 
-                if (_hasExplicitConstructor(toStructDeclRef.getDecl()))
+            // We only check the current struct here, don't check its base struct if it has, because derived cannot inherit
+            // the base's constructor.
+            if (_hasExplicitConstructor(toStructDeclRef.getDecl(), false))
+            {
+                auto ctorInvokeExpr = _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
+                ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
+                if (outExpr && ctorInvokeExpr)
                 {
-                    auto ctorInvokeExpr = _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
-                    ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
-                    if (outExpr && ctorInvokeExpr)
-                    {
-                        *outExpr = ctorInvokeExpr;
-                        return true;
-                    }
+                    *outExpr = ctorInvokeExpr;
+                    return true;
                 }
             }
         }
@@ -370,22 +368,12 @@ namespace Slang
         InitializerListExpr*    fromInitializerListExpr,
         Expr**                  outExpr)
     {
-        StructDecl* structDecl = nullptr;
-        if (auto toDeclRefType = as<DeclRefType>(toType))
-        {
-            auto toTypeDeclRef = toDeclRefType->getDeclRef();
-            if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
-            {
-                structDecl = toStructDeclRef.getDecl();
-            }
-        }
+        StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
         if (!structDecl || isFromStdLib(structDecl))
             return false;
 
         bool isCStyle = isCStyleStruct(structDecl);
-        auto synthesizedConstructor = _getSynthesizedConstructor(structDecl);
-        SLANG_ASSERT(synthesizedConstructor);
 
         List<Expr*> coercedArgs;
         auto ctorInvokeExpr = _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
