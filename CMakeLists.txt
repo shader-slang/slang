@@ -172,6 +172,24 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
+set(webgpu_dawn_release_tag "webgpu_dawn-0")
+if(CMAKE_SYSTEM_NAME MATCHES "Windows" AND
+    CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+  set(
+    SLANG_WEBGPU_DAWN_BINARY_URL
+    "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+  )
+endif()
+
+set(slang_tint_release_tag "slang-tint-0")
+if(CMAKE_SYSTEM_NAME MATCHES "Windows" AND
+    CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+  set(
+    SLANG_SLANG_TINT_BINARY_URL
+    "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+  )
+endif()
+
 #
 # Option validation
 #
@@ -412,6 +430,18 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     add_supported_cxx_linker_flags(slang-glslang PRIVATE "-Wl,--exclude-libs,ALL")
 endif()
 
+# webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
+# trees are too large and onerous for us to depend on.
+if(SLANG_WEBGPU_DAWN_BINARY_URL)
+  copy_fetched_shared_library("webgpu_dawn" "${SLANG_WEBGPU_DAWN_BINARY_URL}")
+endif()
+
+# slang-tint is only available as a fetched shared library, since it's hosted in the Dawn
+# repository, and Dawn's nested source trees are too large and onerous for us to depend
+# on.
+if(SLANG_SLANG_TINT_BINARY_URL)
+  copy_fetched_shared_library("slang-tint" "${SLANG_SLANG_TINT_BINARY_URL}")
+endif()
 
 if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
   install_fetched_shared_library("slang-llvm" "${SLANG_SLANG_LLVM_BINARY_URL}")
