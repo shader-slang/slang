@@ -1409,8 +1409,6 @@ void DocMarkdownWriter::writeCallableOverridable(DocumentPage* page, const ASTMa
         out << "</pre>\n\n";
     }
 
-    funcDoc.writeGenericParameters(out, this, callableDecl);
-
     {
         // We will use the first documentation found for each parameter type
         {

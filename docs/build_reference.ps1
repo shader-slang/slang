@@ -11,6 +11,8 @@ Remove-Item -Path ".\stdlib-reference\global-decls" -Recurse -Force
 Remove-Item -Path ".\stdlib-reference\interfaces" -Recurse -Force
 Remove-Item -Path ".\stdlib-reference\types" -Recurse -Force
 
+git describe --tags | Out-File -FilePath ".\stdlib-reference\_includes\version.inc" -Encoding ASCII
+
 cd stdlib-reference
 & ../../build/Release/bin/slangc -compile-stdlib -doc
 Move-Item -Path ".\toc.html" -Destination ".\_includes\stdlib-reference-toc.html" -Force
