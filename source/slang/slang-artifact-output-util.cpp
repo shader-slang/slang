@@ -33,12 +33,12 @@ namespace Slang
         }
         return SLANG_FAIL;
     }
-    // Get the downstream compiler that can be used for this target
+    // Get the downstream disassembler that can be used for this target
     // TODO(JS):
     // This could perhaps be performed in some other manner if there was more than one way to produce
     // disassembly from a binary.
 
-    const CodeGenTarget target = (CodeGenTarget)ArtifactDescUtil::getCompileTargetFromDesc(desc);
+    const CodeGenTarget target = (CodeGenTarget)ArtifactDescUtil::getCompileTargetFromDesc(assemblyDesc);
     if (target == CodeGenTarget::Unknown)
     {
         return SLANG_FAIL;

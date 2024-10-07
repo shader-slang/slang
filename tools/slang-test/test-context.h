@@ -38,7 +38,7 @@ struct PassThroughFlag
         NVRTC = 1 << int(SLANG_PASS_THROUGH_NVRTC),
         LLVM = 1 << int(SLANG_PASS_THROUGH_LLVM),
         Metal = 1 << int(SLANG_PASS_THROUGH_METAL),
-        WGSL = 1 << int(SLANG_PASS_THROUGH_WGSL)
+        Tint = 1 << int(SLANG_PASS_THROUGH_TINT),
     };
 };
 

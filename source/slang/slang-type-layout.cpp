@@ -1950,6 +1950,8 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
         return &kGLSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
         return &kWGSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::HostHostCallable:

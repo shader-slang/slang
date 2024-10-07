@@ -205,6 +205,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(PTX, KernelLike) \
             x(CuBin, KernelLike) \
             x(MetalAIR, KernelLike) \
+            x(WGSL_SPIRV, KernelLike) \
         x(CPULike, Base) \
             x(UnknownCPU, CPULike) \
             x(X86, CPULike) \
@@ -290,6 +291,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         case SLANG_METAL_LIB:               return Desc::make(Kind::Executable, Payload::MetalAIR, Style::Kernel, 0);
         case SLANG_METAL_LIB_ASM:           return Desc::make(Kind::Assembly, Payload::MetalAIR, Style::Kernel, 0);
         case SLANG_WGSL:                    return Desc::make(Kind::Source, Payload::WGSL, Style::Kernel, 0);
+        case SLANG_WGSL_SPIRV_ASM:          return Desc::make(Kind::Assembly, Payload::WGSL_SPIRV, Style::Kernel, 0);
+        case SLANG_WGSL_SPIRV:              return Desc::make(Kind::Executable, Payload::WGSL_SPIRV, Style::Kernel, 0);
         default: break;
     }
 
@@ -346,6 +349,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 case Payload::DXBC:         return SLANG_DXBC_ASM;
                 case Payload::PTX:          return SLANG_PTX;
                 case Payload::MetalAIR:     return SLANG_METAL_LIB_ASM;
+                case Payload::WGSL_SPIRV:   return SLANG_WGSL_SPIRV_ASM;
                 default: break;
             }
         }
@@ -374,6 +378,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 case Payload::DXBC:         return SLANG_DXBC;
                 case Payload::PTX:          return SLANG_PTX;
                 case Payload::MetalAIR:     return SLANG_METAL_LIB_ASM;
+                case Payload::WGSL_SPIRV:   return SLANG_WGSL_SPIRV;
                 default: break;
             }
         }

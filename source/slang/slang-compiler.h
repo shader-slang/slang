@@ -97,6 +97,8 @@ namespace Slang
         MetalLib            = SLANG_METAL_LIB,
         MetalLibAssembly    = SLANG_METAL_LIB_ASM,
         WGSL                = SLANG_WGSL,
+        WGSLSPIRVAssembly   = SLANG_WGSL_SPIRV_ASM,
+        WGSLSPIRV           = SLANG_WGSL_SPIRV,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -1357,6 +1359,7 @@ namespace Slang
         LLVM = SLANG_PASS_THROUGH_LLVM,                     ///< LLVM 'compiler'
         SpirvOpt = SLANG_PASS_THROUGH_SPIRV_OPT,            ///< pass thorugh spirv to spirv-opt
         MetalC = SLANG_PASS_THROUGH_METAL,
+        Tint = SLANG_PASS_THROUGH_TINT,                     ///< pass through spirv to Tint API
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
