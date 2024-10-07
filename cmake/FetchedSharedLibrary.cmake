@@ -1,71 +1,73 @@
-function(install_fetched_shared_llvm_library)
-    #
-    # Do some stupid little dance to put everything in the right shape with
-    # correct dependencies
-    #
-
-    set(slang_llvm_filename
-        "${CMAKE_SHARED_LIBRARY_PREFIX}slang-llvm${CMAKE_SHARED_LIBRARY_SUFFIX}"
+# Add rule to install shared library of name 'library_name' in the 'module_subdir' directory.
+# If 'url' is a directory, the shared library (with platform-specific shared library prefixes and suffixes) will be
+# taken from the directory, and whatever is found there will be used to produce the install rule.
+# If the 'url' is a path to a file with the platform-specific shared library prefix and suffix, then that file
+# will be used to produce the install rule.
+# Otherwise, the 'url' is interpreted as an URL, and the content of the URL will be fetched, extracted and searched
+# for the shared library to produce the install rule.
+function(install_fetched_shared_library library_name url)
+    set(shared_library_filename
+        "${CMAKE_SHARED_LIBRARY_PREFIX}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
     )
     macro(from_glob dir)
         # A little helper function
         file(
-            GLOB_RECURSE slang_llvm_source_object
-            "${dir}/${slang_llvm_filename}"
+            GLOB_RECURSE source_object
+            "${dir}/${shared_library_filename}"
         )
-        list(LENGTH slang_llvm_source_object nmatches)
+        list(LENGTH source_object nmatches)
         if(nmatches EQUAL 0)
             message(
                 SEND_ERROR
-                "Unable to find ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
+                "Unable to find ${shared_library_filename} in ${url}"
             )
         elseif(nmatches GREATER 1)
             message(
                 SEND_ERROR
-                "Found multiple files named ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
+                "Found multiple files named ${shared_library_filename} in ${url}"
             )
         endif()
     endmacro()
 
-    if(IS_DIRECTORY "${SLANG_SLANG_LLVM_BINARY_URL}")
+    if(IS_DIRECTORY "${url}")
         # Just glob directly from a local directory
-        from_glob("${SLANG_SLANG_LLVM_BINARY_URL}")
+        from_glob("${url}")
     elseif(
-        SLANG_SLANG_LLVM_BINARY_URL
+        url
             MATCHES
             "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
-        AND EXISTS "${SLANG_SLANG_LLVM_BINARY_URL}"
+        AND EXISTS "${url}"
     )
         # Otherwise, if it's a direct path to a shared object, use that
-        set(slang_llvm_source_object "${SLANG_SLANG_LLVM_BINARY_URL}")
+        set(source_object "${url}")
     else()
         # Otherwise, download and extract from whatever URL we have
-        fetchcontent_declare(slang-llvm URL "${SLANG_SLANG_LLVM_BINARY_URL}")
-        fetchcontent_populate(slang-llvm)
-        from_glob("${slang-llvm_SOURCE_DIR}")
+        fetchcontent_declare(${library_name} URL "${url}")
+        fetchcontent_populate(${library_name})
+        from_glob(${${library_name}_SOURCE_DIR})
     endif()
 
-    set(slang_llvm_dest_object
-        ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${slang_llvm_filename}
+    set(dest_object
+        ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${shared_library_filename}
     )
     add_custom_command(
-        OUTPUT ${slang_llvm_dest_object}
+        OUTPUT ${dest_object}
         COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different ${slang_llvm_source_object}
-            ${slang_llvm_dest_object}
-        DEPENDS ${slang_llvm_source_object}
+            ${CMAKE_COMMAND} -E copy_if_different ${source_object}
+            ${dest_object}
+        DEPENDS ${source_object}
         VERBATIM
     )
     # Give this copying action a name
-    add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_dest_object})
-    set_target_properties(copy-slang-llvm PROPERTIES FOLDER generated)
+    add_custom_target(copy-${library_name} DEPENDS ${dest_object})
+    set_target_properties(copy-${library_name} PROPERTIES FOLDER generated)
 
     # Put this into a library target
-    add_library(slang-llvm MODULE IMPORTED GLOBAL)
-    add_dependencies(slang-llvm copy-slang-llvm)
+    add_library(${library_name} MODULE IMPORTED GLOBAL)
+    add_dependencies(${library_name} copy-${library_name})
     set_property(
-        TARGET slang-llvm
-        PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
+        TARGET ${library_name}
+        PROPERTY IMPORTED_LOCATION ${dest_object}
     )
-    install(PROGRAMS ${slang_llvm_dest_object} DESTINATION ${module_subdir})
+    install(PROGRAMS ${dest_object} DESTINATION ${module_subdir})
 endfunction()
