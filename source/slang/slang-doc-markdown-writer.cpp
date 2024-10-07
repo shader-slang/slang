@@ -977,7 +977,7 @@ void DocMarkdownWriter::_appendRequirements(const Requirement& requirement)
         {
             m_builder->append("Available in stages: ");
             bool isFirst = true;
-            for (auto stage : targetSet.second.shaderStageSets)
+            for (auto& stage : targetSet.second.shaderStageSets)
             {
                 if (!isFirst)
                 {
