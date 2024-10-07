@@ -92,6 +92,7 @@ enum class DeviceType
     Metal,
     CPU,
     CUDA,
+    WebGPU,
     CountOf,
 };
 

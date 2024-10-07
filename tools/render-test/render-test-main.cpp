@@ -1206,6 +1206,12 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
             slangPassThrough = SLANG_PASS_THROUGH_NVRTC;
             break;
+        case DeviceType::WGPU:
+            input.target = SLANG_WGSL;
+            input.profile = "";
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;
+            slangPassThrough = SLANG_PASS_THROUGH_NONE;
+            break;
 
 		default:
 			fprintf(stderr, "error: unexpected\n");

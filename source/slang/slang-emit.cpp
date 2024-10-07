@@ -1317,6 +1317,8 @@ Result linkAndOptimizeIR(
         break;
 
     case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
     {
         legalizeIRForWGSL(irModule, sink);
     }
@@ -1637,6 +1639,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             lineDirectiveMode = LineDirectiveMode::GLSL;
             break;
 
+        case CodeGenTarget::WGSLSPIRVAssembly:
+        case CodeGenTarget::WGSLSPIRV:
         case CodeGenTarget::WGSL:
             // WGSL doesn't support line directives.
             // See https://github.com/gpuweb/gpuweb/issues/606.
