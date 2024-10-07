@@ -363,6 +363,76 @@ __generic<T, let N:int>
 vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 
 //@public:
+/// @internal
+/// A parameterized type that represents all flavors of texture types supported by the Slang language.
+/// Please note that this type is not intended to be used directly in user code, and not all combinations
+/// of the generic arguments are valid.
+/// Instead, use the specific texture types such as `Texture1D`, `Texture2DArray` and `Sampler2D` etc.
+/// This documentation is provided for reference purposes only.
+/// @param T The element type of the texture. Must be a scalar or vector type.
+/// @param Shape The shape of the texture. Must be one of `__Shape1D`, `__Shape2D`, `__Shape3D`, `__ShapeCube` or `__ShapeBuffer`.
+/// @param isArray Indicates whether the texture is an array texture.
+/// @param isMS Indicates whether the texture is a multisampled texture.
+/// @param sampleCount The number of samples of a multisampled texture.
+/// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for rasterizer-ordered, 3 for feedback.
+/// @param isShadow Indicates whether the texture is a shadow texture (for combined texture-sampler only).
+/// @param isCombined Indicates whether the texture is a combined texture-sampler.
+/// @param format The storage format of the texture. Users should specify the format using an `[format("...")]` attribute instead.
+/// @see `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`, `Texture1DArray`,
+/// `Texture2DArray`, `TextureCubeArray`, `Sampler1D`, `Sampler2D`, `Sampler3D`, `SamplerCube`, `Sampler1DArray`, `Sampler2DArray`, `SamplerCubeArray`,
+/// `Texture2DMS`, `Texture2DMSArray`, `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray`, `RWTexture2DArray`,
+/// `RWTexture2DMS`, `RWTexture2DMSArray`, `RWTextureBuffer`, `FeedbackTexture2D`, `FeedbackTexture2DArray`.
+/// @remarks
+/// HLSL texture types are implemented as typealiases to the builtin `_Texture` type. Users
+/// are advised to use the HLSL-specific texture types instead of `_Texture` directly.
+///
+/// For read-write textures, Slang will automatically infer `format` from `T`.
+/// To explicitly specify texel storage formats for read-write textures,
+/// use the `[format("...")]` attribute on the texture parameter declaration.
+/// Allowed `format` values are:
+/// |id | Format string        | Meaning           |
+/// |:--|:---------------------|:------------------|
+/// |1  |`"rgba32f"`           | 4 channel 32-bit floating point texture |
+/// |2  |`"rgba16f"`           | 4 channel 16-bit floating point texture |
+/// |3  |`"rg32f"`             | 2 channel 32-bit floating point texture |
+/// |4  |`"rg16f"`             | 2 channel 16-bit floating point texture | 
+/// |5  |`"r11f_g11f_b10f"`    | 3 channel 11/11/10-bit floating point texture |
+/// |6  |`"r32f"`              | 1 channel 32-bit floating point texture |
+/// |7  |`"r16f"`              | 1 channel 16-bit floating point texture |
+/// |8  |`"rgba16"`            | 4 channel 16-bit normalized unsigned integer texture |
+/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit signed integer texture |
+/// |10 |`"rgba8"`             | 4 channel 8-bit normalized unsigned integer texture |
+/// |11 |`"rg16"`              | 2 channel 16-bit normalized unsigned integer texture |
+/// |12 |`"rg8"`               | 2 channel 8-bit normalized unsigned integer texture |
+/// |13 |`"r16"`               | 1 channel 16-bit normalized unsigned integer texture |
+/// |14 |`"r8"`                | 1 channel 8-bit normalized unsigned integer texture |
+/// |15 |`"rgba16_snorm"`      | 4 channel 16-bit normalized signed integer texture |
+/// |16 |`"rgba8_snorm"`       | 4 channel 8-bit normalized signed integer texture |
+/// |17 |`"rg16_snorm"`        | 2 channel 16-bit normalized signed integer texture |
+/// |18 |`"rg8_snorm"`         | 2 channel 8-bit normalized signed integer texture |
+/// |19 |`"r16_snorm"`         | 1 channel 16-bit normalized signed integer texture |
+/// |20 |`"r8_snorm"`          | 1 channel 8-bit normalized signed integer texture |
+/// |21 |`"rgba32i"`           | 4 channel 32-bit signed integer texture |
+/// |22 |`"rgba16i"`           | 4 channel 16-bit signed integer texture |
+/// |23 |`"rgba8i"`            | 4 channel 8-bit signed integer texture |
+/// |24 |`"rg32i"`             | 2 channel 32-bit signed integer texture |
+/// |25 |`"rg16i"`             | 2 channel 16-bit signed integer texture |
+/// |26 |`"rg8i"`              | 2 channel 8-bit signed integer texture |
+/// |27 |`"r32i"`              | 1 channel 32-bit signed integer texture |
+/// |28 |`"r16i"`              | 1 channel 16-bit signed integer texture |
+/// |29 |`"r8i"`               | 1 channel 8-bit signed integer texture |
+/// |30 |`"rgba32ui"`          | 4 channel 32-bit unsigned integer texture |
+/// |31 |`"rgba16ui"`          | 4 channel 16-bit unsigned integer texture |
+/// |32 |`"rgb10_a2ui"`        | 4 channel 10/10/10/2-bit unsigned integer texture |
+/// |33 |`"rgba8ui"`           | 4 channel 8-bit unsigned integer texture |
+/// |34 |`"rg32ui"`            | 2 channel 32-bit unsigned integer texture |
+/// |35 |`"rg16ui"`            | 2 channel 16-bit unsigned integer texture |
+/// |36 |`"rg8ui"`             | 2 channel 8-bit unsigned integer texture |
+/// |37 |`"r32ui"`             | 1 channel 32-bit unsigned integer texture |
+/// |38 |`"r16ui"`             | 1 channel 16-bit unsigned integer texture |
+/// |39 |`"r8ui"`              | 1 channel 8-bit unsigned integer texture |
+/// |40 |`"r64ui"`             | 1 channel 64-bit unsigned integer texture |
+/// |41 |`"r64i"`              | 1 channel 64-bit signed integer texture |
 __magic_type(TextureType)
 __intrinsic_type($(kIROp_TextureType))
 struct _Texture<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>

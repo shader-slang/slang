@@ -448,6 +448,11 @@ void DocMarkdownWriter::writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl
 
     out << toSlice("# ") << printer.getSlice() << toSlice("\n\n");
 
+    DeclDocumentation declDoc;
+    declDoc.parse(entry.m_markup.getUnownedSlice());
+    declDoc.writeDescription(out, this, varDecl);
+
+    out << toSlice("## Signature\n");
     out << toSlice("<pre>\n");
     if (varDecl->hasModifier<HLSLStaticModifier>())
     {
@@ -482,7 +487,9 @@ void DocMarkdownWriter::writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl
 
     out << toSlice(";\n</pre>\n\n");
 
-    writeDescription(entry);
+    declDoc.writeSection(out, this, varDecl, DocPageSection::Remarks);
+    declDoc.writeSection(out, this, varDecl, DocPageSection::Example);
+    declDoc.writeSection(out, this, varDecl, DocPageSection::SeeAlso);
 }
 
 void DocMarkdownWriter::writeProperty(const ASTMarkup::Entry& entry, PropertyDecl* propertyDecl)
@@ -494,7 +501,11 @@ void DocMarkdownWriter::writeProperty(const ASTMarkup::Entry& entry, PropertyDec
     printer.addDeclPath(DeclRef<Decl>(propertyDecl));
     out << escapeMarkdownText(printer.getSlice()) << toSlice("\n\n");
 
-    out << toSlice("## Definition\n\n");
+    DeclDocumentation declDoc;
+    declDoc.parse(entry.m_markup.getUnownedSlice());
+    declDoc.writeDescription(out, this, propertyDecl);
+
+    out << toSlice("## Signature\n\n");
 
     out << toSlice("<pre>\n<span class='code_keyword'>property</span> ");
     out << translateToHTMLWithLinks(printer.getSlice());
@@ -520,7 +531,10 @@ void DocMarkdownWriter::writeProperty(const ASTMarkup::Entry& entry, PropertyDec
     }
     out << "}\n</pre>\n\n";
     
-    writeDescription(entry);
+    declDoc.writeSection(out, this, propertyDecl, DocPageSection::ReturnInfo);
+    declDoc.writeSection(out, this, propertyDecl, DocPageSection::Remarks);
+    declDoc.writeSection(out, this, propertyDecl, DocPageSection::Example);
+    declDoc.writeSection(out, this, propertyDecl, DocPageSection::SeeAlso);
 }
 
 void DocMarkdownWriter::writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl* typeDefDecl)
@@ -532,7 +546,11 @@ void DocMarkdownWriter::writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl*
     _appendAggTypeName(newEntry, typeDefDecl);
     out << toSlice("\n\n");
     
-    out << toSlice("## Definition\n\n");
+    DeclDocumentation declDoc;
+    declDoc.parse(entry.m_markup.getUnownedSlice());
+    declDoc.writeDescription(out, this, typeDefDecl);
+
+    out << toSlice("## Signature\n\n");
 
     out << toSlice("<pre>\n<span class='code_keyword'>typealias</span> ");
     ASTPrinter printer(m_astBuilder);
@@ -548,7 +566,9 @@ void DocMarkdownWriter::writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl*
     out << translateToHTMLWithLinks(typeDefDecl->type->toString());
     out << ";\n</pre>\n\n";
 
-    writeDescription(entry);
+    declDoc.writeSection(out, this, typeDefDecl, DocPageSection::Remarks);
+    declDoc.writeSection(out, this, typeDefDecl, DocPageSection::Example);
+    declDoc.writeSection(out, this, typeDefDecl, DocPageSection::SeeAlso);
 }
 
 void DocMarkdownWriter::writeExtensionConditions(StringBuilder& out, ExtensionDecl* extensionDecl, const char* prefix, bool isHtml)
@@ -777,7 +797,7 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
     out << ";\n";
 }
 
-List<DocMarkdownWriter::NameAndText> DocMarkdownWriter::_getUniqueParams(const List<Decl*>& decls, FuncDocumentation* funcDoc)
+List<DocMarkdownWriter::NameAndText> DocMarkdownWriter::_getUniqueParams(const List<Decl*>& decls, DeclDocumentation* funcDoc)
 {
     List<NameAndText> out;
 
@@ -1101,7 +1121,7 @@ void ParsedDescription::parse(UnownedStringSlice text)
     }
 }
 
-void FuncDocumentation::parse(const UnownedStringSlice& text)
+void DeclDocumentation::parse(const UnownedStringSlice& text)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(text, lines);
@@ -1176,6 +1196,21 @@ void FuncDocumentation::parse(const UnownedStringSlice& text)
             currentSection = DocPageSection::SeeAlso;
             line = line.tail(4).trim();
         }
+        else if (line.startsWith("@experimental"))
+        {
+            currentSection = DocPageSection::ExperimentalCallout;
+            line = line.tail(13).trim();
+        }
+        else if (line.startsWith("@internal"))
+        {
+            currentSection = DocPageSection::InternalCallout;
+            line = line.tail(9).trim();
+        }
+        else if (line.startsWith("@deprecated"))
+        {
+            currentSection = DocPageSection::InternalCallout;
+            line = line.tail(11).trim();
+        }
         sectionBuilders[currentSection] << line << "\n";
     }
     for (auto& kv : sectionBuilders)
@@ -1224,7 +1259,7 @@ void DocMarkdownWriter::writeCallableOverridable(DocumentPage* page, const ASTMa
         }
     }
 
-    FuncDocumentation funcDoc;
+    DeclDocumentation funcDoc;
     funcDoc.parse(descriptionSB.getUnownedSlice());
     funcDoc.parse(additionalDescriptionSB.getUnownedSlice());
 
@@ -1402,11 +1437,17 @@ void DocMarkdownWriter::writeEnum(const ASTMarkup::Entry& entry, EnumDecl* enumD
     }
     out << toSlice("\n\n");
 
+    DeclDocumentation declDoc;
+    declDoc.parse(entry.m_markup.getUnownedSlice());
+    declDoc.writeDescription(out, this, enumDecl);
+
     out << toSlice("## Values \n\n");
 
     _appendAsBullets(_getAsNameAndTextList(enumDecl->getMembersOfType<EnumCaseDecl>()), false, '_');
     
-    writeDescription(entry);
+    declDoc.writeSection(out, this, enumDecl, DocPageSection::Remarks);
+    declDoc.writeSection(out, this, enumDecl, DocPageSection::Example);
+    declDoc.writeSection(out, this, enumDecl, DocPageSection::SeeAlso);
 }
 
 void DocMarkdownWriter::_appendEscaped(const UnownedStringSlice& text)
@@ -1589,7 +1630,10 @@ void DocMarkdownWriter::writeAggType(DocumentPage* page, const ASTMarkup::Entry&
         }
     }
 
-    writeDescription(primaryEntry);
+    DeclDocumentation declDoc;
+    declDoc.parse(primaryEntry.m_markup.getUnownedSlice());
+    declDoc.writeDescription(out, this, aggTypeDecl);
+
     if (GenericDecl* genericDecl = as<GenericDecl>(aggTypeDecl->parentDecl))
     {
         // The parameters, in order
@@ -1754,6 +1798,9 @@ void DocMarkdownWriter::writeAggType(DocumentPage* page, const ASTMarkup::Entry&
             }
         }
     }
+    declDoc.writeSection(out, this, aggTypeDecl, DocPageSection::Remarks);
+    declDoc.writeSection(out, this, aggTypeDecl, DocPageSection::Example);
+    declDoc.writeSection(out, this, aggTypeDecl, DocPageSection::SeeAlso);
 }
 
 String DocMarkdownWriter::escapeMarkdownText(String text)
@@ -1981,26 +2028,61 @@ void DocMarkdownWriter::writePreamble()
     }
 }
 
-bool DocMarkdownWriter::writeDescription(const ASTMarkup::Entry& entry)
+const char* getSectionTitle(DocPageSection section)
 {
-    auto& out = *m_builder;
-
-    if (entry.m_markup.trim().getLength() > 0)
+    switch (section)
     {
-        out << toSlice("## Description\n\n");
-
-        out << entry.m_markup.getUnownedSlice();
-#if 0
-        UnownedStringSlice text(entry.m_markup.getUnownedSlice()), line;
-        while (StringUtil::extractLine(text, line))
-        {
-            out << line << toSlice("\n");
-        }
-#endif
-        out << toSlice("\n");
-        return true;
+    case DocPageSection::Description: return "Description";
+    case DocPageSection::Parameter: return "Parameters";
+    case DocPageSection::ReturnInfo: return "Return value";
+    case DocPageSection::Remarks: return "Remarks";
+    case DocPageSection::Example: return "Example";
+    case DocPageSection::SeeAlso: return "See also";
+    default: return "";
     }
-    return false;
+}
+
+void DeclDocumentation::writeDescription(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl)
+{
+    // Write all callout sections first.
+    writeSection(out, writer, decl, DocPageSection::DeprecatedCallout);
+    writeSection(out, writer, decl, DocPageSection::ExperimentalCallout);
+    writeSection(out, writer, decl, DocPageSection::InternalCallout);
+
+    // Write description section.
+    writeSection(out, writer, decl, DocPageSection::Description);
+}
+
+void DeclDocumentation::writeSection(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl, DocPageSection section)
+{
+    SLANG_UNUSED(decl);
+    ParsedDescription* sectionDoc = sections.tryGetValue(section);
+    if (!sectionDoc)
+        return;
+
+    switch (section)
+    {
+    case DocPageSection::DeprecatedCallout:
+        out << "> #### Deprecated Feature\n";
+        out << "> The feature described in this page is marked as deprecated, and may be removed in a future release.\n";
+        out << "> Users are advised to avoid using this feature, and to migrate to a newer alternative.\n";
+        return;
+    case DocPageSection::ExperimentalCallout:
+        out << "> #### Experimental Feature\n";
+        out << "> The feature described in this page is marked as experimental, and may be subject to change in future releases.\n";
+        out << "> Users are advised that any code that depend on this feature may not be compilable by future versions of the compiler.\n";
+        return;
+    case DocPageSection::InternalCallout:
+        out << "> #### Internal Feature\n";
+        out << "> The feature described in this page is marked as an internal implementation detail, and is not intended for use by end-users.\n";
+        out << "> Users are advised to avoid using this declaration directly, as it may be removed or changed in future releases.\n";
+        return;
+    }
+    if (sectionDoc && sectionDoc->ownedText.getLength() > 0)
+    {
+        out << "## \"" << getSectionTitle(section) << "\n\n";
+        sectionDoc->write(writer, out);
+    }
 }
 
 void DocMarkdownWriter::createPage(DocMarkdownWriter::WriteDeclMode mode, ASTMarkup::Entry& entry, Decl* decl)

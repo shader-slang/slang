@@ -75,13 +75,18 @@ enum class DocPageSection
     Remarks,
     Example,
     SeeAlso,
+    InternalCallout,
+    ExperimentalCallout,
+    DeprecatedCallout,
 };
 
-struct FuncDocumentation
+struct DeclDocumentation
 {
     Dictionary<String, ParamDocumentation> parameters;
     Dictionary<DocPageSection, ParsedDescription> sections;
     void parse(const UnownedStringSlice& text);
+    void writeDescription(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl);
+    void writeSection(StringBuilder& sb, DocMarkdownWriter* writer, Decl* decl, DocPageSection section);
 };
 
 struct DocMarkdownWriter
@@ -142,7 +147,6 @@ struct DocMarkdownWriter
     void createPage(WriteDeclMode mode, ASTMarkup::Entry& entry, Decl* decl);
 
     void writePreamble();
-    bool writeDescription(const ASTMarkup::Entry& entry);
 
     void writeSignature(CallableDecl* callableDecl);
     void writeExtensionConditions(StringBuilder& sb, ExtensionDecl* decl, const char* prefix, bool isHtml);
@@ -179,7 +183,7 @@ struct DocMarkdownWriter
         String text;
     };
 
-    List<NameAndText> _getUniqueParams(const List<Decl*>& decls, FuncDocumentation* funcDoc);
+    List<NameAndText> _getUniqueParams(const List<Decl*>& decls, DeclDocumentation* funcDoc);
 
     String _getName(Decl* decl);
     String _getFullName(Decl* decl);
