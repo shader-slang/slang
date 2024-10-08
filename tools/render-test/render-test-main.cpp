@@ -5,6 +5,7 @@
 #include "options.h"
 #include <slang-rhi.h>
 #include <slang-rhi/shader-cursor.h>
+#include <slang-rhi/acceleration-structure-utils.h>
 #include "slang-support.h"
 #include "png-serialize-util.h"
 
@@ -98,12 +99,12 @@ public:
         IDevice* device,
         const Options& options,
         const ShaderCompilerUtil::Input& input);
-    void runCompute(IComputeCommandEncoder* encoder);
-    void renderFrame(IRenderCommandEncoder* encoder);
-    void renderFrameMesh(IRenderCommandEncoder* encoder);
+    void runCompute(IComputePassEncoder* encoder);
+    void renderFrame(IRenderPassEncoder* encoder);
+    void renderFrameMesh(IRenderPassEncoder* encoder);
     void finalize();
 
-    Result applyBinding(PipelineType pipelineType, ICommandEncoder* encoder);
+    Result applyBinding(PipelineType pipelineType, IPassEncoder* encoder);
     void setProjectionMatrix(IShaderObject* rootObject);
     Result writeBindingOutput(const String& fileName);
 
@@ -478,7 +479,7 @@ SlangResult _assignVarsFromLayout(
     return context.assign(rootCursor, layout.rootVal);
 }
 
-Result RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
+Result RenderTestApp::applyBinding(PipelineType pipelineType, IPassEncoder* encoder)
 {
     auto slangReflection = (slang::ProgramLayout*)spGetReflection(
         m_compilationOutput.output.getRequestForReflection());
@@ -489,7 +490,7 @@ Result RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* e
     {
     case PipelineType::Compute:
         {
-            IComputeCommandEncoder* computeEncoder = static_cast<IComputeCommandEncoder*>(encoder);
+            IComputePassEncoder* computeEncoder = static_cast<IComputePassEncoder*>(encoder);
             auto rootObject = computeEncoder->bindPipeline(m_pipeline);
             SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
                 m_device,
@@ -503,7 +504,7 @@ Result RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* e
         break;
     case PipelineType::Graphics:
         {
-            IRenderCommandEncoder* renderEncoder = static_cast<IRenderCommandEncoder*>(encoder);
+            IRenderPassEncoder* renderEncoder = static_cast<IRenderPassEncoder*>(encoder);
             auto rootObject = renderEncoder->bindPipeline(m_pipeline);
             SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
                 m_device,
@@ -652,8 +653,7 @@ void RenderTestApp::_initializeRenderPass()
     m_transientHeap = m_device->createTransientResourceHeap(transientHeapDesc);
     SLANG_ASSERT(m_transientHeap);
 
-    ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-    m_queue = m_device->createCommandQueue(queueDesc);
+    m_queue = m_device->getQueue(QueueType::Graphics);
     SLANG_ASSERT(m_queue);
     
     rhi::TextureDesc depthBufferDesc;
@@ -746,12 +746,12 @@ void RenderTestApp::_initializeAccelerationStructure()
         compactedSizeQuery->reset();
 
         auto commandBuffer = m_transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeRayTracingCommands();
+        auto passEncoder = commandBuffer->beginRayTracingPass();
         AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
         compactedSizeQueryDesc.queryPool = compactedSizeQuery;
         compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-        encoder->buildAccelerationStructure(buildDesc, draftAS, nullptr, scratchBuffer, 1, &compactedSizeQueryDesc);
-        encoder->endEncoding();
+        passEncoder->buildAccelerationStructure(buildDesc, draftAS, nullptr, scratchBuffer, 1, &compactedSizeQueryDesc);
+        passEncoder->end();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
         m_queue->waitOnHost();
@@ -763,10 +763,10 @@ void RenderTestApp::_initializeAccelerationStructure()
         m_device->createAccelerationStructure(finalDesc, m_bottomLevelAccelerationStructure.writeRef());
 
         commandBuffer = m_transientHeap->createCommandBuffer();
-        encoder = commandBuffer->encodeRayTracingCommands();
-        encoder->copyAccelerationStructure(
+        passEncoder = commandBuffer->beginRayTracingPass();
+        passEncoder->copyAccelerationStructure(
             m_bottomLevelAccelerationStructure, draftAS, AccelerationStructureCopyMode::Compact);
-        encoder->endEncoding();
+        passEncoder->end();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
         m_queue->waitOnHost();
@@ -774,29 +774,43 @@ void RenderTestApp::_initializeAccelerationStructure()
 
     // Build top level acceleration structure.
     {
-        List<AccelerationStructureInstanceDesc> instanceDescs;
-        instanceDescs.setCount(1);
-        instanceDescs[0].accelerationStructure = m_bottomLevelAccelerationStructure->getHandle();
-        instanceDescs[0].flags = AccelerationStructureInstanceFlags::TriangleFacingCullDisable;
-        instanceDescs[0].instanceContributionToHitGroupIndex = 0;
-        instanceDescs[0].instanceID = 0;
-        instanceDescs[0].instanceMask = 0xFF;
+        AccelerationStructureInstanceDescType nativeInstanceDescType =
+            getAccelerationStructureInstanceDescType(m_device);
+        Size nativeInstanceDescSize = getAccelerationStructureInstanceDescSize(nativeInstanceDescType);
+
+        List<AccelerationStructureInstanceDescGeneric> genericInstanceDescs;
+        genericInstanceDescs.setCount(1);
+        genericInstanceDescs[0].accelerationStructure = m_bottomLevelAccelerationStructure->getHandle();
+        genericInstanceDescs[0].flags = AccelerationStructureInstanceFlags::TriangleFacingCullDisable;
+        genericInstanceDescs[0].instanceContributionToHitGroupIndex = 0;
+        genericInstanceDescs[0].instanceID = 0;
+        genericInstanceDescs[0].instanceMask = 0xFF;
         float transformMatrix[] = {
             1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-        memcpy(&instanceDescs[0].transform[0][0], transformMatrix, sizeof(float) * 12);
+        memcpy(&genericInstanceDescs[0].transform[0][0], transformMatrix, sizeof(float) * 12);
+
+        List<unsigned char> nativeInstanceDescs;
+        nativeInstanceDescs.setCount(genericInstanceDescs.getCount() * nativeInstanceDescSize);
+        convertAccelerationStructureInstanceDescs(
+            genericInstanceDescs.getCount(),
+            nativeInstanceDescType,
+            nativeInstanceDescs.getBuffer(),
+            nativeInstanceDescSize,
+            genericInstanceDescs.getBuffer(),
+            sizeof(AccelerationStructureInstanceDescGeneric)
+        );
 
         BufferDesc instanceBufferDesc = {};
-        instanceBufferDesc.size =
-            instanceDescs.getCount() * sizeof(AccelerationStructureInstanceDesc);
+        instanceBufferDesc.size = nativeInstanceDescs.getCount();
         instanceBufferDesc.usage = BufferUsage::AccelerationStructureBuildInput;
         instanceBufferDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
         ComPtr<IBuffer> instanceBuffer =
-            m_device->createBuffer(instanceBufferDesc, instanceDescs.getBuffer());
+            m_device->createBuffer(instanceBufferDesc, nativeInstanceDescs.getBuffer());
 
         AccelerationStructureBuildInputInstances instances = {};
         instances.instanceBuffer = instanceBuffer;
         instances.instanceCount = 1;
-        instances.instanceStride = sizeof(AccelerationStructureInstanceDesc);
+        instances.instanceStride = nativeInstanceDescSize;
         AccelerationStructureBuildDesc buildDesc = {};
         buildDesc.inputs = &instances;
         buildDesc.inputCount = 1;
@@ -817,9 +831,9 @@ void RenderTestApp::_initializeAccelerationStructure()
             createDesc, m_topLevelAccelerationStructure.writeRef());
 
         auto commandBuffer = m_transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeRayTracingCommands();
-        encoder->buildAccelerationStructure(buildDesc, m_topLevelAccelerationStructure, nullptr, scratchBuffer, 0, nullptr);
-        encoder->endEncoding();
+        auto passEncoder = commandBuffer->beginRayTracingPass();
+        passEncoder->buildAccelerationStructure(buildDesc, m_topLevelAccelerationStructure, nullptr, scratchBuffer, 0, nullptr);
+        passEncoder->end();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
         m_queue->waitOnHost();
@@ -835,7 +849,7 @@ void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
         .setData(info.identityProjectionMatrix, sizeof(float) * 16);
 }
 
-void RenderTestApp::renderFrameMesh(IRenderCommandEncoder* encoder)
+void RenderTestApp::renderFrameMesh(IRenderPassEncoder* encoder)
 {
     auto pipelineType = PipelineType::Graphics;
     applyBinding(pipelineType, encoder);
@@ -846,7 +860,7 @@ void RenderTestApp::renderFrameMesh(IRenderCommandEncoder* encoder)
     );
 }
 
-void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
+void RenderTestApp::renderFrame(IRenderPassEncoder* encoder)
 {
     auto pipelineType = PipelineType::Graphics;
     applyBinding(pipelineType, encoder);
@@ -856,7 +870,7 @@ void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
 	encoder->draw(3);
 }
 
-void RenderTestApp::runCompute(IComputeCommandEncoder* encoder)
+void RenderTestApp::runCompute(IComputePassEncoder* encoder)
 {
     auto pipelineType = PipelineType::Compute;
     applyBinding(pipelineType, encoder);
@@ -933,9 +947,9 @@ Result RenderTestApp::update()
     auto commandBuffer = m_transientHeap->createCommandBuffer();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
-        auto encoder = commandBuffer->encodeComputeCommands();
-        runCompute(encoder);
-        encoder->endEncoding();
+        auto passEncoder = commandBuffer->beginComputePass();
+        runCompute(passEncoder);
+        passEncoder->end();
     }
     else
     {
@@ -952,18 +966,18 @@ Result RenderTestApp::update()
         renderPass.colorAttachmentCount = 1;
         renderPass.depthStencilAttachment = &depthStencilAttachment;
 
-        auto encoder = commandBuffer->encodeRenderCommands(renderPass);
+        auto passEncoder = commandBuffer->beginRenderPass(renderPass);
         rhi::Viewport viewport = {};
         viewport.maxZ = 1.0f;
         viewport.extentX = (float)gWindowWidth;
         viewport.extentY = (float)gWindowHeight;
-        encoder->setViewportAndScissor(viewport);
+        passEncoder->setViewportAndScissor(viewport);
         if(m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute
             || m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute)
-            renderFrameMesh(encoder);
+            renderFrameMesh(passEncoder);
         else
-            renderFrame(encoder);
-        encoder->endEncoding();
+            renderFrame(passEncoder);
+        passEncoder->end();
     }
     commandBuffer->close();
 
