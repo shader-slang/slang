@@ -908,7 +908,8 @@ static void maybeCopyLayoutInformationToParameters(
 
 IRFunc* specializeIRForEntryPoint(
     IRSpecContext*      context,
-    EntryPoint*         entryPoint)
+    EntryPoint*         entryPoint,
+    UnownedStringSlice  nameOverride)
 {
     // We start by looking up the IR symbol that
     // matches the mangled name given to the
@@ -1009,8 +1010,6 @@ IRFunc* specializeIRForEntryPoint(
         context->builder->addKeepAliveDecoration(clonedFunc);
     }
 
-    auto nameOverride = entryPoint->getEntryPointNameOverride(0);
-
     // If an IREntryPointDecoration already exist in the function,
     // check if we need to update its name with nameOverride.
     // If the decoration doesn't exist, create it with the desired name.
@@ -1020,7 +1019,7 @@ IRFunc* specializeIRForEntryPoint(
         {
                 IRInst* operands[] = {
                     entryPointDecor->getProfileInst(),
-                    context->builder->getStringValue(nameOverride.getUnownedSlice()),
+                    context->builder->getStringValue(nameOverride),
                     entryPointDecor->getModuleName() };
                 context->builder->addDecoration(
                     clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
@@ -1029,9 +1028,11 @@ IRFunc* specializeIRForEntryPoint(
     }
     else
     {
+        if (!nameOverride.getLength())
+            nameOverride = getUnownedStringSliceText(entryPoint->getName());
         IRInst* operands[] = {
                    context->builder->getIntValue(context->builder->getIntType(), entryPoint->getProfile().raw),
-                   context->builder->getStringValue(nameOverride.getUnownedSlice()),
+                   context->builder->getStringValue(nameOverride),
                    context->builder->getStringValue(UnownedStringSlice(entryPoint->getModule()->getName())) };
         context->builder->addDecoration(
             clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
@@ -1815,8 +1816,10 @@ LinkedIR linkIR(
     List<IRFunc*> irEntryPoints;
     for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
     {
+        auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
+        auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);
         auto entryPoint = program->getEntryPoint(entryPointIndex).get();
-        irEntryPoints.add(specializeIRForEntryPoint(context, entryPoint));
+        irEntryPoints.add(specializeIRForEntryPoint(context, entryPoint, nameOverride.getUnownedSlice()));
     }
 
     // Layout information for global shader parameters is also required,
