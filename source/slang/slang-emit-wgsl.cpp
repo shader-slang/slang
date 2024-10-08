@@ -602,6 +602,21 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType * type, IRInst* varDecl)
         m_writer->emit("storage, read");
         m_writer->emit(">");
     }
+    else if(varDecl->getOp() == kIROp_GlobalVar)
+    {
+        // Global ("module-scope") non-handle variables need to specify storage space
+
+        // https://www.w3.org/TR/WGSL/#var-decls
+        // "
+        // Variables in the private, storage, uniform, workgroup, and handle address
+        // spaces must only be declared in module scope, while variables in the function
+        // address space must only be declared in function scope. The address space must
+        // be specified for all address spaces except handle and function. The handle
+        // address space must not be specified. Specifying the function address space is
+        // optional.
+        // "
+        m_writer->emit("<private>");
+    }
 }
 
 void WGSLSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
