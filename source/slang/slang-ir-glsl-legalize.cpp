@@ -11,7 +11,12 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-single-return.h"
 #include "slang-glsl-extension-tracker.h"
+
+#ifdef SLANG_USE_SYSTEM_SPIRV_HEADER
+#include <spirv/unified1/spirv.h>
+#else
 #include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
+#endif
 
 namespace Slang
 {
@@ -951,7 +956,7 @@ IRInst* getOrCreateBuiltinParamForHullShader(GLSLLegalizationContext* context, U
         {
             IRBuilder builder(context->entryPointFunc);
             auto paramType = builder.getIntType();
-            builder.setInsertInto(context->entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+            builder.setInsertBefore(context->entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
             outputControlPointIdParam = builder.emitParam(paramType);
             IRStructTypeLayout::Builder typeBuilder(&builder);
             auto typeLayout = typeBuilder.build();

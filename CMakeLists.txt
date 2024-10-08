@@ -81,8 +81,8 @@ auto_option(
     Aftermath
     "Enable Aftermath in GFX, and add aftermath crash example to project"
 )
-option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support")
-mark_as_advanced(SLANG_ENABLE_DX_ON_VK)
+advanced_option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support" OFF)
+advanced_option(SLANG_ENABLE_SLANG_RHI "Use slang-rhi as dependency" ON)
 
 option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
@@ -100,6 +100,29 @@ option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang w
 option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
 option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
+
+option(SLANG_GITHUB_TOKEN "Use a given token value for accessing Github REST API" "")
+
+advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
+advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
+advanced_option(SLANG_USE_SYSTEM_VULKAN_HEADERS "Build using system Vulkan headers" OFF)
+advanced_option(SLANG_USE_SYSTEM_SPIRV_HEADERS "Build using system SPIR-V headers" OFF)
+advanced_option(SLANG_USE_SYSTEM_UNORDERED_DENSE "Build using system unordered dense" OFF)
+
+option(SLANG_SPIRV_HEADERS_INCLUDE_DIR "Provide a specific path for the SPIR-V headers and grammar files")
+mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
+
+if (${SLANG_USE_SYSTEM_LZ4})
+    add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
+endif()
+
+if (${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+    add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
+endif()
+
+if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+    add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
+endif()
 
 enum_option(
     SLANG_LIB_TYPE
@@ -136,7 +159,7 @@ enum_option(
 if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     # If the user didn't specify a URL, find the best one now
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
-        get_best_slang_binary_release_url(url)
+        get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
         if(NOT DEFINED url)
             message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
         endif()
@@ -198,7 +221,14 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     find_package(Clang REQUIRED CONFIG)
 endif()
 
+if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+    find_package(unordered_dense CONFIG QUIET)
+endif()
+
 add_subdirectory(external)
+
+set(SLANG_CORE_LIBRARIES "")
+list(APPEND SLANG_CORE_LIBRARIES miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS})
 
 #
 # Our targets
@@ -209,7 +239,8 @@ slang_add_target(
     STATIC
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
+    LINK_WITH_PRIVATE ${SLANG_CORE_LIBRARIES}
+    LINK_WITH_PUBLIC unordered_dense::unordered_dense
     INCLUDE_DIRECTORIES_PUBLIC source include
 )
 
@@ -220,7 +251,8 @@ if(SLANG_ENABLE_SLANGRT)
         # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
         EXTRA_SOURCE_DIRS source/core
         USE_EXTRA_WARNINGS
-        LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
+        LINK_WITH_PRIVATE ${SLANG_CORE_LIBRARIES}
+        LINK_WITH_PUBLIC unordered_dense::unordered_dense
         EXPORT_MACRO_PREFIX SLANG_RT
         INCLUDE_DIRECTORIES_PUBLIC include
         INSTALL
@@ -233,6 +265,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE core
+    INCLUDE_FROM_PUBLIC SPIRV-Headers
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers
@@ -251,6 +284,13 @@ add_custom_target(
     all-generators
     COMMENT "meta target which depends on all generators"
 )
+
+if(CMAKE_HOST_WIN32)
+  set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
+else()
+  set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
+endif()
+
 set_target_properties(all-generators PROPERTIES FOLDER generators)
 function(generator dir)
     if(SLANG_GENERATORS_PATH)
@@ -265,7 +305,7 @@ function(generator dir)
             TARGET ${target}
             PROPERTY
                 IMPORTED_LOCATION
-                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_EXECUTABLE_SUFFIX}"
+                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_HOST_EXECUTABLE_SUFFIX}"
         )
     else()
         slang_add_target(
@@ -282,12 +322,14 @@ function(generator dir)
         )
     endif()
 endfunction()
+
 generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-embed)
 generator(tools/slang-generate USE_FEWER_WARNINGS)
 generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
+
 generator(
     source/slangc
     TARGET_NAME slang-bootstrap
@@ -310,6 +352,7 @@ if(SLANG_ENABLE_SLANGD)
         EXECUTABLE
         LINK_WITH_PRIVATE
             core
+            compiler-core
             slang
             slang-reflect-headers
             slang-capability-defs
@@ -609,7 +652,7 @@ if(SLANG_ENABLE_TESTS)
         tools/unit-test
         OBJECT
         EXCLUDE_FROM_ALL
-        INCLUDE_FROM_PRIVATE slang
+        INCLUDE_FROM_PRIVATE slang core
         INCLUDE_DIRECTORIES_PRIVATE include
         FOLDER test
     )
@@ -627,26 +670,28 @@ if(SLANG_ENABLE_TESTS)
             REQUIRED_BY slang-test
             FOLDER test/tools
         )
-        slang_add_target(
-            tools/render-test
-            MODULE
-            EXCLUDE_FROM_ALL
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-            USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE
-                core
-                compiler-core
-                slang
-                slang-rhi
-                platform
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
-                $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
-            OUTPUT_NAME render-test-tool
-            REQUIRED_BY slang-test
-            FOLDER test/tools
-        )
+        if(SLANG_ENABLE_SLANG_RHI)
+            slang_add_target(
+                tools/render-test
+                MODULE
+                EXCLUDE_FROM_ALL
+                EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+                USE_FEWER_WARNINGS
+                LINK_WITH_PRIVATE
+                    core
+                    compiler-core
+                    slang
+                    slang-rhi
+                    platform
+                    $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+                EXTRA_COMPILE_DEFINITIONS_PRIVATE
+                    $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
+                    $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
+                OUTPUT_NAME render-test-tool
+                REQUIRED_BY slang-test
+                FOLDER test/tools
+            )
+        endif()
     endif()
     slang_add_target(
         tools/slang-unit-test

@@ -152,8 +152,12 @@ target_include_directories(
 # generated lookup tables
 #
 
+if (NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
+    set(SLANG_SPIRV_HEADERS_INCLUDE_DIR "${slang_SOURCE_DIR}/external/spirv-headers/include")
+endif()
+
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
-    "${slang_SOURCE_DIR}/external/spirv-headers/include/spirv/unified1/extinst.glsl.std.450.grammar.json"
+    "${SLANG_SPIRV_HEADERS_INCLUDE_DIR}/spirv/unified1/extinst.glsl.std.450.grammar.json"
 )
 set(SLANG_LOOKUP_GENERATOR_OUTPUT_DIR
     "${CMAKE_CURRENT_BINARY_DIR}/slang-lookup-tables/"
@@ -179,7 +183,7 @@ add_custom_command(
 )
 
 set(SLANG_SPIRV_CORE_SOURCE_JSON
-    "${slang_SOURCE_DIR}/external/spirv-headers/include/spirv/unified1/spirv.core.grammar.json"
+    "${SLANG_SPIRV_HEADERS_INCLUDE_DIR}/spirv/unified1/spirv.core.grammar.json"
 )
 set(SLANG_SPIRV_CORE_GRAMMAR_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-spirv-core-grammar-embed.cpp"

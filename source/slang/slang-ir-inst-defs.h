@@ -61,14 +61,17 @@ INST(Nop, nop, 0, 0)
 
     INST(DifferentialPairType, DiffPair, 1, HOISTABLE)
     INST(DifferentialPairUserCodeType, DiffPairUserCode, 1, HOISTABLE)
-    INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPairUserCodeType)
+    INST(DifferentialPtrPairType, DiffRefPair, 1, HOISTABLE)
+    INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPtrPairType)
 
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 
     INST(TensorViewType, TensorView, 1, HOISTABLE)
     INST(TorchTensorType, TorchTensor, 0, HOISTABLE)
     INST(ArrayListType, ArrayListVector, 1, HOISTABLE)
-    
+
+    INST(AtomicType, Atomic, 1, HOISTABLE)
+
     /* BindExistentialsTypeBase */
 
         // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
@@ -325,15 +328,18 @@ INST(DefaultConstruct, defaultConstruct, 0, 0)
 
 INST(MakeDifferentialPair, MakeDiffPair, 2, 0)
 INST(MakeDifferentialPairUserCode, MakeDiffPairUserCode, 2, 0)
-INST_RANGE(MakeDifferentialPairBase, MakeDifferentialPair, MakeDifferentialPairUserCode)
+INST(MakeDifferentialPtrPair, MakeDiffRefPair, 2, 0)
+INST_RANGE(MakeDifferentialPairBase, MakeDifferentialPair, MakeDifferentialPtrPair)
 
 INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
 INST(DifferentialPairGetDifferentialUserCode, GetDifferentialUserCode, 1, 0)
-INST_RANGE(DifferentialPairGetDifferentialBase, DifferentialPairGetDifferential, DifferentialPairGetDifferentialUserCode)
+INST(DifferentialPtrPairGetDifferential, GetDifferentialPtr, 1, 0)
+INST_RANGE(DifferentialPairGetDifferentialBase, DifferentialPairGetDifferential, DifferentialPtrPairGetDifferential)
 
 INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
 INST(DifferentialPairGetPrimalUserCode, GetPrimalUserCode, 1, 0)
-INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, DifferentialPairGetPrimalUserCode)
+INST(DifferentialPtrPairGetPrimal, GetPrimalRef, 1, 0)
+INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, DifferentialPtrPairGetPrimal)
 
 INST(Specialize, specialize, 2, HOISTABLE)
 INST(LookupWitness, lookupWitness, 2, HOISTABLE)
@@ -395,6 +401,21 @@ INST(Var, var, 0, 0)
 
 INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
+
+// Atomic Operations
+INST(AtomicLoad, atomicLoad, 1, 0)
+INST(AtomicStore, atomicStore, 2, 0)
+INST(AtomicExchange, atomicExchange, 2, 0)
+INST(AtomicCompareExchange, atomicCompareExchange, 3, 0)
+INST(AtomicAdd, atomicAdd, 2, 0)
+INST(AtomicSub, atomicSub, 2, 0)
+INST(AtomicAnd, atomicAnd, 2, 0)
+INST(AtomicOr, atomicOr, 2, 0)
+INST(AtomicXor, atomicXor, 2, 0)
+INST(AtomicMin, atomicMin, 2, 0)
+INST(AtomicMax, atomicMax, 2, 0)
+INST(AtomicInc, atomicInc, 1, 0)
+INST(AtomicDec, atomicDec, 1, 0)
 
 // Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 // currently accumulated derivative to pass to some dOut argument in a nested call.
@@ -510,9 +531,6 @@ INST(StructuredBufferGetDimensions, StructuredBufferGetDimensions, 1, 0)
 
 // Resource qualifiers for dynamically varying index
 INST(NonUniformResourceIndex, nonUniformResourceIndex, 1, 0)
-
-INST(AtomicCounterIncrement, AtomicCounterIncrement, 1, 0)
-INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
 
 INST(GetNaturalStride, getNaturalStride, 1, 0)
 
@@ -771,6 +789,11 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         Typically used mark an instruction so can be specially handled - say when creating a IRConstant literal, and the payload of 
         needs to be special cased for lookup. */
     INST(TransitoryDecoration,              transitory,             0, 0)
+
+    // The result witness table that the functon's return type is a subtype of an interface.
+    // This is used to keep track of the original witness table in a function that used to
+    // return an existential value but now returns a concrete type after specialization.
+    INST(ResultWitnessDecoration,           ResultWitness,          1, 0)
 
     INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
     INST(VulkanRayPayloadInDecoration,      vulkanRayPayloadIn,       0, 0)
@@ -1050,6 +1073,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
         /// Hint that the result from a call to the decorated function should be recomputed in backward prop function.
     INST(PreferRecomputeDecoration, PreferRecomputeDecoration, 0, 0)
+
+        /// Hint that a struct is used for reverse mode checkpointing
+    INST(CheckpointIntermediateDecoration, CheckpointIntermediateDecoration, 1, 0)
 
     INST_RANGE(CheckpointHintDecoration, PreferCheckpointDecoration, PreferRecomputeDecoration)
 

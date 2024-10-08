@@ -28,7 +28,6 @@
 #include "slang-type-layout.h"
 #include "slang-lookup.h"
 
-#
 #include "slang-options.h"
 
 #include "slang-repro.h"
@@ -261,8 +260,11 @@ void Session::_initCodeGenTransitionMap()
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::Metal, CodeGenTarget::MetalLib, PassThroughMode::MetalC);
+    map.addTransition(CodeGenTarget::WGSL, CodeGenTarget::WGSLSPIRV, PassThroughMode::Tint);
     // To assembly
     map.addTransition(CodeGenTarget::SPIRV, CodeGenTarget::SPIRVAssembly, PassThroughMode::Glslang);
+    // We use glslang to turn SPIR-V into SPIR-V assembly.
+    map.addTransition(CodeGenTarget::WGSLSPIRV, CodeGenTarget::WGSLSPIRVAssembly, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::DXIL, CodeGenTarget::DXILAssembly, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::DXBytecode, CodeGenTarget::DXBytecodeAssembly, PassThroughMode::Fxc);
     map.addTransition(CodeGenTarget::MetalLib, CodeGenTarget::MetalLibAssembly, PassThroughMode::MetalC);
@@ -1069,7 +1071,11 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
         for (const auto& nameToMod : builtinLinkage->mapNameToLoadedModules)
             mapNameToLoadedModules.add(nameToMod);
     }
+
+    m_semanticsForReflection = new SharedSemanticsContext(this, nullptr, nullptr);
 }
+
+SharedSemanticsContext* Linkage::getSemanticsForReflection() { return m_semanticsForReflection.get(); }
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
 {
@@ -1348,18 +1354,11 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     return asExternal(specializedType);
 }
 
-
-DeclRef<Decl> Linkage::specializeGeneric(
-        DeclRef<Decl>                       declRef,
-        List<Expr*>                         argExprs,
-        DiagnosticSink*                     sink)
+DeclRef<GenericDecl> getGenericParentDeclRef(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef)
 {
-    SLANG_AST_BUILDER_RAII(getASTBuilder());
-    SLANG_ASSERT(declRef);
-
-    SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
-    SemanticsVisitor visitor(&sharedSemanticsContext);
-
     // Create substituted parent decl ref.
     auto decl = declRef.getDecl();
 
@@ -1369,9 +1368,65 @@ DeclRef<Decl> Linkage::specializeGeneric(
     }
 
     auto genericDecl = as<GenericDecl>(decl);
-    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(getASTBuilder(), &visitor, DeclRef(genericDecl)).as<GenericDecl>();
-    genericDeclRef = substituteDeclRef(SubstitutionSet(declRef), getASTBuilder(), genericDeclRef).as<GenericDecl>();
+    auto genericDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, DeclRef(genericDecl)).as<GenericDecl>();
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, genericDeclRef).as<GenericDecl>();
+}
 
+DeclRef<Decl> Linkage::specializeWithArgTypes(
+    Expr*               funcExpr,
+    List<Type*>         argTypes,
+    DiagnosticSink*     sink)
+{
+    SemanticsVisitor visitor(getSemanticsForReflection());
+    visitor = visitor.withSink(sink);
+
+    ASTBuilder* astBuilder = getASTBuilder();
+    
+    if (auto declRefFuncExpr = as<DeclRefExpr>(funcExpr))
+    {
+        auto genericDeclRefExpr = astBuilder->create<DeclRefExpr>();
+        genericDeclRefExpr->declRef = getGenericParentDeclRef(
+            getASTBuilder(),
+            &visitor,
+            declRefFuncExpr->declRef);
+        funcExpr = genericDeclRefExpr;
+    }
+
+    List<Expr*> argExprs;
+    for (SlangInt aa = 0; aa < argTypes.getCount(); ++aa)
+    {
+        auto argType = argTypes[aa];
+
+        // Create an 'empty' expr with the given type. Ideally, the expression itself should not matter
+        // only its checked type.
+        //
+        auto argExpr = astBuilder->create<VarExpr>();
+        argExpr->type = argType;
+        argExprs.add(argExpr);
+    }
+
+    // Construct invoke expr.
+    auto invokeExpr = astBuilder->create<InvokeExpr>();
+    invokeExpr->functionExpr = funcExpr;
+    invokeExpr->arguments = argExprs;
+
+    auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
+    return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
+}
+
+
+DeclRef<Decl> Linkage::specializeGeneric(
+        DeclRef<Decl>                       declRef,
+        List<Expr*>                         argExprs,
+        DiagnosticSink*                     sink)
+{
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+    SLANG_ASSERT(declRef);
+
+    SemanticsVisitor visitor(getSemanticsForReflection());
+    visitor = visitor.withSink(sink);
+
+    auto genericDeclRef = getGenericParentDeclRef(getASTBuilder(), &visitor, declRef);
 
     DeclRefExpr* declRefExpr = getASTBuilder()->create<DeclRefExpr>();
     declRefExpr->declRef = genericDeclRef;
@@ -1561,8 +1616,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
 
     try
     {
-        SharedSemanticsContext sharedSemanticsContext(this, nullptr, &sink);
-        SemanticsVisitor visitor(&sharedSemanticsContext);
+        SemanticsVisitor visitor(getSemanticsForReflection());
+        visitor = visitor.withSink(&sink);
+
         auto witness =
             visitor.isSubtype((Slang::Type*)type, (Slang::Type*)interfaceType, IsSubTypeOptions::None);
         if (auto subtypeWitness = as<SubtypeWitness>(witness))
@@ -2285,14 +2341,14 @@ Type* ComponentType::getTypeFromString(
     return type;
 }
 
-DeclRef<Decl> ComponentType::findDeclFromString(
+Expr* ComponentType::findDeclFromString(
     String const& name,
     DiagnosticSink* sink)
 {
     // If we've looked up this type name before,
    // then we can re-use it.
    //
-    DeclRef<Decl> result;
+    Expr* result = nullptr;
     if (m_decls.tryGetValue(name, result))
         return result;
 
@@ -2318,43 +2374,31 @@ DeclRef<Decl> ComponentType::findDeclFromString(
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SharedSemanticsContext sharedSemanticsContext(
-        linkage,
-        nullptr,
-        sink);
-    SemanticsContext context(&sharedSemanticsContext);
-    context = context.allowStaticReferenceToNonStaticMember();
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
 
-    auto checkedExpr = visitor.CheckExpr(expr);
-    if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+    auto checkedExpr = visitor.CheckTerm(expr);
+
+    if (as<DeclRefExpr>(checkedExpr) || as<OverloadedExpr>(checkedExpr))
     {
-        result = declRefExpr->declRef;
+        result = checkedExpr;
     }
-    else if (auto overloadedExpr = as<OverloadedExpr>(checkedExpr))
-    {
-        sink->diagnose(SourceLoc(), Diagnostics::ambiguousReference, name);
-        for (auto candidate : overloadedExpr->lookupResult2)
-        {
-            sink->diagnose(candidate.declRef.getDecl(), Diagnostics::overloadCandidate, candidate.declRef);
-        }
-    }
+    
     m_decls[name] = result;
     return result;
 }
 
-DeclRef<Decl> ComponentType::findDeclFromStringInType(
+Expr* ComponentType::findDeclFromStringInType(
     Type* type,
     String const& name,
     LookupMask mask,
     DiagnosticSink* sink)
 {
-    DeclRef<Decl> result;
-
     // Only look up in the type if it is a DeclRefType
     if (!as<DeclRefType>(type))
-        return DeclRef<Decl>();
+        return nullptr;
 
     // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
     //
@@ -2377,12 +2421,8 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
 
     Expr* expr = linkage->parseTermString(name, scope);
 
-    SharedSemanticsContext sharedSemanticsContext(
-        linkage,
-        nullptr,
-        sink);
-    SemanticsContext context(&sharedSemanticsContext);
-    context = context.allowStaticReferenceToNonStaticMember();
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 
     SemanticsVisitor visitor(context);
 
@@ -2395,7 +2435,7 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
     }
 
     if (!as<VarExpr>(expr))
-        return result;
+        return nullptr;
 
     auto rs = astBuilder->create<StaticMemberExpr>();
     auto typeExpr = astBuilder->create<SharedTypeExpr>();
@@ -2415,29 +2455,23 @@ DeclRef<Decl> ComponentType::findDeclFromStringInType(
     
     auto checkedTerm = visitor.CheckTerm(expr);
     auto resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+    
 
+    if (auto overloadedExpr = as<OverloadedExpr>(resolvedTerm))
+    {
+        return overloadedExpr;
+    }
     if (auto declRefExpr = as<DeclRefExpr>(resolvedTerm))
     {
-        result = declRefExpr->declRef;
+        return declRefExpr;
     }
 
-    if (auto genericDeclRef = result.as<GenericDecl>())
-    {   
-        result = createDefaultSubstitutionsIfNeeded(
-            astBuilder, &visitor, DeclRef(genericDeclRef.getDecl()->inner));
-        result = substituteDeclRef(SubstitutionSet(genericDeclRef), astBuilder, result);
-    }
-
-    return result;
+    return nullptr;
 }
 
 bool ComponentType::isSubType(Type* subType, Type* superType)
 {
-    SharedSemanticsContext sharedSemanticsContext(
-        getLinkage(),
-        nullptr,
-        nullptr);
-    SemanticsContext context(&sharedSemanticsContext);
+    SemanticsContext context(getLinkage()->getSemanticsForReflection());
     SemanticsVisitor visitor(context);
 
     return (visitor.isSubtype(subType, superType, IsSubTypeOptions::None) != nullptr);
@@ -4253,6 +4287,8 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 {
     if(guid == IModule::getTypeGuid())
         return asExternal(this);
+    if (guid == IModulePrecompileService_Experimental::getTypeGuid())
+        return static_cast<slang::IModulePrecompileService_Experimental*>(this);
     return Super::getInterface(guid);
 }
 
@@ -4469,6 +4505,8 @@ ISlangUnknown* ComponentType::getInterface(Guid const& guid)
     {
         return static_cast<slang::IComponentType*>(this);
     }
+    if(guid == IModulePrecompileService_Experimental::getTypeGuid())    
+        return static_cast<slang::IModulePrecompileService_Experimental*>(this);
     return nullptr;
 }
 
@@ -4671,6 +4709,38 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
         return SLANG_FAIL;
 
     return artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
+    SlangInt        entryPointIndex,
+    Int             targetIndex,
+    slang::IMetadata** outMetadata,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
+    if (!metadata)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outMetadata = static_cast<slang::IMetadata*>(metadata);
+    (*outMetadata)->addRef();
+    return SLANG_OK;
 }
 
 RefPtr<ComponentType> ComponentType::specialize(
@@ -4902,14 +4972,16 @@ void ComponentType::enumerateIRModules(EnumerateIRModulesCallback callback, void
     acceptVisitor(&visitor, nullptr);
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
-    Int             targetIndex,
-    slang::IBlob** outCode,
-    slang::IBlob** outDiagnostics)
+IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outDiagnostics)
 {
     auto linkage = getLinkage();
     if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
-        return SLANG_E_INVALID_ARG;
+        return nullptr;
+    ComPtr<IArtifact> artifact;
+    if (m_targetArtifacts.tryGetValue(targetIndex, artifact))
+    {
+        return artifact.get();
+    }
 
     // If the user hasn't specified any entry points, then we should
     // discover all entrypoints that are defined in linked modules, and
@@ -4933,8 +5005,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
         }
         RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
         ComPtr<IComponentType> linkedComponentType;
-        SLANG_RETURN_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
-        return linkedComponentType->getTargetCode(targetIndex, outCode, outDiagnostics);
+        SLANG_RETURN_NULL_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
+        auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())->getTargetArtifact(targetIndex, outDiagnostics);
+        if (targetArtifact)
+        {
+            m_targetArtifacts[targetIndex] = targetArtifact;
+        }
+        return targetArtifact;
     }
 
     auto target = linkage->targets[targetIndex];
@@ -4944,13 +5021,41 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-    IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
+    IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
     sink.getBlobIfNeeded(outDiagnostics);
+    m_targetArtifacts[targetIndex] = ComPtr<IArtifact>(targetArtifact);
+    return targetArtifact;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCode(
+    Int             targetIndex,
+    slang::IBlob** outCode,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
 
     if (artifact == nullptr)
         return SLANG_FAIL;
 
     return artifact->loadBlob(ArtifactKeep::Yes, outCode);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetMetadata(
+    Int             targetIndex,
+    slang::IMetadata** outMetadata,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
+
+    if (artifact == nullptr)
+        return SLANG_FAIL;
+
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
+    if (!metadata)
+        return SLANG_E_NOT_AVAILABLE;
+    *outMetadata = static_cast<slang::IMetadata*>(metadata);
+    (*outMetadata)->addRef();
+    return SLANG_OK;
 }
 
 //
@@ -6857,19 +6962,7 @@ SlangResult EndToEndCompileRequest::isParameterLocationUsed(Int entryPointIndex,
     if (!metadata)
         return SLANG_E_NOT_AVAILABLE;
 
-
-    // TODO: optimize this with a binary search through a sorted list
-    for (const auto& range : metadata->getUsedBindingRanges())
-    {
-        if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
-        {
-            outUsed = true;
-            return SLANG_OK;
-        }
-    }
-
-    outUsed = false;
-    return SLANG_OK;
+    return metadata->isParameterLocationUsed(category, spaceIndex, registerIndex, outUsed);
 }
 
 } // namespace Slang

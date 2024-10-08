@@ -1,4 +1,5 @@
 // slang-check-overload.cpp
+#include "slang-ast-base.h"
 #include "slang-check-impl.h"
 
 #include "slang-lookup.h"
@@ -1069,10 +1070,29 @@ namespace Slang
                     if(auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                     {
                         const auto& decl = subscriptDeclRef.getDecl();
-                        if (decl->getMembersOfType<SetterDecl>().isNonEmpty() ||
-                            decl->getMembersOfType<RefAccessorDecl>().isNonEmpty())
+                        for (auto member : decl->members)
                         {
-                            callExpr->type.isLeftValue = true;
+                            if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
+                            {
+                                // If the subscript decl has a setter,
+                                // then the call is an l-value if base is l-value.
+                                if (auto base = GetBaseExpr(baseExpr))
+                                {
+                                    if (base->type.isLeftValue)
+                                    {
+                                        callExpr->type.isLeftValue = true;
+                                        break;
+                                    }
+                                }
+                                // Otherwise, if the accessor is [nonmutating], we can
+                                // also consider the result of the subscript call as l-value
+                                // regardless of the base.
+                                if (member->findModifier<NonmutatingAttribute>())
+                                {
+                                    callExpr->type.isLeftValue = true;
+                                    break;
+                                }
+                            }
                         }
                     }
 
@@ -1199,6 +1219,8 @@ namespace Slang
         return parent;
     }
 
+    // Returns -1 if left is preferred, 1 if right is preferred, and 0 if they are equal.
+    //
     int SemanticsVisitor::CompareLookupResultItems(
         LookupResultItem const& left,
         LookupResultItem const& right)
@@ -1282,6 +1304,46 @@ namespace Slang
                 if (facet.getImpl()->getDeclRef().equals(rightDeclRefParent))
                     return -1;
         }
+
+        // If both are subscript decls, prefer the one that provides more
+        // accessors.
+        if (auto leftSubscriptDecl = left.declRef.as<SubscriptDecl>())
+        {
+            if (auto rightSubscriptDecl = right.declRef.as<SubscriptDecl>())
+            {
+                auto leftAccessorCount = leftSubscriptDecl.getDecl()->getMembersOfType<AccessorDecl>().getCount();
+                auto rightAccessorCount = rightSubscriptDecl.getDecl()->getMembersOfType<AccessorDecl>().getCount();
+                auto decl1IsSubsetOfDecl2 = [=](SubscriptDecl* decl1, SubscriptDecl* decl2)
+                    {
+                        for (auto accessorDecl1 : decl1->getMembersOfType<AccessorDecl>())
+                        {
+                            bool found = false;
+                            for (auto accessorDecl2 : decl2->getMembersOfType<AccessorDecl>())
+                            {
+                                if (accessorDecl1->astNodeType == accessorDecl2->astNodeType)
+                                {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found)
+                                return false;
+                        }
+                        return true;
+                    };
+                if (leftAccessorCount > rightAccessorCount
+                    && decl1IsSubsetOfDecl2(rightSubscriptDecl.getDecl(), leftSubscriptDecl.getDecl()))
+                {
+                    return -1;
+                }
+                else if (rightAccessorCount > leftAccessorCount
+                    && decl1IsSubsetOfDecl2(leftSubscriptDecl.getDecl(), rightSubscriptDecl.getDecl()))
+                {
+                    return 1;
+                }
+            }
+        }
+
 
         // TODO: We should generalize above rules such that in a tie a declaration
         // A::m is better than B::m when all other factors are equal and
@@ -1397,6 +1459,70 @@ namespace Slang
         return 0;
     }
 
+    int getScopeRank(DeclRef<Decl> const& left,
+                DeclRef<Decl> const& right, Slang::Scope* referenceSiteScope)
+    {
+        if (!referenceSiteScope)
+            return 0;
+
+        DeclRef<Decl> prefixDecl = referenceSiteScope->containerDecl;
+
+        // Hold the path from reference site to the root
+        // key: Decl node, value: distance from reference site
+        Dictionary<Decl*, uint32_t> refPath;
+        for (auto node = prefixDecl; node != nullptr; node = node.getParent())
+        {
+            Decl* key = node.getDecl();
+            uint32_t value = (uint32_t)refPath.getCount();
+            refPath.add(key, value);
+        }
+
+        // find the common prefix decl of reference site and left
+        int leftDistance = 0;
+        int rightDistance = 0;
+        auto distanceToCommonPrefix = [](DeclRef<Decl> const& candidate, Dictionary<Decl*, uint32_t> refPath) -> int
+        {
+            uint32_t distanceToReferenceSite = 0;
+            uint32_t distanceToCandidate = 0;
+
+            // Sanity check
+            if (candidate.getDecl() == nullptr)
+                return -1;
+
+            // search from candidate to root, once we found the first node in the reference path, that is the first
+            // common prefix, and we can stop searching.
+            for (auto node = candidate; node != nullptr; node = node.getParent())
+            {
+                Decl* key = node.getDecl();
+                if (refPath.tryGetValue(key, distanceToReferenceSite))
+                {
+                    break;
+                }
+                distanceToCandidate++;
+            }
+
+            // If we don't find the common prefix, there must be something wrong, return the max value.
+            if (distanceToReferenceSite == 0)
+                return -1;
+
+            return distanceToReferenceSite + distanceToCandidate;
+        };
+
+        leftDistance = distanceToCommonPrefix(left, refPath);
+        rightDistance = distanceToCommonPrefix(right, refPath);
+
+        if (leftDistance == rightDistance)
+            return 0;
+
+        if (leftDistance == -1)
+            return 1;
+
+        if (rightDistance == -1)
+            return -1;
+
+        return leftDistance < rightDistance ? -1 : 1;
+    }
+
     int SemanticsVisitor::CompareOverloadCandidates(
         OverloadCandidate*	left,
         OverloadCandidate*	right)
@@ -1466,6 +1592,7 @@ namespace Slang
             auto itemDiff = CompareLookupResultItems(left->item, right->item);
             if(itemDiff)
                 return itemDiff;
+
             auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
             if(specificityDiff)
                 return specificityDiff;
@@ -1474,6 +1601,42 @@ namespace Slang
             auto externExportDiff = getExportRank(left->item.declRef, right->item.declRef);
             if (externExportDiff)
                 return externExportDiff;
+
+            // We need to consider the distance of the declarations to the global scope to resolve this case:
+            //      float f(float x);
+            //      struct S
+            //      {
+            //          float f(float x);
+            //          float g(float y) { return f(y); }   // will call S::f() instead of ::f()
+            //      }
+            //  we will count the distance from the reference site to the declaration in the scope tree.
+
+            //  NOTE: We CAN'T do this for the generic function, because generic lookup is little bit complicated.
+            //  It will go through multiple passes of candidates compare.
+            //  In the first pass, it will lookup all the generic candidates that matches the generic parameter only,
+            //  e.g., the following generic functions are totally different, but they will be selected as candidates
+            //  because the function name and the generic parameters are the same:
+            //  void func<let Z0 : uint, let Z1 : uint>(Z0 a, Z1 b);
+            //  void func<let Z0 : uint, let Z1 : uint>(Z0 a, Z1 b, Z0 c);
+            //  void func<let Z0 : uint, let Z1 : uint>(Z0 a, Z1 b, Z0 c, Z1 d);
+            //
+            //  So in this case, we should not consider the scope rank and overload rank at all, because there is only
+            //  one of above candidates is valid, and the rank calculation doesn't consider the correctness of the
+            //  candidates, so it could select the wrong candidate.
+            //
+            //  In the next pass, the lookup system will match the input parameters in those candidates to find out the valid
+            //  match, the "flavor" field will become "Func" or "Expr". So the rank calculation can be applied.
+            if (left->flavor == OverloadCandidate::Flavor::Generic ||
+                left->flavor == OverloadCandidate::Flavor::UnspecializedGeneric ||
+                right->flavor == OverloadCandidate::Flavor::Generic ||
+                right->flavor == OverloadCandidate::Flavor::UnspecializedGeneric)
+            {
+                return 0;
+            }
+
+            auto scopeRank = getScopeRank(left->item.declRef, right->item.declRef, this->m_outerScope);
+            if (scopeRank)
+                return scopeRank;
 
             // If we reach here, we will attempt to use overload rank to break the ties.
             auto overloadRankDiff = getOverloadRank(right->item.declRef) - getOverloadRank(left->item.declRef);
@@ -2469,7 +2632,7 @@ namespace Slang
 
         // If absolutely no viable candidates were extracted from the overloaded expression,
         // we may be dealing with a composite type or an overloaded expression with composite types.
-        // 
+        //
 
         auto typeExpr = funcExpr;
         if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
@@ -2530,8 +2693,7 @@ namespace Slang
         else if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
         {
             // We are referring to a bunch of declarations, each of which might be generic
-            LookupResult result;
-            for (auto item : overloadedExpr->lookupResult2.items)
+            for (auto item : overloadedExpr->lookupResult2)
             {
                 AddGenericOverloadCandidate(item, context);
             }

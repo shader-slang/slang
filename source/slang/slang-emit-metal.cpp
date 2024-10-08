@@ -246,6 +246,20 @@ void MetalSourceEmitter::ensurePrelude(const char* preludeText)
     m_requiredPreludes.add(stringLit);
 }
 
+void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
+{
+    auto memoryOrder = (IRMemoryOrder)getIntVal(inst);
+    switch (memoryOrder)
+    {
+    case kIRMemoryOrder_Relaxed:
+        m_writer->emit("memory_order_relaxed");
+        break;
+    default:
+        m_writer->emit("memory_order_seq_cst");
+        break;
+    }
+}
+
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     switch (inst->getOp())
@@ -269,6 +283,164 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         m_writer->emit(")(");
         emitOperand(op0, getInfo(EmitOp::General));
         m_writer->emit("));\n");
+        return true;
+    }
+    case kIROp_AtomicLoad:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_load_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(1));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicStore:
+    {
+        m_writer->emit("atomic_store_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicExchange:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_exchange_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicCompareExchange:
+    {
+        emitType(inst->getDataType(), getName(inst));
+        m_writer->emit(";\n{\n");
+        emitType(inst->getDataType(), "_metal_cas_comparand");
+        m_writer->emit(" = ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+
+        m_writer->emit(getName(inst));
+        m_writer->emit(" = atomic_compare_exchange_weak_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", &_metal_cas_comparand, ");
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(3));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(4));
+        m_writer->emit(");\n}\n");
+        return true;
+    }
+    case kIROp_AtomicAdd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_add_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicSub:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_sub_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicAnd:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_and_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicOr:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_or_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicXor:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_xor_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMin:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_min_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicMax:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_max_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitMemoryOrderOperand(inst->getOperand(2));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicInc:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_add_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", 1, ");
+        emitMemoryOrderOperand(inst->getOperand(1));
+        m_writer->emit(");\n");
+        return true;
+    }
+    case kIROp_AtomicDec:
+    {
+        emitInstResultDecl(inst);
+        m_writer->emit("atomic_fetch_sub_explicit(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", 1, ");
+        emitMemoryOrderOperand(inst->getOperand(1));
+        m_writer->emit(");\n");
         return true;
     }
     }
@@ -522,6 +694,8 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
                 emitOperand(setIndices->getIndex(), getInfo(EmitOp::General));
                 m_writer->emit("*");
                 m_writer->emitUInt64(numIndices);
+                m_writer->emit("+");
+                m_writer->emitUInt64(i);
                 m_writer->emit(",(");
                 emitOperand(setIndices->getElementValue(), getInfo(EmitOp::General));
                 m_writer->emit(")[");
@@ -664,10 +838,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_BoolType:
         case kIROp_Int8Type:
         case kIROp_IntType:
-        case kIROp_Int64Type:
         case kIROp_UInt8Type:
         case kIROp_UIntType:
-        case kIROp_UInt64Type:
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
@@ -675,6 +847,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
+        case kIROp_Int64Type:
+            m_writer->emit("long");
+            return;
+        case kIROp_UInt64Type:
+            m_writer->emit("ulong");
+            return;
         case kIROp_Int16Type:
             m_writer->emit("short");
             return;
@@ -682,10 +860,10 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("ushort");
             return;
         case kIROp_IntPtrType:
-            m_writer->emit("int64_t");
+            m_writer->emit("long");
             return;
         case kIROp_UIntPtrType:
-            m_writer->emit("uint64_t");
+            m_writer->emit("ulong");
             return;
         case kIROp_StructType:
             m_writer->emit(getName(type));
@@ -779,6 +957,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_MetalMeshGridPropertiesType:
         {
             m_writer->emit("mesh_grid_properties ");
+            return;
+        }
+        case kIROp_AtomicType:
+        {
+            m_writer->emit("atomic<");
+            emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
+            m_writer->emit(">");
             return;
         }
         default:
