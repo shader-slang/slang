@@ -908,8 +908,7 @@ static void maybeCopyLayoutInformationToParameters(
 
 IRFunc* specializeIRForEntryPoint(
     IRSpecContext*      context,
-    String const&       mangledName,
-    String const&       nameOverride)
+    EntryPoint*         entryPoint)
 {
     // We start by looking up the IR symbol that
     // matches the mangled name given to the
@@ -921,6 +920,7 @@ IRFunc* specializeIRForEntryPoint(
     // not the same as the mangled name of the decl.
     //
     RefPtr<IRSpecSymbol> sym;
+    auto mangledName = entryPoint->getEntryPointMangledName(0);
     if (!context->getSymbols().tryGetValue(mangledName, sym))
     {
         String hashedName = getHashedName(mangledName.getUnownedSlice());
@@ -947,20 +947,6 @@ IRFunc* specializeIRForEntryPoint(
     // like any other global value.
     //
     auto clonedVal = cloneGlobalValue(context, originalVal);
-
-    if (nameOverride.getLength())
-    {
-        if (auto entryPointDecor = clonedVal->findDecoration<IREntryPointDecoration>())
-        {
-            IRInst* operands[] = {
-                entryPointDecor->getProfileInst(),
-                context->builder->getStringValue(nameOverride.getUnownedSlice()),
-                entryPointDecor->getModuleName()};
-            context->builder->addDecoration(
-                clonedVal, IROp::kIROp_EntryPointDecoration, operands, 3);
-            entryPointDecor->removeAndDeallocate();
-        }
-    }
 
     // In the case where the user is requesting a specialization
     // of a generic entry point, we have a bit of a problem.
@@ -1021,6 +1007,34 @@ IRFunc* specializeIRForEntryPoint(
     if( !clonedFunc->findDecorationImpl(kIROp_KeepAliveDecoration) )
     {
         context->builder->addKeepAliveDecoration(clonedFunc);
+    }
+
+    auto nameOverride = entryPoint->getEntryPointNameOverride(0);
+
+    // If an IREntryPointDecoration already exist in the function,
+    // check if we need to update its name with nameOverride.
+    // If the decoration doesn't exist, create it with the desired name.
+    if (auto entryPointDecor = clonedFunc->findDecoration<IREntryPointDecoration>())
+    {
+        if (nameOverride.getLength())
+        {
+                IRInst* operands[] = {
+                    entryPointDecor->getProfileInst(),
+                    context->builder->getStringValue(nameOverride.getUnownedSlice()),
+                    entryPointDecor->getModuleName() };
+                context->builder->addDecoration(
+                    clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
+                entryPointDecor->removeAndDeallocate();
+        }
+    }
+    else
+    {
+        IRInst* operands[] = {
+                   context->builder->getIntValue(context->builder->getIntType(), entryPoint->getProfile().raw),
+                   context->builder->getStringValue(nameOverride.getUnownedSlice()),
+                   context->builder->getStringValue(UnownedStringSlice(entryPoint->getModule()->getName())) };
+        context->builder->addDecoration(
+            clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
     }
 
     // We will also go on and attach layout information
@@ -1801,9 +1815,8 @@ LinkedIR linkIR(
     List<IRFunc*> irEntryPoints;
     for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
     {
-        auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
-        auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);
-        irEntryPoints.add(specializeIRForEntryPoint(context, entryPointMangledName, nameOverride));
+        auto entryPoint = program->getEntryPoint(entryPointIndex).get();
+        irEntryPoints.add(specializeIRForEntryPoint(context, entryPoint));
     }
 
     // Layout information for global shader parameters is also required,

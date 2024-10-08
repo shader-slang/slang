@@ -19,7 +19,7 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
 {
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
-        float4 fragMain(float4 pos:SV_Position) : SV_Position
+        float4 fragMain(float4 pos:SV_Position) : SV_Target
         {
             return pos;
         }
@@ -30,8 +30,8 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_HLSL;
-    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    targetDesc.format = SLANG_DXIL;
+    targetDesc.profile = globalSession->findProfile("sm_6_0");
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
@@ -58,8 +58,6 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     ComPtr<slang::IBlob> code;
     linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
     SLANG_CHECK(code != nullptr);
-
-    auto codeSrc = UnownedStringSlice((const char*)code->getBufferPointer());
-    SLANG_CHECK(codeSrc.indexOf(toSlice("fragMain")) != -1);
+    SLANG_CHECK(code->getBufferSize() != 0);
 }
 
