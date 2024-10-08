@@ -628,6 +628,8 @@ if(SLANG_ENABLE_TESTS)
             slang-rt
             slang-glslang
             slang-llvm
+            copy-webgpu_dawn
+            copy-slang-tint
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
