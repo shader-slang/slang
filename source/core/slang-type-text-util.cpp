@@ -64,6 +64,8 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_METAL_LIB,      "metallib",                                         "metallib",                 "Metal Library Bytecode" },
     { SLANG_METAL_LIB_ASM,  "metallib-asm"                                      "metallib-asm",             "Metal Library Bytecode assembly" },
     { SLANG_WGSL,           "wgsl",                                             "wgsl",                     "WebGPU shading language source" },
+    { SLANG_WGSL_SPIRV_ASM, "wgsl-spirv-asm",                                   "wgsl-spirv-asm,wgsl-spirv-assembly", "SPIR-V assembly via WebGPU shading language" },
+    { SLANG_WGSL_SPIRV,     "wgsl-spirv",                                       "wgsl-spirv",                         "SPIR-V via WebGPU shading language" },
 };
 
 static const NamesDescriptionValue s_languageInfos[] =
@@ -91,6 +93,7 @@ static const NamesDescriptionValue s_compilerInfos[] =
     { SLANG_PASS_THROUGH_LLVM,      "llvm",     "LLVM/Clang `slang-llvm`" },
     { SLANG_PASS_THROUGH_SPIRV_OPT, "spirv-opt",  "spirv-tools SPIRV optimizer" },
     { SLANG_PASS_THROUGH_METAL,     "metal",    "Metal shader compiler" },
+    { SLANG_PASS_THROUGH_TINT,      "tint",     "Tint compiler" },
 };
 
 static const NamesDescriptionValue s_archiveTypeInfos[] =

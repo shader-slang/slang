@@ -17,35 +17,47 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     endif()
 endif()
 
+if (NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+    add_subdirectory(unordered_dense EXCLUDE_FROM_ALL SYSTEM)
+endif()
+
 # Miniz
-add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
-set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
-# Work around https://github.com/richgel999/miniz/pull/292
-get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
-if(MSVC AND miniz_c_launcher MATCHES "ccache")
-    set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
-    set_property(TARGET miniz PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
+if (NOT ${SLANG_USE_SYSTEM_MINIZ})
+    add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
+    set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
+    # Work around https://github.com/richgel999/miniz/pull/292
+    get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
+    if(MSVC AND miniz_c_launcher MATCHES "ccache")
+        set_property(TARGET miniz PROPERTY C_COMPILER_LAUNCHER)
+        set_property(TARGET miniz PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
+    endif()
 endif()
 
 # LZ4
-set(LZ4_BUNDLED_MODE ON)
-add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
-if(MSVC)
-    target_compile_options(
-        lz4_static
-        PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
-    )
+if (NOT ${SLANG_USE_SYSTEM_LZ4})
+    set(LZ4_BUNDLED_MODE ON)
+    add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
+    if(MSVC)
+		target_compile_options(
+		    lz4_static
+		    PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
+		)
+    endif()
 endif()
 
 # Vulkan headers
-add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
+if (NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
+    add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
+endif()
 
 # metal-cpp headers
 add_library(metal-cpp INTERFACE)
 target_include_directories(metal-cpp INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp")
 
 # SPIRV-Headers
-add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
+if (NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+    add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
+endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
     # SPIRV-Tools
@@ -66,18 +78,21 @@ endif()
 add_library(imgui INTERFACE)
 target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
 
-# slang-rhi
-set(SLANG_RHI_BINARY_DIR ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
-set(SLANG_RHI_SLANG_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
-set(SLANG_RHI_BUILD_TESTS OFF)
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(SLANG_RHI_ENABLE_WGPU OFF)
+if(SLANG_ENABLE_SLANG_RHI)
+    # slang-rhi
+    set(SLANG_RHI_BINARY_DIR ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
+    set(SLANG_RHI_SLANG_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+    set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
+    set(SLANG_RHI_BUILD_TESTS OFF)
+    set(SLANG_RHI_BUILD_EXAMPLES OFF)
+    if(SLANG_ENABLE_DX_ON_VK)
+        set(SLANG_RHI_HAS_D3D12 ON)
+    endif()
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(SLANG_RHI_ENABLE_WGPU OFF)
+    endif()
+    add_subdirectory(slang-rhi)
 endif()
-if(SLANG_ENABLE_DX_ON_VK)
-    set(SLANG_RHI_HAS_D3D12 ON)
-endif()
-add_subdirectory(slang-rhi)
 
 # Tidy things up:
 

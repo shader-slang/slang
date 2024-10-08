@@ -931,8 +931,9 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
 
         { ".c",    SLANG_SOURCE_LANGUAGE_C,     SLANG_STAGE_NONE },
         { ".cpp",  SLANG_SOURCE_LANGUAGE_CPP,   SLANG_STAGE_NONE },
-        { ".cu",   SLANG_SOURCE_LANGUAGE_CUDA,  SLANG_STAGE_NONE }
+        { ".cu",   SLANG_SOURCE_LANGUAGE_CUDA,  SLANG_STAGE_NONE },
 
+        { ".wgsl", SLANG_SOURCE_LANGUAGE_WGSL, SLANG_STAGE_NONE },
     };
 
     for (Index i = 0; i < SLANG_COUNT_OF(entries); ++i)

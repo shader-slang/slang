@@ -972,6 +972,11 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         {
             return 0;
         }
+        case SLANG_WGSL_SPIRV:
+        case SLANG_WGSL_SPIRV_ASM:
+        {
+            return PassThroughFlag::Tint;
+        }
         case SLANG_DXBC:
         case SLANG_DXBC_ASM:
         {
@@ -1116,6 +1121,10 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             target = SLANG_PTX;
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
             passThru = SLANG_PASS_THROUGH_NVRTC;
+            break;
+        case RenderApiType::WebGPU:
+            target = SLANG_WGSL;
+            SLANG_ASSERT(!usePassthru);
             break;
     }
 
@@ -1659,6 +1668,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     args.add("exe");
     args.add("-Xgenericcpp");
     args.add("-I./include");
+    args.add("-Xgenericcpp");
+    args.add("-I./external/unordered_dense/include");
     for (auto arg : args)
     {
         // If unescaping is needed, do it
@@ -2426,7 +2437,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     TerminatedCharSlice includePaths[] = { TerminatedCharSlice(".") };
 
     options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
-    options.includePaths = makeSlice(includePaths, 1);
+    options.includePaths = makeSlice(includePaths, SLANG_COUNT_OF(includePaths));
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
