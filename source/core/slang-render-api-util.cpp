@@ -19,6 +19,7 @@ namespace Slang {
     { RenderApiType::Metal,  "mtl,metal",       ""},
     { RenderApiType::CPU,    "cpu",             ""},
     { RenderApiType::CUDA,   "cuda",            "cuda,ptx"},
+    { RenderApiType::WebGPU, "wgpu,webgpu",     "wgsl"},
 };
 
 static int _calcAvailableApis()
@@ -265,6 +266,10 @@ static bool _canLoadSharedLibrary(const char* libName)
     {
 #if SLANG_WINDOWS_FAMILY
         case RenderApiType::Vulkan: return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
+        case RenderApiType::WebGPU:
+            return _canLoadSharedLibrary("webgpu_dawn") &&
+                _canLoadSharedLibrary("dxcompiler") &&
+                _canLoadSharedLibrary("dxil");
 #elif SLANG_APPLE_FAMILY
         case RenderApiType::Vulkan: return true;
         case RenderApiType::Metal:  return true;

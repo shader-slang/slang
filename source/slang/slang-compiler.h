@@ -97,6 +97,8 @@ namespace Slang
         MetalLib            = SLANG_METAL_LIB,
         MetalLibAssembly    = SLANG_METAL_LIB_ASM,
         WGSL                = SLANG_WGSL,
+        WGSLSPIRVAssembly   = SLANG_WGSL_SPIRV_ASM,
+        WGSLSPIRV           = SLANG_WGSL_SPIRV,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -1357,6 +1359,7 @@ namespace Slang
         LLVM = SLANG_PASS_THROUGH_LLVM,                     ///< LLVM 'compiler'
         SpirvOpt = SLANG_PASS_THROUGH_SPIRV_OPT,            ///< pass thorugh spirv to spirv-opt
         MetalC = SLANG_PASS_THROUGH_METAL,
+        Tint = SLANG_PASS_THROUGH_TINT,                     ///< pass through spirv to Tint API
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
@@ -3269,6 +3272,7 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL checkCompileTargetSupport(SlangCompileTarget target) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(SlangPassThrough passThrough) override;
 
+        void writeStdlibDoc(String config);
         SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib(slang::CompileStdLibFlags flags) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob) override;

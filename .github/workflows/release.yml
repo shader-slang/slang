@@ -194,3 +194,21 @@ jobs:
             ${{ steps.notarize.outputs.SLANG_NOTARIZED_DIST }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout stdlib reference
+        if: matrix.os == 'windows' && matrix.platform == 'x86_64'
+        uses: actions/checkout@v3
+        with:
+          repository: shader-slang/stdlib-reference
+          path: docs/stdlib-reference/
+          token: ${{ secrets.UPDATE_STDLIB_REFERENCE_PAT }}
+      - name: Update stdlib reference
+        if: matrix.os == 'windows' && matrix.platform == 'x86_64'
+        shell: powershell
+        run: |
+          cd docs/
+          ls
+          & ".\build_reference.ps1"
+        env:
+          GITHUB_TOKEN: ${{ secrets.UPDATE_STDLIB_REFERENCE_PAT }}
+

@@ -17,6 +17,7 @@ enum class RenderApiType
     Metal,
     CPU,
     CUDA,
+    WebGPU,
     CountOf,
 };
 
@@ -31,6 +32,7 @@ struct RenderApiFlag
         Metal = 1 << int(RenderApiType::Metal),
         CPU   = 1 << int(RenderApiType::CPU),
         CUDA  = 1 << int(RenderApiType::CUDA),
+        WebGPU = 1 << int(RenderApiType::WebGPU),
         AllOf = (1 << int(RenderApiType::CountOf)) - 1                   ///< All bits set
     };
 };

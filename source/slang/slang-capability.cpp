@@ -568,6 +568,25 @@ void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
     }
 }
 
+bool CapabilitySet::operator==(CapabilitySet const& that) const
+{
+    for (auto set : this->m_targetSets)
+    {
+        auto thatSet = that.m_targetSets.tryGetValue(set.first);
+        if (!thatSet)
+            return false;
+        for (auto stageSet : set.second.shaderStageSets)
+        {
+            auto thatStageSet = thatSet->shaderStageSets.tryGetValue(stageSet.first);
+            if (!thatStageSet)
+                return false;
+            if (stageSet.second.atomSet != thatStageSet->atomSet)
+                return false;
+        }
+    }
+    return true;
+}
+
 CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySet& other)
 {
     CapabilitySet newSet{};
