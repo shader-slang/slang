@@ -69,7 +69,7 @@ TextureCubeArray<uint4> tCubeArray_u32v4;
 // depth
 
 __generic<let sampleCount:int=0, let format:int=0>
-typealias Depth2D = __TextureImpl<
+typealias Depth2D = _Texture<
     float,
     __Shape2D,
     0, // isArray
@@ -82,7 +82,7 @@ typealias Depth2D = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-typealias Depth2DArray = __TextureImpl<
+typealias Depth2DArray = _Texture<
     float,
     __Shape2D,
     1, // isArray
@@ -95,7 +95,7 @@ typealias Depth2DArray = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-typealias DepthCube = __TextureImpl<
+typealias DepthCube = _Texture<
     float,
     __ShapeCube,
     0, // isArray
@@ -108,7 +108,7 @@ typealias DepthCube = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-typealias DepthCubeArray = __TextureImpl<
+typealias DepthCubeArray = _Texture<
     float,
     __ShapeCube,
     1, // isArray
