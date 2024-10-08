@@ -454,8 +454,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     }
 
     // Generate a dummy name for the block
-    m_writer->emit("_S");
-    m_writer->emit(m_uniqueIDCounter++);
+    m_writer->emit(getName(type->getElementType()));
 
 
     auto elementType = type->getElementType();
