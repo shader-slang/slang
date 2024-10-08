@@ -301,7 +301,9 @@ SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int co
 bool GlslangDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // Can only disassemble blobs that are SPIR-V
-    return ArtifactDescUtil::isDisassembly(from, to) && from.payload == ArtifactPayload::SPIRV;
+    return ArtifactDescUtil::isDisassembly(from, to) && (
+        (from.payload == ArtifactPayload::SPIRV) ||
+        (from.payload == ArtifactPayload::WGSL_SPIRV));
 }
 
 SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 

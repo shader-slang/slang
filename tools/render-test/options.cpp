@@ -33,6 +33,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     case RenderApiType::Metal:  return rhi::DeviceType::Metal;
     case RenderApiType::CPU:    return rhi::DeviceType::CPU;
     case RenderApiType::CUDA:   return rhi::DeviceType::CUDA;
+    case RenderApiType::WebGPU: return rhi::DeviceType::WGPU;
     default:
         return rhi::DeviceType::Default;
     }
