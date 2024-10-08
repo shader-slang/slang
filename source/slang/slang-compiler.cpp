@@ -520,6 +520,10 @@ namespace Slang
             {
                 return SourceLanguage::CUDA;
             }
+            case PassThroughMode::Tint:
+            {
+                return SourceLanguage::WGSL;
+            }
             case PassThroughMode::SpirvDis:
             {
                 return SourceLanguage::SPIRV;
@@ -555,6 +559,7 @@ namespace Slang
             {
                 return PassThroughMode::None;
             }
+            case CodeGenTarget::WGSLSPIRVAssembly:
             case CodeGenTarget::SPIRVAssembly:
             case CodeGenTarget::SPIRV:
             {
@@ -588,7 +593,10 @@ namespace Slang
             {
                 return PassThroughMode::NVRTC;
             }
-
+            case CodeGenTarget::WGSLSPIRV:
+            {
+                return PassThroughMode::Tint;
+            }
             default: break;
         }
 
@@ -1010,6 +1018,7 @@ namespace Slang
             case CodeGenTarget::DXIL:               return CodeGenTarget::HLSL;
             case CodeGenTarget::SPIRV:              return CodeGenTarget::GLSL;
             case CodeGenTarget::MetalLib:           return CodeGenTarget::Metal;
+            case CodeGenTarget::WGSLSPIRV:          return CodeGenTarget::WGSL;
             default: break;
         }
         return CodeGenTarget::Unknown;
@@ -1621,6 +1630,7 @@ namespace Slang
             case CodeGenTarget::DXBytecodeAssembly: return CodeGenTarget::DXBytecode;
             case CodeGenTarget::DXILAssembly:       return CodeGenTarget::DXIL;
             case CodeGenTarget::SPIRVAssembly:      return CodeGenTarget::SPIRV;
+            case CodeGenTarget::WGSLSPIRVAssembly:  return CodeGenTarget::WGSLSPIRV;
             default:    return CodeGenTarget::None;
         }
     }
@@ -1635,6 +1645,7 @@ namespace Slang
             case CodeGenTarget::DXBytecodeAssembly:
             case CodeGenTarget::DXILAssembly:
             case CodeGenTarget::MetalLibAssembly:
+            case CodeGenTarget::WGSLSPIRVAssembly:
             {
                 // First compile to an intermediate target for the corresponding binary format.
                 const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
@@ -1669,6 +1680,7 @@ namespace Slang
             case CodeGenTarget::HostExecutable:
             case CodeGenTarget::HostHostCallable:
             case CodeGenTarget::HostSharedLibrary:
+            case CodeGenTarget::WGSLSPIRV:
                 SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
                 return SLANG_OK;
 
@@ -1701,6 +1713,7 @@ namespace Slang
         case CodeGenTarget::ShaderSharedLibrary:
         case CodeGenTarget::HostExecutable:
         case CodeGenTarget::HostSharedLibrary:
+        case CodeGenTarget::WGSLSPIRVAssembly:
             {
                 SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
