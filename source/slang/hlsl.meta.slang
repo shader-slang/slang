@@ -1,35 +1,42 @@
 // Slang HLSL compatibility library
+//@hidden:
 
 typedef uint UINT;
 
 __intrinsic_op($(kIROp_RequireGLSLExtension))
 void __requireGLSLExtension(String extensionName);
 
+//@public:
 [sealed]
 interface IBufferDataLayout
 {
 }
 
+/// @category misc_types
 __intrinsic_type($(kIROp_DefaultBufferLayoutType))
 struct DefaultDataLayout : IBufferDataLayout
 {};
 
+/// @category misc_types
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
 struct Std140DataLayout : IBufferDataLayout
 {};
 
+/// @category misc_types
 __intrinsic_type($(kIROp_Std430BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
 struct Std430DataLayout : IBufferDataLayout
 {};
 
+/// @category misc_types
 __intrinsic_type($(kIROp_ScalarBufferLayoutType))
 struct ScalarDataLayout : IBufferDataLayout
 {};
 
+//@hidden:
 __generic<T, L : IBufferDataLayout = DefaultDataLayout>
 __intrinsic_type($(kIROp_GLSLShaderStorageBufferType))
 __magic_type(GLSLShaderStorageBufferType)
@@ -57,6 +64,26 @@ __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
+//@public:
+/**
+Represents an opaque handle to an append structured buffer allocated in global memory.
+A structured buffer can be viewed as an array of the specified element type.
+An append structure buffer internally maintains an atomic counter to keep track of the number of elements in the buffer,
+and provide an atomic operation to append a new element to the buffer.
+ @param T The element type of the buffer.
+ @param L The memory layout of the buffer.
+ @remarks
+This type is supported natively when targeting HLSL.
+When generating code for other targets, this type is translated into a pair or an ordinary `RWStructuredBuffer` and
+a separate `RWStructuredBuffer` that holds the atomic counter.
+The `L` generic parameter is used to specify the memory layout of the buffer when
+generating SPIRV.
+`L` must be one of `DefaultDataLayout`, `Std140DataLayout`, `Std430DataLayout` or `ScalarDataLayout`.
+The default value is `DefaultDataLayout`.
+When generating code for other targets, this parameter is ignored and has no effect on the generated code.
+ @see `RWStructuredBuffer`, `ConsumeStructuredBuffer`, `RasterizerOrderedStructuredBuffer`.
+ @category buffer_types
+*/
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
@@ -77,6 +104,7 @@ struct AppendStructuredBuffer
     }
 };
 
+/// @category buffer_types
 __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
@@ -309,6 +337,8 @@ interface __ITextureShape
 interface __ITextureShape1D2D3D : __ITextureShape
 {
 }
+
+/// @category misc_types Miscelaneous types
 __magic_type(TextureShape1DType)
 __intrinsic_type($(kIROp_TextureShape1DType))
 struct __Shape1D : __ITextureShape1D2D3D
@@ -317,6 +347,7 @@ struct __Shape1D : __ITextureShape1D2D3D
     static const int dimensions = 1;
     static const int planeDimensions = 1;
 }
+/// @category misc_types
 __magic_type(TextureShape2DType)
 __intrinsic_type($(kIROp_TextureShape2DType))
 struct __Shape2D : __ITextureShape1D2D3D
@@ -325,6 +356,7 @@ struct __Shape2D : __ITextureShape1D2D3D
     static const int dimensions = 2;
     static const int planeDimensions = 2;
 }
+/// @category misc_types
 __magic_type(TextureShape3DType)
 __intrinsic_type($(kIROp_TextureShape3DType))
 struct __Shape3D : __ITextureShape1D2D3D
@@ -333,6 +365,7 @@ struct __Shape3D : __ITextureShape1D2D3D
     static const int dimensions = 3;
     static const int planeDimensions = 3;
 }
+/// @category misc_types
 __magic_type(TextureShapeCubeType)
 __intrinsic_type($(kIROp_TextureShapeCubeType))
 struct __ShapeCube : __ITextureShape
@@ -341,6 +374,7 @@ struct __ShapeCube : __ITextureShape
     static const int dimensions = 3;
     static const int planeDimensions = 2;
 }
+/// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
 struct __ShapeBuffer : __ITextureShape
@@ -349,6 +383,8 @@ struct __ShapeBuffer : __ITextureShape
     static const int dimensions = 1;
     static const int planeDimensions = 1;
 }
+
+//@hidden:
 __intrinsic_op(vectorReshape)
 vector<T,N> __vectorReshape<let N : int, T, let M : int>(vector<T,M> vin);
 
@@ -356,14 +392,90 @@ __intrinsic_op(makeVector)
 __generic<T, let N:int>
 vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 
-
+//@public:
+/// A parameterized type that represents all flavors of texture types supported by the Slang language.
+/// Please note that this type is not intended to be used directly in user code, and not all combinations
+/// of the generic arguments are valid.
+/// Instead, use the specific texture types such as `Texture1D`, `Texture2DArray` and `Sampler2D` etc.
+/// This documentation is provided for reference purposes only.
+/// @param T The element type of the texture. Must be a scalar or vector type.
+/// @param Shape The shape of the texture. Must be one of `__Shape1D`, `__Shape2D`, `__Shape3D`, `__ShapeCube` or `__ShapeBuffer`.
+/// @param isArray Indicates whether the texture is an array texture.
+/// @param isMS Indicates whether the texture is a multisampled texture.
+/// @param sampleCount The number of samples of a multisampled texture.
+/// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for rasterizer-ordered, 3 for feedback.
+/// @param isShadow Indicates whether the texture is a shadow texture (for combined texture-sampler only).
+/// @param isCombined Indicates whether the texture is a combined texture-sampler.
+/// @param format The storage format of the texture. Users should specify the format using an `[format("...")]` attribute instead.
+/// @see `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`, `Texture1DArray`,
+/// `Texture2DArray`, `TextureCubeArray`, `Sampler1D`, `Sampler2D`, `Sampler3D`, `SamplerCube`, `Sampler1DArray`, `Sampler2DArray`, `SamplerCubeArray`,
+/// `Texture2DMS`, `Texture2DMSArray`, `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray`, `RWTexture2DArray`,
+/// `RWTexture2DMS`, `RWTexture2DMSArray`, `Buffer`, `RWBuffer`, `FeedbackTexture2D`, `FeedbackTexture2DArray`.
+/// @remarks
+/// HLSL texture types are implemented as typealiases to the builtin `_Texture` type. Users
+/// are advised to use the HLSL-specific texture types instead of `_Texture` directly.
+///
+/// For read-write textures, Slang will automatically infer `format` from `T`.
+/// To explicitly specify texel storage formats for read-write textures,
+/// use the `[format("formatString")]` attribute on the texture parameter declaration.
+/// Allowed `formatString` values are:
+///
+/// |id | Format string        | Meaning           |
+/// |:--|:---------------------|:------------------|
+/// |1  |`"rgba32f"`           | 4 channel 32-bit floating point texture |
+/// |2  |`"rgba16f"`           | 4 channel 16-bit floating point texture |
+/// |3  |`"rg32f"`             | 2 channel 32-bit floating point texture |
+/// |4  |`"rg16f"`             | 2 channel 16-bit floating point texture |
+/// |5  |`"r11f_g11f_b10f"`    | 3 channel 11/11/10-bit floating point texture |
+/// |6  |`"r32f"`              | 1 channel 32-bit floating point texture |
+/// |7  |`"r16f"`              | 1 channel 16-bit floating point texture |
+/// |8  |`"rgba16"`            | 4 channel 16-bit normalized unsigned integer texture |
+/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit signed integer texture |
+/// |10 |`"rgba8"`             | 4 channel 8-bit normalized unsigned integer texture |
+/// |11 |`"rg16"`              | 2 channel 16-bit normalized unsigned integer texture |
+/// |12 |`"rg8"`               | 2 channel 8-bit normalized unsigned integer texture |
+/// |13 |`"r16"`               | 1 channel 16-bit normalized unsigned integer texture |
+/// |14 |`"r8"`                | 1 channel 8-bit normalized unsigned integer texture |
+/// |15 |`"rgba16_snorm"`      | 4 channel 16-bit normalized signed integer texture |
+/// |16 |`"rgba8_snorm"`       | 4 channel 8-bit normalized signed integer texture |
+/// |17 |`"rg16_snorm"`        | 2 channel 16-bit normalized signed integer texture |
+/// |18 |`"rg8_snorm"`         | 2 channel 8-bit normalized signed integer texture |
+/// |19 |`"r16_snorm"`         | 1 channel 16-bit normalized signed integer texture |
+/// |20 |`"r8_snorm"`          | 1 channel 8-bit normalized signed integer texture |
+/// |21 |`"rgba32i"`           | 4 channel 32-bit signed integer texture |
+/// |22 |`"rgba16i"`           | 4 channel 16-bit signed integer texture |
+/// |23 |`"rgba8i"`            | 4 channel 8-bit signed integer texture |
+/// |24 |`"rg32i"`             | 2 channel 32-bit signed integer texture |
+/// |25 |`"rg16i"`             | 2 channel 16-bit signed integer texture |
+/// |26 |`"rg8i"`              | 2 channel 8-bit signed integer texture |
+/// |27 |`"r32i"`              | 1 channel 32-bit signed integer texture |
+/// |28 |`"r16i"`              | 1 channel 16-bit signed integer texture |
+/// |29 |`"r8i"`               | 1 channel 8-bit signed integer texture |
+/// |30 |`"rgba32ui"`          | 4 channel 32-bit unsigned integer texture |
+/// |31 |`"rgba16ui"`          | 4 channel 16-bit unsigned integer texture |
+/// |32 |`"rgb10_a2ui"`        | 4 channel 10/10/10/2-bit unsigned integer texture |
+/// |33 |`"rgba8ui"`           | 4 channel 8-bit unsigned integer texture |
+/// |34 |`"rg32ui"`            | 2 channel 32-bit unsigned integer texture |
+/// |35 |`"rg16ui"`            | 2 channel 16-bit unsigned integer texture |
+/// |36 |`"rg8ui"`             | 2 channel 8-bit unsigned integer texture |
+/// |37 |`"r32ui"`             | 1 channel 32-bit unsigned integer texture |
+/// |38 |`"r16ui"`             | 1 channel 16-bit unsigned integer texture |
+/// |39 |`"r8ui"`              | 1 channel 8-bit unsigned integer texture |
+/// |40 |`"r64ui"`             | 1 channel 64-bit unsigned integer texture |
+/// |41 |`"r64i"`              | 1 channel 64-bit signed integer texture |
+///
+/// When targeting Vulkan, a combined-texture-sampler type (`isCombined==1`) translates to a `OpTypeSampledImage` type in SPIR-V.
+/// For other targets, the combined-texture-sampler type is translated to a pair of a `Texture` and `SamplerState`.
+/// `isShadow` is only applicable to combined-texture-sampler types and must be `0` for non-combined texture types.
+/// @internal
+/// @category texture_types Texture types
 __magic_type(TextureType)
 __intrinsic_type($(kIROp_TextureType))
-struct __TextureImpl<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+struct _Texture<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 {
 }
 
-
+//@hidden:
 // Combined texture sampler specific functions
 
 [require(glsl, texture_sm_4_1)]
@@ -542,15 +654,19 @@ float __glsl_texture_offset_level_zero_1d_shadow<TTexture, TCoord, TOffset>(TTex
     }
 }
 
+//@public:
+
 __generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
+extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 {
+    //@hidden:
     static const int access = 0;
 
+    //@public:
     typealias TextureCoord = vector<float, Shape.dimensions>;
 
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
-    __TextureImpl<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
+    _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> __getTexture();
 
     __intrinsic_op($(kIROp_CombinedTextureSamplerGetSampler))
     SamplerState __getSampler();
@@ -608,6 +724,26 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
+    /// Samples the texture at the given location.
+    ///
+    ///@param s The `SamplerState` to use for the sampling operation. This parameter is omitted when `this` is a combined texture sampler type (`isCombined == 0`).
+    ///@param location The location to sample the texture at.
+    ///@param offset Texel offset to apply.
+    ///@param clamp The max level of detail to use.
+    ///@param[out] status The result status of the operation.
+    ///                   This parameter is currently only used when targeting HLSL.
+    ///                   For other targets, the result status is always 0.
+    ///@return The sampled texture value.
+    ///@see `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`.
+    ///@remarks
+    /// The `Sample` function is defined for all read-only texture types, including
+    /// `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`,
+    /// `Texture1DArray`, `Texture2DArray` and `TextureCubeArray`.
+    ///
+    /// The function is not available for read-write texture types.
+    ///
+    /// For HLSL/D3D targets, the texture element type must be a scalar or vector of float or half types.
+    ///
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
@@ -1114,8 +1250,9 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 }
 
 // Non-combined texture types specific functions
+
 __generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
+extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
 {
     typealias TextureCoord = vector<float, Shape.dimensions>;
 
@@ -1165,7 +1302,7 @@ extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,forma
 }
 
 __generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
+extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
     [ForceInline]
@@ -2166,7 +2303,7 @@ for (int isMS = 0; isMS <= 1; isMS++) {
 }}}}
 
 __generic<T, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
-extension __TextureImpl<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
+extension _Texture<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
     ${{{{
     textureTypeInfo.writeGetDimensionFunctions();
@@ -2179,7 +2316,7 @@ ${{{{
 
 // Texture.GetSamplePosition(int s);
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined,format>
+extension _Texture<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined,format>
 {
     [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_vertex_fragment_geometry)]
     float2 GetSamplePosition(int s);
@@ -2194,7 +2331,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<TElement,4> __texture_gather(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
     int component)
@@ -2263,7 +2400,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gather(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     int component)
 {
@@ -2282,7 +2419,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<TElement,4> __texture_gather_offset(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     constexpr vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset,
@@ -2343,7 +2480,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gather_offset(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset,
     int component)
@@ -2363,7 +2500,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gather_offsets(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
@@ -2390,7 +2527,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gather_offsets(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
     constexpr vector<int, Shape.planeDimensions> offset2,
@@ -2415,7 +2552,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<TElement,4> __texture_gatherCmp(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue)
@@ -2465,7 +2602,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue)
 {
@@ -2484,7 +2621,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offset(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
@@ -2531,7 +2668,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offset(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
     constexpr vector<int, Shape.planeDimensions> offset)
@@ -2551,7 +2688,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offsets(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
@@ -2578,7 +2715,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
 vector<TElement,4> __texture_gatherCmp_offsets(
-    __TextureImpl<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
+    _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     TElement compareValue,
     vector<int, Shape.planeDimensions> offset1,
@@ -2608,8 +2745,9 @@ for (int isScalarTexture = 0; isScalarTexture < 2; isScalarTexture++)
 
 }}}}
 // Gather for [TextureType = $(extTexType), isCombined = $(isCombined)]
+
 __generic<T:__BuiltinArithmeticType $(extSizeParam), Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
-extension __TextureImpl<$(extTexType),Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
+extension _Texture<$(extTexType),Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
 {
 ${{{{
     for (int isShadow = 0; isShadow < 2; isShadow++)
@@ -2768,11 +2906,12 @@ ${{{{
 // Load/Subscript for readonly, no MS textures
 
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
+extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 {
+//@hidden:
     static const int isMS = 0;
     static const int access = $(kStdlibResourceAccessReadOnly);
-
+//@public:
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [require(glsl, texture_sm_4_1_samplerless)]
@@ -3001,11 +3140,12 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,form
 // Texture Load/Subscript for readonly, MS textures
 
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
+extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 {
+//@hidden:
     static const int access = $(kStdlibResourceAccessReadOnly);
     static const int isMS = 1;
-
+//@public:
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
@@ -3183,8 +3323,9 @@ ${{{{
         const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
         const char* glslIntrinsicMSOffset = "$cimageLoad($0, ($1)+($3), $2)$z";
 }}}}
+
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
+extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 {
     [__readNone]
     [ForceInline]
@@ -3494,9 +3635,11 @@ extension __TextureImpl<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,form
 ${{{{
 if (access == kStdlibResourceAccessReadWrite) {
 }}}}
+
 // RW MS textures.
+
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
-extension __TextureImpl<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
+extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
 {
     [__readNone]
     [ForceInline]
@@ -3650,7 +3793,7 @@ ${{{{
 // Definitions to support the legacy texture .mips[][] operator.
 struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
-    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     int mip;
     __subscript(vector<int, isArray + Shape.dimensions> pos)->T
     {
@@ -3661,7 +3804,7 @@ struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombine
 
 struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
-    __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     __subscript(int mip)->__TextureMip<T, Shape, isArray, isCombined, format>
     {
         [__unsafeForceInlineEarly]
@@ -3669,8 +3812,9 @@ struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombin
     }
 }
 
+//@hidden:
 __generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
-extension __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
+extension _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
 {
     property __TextureMips<T, Shape, isArray, isCombined, format> mips
     {
@@ -3682,7 +3826,7 @@ extension __TextureImpl<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*ac
 // Definitions to support the .sample[][] operator.
 struct __TextureSample<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
-    __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     int sample;
     __subscript(vector<int, isArray + Shape.dimensions> pos)->T
     {
@@ -3693,7 +3837,7 @@ struct __TextureSample<T, Shape : __ITextureShape, let isArray : int, let isComb
 
 struct __TextureSampleMS<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
-    __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
+    _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     __subscript(int sample)->__TextureSample<T, Shape, isArray, isCombined, format>
     {
         [__unsafeForceInlineEarly]
@@ -3702,7 +3846,7 @@ struct __TextureSampleMS<T, Shape : __ITextureShape, let isArray : int, let isCo
 }
 
 __generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
-extension __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
+extension _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
 {
     property __TextureSampleMS<T, Shape, isArray, isCombined, format> sample
     {
@@ -3710,6 +3854,8 @@ extension __TextureImpl<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*ac
         get { return { this }; }
     }
 }
+
+//@public:
 
 // Texture type aliases.
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
@@ -3749,7 +3895,8 @@ ${{{{
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
 }}}}
-typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T=float4, let sampleCount:int=0, let format:int=0> = __TextureImpl<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
+/// @category texture_types
+typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }
 }}}}
@@ -4260,6 +4407,20 @@ __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment, T value);
 
+/**
+Represents an opaque handle to a read-only structured buffer allocated in global memory.
+A structured buffer can be viewed as an array of the specified element type.
+@param T The element type of the buffer.
+@param L The memory layout of the buffer.
+@remarks
+The `L` generic parameter is used to specify the memory layout of the buffer when
+generating SPIRV.
+`L` must be one of `DefaultDataLayout`, `Std140DataLayout`, `Std430DataLayout` or `ScalarDataLayout`.
+The default value is `DefaultDataLayout`.
+When generating code for other targets, this parameter is ignored and has no effect on the generated code.
+@see `RWStructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`, `RasterizerOrderedStructuredBuffer`.
+@category buffer_types Buffer types
+**/
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
@@ -4295,6 +4456,25 @@ struct StructuredBuffer
     };
 };
 
+/**
+Represents an opaque handle to a consume structured buffer allocated in global memory.
+A structured buffer can be viewed as an array of the specified element type.
+An append structure buffer internally maintains an atomic counter to keep track of the number of elements in the buffer,
+and provide an atomic operation to append a new element to the buffer.
+@param T The element type of the buffer.
+@param L The memory layout of the buffer.
+@remarks
+This type is supported natively when targeting HLSL.
+When generating code for other targets, this type is translated into a pair or an ordinary `StructuredBuffer` and
+a separate `RWStructuredBuffer` that holds the atomic counter.
+The `L` generic parameter is used to specify the memory layout of the buffer when
+generating SPIRV.
+`L` must be one of `DefaultDataLayout`, `Std140DataLayout`, `Std430DataLayout` or `ScalarDataLayout`.
+The default value is `DefaultDataLayout`.
+When generating code for other targets, this parameter is ignored and has no effect on the generated code.
+@see `StructuredBuffer`, `AppendStructuredBuffer`, `RWStructuredBuffer`, `RasterizerOrderedStructuredBuffer`.
+@category buffer_types
+*/
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLConsumeStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
@@ -4318,6 +4498,7 @@ struct ConsumeStructuredBuffer
 __intrinsic_op($(kIROp_GetElement))
 T __getElement<T, U, I>(U collection, I index);
 
+/// @category stage_io Stage IO types
 __generic<T, let N : int>
 [require(glsl_hlsl_spirv, hull)]
 __magic_type(HLSLInputPatchType)
@@ -4341,6 +4522,7 @@ struct InputPatch
     }
 };
 
+/// @category stage_io
 __generic<T, let N : int>
 [require(glsl_hlsl_spirv, domain_hull)]
 __magic_type(HLSLOutputPatchType)
@@ -4376,6 +4558,7 @@ static const struct {
 for(auto item : kMutableByteAddressBufferCases) {
 }}}}
 
+/// @category buffer_types
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 struct $(item.name)
@@ -5707,6 +5890,20 @@ __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+/**
+Represents an opaque handle to a mutable structured buffer allocated in global memory.
+A structured buffer can be viewed as an array of the specified element type.
+ @param T The element type of the buffer.
+ @param L The memory layout of the buffer.
+ @remarks
+The `L` generic parameter is used to specify the memory layout of the buffer when
+generating SPIRV.
+`L` must be one of `DefaultDataLayout`, `Std140DataLayout`, `Std430DataLayout` or `ScalarDataLayout`.
+The default value is `DefaultDataLayout`.
+When generating code for other targets, this parameter is ignored and has no effect on the generated code.
+ @see `StructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`
+ @category buffer_types
+**/
 struct $(item.name)
 {
     uint DecrementCounter();
@@ -5755,6 +5952,7 @@ ${{{{
 }
 }}}}
 
+/// @category stage_io
 __generic<T>
 [require(glsl_hlsl_spirv, geometry)]
 __magic_type(HLSLPointStreamType)
@@ -5784,6 +5982,7 @@ struct PointStream
     }
 };
 
+/// @category stage_io
 __generic<T>
 [require(glsl_hlsl_spirv, geometry)]
 __magic_type(HLSLLineStreamType)
@@ -5813,6 +6012,7 @@ struct LineStream
     }
 };
 
+/// @category stage_io
 __generic<T>
 [require(glsl_hlsl_spirv, geometry)]
 __magic_type(HLSLTriangleStreamType)
@@ -5860,11 +6060,13 @@ struct TriangleStream
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
     matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
-// Try to terminate the current draw or dispatch call (HLSL SM 4.0)
+//@public:
+
+/// Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 void abort();
 
-// Absolute value (HLSL SM 1.0)
-
+/// Absolute value (HLSL SM 1.0)
+/// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -5970,6 +6172,8 @@ matrix<T,N,M> abs(matrix<T,N,M> x)
     }
 }
 
+/// Absolute value (HLSL SM 1.0)
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -5999,8 +6203,8 @@ vector<T, N> fabs(vector<T, N> x)
 }
 
 
-// Inverse cosine (HLSL SM 1.0)
-
+/// Inverse cosine (HLSL SM 1.0)
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -6052,8 +6256,8 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
     }
 }
 
-// Inverse hyperbolic cosine
-
+/// Inverse hyperbolic cosine
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -6195,7 +6399,8 @@ bool all(matrix<T,N,M> x)
     }
 }
 
-// Barrier for writes to all memory spaces (HLSL SM 5.0)
+/// Barrier for writes to all memory spaces (HLSL SM 5.0)
+/// @category barrier Memory and control barriers
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void AllMemoryBarrier()
@@ -6214,7 +6419,8 @@ void AllMemoryBarrier()
     }
 }
 
-// Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
+/// Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
+/// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void AllMemoryBarrierWithGroupSync()
@@ -6339,8 +6545,8 @@ bool any(matrix<T, N, M> x)
 }
 
 
-// Reinterpret bits as a double (HLSL SM 5.0)
-
+/// Reinterpret bits as a double (HLSL SM 5.0)
+/// @category conversion
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
@@ -6373,8 +6579,8 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
     }
 }
 
-// Reinterpret bits as a float (HLSL SM 4.0)
-
+/// Reinterpret bits as a float (HLSL SM 4.0)
+/// @category conversion
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 float asfloat(int x)
@@ -6475,7 +6681,6 @@ matrix<float,N,M> asfloat(matrix<uint,N,M> x)
     }
 }
 
-// No op
 [__unsafeForceInlineEarly]
 [__readNone]
 float asfloat(float x)
@@ -6493,7 +6698,8 @@ __generic<let N : int, let M : int>
 matrix<float,N,M> asfloat(matrix<float,N,M> x)
 { return x; }
 
-// Inverse sine (HLSL SM 1.0)
+/// Inverse sine (HLSL SM 1.0)
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -6545,8 +6751,8 @@ matrix<T, N, M> asin(matrix<T, N, M> x)
     }
 }
 
-// Inverse hyperbolic sine
-
+/// Inverse hyperbolic sine.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -6587,8 +6793,8 @@ vector<T,N> asinh(vector<T,N> x)
     }
 }
 
-// Reinterpret bits as an int (HLSL SM 4.0)
-
+/// Reinterpret bits as an int (HLSL SM 4.0)
+/// @category conversion
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 int asint(float x)
@@ -6709,8 +6915,8 @@ __generic<let N : int, let M : int>
 matrix<int,N,M> asint(matrix<int,N,M> x)
 { return x; }
 
-// Reinterpret bits of double as a uint (HLSL SM 5.0)
-
+/// Reinterpret bits of double as a uint (HLSL SM 5.0)
+/// @category conversion
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
@@ -6864,14 +7070,20 @@ matrix<uint,N,M> asuint(matrix<uint,N,M> x)
 
 // Identity cases:
 
+/// Reinterpret bits as a float16 (HLSL SM 6.2).
+/// @category conversion
 [__unsafeForceInlineEarly][__readNone] float16_t asfloat16(float16_t value) { return value; }
 [__unsafeForceInlineEarly][__readNone] vector<float16_t,N> asfloat16<let N : int>(vector<float16_t,N> value) { return value; }
 [__unsafeForceInlineEarly][__readNone] matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<float16_t,R,C> value) { return value; }
 
+/// Reinterpret bits as a int16_t (HLSL SM 6.2).
+/// @category conversion
 [__unsafeForceInlineEarly][__readNone] int16_t asint16(int16_t value) { return value; }
 [__unsafeForceInlineEarly][__readNone] vector<int16_t,N> asint16<let N : int>(vector<int16_t,N> value) { return value; }
 [__unsafeForceInlineEarly][__readNone] matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<int16_t,R,C> value) { return value; }
 
+/// Reinterpret bits as a uint16_t (HLSL SM 6.2).
+/// @category conversion
 [__unsafeForceInlineEarly][__readNone] uint16_t asuint16(uint16_t value) { return value; }
 [__unsafeForceInlineEarly][__readNone] vector<uint16_t,N> asuint16<let N : int>(vector<uint16_t,N> value) { return value; }
 [__unsafeForceInlineEarly][__readNone] matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<uint16_t,R,C> value) { return value; }
@@ -7048,7 +7260,8 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> va
     }
 }
 
-// Inverse tangent (HLSL SM 1.0)
+/// Inverse tangent (HLSL SM 1.0).
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -7100,6 +7313,8 @@ matrix<T, N, M> atan(matrix<T, N, M> x)
     }
 }
 
+/// Inverse tangent (HLSL SM 1.0).
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -7151,8 +7366,8 @@ matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
     }
 }
 
-// Hyperbolic inverse tangent
-
+/// Hyperbolic inverse tangent
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -7193,7 +7408,8 @@ vector<T,N> atanh(vector<T,N> x)
     }
 }
 
-// Ceiling (HLSL SM 1.0)
+/// Ceiling (HLSL SM 1.0).
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -7246,7 +7462,7 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
 }
 
 // Copy-sign
-
+/// @category math
 __generic<let N: int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv)]
@@ -7259,6 +7475,7 @@ vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
     return reinterpret<vector<half,N>>(newX);
 }
 
+/// @category math
 __generic<let N: int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv)]
@@ -7271,6 +7488,7 @@ vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
     return reinterpret<vector<float,N>>(newX);
 }
 
+/// @category math
 __generic<let N: int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv)]
@@ -7287,6 +7505,7 @@ __generic<T:__BuiltinFloatingPointType, U:__BuiltinFloatingPointType, let N : in
 __intrinsic_op($(kIROp_FloatCast))
 vector<T,N> __real_cast(vector<U,N> val);
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv)]
@@ -7338,7 +7557,8 @@ bool CheckAccessFullyMapped(out uint status)
     }
 }
 
-// Clamp (HLSL SM 1.0)
+/// Clamp (HLSL SM 1.0).
+/// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -7453,7 +7673,7 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
     }
 }
 
-// Clip (discard) fragment conditionally
+/// Clip (discard) fragment conditionally
 __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv, fragment)]
 void clip(T x)
@@ -7490,7 +7710,7 @@ void clip(matrix<T,N,M> x)
     }
 }
 
-// Cosine
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -7542,7 +7762,8 @@ matrix<T, N, M> cos(matrix<T, N, M> x)
     }
 }
 
-// Hyperbolic cosine
+/// Hyperbolic cosine.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -7594,8 +7815,8 @@ matrix<T, N, M> cosh(matrix<T, N, M> x)
     }
 }
 
-// Cosine degree
-
+/// Compute the cosine of an angle in degrees.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -7623,7 +7844,8 @@ vector<T,N> cospi(vector<T,N> x)
 }
 
 
-// Population count
+/// Population count.
+/// @category bitops
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -7670,13 +7892,14 @@ vector<uint, N> countbits(vector<uint, N> value)
     }
 }
 
-// Cross product
-// TODO: SPIRV does not support integer vectors.
+/// Cross product
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
+    // TODO: SPIRV does not support integer vectors.
     __target_switch
     {
     case glsl: __intrinsic_asm "cross";
@@ -7735,6 +7958,7 @@ ${{{{
 const char* diffDimensions[2] = {"x", "y"};
 for (auto xOrY : diffDimensions) {
 }}}}
+/// @category derivative Derivative functions
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
@@ -7796,6 +8020,7 @@ matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> x)
     }
 }
 
+/// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
@@ -7841,6 +8066,7 @@ matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> x)
     }
 }
 
+/// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
@@ -7891,8 +8117,8 @@ ${{{{
 }}}}
 
 
-// Radians to degrees
-
+/// Convert radians to degrees.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
@@ -7942,8 +8168,8 @@ matrix<T, N, M> degrees(matrix<T, N, M> x)
     }
 }
 
-// Matrix determinant
-
+/// Compute matrix determinant.
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [PreferCheckpoint]
@@ -7962,7 +8188,8 @@ T determinant(matrix<T,N,N> m)
     }
 }
 
-// Barrier for device memory
+/// Barrier for device memory.
+/// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void DeviceMemoryBarrier()
@@ -7981,6 +8208,8 @@ void DeviceMemoryBarrier()
     }
 }
 
+/// @category barrier
+/// Barrier for device memory with group synchronization.
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void DeviceMemoryBarrierWithGroupSync()
@@ -8000,7 +8229,7 @@ void DeviceMemoryBarrierWithGroupSync()
 }
 
 // Vector distance
-
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -8037,8 +8266,8 @@ T distance(T x, T y)
     }
 }
 
-// fdim
-
+/// Computes `max(0, x-y)`.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -8066,7 +8295,7 @@ vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 }
 
 // divide
-
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv)]
@@ -8093,9 +8322,8 @@ vector<T,N> divide(vector<T,N> x, vector<T,N> y)
     }
 }
 
-
-// Vector dot product
-
+/// Vector dot product
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -8151,9 +8379,9 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
 }
 
-
-// Helper for computing distance terms for lighting (obsolete)
-
+/// Helper for computing distance terms for lighting (obsolete)
+/// @category math
+/// @deprecated
 __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<T,4> y);
 
 // Given a RWByteAddressBuffer allow it to be interpreted as a RWStructuredBuffer
@@ -8323,8 +8551,8 @@ matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset)
     }
 }
 
-// Base-e exponent
-
+/// Computes base-e exponent.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -8344,6 +8572,7 @@ T exp(T x)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -8363,6 +8592,7 @@ vector<T, N> exp(vector<T, N> x)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -8376,8 +8606,8 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
     }
 }
 
-// Base-2 exponent
-
+/// Computes base-2 exponent
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -8445,8 +8675,8 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
     }
 }
 
-// Base-10 exponent
-
+/// Computes base-10 exponent
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -8476,7 +8706,8 @@ vector<T,N> exp10(vector<T,N> x)
 }
 
 
-// Convert 16-bit float stored in low bits of integer
+/// Convert 16-bit float stored in low bits of integer
+/// @category conversion Conversion functions
 __glsl_version(420)
 __cuda_sm_version(6.0)
 [__readNone]
@@ -8523,9 +8754,8 @@ vector<float, N> f16tof32(vector<uint, N> value)
     }
 }
 
-
-
-// Convert to 16-bit float stored in low bits of integer
+/// Convert to 16-bit float stored in low bits of integer.
+/// @category conversion
 __glsl_version(420)
 __cuda_sm_version(6.0)
 [__readNone]
@@ -8617,7 +8847,8 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
     }
 }
 
-// Convert to float16_t
+/// Convert to float16_t.
+/// @category conversion
 __glsl_version(420)
 [__readNone]
 [require(cuda_glsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -8654,7 +8885,8 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-// Flip surface normal to face forward, if needed
+/// Flip surface normal to face forward, if needed.
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -8674,7 +8906,8 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
     }
 }
 
-// Find first set bit starting at high bit and working down
+/// Find first set bit starting at high bit and working down.
+/// @category bitops Bit operation functions
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int firstbithigh(int value)
@@ -8749,7 +8982,8 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
     }
 }
 
-// Find first set bit starting at low bit and working up
+/// Find first set bit starting at low bit and working up.
+/// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int firstbitlow(int value)
@@ -8824,8 +9058,8 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
     }
 }
 
-// Floor (HLSL SM 1.0)
-
+/// Floor (HLSL SM 1.0).
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -8877,7 +9111,8 @@ matrix<T, N, M> floor(matrix<T, N, M> x)
     }
 }
 
-// Fused multiply-add
+/// Fused multiply-add.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -8935,7 +9170,11 @@ matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
     }
 }
 
-// Floating point remainder of x/y
+/// Floating point remainder of x/y.
+/// The floating-point remainder is calculated such that x = i * y + f,
+/// where i is an integer, f has the same sign as x, and the absolute value
+/// of f is less than the absolute value of y.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -9040,7 +9279,8 @@ matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
     }
 }
 
-// Fractional part
+/// Extract the fractional part of a floating-point number.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -9086,6 +9326,8 @@ matrix<T, N, M> frac(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, frac, x);
 }
 
+/// Extract the fractional part of a floating-point number.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -9104,8 +9346,8 @@ vector<T, N> fract(vector<T, N> x)
     return frac(x);
 }
 
-
-// Split float into mantissa and exponent
+/// Split float into mantissa and exponent.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -9184,7 +9426,8 @@ matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
     }
 }
 
-// Texture filter width
+/// Texture filter width.
+/// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
@@ -9373,7 +9616,8 @@ float2 GetRenderTargetSamplePosition(int Index)
     }
 }
 
-// Group memory barrier
+/// Group memory barrier. Ensures that all memory accesses in the group are visible to all threads in the group.
+/// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void GroupMemoryBarrier()
@@ -9410,6 +9654,8 @@ void __subgroupBarrier()
     }
 }
 
+/// Group memory barrier. Ensures that all memory accesses in the group are visible to all threads in the group.
+/// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void GroupMemoryBarrierWithGroupSync()
@@ -9985,6 +10231,7 @@ ${{{{
 for(const char* T : {"int64_t", "uint64_t"})
 {
 }}}}
+/// @category atomic Atomic functions
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda_metal)]
 void InterlockedAdd(__ref $(T) dest, $(T) value)
@@ -10025,6 +10272,7 @@ void InterlockedAdd(__ref $(T) dest, $(T) value, out $(T) original_value)
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedAnd(__ref $(T) dest, $(T) value)
 {
@@ -10043,6 +10291,7 @@ void InterlockedAnd(__ref $(T) dest, $(T) value, out $(T) original_value)
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedCompareExchange(__ref $(T) dest, $(T) compare_value, $(T) value)
 {
@@ -10070,6 +10319,7 @@ void InterlockedCompareStore(__ref $(T) dest, $(T) compare_value, $(T) value);
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedExchange(__ref $(T) dest, $(T) value)
 {
@@ -10088,6 +10338,7 @@ void InterlockedExchange(__ref $(T) dest, $(T) value, out $(T) original_value)
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedMax(__ref $(T) dest, $(T) value)
 {
@@ -10106,6 +10357,7 @@ void InterlockedMax(__ref $(T) dest, $(T) value, out $(T) original_value)
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedMin(__ref $(T) dest, $(T) value)
 {
@@ -10124,6 +10376,7 @@ void InterlockedMin(__ref $(T) dest, $(T) value, out $(T) original_value)
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedOr(__ref  $(T) dest,  $(T) value)
 {
@@ -10142,6 +10395,7 @@ void InterlockedOr(__ref $(T) dest, $(T) value, out $(T) original_value)
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedXor(__ref $(T) dest, $(T) value)
 {
@@ -10164,6 +10418,7 @@ ${{{{
 } // for(const char* T : {"int64_t", "uint64_t"})
 }}}}
 
+/// @category atomic
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
@@ -10234,6 +10489,7 @@ void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value,
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_value, float value)
 {
@@ -10262,6 +10518,7 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
     }
 }
 
+/// @category atomic
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
@@ -10343,6 +10600,7 @@ void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value)
     }
 }
 
+/// @category atomic
 [ForceInline]
 void InterlockedCompareStoreFloatBitwise(__ref  float dest,  float compare_value, float value)
 {
@@ -10352,7 +10610,7 @@ void InterlockedCompareStoreFloatBitwise(__ref  float dest,  float compare_value
     }
 }
 
-
+/// @category atomic
 [ForceInline]
 void InterlockedExchange(__ref  float dest,  float value)
 {
@@ -10383,8 +10641,8 @@ void InterlockedExchange(__ref  float dest,  float value, out  float original_va
 
 
 
-// Is floating-point value finite?
-
+/// Test if a floating-point value finite.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -10434,7 +10692,8 @@ matrix<bool, N, M> isfinite(matrix<T, N, M> x)
     }
 }
 
-// Is floating-point value infinite?
+/// Test if a floating-point value infinite.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -10485,7 +10744,8 @@ matrix<bool, N, M> isinf(matrix<T, N, M> x)
     }
 }
 
-// Is floating-point value not-a-number?
+/// Test if a floating-point value is not-a-number.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -10536,8 +10796,8 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
     }
 }
 
-// Construct float from mantissa and exponent
-
+/// Construct float from mantissa and exponent.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -10622,7 +10882,8 @@ vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 }
 
 
-// Vector length
+/// Compute the length of a vector.
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -10642,7 +10903,6 @@ T length(vector<T, N> x)
     }
 }
 
-// Scalar float length
 __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T length(T x)
@@ -10659,7 +10919,9 @@ T length(T x)
     }
 }
 
-// Linear interpolation
+/// Computes linear interpolation.
+/// @return Returns `x+(y-x)*s`.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -10710,6 +10972,8 @@ matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 }
 
 // Legacy lighting function (obsolete)
+/// @category math
+/// @deprecated
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 float4 lit(float n_dot_l, float n_dot_h, float m)
@@ -10725,7 +10989,8 @@ float4 lit(float n_dot_l, float n_dot_h, float m)
     }
 }
 
-// Base-e logarithm
+/// Compute base-e logarithm.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -10777,7 +11042,8 @@ matrix<T, N, M> log(matrix<T, N, M> x)
     }
 }
 
-// Base-10 logarithm
+/// Compute base-10 logarithm.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -10837,7 +11103,8 @@ matrix<T,N,M> log10(matrix<T,N,M> x)
     }
 }
 
-// Base-2 logarithm
+/// Compute base-2 logarithm.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -10889,8 +11156,8 @@ matrix<T,N,M> log2(matrix<T,N,M> x)
     }
 }
 
-// multiply-add
-
+/// Computes multiply-add.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
@@ -10987,8 +11254,8 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
-
 // maximum
+/// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -11025,6 +11292,7 @@ T max(T x, T y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -11056,6 +11324,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -11120,6 +11389,7 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11146,6 +11416,7 @@ vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11173,6 +11444,7 @@ vector<T,N> fmax(vector<T,N> x, vector<T,N> y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11220,8 +11492,8 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
-
 // minimum
+/// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -11355,6 +11627,7 @@ T min3(T x, T y, T z)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11368,6 +11641,7 @@ vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11395,7 +11669,7 @@ vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
     }
 }
 
-
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11443,8 +11717,8 @@ vector<T,N> fmin3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
-
 // Median
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11473,6 +11747,7 @@ T median3(T x, T y, T z)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11492,6 +11767,7 @@ vector<T,N> median3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -11534,8 +11810,8 @@ vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
-
-// split into integer and fractional parts (both with same sign)
+/// Split into integer and fractional parts (both with same sign).
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -11615,6 +11891,7 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 }
 
 // msad4 (whatever that is)
+/// @category math
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
 uint4 msad4(uint reference, uint2 source, uint4 accum)
@@ -11641,6 +11918,7 @@ uint4 msad4(uint reference, uint2 source, uint4 accum)
 // General inner products
 
 // scalar-scalar
+/// @category math
 __generic<T : __BuiltinArithmeticType>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
@@ -11674,6 +11952,7 @@ __intrinsic_op($(kIROp_Mul))
 matrix<T, N, M> mul(T x, matrix<T, N, M> y);
 
 // vector-vector (dot product)
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -11989,9 +12268,8 @@ vector<T,N> nextafter(vector<T,N> x, vector<T,N> y)
     }
 }
 
-
-// noise (deprecated)
-
+/// @deprecated
+/// @category math
 [__readNone]
 [deprecated("Always returns 0")]
 float noise(float x)
@@ -12051,6 +12329,7 @@ T NonUniformResourceIndex(T index);
 T NonUniformResourceIndex<T>(T value) { return value; }
 
 // Normalize a vector
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12090,6 +12369,7 @@ T normalize(T x)
 }
 
 // Raise to a power
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12141,6 +12421,7 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12219,7 +12500,7 @@ ${{{{
 }}}}
 
 // Tessellation factor fixup routines
-
+/// @category tessellation Tessellation functions
 [require(hlsl, sm_5_0)]
 void Process2DQuadTessFactorsAvg(
     in  float4 RawEdgeFactors,
@@ -12228,6 +12509,7 @@ void Process2DQuadTessFactorsAvg(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void Process2DQuadTessFactorsMax(
     in  float4 RawEdgeFactors,
@@ -12236,6 +12518,7 @@ void Process2DQuadTessFactorsMax(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void Process2DQuadTessFactorsMin(
     in  float4 RawEdgeFactors,
@@ -12244,6 +12527,7 @@ void Process2DQuadTessFactorsMin(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void ProcessIsolineTessFactors(
     in  float RawDetailFactor,
@@ -12251,6 +12535,7 @@ void ProcessIsolineTessFactors(
     out float RoundedDetailFactor,
     out float RoundedDensityFactor);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void ProcessQuadTessFactorsAvg(
     in  float4 RawEdgeFactors,
@@ -12259,6 +12544,7 @@ void ProcessQuadTessFactorsAvg(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void ProcessQuadTessFactorsMax(
     in  float4 RawEdgeFactors,
@@ -12267,6 +12553,7 @@ void ProcessQuadTessFactorsMax(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void ProcessQuadTessFactorsMin(
     in  float4 RawEdgeFactors,
@@ -12275,6 +12562,7 @@ void ProcessQuadTessFactorsMin(
     out float2 RoundedInsideTessFactors,
     out float2 UnroundedInsideTessFactors);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void ProcessTriTessFactorsAvg(
     in  float3 RawEdgeFactors,
@@ -12283,6 +12571,7 @@ void ProcessTriTessFactorsAvg(
     out float RoundedInsideTessFactor,
     out float UnroundedInsideTessFactor);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void ProcessTriTessFactorsMax(
     in  float3 RawEdgeFactors,
@@ -12291,6 +12580,7 @@ void ProcessTriTessFactorsMax(
     out float RoundedInsideTessFactor,
     out float UnroundedInsideTessFactor);
 
+/// @category tessellation
 [require(hlsl, sm_5_0)]
 void ProcessTriTessFactorsMin(
     in  float3 RawEdgeFactors,
@@ -12299,7 +12589,8 @@ void ProcessTriTessFactorsMin(
     out float RoundedInsideTessFactors,
     out float UnroundedInsideTessFactors);
 
-// Degrees to radians
+/// Convert degrees to radians.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12349,7 +12640,8 @@ matrix<T, N, M> radians(matrix<T, N, M> x)
     }
 }
 
-// Approximate reciprocal
+/// Compute approximate reciprocal of `x`.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12393,7 +12685,8 @@ matrix<T, N, M> rcp(matrix<T, N, M> x)
     }
 }
 
-// Reflect incident vector across plane with given normal
+/// Reflect incident vector across plane with given normal.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12432,7 +12725,8 @@ vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
     }
 }
 
-// Refract incident vector given surface normal and index of refraction
+/// Refract incident vector given surface normal and index of refraction.
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12477,7 +12771,8 @@ T refract(T i, T n, T eta)
     }
 }
 
-// Reverse order of bits
+/// Reverse order of bits.
+/// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint reversebits(uint value)
@@ -12518,7 +12813,8 @@ vector<uint, N> reversebits(vector<uint, N> value)
     }
 }
 
-// round even
+/// Round even.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -12568,7 +12864,8 @@ vector<T,N> rint(vector<T,N> x)
     }
 }
 
-// Round-to-nearest
+/// Round-to-nearest.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12620,7 +12917,8 @@ matrix<T,N,M> round(matrix<T,N,M> x)
     }
 }
 
-// Reciprocal of square root
+/// Reciprocal of square root.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12672,8 +12970,8 @@ matrix<T, N, M> rsqrt(matrix<T, N, M> x)
     }
 }
 
-// Clamp value to [0,1] range
-
+/// Clamp value to [0,1] range.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12727,7 +13025,8 @@ __generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_IntCast))
 vector<T,N> __int_cast(vector<U,N> val);
 
-// Extract sign of value
+/// Extract sign of value.
+/// @category math Math functions
 __generic<T : __BuiltinSignedArithmeticType>
 [__readNone]
 int sign(T x)
@@ -12793,7 +13092,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 }
 
 // Sine
-
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12868,6 +13167,7 @@ vector<T,N> __sincos_metal(vector<T,N> x, out vector<T,N> c)
     }
 }
 
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
@@ -12922,7 +13222,8 @@ void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
     }
 }
 
-// Hyperbolic Sine
+/// Hyperbolic sine.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -12974,8 +13275,8 @@ matrix<T, N, M> sinh(matrix<T, N, M> x)
     }
 }
 
-// Sine degree
-
+/// Compute the sine of an angle in degrees.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -13003,7 +13304,8 @@ vector<T,N> sinpi(vector<T,N> x)
 }
 
 
-// Smooth step (Hermite interpolation)
+/// Smooth step (Hermite interpolation).
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -13056,7 +13358,8 @@ matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N
     }
 }
 
-// Square root
+/// Compute the square root of `x`.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -13108,7 +13411,8 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
     }
 }
 
-// Step function
+/// Step function.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -13160,7 +13464,8 @@ matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
     }
 }
 
-// Tangent
+/// Compute the tangent of `x`.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -13212,7 +13517,8 @@ matrix<T, N, M> tan(matrix<T, N, M> x)
     }
 }
 
-// Hyperbolic tangent
+/// Compute the hyperbolic tangent of `x`.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -13264,8 +13570,8 @@ matrix<T,N,M> tanh(matrix<T,N,M> x)
     }
 }
 
-// Tangent degree
-
+/// Compute the tangent of `x` in degrees.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -13293,7 +13599,8 @@ vector<T,N> tanpi(vector<T,N> x)
 }
 
 
-// Matrix transpose
+/// Matrix transpose.
+/// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
@@ -13362,7 +13669,8 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     }
 }
 
-// Truncate to integer
+/// Truncate to integer.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
@@ -13416,6 +13724,7 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
 
 // Slang Specific 'Mask' Wave Intrinsics
 
+//@hidden:
 typedef uint WaveMask;
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
@@ -14620,11 +14929,14 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
     }
 }
 
+//@public:
+
 // Shader model 6.0 stuff
 
 // Information for GLSL wave/subgroup support
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -14665,7 +14977,7 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
 }
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
 
-
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -14709,6 +15021,7 @@ vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 }
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossX(matrix<T,N,M> localValue);
 
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -14752,6 +15065,7 @@ vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue);
 
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
@@ -14800,7 +15114,7 @@ struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const 
 const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd"}, {"BitOr", "Or", "BitwiseOr"}, {"BitXor", "Xor", "BitwiseXor"}};
 for (auto opName : kWaveActiveBitOpEntries) {
 }}}}
-
+/// @category wave Wave and quad functions
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -14862,7 +15176,7 @@ ${{{{
 const char* kWaveActiveMinMaxNames[] = {"Min", "Max"};
 for (const char* opName : kWaveActiveMinMaxNames) {
 }}}}
-
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -14936,7 +15250,7 @@ struct WaveActiveProductSumEntry { const char* hlslName; const char* glslName; }
 const WaveActiveProductSumEntry kWaveActivProductSumNames[] = {{"Product", "Mul"}, {"Sum", "Add"}};
 for (auto opName : kWaveActivProductSumNames) {
 }}}}
-
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -15022,7 +15336,7 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 ${{{{
 } // WaveActiveProduct/WaveActiveProductSum.
 }}}}
-
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -15081,6 +15395,7 @@ bool WaveActiveAllEqual(matrix<T, N, M> value)
     }
 }
 
+/// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
@@ -15103,6 +15418,7 @@ bool WaveActiveAllTrue(bool condition)
     }
 }
 
+/// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_vote)]
@@ -15125,6 +15441,7 @@ bool WaveActiveAnyTrue(bool condition)
     }
 }
 
+/// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [NonUniformReturn]
@@ -15148,6 +15465,7 @@ uint4 WaveActiveBallot(bool condition)
     }
 }
 
+/// @category wave
 [require(cuda_glsl_hlsl_spirv, subgroup_basic_ballot)]
 uint WaveActiveCountBits(bool value)
 {
@@ -15162,6 +15480,7 @@ uint WaveActiveCountBits(bool value)
     }
 }
 
+/// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
@@ -15182,6 +15501,7 @@ uint WaveGetLaneCount()
     }
 }
 
+/// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
@@ -15202,6 +15522,7 @@ uint WaveGetLaneIndex()
     }
 }
 
+/// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
@@ -15227,6 +15548,7 @@ bool WaveIsFirstLane()
 
 // It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
 // This implementation tries to limit the amount of work required by the actual lane count.
+/// @category wave
 __spirv_version(1.3)
 [require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic_ballot)]
 uint _WaveCountBits(uint4 value)
@@ -15253,9 +15575,8 @@ uint _WaveCountBits(uint4 value)
     }
 }
 
-
 // Prefix
-
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -15288,7 +15609,7 @@ T WavePrefixProduct(T expr)
     }
 }
 
-
+/// @category wave
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -15317,7 +15638,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
         return WaveMaskPrefixProduct(WaveGetActiveMask(), expr);
     }
 }
-
+/// @category wave
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
 matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
@@ -15336,6 +15657,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -15412,6 +15734,7 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -15474,6 +15797,7 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 // Versions SPIR-V greater than 1.4 loosen this restriction, and allow 'dynamic uniform' index
 // If that's the behavior required then client code should use WaveReadLaneAt which works this way.
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -15494,6 +15818,7 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -15535,6 +15860,7 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 
 // TODO(JS): If it can be determines that the `laneId` is constExpr, then subgroupBroadcast
 // could be used on GLSL. For now we just use subgroupShuffle
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -15597,6 +15923,7 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 // NOTE! WaveShuffle is a NON STANDARD HLSL intrinsic! It will map to WaveReadLaneAt on HLSL
 // which means it will only work on hardware which allows arbitrary laneIds which is not true
 // in general because it breaks the HLSL standard, which requires it's 'dynamically uniform' across the Wave.
+/// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -15617,6 +15944,7 @@ T WaveShuffle(T value, int lane)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
@@ -15649,6 +15977,7 @@ matrix<T, N, M> WaveShuffle(matrix<T, N, M> value, int lane)
     }
 }
 
+/// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
@@ -15671,6 +16000,7 @@ uint WavePrefixCountBits(bool value)
     }
 }
 
+/// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
@@ -15692,6 +16022,7 @@ uint4 WaveGetConvergedMulti()
     }
 }
 
+/// @category wave
 [ForceInline]
 uint4 WaveGetActiveMulti()
 {
@@ -15701,6 +16032,7 @@ uint4 WaveGetActiveMulti()
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
 
+/// @category wave
 __generic<T : __BuiltinType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 uint4 WaveMatch(T value)
@@ -15761,6 +16093,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
     }
 }
 
+/// @category wave
 [require(cuda_hlsl, waveprefix)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 {
@@ -15771,6 +16104,7 @@ uint WaveMultiPrefixCountBits(bool value, uint4 mask)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -15810,6 +16144,7 @@ matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr, uint4 mask)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -15849,6 +16184,7 @@ matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr, uint4 mask)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
@@ -15888,6 +16224,7 @@ matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr, uint4 mask)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 [require(cuda_hlsl, waveprefix)]
 T WaveMultiPrefixProduct(T value, uint4 mask)
@@ -15921,6 +16258,7 @@ matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask)
     }
 }
 
+/// @category wave
 __generic<T : __BuiltinArithmeticType>
 [require(cuda_hlsl, waveprefix)]
 T WaveMultiPrefixSum(T value, uint4 mask)
@@ -15973,7 +16311,9 @@ bool IsHelperLane()
 }
 
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
+//@hidden:
 typedef Texture2D texture2D;
+//@public:
 
 ${{{{
 
@@ -15992,10 +16332,11 @@ static const int kBaseBufferAccessLevelCount = sizeof(kBaseBufferAccessLevels) /
 for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
     auto access = kBaseBufferAccessLevels[aa].access;
+    sb << "/// @category texture_types\n";
     sb << "__generic<T,let format:int=0>\n";
     sb << "typealias ";
     sb << kBaseBufferAccessLevels[aa].name;
-    sb << "Buffer = __TextureImpl<T, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0, format>;\n";
+    sb << "Buffer = _Texture<T, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0, format>;\n";
     
     bool isReadOnly = aa == 0;
 
@@ -16008,7 +16349,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 }}}}
 
 __generic<T, let format:int>
-extension __TextureImpl<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
+extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 {
     [__readNone]
     $(requireToSetQuery)
@@ -16105,22 +16446,34 @@ ${{{{
 
 // 10.1.1 - Ray Flags
 
+/// @category raytracing Ray-tracing
 typedef uint RAY_FLAG;
 
-static const RAY_FLAG RAY_FLAG_NONE                             = 0x00;
-static const RAY_FLAG RAY_FLAG_FORCE_OPAQUE                     = 0x01;
-static const RAY_FLAG RAY_FLAG_FORCE_NON_OPAQUE                 = 0x02;
-static const RAY_FLAG RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH  = 0x04;
-static const RAY_FLAG RAY_FLAG_SKIP_CLOSEST_HIT_SHADER          = 0x08;
-static const RAY_FLAG RAY_FLAG_CULL_BACK_FACING_TRIANGLES       = 0x10;
-static const RAY_FLAG RAY_FLAG_CULL_FRONT_FACING_TRIANGLES      = 0x20;
-static const RAY_FLAG RAY_FLAG_CULL_OPAQUE                      = 0x40;
-static const RAY_FLAG RAY_FLAG_CULL_NON_OPAQUE                  = 0x80;
-static const RAY_FLAG RAY_FLAG_SKIP_TRIANGLES                   = 0x100;
-static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES       = 0x200;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_NONE = 0x00;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_FORCE_OPAQUE = 0x01;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_FORCE_NON_OPAQUE = 0x02;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH = 0x04;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_SKIP_CLOSEST_HIT_SHADER = 0x08;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_CULL_BACK_FACING_TRIANGLES = 0x10;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_CULL_FRONT_FACING_TRIANGLES = 0x20;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_CULL_OPAQUE = 0x40;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_CULL_NON_OPAQUE = 0x80;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_SKIP_TRIANGLES = 0x100;
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES = 0x200;
 
 // 10.1.2 - Ray Description Structure
-
+/// @category raytracing
 __target_intrinsic(hlsl, RayDesc)
 __target_intrinsic(cuda, RayDesc)
 struct RayDesc
@@ -16143,7 +16496,7 @@ struct RayDesc
 };
 
 // 10.1.3 - Ray Acceleration Structure
-
+/// @category raytracing
 __builtin
 __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
@@ -16157,7 +16510,7 @@ struct RaytracingAccelerationStructure {};
 // for this stuff comes across as a kludge rather than the best possible design.
 
 // 10.1.5 - Intersection Attributes Structure
-
+/// @category raytracing
 __target_intrinsic(hlsl, BuiltInTriangleIntersectionAttributes)
 [require(cpp_cuda_glsl_hlsl_spirv, raytracing)]
 struct BuiltInTriangleIntersectionAttributes
@@ -16199,6 +16552,7 @@ int __callablePayloadLocation(__ref Payload payload);
 // targets, which maps the generic HLSL operation into the non-generic
 // GLSL equivalent.
 //
+/// @category raytracing
 __generic<Payload>
 [require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 void CallShader(uint shaderIndex, inout Payload payload)
@@ -16289,6 +16643,7 @@ __generic<Payload>
 __intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __rayPayloadLocation(__ref Payload payload);
 
+/// @category raytracing
 [ForceInline]
 __generic<payload_t>
 [require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss)]
@@ -16413,6 +16768,7 @@ void __traceMotionRay(
     }
 }
 
+/// @category raytracing
 [ForceInline]
 [require(glsl_hlsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 __generic<payload_t>
@@ -16513,6 +16869,7 @@ bool __reportIntersection(float tHit, uint hitKind)
     }
 }
 
+/// @category raytracing
 __generic<A>
 [ForceInline]
 [require(glsl_hlsl_spirv, raytracing_intersection)]
@@ -16531,6 +16888,7 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
     }
 }
 
+/// @category raytracing
 __generic<each T : __BuiltinIntegerType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
@@ -16546,6 +16904,7 @@ bool ReportHitOptix(float tHit, uint hitKind, expand each T attribs)
 }
 
 // 10.3.4
+/// @category raytracing
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void IgnoreHit()
 {
@@ -16563,6 +16922,7 @@ void IgnoreHit()
 }
 
 // 10.3.5
+/// @category raytracing
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void AcceptHitAndEndSearch()
 {
@@ -16586,6 +16946,7 @@ void AcceptHitAndEndSearch()
 
 // 10.4.1 - Ray Dispatch System Values
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
 uint3 DispatchRaysIndex()
@@ -16603,6 +16964,7 @@ uint3 DispatchRaysIndex()
     }
 }
 
+/// @category raytracing
 [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
 uint3 DispatchRaysDimensions()
 {
@@ -16621,6 +16983,7 @@ uint3 DispatchRaysDimensions()
 
 // 10.4.2 - Ray System Values
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float3 WorldRayOrigin()
@@ -16638,6 +17001,7 @@ float3 WorldRayOrigin()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float3 WorldRayDirection()
@@ -16655,6 +17019,7 @@ float3 WorldRayDirection()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float RayTMin()
@@ -16682,6 +17047,7 @@ float RayTMin()
 // we should simply provide two overloads here, specialized
 // to the appropriate Vulkan stages.
 //
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 float RayTCurrent()
@@ -16699,6 +17065,7 @@ float RayTCurrent()
     }
 }
 
+/// @category raytracing
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 uint RayFlags()
 {
@@ -16717,6 +17084,7 @@ uint RayFlags()
 
 // 10.4.3 - Primitive/Object Space System Values
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint InstanceIndex()
@@ -16734,6 +17102,7 @@ uint InstanceIndex()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint InstanceID()
@@ -16751,6 +17120,7 @@ uint InstanceID()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint PrimitiveIndex()
@@ -16768,6 +17138,7 @@ uint PrimitiveIndex()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayOrigin()
@@ -16785,6 +17156,7 @@ float3 ObjectRayOrigin()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayDirection()
@@ -16804,6 +17176,7 @@ float3 ObjectRayDirection()
 
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
 // floats by reference.
+/// @category raytracing
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 ObjectToWorld3x4()
@@ -16821,6 +17194,7 @@ float3x4 ObjectToWorld3x4()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 WorldToObject3x4()
@@ -16838,6 +17212,7 @@ float3x4 WorldToObject3x4()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 ObjectToWorld4x3()
@@ -16854,6 +17229,7 @@ float4x3 ObjectToWorld4x3()
     }
 }
 
+/// @category raytracing
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 WorldToObject4x3()
@@ -16874,6 +17250,7 @@ float4x3 WorldToObject4x3()
 // The name of the following functions may change when DXR supports
 // a feature similar to the `GL_NV_ray_tracing_motion_blur` extension
 
+/// @category raytracing
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
@@ -16901,10 +17278,13 @@ float RayCurrentTime()
 // declarations, so that users can know they aren't coding
 // against the final spec?
 //
+/// @category raytracing
 [NonUniformReturn] float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
+/// @category raytracing
 [NonUniformReturn] float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
+/// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit)]
 uint HitKind()
@@ -16923,22 +17303,26 @@ uint HitKind()
 }
 
 // Pre-defined hit kinds (not documented explicitly)
-static const uint HIT_KIND_TRIANGLE_FRONT_FACE  = 254;
+/// @category raytracing
+static const uint HIT_KIND_TRIANGLE_FRONT_FACE = 254;
+/// @category raytracing
 static const uint HIT_KIND_TRIANGLE_BACK_FACE   = 255;
 
 //
 // Shader Model 6.4
 //
 
-// Treats `left` and `right` as 4-component vectors of `UInt8` and computes `dot(left, right) + acc`
+/// Treats `left` and `right` as 4-component vectors of `UInt8` and computes `dot(left, right) + acc`
+/// @category math
 uint dot4add_u8packed(uint left, uint right, uint acc);
 
-// Treats `left` and `right` as 4-component vectors of `Int8` and computes `dot(left, right) + acc`
+/// Treats `left` and `right` as 4-component vectors of `Int8` and computes `dot(left, right) + acc`
+/// @category math
 int dot4add_i8packed(uint left, uint right, int acc);
 
-// Computes `dot(left, right) + acc`.
-//
-// May not produce infinities or NaNs for intermediate results that overflow the range of `half`
+/// Computes `dot(left, right) + acc`.
+/// May not produce infinities or NaNs for intermediate results that overflow the range of `half`
+/// @category math
 float dot2add(float2 left, float2 right, float acc);
 
 //
@@ -16949,7 +17333,8 @@ float dot2add(float2 left, float2 right, float acc);
 // Mesh Shaders
 //
 
-// Set the number of output vertices and primitives for a mesh shader invocation.
+/// Set the number of output vertices and primitives for a mesh shader invocation.
+/// @category meshshading Mesh shading
 __glsl_extension(GL_EXT_mesh_shader)
 __glsl_version(450)
 [require(glsl_hlsl_metal_spirv, meshshading)]
@@ -16974,18 +17359,17 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
     }
 }
 
-// Specify the number of downstream mesh shader thread groups to invoke from an amplification shader,
-// and provide the values for per-mesh payload parameters.
-//
-// This function doesn't return.
-//
-// This function cannot be inlined due to a legalization pass happening mid-way through processing
-// and later more processing happening to the function which requires eventual inlining.
+/// Specify the number of downstream mesh shader thread groups to invoke from an amplification shader,
+/// and provide the values for per-mesh payload parameters.
+/// @return This function doesn't return.
+/// @category meshshading
 [KnownBuiltin("DispatchMesh")]
 [require(glsl_hlsl_metal_spirv, meshshading)]
 [noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
 {
+    // This function cannot be inlined due to a legalization pass happening mid-way through processing
+    // and later more processing happening to the function which requires eventual inlining.
     __target_switch
     {
     case hlsl:
@@ -17022,19 +17406,22 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
 [builtin]
 interface __BuiltinSamplerFeedbackType {};
 
+/// @category texture_types
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MinMip)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIN_MIP)
 struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType {};
 
+/// @category texture_types
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MipRegionUsed)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
 struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
+
 __generic<T:__BuiltinSamplerFeedbackType>
-extension __TextureImpl<T,__Shape2D, 0, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0, 0>
+extension _Texture<T,__Shape2D, 0, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0, 0>
 {
     // With Clamp
 
@@ -17114,7 +17501,7 @@ extension __TextureImpl<T,__Shape2D, 0, 0, 0, $(kStdlibResourceAccessFeedback), 
 };
 
 __generic<T:__BuiltinSamplerFeedbackType>
-extension __TextureImpl<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0, 0>
+extension _Texture<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0, 0>
 {
     // With Clamp
 
@@ -17198,6 +17585,7 @@ extension __TextureImpl<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 
 //
 
 // Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
+/// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -17213,8 +17601,9 @@ uint GeometryIndex()
     }
 }
 
-// Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader.
-// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
+/// Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader.
+/// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
+/// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_ray_tracing_position_fetch)
 [ForceInline]
@@ -17238,71 +17627,73 @@ float3 HitTriangleVertexPosition(uint index)
     }
 }
 
-// Status of whether a (closest) hit has been committed in a `RayQuery`.
+/// Status of whether a (closest) hit has been committed in a `RayQuery`.
+/// @category raytracing
 typedef uint COMMITTED_STATUS;
 
-// No hit committed.
+/// No hit committed.
+/// @category raytracing
 static const COMMITTED_STATUS COMMITTED_NOTHING = 0;
 
-// Closest hit is a triangle.
-//
-// This could be an opaque triangle hit found by the fixed-function
-// traversal and intersection implementation, or a non-opaque
-// triangle hit committed by user code with `RayQuery.CommitNonOpaqueTriangleHit`
-//
+/// Closest hit is a triangle.
+/// This could be an opaque triangle hit found by the fixed-function
+/// traversal and intersection implementation, or a non-opaque
+/// triangle hit committed by user code with `RayQuery.CommitNonOpaqueTriangleHit`
+/// @category raytracing
 static const COMMITTED_STATUS COMMITTED_TRIANGLE_HIT = 1;
 
-// Closest hit is a procedural primitive.
-//
-// A procedural hit primitive is committed using `RayQuery.CommitProceduralPrimitiveHit`.
+/// Closest hit is a procedural primitive.
+/// A procedural hit primitive is committed using `RayQuery.CommitProceduralPrimitiveHit`.
+/// @category raytracing
 static const COMMITTED_STATUS COMMITTED_PROCEDURAL_PRIMITIVE_HIT = 2;
 
-// Type of candidate hit that a `RayQuery` is pausing at.
-//
-// A `RayQuery` can automatically commit hits with opaque triangles,
-// but yields to user code for other hits to allow them to be
-// dismissed or committed.
-//
+/// Type of candidate hit that a `RayQuery` is pausing at.
+/// A `RayQuery` can automatically commit hits with opaque triangles,
+/// but yields to user code for other hits to allow them to be
+/// dismissed or committed.
+/// @category raytracing
 typedef uint CANDIDATE_TYPE;
 
-// Candidate hit is a non-opaque triangle.
+/// Candidate hit is a non-opaque triangle.
+/// @category raytracing
 static const CANDIDATE_TYPE CANDIDATE_NON_OPAQUE_TRIANGLE = 0;
 
-// Candidate hit is a procedural primitive.
+/// Candidate hit is a procedural primitive.
+/// @category raytracing
 static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 
-// Handle to state of an in-progress ray-tracing query.
+/// Handle to state of an in-progress ray-tracing query.
+/// The ray query is effectively a coroutine that user shader
+/// code can resume to continue tracing the ray, and which yields
+/// back to the user code at interesting events along the ray.
 //
-// The ray query is effectively a coroutine that user shader
-// code can resume to continue tracing the ray, and which yields
-// back to the user code at interesting events along the ray.
-//
-// Note: The treatment of the `RayQuery` type in Slang does not
-// perfectly match its semantics in vanilla HLSL in some corner
-// cases. Specifically, a `RayQuery` in vanilla HLSL is an
-// opaque handle to mutable storage, and assigning a `RayQuery`
-// or passing one as a parameter will only copy the *handle*,
-// potentially resulting in aliasing of the underlying mutable
-// storage.
-//
-// In contrast, Slang considers a `RayQuery` to own its mutable
-// state, and (because the API does not support cloning of queries),
-// `RayQuery` values are non-copyable (aka "move-only").
-//
-// The main place where this arises as a consideration is when
-// passing a `RayQuery` down into a function that will perform
-// mutating operations on it (e.g., `TraceRay` or `Proceed`):
-//
-//      void myFunc( inout RayQuery<FLAGS> q )
-//      {
-//          q.Proceed();
-//      }
-//
-// In Slang, a parameter like `q` above should be declared `inout`.
-// HLSL does not care about whether `q` is declared `inout` or not.
-//
-//cannot use a cap for struct with unequal target support
-//since it will propegate rules to children
+/// Note: The treatment of the `RayQuery` type in Slang does not
+/// perfectly match its semantics in vanilla HLSL in some corner
+/// cases. Specifically, a `RayQuery` in vanilla HLSL is an
+/// opaque handle to mutable storage, and assigning a `RayQuery`
+/// or passing one as a parameter will only copy the *handle*,
+/// potentially resulting in aliasing of the underlying mutable
+/// storage.
+///
+/// In contrast, Slang considers a `RayQuery` to own its mutable
+/// state, and (because the API does not support cloning of queries),
+/// `RayQuery` values are non-copyable (aka "move-only").
+///
+/// The main place where this arises as a consideration is when
+/// passing a `RayQuery` down into a function that will perform
+/// mutating operations on it (e.g., `TraceRay` or `Proceed`):
+/// ```
+///      void myFunc( inout RayQuery<FLAGS> q )
+///      {
+///          q.Proceed();
+///      }
+/// ```
+/// In Slang, a parameter like `q` above should be declared `inout`.
+/// HLSL does not care about whether `q` is declared `inout` or not.
+///
+///cannot use a cap for struct with unequal target support
+///since it will propegate rules to children
+/// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
 __intrinsic_type($(kIROp_RayQueryType))
@@ -18149,6 +18540,7 @@ ${{{{
 // SubpassInput
 //
 
+/// @category stage_io
 __magic_type(SubpassInputType)
 __intrinsic_type($(kIROp_SubpassInputType))
 [require(glsl_hlsl_spirv, subpass)]
@@ -18156,6 +18548,7 @@ struct __SubpassImpl<T, let isMS:int>
 {
 }
 
+/// @category stage_io
 __generic<T = float4, let isMS:int=0>
 typealias SubpassInput = __SubpassImpl<T, isMS>;
 
@@ -18183,6 +18576,7 @@ extension __SubpassImpl<T, 0>
     }
 }
 
+/// @category stage_io
 __generic<T = float4, let isMS:int=1>
 typealias SubpassInputMS = __SubpassImpl<T, isMS>;
 
@@ -18260,9 +18654,10 @@ __generic<Attributes>
 __intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __hitObjectAttributesLocation(__ref Attributes attributes);
 
-    /// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,
-    /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
-    /// and its related functions are available in raytracing shader types only.
+/// Immutable data type representing a ray hit or a miss. Can be used to invoke hit or miss shading,
+/// or as a key in ReorderThread. Created by one of several methods described below. HitObject
+/// and its related functions are available in raytracing shader types only.
+/// @category raytracing Ray-tracing
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing)
 [__NonCopyableType]
@@ -19926,6 +20321,7 @@ uint3 cudaBlockDim()
 // (This fusion takes place in the fuse-satcoop pass, and as such any changes to
 // the signature or behavior of this function should be adjusted for there).
 //
+//@hidden:
 [KnownBuiltin("saturated_cooperation")]
 func saturated_cooperation<A : __BuiltinType, B, C>(
     cooperate : functype (A, B) -> C,
@@ -20021,12 +20417,13 @@ ${
 // for any resource type.
 }
 
-__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(__TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
+__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace(SamplerState sampler);
 
-__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(__TextureImpl<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
+__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex(SamplerState sampler);
 
+//@public:
 
 ${{{{
 //
@@ -20098,6 +20495,7 @@ vector<uint, ND> __textureFootprintGetOffset<let ND:int>(__TextureFootprintData<
     }
 }
 
+//@public:
 __intrinsic_type($(kIROp_TextureFootprintType))
 [require(glsl_hlsl_spirv, texturefootprint)]
 struct __TextureFootprintData<let ND:int>
@@ -20185,6 +20583,7 @@ struct __TextureFootprintData<let ND:int>
     }
 }
 
+///@category stage_io
 struct TextureFootprint<let ND:int> : __TextureFootprintData<ND>
 {
     bool _isSingleLevel;
@@ -20199,7 +20598,10 @@ struct TextureFootprint<let ND:int> : __TextureFootprintData<ND>
     }
 }
 
+///@category stage_io
 typealias TextureFootprint2D = TextureFootprint<2>;
+
+///@category stage_io
 typealias TextureFootprint3D = TextureFootprint<3>;
 
 ${
@@ -20209,7 +20611,7 @@ ${
 }
 
 __generic<T, Shape: __ITextureShape, let sampleCount:int, let isShadow:int, let format:int>
-extension __TextureImpl<T,Shape,0,0,sampleCount,0,isShadow,0,format>
+extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
 {
 ${
 // We introduce a few convenience type aliases here,
@@ -20809,10 +21211,9 @@ ${{{{
 
 } // extension
 
-
 //<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 __generic<Shape:__ITextureShape1D2D3D, let format : int>
-extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 0, format>
+extension _Texture<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 0, format>
 {
     [__requiresNVAPI]
     [ForceInline]
@@ -20842,6 +21243,8 @@ extension __TextureImpl<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite)
 }
 
 // Buffer Pointer
+
+//@hidden:
 
 namespace vk
 {
@@ -20992,7 +21395,7 @@ enum __DynamicResourceKind
 }
 
 __generic<T, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
-extension __TextureImpl<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IDynamicResourceCastable<__DynamicResourceKind.General>
+extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IDynamicResourceCastable<__DynamicResourceKind.General>
 {
     __intrinsic_op($(kIROp_CastDynamicResource))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))

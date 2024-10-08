@@ -1,6 +1,8 @@
 // slang-ast-print.cpp
 #include "slang-ast-print.h"
 
+#include "core/slang-char-util.h"
+
 #include "slang-check-impl.h"
 
 namespace Slang {
@@ -81,7 +83,11 @@ void ASTPrinter::addVal(Val* val)
     }
     else
     {
-        out << getText(decl->getName());
+        auto text = getText(decl->getName());
+        if (text.getLength() && !(CharUtil::isAlphaOrDigit(text[0]) || text[0] == '_'))
+            out << "operator" << text;
+        else
+            out << text;
     }
 }
 
@@ -140,6 +146,13 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     {
         ExtensionDecl* extensionDecl = as<ExtensionDecl>(parentDeclRef.getDecl());
         Type* type = extensionDecl->targetType.type;
+        if (m_optionFlags & OptionFlag::NoSpecializedExtensionTypeName)
+        {
+            if (auto unspecializedDeclRef = isDeclRefTypeOf<Decl>(type))
+            {
+                type = DeclRefType::create(m_astBuilder, unspecializedDeclRef.getDecl()->getDefaultDeclRef());
+            }
+        }
         addType(type);
         sb << toSlice(".");
     }

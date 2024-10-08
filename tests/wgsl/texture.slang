@@ -36,7 +36,7 @@ Texture2DArray<float4> t2DArray_f32v4;
 TextureCubeArray<float4> tCubeArray_f32v4;
 
 __generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
-typealias depth2d = __TextureImpl<
+typealias depth2d = _Texture<
     T,
     __Shape2D,
     0, // isArray
@@ -49,7 +49,7 @@ typealias depth2d = __TextureImpl<
 >;
 
 __generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
-typealias depth2d_array = __TextureImpl<
+typealias depth2d_array = _Texture<
     T,
     __Shape2D,
     1, // isArray
@@ -62,7 +62,7 @@ typealias depth2d_array = __TextureImpl<
 >;
 
 __generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
-typealias depthcube = __TextureImpl<
+typealias depthcube = _Texture<
     T,
     __ShapeCube,
     0, // isArray
@@ -75,7 +75,7 @@ typealias depthcube = __TextureImpl<
 >;
 
 __generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
-typealias depthcube_array = __TextureImpl<
+typealias depthcube_array = _Texture<
     T,
     __ShapeCube,
     1, // isArray

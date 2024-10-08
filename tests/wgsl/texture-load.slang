@@ -81,7 +81,7 @@ Texture2DArray<uint4> t2DArray_u32v4;
 // depth
 
 __generic<let sampleCount:int=0, let format:int=0>
-typealias Depth2D = __TextureImpl<
+typealias Depth2D = _Texture<
     float,
     __Shape2D,
     0, // isArray
@@ -94,7 +94,7 @@ typealias Depth2D = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-typealias Depth2DMS = __TextureImpl<
+typealias Depth2DMS = _Texture<
     float,
     __Shape2D,
     0, // isArray
@@ -107,7 +107,7 @@ typealias Depth2DMS = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-typealias Depth2DArray = __TextureImpl<
+typealias Depth2DArray = _Texture<
     float,
     __Shape2D,
     1, // isArray
