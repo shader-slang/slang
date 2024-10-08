@@ -265,7 +265,7 @@ namespace Slang
 
         // Consider it as a store if its passed
         // as an out/inout/ref parameter
-        IRType* type = ftype->getParamType(index);
+        auto type = unwrapAttributedType(ftype->getParamType(index));
         return (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type)) ? Store : Load;
     }
 
