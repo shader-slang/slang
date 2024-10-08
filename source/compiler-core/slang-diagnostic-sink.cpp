@@ -574,7 +574,8 @@ bool DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStrin
     if (info.severity >= Severity::Fatal)
     {
         // TODO: figure out a better policy for aborting compilation
-        SLANG_ABORT_COMPILATION("");
+        std::string message(formattedMessage.begin(), formattedMessage.end());
+        SLANG_ABORT_COMPILATION(message.c_str());
     }
     return true;
 }

@@ -89,7 +89,7 @@
       "configurePreset": "emscripten",
       "configuration": "Release",
       "targets": [
-        "slang"
+        "slang-wasm"
       ]
     },
     {
