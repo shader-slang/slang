@@ -30,8 +30,8 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_DXIL;
-    targetDesc.profile = globalSession->findProfile("sm_6_0");
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
