@@ -16,19 +16,18 @@ git describe --tags | Out-File -FilePath ".\stdlib-reference\_includes\version.i
 cd stdlib-reference
 & ../../build/Release/bin/slangc -compile-stdlib -doc
 Move-Item -Path ".\toc.html" -Destination ".\_includes\stdlib-reference-toc.html" -Force
-#git config user.email "bot@shader-slang.com"
-#git config user.name "Stdlib Reference Bot"
-#git add .
-#git commit -m "Update stdlib reference"
-#git push
+git config user.email "bot@shader-slang.com"
+git config user.name "Stdlib Reference Bot"
+git add .
+git commit -m "Update stdlib reference"
+git push
 cd ../
 
-Remove-Item -Path "D:\git_repo\stdlib-reference\global-decls" -Recurse -Force
-Remove-Item -Path "D:\git_repo\stdlib-reference\interfaces" -Recurse -Force
-Remove-Item -Path "D:\git_repo\stdlib-reference\types" -Recurse -Force
-Copy-Item -Path .\stdlib-reference\global-decls -Destination D:\git_repo\stdlib-reference\global-decls -Recurse -Force
-Copy-Item -Path .\stdlib-reference\interfaces -Destination D:\git_repo\stdlib-reference\interfaces -Recurse -Force
-Copy-Item -Path .\stdlib-reference\types -Destination D:\git_repo\stdlib-reference\types -Recurse -Force
-Copy-Item -Path .\stdlib-reference\_includes\stdlib-reference-toc.html -Destination D:\git_repo\stdlib-reference\_includes\stdlib-reference-toc.html -Force
-
-
+# For local debugging only.
+# Remove-Item -Path "D:\git_repo\stdlib-reference\global-decls" -Recurse -Force
+# Remove-Item -Path "D:\git_repo\stdlib-reference\interfaces" -Recurse -Force
+# Remove-Item -Path "D:\git_repo\stdlib-reference\types" -Recurse -Force
+# Copy-Item -Path .\stdlib-reference\global-decls -Destination D:\git_repo\stdlib-reference\global-decls -Recurse -Force
+# Copy-Item -Path .\stdlib-reference\interfaces -Destination D:\git_repo\stdlib-reference\interfaces -Recurse -Force
+# Copy-Item -Path .\stdlib-reference\types -Destination D:\git_repo\stdlib-reference\types -Recurse -Force
+# Copy-Item -Path .\stdlib-reference\_includes\stdlib-reference-toc.html -Destination D:\git_repo\stdlib-reference\_includes\stdlib-reference-toc.html -Force
