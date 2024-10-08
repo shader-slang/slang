@@ -262,9 +262,8 @@ namespace Slang
 
         // 4. All of its members have to have the same visibility as the struct itself.
         DeclVisibility structVisibility = getDeclVisibility(structDecl);
-        for (auto varDeclRef : getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+        for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
         {
-            auto varDecl = varDeclRef.getDecl();
             if (getDeclVisibility(varDecl) != structVisibility)
             {
                 return false;
@@ -289,24 +288,25 @@ namespace Slang
         }
 
         // 5. All its members are legacy C-Style structs or arrays of legacy C-style structs
-        for (auto varDeclRef : getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+        for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
         {
-            auto varDecl = varDeclRef.getDecl();
-
             // if the member is an array, check if the element is legacy C-style rule.
             if (auto arrayType = as<ArrayExpressionType>(varDecl->getType()))
             {
                 auto* elementType = arrayType->getElementType();
-                ArrayExpressionType* nextType = nullptr;
-                while(nextType = as<ArrayExpressionType>(elementType))
+                for (;;)
                 {
+                    ArrayExpressionType* nextType = as<ArrayExpressionType>(elementType);
+                    if(!nextType)
+                        break;
+
                     elementType = nextType->getElementType();
                 }
-                if(auto structDecl = _getStructDecl(elementType))
+                if(auto elemStructDecl = _getStructDecl(elementType))
                 {
-                    if (!_cStyleStructBasicCheck(structDecl))
+                    if (!_cStyleStructBasicCheck(elemStructDecl))
                     {
-                        getShared()->cacheCStyleStruct(structDecl, false);
+                        getShared()->cacheCStyleStruct(elemStructDecl, false);
                         return false;
                     }
                 }
@@ -390,6 +390,11 @@ namespace Slang
             return false;
 
         bool isCStyle = isCStyleStruct(structDecl);
+
+        if (structDecl->m_synthesizedCtorMap.getCount() == 0)
+        {
+            return false;
+        }
 
         List<Expr*> coercedArgs;
         auto ctorInvokeExpr = _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);

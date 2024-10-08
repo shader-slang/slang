@@ -26,6 +26,6 @@ RWStructuredBuffer<uint> output;
 [numthreads(4, 1, 1)]
 void main()
 {
-    S s = S();
+    S s = S(1, 2, 3);
     output[0] = test(s).a;
 }
