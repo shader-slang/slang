@@ -1,15 +1,24 @@
 // Slang `core` library
 
 // Aliases for base types
+/// @category scalar_types Scalar types
 typedef half float16_t;
+/// @category scalar_types
 typedef float float32_t;
+/// @category scalar_types
 typedef double float64_t;
 
+/// @category scalar_types
 typedef int int32_t;
+
+/// @category scalar_types
 typedef uint uint32_t;
 
+/// @category scalar_types
 typedef uintptr_t size_t;
-typedef uintptr_t usize_t
+/// @category scalar_types
+typedef uintptr_t usize_t;
+/// @category scalar_types
 typedef intptr_t ssize_t;
 
 // Modifier for variables that must resolve to compile-time constants
@@ -1108,8 +1117,10 @@ struct String
     }
 };
 
+/// @category misc_types
 typedef String string;
 
+/// @category misc_types
 __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
 struct NativeString
@@ -1225,7 +1236,9 @@ struct Array : IRWArray<T>
     __intrinsic_op($(kIROp_GetArrayLength))
     int getCount();
 }
-    /// An `N` component vector with elements of type `T`.
+
+/// @category math_types Math types
+/// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(VectorExpressionType)
 struct vector : IRWArray<T>
@@ -1255,7 +1268,8 @@ static const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
 static const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
 
 //@public:
-    /// A matrix with `R` rows and `C` columns, with elements of type `T`.
+/// A matrix with `R` rows and `C` columns, with elements of type `T`.
+/// @category math_types Math types
 __generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
 __magic_type(MatrixExpressionType)
 struct matrix : IRWArray<vector<T,C>>
@@ -1490,6 +1504,7 @@ __intrinsic_type($(kIROp_ConstantBufferType))
 __magic_type(ConstantBufferType)
 struct ConstantBuffer {}
 
+///@category texture_types
 __generic<T>
 __intrinsic_type($(kIROp_TextureBufferType))
 __magic_type(TextureBufferType)
@@ -1500,6 +1515,7 @@ __intrinsic_type($(kIROp_ParameterBlockType))
 __magic_type(ParameterBlockType)
 struct ParameterBlock {}
 
+/// @category stage_io
 __generic<T, let MAX_VERTS : uint>
 __magic_type(VerticesType)
 __intrinsic_type($(kIROp_VerticesType))
@@ -1539,6 +1555,7 @@ struct OutputVertices
     }
 };
 
+/// @category stage_io
 __generic<T, let MAX_PRIMITIVES : uint>
 __magic_type(IndicesType)
 __intrinsic_type($(kIROp_IndicesType))
@@ -1571,6 +1588,7 @@ struct OutputIndices
     }
 };
 
+/// @category stage_io
 __generic<T, let MAX_PRIMITIVES : uint>
 __magic_type(PrimitivesType)
 __intrinsic_type($(kIROp_PrimitivesType))
@@ -1797,14 +1815,16 @@ T __slang_noop_cast(U u);
 
 //@ public:
 
-    /// Sampling state for filtered texture fetches.
+/// Sampling state for filtered texture fetches.
+/// @category sampler_types Sampler types
 __magic_type(SamplerStateType, $(int(SamplerStateFlavor::SamplerState)))
 __intrinsic_type($(kIROp_SamplerStateType))
 struct SamplerState
 {
 }
 
-    /// Sampling state for filtered texture fetches that include a comparison operation before filtering.
+/// Sampling state for filtered texture fetches that include a comparison operation before filtering.
+/// @category sampler_types
 __magic_type(SamplerStateType, $(int(SamplerStateFlavor::SamplerComparisonState)))
 __intrinsic_type($(kIROp_SamplerComparisonStateType))
 struct SamplerComparisonState
@@ -2245,7 +2265,9 @@ ${{{{
 //@ public:
 
 
-// Bit cast
+/// Bit cast between types. `T` and `U` must have the same size.
+/// They can be any scalar, vector, matrix, struct or array types.
+/// @category conversion
 __generic<T, U>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitCast))
@@ -2257,15 +2279,16 @@ __generic<T, U>
 __intrinsic_op($(kIROp_CreateExistentialObject))
 T createDynamicObject(uint typeId, U value);
 
-// Reinterpret
+/// Reinterpret type `U` as type `T`. `T` and `U` 
+/// can be any scalar, vector, matrix, struct or array types.
+/// @category conversion
 __generic<T, U>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_Reinterpret))
 T reinterpret(U value);
 
-// Use an otherwise unused value
-//
-// This can be used to silence the warning about returning before initializing an out paramter.
+/// Use an otherwise unused value
+/// This can be used to silence the warning about returning before initializing an out paramter.
 __generic<T>
 [__readNone]
 [ForceInline]
@@ -2758,8 +2781,7 @@ __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
 
 //@ public:
-// Atomic<T>
-
+/// @category misc_types 
 enum MemoryOrder
 {
     Relaxed = $(kIRMemoryOrder_Relaxed),

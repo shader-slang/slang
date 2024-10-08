@@ -326,21 +326,8 @@ void Session::writeStdlibDoc(String config)
 
         DocMarkdownWriter writer(markup, astBuilder, &sink);
         auto rootPage = writer.writeAll(config.getUnownedSlice());
-        rootPage->writeToDisk();
         File::writeAllText("toc.html", writer.writeTOC());
-
-        // Write generated document pages to disk.
-        for (auto& doc : writer.getOutput())
-        {
-            auto filename = doc.first;
-            auto content = doc.second;
-            auto dir = Path::getParentDirectory(filename);
-            if (dir.getLength())
-                Path::createDirectoryRecursive(dir);
-            if (content->skipWrite)
-                continue;
-            File::writeAllText(filename, content->get().produceString());
-        }
+        rootPage->writeToDisk();
     }
     ComPtr<ISlangBlob> diagnosticBlob;
     sink.getBlobIfNeeded(diagnosticBlob.writeRef());

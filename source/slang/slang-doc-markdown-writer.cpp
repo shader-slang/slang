@@ -503,6 +503,7 @@ void DocMarkdownWriter::writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl
     DeclDocumentation declDoc;
     declDoc.parse(entry.m_markup.getUnownedSlice());
     declDoc.writeDescription(out, this, varDecl);
+    registerCategory(m_currentPage, declDoc);
 
     out << toSlice("## Signature\n");
     out << toSlice("<pre>\n");
@@ -556,6 +557,7 @@ void DocMarkdownWriter::writeProperty(const ASTMarkup::Entry& entry, PropertyDec
     DeclDocumentation declDoc;
     declDoc.parse(entry.m_markup.getUnownedSlice());
     declDoc.writeDescription(out, this, propertyDecl);
+    registerCategory(m_currentPage, declDoc);
 
     out << toSlice("## Signature\n\n");
 
@@ -600,6 +602,8 @@ void DocMarkdownWriter::writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl*
     
     DeclDocumentation declDoc;
     declDoc.parse(entry.m_markup.getUnownedSlice());
+    registerCategory(m_currentPage, declDoc);
+
     declDoc.writeDescription(out, this, typeDefDecl);
 
     out << toSlice("## Signature\n\n");
@@ -1261,6 +1265,21 @@ void DeclDocumentation::parse(const UnownedStringSlice& text)
             currentSection = DocPageSection::DeprecatedCallout;
             line = line.tail(11).trim();
         }
+        else if (line.startsWith("@category"))
+        {
+            line = line.tail(9).trimStart();
+            auto spaceIndex = line.indexOf(' ');
+            if (spaceIndex != -1)
+            {
+                categoryName = line.subString(0, spaceIndex);
+                categoryText = line.tail(spaceIndex + 1).trim();
+            }
+            else
+            {
+                categoryName = line.trim();
+            }
+            continue;
+        }
         sectionBuilders[currentSection] << line << "\n";
 
         // If the current directive is a callout, set currentSection back
@@ -1323,6 +1342,8 @@ void DocMarkdownWriter::writeCallableOverridable(DocumentPage* page, const ASTMa
     DeclDocumentation funcDoc;
     funcDoc.parse(descriptionSB.getUnownedSlice());
     funcDoc.parse(additionalDescriptionSB.getUnownedSlice());
+
+    registerCategory(page, funcDoc);
 
     auto& descSection = funcDoc.sections[DocPageSection::Description];
     if (descSection.ownedText.getLength() > 0)
@@ -1509,6 +1530,7 @@ void DocMarkdownWriter::writeEnum(const ASTMarkup::Entry& entry, EnumDecl* enumD
     DeclDocumentation declDoc;
     declDoc.parse(entry.m_markup.getUnownedSlice());
     declDoc.writeDescription(out, this, enumDecl);
+    registerCategory(m_currentPage, declDoc);
 
     out << toSlice("## Values \n\n");
 
@@ -1702,6 +1724,7 @@ void DocMarkdownWriter::writeAggType(DocumentPage* page, const ASTMarkup::Entry&
     DeclDocumentation declDoc;
     declDoc.parse(primaryEntry.m_markup.getUnownedSlice());
     declDoc.writeDescription(out, this, aggTypeDecl);
+    registerCategory(page, declDoc);
 
     declDoc.writeGenericParameters(out, this, aggTypeDecl);
 
@@ -2227,6 +2250,20 @@ void DocMarkdownWriter::createPage(DocMarkdownWriter::WriteDeclMode mode, ASTMar
     }
 }
 
+void DocMarkdownWriter::registerCategory(DocumentPage* page, DeclDocumentation& doc)
+{
+    if (doc.categoryText.getLength() != 0)
+    {
+        m_categories[doc.categoryName] = doc.categoryText;
+    }
+    else if (!m_categories.containsKey(doc.categoryName))
+    {
+        m_categories[doc.categoryName] = doc.categoryName;
+    }
+    page->category = doc.categoryName;
+}
+
+
 bool DocMarkdownWriter::isVisible(const Name* name)
 {
     return name == nullptr || !name->text.startsWith(toSlice("__"))
@@ -2546,9 +2583,9 @@ void DocMarkdownWriter::writePageRecursive(DocumentPage* page)
     }
 }
 
-void writeTOCImpl(StringBuilder& sb, DocumentationConfig& config, DocumentPage* page);
+void writeTOCImpl(StringBuilder& sb, DocMarkdownWriter* writer, DocumentationConfig& config, DocumentPage* page);
 
-void writeTOCChildren(StringBuilder& sb, DocumentationConfig& config, DocumentPage* page)
+void writeTOCChildren(StringBuilder& sb, DocMarkdownWriter* writer, DocumentationConfig& config, DocumentPage* page)
 {
     if (page->children.getCount() == 0)
         return;
@@ -2558,19 +2595,66 @@ void writeTOCChildren(StringBuilder& sb, DocumentationConfig& config, DocumentPa
     // Don't sort the root page.
     if (page->path != "index.md")
         sortPages(page);
+
+    Dictionary<String, List<DocumentPage*>> categories;
     for (auto child : page->children)
     {
-        writeTOCImpl(sb, config, child);
+        categories[child->category].add(child);
+    }
+    List<String> categoryNames;
+    for (auto& kv : categories)
+    {
+        categoryNames.add(kv.first);
+    }
+    categoryNames.sort();
+    auto parentPath = Path::getParentDirectory(page->path);
+    parentPath.append("/");
+    for (auto& cat : categoryNames)
+    {
+        // Skip non-categorized pages first.
+        if (cat.getLength() == 0)
+            continue;
+        sb << "<li data-link=\"" << config.rootDir << parentPath << cat << "\"><span>";
+        escapeHTMLContent(sb, writer->m_categories[cat].getUnownedSlice());
+        sb << "</span>\n";
+        sb << "<ul class=\"toc_list\">\n";
+        for (auto child : categories[cat])
+        {
+            writeTOCImpl(sb, writer, config, child);
+        }
+        sb << "</ul>\n";
+        sb << "</li>\n";
+
+        // Create a landing page for the category.
+        RefPtr<DocumentPage> landingPage = new DocumentPage();
+        landingPage->title = writer->m_categories[cat];
+        landingPage->path = parentPath + cat + ".md";
+        landingPage->shortName = writer->m_categories[cat];
+        landingPage->decl = nullptr;
+        landingPage->parentPage = page;
+        landingPage->contentSB << config.preamble;
+        landingPage->contentSB << "# " << landingPage->title << "\n\nThis category contains the following declarations:\n\n";
+        for (auto child : categories[cat])
+        {
+            landingPage->contentSB << "#### [" << writer->escapeMarkdownText(child->title) << "](" <<
+                child->path << ")\n\n";
+        }
+        page->children.add(landingPage);
+    }
+
+    for (auto child : categories[""])
+    {
+        writeTOCImpl(sb, writer, config, child);
     }
     sb << "</ul>\n";
 }
 
-void writeTOCImpl(StringBuilder& sb, DocumentationConfig& config, DocumentPage* page)
+void writeTOCImpl(StringBuilder& sb, DocMarkdownWriter* writer, DocumentationConfig& config, DocumentPage* page)
 {
     sb << R"(<li data-link=")" << getDocPath(config, page->path) << R"("><span>)";
     escapeHTMLContent(sb, page->shortName.getUnownedSlice());
     sb << "</span>\n";
-    writeTOCChildren(sb, config, page);
+    writeTOCChildren(sb, writer, config, page);
     sb << "</li>";
 }
 
@@ -2580,7 +2664,7 @@ String DocMarkdownWriter::writeTOC()
     sb << R"(<ul class="toc_root_list"><li data-link=")"
         << m_config.rootDir << R"(index"><span>)"
         << m_config.title << "</span>\n";
-    writeTOCChildren(sb, m_config, m_rootPage);
+    writeTOCChildren(sb, this, m_config, m_rootPage);
     sb << "</li></ul>\n";
     return sb.produceString();
 }
@@ -2623,7 +2707,12 @@ StringBuilder* DocMarkdownWriter::getBuilder(Decl* decl)
 void writePageToDisk(DocumentPage* page)
 {
     if (!page->skipWrite)
+    {
+        auto dir = Path::getParentDirectory(page->path);
+        if (dir.getLength())
+            Path::createDirectoryRecursive(dir);
         File::writeAllText(page->path, page->contentSB.toString());
+    }
     for (auto child : page->children)
     {
         writePageToDisk(child);

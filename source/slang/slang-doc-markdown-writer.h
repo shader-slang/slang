@@ -16,8 +16,9 @@ struct DocumentPage : public RefObject
     String title;
     String shortName;
     String path;
+    String category;
     StringBuilder contentSB;
-    Decl* decl;
+    Decl* decl = nullptr;
     bool skipWrite = false;
     DocumentPage* parentPage = nullptr;
     DocumentPage* findChildByShortName(const UnownedStringSlice& shortName);
@@ -84,6 +85,9 @@ struct DeclDocumentation
 {
     Dictionary<String, ParamDocumentation> parameters;
     Dictionary<DocPageSection, ParsedDescription> sections;
+    String categoryName;
+    String categoryText;
+
     void parse(const UnownedStringSlice& text);
     void writeDescription(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl);
     void writeGenericParameters(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl);
@@ -146,6 +150,7 @@ struct DocMarkdownWriter
     void writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl* typeDefDecl);
 
     void createPage(WriteDeclMode mode, ASTMarkup::Entry& entry, Decl* decl);
+    void registerCategory(DocumentPage* page, DeclDocumentation& doc);
 
     void writePreamble();
 
@@ -247,6 +252,7 @@ struct DocMarkdownWriter
     RefPtr<DocumentPage> m_globalDeclsPage;
 
     DocumentationConfig m_config;
+    Dictionary<String, String> m_categories;
 };
 
 } // namespace Slang
