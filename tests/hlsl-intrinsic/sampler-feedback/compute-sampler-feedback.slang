@@ -1,4 +1,5 @@
 //TEST:COMPILE: -entry computeMain -stage compute -target callable tests/hlsl-intrinsic/sampler-feedback/compute-sampler-feedback.slang
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Not available on non PS shader
 // dx.op.writeSamplerFeedback 	WriteSamplerFeedback 	
