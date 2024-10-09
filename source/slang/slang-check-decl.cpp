@@ -8430,6 +8430,11 @@ namespace Slang
     {
         auto typeExpr = paramDecl->type;
 
+        if (!as<ArrayExpressionType>(paramDecl->type) && doesTypeHaveTag(paramDecl->type, TypeTag::Unsized))
+        {
+            getSink()->diagnose(paramDecl, Diagnostics::paramCannotBeUnsized, paramDecl);
+        }
+
         // The "initializer" expression for a parameter represents
         // a default argument value to use if an explicit one is
         // not supplied.

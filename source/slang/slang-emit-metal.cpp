@@ -644,7 +644,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
         case kIROp_ImageStore:
         {
-            
             auto imageOp = as<IRImageStore>(inst);
             emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
             m_writer->emit(".write(");
@@ -655,11 +654,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             {
                 m_writer->emit(",");
                 emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
-            }
-            if(imageOp->hasAuxCoord2())
-            {
-                m_writer->emit(",");
-                emitOperand(imageOp->getAuxCoord2(), getInfo(EmitOp::General));
             }
             m_writer->emit(")");
             return true;
