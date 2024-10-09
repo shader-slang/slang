@@ -177,6 +177,8 @@ namespace Slang
                         }
                         case kIROp_GetElementPtr:
                         case kIROp_FieldAddress:
+                        case kIROp_GetOffsetPtr:
+                        case kIROp_BitCast:
                             if (!mapInstToAddrSpace.containsKey(inst))
                             {
                                 auto addrSpace = getAddrSpace(inst->getOperand(0));

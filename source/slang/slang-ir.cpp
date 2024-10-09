@@ -5464,6 +5464,12 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitGetOffsetPtr(IRInst* base, IRInst* offset)
+    {
+        IRInst* args[] = { base, offset };
+        return emitIntrinsicInst(base->getDataType(), kIROp_GetOffsetPtr, 2, args);
+    }
+
     IRInst* IRBuilder::emitGetAddress(
         IRType* type,
         IRInst* value)
