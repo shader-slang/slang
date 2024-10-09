@@ -25,7 +25,7 @@ public:
     Entry* getEntry(NodeBase* base);
 
         /// Get list of all of the entries in source order
-    const List<Entry>& getEntries() const { return m_entries; }
+    List<Entry>& getEntries() { return m_entries; }
 
         /// Attaches the markup to the AST nodes.
     void attachToAST();
