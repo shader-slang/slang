@@ -54,7 +54,8 @@ It is allowed, and indeed common, for a translation unit to contain only a singl
 For example, when adapting an existing codebase with many `.hlsl` files, it is appropriate to compile each `.hlsl` file as its own translation unit.
 A modernized codebase that uses modular `include` feature as documented in [Modules and Access Control](modules) might decide to compile multiple `.slang` files in a single directory as a single translation unit.
 
-The result of compiling a translation unit is a module in Slang's internal intermediate representation (IR). The compiled module can then be serialized to a `.slang-module` binary file and loaded/imported just as `.slang` files.
+The result of compiling a translation unit is a module in Slang's internal intermediate representation (IR). The compiled module can then be serialized to a `.slang-module` binary file. The binary file can then be loaded via the
+`ISession::loadModuleFromIRBlob` function or `import`ed in slang code the same way as modules written in `.slang` files.
 
 ### Entry Points
 
