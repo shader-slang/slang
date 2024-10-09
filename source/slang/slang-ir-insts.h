@@ -4330,7 +4330,7 @@ public:
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, ArrayView<IRInst*> accessChain, IRInst* newElement);
-
+    IRInst* emitGetOffsetPtr(IRInst* base, IRInst* offset);
     IRInst* emitGetAddress(
         IRType* type,
         IRInst* value);

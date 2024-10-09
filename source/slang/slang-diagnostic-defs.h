@@ -329,6 +329,7 @@ DIAGNOSTIC(30068, Warning, mutatingMethodOnFunctionInputParameterWarning, "mutat
 
 DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "member with unknown size at compile time can only appear as the last member in a composite type.")
 DIAGNOSTIC(30071, Error, varCannotBeUnsized, "cannot instantiate a variable of unsized type.")
+DIAGNOSTIC(30072, Error, paramCannotBeUnsized, "function parameter cannot be unsized.")
 
 DIAGNOSTIC(30075, Error, cannotSpecializeGeneric, "cannot specialize generic '$0' with the provided arguments.")
 

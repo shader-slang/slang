@@ -361,7 +361,11 @@ namespace Slang
                 info.loweredInnerStructKey = structKey;
                 info.convertLoweredToOriginal = createArrayUnpackFunc(arrayType, loweredType, structKey, innerArrayType, loweredInnerTypeInfo);
                 info.convertOriginalToLowered = createArrayPackFunc(arrayType, loweredType, innerArrayType, loweredInnerTypeInfo);
-
+                return info;
+            }
+            else if (as<IRArrayTypeBase>(type))
+            {
+                info.loweredType = builder.getVoidType();
                 return info;
             }
             else if (auto structType = as<IRStructType>(type))
@@ -399,6 +403,11 @@ namespace Slang
                     Index fieldId = 0;
                     for (auto field : structType->getFields())
                     {
+                        if (as<IRVoidType>(fieldLoweredTypeInfo[fieldId].loweredType))
+                        {
+                            fieldId++;
+                            continue;
+                        }
                         auto loweredFieldTypeInfo = fieldLoweredTypeInfo[fieldId];
                         builder.createStructField(loweredType, field->getKey(), loweredFieldTypeInfo.loweredType);
                         fieldId++;
@@ -418,6 +427,11 @@ namespace Slang
                     Index fieldId = 0;
                     for (auto field : structType->getFields())
                     {
+                        if (as<IRVoidType>(fieldLoweredTypeInfo[fieldId].loweredType))
+                        {
+                            fieldId++;
+                            continue;
+                        }
                         auto storageField = builder.emitFieldExtract(fieldLoweredTypeInfo[fieldId].loweredType, loweredParam, field->getKey());
                         auto unpackedField = fieldLoweredTypeInfo[fieldId].convertLoweredToOriginal
                             ? builder.emitCallInst(field->getFieldType(), fieldLoweredTypeInfo[fieldId].convertLoweredToOriginal, 1, &storageField)
@@ -442,6 +456,11 @@ namespace Slang
                     Index fieldId = 0;
                     for (auto field : structType->getFields())
                     {
+                        if (as<IRVoidType>(fieldLoweredTypeInfo[fieldId].loweredType))
+                        {
+                            fieldId++;
+                            continue;
+                        }
                         auto fieldVal = builder.emitFieldExtract(field->getFieldType(), param, field->getKey());
                         auto packedField = fieldLoweredTypeInfo[fieldId].convertOriginalToLowered
                             ? builder.emitCallInst(fieldLoweredTypeInfo[fieldId].loweredType, fieldLoweredTypeInfo[fieldId].convertOriginalToLowered, 1, &fieldVal)
@@ -641,6 +660,48 @@ namespace Slang
                     auto ptrVal = ptrValsWorkList[i];
                     auto oldPtrType = ptrVal->getFullType();
                     auto originalElementType = oldPtrType->getOperand(0);
+
+                    // If we are accessing an unsized array element from a pointer, we need to compute
+                    // the trailing ptr that points to the first element of the array.
+                    // And then replace all getElementPtr(arrayPtr, index) with getOffsetPtr(trailingPtr, index).
+                    if (auto fieldAddr = as<IRFieldAddress>(ptrVal))
+                    {
+                        if (auto ptrType = as<IRPtrType>(ptrVal->getDataType()))
+                        {
+                            if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
+                            {
+                                builder.setInsertBefore(ptrVal);
+                                auto newArrayPtrVal = builder.emitGetOffsetPtr(fieldAddr->getBase(), builder.getIntValue(builder.getIntType(), 1));
+                                auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), layoutRules);
+                                newArrayPtrVal = builder.emitBitCast(
+                                    builder.getPtrType(loweredInnerType.loweredType,
+                                    ptrType->getAddressSpace()), newArrayPtrVal);
+                                traverseUses(ptrVal, [&](IRUse* use)
+                                    {
+                                        auto user = use->getUser();
+                                        if (user->getOp() == kIROp_GetElementPtr)
+                                        {
+                                            builder.setInsertBefore(user);
+                                            auto newElementPtr = builder.emitGetOffsetPtr(newArrayPtrVal, user->getOperand(1));
+                                            user->replaceUsesWith(newElementPtr);
+                                            user->removeAndDeallocate();
+                                            ptrValsWorkList.add(newElementPtr);
+                                        }
+                                        else if (user->getOp() == kIROp_GetOffsetPtr)
+                                        {
+                                        }
+                                        else
+                                        {
+                                            SLANG_UNEXPECTED("unknown use of pointer to unsized array.");
+                                        }
+                                    });
+                                SLANG_ASSERT(!ptrVal->hasUses());
+                                ptrVal->removeAndDeallocate();
+                                continue;
+                            }
+                        }
+                    }
+
                     auto loweredElementTypeInfo = getLoweredTypeInfo((IRType*)originalElementType, layoutRules);
                     if (!loweredElementTypeInfo.convertLoweredToOriginal)
                         continue;
