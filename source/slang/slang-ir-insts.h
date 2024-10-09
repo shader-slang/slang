@@ -2539,13 +2539,9 @@ struct IRImageStore : IRInst
     IRInst* getValue() { return getOperand(2); }
 
     /// If GLSL/SPIR-V, Sample coord
-    /// If Metal, Array or Sample coord
+    /// Metal array/face index
     bool hasAuxCoord1() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
     IRInst* getAuxCoord1() { return getOperand(3); }
-
-    /// If Metal, Sample coord
-    bool hasAuxCoord2() { return getOperandCount() > 4 && getOperand(4) != nullptr; }
-    IRInst* getAuxCoord2() { return getOperand(4); }
 };
 // Terminators
 
