@@ -454,9 +454,8 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUnifor
     }
 
     // Generate a name for the block.
-    m_writer->emit("block_");
-    m_writer->emit(getName(type->getElementType()));
-
+    m_writer->emit(_generateUniqueName(
+        (StringBuilder() << "block_" << getUnmangledName(type->getElementType()).getUnownedSlice()).getUnownedSlice()));
 
     auto elementType = type->getElementType();
     auto structType = as<IRStructType>(elementType);
