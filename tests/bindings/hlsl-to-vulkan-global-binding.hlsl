@@ -5,7 +5,7 @@
 // CHECK: layout(binding = 1)
 // CHECK: uniform sampler sampler_0;
 // CHECK: layout(binding = 5, set = 9)
-// CHECK: layout(std140) uniform _S1
+// CHECK: layout(std140) uniform block_
 
 uniform int a;
 uniform float b;
