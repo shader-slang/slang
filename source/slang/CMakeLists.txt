@@ -1,50 +1,3 @@
-#
-# Compiling the meta.slang files
-#
-
-# List of *.meta.slang headers
-glob_append(SLANG_STDLIB_META_SOURCE "*.meta.slang")
-
-set(SLANG_STDLIB_META_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/stdlib-meta")
-
-# Generate the output file list
-set(SLANG_STDLIB_META_GENERATED_HEADERS)
-foreach(meta_source ${SLANG_STDLIB_META_SOURCE})
-    file(
-        RELATIVE_PATH
-        meta_source_relative
-        ${CMAKE_CURRENT_LIST_DIR}
-        ${meta_source}
-    )
-    list(
-        APPEND
-        SLANG_STDLIB_META_GENERATED_HEADERS
-        "${SLANG_STDLIB_META_OUTPUT_DIR}/${meta_source_relative}.h"
-    )
-endforeach()
-
-add_custom_command(
-    OUTPUT ${SLANG_STDLIB_META_GENERATED_HEADERS}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_STDLIB_META_OUTPUT_DIR}
-    COMMAND
-        slang-generate ${SLANG_STDLIB_META_SOURCE} --target-directory
-        ${SLANG_STDLIB_META_OUTPUT_DIR}
-    DEPENDS ${SLANG_STDLIB_META_SOURCE} slang-generate
-    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-    VERBATIM
-)
-
-add_library(
-    slang-meta-headers
-    INTERFACE
-    EXCLUDE_FROM_ALL
-    ${SLANG_STDLIB_META_GENERATED_HEADERS}
-)
-set_target_properties(slang-meta-headers PROPERTIES FOLDER generated)
-target_include_directories(
-    slang-meta-headers
-    INTERFACE ${SLANG_STDLIB_META_OUTPUT_DIR}
-)
 
 #
 # generate capability files
@@ -220,58 +173,98 @@ configure_file(${slang_SOURCE_DIR}/slang-tag-version.h.in slang-version-header/s
 # Slang itself
 #
 
-set(slang_common_args
-    EXTRA_SOURCE_DIRS ${SLANG_RECORD_REPLAY_SYSTEM}
+set(slang_build_args
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE
-        core
-        compiler-core
-        slang-capability-defs
-        slang-capability-lookup
-        slang-reflect-headers
-        slang-lookup-tables
-        SPIRV-Headers
     EXTRA_COMPILE_OPTIONS_PRIVATE
         # a warning is disabled for a memset boundary check.
         # everything looked fine and it is unclear why the checking fails
         $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
     # slang.h is in the project root, so include that directory in the interface
     # for slang
-    INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}
     INCLUDE_DIRECTORIES_PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     EXPORT_MACRO_PREFIX SLANG
+    EXPORT_TYPE_AS ${SLANG_LIB_TYPE} 
+    EXTRA_SOURCE_DIRS ${SLANG_RECORD_REPLAY_SYSTEM}
+)
+set(slang_link_args
+    LINK_WITH_PRIVATE
+        core
+        prelude
+        compiler-core
+        slang-capability-defs
+        slang-capability-lookup
+        slang-reflect-headers
+        slang-lookup-tables
+        SPIRV-Headers
+)
+set(slang_interface_args
+    INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}
+) 
+set(slang_public_lib_args
+    PUBLIC_HEADERS 
+        ${slang_SOURCE_DIR}/slang*.h 
+        ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/*.h
+    LINK_WITH_PRIVATE
+        $<IF:$<BOOL:${SLANG_EMBED_STDLIB}>,slang-embedded-stdlib,slang-no-embedded-stdlib>
+        $<IF:$<BOOL:${SLANG_EMBED_STDLIB_SOURCE}>,slang-embedded-stdlib-source,slang-no-embedded-stdlib-source>
+    INSTALL
 )
 
 #
 # Minimal static slang used in generating the embedded stdlib
 #
 
-slang_add_target(
-    .
-    OBJECT
-    ${slang_common_args}
-    TARGET_NAME slang-without-embedded-stdlib
-    EXCLUDE_FROM_ALL
-    LINK_WITH_PUBLIC slang-no-embedded-stdlib slang-embedded-stdlib-source
-    EXTRA_COMPILE_DEFINITIONS_PUBLIC SLANG_STATIC
-    FOLDER generators
-)
-
 #
-# Slang with whatever options
+# Slang itself
 #
 
-slang_add_target(
-    .
-    ${SLANG_LIB_TYPE}
-    ${slang_common_args}
-    LINK_WITH_PRIVATE
-        prelude
-        $<$<BOOL:${SLANG_EMBED_STDLIB_SOURCE}>:slang-meta-headers>
-    LINK_WITH_PUBLIC
-        $<IF:$<BOOL:${SLANG_EMBED_STDLIB}>,slang-embedded-stdlib,slang-no-embedded-stdlib>
-        $<IF:$<BOOL:${SLANG_EMBED_STDLIB_SOURCE}>,slang-embedded-stdlib-source,slang-no-embedded-stdlib-source>
-    EXPORT_MACRO_PREFIX SLANG
-    INSTALL
-    PUBLIC_HEADERS ${slang_SOURCE_DIR}/slang*.h ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/*.h
-)
+if(NOT SLANG_EMBED_STDLIB)
+    # If we're not embedding stdlib we can just do a normal build of slang,
+    # including all the options, this can also serve as our no embedded stdlib
+    # library for slang-bootstrap (not that we need that anyway)
+    slang_add_target(
+        .
+        ${SLANG_LIB_TYPE}
+        ${slang_build_args}
+        ${slang_link_args}
+        ${slang_interface_args}
+        ${slang_public_lib_args}
+    )
+    add_library(slang-without-embedded-stdlib ALIAS slang) 
+else()
+    # However if we're embedding stdlib, we need to make two different
+    # libraries, one with the embedded stdlib and one without, so first define
+    # the shared objects as one target so we don't build them twice.
+    slang_add_target(
+        .
+        OBJECT
+        ${slang_build_args}
+        ${slang_link_args}
+        TARGET_NAME slang-common-objects
+        EXCLUDE_FROM_ALL
+    )
+    slang_add_target(
+        .
+        ${SLANG_LIB_TYPE}
+        ${slang_link_args}
+        ${slang_interface_args}
+        NO_SOURCE
+        TARGET_NAME 
+            slang-without-embedded-stdlib
+        EXCLUDE_FROM_ALL
+        LINK_WITH_PRIVATE 
+            slang-common-objects
+            slang-no-embedded-stdlib 
+            slang-embedded-stdlib-source
+    )
+    slang_add_target(
+        .
+        ${SLANG_LIB_TYPE}
+        ${slang_link_args}
+        ${slang_interface_args}
+        ${slang_public_lib_args}
+        LINK_WITH_PRIVATE 
+            slang-common-objects
+        NO_SOURCE
+    )
+endif()
