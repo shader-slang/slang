@@ -673,9 +673,27 @@ namespace Slang
                                 builder.setInsertBefore(ptrVal);
                                 auto newArrayPtrVal = builder.emitGetOffsetPtr(fieldAddr->getBase(), builder.getIntValue(builder.getIntType(), 1));
                                 auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), layoutRules);
+                                
+                                IRSizeAndAlignment arrayElementSizeAlignment;
+                                getSizeAndAlignment(
+                                    target->getOptionSet(), layoutRules, loweredInnerType.loweredType, &arrayElementSizeAlignment);
+                                IRSizeAndAlignment baseSizeAlignment;
+                                getSizeAndAlignment(
+                                    target->getOptionSet(),
+                                    layoutRules,
+                                    tryGetPointedToType(&builder, fieldAddr->getBase()->getDataType()),
+                                    &baseSizeAlignment);
+
+                                // Convert pointer to uint64 and adjust offset.
+                                auto rawPtr = builder.emitBitCast(builder.getUInt64Type(), newArrayPtrVal);
+                                IRIntegerValue offset = baseSizeAlignment.size;
+                                offset = align(offset, arrayElementSizeAlignment.alignment);
+                                newArrayPtrVal = builder.emitAdd(rawPtr->getFullType(), rawPtr,
+                                    builder.getIntValue(builder.getUInt64Type(), offset));
+
                                 newArrayPtrVal = builder.emitBitCast(
                                     builder.getPtrType(loweredInnerType.loweredType,
-                                    ptrType->getAddressSpace()), newArrayPtrVal);
+                                        ptrType->getAddressSpace()), newArrayPtrVal);
                                 traverseUses(ptrVal, [&](IRUse* use)
                                     {
                                         auto user = use->getUser();
