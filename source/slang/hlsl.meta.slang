@@ -3498,6 +3498,14 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
     {
         __intrinsic_asm "imageStore($0, $1, $V2)";
     }
+    
+    [require(metal, texture_sm_4_1)]
+    __intrinsic_op($(kIROp_ImageStore))
+    static void __metalImageStoreArray(This val, vector<uint, Shape.dimensions> location, T value, uint arrayIndex);
+
+    [require(metal, texture_sm_4_1)]
+    __intrinsic_op($(kIROp_ImageStore))
+    static void __metalImageStore(This val, vector<uint, Shape.dimensions+isArray> location, T value);
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
@@ -3567,55 +3575,14 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                         OpImageWrite $this $location __convertTexel(newValue);
                     };
                 case metal:
-                    switch (Shape.flavor)
+                    if (isArray != 0)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        // lod is not supported for 1D texture
-                        if (isArray == 1)
-                            // void write(Tv color, uint coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, uint(($1).x), uint(($1).y))";
-                        else
-                            // void write(Tv color, uint coord, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, uint($1))";
-                        break;
-                    case $(SLANG_TEXTURE_2D):
-                        if (isShadow == 1)
-                        {
-                            if (isArray == 1)
-                                // void write(Tv color, uint2 coord, uint array, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
-                            else
-                                // void write(Tv color, uint2 coord, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy))";
-                        }
-                        else
-                        {
-                            if (isArray == 1)
-                                // void write(Tv color, uint2 coord, uint array, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z))";
-                            else
-                                // void write(Tv color, uint2 coord, uint lod = 0) const
-                                __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy))";
-                        }
-                        break;
-                    case $(SLANG_TEXTURE_3D):
-                        if (isShadow == 0 && isArray == 0)
-                            // void write(Tv color, uint3 coord, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, vec<uint,3>(($1).xyz))";
-                        break;
-                    case $(SLANG_TEXTURE_CUBE):
-                        static_assert(isArray == 0, "Unsupported 'Store' of 'texture cube array' for 'metal' target");
-                        if (isShadow == 1)
-                        {
-                            // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
-                        }
-                        else
-                        {
-                            // void write(Tv color, uint2 coord, uint face, uint lod = 0) const
-                            __intrinsic_asm "$0.write($2, vec<uint,2>(($1).xy), uint(($1).z), uint(($1).w))";
-                        }
-                        break;
+                        // last arg will be replaced with the split off array index
+                        __metalImageStoreArray(this, __vectorReshape<Shape.dimensions>(location), newValue, location[Shape.dimensions + isArray - 1]);
+                    }
+                    else
+                    {
+                        __metalImageStore(this, location, newValue);
                     }
             case wgsl:
                 static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
