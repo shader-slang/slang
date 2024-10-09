@@ -2194,16 +2194,10 @@ private:
         return true;
     }
 
-    static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+    static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type* type)
     {
-        if (!varDecl->type || !varDecl->type.type)
-            return nullptr;
-        
-        if (!isDefaultInitializable(varDecl))
-            return nullptr;
-
         ConstructorDecl* defaultCtor = nullptr;
-        auto declRefType = as<DeclRefType>(varDecl->type.type);
+        auto declRefType = as<DeclRefType>(type);
         if (declRefType)
         {
             if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
@@ -2218,6 +2212,22 @@ private:
             auto member = visitor->getASTBuilder()->getMemberDeclRef(declRefType->getDeclRef(), defaultCtor);
             invoke->functionExpr = visitor->ConstructDeclRefExpr(member, nullptr, defaultCtor->getName(), defaultCtor->loc, nullptr);
             return invoke;
+        }
+
+        return nullptr;
+    }
+
+    static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+    {
+        if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+
+        if (!isDefaultInitializable(varDecl))
+            return nullptr;
+
+        if (auto defaultInitExpr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+        {
+            return defaultInitExpr;
         }
         else
         {
@@ -7241,6 +7251,10 @@ private:
 
         auto _hasExplicitCtor = [](StructDecl* structDecl) -> bool
         {
+            // First check if the extension of this struct defines an explicit constructor.
+            if (structDecl->m_hasExplicitCtorInExtension)
+                return true;
+
             for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
             {
                 // constructor that is not synthesized must be user defined.
@@ -9236,6 +9250,15 @@ private:
             // on the type as originally declared.
 
             _validateCrossModuleInheritance(decl, inheritanceDecl);
+        }
+
+        if(decl->getMembersOfType<ConstructorDecl>().getCount() > 0)
+        {
+            if (auto structDeclRef = isDeclRefTypeOf<StructDecl>(decl->targetType.type))
+            {
+                auto structDecl = structDeclRef.getDecl();
+                structDecl->m_hasExplicitCtorInExtension = true;
+            }
         }
     }
 
@@ -11352,9 +11375,9 @@ private:
 
     // If a struct's member has:
     // 1. an initialize expersion: Struct S {int a = 1;}; or
-    // 2. a default value: Struct T{}; Struct S {T t;}
-    //    Note, If a type is not default initializable, it doesn't have default value.
-    // it can be associated with default value expression in the constructor signature.
+    // 2. this member is a default initializable type.
+    // See https://github.com/shader-slang/slang/blob/master/docs/proposals/004-initialization.md#default-initializable-type
+    // for the definition of "Default Initializable type".
     // This function helps to check whether either of those 2 conditions are met and create
     // a default value for the parameter.
     // It's totally fine that there is no default value for the parameter, in this case, user
@@ -11369,7 +11392,13 @@ private:
 
         // For the 2nd condition, we need to check if the type is default initializable, if so,
         // we can use the default constructor.
-        return constructDefaultInitExprForType(visitor, varDecl);
+        if (!varDecl->type || !varDecl->type.type)
+            return nullptr;
+
+        if (!isDefaultInitializable(varDecl))
+            return nullptr;
+
+        return constructDefaultConstructorForType(visitor, varDecl->type.type);
     }
 
     void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
