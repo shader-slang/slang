@@ -211,33 +211,6 @@ slang_add_target(
 )
 
 #
-# Generate an embeddable stdlib
-#
-
-set(SLANG_STDLIB_GENERATED_HEADER
-    ${CMAKE_CURRENT_BINARY_DIR}/slang-stdlib-generated.h
-)
-add_custom_command(
-    OUTPUT ${SLANG_STDLIB_GENERATED_HEADER}
-    COMMAND
-        slang-bootstrap -archive-type riff-lz4 -save-stdlib-bin-source
-        ${SLANG_STDLIB_GENERATED_HEADER}
-    DEPENDS slang-bootstrap
-    VERBATIM
-)
-add_library(
-    slang-stdlib-embed-headers
-    INTERFACE
-    EXCLUDE_FROM_ALL
-    ${SLANG_STDLIB_GENERATED_HEADER}
-)
-set_target_properties(slang-stdlib-embed-headers PROPERTIES FOLDER generated)
-target_include_directories(
-    slang-stdlib-embed-headers
-    INTERFACE ${CMAKE_CURRENT_BINARY_DIR}
-)
-
-#
 # Generate the version header
 #
 
@@ -277,11 +250,10 @@ slang_add_target(
     .
     OBJECT
     ${slang_common_args}
-    TARGET_NAME slang-no-embedded-stdlib
+    TARGET_NAME slang-without-embedded-stdlib
     EXCLUDE_FROM_ALL
-    LINK_WITH_PRIVATE slang-meta-headers
+    LINK_WITH_PUBLIC slang-no-embedded-stdlib slang-embedded-stdlib-source
     EXTRA_COMPILE_DEFINITIONS_PUBLIC SLANG_STATIC
-    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_WITHOUT_EMBEDDED_STD_LIB
     FOLDER generators
 )
 
@@ -295,11 +267,10 @@ slang_add_target(
     ${slang_common_args}
     LINK_WITH_PRIVATE
         prelude
-        $<$<BOOL:${SLANG_EMBED_STDLIB}>:slang-stdlib-embed-headers>
         $<$<BOOL:${SLANG_EMBED_STDLIB_SOURCE}>:slang-meta-headers>
-    EXTRA_COMPILE_DEFINITIONS_PRIVATE
-        $<$<NOT:$<BOOL:${SLANG_EMBED_STDLIB}>>:SLANG_WITHOUT_EMBEDDED_STD_LIB>
-        $<$<NOT:$<BOOL:${SLANG_EMBED_STDLIB_SOURCE}>>:SLANG_DISABLE_STDLIB_SOURCE>
+    LINK_WITH_PUBLIC
+        $<IF:$<BOOL:${SLANG_EMBED_STDLIB}>,slang-embedded-stdlib,slang-no-embedded-stdlib>
+        $<IF:$<BOOL:${SLANG_EMBED_STDLIB_SOURCE}>,slang-embedded-stdlib-source,slang-no-embedded-stdlib-source>
     EXPORT_MACRO_PREFIX SLANG
     INSTALL
     PUBLIC_HEADERS ${slang_SOURCE_DIR}/slang*.h ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/*.h

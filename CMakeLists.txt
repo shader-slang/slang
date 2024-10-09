@@ -334,7 +334,7 @@ generator(
     source/slangc
     TARGET_NAME slang-bootstrap
     USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup slang-lookup-tables Threads::Threads
+    LINK_WITH_PRIVATE prelude slang-without-embedded-stdlib slang-no-embedded-stdlib slang-embedded-stdlib-source slang-capability-lookup slang-lookup-tables Threads::Threads
 )
 
 #
@@ -344,6 +344,7 @@ generator(
 # keep these non-trivial targets in their own directories so as not to clutter
 # this file
 add_subdirectory(prelude)
+add_subdirectory(source/slang-stdlib)
 add_subdirectory(source/slang)
 
 if(SLANG_ENABLE_SLANGD)
