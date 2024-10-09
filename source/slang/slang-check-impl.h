@@ -2085,6 +2085,11 @@ namespace Slang
             ConstantFoldingKind             kind,
             ConstantFoldingCircularityInfo* circularityInfo);
 
+        IntVal* tryFoldIndexExpr(
+            SubstExpr<IndexExpr> expr,
+            ConstantFoldingKind             kind,
+            ConstantFoldingCircularityInfo* circularityInfo);
+
         // Enforce that an expression resolves to an integer constant, and get its value
         enum class IntegerConstantExpressionCoercionType
         {
