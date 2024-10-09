@@ -5,6 +5,7 @@
 
 //TEST(compute):COMPARE_COMPUTE:
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 struct Things
 {
