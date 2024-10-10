@@ -1738,7 +1738,7 @@ void DocMarkdownWriter::writeAggType(DocumentPage* page, const ASTMarkup::Entry&
 
             for (AssocTypeDecl* assocTypeDecl : assocTypeDecls)
             {
-                out << "* _" << assocTypeDecl->getName()->text << "_ ";
+                out << "#### _" << escapeMarkdownText(assocTypeDecl->getName()->text) << "\n\n";
 
                 // Look up markup
                 ASTMarkup::Entry* assocTypeDeclEntry = m_markup->getEntry(assocTypeDecl);
@@ -1746,19 +1746,23 @@ void DocMarkdownWriter::writeAggType(DocumentPage* page, const ASTMarkup::Entry&
                 {
                     _appendAsSingleLine(assocTypeDeclEntry->m_markup.getUnownedSlice(), out);
                 }
-                out << toSlice("\n");
 
                 List<TypeConstraintDecl*> inheritanceDecls;
                 _getDecls<TypeConstraintDecl>(assocTypeDecl, inheritanceDecls);
 
                 if (inheritanceDecls.getCount())
                 {
-                    out << "  ";
-                    _appendCommaList(_getAsStringList(inheritanceDecls), '`');
-                    out << toSlice("\n");
+                    out << toSlice("\n\nConstraints:\n\n");
+                    for (auto inheritanceDecl : inheritanceDecls)
+                    {
+                        out << "  - ";
+                        out << escapeMarkdownText(getSub(m_astBuilder, inheritanceDecl)->toString());
+                        out << " : ";
+                        out << escapeMarkdownText(getSup(m_astBuilder, inheritanceDecl)->toString());
+                        out << toSlice("\n");
+                    }
                 }
             }
-
             out << toSlice("\n\n");
         }
     }
@@ -2637,7 +2641,7 @@ void writeTOCChildren(StringBuilder& sb, DocMarkdownWriter* writer, Documentatio
         for (auto child : categories[cat])
         {
             landingPage->contentSB << "#### [" << writer->escapeMarkdownText(child->title) << "](" <<
-                child->path << ")\n\n";
+                getDocPath(config, child->path) << ")\n\n";
         }
         page->children.add(landingPage);
     }
