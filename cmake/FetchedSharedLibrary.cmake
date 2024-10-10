@@ -1,11 +1,11 @@
-# Add rule to install shared library of name 'library_name' in the 'module_subdir' directory.
+# Add rules to copy & install shared library of name 'library_name' in the 'module_subdir' directory.
 # If 'url' is a directory, the shared library (with platform-specific shared library prefixes and suffixes) will be
 # taken from the directory, and whatever is found there will be used to produce the install rule.
 # If the 'url' is a path to a file with the platform-specific shared library prefix and suffix, then that file
 # will be used to produce the install rule.
 # Otherwise, the 'url' is interpreted as an URL, and the content of the URL will be fetched, extracted and searched
 # for the shared library to produce the install rule.
-function(install_fetched_shared_library library_name url)
+function(copy_fetched_shared_library library_name url)
     set(shared_library_filename
         "${CMAKE_SHARED_LIBRARY_PREFIX}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
     )
@@ -68,6 +68,16 @@ function(install_fetched_shared_library library_name url)
     set_property(
         TARGET ${library_name}
         PROPERTY IMPORTED_LOCATION ${dest_object}
+    )
+endfunction()
+
+function(install_fetched_shared_library library_name url)
+    copy_fetched_shared_library(${library_name} ${url})
+    set(shared_library_filename
+        "${CMAKE_SHARED_LIBRARY_PREFIX}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    )
+    set(dest_object
+        ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${shared_library_filename}
     )
     install(PROGRAMS ${dest_object} DESTINATION ${module_subdir})
 endfunction()
