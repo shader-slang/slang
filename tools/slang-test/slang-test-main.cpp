@@ -103,6 +103,14 @@ struct TestOptions
     bool isSynthesized = false;
 };
 
+struct FileTestInfoImpl : public FileTestInfo
+{
+    String testName;
+    String filePath;
+    String outputStem;
+    TestOptions options;
+};
+
 struct TestDetails
 {
     TestDetails() {}
@@ -4042,13 +4050,29 @@ static SlangResult _runTestsOnFile(
             if (_canIgnore(context, testDetails))
             {
                 testResult = TestResult::Ignored;
+                context->getTestReporter()->addResult(testResult);
             }
             else
             {
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
+                if (testResult == TestResult::Fail
+                    && !context->getTestReporter()->m_expectedFailureList.contains(testName))
+                {
+                    RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
+                    fileTestInfo->filePath = filePath;
+                    fileTestInfo->testName = testName;
+                    fileTestInfo->outputStem = outputStem;
+                    fileTestInfo->options = testDetails.options;
+
+                    std::lock_guard lock(context->mutexFailedFileTests);
+                    context->failedFileTests.add(fileTestInfo);
+                }
+                else
+                {
+                    context->getTestReporter()->addResult(testResult);
+                }
             }
 
-            context->getTestReporter()->addResult(testResult);
 
             // Could determine if to continue or not here... based on result
         }        
@@ -4613,6 +4637,33 @@ SlangResult innerMain(int argc, char** argv)
             }
              
             TestReporter::set(nullptr);
+        }
+
+        // If we have a couple failed tests, they maybe intermittent failures due to parallel
+        // excution or driver instability. We can try running them again.
+        static constexpr int kFailedTestLimitForRetry = 16;
+        if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
+        {
+            reporter.message(TestMessageType::Info,
+                (StringBuilder() << "Retrying " << context.failedFileTests.getCount() << " failed tests").produceString());
+            for (auto& test : context.failedFileTests)
+            {
+                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                auto newResult = runTest(&context, fileTestInfo->filePath, fileTestInfo->outputStem, fileTestInfo->testName, fileTestInfo->options);
+                reporter.addResult(newResult);
+            }
+        }
+        else
+        {
+            // If there are too many failed tests, don't bother retrying.
+            for (auto& test : context.failedFileTests)
+            {
+                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                reporter.addResult(TestResult::Fail);
+            }
         }
 
         reporter.outputSummary();

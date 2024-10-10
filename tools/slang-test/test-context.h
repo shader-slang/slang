@@ -85,62 +85,66 @@ struct TestRequirements
     Slang::RenderApiFlags usedRenderApiFlags = 0;                               ///< Used render api flags (some might be implied)
 };
 
+struct FileTestInfo : public Slang::RefObject
+{
+};
+
 class TestContext
 {
-    public:
+public:
 
     typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
 
-        /// Get the slang session
-    SlangSession* getSession() const { return m_session;  }
+    /// Get the slang session
+    SlangSession* getSession() const { return m_session; }
 
     SlangResult init(const char* exePath);
 
-        /// Get the inner main function (from shared library)
+    /// Get the inner main function (from shared library)
     InnerMainFunc getInnerMainFunc(const Slang::String& dirPath, const Slang::String& name);
-        /// Set the function for the shared library
+    /// Set the function for the shared library
     void setInnerMainFunc(const Slang::String& name, InnerMainFunc func);
 
     void setTestRequirements(TestRequirements* req);
 
     TestRequirements* getTestRequirements() const;
 
-        /// If true tests aren't being run just the information on testing is being accumulated
+    /// If true tests aren't being run just the information on testing is being accumulated
     bool isCollectingRequirements() const { return getTestRequirements() != nullptr; }
-        /// If set, then tests are executed
+    /// If set, then tests are executed
     bool isExecuting() const { return getTestRequirements() == nullptr; }
 
-        /// True if a render API filter is enabled
+    /// True if a render API filter is enabled
     bool isRenderApiFilterEnabled() const { return options.enabledApis != Slang::RenderApiFlag::AllOf && options.enabledApis != 0; }
 
-        /// True if a test with the requiredFlags can in principal run (it may not be possible if the API is not available though)
+    /// True if a test with the requiredFlags can in principal run (it may not be possible if the API is not available though)
     bool canRunTestWithRenderApiFlags(Slang::RenderApiFlags requiredFlags);
 
-        /// True if can run unit tests
+    /// True if can run unit tests
     bool canRunUnitTests() const { return options.apiOnly == false; }
 
-        /// Given a spawn type, return the final spawn type.
-        /// In particular we want 'Default' spawn type to vary by the environment (for example running on test server on CI)
+    /// Given a spawn type, return the final spawn type.
+    /// In particular we want 'Default' spawn type to vary by the environment (for example running on test server on CI)
     SpawnType getFinalSpawnType(SpawnType spawnType);
 
     SpawnType getFinalSpawnType();
 
-        /// Get compiler set
+    /// Get compiler set
     Slang::DownstreamCompilerSet* getCompilerSet();
     Slang::IDownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);
 
     Slang::JSONRPCConnection* getOrCreateJSONRPCConnection();
     void destroyRPCConnection();
 
-        /// Ctor
+    /// Ctor
     TestContext();
-        /// Dtor
+    /// Dtor
     ~TestContext();
 
     Options options;
     TestCategorySet categorySet;
 
-        /// If set then tests are not run, but their requirements are set 
+    /// If set then tests are not run, but their requirements are set 
 
     PassThroughFlags availableBackendFlags = 0;
     Slang::RenderApiFlags availableRenderApiFlags = 0;
@@ -152,17 +156,17 @@ class TestContext
     Slang::String dllDirectoryPath;
     Slang::String exePath;
 
-        /// Timeout time for communication over connection.
-        /// NOTE! If the timeout is hit, the connection will be destroyed, and then recreated.
-        /// For tests that compile the stdlib, if that takes this time, the stdlib will be
-        /// repeatedly compiled and each time fail.
-        /// NOTE! This timeout may be altered in the ctor for a specific target, the initializatoin
-        /// value is just the default.
-        ///
-        /// TODO(JS): We could split the stdlib compilation from other actions, and have timeout specific for
-        /// that. To do this we could have a 'compileStdLib' RPC method.
-        ///
-        /// Current default is 60 seconds.
+    /// Timeout time for communication over connection.
+    /// NOTE! If the timeout is hit, the connection will be destroyed, and then recreated.
+    /// For tests that compile the stdlib, if that takes this time, the stdlib will be
+    /// repeatedly compiled and each time fail.
+    /// NOTE! This timeout may be altered in the ctor for a specific target, the initializatoin
+    /// value is just the default.
+    ///
+    /// TODO(JS): We could split the stdlib compilation from other actions, and have timeout specific for
+    /// that. To do this we could have a 'compileStdLib' RPC method.
+    ///
+    /// Current default is 60 seconds.
     Slang::Int connectionTimeOutInMs = 60 * 1000;
 
     void setThreadIndex(int index);
@@ -174,6 +178,10 @@ class TestContext
 
     std::mutex mutex;
     Slang::RefPtr<Slang::JSONRPCConnection> m_languageServerConnection;
+
+    
+    std::mutex mutexFailedFileTests;
+    Slang::List<Slang::RefPtr<FileTestInfo>> failedFileTests;
 
     Slang::IFileCheck* getFileCheck() { return m_fileCheck; };
 
