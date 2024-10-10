@@ -1062,6 +1062,10 @@ namespace Slang
 
         OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
 
+        void setCheckForSynthesizedCtor(bool checkForSynthesizedCtor)
+        {
+            m_checkForSynthesizedCtor = checkForSynthesizedCtor;
+        }
     private:
         SharedSemanticsContext* m_shared = nullptr;
 
@@ -1107,6 +1111,9 @@ namespace Slang
         ExpandExpr* m_parentExpandExpr = nullptr;
 
         OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+
+        // Flag to indicate whether this check is to check a synthesized constructor
+        bool m_checkForSynthesizedCtor = false;
     };
 
     struct OuterScopeContextRAII
