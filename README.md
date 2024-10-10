@@ -47,6 +47,8 @@ Documentation
 
 The Slang project provides a variety of different [documentation](docs/), but most users would be well served starting with the [User's Guide](https://shader-slang.github.io/slang/user-guide/).
 
+For developers writing Slang code, the [Slang Standard Library Reference](https://shader-slang.com/stdlib-reference/) provides detailed documentation on Slang's built-in types and functions.
+
 We also provide a few [examples](examples/) of how to integrate Slang into a rendering application.
 
 These examples use a graphics layer that we include with Slang called "GFX" which is an abstraction library of various graphics APIs (D3D11, D2D12, OpenGL, Vulkan, CUDA, and the CPU) to support cross-platform applications using GPU graphics and compute capabilities. 
@@ -71,11 +73,19 @@ Limitations and Support
 -----------------------
 
 ### Platform support
+
+The Slang compiler and libraries can be built on the following platforms:
+
 |   Windows       |     Linux      |    MacOS     |      WebAssembly     |
 |:---------------:|:--------------:|:------------:|:--------------------:|
 |   supported     |   supported    |  supported   |      experimental    |
 
+Both `x86_64` and `arm64` architectures are supported on Windows, Linux and MacOS platforms.
+
 ### Target support
+
+Slang can compile shader code to the following targets:
+
 |   Target         |     Status     |     Output Formats     |
 |:----------------:|:--------------:|:----------------------:|
 |  Direct3D 11     |    supported   |  HLSL                   |
