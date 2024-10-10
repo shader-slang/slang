@@ -237,24 +237,36 @@ namespace Slang
         if (isFromStdLib(decl))
             return false;
 
+        StructDecl* structDecl = nullptr;
         if (auto varDecl = as<VarDecl>(decl))
         {
+            // check for basic scalar, vector or matrix type
             auto type = varDecl->getType();
             if( as<VectorExpressionType>(type) ||
                 as<MatrixExpressionType>(type) ||
                 as<BasicExpressionType>(type))
                 return true;
-            else
+
+            // check for user-defined struct type
+            structDecl = _getStructDecl(type);
+            if (!structDecl)
                 return false;
         }
 
-        auto structDecl = as<StructDecl>(decl);
+        if (!structDecl)
+            structDecl = as<StructDecl>(decl);
+
         if (!structDecl)
             return false;
 
-        // 2. It cannot have inheritance
-        if (structDecl->getMembersOfType<InheritanceDecl>().getCount() > 0)
-            return false;
+        // 2. It cannot have inheritance, but inherit from interface is fine.
+        for (auto inheritanceDecl: structDecl->getMembersOfType<InheritanceDecl>())
+        {
+            if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+            {
+                return false;
+            }
+        }
 
         // 3. It cannot have explicit constructor
         if (_hasExplicitConstructor(structDecl, true))
