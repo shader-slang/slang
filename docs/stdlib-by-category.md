@@ -1,0 +1,571 @@
+# Table of Contents
+
+<!-- toc -->
+
+- [Interface](#interface)
+  * [Common Interfaces](#common-interfaces)
+  * [Math Interfaces](#math-interfaces)
+  * [Atomic Interfaces](#atomic-interfaces)
+  * [Auto-diff Interfaces](#auto-diff-interfaces)
+- [Types](#types)
+  * [Common Types](#common-types)
+  * [Texture Types](#texture-types)
+  * [Sampler Types](#sampler-types)
+  * [Uniform Buffer Types](#uniform-buffer-types)
+  * [Pointer Types](#pointer-types)
+  * [Atomic Types](#atomic-types)
+  * [Auto-diff Types](#auto-diff-types)
+- [Global Functions](#global-functions)
+  * [Common Functions](#common-functions)
+  * [Relational Functions](#relational-functions)
+  * [Bitwise Functions](#bitwise-functions)
+  * [Trigonometry Functions](#trigonometry-functions)
+  * [Exponential Functions](#exponential-functions)
+  * [Matrix Functions](#matrix-functions)
+  * [Math Functions](#math-functions)
+  * [Geometric Functions](#geometric-functions)
+  * [Conversion Functions](#conversion-functions)
+  * [Atomic Functions](#atomic-functions)
+  * [Synchronization Functions](#synchronization-functions)
+  * [Wave Functions](#wave-functions)
+  * [Auto-diff Functions](#auto-diff-functions)
+  * [Misc Functions](#misc-functions)
+- [Stage specific](#stage-specific)
+  * [Fragment Shader Functions](#fragment-shader-functions)
+  * [Compute Shader Functions](#compute-shader-functions)
+  * [Hull Shader Functions](#hull-shader-functions)
+  * [Hull Shader Types](#hull-shader-types)
+  * [Geometry Shader Functions](#geometry-shader-functions)
+  * [Geometry Shader Types](#geometry-shader-types)
+  * [Mesh Shader Functions](#mesh-shader-functions)
+  * [Mesh Shader Types](#mesh-shader-types)
+  * [Ray-Tracing Functions](#ray-tracing-functions)
+  * [Ray-tracing Types](#ray-tracing-types)
+
+<!-- tocstop -->
+
+# Interface
+
+## Common Interfaces
+
+| Interface name | Inherits from | Description |
+|--|--|--|
+| IArray | none | Provides operators to access elements in an array. |
+| IBufferDataLayout | none | TODO |
+| IFunc | IMutatingFunc | Provides an `operator()` to make a Functor. |
+| IMutatingFunc | none | Same as `IFunc` but with mutability. |
+| IRWArray | IArray | Same as `IArray` but with mutability. |
+
+## Math Interfaces
+
+| Interface name | Inherits from | Description |
+|--|--|--|
+| IArithmetic | IComparable | Provides basic arithmetic operators: `add`, `sub`, `mul`, `div`, `mod`, and `neg`. |
+| ICompareable | none | Provides comparison operators: `equals`, `lessThan` and `lessThanOrEquals`. |
+| IFloat | IArithmetic<br>IDifferentiable | Provides basic arithmetic operators for floating-point types and also provides operators required by Auto-diff feature. |
+| IInteger | IArithmetic<br>ILogical | Provides logical operators and basic arithmetic operators for integer types. |
+| ILogical | IComparable | Provides Logical operators: `And`, `Or`, `Xor`, `Not`, `shift-left` and `shift-right`. |
+| IRangedValue | none | Provides the limit the type can represent: `maxValue` and `minValue`. |
+
+## Atomic Interfaces
+
+| Interface name | Inherits from | Description |
+|--|--|--|
+| IAtomicable | none | Used for denote types allowed for the atomic operations. |
+| IArithmeticAtomicable | IAtomicable<br>IArithmetic | Provides basic arithmetic operators atomically. |
+| IBitAtomicable | IArithmeticAtomicable<br>IInteger | Provides bit-wise operators atomically. |
+
+## Auto-diff Interfaces
+
+| Interface name | Inherits from | Description |
+|--|--|--|
+| IDiffTensorWrapper | none | TODO |
+| IDifferentiable | none | Used for denote types that are differentiable. |
+| IDifferentiableFunc | IFunc<br>IDifferentiableMutatingFunc | Same as `IFunc` but for Auto-diff. |
+| IDifferentiableMutatingFunc | IMutatingFunc | Same as `IMutatingFunc` but for Auto-diff. |
+| IDifferentiablePtrType | none | Memory Pointer type for Auto-diff. |
+
+# Types
+
+## Common Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| Optional | none | Provides a way to represent an optional value that may or may not be valid. |
+| Tuple | ICompare<br>IDifferentiable | A container type that can hold any number of different types. |
+| matrix | IRWArray<br>IFloat | A matrix type with `R` rows, `C` columns and elemnt type `T`. |
+| vector | IRWArray<br>IFloat | A vector type with `N` component and element type `T`. |
+
+## Texture Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| FeedbackTexture2D | none | Feedback texture resource type for 2D. |
+| FeedbackTexture2DArray | none | Feedback texture resource type for 2D array. |
+| RWTexture1D | none | Read-write texture resource type for 1D. |
+| RWTexture1DArray | none | Read-write texture resource type for 1D Array. |
+| RWTexture2D | none | Read-write texture resource type for 2D. |
+| RWTexture2DArray | none | Read-write texture resource type for 2D Array. |
+| RWTexture2DMS | none | Read-write texture resource type for 2D Multi-sample. |
+| RWTexture2DMSArray | none | Read-write texture resource type for 2D Multi-sample Array. |
+| RWTexture3D | none | Read-write texture resource type for 3D. |
+| RasterizerOrderedTexture1D | none | Rasterizer-Ordered texture resource type for 1D. |
+| RasterizerOrderedTexture1DArray | none | Rasterizer-Ordered texture resource type for 1D Array. |
+| RasterizerOrderedTexture2D | none | Rasterizer-Ordered texture resource type for 2D. |
+| RasterizerOrderedTexture2DArray | none | Rasterizer-Ordered texture resource type for 2D Array. |
+| RasterizerOrderedTexture3D | none | Rasterizer-Ordered texture resource type for 3D. |
+| Texture1D | none | Read-only texture resource type for 1D. |
+| Texture1DArray | none | Read-only texture resource type for 1D Array. |
+| Texture2D | none | Read-only texture resource type for 2D. |
+| Texture2DArray | none | Read-only texture resource type for 2D Array. |
+| Texture2DMS | none | Read-only texture resource type for 2D Multi-sample. |
+| Texture2DMSArray | none | Read-only texture resource type for 2D Multi-sample Array. |
+| Texture3D | none | Read-only texture resource type for 3D. |
+| TextureCube | none | Read-only texture resource type for Cube. |
+| TextureCubeArray | none | Read-only texture resource type for Cube Array. |
+| TextureFootprint | none | Read-only texture resource type for Footprint/feedback. |
+
+## Sampler Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| SamplerComparisonState | none | Sampler resource type for sampling a depth texture. |
+| SamplerState | none | Sampler resource type for sampling a texture. |
+
+## Uniform Buffer Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| AppendStructuredBuffer | none | Buffer resource type that allows the shader to append data to. |
+| ByteAddressBuffer | none | Read-only byte address buffer resource type. |
+| ConstantBuffer | none | Read-only Constant Buffer resource type. |
+| ConsumeStructuredBuffer | none | Buffer resource type that can read data coming from AppendStructuredBuffer. |
+| ParameterBlock | none | Buffer resource type that can hold a mix of constant data resources with descriptor resources. |
+| RWByteAddressBuffer | none | Read-write byte address buffer resource type. |
+| RWStructuredBuffer | IRWArray | Read-write structured buffer resource type. |
+| RasterizerOrderedByteAddressBuffer | none | Rasterizer-Ordered byte address buffer resource type. |
+| RasterizerOrderedStructuredBuffer | IRWArray | Rasterizer-Ordered structured buffer resource type. |
+| StructuredBuffer | IArray | Read-only structured buffer resource type. |
+| TextureBuffer | none | TODO |
+
+## Pointer Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| ConstBufferPointer | none | Pointer type for a constant buffer. |
+| NullPtr | none | TODO |
+| Ptr | none | Pointer type for a given Type `T`. |
+
+## Atomic Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| Atomic | none | Provides atomic operators: `load`, `store`, `exchange` and `compareExchange`. |
+
+## Auto-diff Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| AtomicAdd | IDiffTensorWrapper | Type that provides atomic operators for Auto-diff. |
+| DifferentialPair | IDifferentiable | Pair type that serves to wrap the primal and differential types of an arbitrary type `T`. |
+| DifferentialPtrPair | IDifferentiablePtrType | Pair type similar to DifferentialPair but for memory pointer. |
+| DiffTensorView | none | TODO |
+
+## Misc Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| Array | IRWArray | TODO |
+| ConstRef | none | TODO |
+| InOut | none | TODO |
+| Out | none | TODO |
+| Ref | none | TODO |
+| TensorView | none | TODO |
+| TorchTensor | none | TODO |
+
+# Global Functions
+
+## Common Functions
+
+| Function name | Description |
+|--|--|
+| clamp() | Clamps a value between a minimum and maximum. |
+| isfinite() | Returns true if value is finite. |
+| isinf() | Returns true if the value is infinite. |
+| isnan() | Returns true if the value is NaN. |
+| lerp() | Linear interpolation between two values. |
+| saturate() | Clamps the input to the range [0,1]. |
+| sign() | Returns the sign of a value (-1, 0, 1). |
+| smoothstep() | Smooth Hermite interpolation between 0 and 1. |
+| step() | Returns 0 if less than a threshold and 1 otherwise. |
+
+## Relational Functions
+
+| Function name | Description |
+|--|--|
+| all() | True if all components are non-zero. |
+| any() | True if any component is non-zero. |
+
+## Bitwise Functions
+
+| Function name | Description |
+|--|--|
+| and() | Component-wise logical AND. |
+| countbits() | Counts the number of bits set to 1. |
+| firstbithigh() | Count leading zeros. |
+| firstbitlow() | Count trailing zeros. |
+| msad4() | Compares a 4-byte reference value and an 8-byte source value, accumulating a vector of 4 sums based on the masked sum of absolute differences. |
+| or() | Component-wise logical OR. |
+| reversebits() | Reverses the order of bits in an integer. |
+
+## Trigonometry Functions
+
+| Function name | Description |
+|--|--|
+| acos() | Inverse cosine. |
+| acosh() | Inverse hyperbolic cosine. |
+| asin() | Inverse sine. |
+| asinh() | Inverse hyperbolic sine. |
+| atan() | Inverse tangent. |
+| atan2() | Inverse two parameter tangent. |
+| atanh() | Inverse hyperbolic tangent. |
+| cos() | Cosine. |
+| cosh() | Hyperbolic cosine. |
+| degrees() | Converts radians to degrees. |
+| radians() | Converts degrees to radians. |
+| sin() | Sine. |
+| sincos() | Simultaneous sine and cosine. |
+| sinh() | Hyperbolic sine. |
+| tan() | Tangent. |
+| tanh() | Hyperbolic tangent. |
+
+## Exponential Functions
+
+| Function name | Description |
+|--|--|
+| exp() | Exponential (e^x). |
+| exp10() | Base 10 exponential (10^x). |
+| exp2() | Base 2 exponential (2^x). |
+| log() | Natural logarithm. |
+| log10() | Base 10 logarithm. |
+| log2() | Base 2 logarithm. |
+| pow() | Power function. |
+| rsqrt() | Reciprocal square root. |
+| sqrt() | Square root. |
+
+## Matrix Functions
+
+| Function name | Description |
+|--|--|
+| determinant() | Returns the determinant of a matrix. |
+| mul() | Multiplication. |
+| transpose() | Transposes a matrix. |
+
+## Math Functions
+
+| Function name | Description |
+|--|--|
+| abs() | Absolute value. |
+| ceil() | Round up to the nearest integer. |
+| fabs() | Absolute value. |
+| floor() | Round down to the nearest integer. |
+| fma() | Fused multiply-add. |
+| fmax() | Returns maximum of two floats. |
+| fmin() | Returns the minimum of two floats. |
+| fmod() | Returns the floating point remainder. |
+| frac() | Returns the fractional part of a number. |
+| frexp() | Splits a floating point into mantissa and exponent. |
+| ldexp() | Combines a mantissa and exponent. |
+| mad() | Multiply and add operation. |
+| max() | Returns the larger of two values. |
+| min() | Returns the smaller of two values. |
+| modf() | Splits value into integral and fractional parts. |
+| rcp() | Computes the reciprocal of a value. |
+| round() | Rounds to the nearest whole number. |
+| trunc() | Truncates the fractional part. |
+
+## Geometric Functions
+
+| Function name | Description |
+|--|--|
+| cross() | Cross product of two 3D vectors. |
+| distance() | Distance between two points. |
+| dot() | Dot product of two vectors. |
+| faceforward() | Adjusts the direction of a normal. |
+| length() | Length of a vector. |
+| lit() | Computes lighting coefficients. |
+| normalize() | Normalize a vector. |
+| reflect() | Reflects a vector around a normal. |
+| refract() | Computes the refraction vector. |
+
+## Conversion Functions
+
+| Function name | Description |
+|--|--|
+| asdouble() | Converts two uint32_t into a double. |
+| asfloat() | Converts int32_t or uint32_t to float. |
+| asfloat16() | Converts uint16_t to float16_t. |
+| asint() | Converts float or uint32_t to int32_t. |
+| asint16() | Converts float16_t type to int16_t. |
+| asuint() | Converts double, float or int32_t to uint32_t. |
+| asuint16() | Converts the float16 to uint16_t. |
+| bit_cast() | Converts a type to another type as bit data. |
+| f16tof32() | Converts a float16 stored in the low-half of a uint to a float. |
+| f32tof16() | Converts a float to a float16 type. |
+
+## Atomic Functions
+
+| Function name | Description |
+|--|--|
+| InterlockedAdd() | Atomic addition. |
+| InterlockedAnd() | Atomic bitwise AND. |
+| InterlockedCompareExchange() | Compares and swaps values atomically. |
+| InterlockedCompareExchangeFloatBitwise() | Same as InterlockedCompareExchange() but for float value. |
+| InterlockedCompareStore() | Atomically compares the destination to the comparison value and, if they are identical, overwrites the destination with the input value. |
+| InterlockedCompareStoreFloatBitwise() | Same as InterlockedCompareStore() but for float value. |
+| InterlockedExchange() | Assigns a value to a destination and returns the original value atomically. |
+| InterlockedMax() | Atomic maximum. |
+| InterlockedMin() | Atomic minimum. |
+| InterlockedOr() | Atomic bitwise OR. |
+| InterlockedXor() | Atomic bitwise XOR. |
+
+## Synchronization Functions
+
+| Function name | Description |
+|--|--|
+| AllMemoryBarrier() | Ensures all threads in a group are synchronized. |
+| AllMemoryBarrierWithGroupSync() | Ensures all threads in a group are synchronized and all memory accesses are completed. |
+| DeviceMemoryBarrier() | Ensures all device memory accesses are completed. |
+| DeviceMemoryBarrierWithGroupSync() | Ensures all device memory accesses are completed and all threads in the group have reached this call. |
+| GroupMemoryBarrier() | Ensures all group shared accesses are completed. |
+| GroupMemoryBarrierWithGroupSync() | Ensures all group shared accesses are completed and all threads in the group have reached this call. |
+| beginInvocationInterlock() | Mark beginning of "interlocked" operations. |
+| endInvocationInterlock() | Mark end of "interlocked" operations. |
+
+## Wave Functions
+
+| Function name | Description |
+|--|--|
+| AllMemoryBarrierWithWaveMaskSync() | Same to AllMemoryBarrierWithWaveSync() but limits to the threads marked in the mask. |
+| AllMemoryBarrierWithWaveSync() | Similar to AllMemoryBarrierWithGroupSync() but limits to the current wave. |
+| GroupMemoryBarrierWithWaveMaskSync() | Same to GroupMemoryBarrierWithWaveSync() but limits to the threads marked in the mask. |
+| GroupMemoryBarrierWithWaveSync() | SImilar to GroupMemoryBarrierWithGroupSync() but limits to the current wave. |
+| QuadReadAcrossDiagonal() | Returns the specified local value read from the diagonally opposite lane in the quad. |
+| QuadReadAcrossX() | Returns the specified local value read from the other lane in the quad in the X direction. |
+| QuadReadAcrossY() | Returns the specified local value read from the other lane in the quad in the Y direction. |
+| QuadReadLaneAt() | Returns the specified source value from the lane identified by the lane ID within the current quad. |
+| WaveActiveAllEqual() | Returns true if the expression is the same for every active lane in the current wave. |
+| WaveActiveAllTrue() | Returns true if all lanes in the wave evaluate the expression to true. |
+| WaveActiveAnyTrue() | Returns true if any lane in the wave evaluates the expression to true. |
+| WaveActiveBallot() | Returns a bitmask where each bit represents whether the corresponding lane evaluates the expression to true. |
+| WaveActiveBitAnd() | Computes the bitwise AND of the expression across all active lanes in the wave. |
+| WaveActiveBitOr() | Computes the bitwise OR of the expression across all active lanes in the wave. |
+| WaveActiveBitXor() | Computes the bitwise XOR of the expression across all active lanes in the wave. |
+| WaveActiveCountBits() | Returns the number of bits set to 1 in the bitmask returned by WaveActiveBallot. |
+| WaveActiveMax() | Computes the maximum value of the expression across all active lanes in the wave. |
+| WaveActiveMin() | Computes the minimum value of the expression across all active lanes in the wave. |
+| WaveActiveProduct() | Computes the product of the expression across all active lanes in the wave. |
+| WaveActiveSum() | Computes the sum of the expression across all active lanes in the wave. |
+| WaveBroadcastLaneAt() | Provides an access to subgroupBroadcast which can only take a constexpr laneId. |
+| WaveGetActiveMask() | TODO |
+| WaveGetActiveMulti() | TODO |
+| WaveGetConvergedMask() | TODO |
+| WaveGetConvergedMulti() | TODO |
+| WaveGetLaneCount() | Returns the number of lanes in a wave on the current architecture. |
+| WaveGetLaneIndex() | Returns the index of the current lane within the current wave. |
+| WaveIsFirstLane() | Returns true if the current lane is the first active lane in the wave. |
+| WaveMaskBroadcastLaneAt() | TODO |
+| WaveMaskIsFirstLane() | TODO |
+| WaveMaskAllEqual() | TODO |
+| WaveMaskAllTrue() | TODO |
+| WaveMaskAnyTrue() | TODO |
+| WaveMaskBallot() | TODO |
+| WaveMaskBitAnd() | TODO |
+| WaveMaskBitOr() | TODO |
+| WaveMaskBitXor() | TODO |
+| WaveMaskCountBits() | TODO |
+| WaveMaskMatch() | TODO |
+| WaveMaskMax() | TODO |
+| WaveMaskMin() | TODO |
+| WaveMaskPrefixBitAnd() | TODO |
+| WaveMaskPrefixBitOr() | TODO |
+| WaveMaskPrefixBitXor() | TODO |
+| WaveMaskPrefixCountBits() | TODO |
+| WaveMaskPrefixProduct() | TODO |
+| WaveMaskPrefixSum() | TODO |
+| WaveMaskProduct() | TODO |
+| WaveMaskReadLaneAt() | TODO |
+| WaveMaskReadLaneFirst() | TODO |
+| WaveMaskShuffle() | TODO |
+| WaveMaskSum() | TODO |
+| WaveMatch() | TODO |
+| WaveMultiPrefixBitAnd() | TODO |
+| WaveMultiPrefixBitOr() | TODO |
+| WaveMultiPrefixBitXor() | TODO |
+| WaveMultiPrefixCountBits() | TODO |
+| WaveMultiPrefixProduct() | TODO |
+| WaveMultiPrefixSum() | TODO |
+| WavePrefixCountBits() | Computes the prefix sum of the number of bits set to 1 across all active lanes in the wave. |
+| WavePrefixProduct() | Computes the prefix product of the expression across all active lanes in the wave. |
+| WavePrefixSum() | Computes the prefix sum of the expression across all active lanes in the wave. |
+| WaveReadLaneAt() | Returns the value of the expression for the specified lane index within the wave1. |
+| WaveReadLaneFirst() | Returns the value of the expression for the active lane with the smallest index in the wave. |
+| WaveShuffle() | TODO |
+
+## Auto-diff Functions
+
+| Function name | Description |
+|--|--|
+| isDifferentialNull() | existential check for null differential type. |
+| detach() | Detach and set derivatives to zero. |
+| diffPair() | Constructs a `DifferentialPair` value from a primal and differential values. |
+| updatePrimal() | Changes the primal value in a DifferentialPair type. |
+| updateDiff() | Changes the diff value in a DifferentialPair type. |
+| updatePair() | Changes both primal and diff values in a DifferentialPair type. |
+
+## Misc Functions
+
+| Function name | Description |
+|--|--|
+| CheckAccessFullyMapped() | Check access status to tiled resource. |
+| GetRenderTargetSampleCount() | Returns the number of samples for a render target. |
+| GetRenderTargetSamplePosition() | Gets the sampling position (x, y) for a given sample index. |
+| NonUniformResourceIndex() | Indicate if the resource index is divergent. |
+| asDynamicUniform() | TODO | 
+| clock2x32ARB() | TODO |
+| clockARB() | TODO |
+| concat() | Concatnate Tuple types. |
+| createDynamicObject() | Create Existential object. |
+| getRealtimeClockLow(): | TODO |
+| getRealtimeClock() | TODO |
+| makeArrayFromElement() | Make an `Array` type variable from the given element. |
+| makeTuple() | Make a `Tuple` type variable from the given values. |
+| reinterpret() | Changes the type from one to another. |
+| static_assert() | Error out when a compile-time value evaluates to false. |
+| unmodified() | Silence the warning message about not writing to an inout parameter. |
+
+# Stage specific
+
+## Fragment Shader Functions
+
+| Function name | Description |
+|--|--|
+| EvaluateAttributeAtCentroid() | Evaluates an attribute at the pixel centroid. |
+| EvaluateAttributeAtSample() | Evaluates an attribute at the indexed sample location. |
+| EvaluateAttributeSnapped() | Evaluates an attribute at the pixel centroid with an offset. |
+| GetAttributeAtVertex() | Returns the vertex attribute for the given vertexIndex. |
+| IsHelperLane() | Returns true if a given lane in a pixel shader is a helper lane, which are nonvisible pixels that are executing due to gradient operations or discarded pixels. |
+| clip() | Discards the current pixel if any component of the input is less than zero. |
+| ddx() | Compute the derivative in the x direction. |
+| ddx_coarse() | Computes a low precision partial derivative with respect to the screen-space x-coordinate. |
+| ddx_fine() | Computes a high precision partial derivative with respect to the screen-space x-coordinate. |
+| ddy() | Same as ddx() but for y direction. |
+| ddy_coarse() | Same as ddx_coarse() but for y direction. |
+| ddy_fine() | Same as ddx_fine() but for y direction. |
+| discard() | Discards a pixel in a fragment shader. |
+| fwidth() | Absolute sum of derivatives in x and y. |
+
+## Compute Shader Functions
+
+| Function name | Description |
+|--|--|
+| WorkgroupSize() | Returns the workgroup size of the calling entry point. |
+
+## Hull Shader Functions
+
+| Function name | Description |
+|--|--|
+| Process2DQuadTessFactorsAvg() | Processes 2D quad tessellation factors using the average method. |
+| Process2DQuadTessFactorsMax() | Processes 2D quad tessellation factors using the maximum method. |
+| Process2DQuadTessFactorsMin() | Processes 2D quad tessellation factors using the minimum method. |
+| ProcessIsolineTessFactors() | Processes isoline tessellation factors. |
+| ProcessQuadTessFactorsAvg() | Processes quad tessellation factors using the average method. |
+| ProcessQuadTessFactorsMax() | Processes quad tessellation factors using the maximum method. |
+| ProcessQuadTessFactorsMin() | Processes quad tessellation factors using the minimum method. |
+| ProcessTriTessFactorsAvg() | Processes triangle tessellation factors using the average method. |
+| ProcessTriTessFactorsMax() | Processes triangle tessellation factors using the maximum method. |
+| ProcessTriTessFactorsMin() | Processes triangle tessellation factors using the minimum method. |
+
+# Hull Shader Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| InputPatch | none | Provides operators to access the input patch in Hull shader. |
+| OutputPatch | none | Provides operators to access the output patch in Domain or Hull shader. |
+
+## Geometry Shader Functions
+
+| Function name | Description |
+|--|--|
+| LineStream::Append() | Appends a vertex to the current line primitive. |
+| LineStream::RestartStrip() | Completes the current line strip and starts a new one. |
+| PointStream::Append() | Appends a vertex to the current point primitive. |
+| PointStream::RestartStrip() | Completes the current point strip and starts a new one. |
+| TriangleStream::Append() | Appends a vertex to the current triangle primitive. |
+| TriangleStream::RestartStrip() | Completes the current triangle strip and starts a new one. |
+
+## Geometry Shader Types
+
+| Type name | Description |
+|--|--|
+| LineStream | Provides an access to a vertex stream for a line primitives. |
+| PointStream | Provides an access to a vertex stream for a point primitives. |
+| TriangleStream | Provides an access to a vertex stream for a triangle primitives. |
+
+## Mesh Shader Functions
+
+| Function name | Description |
+|--|--|
+| DispatchMesh() | Dispatches work for mesh shaders. |
+| SetMeshOutputCounts() | Sets the number of vertices and primitives to emit. |
+
+## Mesh Shader Types
+
+| Type name | Implements | Description |
+|--|--|--|
+| OutputIndices | none | Provides operators to access the output indices in Mesh shader. |
+| OutputPrimitives | none | Provides operators to access the output primitives in Mesh shader. |
+| OutputVertices | none | Provides operators to access the output vertices in Mesh shader. |
+
+## Ray-Tracing Functions
+
+| Function name | Description |
+|--|--|
+| AcceptHitAndEndSearch() | Stops ray traversal upon a hit. |
+| CallShader() | Invokes another shader from within a shader. |
+| DispatchRaysIndex() | Gets the current location within the width, height, and depth obtained with the DispatchRaysDimensions system value intrinsic. |
+| DispatchRaysDimensions() | The width, height and depth values from the originating DispatchRays call. |
+| GeometryIndex() | The autogenerated index of the current geometry in the bottom-level acceleration structure. |
+| HitKind() | Returns the value passed as the HitKind parameter to ReportHit. |
+| HitTriangleVertexPosition() | Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader. |
+| IgnoreHit() | Ignores a hit during ray traversal. |
+| InstanceID() | The user-provided identifier for the instance on the bottom-level acceleration structure instance within the top-level structure. |
+| InstanceIndex() | The autogenerated index of the current instance in the top-level raytracing acceleration structure. |
+| ObjectRayDirection() | The object-space direction for the current ray. Object-space refers to the space of the current bottom-level acceleration structure. |
+| ObjectRayOrigin() | The object-space origin for the current ray. Object-space refers to the space of the current bottom-level acceleration structure. |
+| ObjectToWorld3x4() | A matrix for transforming from object-space to world-space. Object-space refers to the space of the current bottom-level acceleration structure. |
+| ObjectToWorld4x3() | A matrix for transforming from object-space to world-space. Object-space refers to the space of the current bottom-level acceleration structure. |
+| PrimitiveIndex() | Retrieves the autogenerated index of the primitive within the geometry inside the bottom-level acceleration structure instance. |
+| RayCurrentTime() | TODO |
+| RayFlags() | Returns the current ray flag values. |
+| RayTCurrent() | The current parametric ending point for the ray. |
+| RayTMin() | The current parametric starting point for the ray. |
+| ReorderThread() | Reorders threads based on a coherence hint value. |
+| ReportHit() | Reports a hit during ray traversal. |
+| TraceMotionRay() | TODO |
+| TraceRay() | Traces a ray and returns the hit information. |
+| WorldRayDirection() | The world-space direction for the current ray. |
+| WorldRayOrigin() | The world-space origin of the current ray. |
+| WorldToObject3x4() | A matrix for transforming from world-space to object-space. Object-space refers to the space of the current bottom-level acceleration structure. |
+| WorldToObject4x3() | A matrix for transforming from world-space to object-space. Object-space refers to the space of the current bottom-level acceleration structure. |
+
+## Ray-tracing Types
+
+| Type name | Description |
+|--|--|
+| RayDesc | Ray Description structure. |
+| RaytracingAccelerationStructure | Ray Acceleration structure. |
+| BuiltInTriangleIntersectionAttributes | Intersection Attributes structure. |
+| RayQuery | Ray-tracing resource type for an in-progress ray-tracing query. |
+| HitObject | Immutable data type representing a ray hit or miss. |
+
