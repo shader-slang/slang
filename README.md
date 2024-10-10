@@ -34,11 +34,13 @@ The Slang system is designed to provide developers of real-time graphics applica
 Getting Started
 ---------------
 
-If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Shader Playground](docs/shader-playground.md).
-
 The fastest way to get started using Slang in your own development is to use a pre-built binary package, available through GitHub [releases](https://github.com/shader-slang/slang/releases).
+Slang binaries are also included in the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) since version 1.3.296.0.
+
 There are packages built for 32- and 64-bit Windows, as well as 64-bit Ubuntu.
 Each binary release includes the command-line `slangc` compiler, a shared library for the compiler, and the `slang.h` header.
+
+If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Shader Playground](docs/shader-playground.md).
 
 If you would like to build Slang from source, please consult the [build instructions](docs/building.md).
 
