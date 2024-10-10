@@ -107,7 +107,7 @@ struct AppendStructuredBuffer
 /// @category buffer_types
 __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer)]
 struct ByteAddressBuffer
 {
     [__readNone]
@@ -4388,15 +4388,15 @@ uint64_t __asuint64(uint2 i)
 //
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer)]
 T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset, int alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
 T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset, int alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
 T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
@@ -4583,7 +4583,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
     uint Load(int location)
     {
         __target_switch
