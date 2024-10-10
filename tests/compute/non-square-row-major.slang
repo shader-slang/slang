@@ -9,6 +9,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-vk -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-cuda -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PACKED): -slang -output-using-type -shaderobj -mtl
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 
 // matrix<R, C>

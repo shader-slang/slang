@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST_DISABLED(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Note: can't actually test this on Vulkan right now because
 // the support in render-test isn't good enough.
