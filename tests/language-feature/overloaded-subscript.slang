@@ -38,7 +38,8 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1,1,1)]
 void computeMain()
 {
-    MyArray<int> arr = {};
+    // note: MyArray<int> arr = {} doesn't work anymore.
+    MyArray<int> arr = {{1, 2, 3, 4}};
     arr[0] = 1;
     arr[1] = 2;
     // CHECK: 1
