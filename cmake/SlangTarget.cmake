@@ -18,6 +18,9 @@ function(slang_add_target dir type)
         WIN32_EXECUTABLE
         # Install this target for a non-component install
         INSTALL
+        # Don't include any source in this target, this is a complement to
+        # EXPLICIT_SOURCE, and doesn't interact with EXTRA_SOURCE_DIRS
+        NO_SOURCE
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -35,6 +38,10 @@ function(slang_add_target dir type)
         # ${EXPORT_MACRO_PREFIX}_DYNAMIC_EXPORT macros are set for using and
         # building respectively
         EXPORT_MACRO_PREFIX
+        # Ignore target type and use a particular style of export macro
+        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT 
+        # pass in STATIC or SHARED
+        EXPORT_TYPE_AS
         # The folder in which to place this target for IDE-based generators (VS
         # and XCode)
         FOLDER
@@ -115,7 +122,8 @@ function(slang_add_target dir type)
     #
     # Find the source for this target
     #
-    if(ARG_EXPLICIT_SOURCE)
+    if(ARG_NO_SOURCE)
+    elseif(ARG_EXPLICIT_SOURCE)
         list(APPEND source ${ARG_EXPLICIT_SOURCE})
     else()
         slang_glob_sources(source ${dir})
@@ -269,6 +277,8 @@ function(slang_add_target dir type)
         if(
             target_type STREQUAL SHARED_LIBRARY
             OR target_type STREQUAL MODULE_LIBRARY
+            OR ARG_EXPORT_TYPE_AS STREQUAL SHARED
+            OR ARG_EXPORT_TYPE_AS STREQUAL MODULE
         )
             target_compile_definitions(
                 ${target}
@@ -277,11 +287,14 @@ function(slang_add_target dir type)
             )
         elseif(
             target_type STREQUAL STATIC_LIBRARY
+            OR ARG_EXPORT_TYPE_AS STREQUAL STATIC
         )
             target_compile_definitions(
                 ${target}
                 PUBLIC "${ARG_EXPORT_MACRO_PREFIX}_STATIC"
             )
+        else()
+            message(WARNING "unhandled case in slang_add_target while setting export macro")
         endif()
     endif()
 
