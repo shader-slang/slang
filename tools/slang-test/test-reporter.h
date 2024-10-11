@@ -23,7 +23,7 @@ enum class TestOutputMode
 
 class TestReporter : public ITestReporter
 {
-    public:
+public:
 
     struct TestInfo
     {
