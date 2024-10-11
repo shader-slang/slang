@@ -75,8 +75,8 @@ source ./emsdk_env # For Windows, emsdk_env.bat
 popd
 emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja"
 
-# Build build.em/Release/bin/libslang.a
-cmake --build --preset emscripten --target slang
+# Build slang-wasm.js and slang-wasm.wasm in build.em/Release/bin
+cmake --build --preset emscripten --target slang-wasm
 ```
 
 **Note:** If the last build step fails, try running the command that `emcmake` outputs, directly.

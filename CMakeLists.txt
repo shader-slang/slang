@@ -372,6 +372,22 @@ if(SLANG_ENABLE_SLANGC)
 endif()
 
 #
+# WebAssembly bindings for Slang
+#
+# This is an executable target because emcmake produces .a files without bindings if you just create a static library
+# https://stackoverflow.com/questions/63622009/static-library-built-with-cmake-as-a-with-emscripten-instead-of-wasm-js
+slang_add_target(
+  source/slang-wasm
+  EXECUTABLE
+  EXCLUDE_FROM_ALL
+  USE_FEWER_WARNINGS
+  LINK_WITH_PRIVATE miniz lz4_static slang core compiler-core
+  INCLUDE_DIRECTORIES_PUBLIC include source/slang-wasm
+)
+# To generate binding code
+target_link_options(slang-wasm PUBLIC "--bind")
+
+#
 # Our wrappers for glslang and llvm
 #
 if(SLANG_ENABLE_SLANG_GLSLANG)
