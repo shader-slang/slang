@@ -34,11 +34,13 @@ The Slang system is designed to provide developers of real-time graphics applica
 Getting Started
 ---------------
 
-If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Shader Playground](docs/shader-playground.md).
-
 The fastest way to get started using Slang in your own development is to use a pre-built binary package, available through GitHub [releases](https://github.com/shader-slang/slang/releases).
+Slang binaries are also included in the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) since version 1.3.296.0.
+
 There are packages built for 32- and 64-bit Windows, as well as 64-bit Ubuntu.
 Each binary release includes the command-line `slangc` compiler, a shared library for the compiler, and the `slang.h` header.
+
+If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Shader Playground](docs/shader-playground.md).
 
 If you would like to build Slang from source, please consult the [build instructions](docs/building.md).
 
@@ -46,6 +48,8 @@ Documentation
 -------------
 
 The Slang project provides a variety of different [documentation](docs/), but most users would be well served starting with the [User's Guide](https://shader-slang.github.io/slang/user-guide/).
+
+For developers writing Slang code, the [Slang Standard Library Reference](https://shader-slang.com/stdlib-reference/) provides detailed documentation on Slang's built-in types and functions.
 
 We also provide a few [examples](examples/) of how to integrate Slang into a rendering application.
 
@@ -71,11 +75,19 @@ Limitations and Support
 -----------------------
 
 ### Platform support
+
+The Slang compiler and libraries can be built on the following platforms:
+
 |   Windows       |     Linux      |    MacOS     |      WebAssembly     |
 |:---------------:|:--------------:|:------------:|:--------------------:|
 |   supported     |   supported    |  supported   |      experimental    |
 
+Both `x86_64` and `arm64` architectures are supported on Windows, Linux and MacOS platforms.
+
 ### Target support
+
+Slang can compile shader code to the following targets:
+
 |   Target         |     Status     |     Output Formats     |
 |:----------------:|:--------------:|:----------------------:|
 |  Direct3D 11     |    supported   |  HLSL                   |
