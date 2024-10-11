@@ -29,6 +29,9 @@ struct DocumentPage : public RefObject
     OrderedHashSet<ASTMarkup::Entry*> entries;
     ASTMarkup::Entry* getFirstEntry() { return *entries.begin(); }
     void writeToDisk();
+
+    // Write summary on number of documented entries.
+    void writeSummary(UnownedStringSlice fileName);
 };
 
 struct DocumentationConfig
