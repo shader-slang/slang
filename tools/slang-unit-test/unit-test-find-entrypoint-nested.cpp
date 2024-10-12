@@ -22,7 +22,6 @@ SLANG_UNIT_TEST(findEntryPointNested)
         [shader("raygeneration")]
         void inner()
         {
-            return pos;
         }
         [shader("raygeneration")]
         void outer()
