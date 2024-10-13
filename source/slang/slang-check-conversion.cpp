@@ -403,6 +403,12 @@ namespace Slang
 
         bool isCStyle = isCStyleStruct(structDecl);
 
+        DiagnosticSink tempSink(getSourceManager(), nullptr);
+        SemanticsVisitor subVisitor(withSink(&tempSink));
+
+        // First make sure the struct is fully checked, otherwise the synthesized constructor may not be created yet.
+        subVisitor.ensureDecl(structDecl, DeclCheckState::DefinitionChecked);
+
         if (structDecl->m_synthesizedCtorMap.getCount() == 0)
         {
             return false;
@@ -410,9 +416,6 @@ namespace Slang
 
         List<Expr*> coercedArgs;
         auto ctorInvokeExpr = _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
-
-        DiagnosticSink tempSink(getSourceManager(), nullptr);
-        SemanticsVisitor subVisitor(withSink(&tempSink));
         ctorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
 
         if (ctorInvokeExpr)

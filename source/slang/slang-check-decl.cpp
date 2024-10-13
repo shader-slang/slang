@@ -24,6 +24,7 @@ namespace Slang
     static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl);
     static List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut);
     static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
+    void addVisibilityModifier(ASTBuilder* builder, Decl* decl, DeclVisibility vis);
 
         /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
     struct SemanticsDeclModifiersVisitor
@@ -1997,7 +1998,7 @@ private:
             addModifier(func, m_astBuilder->create<TreatAsDifferentiableAttribute>());
     }
 
-    static ConstructorDecl* _createCtor(SemanticsDeclVisitorBase* visitor, ASTBuilder* m_astBuilder, AggTypeDecl* decl)
+    static ConstructorDecl* _createCtor(SemanticsDeclVisitorBase* visitor, ASTBuilder* m_astBuilder, AggTypeDecl* decl, DeclVisibility ctorVisibility)
     {
         auto ctor = m_astBuilder->create<ConstructorDecl>();
         addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
@@ -2024,6 +2025,7 @@ private:
         ctor->addTag(ConstructorDecl::ConstructorTags::Synthesized);
         decl->addMember(ctor);
         addAutoDiffModifiersToFunc(visitor, m_astBuilder, ctor);
+        addVisibilityModifier(m_astBuilder, ctor, ctorVisibility);
         return ctor;
     }
 
@@ -11438,7 +11440,7 @@ private:
 
         // synthesize the constructor signature:
         // 1. The constructor's name is always `$init`, we create one without parameters now.
-        ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl);
+        ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl, ctorVisibility);
         ctor->addTag(ConstructorDecl::ConstructorTags::MemberInitCtor);
         structDecl->m_synthesizedCtorMap.addIfNotExists((int)ConstructorDecl::ConstructorTags::MemberInitCtor, ctor);
 
@@ -11473,9 +11475,6 @@ private:
             }
         }
         ctor->members.reverse();
-
-        // 3. Add the necessary modifiers
-        addVisibilityModifier(getASTBuilder(), ctor, ctorVisibility);
     }
 
     void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
@@ -11489,7 +11488,8 @@ private:
         auto defaultCtor = _getDefaultCtor(structDecl);
         if (!defaultCtor)
         {
-            auto ctor = _createCtor(this, m_astBuilder, structDecl);
+            DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
+            auto ctor = _createCtor(this, m_astBuilder, structDecl, ctorVisibility);
             structDecl->m_synthesizedCtorMap.addIfNotExists((int)ConstructorDecl::ConstructorTags::Synthesized, ctor);
         }
 
