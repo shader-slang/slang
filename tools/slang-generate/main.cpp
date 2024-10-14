@@ -921,14 +921,7 @@ int main(
         outputPath << inputPath << ".temp.h";
 
         FILE* outputStream;
-        for (int retry = 0; retry < 10; retry++)
-        {
-            fopen_s(&outputStream, outputPath.getBuffer(), "w");
-            if (outputStream)
-                break;
-            fprintf(stderr, "unable to open file for writing: %s, retry in 1s...\n", outputPath.getBuffer());
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        }
+        fopen_s(&outputStream, outputPath.getBuffer(), "w");
         if (!outputStream)
         {
             fprintf(stderr, "unable to open file for writing: %s.\n", outputPath.getBuffer());
