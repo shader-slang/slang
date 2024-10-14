@@ -87,6 +87,8 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_target(generate_stdlib_headers DEPENDS ${stdlib_meta_generated_headers})
+
 #
 # Generate embedded stdlib source
 #
@@ -106,6 +108,7 @@ set(stdlib_source_common_args
     EXPLICIT_SOURCE 
       ./slang-embedded-stdlib-source.cpp
       ${stdlib_meta_generated_headers}
+    REQUIRES generate_stdlib_headers
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_STDLIB_SOURCE
     INCLUDE_DIRECTORIES_PRIVATE 
       ${stdlib_meta_output_dir}
