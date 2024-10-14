@@ -920,7 +920,19 @@ int main(
         outputPath << inputPath << ".temp.h";
 
         FILE* outputStream;
-        fopen_s(&outputStream, outputPath.getBuffer(), "w");
+        for (int retry = 0; retry < 10; retry++)
+        {
+            fopen_s(&outputStream, outputPath.getBuffer(), "w");
+            if (outputStream)
+                break;
+            fprintf(stderr, "unable to open file for writing: %s, retry in 1s...\n", outputPath.getBuffer());
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+        if (!outputStream)
+        {
+            fprintf(stderr, "unable to open file for writing: %s.\n", outputPath.getBuffer());
+            exit(1);
+        }
 
         emitTemplateNodes(sourceFile, outputStream, node);
 

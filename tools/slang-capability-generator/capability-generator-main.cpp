@@ -1267,11 +1267,13 @@ int main(int argc, const char* const* argv)
             argc >= 1 ? argv[0] : "slang-capabilities-generator");
         return 1;
     }
-    String targetDir;
+    String targetDir, outDocPath;
     for (int i = 0; i < argc - 1; i++)
     {
         if (strcmp(argv[i], "--target-directory") == 0)
             targetDir = argv[i + 1];
+        if (strcmp(argv[i], "--doc") == 0)
+            outDocPath = argv[i + 1];
     }
 
     String inPath = argv[1];
@@ -1299,7 +1301,6 @@ int main(int argc, const char* const* argv)
         return 1;
     }
 
-    auto outDocPath = Path::combine(targetDir, "../../docs/user-guide/a3-02-reference-capability-atoms.md");
     if (!File::exists(outDocPath))
     {
         sink.diagnose(SourceLoc(), Diagnostics::couldNotFindValidDocumentationOutputPath, outDocPath);
