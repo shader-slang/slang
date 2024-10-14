@@ -200,12 +200,13 @@ public:
 #endif
 
 //
-// Assertions abort in debug builds, no-op in release builds
+// Assertions abort in debug builds, but inform the compiler of true
+// assumptions in release builds
 //
 #ifdef _DEBUG
 #define SLANG_ASSERT(VALUE) do{if(!(VALUE)) SLANG_ASSERT_FAILURE(#VALUE);} while(0)
 #else
-#define SLANG_ASSERT(VALUE) SLANG_UNUSED((VALUE))
+#define SLANG_ASSERT(VALUE) SLANG_ASSUME(VALUE)
 #endif
 
 #define SLANG_RELEASE_ASSERT(VALUE) if(VALUE) {} else SLANG_ASSERT_FAILURE(#VALUE)
