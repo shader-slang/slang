@@ -8,6 +8,13 @@ if(NOT CMAKE_MESSAGE_LOG_LEVEL)
     set(CMAKE_MESSAGE_LOG_LEVEL NOTICE)
 endif()
 
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.25")
+    set(system SYSTEM)
+else()
+    message(STATUS "CMake 3.25 is required to suppress warnings originating in headers in external/ but you are using ${CMAKE_VERSION}, be prepared for some warnings")
+    set(system)
+endif()
+
 # Similarly, disable warnings for external projects
 if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     if(MSVC)
@@ -18,12 +25,12 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
 endif()
 
 if (NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
-    add_subdirectory(unordered_dense EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(unordered_dense EXCLUDE_FROM_ALL ${system})
 endif()
 
 # Miniz
 if (NOT ${SLANG_USE_SYSTEM_MINIZ})
-    add_subdirectory(miniz EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(miniz EXCLUDE_FROM_ALL ${system})
     set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
     # Work around https://github.com/richgel999/miniz/pull/292
     get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
@@ -36,7 +43,7 @@ endif()
 # LZ4
 if (NOT ${SLANG_USE_SYSTEM_LZ4})
     set(LZ4_BUNDLED_MODE ON)
-    add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL ${system})
     if(MSVC)
 		target_compile_options(
 		    lz4_static
@@ -47,7 +54,7 @@ endif()
 
 # Vulkan headers
 if (NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
-    add_subdirectory(vulkan EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
 endif()
 
 # metal-cpp headers
@@ -56,7 +63,7 @@ target_include_directories(metal-cpp INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-
 
 # SPIRV-Headers
 if (NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
-    add_subdirectory(spirv-headers EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
 endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
@@ -65,13 +72,13 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     set(SPIRV_WERROR OFF)
     set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
     set(SPIRV_SKIP_TESTS ON)
-    add_subdirectory(spirv-tools EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
 
     # glslang
     set(SKIP_GLSLANG_INSTALL ON)
     set(ENABLE_OPT ON)
     set(ENABLE_PCH OFF)
-    add_subdirectory(glslang EXCLUDE_FROM_ALL SYSTEM)
+    add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
 endif()
 
 # imgui

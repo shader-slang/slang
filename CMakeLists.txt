@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.22)
 
 # Our module dir, include that now so that we can get the version automatically
 # from git describe
@@ -15,7 +15,9 @@ set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
 #
 # Global CMake options
 #
-cmake_policy(SET CMP0135 OLD)
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24")
+    cmake_policy(SET CMP0135 OLD)
+endif()
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.25")
