@@ -9,7 +9,7 @@ version of Slang.
 
 Please install:
 
-- CMake
+- CMake (3.25 preferred, but 3.22 works[^cmake-version])
 - A C++ compiler with support for C++17. GCC, Clang and MSVC are supported
 - A CMake compatible backend, for example Visual Studio or Ninja
 
@@ -31,6 +31,8 @@ git clone https://github.com/shader-slang/slang --recursive
 ```
 
 ## Configure and build
+
+> This section assumes cmake 3.25 or greater, if you're on a lower version please see [building with an older cmake](#older-cmake)
 
 For a Ninja based build system (all platforms) run:
 ```bash
@@ -217,3 +219,21 @@ rm -rf build # The Visual Studio generator will complain if this is left over fr
 cmake --preset vs2022 --fresh -A arm64 -DSLANG_GENERATORS_PATH=generators/bin
 cmake --build --preset release
 ```
+
+## Building with an older CMake {#older-cmake}
+
+Because older CMake versions don't support all the features we want to use in
+CMakePresets, you'll have to do without the presets. Something like the following
+
+```bash
+cmake -B build -G Ninja
+cmake --build build -j
+```
+
+## Notes
+
+[^cmake-version] below 3.25, CMake lacks the ability to mark directories as being system
+directories
+(https://cmake.org/cmake/help/latest/prop_tgt/SYSTEM.html#prop_tgt:SYSTEM),
+this leads to an inability to suppress warnings originating in the dependencies
+in `./external`, so be prepared for some additional warnings.
