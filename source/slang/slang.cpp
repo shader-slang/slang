@@ -331,6 +331,7 @@ void Session::writeStdlibDoc(String config)
         auto rootPage = writer.writeAll(config.getUnownedSlice());
         File::writeAllText("toc.html", writer.writeTOC());
         rootPage->writeToDisk();
+        rootPage->writeSummary(toSlice("summary.txt"));
     }
     ComPtr<ISlangBlob> diagnosticBlob;
     sink.getBlobIfNeeded(diagnosticBlob.writeRef());

@@ -2728,6 +2728,63 @@ void DocumentPage::writeToDisk()
     writePageToDisk(this);
 }
 
+struct DocumentationStats
+{
+    int documentedPageCount = 0;
+    List<String> undocumentedPages;
+};
+
+static void _collectStats(DocumentationStats& stats, DocumentPage* page)
+{
+    if (!page->skipWrite && page->entries.getCount() != 0)
+    {
+        bool isDocumented = false;
+        for (auto entry : page->entries)
+        {
+            if (entry->m_markup.getUnownedSlice().trim().getLength() > 0)
+            {
+                DeclDocumentation doc;
+                doc.parse(entry->m_markup.getUnownedSlice());
+                auto desc = doc.sections.tryGetValue(DocPageSection::Description);
+                // A page is considered documented if it has a description section
+                // with more than 10 characters and ends with a `.`.
+                if (desc && desc->ownedText.trim().getLength() > 10 &&
+                    String(desc->ownedText.trim()).endsWith("."))
+                {
+                    isDocumented = true;
+                }
+                break;
+            }
+        }
+        if (isDocumented)
+        {
+            stats.documentedPageCount++;
+        }
+        else
+        {
+            stats.undocumentedPages.add(page->title);
+        }
+    }
+    for (auto child : page->children)
+    {
+        _collectStats(stats, child);
+    }
+}
+
+void DocumentPage::writeSummary(UnownedStringSlice fileName)
+{
+    DocumentationStats stats;
+    _collectStats(stats, this);
+    StringBuilder sb;
+    sb << "documented pages: " << stats.documentedPageCount << "\n";
+    sb << "undocumented pages: " << stats.undocumentedPages.getCount() <<"("
+        << String(stats.undocumentedPages.getCount() / (float)(stats.documentedPageCount + stats.undocumentedPages.getCount()) * 100, "%.1f")
+        << "%)\n\n";
+    for (auto page : stats.undocumentedPages)
+        sb << page << "\n";
+    File::writeAllText(fileName, sb.produceString());
+}
+
 DocumentPage* DocumentPage::findChildByShortName(const UnownedStringSlice& name)
 {
     for (auto child : children)
