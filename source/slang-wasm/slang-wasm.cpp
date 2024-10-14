@@ -45,9 +45,9 @@ Session* GlobalSession::createSession()
         SessionDesc sessionDesc = {};
         sessionDesc.structureSize = sizeof(sessionDesc);
         constexpr SlangInt targetCount = 1;
-        TargetDesc targets[targetCount] = {
-            {.structureSize = sizeof(TargetDesc), .format = SLANG_WGSL}
-        };
+        TargetDesc targets[targetCount] = {};
+        targets[0].structureSize = sizeof(TargetDesc);
+        targets[0].format = SLANG_WGSL;
         sessionDesc.targets = targets;
         sessionDesc.targetCount = targetCount;
         SlangResult result = m_interface->createSession(sessionDesc, &session);
