@@ -390,35 +390,29 @@ function(slang_add_target dir type)
     #
     # Mark for installation
     #
-    if(ARG_INSTALL OR ARG_INSTALL_COMPONENT)
-        set(component_args)
-        if(ARG_INSTALL_COMPONENT)
-            set(component_args COMPONENT ${ARG_INSTALL_COMPONENT})
-        endif()
-        set(exclude_arg)
-        if(NOT ARG_INSTALL)
-            set(exclude_arg EXCLUDE_FROM_ALL)
-        endif()
+    macro(i)
         install(
             TARGETS ${target}
             EXPORT SlangTargets
             ARCHIVE
             DESTINATION ${archive_subdir}
-            ${component_args}
-            ${exclude_arg}
+            ${ARGN}
             LIBRARY
             DESTINATION ${library_subdir}
-            ${component_args}
-            ${exclude_arg}
+            ${ARGN}
             RUNTIME
             DESTINATION ${runtime_subdir}
-            ${component_args}
-            ${exclude_arg}
+            ${ARGN}
             PUBLIC_HEADER
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            ${component_args}
-            ${exclude_arg}
+            ${ARGN}
         )
+    endmacro()
+    if(ARG_INSTALL)
+        i()
+    endif()
+    if(ARG_INSTALL_COMPONENT)
+        i(EXCLUDE_FROM_ALL COMPONENT ${ARG_INSTALL_COMPONENT})
     endif()
 endfunction()
 
