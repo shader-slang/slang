@@ -225,7 +225,9 @@ SLANG_API SlangCompileRequest* spCreateCompileRequest(
 {
     slang::ICompileRequest* request = nullptr;
     // Will return with suitable ref count
+    SLANG_ALLOW_DEPRECATED_BEGIN
     session->createCompileRequest(&request);
+    SLANG_ALLOW_DEPRECATED_END
     return request;
 }
 

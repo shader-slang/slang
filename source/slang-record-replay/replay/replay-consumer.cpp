@@ -385,7 +385,9 @@ namespace SlangRecord
 
         slang::IGlobalSession* globalSession = getObjectPointer<slang::IGlobalSession>(objectId);
         slang::ICompileRequest* outRequest {};
+        SLANG_ALLOW_DEPRECATED_BEGIN
         SlangResult res = globalSession->createCompileRequest(&outRequest);
+        SLANG_ALLOW_DEPRECATED_END
 
         if (outRequest && SLANG_SUCCEEDED(res))
         {
