@@ -200,8 +200,15 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         // defensive and bail out in the failure case in release builds.
         //
         auto funcLayoutDecoration = entryPointFunc->findDecoration<IRLayoutDecoration>();
-        SLANG_ASSERT(funcLayoutDecoration);
-        if(!funcLayoutDecoration)
+
+        // If the module contains two functions with entrypoint decorations,
+        // and one entrypoint calls the other entrypoint, and the user
+        // tells us to compile the caller entrypoint but not the callee
+        // entrypoint, we will not have the layout decoration created for
+        // the callee entrypoint. In this case, we should simply treat the
+        // callee entrypoint as if it is an ordinary function and skip the
+        // rest of the logic here.
+        if (!funcLayoutDecoration)
             return;
 
         auto entryPointLayout = as<IREntryPointLayout>(funcLayoutDecoration->getLayout());

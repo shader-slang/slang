@@ -5919,7 +5919,7 @@ namespace Slang
             intrinsicOpModifier->op = kIROp_IntCast;
             break;
         default:
-            SLANG_ASSERT("unknown builtin requirement kind.");
+            SLANG_UNEXPECTED("unknown builtin requirement kind.");
         }
         synFunc->loc = context->parentDecl->closingSourceLoc;
         synFunc->nameAndLoc.loc = synFunc->loc;

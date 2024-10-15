@@ -334,7 +334,12 @@ generator(
     source/slangc
     TARGET_NAME slang-bootstrap
     USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup slang-lookup-tables Threads::Threads
+    LINK_WITH_PRIVATE 
+        prelude 
+        slang-without-embedded-stdlib 
+        slang-capability-lookup 
+        slang-lookup-tables 
+        Threads::Threads
 )
 
 #
@@ -344,6 +349,7 @@ generator(
 # keep these non-trivial targets in their own directories so as not to clutter
 # this file
 add_subdirectory(prelude)
+add_subdirectory(source/slang-stdlib)
 add_subdirectory(source/slang)
 
 if(SLANG_ENABLE_SLANGD)
@@ -371,6 +377,23 @@ if(SLANG_ENABLE_SLANGC)
     )
 endif()
 
+#
+# WebAssembly bindings for Slang
+#
+# This is an executable target because emcmake produces .a files without bindings if you just create a static library
+# https://stackoverflow.com/questions/63622009/static-library-built-with-cmake-as-a-with-emscripten-instead-of-wasm-js
+if (EMSCRIPTEN)
+    slang_add_target(
+        source/slang-wasm
+        EXECUTABLE
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE miniz lz4_static slang core compiler-core
+        INCLUDE_DIRECTORIES_PUBLIC include source/slang-wasm
+    )
+    # To generate binding code
+    target_link_options(slang-wasm PUBLIC "--bind")
+endif()
 #
 # Our wrappers for glslang and llvm
 #

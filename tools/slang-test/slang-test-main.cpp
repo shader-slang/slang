@@ -4644,7 +4644,8 @@ SlangResult innerMain(int argc, char** argv)
         static constexpr int kFailedTestLimitForRetry = 16;
         if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
-            printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
+            if (context.failedFileTests.getCount() > 0)
+                printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
             for (auto& test : context.failedFileTests)
             {
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
