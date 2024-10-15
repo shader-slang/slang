@@ -1,5 +1,6 @@
 // gh-775-ext.slang
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 int test(int inVal)
 {
