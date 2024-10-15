@@ -223,16 +223,38 @@ String DocMarkdownWriter::_getFullName(Decl* decl)
 
 String _translateNameToPath(const UnownedStringSlice& name)
 {
+    // We will generate an all-lowercase file name based on the name of the decl.
+    // We do so by converting all capital letters to lowercase, and append a disambiguator
+    // postfix at the end that tracks the location of the capital letters in the original name.
+    // For example, `MyType` will be converted to `mytype-02`, because there is one capital letter
+    // at location 0 and one at location 2.
+    // To prevent URL issues, all leading underscores are replaced with '0', and we
+    // will also append the location of the replaced character to the disambiguator postfix.
+    // For example, `_MyType` will be converted to `0mytype-013`.
+    // To keep disambiguators short, we use base 36 to represent each location.
+
     StringBuilder buf;
-    for (const char c : name)
+    StringBuilder disambiguatorSB;
+    for (Index i = 0; i < name.getLength(); i++)
     {
+        auto c = name[i];
         // Removing leading underscores to prevent url issues.
         if (c == '_' && buf.getLength() == 0)
+        {
+            disambiguatorSB.append(String(i, 36));
+            buf.appendChar('0');
             continue;
+        }
 
         if (c == ' ')
         {
             buf.appendChar('-');
+        }
+        else if (c >= 'A' && c <= 'Z')
+        {
+            // Convert to lower case.
+            buf.appendChar((char)(c - 'A' + 'a'));
+            disambiguatorSB.append(String(i, 36));
         }
         else if (CharUtil::isAlphaOrDigit(c) || c == '_')
         {
@@ -243,6 +265,11 @@ String _translateNameToPath(const UnownedStringSlice& name)
             buf.appendChar('x');
             buf << String((int)c, 16);
         }
+    }
+    if (disambiguatorSB.getLength())
+    {
+        buf << "-";
+        buf << disambiguatorSB.produceString().toLower();
     }
     return buf;
 }
@@ -262,6 +289,10 @@ String DocMarkdownWriter::_getDocFilePath(Decl* decl)
         else if (as<AggTypeDeclBase>(decl) || as<TypeDefDecl>(decl))
         {
             sb << "types/";
+        }
+        else if (as<AttributeDecl>(decl))
+        {
+            sb << "attributes/";
         }
         else
         {
@@ -319,12 +350,15 @@ DocMarkdownWriter::NameAndText DocMarkdownWriter::_getNameAndText(ASTMarkup::Ent
     StringBuilder sb;
     if (auto varDeclBase = as<VarDeclBase>(decl))
     {
-        sb << " : " << varDeclBase->type->toString();
-
-        if (varDeclBase->initExpr)
+        if (varDeclBase->type)
         {
-            sb << " = ";
-            _appendExpr(sb, varDeclBase->initExpr);
+            sb << " : " << varDeclBase->type->toString();
+
+            if (varDeclBase->initExpr)
+            {
+                sb << " = ";
+                _appendExpr(sb, varDeclBase->initExpr);
+            }
         }
     }
     else if (auto typeParam = as<GenericTypeParamDeclBase>(decl))
@@ -627,6 +661,71 @@ void DocMarkdownWriter::writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl*
     declDoc.writeSection(out, this, typeDefDecl, DocPageSection::Remarks);
     declDoc.writeSection(out, this, typeDefDecl, DocPageSection::Example);
     declDoc.writeSection(out, this, typeDefDecl, DocPageSection::SeeAlso);
+}
+
+static String getAttributeName(AttributeDecl* decl)
+{
+    auto name = getText(decl->getName());
+    if (name.startsWith("vk_"))
+    {
+        return String("vk::") + String(name.getUnownedSlice().tail(3));
+    }
+    return name;
+}
+
+void DocMarkdownWriter::writeAttribute(const ASTMarkup::Entry& entry, AttributeDecl* attributeDecl)
+{
+    auto& out = *m_builder;
+
+    out << toSlice("# attribute [");
+    out << escapeMarkdownText(getAttributeName(attributeDecl));
+    out << toSlice("]\n\n");
+    DeclDocumentation declDoc;
+    declDoc.parse(entry.m_markup.getUnownedSlice());
+    declDoc.writeDescription(out, this, attributeDecl);
+    registerCategory(m_currentPage, declDoc);
+
+    out << toSlice("## Signature\n\n");
+    List<Decl*> paramDecls;
+    for (auto param : attributeDecl->getMembersOfType<ParamDecl>())
+    {
+        paramDecls.add(param);
+    }
+    out << "<pre>\n";
+    out << "[" << translateToHTMLWithLinks(attributeDecl, getAttributeName(attributeDecl));
+    if (paramDecls.getCount() > 0)
+    {
+        out << "(";
+        for (Index i = 0; i < paramDecls.getCount(); i++)
+        {
+            if (i > 0)
+                out << ", ";
+            auto param = paramDecls[i];
+            out << translateToHTMLWithLinks(attributeDecl, _getName(param));
+            auto type = as<ParamDecl>(param)->type;
+            if (type)
+            {
+                out << " : ";
+                out << translateToHTMLWithLinks(attributeDecl, type->toString());
+            }
+        }
+        out << ")";
+    }
+    out << "]\n</pre>\n\n";
+
+    if (paramDecls.getCount() > 0)
+    {
+        out << "## Parameters\n\n";
+
+        // Document ordinary parameters
+        _appendAsBullets(_getUniqueParams(paramDecls, &declDoc), false, 0);
+
+        out << toSlice("\n");
+    }
+
+    declDoc.writeSection(out, this, attributeDecl, DocPageSection::Remarks);
+    declDoc.writeSection(out, this, attributeDecl, DocPageSection::Example);
+    declDoc.writeSection(out, this, attributeDecl, DocPageSection::SeeAlso);
 }
 
 void DocMarkdownWriter::writeExtensionConditions(StringBuilder& out, ExtensionDecl* extensionDecl, const char* prefix, bool isHtml)
@@ -1125,15 +1224,18 @@ void ParsedDescription::parse(UnownedStringSlice text)
     ownedText = text;
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(text, lines);
+    Index codeBlockIndent = 0;
     bool isInCodeBlock = false;
     for (auto line : lines)
     {
+        auto originalLine = line;
         line = line.trim();
         if (line.startsWith("```"))
         {
             isInCodeBlock = !isInCodeBlock;
             spans.add({ line, DocumentationSpanKind::OrdinaryText});
             spans.add({ toSlice("\n"), DocumentationSpanKind::OrdinaryText });
+            codeBlockIndent = originalLine.indexOf('`');
             continue;
         }
 
@@ -1169,6 +1271,18 @@ void ParsedDescription::parse(UnownedStringSlice text)
         }
         else
         {
+            line = originalLine;
+            for (Index i = 0; i < codeBlockIndent; i++)
+            {
+                if (line.startsWith(" "))
+                {
+                    line = line.tail(1);
+                }
+                else
+                {
+                    break;
+                }
+            }
             spans.add({ line, DocumentationSpanKind::OrdinaryText });
             spans.add({ toSlice("\n"), DocumentationSpanKind::OrdinaryText });
         }
@@ -1183,7 +1297,8 @@ void DeclDocumentation::parse(const UnownedStringSlice& text)
     Dictionary<DocPageSection, StringBuilder> sectionBuilders;
     for (Index ptr = 0; ptr < lines.getCount(); ptr++)
     {
-        auto line = lines[ptr].trim();
+        auto originalLine = lines[ptr];
+        auto line = originalLine.trim();
         if (line.startsWith("@param"))
         {
             currentSection = DocPageSection::Parameter;
@@ -1279,6 +1394,10 @@ void DeclDocumentation::parse(const UnownedStringSlice& text)
                 categoryName = line.trim();
             }
             continue;
+        }
+        else
+        {
+            line = originalLine;
         }
         sectionBuilders[currentSection] << line << "\n";
 
@@ -2201,7 +2320,7 @@ void DeclDocumentation::writeSection(StringBuilder& out, DocMarkdownWriter* writ
     }
 }
 
-void DocMarkdownWriter::createPage(DocMarkdownWriter::WriteDeclMode mode, ASTMarkup::Entry& entry, Decl* decl)
+void DocMarkdownWriter::createPage(ASTMarkup::Entry& entry, Decl* decl)
 {
     // Skip these they will be output as part of their respective 'containers'
     if (as<ParamDecl>(decl) ||
@@ -2218,35 +2337,33 @@ void DocMarkdownWriter::createPage(DocMarkdownWriter::WriteDeclMode mode, ASTMar
     {
         if (_isFirstOverridden(callableDecl))
         {
-            if (mode == WriteDeclMode::Header)
-                ensureDeclPageCreated(entry);
+            ensureDeclPageCreated(entry);
         }
     }
     else if (as<EnumDecl>(decl))
     {
-        if (mode == WriteDeclMode::Header)
-            ensureDeclPageCreated(entry);
+        ensureDeclPageCreated(entry);
     }
     else if (as<AggTypeDeclBase>(decl))
     {
-        if (mode == WriteDeclMode::Header)
-            ensureDeclPageCreated(entry);
+        ensureDeclPageCreated(entry);
     }
     else if (as<VarDecl>(decl))
     {
         // If part of aggregate type will be output there.
-        if (mode == WriteDeclMode::Header)
-            ensureDeclPageCreated(entry);
+        ensureDeclPageCreated(entry);
     }
     else if (as<TypeDefDecl>(decl))
     {
-        if (mode == WriteDeclMode::Header)
-            ensureDeclPageCreated(entry);
+        ensureDeclPageCreated(entry);
     }
     else if (as<PropertyDecl>(decl))
     {
-        if (mode == WriteDeclMode::Header)
-            ensureDeclPageCreated(entry);
+        ensureDeclPageCreated(entry);
+    }
+    else if (as<AttributeDecl>(decl))
+    {
+        ensureDeclPageCreated(entry);
     }
     else if (as<GenericDecl>(decl))
     {
@@ -2504,6 +2621,7 @@ DocumentPage* DocMarkdownWriter::writeAll(UnownedStringSlice configStr)
 
     m_interfacesPage = addBuiltinPage(m_rootPage.get(), toSlice("interfaces/index.md"), toSlice("Interfaces"), toSlice("Interfaces"));
     m_typesPage = addBuiltinPage(m_rootPage.get(), toSlice("types/index.md"), toSlice("Types"), toSlice("Types"));
+    m_attributesPage = addBuiltinPage(m_rootPage.get(), toSlice("attributes/index.md"), toSlice("Attributes"), toSlice("Attributes"));
     m_globalDeclsPage = addBuiltinPage(m_rootPage.get(), toSlice("global-decls/index.md"), toSlice("Global Declarations"), toSlice("Global Declarations"));
 
     // In the first pass, we create all the pages so we can reference them
@@ -2514,7 +2632,7 @@ DocumentPage* DocMarkdownWriter::writeAll(UnownedStringSlice configStr)
     
         if (decl && isVisible(entry))
         {
-            createPage(WriteDeclMode::Header, entry, decl);
+            createPage(entry, decl);
         }
     }
     // In the second pass, actually writes the content to each page.
@@ -2522,6 +2640,7 @@ DocumentPage* DocMarkdownWriter::writeAll(UnownedStringSlice configStr)
 
     generateSectionIndexPage(m_interfacesPage);
     generateSectionIndexPage(m_typesPage);
+    generateSectionIndexPage(m_attributesPage);
     generateSectionIndexPage(m_globalDeclsPage);
 
     return m_rootPage.get();
@@ -2575,6 +2694,10 @@ void DocMarkdownWriter::writePage(DocumentPage* page)
     else if (TypeDefDecl* typeDefDecl = as<TypeDefDecl>(decl))
     {
         writeTypeDef(*page->getFirstEntry(), typeDefDecl);
+    }
+    else if (AttributeDecl* attributeDecl = as<AttributeDecl>(decl))
+    {
+        writeAttribute(*page->getFirstEntry(), attributeDecl);
     }
 }
 

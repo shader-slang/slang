@@ -1148,7 +1148,9 @@ SlangResult OptionsParser::_compileReproDirectory(SlangSession* session, EndToEn
     {
         // Create a fresh request
         ComPtr<slang::ICompileRequest> request;
+        SLANG_ALLOW_DEPRECATED_BEGIN
         SLANG_RETURN_ON_FAIL(session->createCompileRequest(request.writeRef()));
+        SLANG_ALLOW_DEPRECATED_END
 
         auto requestImpl = asInternal(request);
 

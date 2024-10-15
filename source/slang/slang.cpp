@@ -5858,7 +5858,7 @@ void Session::addBuiltinSource(
 
         SLANG_UNEXPECTED("error in Slang standard library");
     }
-
+    
     // Compiling stdlib should not yield any warnings.
     SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
 
