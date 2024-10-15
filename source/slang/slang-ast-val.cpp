@@ -120,7 +120,7 @@ String Val::toString()
 {
     StringBuilder builder;
     toText(builder);
-    return std::move(builder);
+    return builder;
 }
 
 HashCode Val::getHashCode()

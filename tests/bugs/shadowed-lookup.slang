@@ -1,4 +1,5 @@
 //TEST:COMPARE_COMPUTE_EX: -slang -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 RWStructuredBuffer<float> outputBuffer;
 

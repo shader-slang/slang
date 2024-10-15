@@ -7684,7 +7684,7 @@ namespace Slang
     {
         StringBuilder sb;
         printSlangIRAssembly(sb, module, options, sourceManager);
-        return std::move(sb);
+        return sb;
     }
 
     void dumpIR(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer)

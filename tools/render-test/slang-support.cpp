@@ -51,7 +51,9 @@ void ShaderCompilerUtil::Output::reset()
     sessionDesc.preprocessorMacros = macros.getBuffer();
 
     ComPtr<SlangCompileRequest> slangRequest = nullptr;
+    SLANG_ALLOW_DEPRECATED_BEGIN
     globalSession->createCompileRequest(slangRequest.writeRef());
+    SLANG_ALLOW_DEPRECATED_END
     out.m_requestForKernels = slangRequest;
     out.session = globalSession;
 

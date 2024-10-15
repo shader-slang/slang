@@ -267,9 +267,17 @@ static bool _canLoadSharedLibrary(const char* libName)
 #if SLANG_WINDOWS_FAMILY
         case RenderApiType::Vulkan: return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
         case RenderApiType::WebGPU:
+#if _DEBUG
+            // At the moment, some CI issue is preventing tests to run in Debug builds.
+            // As a work-around in order to allow us to enable tests in Release builds ASSP,
+            // we skip WebGPU tests in by returning false here.
+            // https://github.com/shader-slang/slang/issues/5233#issuecomment-2411380030
+            return false;
+#else
             return _canLoadSharedLibrary("webgpu_dawn") &&
                 _canLoadSharedLibrary("dxcompiler") &&
                 _canLoadSharedLibrary("dxil");
+#endif // if SLANG_DEBUG
 #elif SLANG_APPLE_FAMILY
         case RenderApiType::Vulkan: return true;
         case RenderApiType::Metal:  return true;
