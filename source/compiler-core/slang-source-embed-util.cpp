@@ -73,7 +73,7 @@ static bool _isHeaderExtension(const UnownedStringSlice& in)
     // Assume it's a header, and just use the .h extension
     StringBuilder buf;
     buf << path << toSlice(".h");
-    return std::move(buf);
+    return buf;
 }
 
 /* static */SourceEmbedUtil::Style SourceEmbedUtil::getDefaultStyle(const ArtifactDesc& desc)

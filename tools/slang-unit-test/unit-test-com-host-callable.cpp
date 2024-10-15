@@ -181,7 +181,9 @@ SlangResult ComTestContext::_runTest()
 
     // Create a compile request
     Slang::ComPtr<slang::ICompileRequest> request;
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SLANG_RETURN_ON_FAIL(slangSession->createCompileRequest(request.writeRef()));
+    SLANG_ALLOW_DEPRECATED_END
 
     // We want to compile to 'HOST_CALLABLE' here such that we can execute the Slang code.
     // 
