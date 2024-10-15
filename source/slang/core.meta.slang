@@ -3300,6 +3300,7 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 ///       x = 1; // ok
 ///    }
 /// }
+/// ```
 /// @see `[nonmutating]`.
 ///
 __attributeTarget(FunctionDeclBase)
