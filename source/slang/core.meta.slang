@@ -159,6 +159,37 @@ interface ILogical : IComparable
     __init(int val);
 }
 
+/// Represent a type that can be used for integer arithmetic operations.
+/// 
+/// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`.
+///
+/// Also implemented by `vector<T, N>` where `T` is one of the above scalar types.
+///
+/// @remarks This interface can be used to define generic functions that work with integer-like types. See example below.
+/// @example The following code defines a generic function that computes `a*b+1`, where `a`, `b` can be any integer scalar or vector types.
+/// ```csharp
+/// T compute<T:IInteger>(T a, T b)
+/// {
+///     return a * b + T(1);
+/// }
+/// 
+/// RWStructuredBuffer<int> outputBuffer;
+/// 
+/// [numthreads(1,1,1)]
+/// void test()
+/// {
+///     int a = 2;
+///     int b = 3;
+///     outputBuffer[0] = compute(a, b); // result = 2*3 + 1 = 7
+/// 
+///     int16_t2 a2 = int16_t2(2, 3);
+///     int16_t2 b2 = int16_t2(4, 5);
+///     // result2 = int16_t2(2*4 + 1, 3*5 + 1) = int16_t2(9, 16)
+///     int16_t2 result2 = compute<int16_t2>(a2, b2);
+///     outputBuffer[1] = result2.x;
+/// }
+/// ```
+///
 interface IInteger : IArithmetic, ILogical
 {
     int toInt();
@@ -169,6 +200,37 @@ interface IInteger : IArithmetic, ILogical
     __init(int64_t val);
 }
 
+/// Represent a type that can be used for floating point arithmetic operations.
+/// 
+/// Implemented by builtin scalar types: `float`, `half`, `double`.
+///
+/// Also implemented by `vector<T, N>` where `T` is one of the above scalar types.
+///
+/// @remarks This interface can be used to define generic functions that work with floating-point-like types. See example below.
+/// @example The following code defines a generic function that computes `a*b+1`, where `a`, `b` can be any floating point scalar or vector types.
+/// ```csharp
+/// T compute<T:IFloat>(T a, T b)
+/// {
+///     return a * b + T(1.0f);
+/// }
+/// 
+/// RWStructuredBuffer<float> outputBuffer;
+/// 
+/// [numthreads(1,1,1)]
+/// void test()
+/// {
+///     float a = 2.0;
+///     float b = 3.0;
+///     outputBuffer[0] = compute(a, b); // result = 2.0*3.0 + 1.0 = 7.0
+/// 
+///     half2 a2 = half2(2.0h, 3.0h);
+///     half2 b2 = half2(4.0h, 5.0h);
+///     // result2 = half2(2*4 + 1, 3*5 + 1) = half2(9, 16)
+///     half2 result2 = compute(a2, b2);
+///     outputBuffer[1] = result2.x;
+/// }
+/// ```
+///
 interface IFloat : IArithmetic, IDifferentiable
 {
     [TreatAsDifferentiable]
@@ -209,32 +271,35 @@ interface __BuiltinType
 {
 }
 
-/// A type that can be used for arithmetic operations
+/// A type that can be used for arithmetic operations. For defining generic functions that work with builtin scalar arithmetic types only.
+/// Builtin types implementing this interface: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `half`, `double`.
+/// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
 interface __BuiltinArithmeticType : __BuiltinType, IArithmetic
 {
 }
 
-/// A type that can be used for logical/bitwise operations
+/// A type that can be used for logical/bitwise operations. For defining generic functions that work with builtin scalar logical types only.
+/// Builtin types implementing this interface: `bool`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int`, `uint`, `int64_t`, `uint64_t`.
 [sealed]
 [builtin]
 interface __BuiltinLogicalType : __BuiltinType, ILogical
 {
 }
 
-/// A type that logically has a sign (positive/negative/zero)
+/// Represent builtin types that logically have a sign (positive/negative/zero).
 [sealed]
 [builtin]
 interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 
-/// A type that can represent integers
+/// Represent builtin types that can represent integers.
 [sealed]
 [builtin]
 interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
-/// A type that can represent non-integers
+/// Represent builtin types that can represent a real number.
 [sealed]
 [builtin]
 interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
@@ -404,7 +469,8 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 };
 
 
-/// A type that uses a floating-point representation
+/// Represents builtin floating point scalar types.
+/// To define generic functions that work with both scalar and vector types, use `IFloat` instead.
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
@@ -488,6 +554,10 @@ T __realCast<T : __BuiltinRealType, U : __BuiltinIntegerType>(U val);
 //@hidden:
 __intrinsic_op($(kIROp_IntCast))
 T __intCast<T : __BuiltinType, U : __BuiltinType>(U val);
+
+//@hidden:
+__intrinsic_op($(kIROp_CastIntToFloat))
+T __castIntToFloat<T:__BuiltinType, U:__BuiltinType>(U v);
 
 //@hidden:
 ${{{{
@@ -1294,6 +1364,56 @@ __intrinsic_op($(kIROp_Eql))
 vector<bool, N> __vectorEql<T, let N : int>(vector<T, N> left, vector<T, N> right);
 
 //@public:
+__generic<T:__BuiltinIntegerType, let N : int>
+extension vector<T,N> : IInteger
+{
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0] < other[0]; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0] <= other[0]; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return all(__vectorEql(this, other)); }
+    __intrinsic_op($(kIROp_Add)) This add(This other);
+    __intrinsic_op($(kIROp_Sub)) This sub(This other);
+    __intrinsic_op($(kIROp_Mul)) This mul(This other);
+    __intrinsic_op($(kIROp_Div)) This div(This other);
+    __intrinsic_op($(kIROp_FRem)) This mod(This other);
+    __intrinsic_op($(kIROp_Neg)) This neg();
+
+    __intrinsic_op($(kIROp_Lsh))
+    This shl(int value);
+
+    __intrinsic_op($(kIROp_Rsh))
+    This shr(int value);
+
+    __intrinsic_op($(kIROp_BitAnd))
+    This bitAnd(This other);
+
+    __intrinsic_op($(kIROp_BitOr))
+    This bitOr(This other);
+
+    __intrinsic_op($(kIROp_BitXor))
+    This bitXor(This other);
+
+    __intrinsic_op($(kIROp_BitNot))
+    This bitNot();
+
+    __intrinsic_op($(kIROp_And))
+    This and(This other);
+
+    __intrinsic_op($(kIROp_Or))
+    This or(This other);
+
+    __intrinsic_op($(kIROp_Not))
+    This not();
+
+    [__unsafeForceInlineEarly] int toInt() { return __intCast<int>(this[0]); }
+    [__unsafeForceInlineEarly] int64_t toInt64() { return __intCast<int64_t>(this[0]); }
+    [__unsafeForceInlineEarly] uint toUInt() { return __intCast<uint>(this[0]); }
+    [__unsafeForceInlineEarly] uint64_t toUInt64() { return __intCast<uint64_t>(this[0]); }
+    [OverloadRank(-1)]
+    [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
+    [OverloadRank(-1)]
+    [__unsafeForceInlineEarly] __init(int64_t v) { this = vector<T,N>(T(v)); }
+}
+
 __generic<T:__BuiltinFloatingPointType, let N : int>
 extension vector<T,N> : IFloat
 {
@@ -2791,8 +2911,16 @@ enum MemoryOrder
     SeqCst = $(kIRMemoryOrder_SeqCst),
 }
 
+/// Represent types that can be used in any atomic operations.
+/// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.
 [sealed] interface IAtomicable {}
+
+/// Represent types that can be used in atomic arithmetic operations.
+/// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.
 [sealed] interface IArithmeticAtomicable : IAtomicable, IArithmetic {}
+
+/// Represent types that can be used in atomic bit operations.
+/// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`.
 [sealed] interface IBitAtomicable : IArithmeticAtomicable, IInteger {}
 
 extension int : IBitAtomicable {}
@@ -2912,138 +3040,225 @@ __postfix T operator --(__ref Atomic<T> v)
 }
 // Binding Attributes
 
+//@public:
+
+/// Declare the Vulkan binding location of a global shader variable.
+/// @param binding The binding location.
+/// @param set The descriptor set index of the binding.
 __attributeTarget(DeclBase)
 attribute_syntax [vk_binding(binding: int, set: int = 0)]			: GLSLBindingAttribute;
 
+/// Declare the Vulkan binding location of a global shader variable.
+/// @param binding The binding location.
+/// @param set The descriptor set index of the binding.
 __attributeTarget(DeclBase)
 attribute_syntax [gl_binding(binding: int, set: int = 0)]			: GLSLBindingAttribute;
 
 
+/// Mark a global variable as a Vulkan shader record.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_shader_record]			                        : ShaderRecordAttribute;
+
+/// Mark a global variable as a Vulkan shader record.
 __attributeTarget(VarDeclBase)
 attribute_syntax [shader_record]			                        : ShaderRecordAttribute;
 
+/// Mark a global variable as a Vulkan push constant.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_push_constant]									: PushConstantAttribute;
+
+/// Mark a global variable as a Vulkan push constant.
 __attributeTarget(VarDeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
 
+/// Mark a global variable as a Vulkan specialization constant.
 __attributeTarget(VarDeclBase)
 attribute_syntax[vk_specialization_constant] : SpecializationConstantAttribute;
+/// Mark a global variable as a Vulkan specialization constant.
 __attributeTarget(VarDeclBase)
 attribute_syntax[SpecializationConstant] : SpecializationConstantAttribute;
+/// Mark a global variable as a Vulkan specialization constant.
+/// @param location The index of the specialization constant.
 __attributeTarget(VarDeclBase)
 attribute_syntax[vk_constant_id(location: int)] : VkConstantIdAttribute;
 
+/// Declare the Vulkan location of a global variable.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 
+/// Declare the Vulkan binding index of a global variable.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
+/// @deprecated
+/// Use `spirv_asm` instead for inline SPIR-V assembly.
 __attributeTarget(FuncDecl)
 attribute_syntax [vk_spirv_instruction(op : int, set : String = "")]     : SPIRVInstructionOpAttribute;
 
+/// Declare the Vulkan input attachment index of a global variable.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_input_attachment_index(location : int)] : GLSLInputAttachmentIndexLayoutAttribute;
 
+/// @internal
 __attributeTarget(FuncDecl)
 attribute_syntax [spv_target_env_1_3] : SPIRVTargetEnv13Attribute;
 
+/// @internal
 __attributeTarget(VarDeclBase)
 attribute_syntax [disable_array_flattening] : DisableArrayFlatteningAttribute;
 
+/// Marks a enum type as an unscoped enum. The enum cases of an unscoped enum are not scoped within the enum type, and can be
+/// referenced directly without the enum type name.
 __attributeTarget(EnumDecl)
 attribute_syntax [UnscopedEnum] : UnscopedEnumAttribute;
 
+/// Marks a enum type as a bit flag enum. Bit flag enums will have their enum cases assigned to powers of 2 instead of consecutive integers.
+///
 __attributeTarget(EnumDecl)
 attribute_syntax[Flags] : FlagsAttribute;
 
 // Statement Attributes
 
+/// A hint to the downstream compiler to unroll the loop until the specified number of iterations reached.
+/// This attribute does not affect Slang compiler's behavior.
+/// To unroll a loop in the Slang compiler before emitting target code, use the `[ForceUnroll]` attribute.
 __attributeTarget(LoopStmt)
 attribute_syntax [unroll(count: int = 0)]   : UnrollAttribute;
 
+/// Instructs the Slang compiler to unroll the loop until the specified number of iterations before
+/// emiting targett code.
+/// @param count The maximun number of iterations to unroll the loop.
 __attributeTarget(LoopStmt)
 attribute_syntax [ForceUnroll(count: int = 0)]   : ForceUnrollAttribute;
 
+/// A hint to the downstream compiler to preserve a loop.
 __attributeTarget(LoopStmt)
 attribute_syntax [loop]                 : LoopAttribute;
 
+/// Used on loop statements as a hint to the downstream compiler to perform less aggressive optimization on the loop
+/// in favor of faster compilation time.
+/// This attribute has no effect on targets other than HLSL.
 __attributeTarget(LoopStmt)
 attribute_syntax [fastopt]              : FastOptAttribute;
 
+/// A hint to the downstream compiler that UAV conditions are allowed in the loop.
+/// This attribute has no effect on targets other than HLSL.
+/// @deprecated
 __attributeTarget(LoopStmt)
 attribute_syntax [allow_uav_condition]  : AllowUAVConditionAttribute;
 
 __attributeTarget(LoopStmt)
 attribute_syntax [MaxIters(count)]      : MaxItersAttribute;
 
+/// A hint to the downstream compiler to flatten an if statement.
 __attributeTarget(IfStmt)
 attribute_syntax [flatten]              : FlattenAttribute;
 
+/// A hint to the downstream compiler to preserve the branching behavior of an if statement.
 __attributeTarget(IfStmt)
 __attributeTarget(SwitchStmt)
 attribute_syntax [branch]               : BranchAttribute;
 
+/// A hint to the downstream compiler to preserve the `switch` statement as is.
+/// This attribute has no effect on targets other than HLSL.
 __attributeTarget(SwitchStmt)
 attribute_syntax [forcecase]            : ForceCaseAttribute;
 
+/// A hint to the downstream compiler to translate the `switch` statement into subroutine calls.
+/// This attribute has no effect on targets other than HLSL.
 __attributeTarget(SwitchStmt)
 attribute_syntax [call]                 : CallAttribute;
 
 // Entry-point Attributes
 
 // All Stages
+
+/// Marks a function as a shader entry point.
+/// @param stage The stage of the shader. Must be one of "vertex", "fragment", "compute", "geometry", "hull", "domain", "raygeneration",
+// "intersection", "anyhit", "closesthit", "miss", "callable", "task", "mesh".
 __attributeTarget(FuncDecl)
 attribute_syntax [shader(stage)]    : EntryPointAttribute;
 
+/// Marks a function as a shader entry point.
+/// @param stage The stage of the shader. Must be one of "vertex", "fragment", "compute", "geometry", "hull", "domain", "raygeneration",
+// "intersection", "anyhit", "closesthit", "miss", "callable", "task", "mesh".
 __attributeTarget(FuncDecl)
 attribute_syntax [Shader(stage)]    : EntryPointAttribute;
 
 // Hull Shader
+/// Used on an hull shader entrypoint to declare the upperbound of the tessellation factor that the hull shader can return.
+/// @param factor The maximum tessellation factor the hull shader can return.
 __attributeTarget(FuncDecl)
 attribute_syntax [maxtessfactor(factor: float)]     : MaxTessFactorAttribute;
 
+/// Used on an hull shader entrypoint to declare the number of control points the hull shader will produce per thread.
+/// @param count The number of control points the hull shader will produce per thread.
+/// @remarks The attribute indicates be the number of times the hull shader function will be executed.
 __attributeTarget(FuncDecl)
 attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribute;
 
+/// Used on an hull shader entrypoint to declare the output primitive type of the tessellator.
+/// @param topology The output primitive type, must be one of "point", "line", "triangle_cw", and "triangle_ccw".
 __attributeTarget(FuncDecl)
 attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;
 
+/// Used on an hull shader entrypoint to specify the patch type used by the hull shader.
+/// @param mode The patch type used by the hull shader. Valid values are "tri", "quad" and "isoline".
 __attributeTarget(FuncDecl)
 attribute_syntax [partitioning(mode)]               : PartitioningAttribute;
 
+/// Used on a hull shader entrypoint to specify the associated function that computes the patch constant data.
+/// @param name The name of the function (in string literal) that computes the patch constant data.
 __attributeTarget(FuncDecl)
 attribute_syntax [patchconstantfunc(name)]          : PatchConstantFuncAttribute;
 
 // Hull/Domain Shader
+
+/// Used on an hull shader entrypoint to specify the patch type used by the hull shader.
+/// @param patchType The patch type used by the hull shader. Valid values are "tri", "quad" and "isoline".
 __attributeTarget(FuncDecl)
-attribute_syntax [domain(domain)]   : DomainAttribute;
+attribute_syntax [domain(patchType)]   : DomainAttribute;
 
 // Geometry Shader
+
+/// Used on a geometry shader entry point to specify the maximum number of vertices that the geometry shader can output.
+/// @param count The maximum number of vertices that the geometry shader can output.
 __attributeTarget(FuncDecl)
 attribute_syntax [maxvertexcount(count: int)]   : MaxVertexCountAttribute;
 
+/// Used on a geometry shader entry point to specify the number of instances to execute for each input primitive.
+/// @param count The number of instances to execute for each input primitive. 
+/// @remarks When using this attribute, a geometry shader can declare a parameter with `SV_GSInstanceID` semantic to get the instance index.
 __attributeTarget(FuncDecl)
 attribute_syntax [instance(count: int)]         : InstanceAttribute;
 
 // Fragment ("Pixel") Shader
+/// Used on a fragment shader entry point to specify that early depth stencil testing can be enabled.
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 
 // Compute Shader
+
+/// Specifies the size of the thread group a compute shader.
+/// @param x The number of threads in the x dimension of a thread group.
+/// @param y The number of threads in the y dimension of a thread group.
+/// @param z The number of threads in the z dimension of a thread group.
 __attributeTarget(FuncDecl)
 attribute_syntax [numthreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
+/// Specifies the size of the thread group a compute shader.
+/// @param x The number of threads in the x dimension of a thread group.
+/// @param y The number of threads in the y dimension of a thread group.
+/// @param z The number of threads in the z dimension of a thread group.
 __attributeTarget(FuncDecl)
 attribute_syntax [NumThreads(x: int, y: int = 1, z: int = 1)]   : NumThreadsAttribute;
 
+/// Indicate a compute shader entry point is only compatible with the specified wave size.
+/// @param numLanes The wave size this shader entrypoint is compatible with. Must be one of 4, 8, 16, 32, 64, 128.
 __attributeTarget(FuncDecl)
 attribute_syntax [WaveSize(numLanes: int)]   : WaveSizeAttribute;
 
-//
+//@hidden:
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanRayPayload(location : int = -1)] : VulkanRayPayloadAttribute;
 
@@ -3056,43 +3271,118 @@ attribute_syntax [__vulkanHitObjectAttributes(location : int = -1)] : VulkanHitO
 __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
+//@public:
+/// Mark a function or a property or subscript accessor as mutating. A mutating function receives the implicit `this` parameter
+/// as an `inout` parameter, so that mutations to members access from `this` argument will be visible to the caller.
+///
+/// @remarks
+/// By default, Slang treats all member functions as non-mutating. For example, consider the following function:
+/// ```csharp
+/// struct S
+/// {
+///    int x;
+///    void foo()
+///    {
+///       x = 1; // error: `x` is not an l-value.
+///    }
+/// }
+///
+/// ```
+/// The line `x = 1` will lead to a compile time error because by-default, all member methods in Slang are non-mutating. To
+/// allow `foo` to modify `x`, you can use `[mutating]` to mark the function as such:
+/// ```csharp
+/// struct S
+/// {
+///    int x;
+///    [mutating]
+///    void foo()
+///    {
+///       x = 1; // ok
+///    }
+/// }
+/// @see `[nonmutating]`.
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
 
+/// Marks a function or a property and subscript accessor as non-mutating. A non-mutating function receives the implicit `this` parameter
+/// as an `in` parameter, so mutations to members accessed from `this` argument will be prohibited by the compiler.
+/// @remarks
+/// Member functions of a type are non-mutating by default, so this attribute is not necessary in most cases.
+/// However, the `set` accessor of a property or subscript is mutating by default, and you can use `[nonmutating]` to mark it as non-mutating.
+/// For example:
+/// ```csharp
+/// struct S
+/// {
+///    int* ptr_x;
+///    property x : int
+///    {
+///      get { return *ptr_x; }
+///
+///      [nonmutating]
+///      set { *ptr_x = value; }
+///    }
+/// }
+/// uniform S s; // `s` is not mutable.
+/// void test() { s.x = 1; } // OK, because the `set` accessor is non-mutating.
+/// ```
+/// In the above example, the property `x` reads and writes to a memory location pointed to by `ptr_x`. Therefore, the `set` accessor is not actually
+/// modifying any field of `S`, and does not need to take `this` as an `inout` parameter. Using `[nonmutating]` here on the set accessor will allow
+/// it to be called with a non-mutating value of `S`.
+/// @see `[mutating]`.
+///
 __attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
+/// @internal
+/// Marks a member function to make `this` argument passed by const reference.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [constref] : ConstRefAttribute;
 
+/// @internal
+/// Marks a member function to make `this` argument passed by reference.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__ref] : RefAttribute;
 
-    /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
-    ///
-    /// This is equivalent to the LLVM `readnone` function attribute.
+/// @internal
+/// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
+///
+/// This is equivalent to the LLVM `readnone` function attribute.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__readNone] : ReadNoneAttribute;
 
+/// Represent the applicable target for an attribute.
 enum _AttributeTargets
 {
-    Struct = $( (int) UserDefinedAttributeTargets::Struct),
-    Var = $( (int) UserDefinedAttributeTargets::Var),
-    Function = $( (int) UserDefinedAttributeTargets::Function),
-    Param = $( (int) UserDefinedAttributeTargets::Param),
+    Struct = $( (int) UserDefinedAttributeTargets::Struct), /// Struct types.
+    Var = $( (int) UserDefinedAttributeTargets::Var), /// Global and local variables and constants.
+    Function = $( (int) UserDefinedAttributeTargets::Function), /// Functions or member functions.
+    Param = $( (int) UserDefinedAttributeTargets::Param), /// Function parameters.
 };
+
+/// Mark a struct type as a user defined attribute type.
+/// @param target The type of declarations to which the attribute can be applied.
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
 
+/// Specify the storage format of a read-write texture. Can only be used on a texture typed struct field or global parameter.
+/// @param format The storage format of the texture.
+/// @see Please refer to `_Texture` for a complete list of allowed format strings.
 __attributeTarget(VarDeclBase)
 attribute_syntax [format(format : String)] : FormatAttribute;
 
+/// Specify the storage format of a read-write texture. Can only be used on a texture typed struct field or global parameter.
+/// This is an alias of the `[format]` attribute.
+/// @param format The storage format of the texture.
+/// @see Please refer to `_Texture` for a complete list of allowed format strings.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_image_format(format : String)] : FormatAttribute;
 
 __attributeTarget(Decl)
 attribute_syntax [allow(diagnostic: String)] : AllowAttribute;
 
+/// Mark declaration to require a specific target capability.
+/// @param capability The required capability.
 __attributeTarget(Decl)
 attribute_syntax [require(capability)] : RequireCapabilityAttribute;
 
@@ -3103,85 +3393,141 @@ attribute_syntax [__extern] : ExternAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;
 
+/// Perform inlining of the function at the call site during Slang compilation.
+/// @remarks By default Slang does not inline user defined functions, and will preserve the function call hierarchy in the generated code.
+/// Use this attribute on a function to force the Slang compiler to inline the function before emitting target code.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForceInline] : ForceInlineAttribute;
 
+/// @internal
+/// Specify the overload rank of a function for overload resolution.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [OverloadRank] : OverloadRankAttribute;
 
+/// @experimental
+/// Mark a function as imported from a DLL. Valid only on CPU host targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DllImport(modulePath: String)] : DllImportAttribute;
 
+/// @experimental
+/// Mark a function to be exported as a DLL symbol. Valid only on CPU host targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DllExport] : DllExportAttribute;
 
+/// @experimental
+/// Mark a function as a pytorch kernel entrypoint.
 __attributeTarget(FuncDecl)
 attribute_syntax [TorchEntryPoint] : TorchEntryPointAttribute;
 
+/// @experimental
+/// Mark a function for export as a CUDA device function. Valid only on CUDA target.
 __attributeTarget(FuncDecl)
 attribute_syntax [CudaDeviceExport] : CudaDeviceExportAttribute;
 
+/// @experimental
+/// Mark a function for export as a CUDA host function. Valid only on CUDA target.
 __attributeTarget(FuncDecl)
 attribute_syntax [CudaHost] : CudaHostAttribute;
 
+/// @experimental
+/// Mark a function for export as a CUDA kernel function. Valid only on CUDA target.
 __attributeTarget(FuncDecl)
 attribute_syntax [CudaKernel] : CudaKernelAttribute;
 
+/// @experimental
+/// Mark a function for export as a CUDA device function. Valid only on CUDA target.
 __attributeTarget(FuncDecl)
 attribute_syntax [CUDADeviceExport] : CudaDeviceExportAttribute;
 
+/// @experimental
+/// Mark a function for export as a CUDA host function. Valid only on CUDA target.
 __attributeTarget(FuncDecl)
 attribute_syntax [CUDAHost] : CudaHostAttribute;
 
+/// @experimental
+/// Mark a function for export as a CUDA kernel function. Valid only on CUDA target.
 __attributeTarget(FuncDecl)
 attribute_syntax [CUDAKernel] : CudaKernelAttribute;
 
+/// @experimental
+/// Mark a function for automatic pytorch binding.
 __attributeTarget(FuncDecl)
 attribute_syntax [AutoPyBindCUDA] : AutoPyBindCudaAttribute;
 
+/// @experimental
+/// Mark a type for export to slang-torch.
 __attributeTarget(AggTypeDecl)
 attribute_syntax [PyExport(name: String)] : PyExportAttribute;
 
+/// @experimental
+/// Mark an interface as a COM interface. Valid only on CPU target.
+/// @param guid The GUID of the COM interface.
 __attributeTarget(InterfaceDecl)
 attribute_syntax [COM(guid: String)] : ComInterfaceAttribute;
 
 // Inheritance Control
+
+/// @experimental
+/// Mark a type as sealed, preventing it from being inherited from or implemented by types defined in other modules.
+/// @see `[open]`.
 __attributeTarget(AggTypeDecl)
 attribute_syntax [sealed] : SealedAttribute;
 
+/// @experimental
+/// Mark a type as open, allowing it from being inherited from or implemented by types defined in other modules.
+/// This is the default behavior.
+/// @see `[sealed]`.
 __attributeTarget(AggTypeDecl)
 attribute_syntax [open] : OpenAttribute;
 
+/// @experimental
+/// Mark an interface type to allow dynmaic dispatch, and declare the maximum size in bytes that an implementation type
+/// of the interface can have.
 __attributeTarget(InterfaceDecl)
 attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
 
+/// @experimental
+/// Mark an interface type for specialization only. Such interface types cannot be used for dynamic dispatch.
 __attributeTarget(InterfaceDecl)
 attribute_syntax [Specialize] : SpecializeAttribute;
 
+/// @internal
+/// Marks a declaration as a builtin declaration.
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
 
+// @hidden:
 __attributeTarget(DeclBase)
 attribute_syntax[__AutoDiffBuiltin] : AutoDiffBuiltinAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
 
+// @public:
+
+/// Mark a type to require a target specific prelude.
+/// The prelude will be included in the generated code for the specified target if the resulting code uses
+/// the marked type.
 __attributeTarget(AggTypeDecl)
 attribute_syntax[RequirePrelude(target, prelude:String)] : RequirePreludeAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [__AlwaysFoldIntoUseSiteAttribute] : AlwaysFoldIntoUseSiteAttribute;
 
+/// Inform the downstream compiler to not inline the function.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [noinline] : NoInlineAttribute;
 
 __attributeTarget(StructDecl)
 attribute_syntax [payload] : PayloadAttribute;
 
+/// Mark a declaration as deprecated.
+/// @param message The diagnostic message to show when the declaration is used.
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 
+/// Controls the behavior of the compiler when a differentiable function is detected to have side-effects.
+/// @category misc_types
 enum SideEffectBehavior
 {
     /// Causes a warning if the method is detected to have side-effects
@@ -3190,26 +3536,41 @@ enum SideEffectBehavior
     /// Suppresses the warning
     Allow = 1
 };
+
+/// Mark a differentiable function to prefer recomputation over checkpointing when a value computed in the primal pass is needed
+/// during backward derivative propagation.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax[PreferRecompute(behavior: SideEffectBehavior = SideEffectBehavior.Warn)] : PreferRecomputeAttribute;
 
+/// Mark a differentiable function to prefer checkpointing over recomputation when a value computed in the primal pass is needed
+/// during backward derivative propagation.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 
+// @hidden:
 __attributeTarget(DeclBase)
 attribute_syntax [KnownBuiltin(name : String)] : KnownBuiltinAttribute;
-
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
 
 __attributeTarget(FuncDecl)
+attribute_syntax [noRefInline] : NoRefInlineAttribute;
+
+// @public:
+
+/// Mark a function's return value as non-uniform.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;
+
+/// Mark a compute shader entry point to allow it to use implicit derivatives.
+/// @remarks This attributes causes Slang to emit `DerivativeGroupQuadsNV` execution mode when producing SPIR-V. The attribute has no
+/// effect on other targets.
+__attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 
+/// Mark a compute shader entry point to allow it to use implicit derivatives.
+/// @remarks This attributes causes Slang to emit `DerivativeGroupLinearNV` execution mode when producing SPIR-V. The attribute has no
+/// effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
-
-__attributeTarget(FuncDecl)
-attribute_syntax [noRefInline] : NoRefInlineAttribute;

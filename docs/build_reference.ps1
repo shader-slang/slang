@@ -26,6 +26,7 @@ else {
 Remove-Item -Path ".\stdlib-reference\global-decls" -Recurse -Force
 Remove-Item -Path ".\stdlib-reference\interfaces" -Recurse -Force
 Remove-Item -Path ".\stdlib-reference\types" -Recurse -Force
+Remove-Item -Path ".\stdlib-reference\attributes" -Recurse -Force
 
 # Use git describe to produce a version string and write it to _includes/version.inc.
 # This file will be included by the stdlib-reference Jekyll template.
