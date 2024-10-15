@@ -102,11 +102,6 @@ struct DocMarkdownWriter
     typedef ASTPrinter::Part Part;
     typedef ASTPrinter::PartPair PartPair;
 
-    enum WriteDeclMode
-    {
-        Header, Content
-    };
-
     struct Signature
     {
         struct GenericParam
@@ -151,8 +146,9 @@ struct DocMarkdownWriter
     void writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl);
     void writeProperty(const ASTMarkup::Entry& entry, PropertyDecl* propertyDecl);
     void writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl* typeDefDecl);
+    void writeAttribute(const ASTMarkup::Entry& entry, AttributeDecl* attributeDecl);
 
-    void createPage(WriteDeclMode mode, ASTMarkup::Entry& entry, Decl* decl);
+    void createPage(ASTMarkup::Entry& entry, Decl* decl);
     void registerCategory(DocumentPage* page, DeclDocumentation& doc);
 
     void writePreamble();
@@ -251,6 +247,7 @@ struct DocMarkdownWriter
     Dictionary<String, RefPtr<DocumentPage>> m_output;
     RefPtr<DocumentPage> m_rootPage;
     RefPtr<DocumentPage> m_typesPage;
+    RefPtr<DocumentPage> m_attributesPage;
     RefPtr<DocumentPage> m_interfacesPage;
     RefPtr<DocumentPage> m_globalDeclsPage;
 

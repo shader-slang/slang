@@ -324,6 +324,13 @@ struct ByteAddressBuffer
 };
 
 // Texture
+
+/// Represent a texture shape type that can be used to specify the shape of a texture.
+/// Used for the `Shape` parameter of the `_Texture` type.
+///
+/// Implemented by `__Shape1D`, `__Shape2D`, `__Shape3D`, `__ShapeCube` and `__ShapeBuffer`.
+/// @see `_Texture`.
+/// @internal
 [sealed]
 [builtin]
 interface __ITextureShape
@@ -332,6 +339,12 @@ interface __ITextureShape
     static const int dimensions;
     static const int planeDimensions;
 }
+
+/// Represent a 1D, 2D or 3D texture shape that can be used as the `Shape` parameter of the `_Texture` type.
+///
+/// Implemented by `__Shape1D`, `__Shape2D` and `__Shape3D`.
+/// @see `_Texture`.
+/// @internal
 [sealed]
 [builtin]
 interface __ITextureShape1D2D3D : __ITextureShape
@@ -339,6 +352,7 @@ interface __ITextureShape1D2D3D : __ITextureShape
 }
 
 /// @category misc_types Miscelaneous types
+/// When used as the `Shape` parameter of the `_Texture` type, specifies a 1D texture.
 __magic_type(TextureShape1DType)
 __intrinsic_type($(kIROp_TextureShape1DType))
 struct __Shape1D : __ITextureShape1D2D3D
@@ -347,7 +361,9 @@ struct __Shape1D : __ITextureShape1D2D3D
     static const int dimensions = 1;
     static const int planeDimensions = 1;
 }
+
 /// @category misc_types
+/// When used as the `Shape` parameter of the `_Texture` type, specifies a 2D texture.
 __magic_type(TextureShape2DType)
 __intrinsic_type($(kIROp_TextureShape2DType))
 struct __Shape2D : __ITextureShape1D2D3D
@@ -356,7 +372,9 @@ struct __Shape2D : __ITextureShape1D2D3D
     static const int dimensions = 2;
     static const int planeDimensions = 2;
 }
+
 /// @category misc_types
+/// When used as the `Shape` parameter of the `_Texture` type, specifies a 3D texture.
 __magic_type(TextureShape3DType)
 __intrinsic_type($(kIROp_TextureShape3DType))
 struct __Shape3D : __ITextureShape1D2D3D
@@ -365,7 +383,9 @@ struct __Shape3D : __ITextureShape1D2D3D
     static const int dimensions = 3;
     static const int planeDimensions = 3;
 }
+
 /// @category misc_types
+/// When used as the `Shape` parameter of the `_Texture` type, specifies a Cube texture.
 __magic_type(TextureShapeCubeType)
 __intrinsic_type($(kIROp_TextureShapeCubeType))
 struct __ShapeCube : __ITextureShape
@@ -374,7 +394,9 @@ struct __ShapeCube : __ITextureShape
     static const int dimensions = 3;
     static const int planeDimensions = 2;
 }
+
 /// @category misc_types
+/// When used as the `Shape` parameter of the `_Texture` type, specifies a buffer texture.
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
 struct __ShapeBuffer : __ITextureShape
