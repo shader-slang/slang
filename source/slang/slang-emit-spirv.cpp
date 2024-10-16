@@ -6457,9 +6457,7 @@ struct SPIRVEmitContext
         else if (auto ptrType = as<IRPtrTypeBase>(type))
         {
             IRType* baseType = ptrType->getValueType();
-
-            // If the base type of the pointer is basic types,
-            // emit the basic types and emit DebugTypePointer with it.
+            // Emit DebugTypePointer for pointer types.
             SpvInst* debugBaseType = emitDebugType(baseType);
             SpvStorageClass storageClass = SpvStorageClassFunction;
             if (ptrType->hasAddressSpace())
