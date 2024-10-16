@@ -1085,7 +1085,19 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
             // use the appropriate options for glslang to
             // make it support a non-`main` name.
             //
-            return "main";
+            // A function may have an entry-point deocration if it
+            // is declared by the user as an entry-point function.
+            // However it may not actually be compiled as an entry-point
+            // when generating code for targets that doesn't support
+            // multiple entry-points.
+            // We only want to emit "main" for user-marked entrypoint
+            // functions that are actually being selected as entrypoint
+            // for current compilation. We can do so by checking if
+            // a layout decoration existed on the function.
+            if (inst->findDecoration<IRLayoutDecoration>())
+            {
+                return "main";
+            }
         }
 
         return generateEntryPointNameImpl(entryPointDecor);
