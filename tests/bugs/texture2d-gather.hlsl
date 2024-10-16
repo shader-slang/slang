@@ -1,5 +1,4 @@
 //TEST(smoke):COMPARE_HLSL_RENDER:
-//DISABLE_TEST(smoke):COMPARE_HLSL_RENDER:-mtl
 //TEST_INPUT: Texture2D(size=16, content=chessboard, format=R32_FLOAT):name g_texture
 //TEST_INPUT: Sampler :name g_sampler
 

@@ -3357,6 +3357,15 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     for( auto arg : input.testOptions->args )
     {
+        if (arg.getLength() && arg[0] == '-')
+        {
+            UnownedStringSlice argName = UnownedStringSlice(arg.begin() + 1, arg.end());
+            RenderApiType renderApiType = RenderApiUtil::findApiTypeByName(argName);
+            bool apiFound = (renderApiType != RenderApiType::Unknown);
+            if (apiFound)
+                continue; // API name is already handled in runHLSLRenderComparisonTest()
+        }
+
         cmdLine.addArg(arg);
     }
 
@@ -3615,7 +3624,23 @@ TestResult runHLSLRenderComparisonTestImpl(
 
 TestResult runHLSLRenderComparisonTest(TestContext* context, TestInput& input)
 {
-    return runHLSLRenderComparisonTestImpl(context, input, "-hlsl", "-slang");
+    String apiActual = "-slang";
+    for (auto arg : input.testOptions->args)
+    {
+        if (arg.getLength() && arg[0] == '-')
+        {
+            UnownedStringSlice argName = UnownedStringSlice(arg.begin() + 1, arg.end());
+            RenderApiType renderApiType = RenderApiUtil::findApiTypeByName(argName);
+            bool apiFound = (renderApiType != RenderApiType::Unknown);
+            if (apiFound)
+            {
+                apiActual = arg;
+                break;
+            }
+        }
+    }
+
+    return runHLSLRenderComparisonTestImpl(context, input, "-hlsl", apiActual.getBuffer());
 }
 
 TestResult runHLSLCrossCompileRenderComparisonTest(TestContext* context, TestInput& input)
