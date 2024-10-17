@@ -46,6 +46,10 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "findEntryPointByName",
             &slang::wgsl::Module::findEntryPointByName,
+            return_value_policy::take_ownership())
+        .function(
+            "findAndCheckEntryPoint",
+            &slang::wgsl::Module::findAndCheckEntryPoint,
             return_value_policy::take_ownership());
 
     value_object<slang::wgsl::Error>("Error")
