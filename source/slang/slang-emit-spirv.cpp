@@ -3400,6 +3400,15 @@ struct SPIRVEmitContext
                 emitInst(parent, inst, SpvOpControlBarrier, executionScope, memoryScope, memorySemantics);
             }
             break;
+        case kIROp_Printf:
+            {
+                List<IRInst*> operands;
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    operands.add(inst->getOperand(i));
+                result = emitInst(parent, inst, SpvOpExtInst, inst->getFullType(), kResultID,
+                    getNonSemanticDebugPrintfExtInst(), SpvLiteralInteger::from32(1), operands.getArrayView());
+            }
+            break;
         }
         if (result)
             emitDecorations(inst, getID(result));

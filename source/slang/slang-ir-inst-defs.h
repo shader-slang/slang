@@ -649,6 +649,7 @@ INST(RequirePrelude, RequirePrelude, 1, 0)
 INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
 INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 INST(StaticAssert, StaticAssert, 2, 0)
+INST(Printf, Printf, 1, 0)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
