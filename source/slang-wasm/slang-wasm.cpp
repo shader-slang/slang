@@ -103,6 +103,31 @@ EntryPoint* Module::findEntryPointByName(const std::string& name)
     return new EntryPoint(entryPoint);
 }
 
+
+EntryPoint* Module::findAndCheckEntryPoint(const std::string& name, int stage)
+{
+    Slang::ComPtr<IEntryPoint> entryPoint;
+    {
+        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        SlangResult result = moduleInterface()->findAndCheckEntryPoint(
+            name.c_str(), (SlangStage)stage, entryPoint.writeRef(), diagnosticsBlob.writeRef());
+        if (!SLANG_SUCCEEDED(result))
+        {
+            g_error.type = std::string("USER");
+            g_error.result = result;
+
+            if (diagnosticsBlob->getBufferSize())
+            {
+                char* diagnostics = (char*)diagnosticsBlob->getBufferPointer();
+                g_error.message = std::string(diagnostics);
+            }
+            return nullptr;
+        }
+    }
+
+    return new EntryPoint(entryPoint);
+}
+
 ComponentType* Session::createCompositeComponentType(
     const std::vector<ComponentType*>& components)
 {
