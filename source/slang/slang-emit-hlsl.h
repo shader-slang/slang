@@ -87,8 +87,6 @@ protected:
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
 
     void _emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name);
-
-    void emitInterlockedSuffix(IRInst* inst);
 };
 
 }

@@ -2929,11 +2929,11 @@ struct SPIRVEmitContext
 
     void ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
     {
+        auto typeOp = getVectorElementType(atomicInst->getDataType())->getOp();
         switch (op)
         {
         case SpvOpAtomicFAddEXT:
         {
-            auto typeOp = getVectorElementType(atomicInst->getDataType())->getOp();
             switch (typeOp)
             {
             case kIROp_FloatType:
@@ -2954,7 +2954,6 @@ struct SPIRVEmitContext
         case SpvOpAtomicFMinEXT:
         case SpvOpAtomicFMaxEXT:
         {
-            auto typeOp = getVectorElementType(atomicInst->getDataType())->getOp();
             switch (typeOp)
             {
             case kIROp_FloatType:
@@ -2972,6 +2971,13 @@ struct SPIRVEmitContext
             }
         }
         break;
+        }
+        switch (typeOp)
+        {
+        case kIROp_UInt64Type:
+        case kIROp_Int64Type:
+            requireSPIRVCapability(SpvCapabilityInt64Atomics);
+            break;
         }
     }
 
@@ -3321,6 +3327,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
                 result = emitOpAtomicIIncrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+                ensureAtomicCapability(inst, SpvOpAtomicIIncrement);
             }
             break;
         case kIROp_AtomicDec:
@@ -3329,6 +3336,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
                 result = emitOpAtomicIDecrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+                ensureAtomicCapability(inst, SpvOpAtomicIDecrement);
             }
             break;
         case kIROp_AtomicLoad:
@@ -3337,6 +3345,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
                 result = emitOpAtomicLoad(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+                ensureAtomicCapability(inst, SpvOpAtomicLoad);
             }
             break;
         case kIROp_AtomicStore:
@@ -3345,6 +3354,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
                 result = emitOpAtomicStore(parent, inst, inst->getOperand(0), memoryScope, memorySemantics, inst->getOperand(1));
+                ensureAtomicCapability(inst, SpvOpAtomicStore);
             }
             break;
         case kIROp_AtomicExchange:
@@ -3353,6 +3363,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
                 result = emitOpAtomicExchange(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics, inst->getOperand(1));
+                ensureAtomicCapability(inst, SpvOpAtomicExchange);
             }
             break;
         case kIROp_AtomicCompareExchange:
@@ -3365,6 +3376,7 @@ struct SPIRVEmitContext
                     parent, inst, inst->getFullType(), inst->getOperand(0),
                     memoryScope, memorySemanticsEqual, memorySemanticsUnequal,
                     inst->getOperand(2), inst->getOperand(1));
+                ensureAtomicCapability(inst, SpvOpAtomicCompareExchange);
             }
             break;
         case kIROp_AtomicAdd:

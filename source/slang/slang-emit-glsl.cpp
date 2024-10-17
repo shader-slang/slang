@@ -2183,6 +2183,13 @@ void GLSLSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 
 bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    auto requireFloatAtomicExtIfNeeded = [&]()
+        {
+            if (isFloatingType(inst->getDataType()))
+            {
+                _requireGLSLExtension(toSlice("GL_EXT_shader_atomic_float"));
+            }
+        };
     switch (inst->getOp())
     {
     case kIROp_StructuredBufferGetDimensions:
@@ -2238,6 +2245,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicExchange:
     {
+        requireFloatAtomicExtIfNeeded();
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2256,6 +2264,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicCompareExchange:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2276,6 +2286,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicAdd:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2294,6 +2306,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicSub:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2312,6 +2326,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicAnd:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2330,6 +2346,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicOr:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2348,6 +2366,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicXor:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2366,6 +2386,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicMin:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2384,6 +2406,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicMax:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2402,6 +2426,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicInc:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {
@@ -2421,6 +2447,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicDec:
     {
+        requireFloatAtomicExtIfNeeded();
+
         emitInstResultDecl(inst);
         if (auto imageSubscript = isTextureAccess(inst))
         {

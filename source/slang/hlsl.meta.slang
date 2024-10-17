@@ -4518,7 +4518,7 @@ ${{{{
     // Cas uint64_t
 
     /// Perform a 64-bit integer atomic compare-and-exchange operation at `byteAddress`.
-    /// @param byteAddress The address at which to perform the atomic add operation.
+    /// @param byteAddress The address at which to perform the atomic compare-and-exchange operation.
     /// @param compareValue The value to compare to the value at `byteAddress`.
     /// @param value The value to store at `byteAddress` if the comparison is successful.
     /// @param originalValue The original value at `byteAddress` before the add operation.
@@ -4546,7 +4546,6 @@ ${{{{
     for (auto op : bufferAtomicOps) {
 }}}}
     [ForceInline]
-    [deprecated("use Ineterlocked$(op.name)64 instead")]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     uint64_t Interlocked$(op.name)U64(uint byteAddress, uint64_t value)
     {
@@ -4564,7 +4563,7 @@ ${{{{
     }
 
     /// Perform a 64-bit integer atomic $(op.internalName) operation at `byteAddress`.
-    /// @param byteAddress The address at which to perform the atomic add operation.
+    /// @param byteAddress The address at which to perform the atomic $(op.internalName) operation.
     /// @param value The operand for the $(op.internalName) operation.
     /// @param originalValue The original value at `byteAddress` before the $(op.internalName) operation.
     [ForceInline]
@@ -4585,7 +4584,7 @@ ${{{{
 }}}}
 
     /// Perform a 64-bit integer atomic compare-and-exchange operation at `byteAddress`.
-    /// @param byteAddress The address at which to perform the atomic add operation.
+    /// @param byteAddress The address at which to perform the atomic compare-and-exchange operation.
     /// @param compareValue The value to compare to the value at `byteAddress`.
     /// @param value The value to store at `byteAddress` if the comparison is successful.
     /// @param outOriginalValue The original value at `byteAddress` before the add operation.
@@ -4607,21 +4606,6 @@ ${{{{
         }
     }
 
-    /// Perform a floating-point atomic bitwise compare-and-exchange operation at `byteAddress`.
-    /// @param byteAddress The address at which to perform the atomic add operation.
-    /// @param compareValue The value to perform bitwise comparison to the value at `byteAddress`.
-    /// @param value The value to store at `byteAddress` if the comparison is successful.
-    /// @param outOriginalValue The original value at `byteAddress` before the add operation.
-    /// @remarks For SPIR-V, this function maps to `OpAtomicCompareExchange`. For HLSL, this function
-    /// translates to `InterlockedCompareStoreFloatBitwise` and requires shader model 6.6.
-    /// For CUDA, this function maps to `atomicCAS`.
-    [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
-    void InterlockedCompareStoreFloatBitwise(uint byteAddress, float compareValue, float value)
-    {
-        InterlockedCompareStoreFloatBitwise(byteAddress, compareValue, value);
-    }
-
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchangeFloatBitwise(uint byteAddress, float compareValue, float value, out float outOriginalValue)
@@ -4636,6 +4620,36 @@ ${{{{
         }
     }
 
+    /// Perform a floating-point atomic bitwise exchange operation at `byteAddress`.
+    /// @param byteAddress The address at which to perform the atomic exchange operation.
+    /// @param value The value to store at `byteAddress`.
+    /// @param [out] outOriginalValue The original value at `byteAddress` before the exchange operation.
+    /// @remarks For SPIR-V, this function maps to `OpAtomicExchange`. For HLSL, this function
+    /// translates to `InterlockedExchangeFloat` and requires shader model 6.6.
+    /// For CUDA, this function maps to `atomicExch`.
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedExchangeFloat(uint byteAddress, float value, out float outOriginalValue)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedExchangeFloat";
+        default:
+            let buf = __getEquivalentStructuredBuffer<float>(this);
+            outOriginalValue = __atomic_exchange(buf[byteAddress / 4], value);
+            return;
+        }
+    }
+
+    /// Perform a 64-bit integer atomic compare-and-store operation at `byteAddress`.
+    /// @param byteAddress The address at which to perform the atomic store operation.
+    /// @param compareValue The value to compare to the value at `byteAddress`.
+    /// @param value The value to store at `byteAddress` if the the value at address is equal to `compareValue`.
+    /// @param [out] outOriginalValue The original value at `byteAddress` before the store operation.
+    /// @remarks For SPIR-V, this function maps to `OpAtomicCompareExchange`. For HLSL, this function
+    /// translates to `InterlockedCompareStore64` and requires shader model 6.6.
+    /// For CUDA, this function maps to `atomicCAS`.
+    [ForceInline]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareStore64<T:__BuiltinInt64Type>(uint byteAddress, T compareValue, T value)
@@ -4645,6 +4659,28 @@ ${{{{
         case hlsl: __intrinsic_asm ".InterlockedCompareStore64";
         default:
             let buf = __getEquivalentStructuredBuffer<T>(this);
+            __atomic_compare_exchange(buf[byteAddress / 4], compareValue, value);
+            return;
+        }
+    }
+   
+    /// Perform a floating-point atomic bitwise compare-and-store operation at `byteAddress`.
+    /// @param byteAddress The address at which to perform the atomic compare-and-exchange  operation.
+    /// @param compareValue The value to perform bitwise comparison to the value at `byteAddress`.
+    /// @param value The value to store at `byteAddress` if the comparison is successful.
+    /// @param [out] outOriginalValue The original value at `byteAddress` before the compare-and-exchange operation.
+    /// @remarks For SPIR-V, this function maps to `OpAtomicCompareExchange`. For HLSL, this function
+    /// translates to `InterlockedCompareStoreFloatBitwise` and requires shader model 6.6.
+    /// For CUDA, this function maps to `atomicCAS`.
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
+    void InterlockedCompareStoreFloatBitwise(uint byteAddress, float compareValue, float value)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".InterlockedCompareStoreFloatBitwise";
+        default:
+            let buf = __getEquivalentStructuredBuffer<float>(this);
             __atomic_compare_exchange(buf[byteAddress / 4], compareValue, value);
             return;
         }
@@ -4701,10 +4737,10 @@ ${{{{
 
     /// Perform a 32-bit integer atomic compare-and-exchange operation at
     /// the specified byte address within the `RWByteAddressBuffer`.
-    /// @param dest The address at which to perform the atomic add operation.
+    /// @param dest The address at which to perform the atomic compare-and-exchange operation.
     /// @param compare_value The value to perform bitwise comparison to the value at `byteAddress`.
     /// @param value The value to store at `byteAddress` if the comparison is successful.
-    /// @param original_value The original value at `byteAddress` before the add operation.
+    /// @param original_value The original value at `byteAddress` before the compare-and-exchange operation.
     /// @remarks For SPIR-V, this function maps to `OpAtomicCompareExchange`. For HLSL, this function
     /// translates to `InterlockedCompareExchange`.
     /// For CUDA, this function maps to `atomicCAS`.
@@ -8743,6 +8779,17 @@ for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
 {
 }}}}
 
+/// Perform an atomic $(atomicOp.internalCallSuffix) operation on `dest`.
+/// @param T The type of the value to perform the atomic operation on.
+/// @param dest The value to perform the atomic operation on.
+/// @param value The operand to the atomic operation.
+/// @param original_value The value of `dest` before the operation.
+/// @remarks When targeting HLSL, it is invalid to call this function with `T` being a floating-point type, since
+/// HLSL does not allow atomic operations on floating point types. For `InterlockedAdd`, consider using
+/// `RWByteAddressBuffer.InterlockedAddF32` or `RWByteAddressBuffer.InterlockedAddF16` instead when NVAPI is available.
+/// On SPIR-V (Vulkan), all integer and floating point types are supported.
+/// On Metal and WGSL, all floating-point types are not supported.
+/// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
@@ -8771,6 +8818,20 @@ ${{{{
 } // for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
 }}}}
 
+/// Perform an atomic compare and exchange operation on `dest`.
+/// @param T The type of the value to perform the atomic operation on.
+/// @param dest The value to perform the atomic operation on.
+/// @param compare_value The value to compare `dest` with.
+/// @param value The value to store into `dest` if the compare result is equal.
+/// @param original_value The value of `dest` before the operation.
+/// @remarks When targeting HLSL, a call to this function with `T` being `float` will translate to a call to
+/// `InterlockedCompareExchangeFloatBitwise`, which means the comparison is done as a bitwise comparison.
+///
+/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+///
+/// On Metal and WGSL, all floating-point types are not supported.
+///
+/// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
 [ForceInline]
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
@@ -8779,6 +8840,20 @@ void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T 
     original_value = __atomic_compare_exchange(dest, compare_value, value);
 }
 
+/// Perform an atomic compare and exchange operation on `dest`.
+/// @param T The type of the value to perform the atomic operation on.
+/// @param dest The value to perform the atomic operation on.
+/// @param compare_value The value to compare `dest` with.
+/// @param value The value to store into `dest` if the compare result is equal.
+/// @param original_value The value of `dest` before the operation.
+/// @remarks When targeting HLSL, a call to this function will translate to a call to
+/// `InterlockedCompareExchangeFloatBitwise`, which means the comparison is done as a bitwise comparison.
+///
+/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+///
+/// On Metal and WGSL, this function is not available.
+///
+/// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
 [ForceInline]
 void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_value, float value)
@@ -8792,6 +8867,19 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
     original_value = __atomic_compare_exchange(dest, compare_value, value);
 }
 
+/// Perform an atomic compare and store operation on `dest`.
+/// @param T The type of the value to perform the atomic operation on.
+/// @param dest The value to perform the atomic operation on.
+/// @param compare_value The value to compare `dest` with.
+/// @param value The value to store into `dest` if the compare result is equal.
+/// @remarks When targeting HLSL, a call to this function with `T` being `float` will translate to a call to
+/// `InterlockedCompareStoreFloatBitwise`, which means the comparison is done as a bitwise comparison.
+///
+/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+///
+/// On Metal and WGSL, this function is not available.
+///
+/// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
 [ForceInline]
 __glsl_version(430)
@@ -8807,6 +8895,19 @@ void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T v
     }
 }
 
+/// Perform an atomic compare and store operation on `dest`.
+/// @param T The type of the value to perform the atomic operation on.
+/// @param dest The value to perform the atomic operation on.
+/// @param compare_value The value to compare `dest` with.
+/// @param value The value to store into `dest` if the compare result is equal.
+/// @remarks When targeting HLSL, a call to this function will translate to a call to
+/// `InterlockedCompareStoreFloatBitwise`, which means the comparison is done as a bitwise comparison.
+///
+/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+///
+/// On Metal and WGSL, this function is not available.
+///
+/// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
 [ForceInline]
 void InterlockedCompareStoreFloatBitwise<T:IAtomicable>(__ref  T dest,  T compare_value, T value)
@@ -19406,6 +19507,8 @@ extension _Texture<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 
         default:
             originalValue = __atomic_add(this[coord], value);
             return;
+        case hlsl:
+            __intrinsic_asm "$3 = NvInterlockedAddFp32($0, $1, $2)";
         case glsl:
             __intrinsic_asm "$3 = imageAtomicAdd($0, $1, $2)";
         }

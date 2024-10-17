@@ -267,8 +267,15 @@ static IRImageSubscript* isTextureAccess(IRInst* inst)
 
 void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 {
-    auto textureType = as<IRResourceTypeBase>(inst->getImage()->getDataType());
-    bool isArray = getIntVal(textureType->getIsArrayInst()) != 0;
+    auto resourceType = as<IRResourceTypeBase>(inst->getImage()->getDataType());
+    if (auto textureType = as<IRTextureType>(resourceType))
+    {
+        if (as<IRVectorType>(textureType->getElementType()))
+        {
+            getSink()->diagnose(inst, Diagnostics::unsupportedTargetIntrinsic, "atomic operation on non-scalar texture");
+        }
+    }
+    bool isArray = getIntVal(resourceType->getIsArrayInst()) != 0;
     if (isArray)
     {
         emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
@@ -361,7 +368,10 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
                 m_writer->emit(");\n");
         };
-
+    auto diagnoseFloatAtommic = [&]()
+        {
+            getSink()->diagnose(inst, Diagnostics::unsupportedTargetIntrinsic, "floating point atomic operation");
+        };
     switch (inst->getOp())
     {
     case kIROp_discard:
@@ -387,6 +397,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicLoad:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
         emitInstResultDecl(inst);
         bool isImageOp = false;
         if (auto imageSubscript = isTextureAccess(inst))
@@ -439,11 +452,17 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicExchange:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
         emitAtomicOp("atomic_exchange", "atomic_exchange_explicit");
         return true;
     }
     case kIROp_AtomicCompareExchange:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
         bool isImageOp = false;
         auto imageSubscript = isTextureAccess(inst);
         isImageOp = (imageSubscript != nullptr);
@@ -489,11 +508,17 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicAdd:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
         emitAtomicOp("atomic_fetch_add", "atomic_fetch_add_explicit");
         return true;
     }
     case kIROp_AtomicSub:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
         emitAtomicOp("atomic_fetch_sub", "atomic_fetch_sub_explicit");
         return true;
     }
@@ -514,11 +539,17 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicMin:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
         emitAtomicOp("atomic_fetch_min", "atomic_fetch_min_explicit");
         return true;
     }
     case kIROp_AtomicMax:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
         emitAtomicOp("atomic_fetch_max", "atomic_fetch_max_explicit");
         return true;
     }
