@@ -2153,6 +2153,34 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     return false;
 }
 
+static IRImageSubscript* isTextureAccess(IRInst* inst)
+{
+    return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
+}
+
+void GLSLSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
+{
+    emitOperand(inst->getImage(), getInfo(EmitOp::General));
+    m_writer->emit(", ");
+    if (auto vecType = as<IRVectorType>(inst->getCoord()->getDataType()))
+    {
+        m_writer->emit("ivec");
+        m_writer->emit(getIntVal(vecType->getElementCount()));
+    }
+    else
+    {
+        m_writer->emit("int");
+    }
+    m_writer->emit("(");
+    emitOperand(inst->getCoord(), getInfo(EmitOp::General));
+    m_writer->emit(")");
+    if (inst->hasSampleCoord())
+    {
+        m_writer->emit(", ");
+        emitOperand(inst->getSampleCoord(), getInfo(EmitOp::General));
+    }
+}
+
 bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     switch (inst->getOp())
@@ -2176,24 +2204,51 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicLoad:
     {
         emitInstResultDecl(inst);
-        emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageLoad(");
+            emitAtomicImageCoord(imageSubscript);
+            m_writer->emit(")");
+        }
+        else
+        {
+            emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(";\n");
         return true;
     }
     case kIROp_AtomicStore:
     {
-        emitInstResultDecl(inst);
-        emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(" = ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(";\n");
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageStore(");
+            emitAtomicImageCoord(imageSubscript);
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+        }
+        else
+        {
+            emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(" = ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+        }
         return true;
     }
     case kIROp_AtomicExchange:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicExchange(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicExchange(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicExchange(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(");\n");
@@ -2202,8 +2257,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicCompareExchange:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicCompSwap(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicCompSwap(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicCompSwap(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(", ");
@@ -2214,8 +2277,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicAdd:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicAdd(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicAdd(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(");\n");
@@ -2224,8 +2295,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicSub:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicAdd(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicAdd(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", -(");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit("));\n");
@@ -2234,8 +2313,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicAnd:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicAnd(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicAnd(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicAnd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(");\n");
@@ -2244,8 +2331,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicOr:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicOr(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicOr(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicOr(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(");\n");
@@ -2254,8 +2349,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicXor:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicXor(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicXor(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicXor(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(");\n");
@@ -2264,8 +2367,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicMin:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicMin(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicMin(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicMin(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(");\n");
@@ -2274,8 +2385,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicMax:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicMax(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicMax(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicMax(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(");\n");
@@ -2284,8 +2403,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicInc:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicAdd(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicAdd(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitType(inst->getDataType());
         m_writer->emit("(1)");
@@ -2295,8 +2422,16 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicDec:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomicAdd(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            m_writer->emit("imageAtomicAdd(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomicAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         emitType(inst->getDataType());
         m_writer->emit("(-1)");

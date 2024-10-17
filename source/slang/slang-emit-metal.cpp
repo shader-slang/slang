@@ -260,7 +260,7 @@ void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
     }
 }
 
-IRImageSubscript* isTextureAccess(IRInst* inst)
+static IRImageSubscript* isTextureAccess(IRInst* inst)
 {
     return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
 }
