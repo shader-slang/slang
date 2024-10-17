@@ -6233,6 +6233,7 @@ struct SPIRVEmitContext
     }
 
     Dictionary<IRType*, SpvInst*> m_mapTypeToDebugType;
+    HashSet<IRType*> m_emittingTypes; // Types that are being emitted.
     Dictionary<IRType*, SpvInst*> m_mapForwardRefsToDebugType;
     static constexpr const int kUnknownPhysicalLayout = 1 << 17;
 
@@ -6289,9 +6290,9 @@ struct SPIRVEmitContext
                 {
                     auto fieldPtrBaseType = fieldPtrType->getValueType();
                     if (as<IRStructType>(fieldPtrBaseType)
-                        && !m_mapTypeToDebugType.containsKey(fieldPtrBaseType))
+                        && m_emittingTypes.contains(fieldPtrBaseType))
                     {
-                        forwardRef = emitDebugForwardRefs(type);
+                        forwardRef = emitDebugForwardRefs(fieldPtrBaseType);
 
                         SpvStorageClass storageClass = SpvStorageClassFunction;
                         if (fieldPtrType->hasAddressSpace())
@@ -6327,18 +6328,21 @@ struct SPIRVEmitContext
                     builder.getIntValue(builder.getUIntType(), sizeAlignment.size * 8),
                     builder.getIntValue(builder.getUIntType(), 0));
                 members.add(memberType);
-
-                if (forwardRef)
-                {
-                    // "OpExtInstWithForwardRefsKHR" requires "forward declared ID" at the end.
-                    // TODO: May want to free/release the memory properly
-                    auto tmp = m_memoryArena.allocateArray<SpvWord>(forwardRef->operandWordsCount + 1u);
-                    ::memcpy(tmp, forwardRef->operandWords, forwardRef->operandWordsCount * sizeof(SpvWord));
-                    tmp[forwardRef->operandWordsCount] = getID(memberType);
-                    forwardRef->operandWords = tmp;
-                    forwardRef->operandWordsCount++;
-                }
             }
+
+            SpvInst* forwardRef = nullptr;
+            // If `type` has been declared with a forward reference, fill in the forward reference.
+            if (m_mapForwardRefsToDebugType.tryGetValue(type, forwardRef))
+            {
+                // "OpExtInstWithForwardRefsKHR" requires "forward declared ID" at the end.
+                auto tmp = m_memoryArena.allocateArray<SpvWord>(forwardRef->operandWordsCount + members.getCount());
+                memcpy(tmp, forwardRef->operandWords, forwardRef->operandWordsCount * sizeof(SpvWord));
+                for (Index i = 0; i < members.getCount(); i++)
+                    tmp[forwardRef->operandWordsCount + i] = getID(members[i]);
+                forwardRef->operandWords = tmp;
+                forwardRef->operandWordsCount += (uint32_t)members.getCount();
+            }
+
             return emitOpDebugTypeComposite(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
@@ -6453,35 +6457,19 @@ struct SPIRVEmitContext
         else if (auto ptrType = as<IRPtrTypeBase>(type))
         {
             IRType* baseType = ptrType->getValueType();
-            if (as<IRBasicType>(baseType))
-            {
-                // If the base type of the pointer is basic types,
-                // emit the basic types and emit DebugTypePointer with it.
-                SpvInst* debugBaseType = emitDebugType(baseType);
-                SpvStorageClass storageClass = SpvStorageClassFunction;
-                if (ptrType->hasAddressSpace())
-                    storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
+            // Emit DebugTypePointer for pointer types.
+            SpvInst* debugBaseType = emitDebugType(baseType);
+            SpvStorageClass storageClass = SpvStorageClassFunction;
+            if (ptrType->hasAddressSpace())
+                storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
 
-                return emitOpDebugTypePointer(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                    nullptr,
-                    m_voidType,
-                    getNonSemanticDebugInfoExtInst(),
-                    debugBaseType,
-                    builder.getIntValue(builder.getUIntType(), storageClass),
-                    builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
-            }
-
-            // If the base type of the pointer is more complex,
-            // emit the pointer as "uintptr" of DebugTypeBasic.
-            return emitOpDebugTypeBasic(
+            return emitOpDebugTypePointer(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
-                builder.getStringValue(String("uint64").getUnownedSlice()),
-                builder.getIntValue(builder.getUIntType(), 64),
-                builder.getIntValue(builder.getUIntType(), 0),
+                debugBaseType,
+                builder.getIntValue(builder.getUIntType(), storageClass),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
         }
         return ensureInst(m_voidType);
@@ -6491,7 +6479,12 @@ struct SPIRVEmitContext
     {
         if (auto debugType = m_mapTypeToDebugType.tryGetValue(type))
             return *debugType;
+        bool isStruct = type->getOp() == kIROp_StructType;
+        if (isStruct)
+            m_emittingTypes.add(type);
         auto result = emitDebugTypeImpl(type);
+        if (isStruct)
+            m_emittingTypes.remove(type);
         m_mapTypeToDebugType[type] = result;
         return result;
     }
