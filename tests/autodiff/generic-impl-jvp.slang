@@ -161,6 +161,16 @@ struct lineardvector : IDifferentiable
             val.values[i] = a[i];
         }
     }
+
+    // Add a new constructor for dadd() function.
+    __init(Real a[N])
+    {
+        [ForceUnroll]
+        for (int i = 0; i < N; i++)
+        {
+            val.values[i] = a[i];
+        }
+    }
 };
 
 __generic<let N : int>
@@ -204,12 +214,24 @@ struct linearvector : MyLinearArithmeticType, IDifferentiable
 
     static Differential dadd(Differential a, Differential b)
     {
-        return { myvector<Real, N>.dadd(a.val, b.val) };
+        // return { myvector<Real, N>.dadd(a.val, b.val) };
+        //
+        // Above code will not work because
+        // myvector<Real, N>.dadd will return dvector<T.Differential, N> type
+        // while Differential == lineardvector<N> type
+        // and the constructor of lineardvector<N> requires a vector<Real.Differential, N> type
+        // and dvector<T.Differential, N> != vector<Real.Differential, N>, though they have the
+        // same members.
+        //
+        // In our new design, generic will not be C-Style struct anymore.
+        dvector<Real.Differential, N> d = myvector<Real, N>.dadd(a.val, b.val);
+        return {d.values};
     }
 
     static Differential dmul<T: __BuiltinRealType>(T a, Differential b)
     {
-        return { myvector<Real, N>.dmul<T>(a, b.val) };
+        dvector<Real.Differential, N> d = myvector<Real, N>.dmul<T>(a, b.val);
+        return {d.values};
     }
 
     [ForwardDifferentiable]
