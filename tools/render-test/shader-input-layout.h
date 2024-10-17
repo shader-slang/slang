@@ -127,9 +127,8 @@ struct TextureData
     {
         clearSlices();
 
-        FormatInfo formatSizeInfo;
-        rhiGetFormatInfo(format, &formatSizeInfo);
-        m_formatSize = uint8_t(formatSizeInfo.blockSizeInBytes / formatSizeInfo.pixelsPerBlock);
+        const FormatInfo& formatInfo = getFormatInfo(format);
+        m_formatSize = uint8_t(formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock);
         m_format = format;
     }
 

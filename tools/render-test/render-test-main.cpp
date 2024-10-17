@@ -753,7 +753,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         passEncoder->buildAccelerationStructure(buildDesc, draftAS, nullptr, scratchBuffer, 1, &compactedSizeQueryDesc);
         passEncoder->end();
         commandBuffer->close();
-        m_queue->executeCommandBuffer(commandBuffer);
+        m_queue->submit(commandBuffer);
         m_queue->waitOnHost();
 
         uint64_t compactedSize = 0;
@@ -768,7 +768,7 @@ void RenderTestApp::_initializeAccelerationStructure()
             m_bottomLevelAccelerationStructure, draftAS, AccelerationStructureCopyMode::Compact);
         passEncoder->end();
         commandBuffer->close();
-        m_queue->executeCommandBuffer(commandBuffer);
+        m_queue->submit(commandBuffer);
         m_queue->waitOnHost();
     }
 
@@ -835,7 +835,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         passEncoder->buildAccelerationStructure(buildDesc, m_topLevelAccelerationStructure, nullptr, scratchBuffer, 0, nullptr);
         passEncoder->end();
         commandBuffer->close();
-        m_queue->executeCommandBuffer(commandBuffer);
+        m_queue->submit(commandBuffer);
         m_queue->waitOnHost();
     }
 }
@@ -982,7 +982,7 @@ Result RenderTestApp::update()
     commandBuffer->close();
 
     m_startTicks = Process::getClockTick();
-    m_queue->executeCommandBuffer(commandBuffer);
+    m_queue->submit(commandBuffer);
     m_queue->waitOnHost();
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
@@ -1244,26 +1244,15 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         }
     }
 
-#ifdef _DEBUG
-    rhiEnableDebugLayer();
-#endif
     StdWritersDebugCallback debugCallback;
     debugCallback.writers = stdWriters;
-    rhiSetDebugCallback(&debugCallback);
-    struct ResetDebugCallbackRAII
-    {
-        ~ResetDebugCallbackRAII()
-        {
-            rhiSetDebugCallback(nullptr);
-        }
-    } resetDebugCallbackRAII;
 
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;
 
     StringBuilder rendererName;
     auto info = 
-    rendererName << "[" << rhiGetDeviceTypeName(options.deviceType) << "] ";
+    rendererName << "[" << getRHI()->getDeviceTypeName(options.deviceType) << "] ";
 
     if (options.onlyStartup)
     {
@@ -1310,8 +1299,14 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
     Slang::ComPtr<IDevice> device;
     {
-        IDevice::Desc desc = {};
+        DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
+
+#if _DEBUG
+        desc.enableValidation = true;
+        desc.enableBackendValidation = true;
+        desc.debugCallback = &debugCallback;
+#endif
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
@@ -1343,7 +1338,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
-            SlangResult res = rhiCreateDevice(&desc, device.writeRef());
+            SlangResult res = getRHI()->createDevice(desc, device.writeRef());
             if (SLANG_FAILED(res))
             {
                 // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means that the renderer couldn't
