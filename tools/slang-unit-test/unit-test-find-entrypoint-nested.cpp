@@ -22,6 +22,7 @@ SLANG_UNIT_TEST(findEntryPointNested)
         [shader("raygeneration")]
         void inner()
         {
+            AllMemoryBarrier();
         }
         [shader("raygeneration")]
         void outer()
@@ -40,6 +41,13 @@ SLANG_UNIT_TEST(findEntryPointNested)
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = 1;
+    slang::CompilerOptionEntry compilerOptionEntry = {};
+    compilerOptionEntry.name = slang::CompilerOptionName::EmitSpirvViaGLSL;
+    compilerOptionEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    compilerOptionEntry.value.intValue0 = 1;
+    sessionDesc.compilerOptionEntries = &compilerOptionEntry;
+
     ComPtr<slang::ISession> session;
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
