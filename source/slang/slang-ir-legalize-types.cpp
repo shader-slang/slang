@@ -2194,6 +2194,7 @@ static LegalVal legalizeInst(
         break;
     case kIROp_Printf:
         result = legalizePrintf(context, args);
+        break;
     case kIROp_undefined:
         return LegalVal();
     case kIROp_GpuForeach:
