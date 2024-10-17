@@ -4363,6 +4363,20 @@ struct $(item.name)
     }
 
 ${{{{
+    struct BufferAtomicOps
+    {
+        const char* name;
+        const char* internalName;
+    };
+    const BufferAtomicOps bufferAtomicOps[] = {
+        {"Max", "max"},
+        {"Min", "min"},
+        {"Add", "add"},
+        {"And", "and"},
+        {"Or", "or"},
+        {"Xor", "xor"},
+        {"Exchange", "exchange"}
+    };
     if (item.op == kIROp_HLSLRWByteAddressBufferType)
     {
 }}}}
@@ -4529,20 +4543,6 @@ ${{{{
 
     // InterlockedMax64, InterlockedMin64, InterlockedAdd64, InterlockedAnd64, InterlockedOr64, InterlockedXor64, InterlockedExchange64
 ${{{{
-    struct BufferAtomicOps
-    {
-        const char* name;
-        const char* internalName;
-    };
-    const BufferAtomicOps bufferAtomicOps[] = {
-        {"Max", "max"},
-        {"Min", "min"},
-        {"Add", "add"},
-        {"And", "and"},
-        {"Or", "or"},
-        {"Xor", "xor"},
-        {"Exchange", "exchange"}
-    };
     for (auto op : bufferAtomicOps) {
 }}}}
     [ForceInline]
@@ -4655,7 +4655,7 @@ ${{{{
 }}}}
 
     // 32-bit atomic operations:
-
+    // InterlockedMax, InterlockedMin, InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor, InterlockedExchange
 ${{{{
     for (auto op : bufferAtomicOps) {
 }}}}
