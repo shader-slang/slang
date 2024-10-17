@@ -2146,6 +2146,19 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("endInvocationInterlockARB()");
             return true;
         }
+        case kIROp_Printf:
+        {
+            m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_debug_printf"));
+            m_writer->emit("debugPrintfEXT(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            for (UInt aa = 1; aa < inst->getOperandCount(); ++aa)
+            {
+                m_writer->emit(", ");
+                emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+            return true;
+        }
         default: break;
     }
 

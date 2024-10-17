@@ -2837,6 +2837,18 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
     }
+    case kIROp_Printf:
+    {
+        m_writer->emit("printf(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        for (UInt aa = 1; aa < inst->getOperandCount(); ++aa)
+        {
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+        }
+        m_writer->emit(")");
+        break;
+    }
     case kIROp_RequireGLSLExtension:
     {
         break; //should already have set requirement; case covered for empty intrinsic block
