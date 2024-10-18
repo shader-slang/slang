@@ -294,23 +294,21 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     {
+        auto switchStmt = FindOuterStmt<SwitchStmt>();
+        if (!switchStmt)
+        {
+            getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+            return;
+        }
+
+        // Check that the type for the `case` is consistent with the type for the `switch`.
         auto expr = CheckExpr(stmt->expr);
+        expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr);
 
         // coerce to type being switch on, and ensure that value is a compile-time constant
         // The Vals in the AST are pointer-unique, making them easy to check for duplicates
         // by addeing them to a HashSet.
-        auto exprVal = tryConstantFoldExpr(expr, ConstantFoldingKind::CompileTime, nullptr);
-        auto switchStmt = FindOuterStmt<SwitchStmt>();
-
-        if (!switchStmt)
-        {
-            getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
-        }
-        else
-        {
-            // TODO: need to do some basic matching to ensure the type
-            // for the `case` is consistent with the type for the `switch`...
-        }
+        auto exprVal = checkConstantIntVal(expr);
 
         stmt->expr = expr;
         stmt->exprVal = exprVal;

@@ -27,7 +27,6 @@ namespace Slang
 {
 
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
-    IRBasicType *const switchConditionType,
     const SwitchRegion::Case *const currentCase,
     const bool isDefault)
 {
@@ -36,42 +35,15 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     // "case 2: case 3: case 4: ...;".
 
     m_writer->emit("case ");
+    bool isFirst = false;
     for (auto caseVal : currentCase->values)
     {
-        // TODO: Fix this in the front-end [1], remove the if-path and just do the else-path.
-        //       We can't do that at the moment because it would break Falcor [2].
-        //       [1] https://github.com/shader-slang/slang/pull/5025/commits/a32156ef52f43b8503b2c77f2f1d51220ab9bdea
-        //       [2] https://github.com/shader-slang/slang/pull/5025#issuecomment-2334495120
-        if (caseVal->getOp() == kIROp_IntLit)
+        if (!isFirst)
         {
-            auto caseLitInst = static_cast<IRConstant*>(caseVal);
-            IRBasicType *const caseInstType = as<IRBasicType>(caseLitInst->getDataType());
-            // WGSL doesn't allow switch condition and case type mismatches, see [1].
-            // Thus we need to insert explicit conversions.
-            // Doing a wrapping cast will match Slang's de facto semantics, according to
-            // [2].
-            // (This is just a bitcast, assuming a two's complement representation.)
-            // [1] https://www.w3.org/TR/WGSL/#switch-statement
-            // [2] https://github.com/shader-slang/slang/issues/4921
-            const bool needBitcast =
-                caseInstType->getBaseType() != switchConditionType->getBaseType();
-            if (needBitcast)
-            {
-                m_writer->emit("bitcast<");
-                emitType(switchConditionType);
-                m_writer->emit(">(");
-            }
-            emitOperand(caseVal, getInfo(EmitOp::General));
-            if (needBitcast)
-            {
-                m_writer->emit(")");
-            }
+            m_writer->emit(", ");
         }
-        else
-        {
-            emitOperand(caseVal, getInfo(EmitOp::General));
-        }
-        m_writer->emit(", ");
+        isFirst = false;
+        emitOperand(caseVal, getInfo(EmitOp::General));
     }
     if (isDefault)
     {
