@@ -2929,11 +2929,11 @@ struct SPIRVEmitContext
 
     void ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
     {
+        auto typeOp = atomicInst->getDataType()->getOp();
         switch (op)
         {
         case SpvOpAtomicFAddEXT:
         {
-            auto typeOp = getVectorElementType(atomicInst->getDataType())->getOp();
             switch (typeOp)
             {
             case kIROp_FloatType:
@@ -2948,13 +2948,19 @@ struct SPIRVEmitContext
                 ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float16_add"));
                 requireSPIRVCapability(SpvCapabilityAtomicFloat16AddEXT);
                 break;
+            case kIROp_VectorType:
+                if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() == kIROp_HalfType)
+                {
+                    ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                    requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
+                }
+                break;
             }
         }
         break;
         case SpvOpAtomicFMinEXT:
         case SpvOpAtomicFMaxEXT:
         {
-            auto typeOp = getVectorElementType(atomicInst->getDataType())->getOp();
             switch (typeOp)
             {
             case kIROp_FloatType:
@@ -2969,9 +2975,23 @@ struct SPIRVEmitContext
                 ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float_min_max"));
                 requireSPIRVCapability(SpvCapabilityAtomicFloat16MinMaxEXT);
                 break;
+            case kIROp_VectorType:
+                if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() == kIROp_HalfType)
+                {
+                    ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                    requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
+                }
+                break;
             }
         }
         break;
+        }
+        switch (typeOp)
+        {
+        case kIROp_UInt64Type:
+        case kIROp_Int64Type:
+            requireSPIRVCapability(SpvCapabilityInt64Atomics);
+            break;
         }
     }
 
@@ -3321,6 +3341,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
                 result = emitOpAtomicIIncrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+                ensureAtomicCapability(inst, SpvOpAtomicIIncrement);
             }
             break;
         case kIROp_AtomicDec:
@@ -3329,6 +3350,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
                 result = emitOpAtomicIDecrement(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+                ensureAtomicCapability(inst, SpvOpAtomicIDecrement);
             }
             break;
         case kIROp_AtomicLoad:
@@ -3337,6 +3359,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
                 result = emitOpAtomicLoad(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics);
+                ensureAtomicCapability(inst, SpvOpAtomicLoad);
             }
             break;
         case kIROp_AtomicStore:
@@ -3345,6 +3368,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
                 result = emitOpAtomicStore(parent, inst, inst->getOperand(0), memoryScope, memorySemantics, inst->getOperand(1));
+                ensureAtomicCapability(inst, SpvOpAtomicStore);
             }
             break;
         case kIROp_AtomicExchange:
@@ -3353,6 +3377,7 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeDevice }, builder.getUIntType());
                 const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
                 result = emitOpAtomicExchange(parent, inst, inst->getFullType(), inst->getOperand(0), memoryScope, memorySemantics, inst->getOperand(1));
+                ensureAtomicCapability(inst, SpvOpAtomicExchange);
             }
             break;
         case kIROp_AtomicCompareExchange:
@@ -3365,6 +3390,7 @@ struct SPIRVEmitContext
                     parent, inst, inst->getFullType(), inst->getOperand(0),
                     memoryScope, memorySemanticsEqual, memorySemanticsUnequal,
                     inst->getOperand(2), inst->getOperand(1));
+                ensureAtomicCapability(inst, SpvOpAtomicCompareExchange);
             }
             break;
         case kIROp_AtomicAdd:
@@ -3398,6 +3424,27 @@ struct SPIRVEmitContext
                 const auto memoryScope = emitIntConstant(IRIntegerValue{ SpvScopeInvocation }, builder.getUIntType());
                 const auto memorySemantics = emitIntConstant(IRIntegerValue{ SpvMemorySemanticsMaskNone }, builder.getUIntType());
                 emitInst(parent, inst, SpvOpControlBarrier, executionScope, memoryScope, memorySemantics);
+            }
+            break;
+        case kIROp_Printf:
+            {
+                List<IRInst*> operands;
+                operands.add(inst->getOperand(0));
+                if (inst->getOperandCount() == 2)
+                {
+                    auto operand = inst->getOperand(1);
+                    if (auto makeStruct = as<IRMakeStruct>(operand))
+                    {
+                        // Flatten the tuple resulting from the variadic pack.
+                        for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
+                        {
+                            operands.add(makeStruct->getOperand(bb));
+                        }
+                    }
+                }
+                ensureExtensionDeclaration(toSlice("SPV_KHR_non_semantic_info"));
+                result = emitInst(parent, inst, SpvOpExtInst, inst->getFullType(), kResultID,
+                    getNonSemanticDebugPrintfExtInst(), SpvLiteralInteger::from32(1), operands.getArrayView());
             }
             break;
         }
@@ -6233,6 +6280,7 @@ struct SPIRVEmitContext
     }
 
     Dictionary<IRType*, SpvInst*> m_mapTypeToDebugType;
+    HashSet<IRType*> m_emittingTypes; // Types that are being emitted.
     Dictionary<IRType*, SpvInst*> m_mapForwardRefsToDebugType;
     static constexpr const int kUnknownPhysicalLayout = 1 << 17;
 
@@ -6289,9 +6337,9 @@ struct SPIRVEmitContext
                 {
                     auto fieldPtrBaseType = fieldPtrType->getValueType();
                     if (as<IRStructType>(fieldPtrBaseType)
-                        && !m_mapTypeToDebugType.containsKey(fieldPtrBaseType))
+                        && m_emittingTypes.contains(fieldPtrBaseType))
                     {
-                        forwardRef = emitDebugForwardRefs(type);
+                        forwardRef = emitDebugForwardRefs(fieldPtrBaseType);
 
                         SpvStorageClass storageClass = SpvStorageClassFunction;
                         if (fieldPtrType->hasAddressSpace())
@@ -6327,18 +6375,21 @@ struct SPIRVEmitContext
                     builder.getIntValue(builder.getUIntType(), sizeAlignment.size * 8),
                     builder.getIntValue(builder.getUIntType(), 0));
                 members.add(memberType);
-
-                if (forwardRef)
-                {
-                    // "OpExtInstWithForwardRefsKHR" requires "forward declared ID" at the end.
-                    // TODO: May want to free/release the memory properly
-                    auto tmp = m_memoryArena.allocateArray<SpvWord>(forwardRef->operandWordsCount + 1u);
-                    ::memcpy(tmp, forwardRef->operandWords, forwardRef->operandWordsCount * sizeof(SpvWord));
-                    tmp[forwardRef->operandWordsCount] = getID(memberType);
-                    forwardRef->operandWords = tmp;
-                    forwardRef->operandWordsCount++;
-                }
             }
+
+            SpvInst* forwardRef = nullptr;
+            // If `type` has been declared with a forward reference, fill in the forward reference.
+            if (m_mapForwardRefsToDebugType.tryGetValue(type, forwardRef))
+            {
+                // "OpExtInstWithForwardRefsKHR" requires "forward declared ID" at the end.
+                auto tmp = m_memoryArena.allocateArray<SpvWord>(forwardRef->operandWordsCount + members.getCount());
+                memcpy(tmp, forwardRef->operandWords, forwardRef->operandWordsCount * sizeof(SpvWord));
+                for (Index i = 0; i < members.getCount(); i++)
+                    tmp[forwardRef->operandWordsCount + i] = getID(members[i]);
+                forwardRef->operandWords = tmp;
+                forwardRef->operandWordsCount += (uint32_t)members.getCount();
+            }
+
             return emitOpDebugTypeComposite(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
@@ -6453,35 +6504,19 @@ struct SPIRVEmitContext
         else if (auto ptrType = as<IRPtrTypeBase>(type))
         {
             IRType* baseType = ptrType->getValueType();
-            if (as<IRBasicType>(baseType))
-            {
-                // If the base type of the pointer is basic types,
-                // emit the basic types and emit DebugTypePointer with it.
-                SpvInst* debugBaseType = emitDebugType(baseType);
-                SpvStorageClass storageClass = SpvStorageClassFunction;
-                if (ptrType->hasAddressSpace())
-                    storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
+            // Emit DebugTypePointer for pointer types.
+            SpvInst* debugBaseType = emitDebugType(baseType);
+            SpvStorageClass storageClass = SpvStorageClassFunction;
+            if (ptrType->hasAddressSpace())
+                storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
 
-                return emitOpDebugTypePointer(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                    nullptr,
-                    m_voidType,
-                    getNonSemanticDebugInfoExtInst(),
-                    debugBaseType,
-                    builder.getIntValue(builder.getUIntType(), storageClass),
-                    builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
-            }
-
-            // If the base type of the pointer is more complex,
-            // emit the pointer as "uintptr" of DebugTypeBasic.
-            return emitOpDebugTypeBasic(
+            return emitOpDebugTypePointer(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
-                builder.getStringValue(String("uint64").getUnownedSlice()),
-                builder.getIntValue(builder.getUIntType(), 64),
-                builder.getIntValue(builder.getUIntType(), 0),
+                debugBaseType,
+                builder.getIntValue(builder.getUIntType(), storageClass),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
         }
         return ensureInst(m_voidType);
@@ -6491,7 +6526,12 @@ struct SPIRVEmitContext
     {
         if (auto debugType = m_mapTypeToDebugType.tryGetValue(type))
             return *debugType;
+        bool isStruct = type->getOp() == kIROp_StructType;
+        if (isStruct)
+            m_emittingTypes.add(type);
         auto result = emitDebugTypeImpl(type);
+        if (isStruct)
+            m_emittingTypes.remove(type);
         m_mapTypeToDebugType[type] = result;
         return result;
     }

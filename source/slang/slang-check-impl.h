@@ -38,6 +38,10 @@ namespace Slang
 
     bool isUniformParameterType(Type* type);
 
+        /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
+    RefPtr<ComponentType> fillRequirements(
+        ComponentType* inComponentType);
+
     Type* checkProperType(
         Linkage*        linkage,
         TypeExp         typeExp,
@@ -2082,6 +2086,11 @@ namespace Slang
             ///
         IntVal* tryFoldIntegerConstantExpression(
             SubstExpr<Expr>                 expr,
+            ConstantFoldingKind             kind,
+            ConstantFoldingCircularityInfo* circularityInfo);
+
+        IntVal* tryFoldIndexExpr(
+            SubstExpr<IndexExpr> expr,
             ConstantFoldingKind             kind,
             ConstantFoldingCircularityInfo* circularityInfo);
 

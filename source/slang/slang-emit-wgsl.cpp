@@ -348,6 +348,13 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
     break;
 
+    case kIROp_HLSLByteAddressBufferType:
+    case kIROp_HLSLRWByteAddressBufferType:
+    {
+        m_writer->emit("array<u32>");
+    }
+    break;
+
     case kIROp_VoidType:
     {
         // There is no void type in WGSL.
@@ -590,17 +597,34 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType * type, IRInst* varDecl)
         m_writer->emit("<workgroup>");
     }
     else if (type->getOp() == kIROp_HLSLRWStructuredBufferType ||
-        type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType)
+        type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+        type->getOp() == kIROp_HLSLRWByteAddressBufferType)
     {
         m_writer->emit("<");
         m_writer->emit("storage, read_write");
         m_writer->emit(">");
     }
-    else if (type->getOp() == kIROp_HLSLStructuredBufferType)
+    else if (type->getOp() == kIROp_HLSLStructuredBufferType ||
+        type->getOp() == kIROp_HLSLByteAddressBufferType)
     {
         m_writer->emit("<");
         m_writer->emit("storage, read");
         m_writer->emit(">");
+    }
+    else if(varDecl->getOp() == kIROp_GlobalVar)
+    {
+        // Global ("module-scope") non-handle variables need to specify storage space
+
+        // https://www.w3.org/TR/WGSL/#var-decls
+        // "
+        // Variables in the private, storage, uniform, workgroup, and handle address
+        // spaces must only be declared in module scope, while variables in the function
+        // address space must only be declared in function scope. The address space must
+        // be specified for all address spaces except handle and function. The handle
+        // address space must not be specified. Specifying the function address space is
+        // optional.
+        // "
+        m_writer->emit("<private>");
     }
 }
 
@@ -1163,6 +1187,33 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     }
     break;
+
+    case kIROp_ByteAddressBufferLoad:
+    {
+        // Indices in Slang code count bytes, but in WASM they count u32's since
+        // byte address buffers translate to array<u32> in WASM, so divide by 4.
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("[(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(")/4]");
+        return true;
+    }
+    break;
+
+    case kIROp_ByteAddressBufferStore:
+    {
+        // Indices in Slang code count bytes, but in WASM they count u32's since
+        // byte address buffers translate to array<u32> in WASM, so divide by 4.
+        auto base = inst->getOperand(0);
+        emitOperand(base, EmitOpInfo());
+        m_writer->emit("[(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(")/4] = ");
+        emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
+        return true;
+    }
+    break;
+
     }
 
     return false;

@@ -437,8 +437,6 @@ namespace Slang
             // representation would need to take into account canonicalization of
             // constraints.
 
-            ensureDecl(&visitor, genericDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
-
             if (auto extensionDecl = as<ExtensionDecl>(genericDeclRef.getDecl()->inner))
             {
                 if (isDeclRefTypeOf<GenericTypeParamDecl>(extensionDecl->targetType.type) == declRef)
@@ -459,6 +457,11 @@ namespace Slang
 
             for (auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDeclRef))
             {
+                if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
+                    continue;
+
+                ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
+
                 auto subType = getSub(astBuilder, constraintDeclRef);
                 auto superType = getSup(astBuilder, constraintDeclRef);
 

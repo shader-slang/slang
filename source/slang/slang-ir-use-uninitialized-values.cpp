@@ -265,7 +265,7 @@ namespace Slang
 
         // Consider it as a store if its passed
         // as an out/inout/ref parameter
-        IRType* type = ftype->getParamType(index);
+        auto type = unwrapAttributedType(ftype->getParamType(index));
         return (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type)) ? Store : Load;
     }
 
@@ -315,8 +315,11 @@ namespace Slang
         case kIROp_Unmodified:
             return Store;
 
-        // ... and the rest will load/use them
         default:
+            // Default case is that if the instruction is a pointer, it
+            // is considered a store, otherwise a load.
+            if (as<IRPtrTypeBase>(user->getDataType()))
+                return Store;
             return Load;
         }
     }

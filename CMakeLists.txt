@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.22)
 
 # Our module dir, include that now so that we can get the version automatically
 # from git describe
@@ -15,7 +15,9 @@ set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
 #
 # Global CMake options
 #
-cmake_policy(SET CMP0135 OLD)
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24")
+    cmake_policy(SET CMP0135 OLD)
+endif()
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.25")
@@ -47,6 +49,7 @@ include(LLVM)
 include(SlangTarget)
 include(AutoOption)
 include(GitHubRelease)
+include(FetchedSharedLibrary)
 
 #
 # Options
@@ -81,8 +84,8 @@ auto_option(
     Aftermath
     "Enable Aftermath in GFX, and add aftermath crash example to project"
 )
-option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support")
-mark_as_advanced(SLANG_ENABLE_DX_ON_VK)
+advanced_option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support" OFF)
+advanced_option(SLANG_ENABLE_SLANG_RHI "Use slang-rhi as dependency" ON)
 
 option(SLANG_EMBED_STDLIB_SOURCE "Embed stdlib source in the binary" ON)
 option(SLANG_EMBED_STDLIB "Build slang with an embedded version of the stdlib")
@@ -102,6 +105,27 @@ option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX"
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
 option(SLANG_GITHUB_TOKEN "Use a given token value for accessing Github REST API" "")
+
+advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
+advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
+advanced_option(SLANG_USE_SYSTEM_VULKAN_HEADERS "Build using system Vulkan headers" OFF)
+advanced_option(SLANG_USE_SYSTEM_SPIRV_HEADERS "Build using system SPIR-V headers" OFF)
+advanced_option(SLANG_USE_SYSTEM_UNORDERED_DENSE "Build using system unordered dense" OFF)
+
+option(SLANG_SPIRV_HEADERS_INCLUDE_DIR "Provide a specific path for the SPIR-V headers and grammar files")
+mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
+
+if (${SLANG_USE_SYSTEM_LZ4})
+    add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
+endif()
+
+if (${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+    add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
+endif()
+
+if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+    add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
+endif()
 
 enum_option(
     SLANG_LIB_TYPE
@@ -148,6 +172,24 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
         CACHE STRING
         "URL specifying the location of the slang-llvm prebuilt library"
     )
+endif()
+
+set(webgpu_dawn_release_tag "webgpu_dawn-0")
+if(CMAKE_SYSTEM_NAME MATCHES "Windows" AND
+    CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+  set(
+    SLANG_WEBGPU_DAWN_BINARY_URL
+    "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+  )
+endif()
+
+set(slang_tint_release_tag "slang-tint-0")
+if(CMAKE_SYSTEM_NAME MATCHES "Windows" AND
+    CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+  set(
+    SLANG_SLANG_TINT_BINARY_URL
+    "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+  )
 endif()
 
 #
@@ -200,7 +242,14 @@ if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     find_package(Clang REQUIRED CONFIG)
 endif()
 
+if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+    find_package(unordered_dense CONFIG QUIET)
+endif()
+
 add_subdirectory(external)
+
+set(SLANG_CORE_LIBRARIES "")
+list(APPEND SLANG_CORE_LIBRARIES miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS})
 
 #
 # Our targets
@@ -211,7 +260,8 @@ slang_add_target(
     STATIC
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
+    LINK_WITH_PRIVATE ${SLANG_CORE_LIBRARIES}
+    LINK_WITH_PUBLIC unordered_dense::unordered_dense
     INCLUDE_DIRECTORIES_PUBLIC source include
 )
 
@@ -222,7 +272,8 @@ if(SLANG_ENABLE_SLANGRT)
         # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
         EXTRA_SOURCE_DIRS source/core
         USE_EXTRA_WARNINGS
-        LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
+        LINK_WITH_PRIVATE ${SLANG_CORE_LIBRARIES}
+        LINK_WITH_PUBLIC unordered_dense::unordered_dense
         EXPORT_MACRO_PREFIX SLANG_RT
         INCLUDE_DIRECTORIES_PUBLIC include
         INSTALL
@@ -235,6 +286,7 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE core
+    INCLUDE_FROM_PUBLIC SPIRV-Headers
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers
@@ -291,17 +343,24 @@ function(generator dir)
         )
     endif()
 endfunction()
+
 generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-embed)
 generator(tools/slang-generate USE_FEWER_WARNINGS)
 generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
+
 generator(
     source/slangc
     TARGET_NAME slang-bootstrap
     USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE prelude slang-no-embedded-stdlib slang-capability-lookup slang-lookup-tables Threads::Threads
+    LINK_WITH_PRIVATE 
+        prelude 
+        slang-without-embedded-stdlib 
+        slang-capability-lookup 
+        slang-lookup-tables 
+        Threads::Threads
 )
 
 #
@@ -311,6 +370,7 @@ generator(
 # keep these non-trivial targets in their own directories so as not to clutter
 # this file
 add_subdirectory(prelude)
+add_subdirectory(source/slang-stdlib)
 add_subdirectory(source/slang)
 
 if(SLANG_ENABLE_SLANGD)
@@ -319,6 +379,7 @@ if(SLANG_ENABLE_SLANGD)
         EXECUTABLE
         LINK_WITH_PRIVATE
             core
+            compiler-core
             slang
             slang-reflect-headers
             slang-capability-defs
@@ -338,6 +399,23 @@ if(SLANG_ENABLE_SLANGC)
 endif()
 
 #
+# WebAssembly bindings for Slang
+#
+# This is an executable target because emcmake produces .a files without bindings if you just create a static library
+# https://stackoverflow.com/questions/63622009/static-library-built-with-cmake-as-a-with-emscripten-instead-of-wasm-js
+if (EMSCRIPTEN)
+    slang_add_target(
+        source/slang-wasm
+        EXECUTABLE
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE miniz lz4_static slang core compiler-core
+        INCLUDE_DIRECTORIES_PUBLIC include source/slang-wasm
+    )
+    # To generate binding code
+    target_link_options(slang-wasm PUBLIC "--bind")
+endif()
+#
 # Our wrappers for glslang and llvm
 #
 if(SLANG_ENABLE_SLANG_GLSLANG)
@@ -354,77 +432,21 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     add_supported_cxx_linker_flags(slang-glslang PRIVATE "-Wl,--exclude-libs,ALL")
 endif()
 
+# webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
+# trees are too large and onerous for us to depend on.
+if(SLANG_WEBGPU_DAWN_BINARY_URL)
+  copy_fetched_shared_library("webgpu_dawn" "${SLANG_WEBGPU_DAWN_BINARY_URL}")
+endif()
+
+# slang-tint is only available as a fetched shared library, since it's hosted in the Dawn
+# repository, and Dawn's nested source trees are too large and onerous for us to depend
+# on.
+if(SLANG_SLANG_TINT_BINARY_URL)
+  copy_fetched_shared_library("slang-tint" "${SLANG_SLANG_TINT_BINARY_URL}")
+endif()
 
 if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
-    #
-    # Do some stupid little dance to put everything in the right shape with
-    # correct dependencies
-    #
-
-    set(slang_llvm_filename
-        "${CMAKE_SHARED_LIBRARY_PREFIX}slang-llvm${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    )
-    macro(from_glob dir)
-        # A little helper function
-        file(
-            GLOB_RECURSE slang_llvm_source_object
-            "${dir}/${slang_llvm_filename}"
-        )
-        list(LENGTH slang_llvm_source_object nmatches)
-        if(nmatches EQUAL 0)
-            message(
-                SEND_ERROR
-                "Unable to find ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
-            )
-        elseif(nmatches GREATER 1)
-            message(
-                SEND_ERROR
-                "Found multiple files named ${slang_llvm_filename} in ${SLANG_SLANG_LLVM_BINARY_URL}"
-            )
-        endif()
-    endmacro()
-
-    if(IS_DIRECTORY "${SLANG_SLANG_LLVM_BINARY_URL}")
-        # Just glob directly from a local directory
-        from_glob("${SLANG_SLANG_LLVM_BINARY_URL}")
-    elseif(
-        SLANG_SLANG_LLVM_BINARY_URL
-            MATCHES
-            "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
-        AND EXISTS "${SLANG_SLANG_LLVM_BINARY_URL}"
-    )
-        # Otherwise, if it's a direct path to a shared object, use that
-        set(slang_llvm_source_object "${SLANG_SLANG_LLVM_BINARY_URL}")
-    else()
-        # Otherwise, download and extract from whatever URL we have
-        fetchcontent_declare(slang-llvm URL "${SLANG_SLANG_LLVM_BINARY_URL}")
-        fetchcontent_populate(slang-llvm)
-        from_glob("${slang-llvm_SOURCE_DIR}")
-    endif()
-
-    set(slang_llvm_dest_object
-        ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${slang_llvm_filename}
-    )
-    add_custom_command(
-        OUTPUT ${slang_llvm_dest_object}
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different ${slang_llvm_source_object}
-            ${slang_llvm_dest_object}
-        DEPENDS ${slang_llvm_source_object}
-        VERBATIM
-    )
-    # Give this copying action a name
-    add_custom_target(copy-slang-llvm DEPENDS ${slang_llvm_dest_object})
-    set_target_properties(copy-slang-llvm PROPERTIES FOLDER generated)
-
-    # Put this into a library target
-    add_library(slang-llvm MODULE IMPORTED GLOBAL)
-    add_dependencies(slang-llvm copy-slang-llvm)
-    set_property(
-        TARGET slang-llvm
-        PROPERTY IMPORTED_LOCATION ${slang_llvm_dest_object}
-    )
-    install(PROGRAMS ${slang_llvm_dest_object} DESTINATION ${module_subdir})
+  install_fetched_shared_library("slang-llvm" "${SLANG_SLANG_LLVM_BINARY_URL}")
 elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(
@@ -465,13 +487,21 @@ endif()
 
 if(SLANG_ENABLE_PREBUILT_BINARIES)
     if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+        # DX Agility SDK requires the D3D12*.DLL files to be placed under a sub-directory, "D3D12".
+        # https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#d3d12sdkpath-should-not-be-the-same-directory-as-the-application-exe
         file(GLOB prebuilt_binaries "${CMAKE_SOURCE_DIR}/external/slang-binaries/bin/windows-x64/*")
+        file(GLOB prebuilt_d3d12_binaries "${CMAKE_SOURCE_DIR}/external/slang-binaries/bin/windows-x64/[dD]3[dD]12*")
+        list(REMOVE_ITEM prebuilt_binaries ${prebuilt_d3d12_binaries})
         add_custom_target(
             copy-prebuilt-binaries ALL
             COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
             COMMAND ${CMAKE_COMMAND} -E copy_if_different 
                 ${prebuilt_binaries}
                 ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/D3D12
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${prebuilt_d3d12_binaries}
+                ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/D3D12
             VERBATIM
         )
     endif()
@@ -606,6 +636,8 @@ if(SLANG_ENABLE_TESTS)
             slang-rt
             slang-glslang
             slang-llvm
+            copy-webgpu_dawn
+            copy-slang-tint
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
@@ -618,7 +650,7 @@ if(SLANG_ENABLE_TESTS)
         tools/unit-test
         OBJECT
         EXCLUDE_FROM_ALL
-        INCLUDE_FROM_PRIVATE slang
+        INCLUDE_FROM_PRIVATE slang core
         INCLUDE_DIRECTORIES_PRIVATE include
         FOLDER test
     )
@@ -636,26 +668,28 @@ if(SLANG_ENABLE_TESTS)
             REQUIRED_BY slang-test
             FOLDER test/tools
         )
-        slang_add_target(
-            tools/render-test
-            MODULE
-            EXCLUDE_FROM_ALL
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-            USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE
-                core
-                compiler-core
-                slang
-                slang-rhi
-                platform
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
-                $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
-            OUTPUT_NAME render-test-tool
-            REQUIRED_BY slang-test
-            FOLDER test/tools
-        )
+        if(SLANG_ENABLE_SLANG_RHI)
+            slang_add_target(
+                tools/render-test
+                MODULE
+                EXCLUDE_FROM_ALL
+                EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+                USE_FEWER_WARNINGS
+                LINK_WITH_PRIVATE
+                    core
+                    compiler-core
+                    slang
+                    slang-rhi
+                    platform
+                    $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+                EXTRA_COMPILE_DEFINITIONS_PRIVATE
+                    $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
+                    $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
+                OUTPUT_NAME render-test-tool
+                REQUIRED_BY slang-test
+                FOLDER test/tools
+            )
+        endif()
     endif()
     slang_add_target(
         tools/slang-unit-test

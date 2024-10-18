@@ -692,6 +692,12 @@ public:
     // Should this derive from SequenceTypeLayout? A pointer is kind of like an array without
     // bounds - in that it can be indexed. Of it it can be looked at as an indirection to a value.
     // Is the "Just Work"iness applicable?
+    // TODO(Yong):
+    // This reference can lead to memory leak when we have `struct S{  S* f; };`
+    // where `f` will have a var layout whose type layout is a pointer type layout
+    // whose valueTypeLayout is the layout for `S` itself, forming a cycle.
+    // We need to stop using reference pointers for layouts and instead allocate all
+    // type layout object from MemoryArena on the linkage.
     RefPtr<TypeLayout> valueTypeLayout;
 };
 

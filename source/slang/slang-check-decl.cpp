@@ -21,6 +21,9 @@
 
 namespace Slang
 {
+    static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl);
+    static List<ConstructorDecl*> _getCtorList(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* structDecl, ConstructorDecl** defaultCtorOut);
+
         /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
     struct SemanticsDeclModifiersVisitor
         : public SemanticsDeclVisitorBase
@@ -316,6 +319,26 @@ namespace Slang
 
         SemanticsContext registerDifferentiableTypesForFunc(FunctionDeclBase* funcDecl);
 
+        struct DeclAndCtorInfo
+        {
+            StructDecl* parent = nullptr;
+            ConstructorDecl* defaultCtor = nullptr;
+            List<ConstructorDecl*> ctorList;
+            DeclAndCtorInfo()
+            {
+            }
+            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
+            {
+                if (getOnlyDefault)
+                    defaultCtor = _getDefaultCtor(parent);
+                else
+                    ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
+            }
+        };
+
+        void synthesizeCtorBody(DeclAndCtorInfo& structDeclInfo, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, StructDecl* structDecl);
+        void synthesizeCtorBodyForBases(ConstructorDecl* ctor, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, ThisExpr* thisExpr, SeqStmt* seqStmtChild);
+        void synthesizeCtorBodyForMember(ConstructorDecl* ctor, Decl* member, ThisExpr* thisExpr, Dictionary<Decl*, Expr*>& cachedDeclToCheckedVar, SeqStmt* seqStmtChild);
     };
 
     template<typename VisitorType>
@@ -5896,7 +5919,7 @@ namespace Slang
             intrinsicOpModifier->op = kIROp_IntCast;
             break;
         default:
-            SLANG_ASSERT("unknown builtin requirement kind.");
+            SLANG_UNEXPECTED("unknown builtin requirement kind.");
         }
         synFunc->loc = context->parentDecl->closingSourceLoc;
         synFunc->nameAndLoc.loc = synFunc->loc;
@@ -7733,13 +7756,13 @@ namespace Slang
             // Two such constraints are equivalent if their `sub`
             // and `sup` types are pairwise equivalent.
             //
-            auto leftSub = leftConstraint->sub;
-            auto rightSub = getSub(m_astBuilder, rightConstraint);
+            auto leftSub = leftConstraint->sub.type;
+            auto rightSub = substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->sub.type);
             if(!leftSub->equals(rightSub))
                 return false;
 
-            auto leftSup = leftConstraint->sup;
-            auto rightSup = getSup(m_astBuilder, rightConstraint);
+            auto leftSup = leftConstraint->sup.type;
+            auto rightSup = substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->sup.type);
             if(!leftSup->equals(rightSup))
                 return false;
         }
@@ -8407,6 +8430,11 @@ namespace Slang
     {
         auto typeExpr = paramDecl->type;
 
+        if (!as<ArrayExpressionType>(paramDecl->type) && doesTypeHaveTag(paramDecl->type, TypeTag::Unsized))
+        {
+            getSink()->diagnose(paramDecl, Diagnostics::paramCannotBeUnsized, paramDecl);
+        }
+
         // The "initializer" expression for a parameter represents
         // a default argument value to use if an explicit one is
         // not supplied.
@@ -8470,33 +8498,118 @@ namespace Slang
         return as<SeqStmt>(stmt->body);
     }
 
+    void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(ConstructorDecl* ctor, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, ThisExpr* thisExpr, SeqStmt* seqStmtChild)
+    {
+        // e.g. this->base = BaseType();
+        for (auto& declInfo : inheritanceDefaultCtorList)
+        {
+            if (!declInfo.defaultCtor)
+                continue;
+
+            auto ctorToInvoke = m_astBuilder->create<VarExpr>();
+            ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
+            ctorToInvoke->name = declInfo.defaultCtor->getName();
+            ctorToInvoke->loc = declInfo.defaultCtor->loc;
+            ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), ctor->returnType.type);
+
+            auto invoke = m_astBuilder->create<InvokeExpr>();
+            invoke->functionExpr = ctorToInvoke;
+
+            auto assign = m_astBuilder->create<AssignExpr>();
+            assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+            assign->right = invoke;
+            auto stmt = m_astBuilder->create<ExpressionStmt>();
+            stmt->expression = assign;
+            stmt->loc = ctor->loc;
+
+            seqStmtChild->stmts.add(stmt);
+        }
+    }
+
+    void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(ConstructorDecl* ctor, Decl* member, ThisExpr* thisExpr, Dictionary<Decl*, Expr*>& cachedDeclToCheckedVar, SeqStmt* seqStmtChild)
+    {
+        auto varDeclBase = as<VarDeclBase>(member);
+
+        // Static variables are initialized at start of runtime, not inside a constructor
+        if (!varDeclBase
+            || !varDeclBase->initExpr
+            || varDeclBase->hasModifier<HLSLStaticModifier>())
+            return;
+
+        MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
+        memberExpr->baseExpression = thisExpr;
+        memberExpr->declRef = member->getDefaultDeclRef();
+        memberExpr->scope = ctor->ownedScope;
+        memberExpr->loc = member->loc;
+        memberExpr->name = member->getName();
+        memberExpr->type = DeclRefType::create(getASTBuilder(), member->getDefaultDeclRef());
+
+        auto assign = m_astBuilder->create<AssignExpr>();
+        assign->left = memberExpr;
+        assign->right = varDeclBase->initExpr;
+        assign->loc = member->loc;
+
+        auto stmt = m_astBuilder->create<ExpressionStmt>();
+        stmt->expression = assign;
+        stmt->loc = member->loc;
+
+        Expr* checkedMemberVarExpr;
+        if (cachedDeclToCheckedVar.containsKey(member))
+            checkedMemberVarExpr = cachedDeclToCheckedVar[member];
+        else
+        {
+            checkedMemberVarExpr = CheckTerm(memberExpr);
+            cachedDeclToCheckedVar.add({ member, checkedMemberVarExpr });
+        }
+
+        if (!checkedMemberVarExpr->type.isLeftValue)
+            return;
+
+        seqStmtChild->stmts.add(stmt);
+    }
+
+
+    void SemanticsDeclBodyVisitor::synthesizeCtorBody(DeclAndCtorInfo& structDeclInfo, List<DeclAndCtorInfo>& inheritanceDefaultCtorList, StructDecl* structDecl)
+    {
+        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
+        for (auto ctor : structDeclInfo.ctorList)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount() + structDecl->members.getCount());
+
+            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+            thisExpr->scope = ctor->ownedScope;
+            thisExpr->type = ctor->returnType.type;
+
+            // Initialize base type by using its default constructor if it has one.
+            synthesizeCtorBodyForBases(ctor, inheritanceDefaultCtorList, thisExpr, seqStmtChild);
+
+            // Initialize member variables by using their default value if they have one
+            // e.g. this->member = default_value
+            for (auto& m : structDecl->members)
+            {
+                synthesizeCtorBodyForMember(ctor, m, thisExpr, cachedDeclToCheckedVar, seqStmtChild);
+            }
+
+            if (seqStmtChild->stmts.getCount() != 0)
+            {
+                seqStmt->stmts.insert(0, seqStmtChild);
+            }
+        }
+    }
+
     void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     {
         if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
         {
             getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
         }
-    
+
         auto structDecl = as<StructDecl>(aggTypeDecl);
         if (!structDecl)
             return;
 
-        struct DeclAndCtorInfo
-        {
-            StructDecl* parent = nullptr;
-            ConstructorDecl* defaultCtor = nullptr;
-            List<ConstructorDecl*> ctorList;
-            DeclAndCtorInfo()
-            {
-            }
-            DeclAndCtorInfo(ASTBuilder* m_astBuilder, SemanticsVisitor* visitor, StructDecl* parent, const bool getOnlyDefault)
-            {
-                if (getOnlyDefault)
-                    defaultCtor = _getDefaultCtor(parent);
-                else
-                    ctorList = _getCtorList(m_astBuilder, visitor, parent, &defaultCtor);
-            }
-        };
         List<DeclAndCtorInfo> inheritanceDefaultCtorList{};
         for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
         {
@@ -8525,101 +8638,7 @@ namespace Slang
             varDeclBase->initExpr = constructDefaultInitExprForVar(this, varDeclBase);
         }
 
-        Index insertOffset = 0;
-        Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
-        for (auto ctor : structDeclInfo.ctorList)
-        {
-            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
-            seqStmtChild->stmts.reserve(inheritanceDefaultCtorList.getCount());
-            for (auto& declInfo : inheritanceDefaultCtorList)
-            {
-                if (!declInfo.defaultCtor)
-                    continue;
-
-                auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-                ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
-                ctorToInvoke->name = declInfo.defaultCtor->getName();
-                ctorToInvoke->loc = declInfo.defaultCtor->loc;
-                ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), structDeclInfo.defaultCtor->returnType.type);
-
-                auto invoke = m_astBuilder->create<InvokeExpr>();
-                invoke->functionExpr = ctorToInvoke;
-
-                ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-                thisExpr->scope = ctor->ownedScope;
-                thisExpr->type = ctor->returnType.type;
-
-                auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
-                assign->right = invoke;
-                auto stmt = m_astBuilder->create<ExpressionStmt>();
-                stmt->expression = assign;
-                stmt->loc = ctor->loc;
-
-                seqStmtChild->stmts.add(stmt);
-            }
-
-            if (seqStmtChild->stmts.getCount() == 0)
-                continue;
-
-            seqStmt->stmts.insert(0, seqStmtChild);
-            insertOffset = 1;
-        }
-
-        for (auto ctor : structDeclInfo.ctorList)
-        {
-            ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-            thisExpr->scope = ctor->ownedScope;
-            thisExpr->type = ctor->returnType.type;
-
-            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-            auto seqStmtChild = m_astBuilder->create<SeqStmt>();
-            seqStmtChild->stmts.reserve(structDecl->members.getCount());
-            for (auto& m : structDecl->members)
-            {
-                auto varDeclBase = as<VarDeclBase>(m);
-
-                // Static variables are initialized at start of runtime, not inside a constructor
-                if (!varDeclBase
-                    || !varDeclBase->initExpr
-                    || varDeclBase->hasModifier<HLSLStaticModifier>())
-                    continue;
-
-                MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
-                memberExpr->baseExpression = thisExpr;
-                memberExpr->declRef = m->getDefaultDeclRef();
-                memberExpr->scope = ctor->ownedScope;
-                memberExpr->loc = m->loc;
-                memberExpr->name = m->getName();
-                memberExpr->type = DeclRefType::create(getASTBuilder(), m->getDefaultDeclRef());
-
-                auto assign = m_astBuilder->create<AssignExpr>();
-                assign->left = memberExpr;
-                assign->right = varDeclBase->initExpr;
-                assign->loc = m->loc;
-
-                auto stmt = m_astBuilder->create<ExpressionStmt>();
-                stmt->expression = assign;
-                stmt->loc = m->loc;
-
-                Expr* checkedMemberVarExpr;
-                if (cachedDeclToCheckedVar.containsKey(m))
-                    checkedMemberVarExpr = cachedDeclToCheckedVar[m];
-                else
-                {
-                    checkedMemberVarExpr = CheckTerm(memberExpr);
-                    cachedDeclToCheckedVar.add({ m, checkedMemberVarExpr });
-                }
-                if (!checkedMemberVarExpr->type.isLeftValue)
-                    continue;
-
-                seqStmtChild->stmts.add(stmt);
-            }
-            if (seqStmtChild->stmts.getCount() == 0)
-                continue;
-            seqStmt->stmts.insert(insertOffset, seqStmtChild);
-        }
+        synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);
 
         if (structDeclInfo.defaultCtor)
         {
@@ -10339,10 +10358,67 @@ namespace Slang
         return result;
     }
 
+    bool areTypesCompatibile(SemanticsVisitor* visitor, Type* fst, Type* snd)
+    {
+        if (fst->equals(snd))
+            return true;
+
+        if (auto declRefType = as<DeclRefType>(fst))
+        {
+            auto decl = declRefType->getDeclRef().getDecl();
+            if (auto extGenericDecl = visitor->GetOuterGeneric(decl))
+            {
+                SemanticsVisitor::ConstraintSystem constraints;
+                constraints.loc = decl->loc;
+                constraints.genericDecl = extGenericDecl;
+
+                if (!visitor->TryUnifyTypes(constraints, SemanticsVisitor::ValUnificationContext(), fst, snd))
+                    return false;
+                
+                ConversionCost baseCost;
+                if (!visitor->trySolveConstraintSystem(&constraints, makeDeclRef(extGenericDecl), ArrayView<Val*>(), baseCost))
+                    return false;
+                
+                // If we reach here, it means we have a valid unification.
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Type* getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)
+    {
+        ThisExpr* expr = visitor->getASTBuilder()->create<ThisExpr>();
+        expr->scope = funcDecl->ownedScope;
+        expr->loc = funcDecl->loc;
+
+        DiagnosticSink dummySink;
+        auto tempVisitor = SemanticsVisitor(visitor->withSink(&dummySink));
+
+        auto checkedExpr = tempVisitor.CheckTerm(expr);
+        
+        return !(as<ErrorType>(checkedExpr->type.type)) ? (checkedExpr->type.type) : nullptr;
+    }
+
+    Type* getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef)
+    {
+        auto type = getTypeForThisExpr(visitor, funcDeclRef.getDecl());
+        if (type)
+            return substituteType(
+                SubstitutionSet(funcDeclRef.declRefBase),
+                visitor->getASTBuilder(),
+                type);
+        return nullptr;
+    }
+
+
     struct ArgsWithDirectionInfo
     {
         List<Expr*> args;
         List<ParameterDirection> directions;
+
+        Expr* thisArg;
+        ParameterDirection thisArgDirection;
     };
 
     template<typename TDerivativeAttr>
@@ -10351,7 +10427,9 @@ namespace Slang
         Decl* funcDecl,
         TDerivativeAttr* attr,
         const List<Expr*>& imaginaryArguments,
-        const List<ParameterDirection>& expectedParamDirections)
+        const List<ParameterDirection>& expectedParamDirections,
+        Expr* expectedThisArg,
+        ParameterDirection expectedThisArgDirection)
     {
         if (isInterfaceRequirement(funcDecl))
         {
@@ -10402,7 +10480,18 @@ namespace Slang
             return type->toString();
         };
 
-        auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, imaginaryArguments);
+        List<Expr*> argList = imaginaryArguments;
+        List<ParameterDirection> paramDirections = expectedParamDirections;
+        bool expectStaticFunc = false;
+
+        if (expectedThisArg)
+        {
+            argList.insert(0, expectedThisArg);
+            paramDirections.insert(0, expectedThisArgDirection);
+            expectStaticFunc = true;
+        }
+
+        auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedFuncExpr, argList);
         auto resolved = subVisitor.ResolveInvoke(invokeExpr);
 
         if (auto resolvedInvoke = as<InvokeExpr>(resolved))
@@ -10430,61 +10519,104 @@ namespace Slang
                     visitor->getSink()->diagnose(attr, Diagnostics::cannotUseInterfaceRequirementAsDerivative);
                     return;
                 }
-                if (funcType->getParamCount() != imaginaryArguments.getCount())
+                if (funcType->getParamCount() != argList.getCount())
                 {
                     goto error;
                 }
-                for (Index ii = 0; ii < imaginaryArguments.getCount(); ++ii)
+                for (Index ii = 0; ii < argList.getCount(); ++ii)
                 {
                     // Check if the resolved invoke argument type is an error type.
                     // If so, then we have a type mismatch.
                     //
                     if (resolvedInvoke->arguments[ii]->type.type->equals(ctx.getASTBuilder()->getErrorType()) ||
-                        funcType->getParamDirection(ii) != expectedParamDirections[ii])
+                        funcType->getParamDirection(ii) != paramDirections[ii])
                     {
                         visitor->getSink()->diagnose(
                             attr,
                             Diagnostics::customDerivativeSignatureMismatchAtPosition,
                             ii,
-                            qualTypeToString(imaginaryArguments[ii]->type),
+                            qualTypeToString(argList[ii]->type),
                             funcType->getParamType(ii)->toString());
                     }
                 }
                 // The `imaginaryArguments` list does not include the `this` parameter.
                 // So we need to check that `this` type matches.
                 bool funcIsStatic = isEffectivelyStatic(funcDecl);
+                if (funcIsStatic)
+                    expectStaticFunc = true;
+
                 bool derivativeFuncIsStatic = isEffectivelyStatic(calleeDeclRef->declRef.getDecl());
-                if (funcIsStatic != derivativeFuncIsStatic)
+
+                if (expectStaticFunc && !derivativeFuncIsStatic)
                 {
                     visitor->getSink()->diagnose(
                         attr,
-                        Diagnostics::customDerivativeSignatureThisParamMismatch);
+                        Diagnostics::customDerivativeExpectedStatic);
                     return;
                 }
-                if (!funcIsStatic)
+
+                if (!derivativeFuncIsStatic)
                 {
                     auto defaultFuncDeclRef = createDefaultSubstitutionsIfNeeded(
                         visitor->getASTBuilder(),
                         visitor,
                         makeDeclRef(funcDecl));
-                    auto funcThisType = visitor->calcThisType(defaultFuncDeclRef);
-                    auto derivativeFuncThisType = visitor->calcThisType(calleeDeclRef->declRef);
-                    if (!funcThisType->equals(derivativeFuncThisType))
+                    
+                    DeclRef<FunctionDeclBase> funcDeclRef = defaultFuncDeclRef.as<FunctionDeclBase>();
+                    auto funcThisType = getTypeForThisExpr(visitor, funcDeclRef);
+                    DeclRef<FunctionDeclBase> calleeFuncDeclRef = calleeDeclRef->declRef.template as<FunctionDeclBase>();
+                    auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
+
+                    // If the function is a member function, we need to check that the
+                    // `this` type matches the expected type. This will ensure that after lowering to IR, 
+                    // the two functions are compatible.
+                    // 
+                    if (!areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
                     {
                         visitor->getSink()->diagnose(
                             attr,
                             Diagnostics::customDerivativeSignatureThisParamMismatch);
                         return;
                     }
-                    if (visitor->isTypeDifferentiable(funcThisType))
-                    {
-                        visitor->getSink()->diagnose(
-                            attr,
-                            Diagnostics::customDerivativeNotAllowedForMemberFunctionsOfDifferentiableType);
-                        return;
-                    }
                 }
 
+                // If the two decls are under different generic contexts, we'll need to check that
+                // they agree and specialize the attribute's decl-ref accordingly.
+                //
+                
+                auto originalNextGeneric = visitor->findNextOuterGeneric(visitor->getOuterGenericOrSelf(funcDecl));
+                auto derivativeNextGeneric = visitor->findNextOuterGeneric(visitor->getOuterGenericOrSelf(calleeDeclRef->declRef.getDecl()));
+
+                if ((!originalNextGeneric) != (!derivativeNextGeneric))
+                {
+                    // Diagnostic for when one is generic and the other is not.
+                    visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveGenericArgumentForDerivativeFunction);
+                    return;
+                }
+
+                if (originalNextGeneric != derivativeNextGeneric)
+                {
+                    // If the two generic containers are not the same, but are compatible, we can
+                    // unify them.
+                    //
+
+                    DeclRef<Decl> specializedDecl;
+                    if (!visitor->doGenericSignaturesMatch(originalNextGeneric, derivativeNextGeneric, &specializedDecl))
+                    {
+                        visitor->getSink()->diagnose(attr, Diagnostics::customDerivativeSignatureMismatch);
+                        return;
+                    }
+
+                    calleeDeclRef->declRef = substituteDeclRef(
+                        SubstitutionSet(specializedDecl),
+                        visitor->getASTBuilder(),
+                        calleeDeclRef->declRef);
+                    calleeDeclRef->type = substituteType(
+                        SubstitutionSet(specializedDecl),
+                        visitor->getASTBuilder(),
+                        calleeDeclRef->type);
+                }
+                
                 attr->funcExpr = calleeDeclRef;
                 if (attr->args.getCount())
                     attr->args[0] = attr->funcExpr;
@@ -10497,12 +10629,12 @@ namespace Slang
         // 
         StringBuilder builder;
         builder << "(";
-        for (Index ii = 0; ii < imaginaryArguments.getCount(); ++ii)
+        for (Index ii = 0; ii < argList.getCount(); ++ii)
         {
             if (ii != 0)
                 builder << ", ";
-            if (imaginaryArguments[ii]->type)
-                builder << qualTypeToString(imaginaryArguments[ii]->type);
+            if (argList[ii]->type)
+                builder << qualTypeToString(argList[ii]->type);
             else
                 builder << "<error>";
         }
@@ -10544,11 +10676,36 @@ namespace Slang
             imaginaryArguments.add(arg);
             directions.add(getParameterDirection(param));
         }
-        return { imaginaryArguments, directions };
+        return { imaginaryArguments, directions, nullptr, ParameterDirection::kParameterDirection_In };
     }
 
     ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
     {
+        Expr* thisArgExpr = nullptr;
+        if (auto thisType = getTypeForThisExpr(visitor, originalFuncDecl))
+        {
+            thisArgExpr = visitor->getASTBuilder()->create<VarExpr>();
+            thisArgExpr->type = thisType;
+            thisArgExpr->loc = loc;
+
+            if (visitor->isTypeDifferentiable(thisType) &&
+                !originalFuncDecl->findModifier<NoDiffThisAttribute>() && 
+                !isEffectivelyStatic(originalFuncDecl))
+            {
+                auto pairType = visitor->getDifferentialPairType(thisType);
+                thisArgExpr->type.type = pairType;
+            }
+            else
+            {
+                thisArgExpr = nullptr;
+            }
+        }
+
+        ParameterDirection thisTypeDirection = 
+            (thisArgExpr && !thisArgExpr->type.isLeftValue) ? 
+            ParameterDirection::kParameterDirection_In : 
+            ParameterDirection::kParameterDirection_InOut;
+
         List<Expr*> imaginaryArguments;
         for (auto param : originalFuncDecl->getParameters())
         {
@@ -10574,11 +10731,40 @@ namespace Slang
             expectedParamDirections.add(getParameterDirection(param));
         }
 
-        return { imaginaryArguments, expectedParamDirections };
+        return { imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection };
     }
 
     ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(SemanticsVisitor* visitor, FunctionDeclBase* originalFuncDecl, SourceLoc loc)
     {
+        Expr* thisArgExpr = nullptr;
+        if (auto thisType = getTypeForThisExpr(visitor, originalFuncDecl))
+        {
+            thisArgExpr = visitor->getASTBuilder()->create<VarExpr>();
+            thisArgExpr->type = thisType;
+            thisArgExpr->loc = loc;
+
+            if (visitor->isTypeDifferentiable(thisType) &&
+                !originalFuncDecl->findModifier<NoDiffThisAttribute>() && 
+                !isEffectivelyStatic(originalFuncDecl))
+            {
+                auto pairType = visitor->getDifferentialPairType(thisType);
+                thisArgExpr->type.type = pairType;
+
+                // TODO: for ptr pair types, no need to set isLeftValue to true.
+                if (as<DifferentialPairType>(thisArgExpr->type.type))
+                    thisArgExpr->type.isLeftValue = true;
+            }
+            else
+            {
+                thisArgExpr = nullptr;
+            }
+        }
+
+        ParameterDirection thisTypeDirection = 
+            (thisArgExpr && !thisArgExpr->type.isLeftValue) ? 
+            ParameterDirection::kParameterDirection_In : 
+            ParameterDirection::kParameterDirection_InOut;
+
         List<Expr*> imaginaryArguments;
         List<ParameterDirection> expectedParamDirections;
 
@@ -10660,7 +10846,7 @@ namespace Slang
             expectedParamDirections.add(ParameterDirection::kParameterDirection_In);
         }
 
-        return {imaginaryArguments, expectedParamDirections};
+        return {imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection};
     }
 
     // This helper function is needed to workaround a gcc bug.
@@ -10685,7 +10871,11 @@ namespace Slang
         higherOrderFuncExpr->baseFunction = derivativeOfAttr->funcExpr;
         if (derivativeOfAttr->args.getCount() > 0)
             higherOrderFuncExpr->loc = derivativeOfAttr->args[0]->loc;
-        Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(higherOrderFuncExpr, visitor->allowStaticReferenceToNonStaticMember());
+
+        Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(
+            higherOrderFuncExpr,
+            visitor->allowStaticReferenceToNonStaticMember());
+
         if (!checkedHigherOrderFuncExpr)
         {
             visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveOriginalFunctionForDerivative);
@@ -10701,7 +10891,15 @@ namespace Slang
         {
             auto resolvedFuncExpr = as<HigherOrderInvokeExpr>(resolvedInvoke->functionExpr);
             if (resolvedFuncExpr)
+            {
                 calleeDeclRefExpr = as<DeclRefExpr>(resolvedFuncExpr->baseFunction);
+                if (!calleeDeclRef && as<OverloadedExpr>(resolvedFuncExpr->baseFunction))
+                {
+                    visitor->getSink()->diagnose(
+                        derivativeOfAttr,
+                        Diagnostics::overloadedFuncUsedWithDerivativeOfAttributes);
+                }
+            }
         }
 
         if (!calleeDeclRefExpr)
@@ -10729,13 +10927,6 @@ namespace Slang
         // We may relax this restriction in the future by solving the "inverse" generic arguments
         // from the `calleeDeclRef`, and use them to create a declRef to funcDecl from the original
         // func.
-        auto originalNextGeneric = visitor->findNextOuterGeneric(visitor->getOuterGenericOrSelf(calleeFunc));
-        auto derivativeNextGeneric = visitor->findNextOuterGeneric(visitor->getOuterGenericOrSelf(funcDecl));
-        if (originalNextGeneric != derivativeNextGeneric)
-        {
-            visitor->getSink()->diagnose(derivativeOfAttr, Diagnostics::cannotResolveGenericArgumentForDerivativeFunction);
-            return;
-        }
 
         if (isInterfaceRequirement(calleeFunc))
         {
@@ -10787,7 +10978,14 @@ namespace Slang
             return;
 
         ArgsWithDirectionInfo imaginaryArguments = getImaginaryArgsToForwardDerivative(visitor, funcDecl, attr->loc);
-        checkDerivativeAttributeImpl(visitor, funcDecl, attr, imaginaryArguments.args, imaginaryArguments.directions);
+        checkDerivativeAttributeImpl(
+            visitor,
+            funcDecl,
+            attr,
+            imaginaryArguments.args,
+            imaginaryArguments.directions,
+            imaginaryArguments.thisArg,
+            imaginaryArguments.thisArgDirection);
     }
 
     static void checkDerivativeAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, BackwardDerivativeAttribute* attr)
@@ -10798,7 +10996,14 @@ namespace Slang
             return;
 
         ArgsWithDirectionInfo imaginaryArguments = getImaginaryArgsToBackwardDerivative(visitor, funcDecl, attr->loc);
-        checkDerivativeAttributeImpl(visitor, funcDecl, attr, imaginaryArguments.args, imaginaryArguments.directions);
+        checkDerivativeAttributeImpl(
+            visitor,
+            funcDecl,
+            attr,
+            imaginaryArguments.args,
+            imaginaryArguments.directions,
+            imaginaryArguments.thisArg,
+            imaginaryArguments.thisArgDirection);
     }
 
     static void checkDerivativeAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, PrimalSubstituteAttribute* attr)
@@ -10809,7 +11014,14 @@ namespace Slang
             return;
 
         ArgsWithDirectionInfo imaginaryArguments = getImaginaryArgsToFunc(visitor->getASTBuilder(), funcDecl, attr->loc);
-        checkDerivativeAttributeImpl(visitor, funcDecl, attr, imaginaryArguments.args, imaginaryArguments.directions);
+        checkDerivativeAttributeImpl(
+            visitor,
+            funcDecl,
+            attr,
+            imaginaryArguments.args,
+            imaginaryArguments.directions,
+            imaginaryArguments.thisArg,
+            imaginaryArguments.thisArgDirection);
     }
 
     static void checkCudaKernelAttribute(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl, CudaKernelAttribute*)

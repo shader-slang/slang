@@ -260,8 +260,118 @@ void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
     }
 }
 
+static IRImageSubscript* isTextureAccess(IRInst* inst)
+{
+    return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
+}
+
+void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
+{
+    auto resourceType = as<IRResourceTypeBase>(inst->getImage()->getDataType());
+    if (auto textureType = as<IRTextureType>(resourceType))
+    {
+        if (as<IRVectorType>(textureType->getElementType()))
+        {
+            getSink()->diagnose(inst, Diagnostics::unsupportedTargetIntrinsic, "atomic operation on non-scalar texture");
+        }
+    }
+    bool isArray = getIntVal(resourceType->getIsArrayInst()) != 0;
+    if (isArray)
+    {
+        emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
+        if (auto coordType = as<IRVectorType>(inst->getCoord()->getDataType()))
+        {
+            m_writer->emit(".");
+            const char* elements[] = { "x", "y", "z", "w" };
+            for (IRIntegerValue i = 0; i < getIntVal(coordType->getElementCount()) - 1; i++)
+                m_writer->emit(elements[Math::Min(3, (int)i)]);
+            m_writer->emit(", ");
+            emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
+            m_writer->emit(".");
+            m_writer->emit(elements[Math::Min(3, (int)getIntVal(coordType->getElementCount()) - 1)]);
+        }
+        else
+        {
+            getSink()->diagnose(inst, Diagnostics::unsupportedTargetIntrinsic, "invalid image coordinate for atomic operation");
+        }
+    }
+    else
+    {
+        emitOperand(inst->getCoord(), getInfo(EmitOp::General));
+    }
+}
+
+void MetalSourceEmitter::emitAtomicDestOperand(IRInst* inst)
+{
+    // If operand is already an atomic type, we can emit it
+    // as is.
+    auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
+    if (ptrType && as<IRAtomicType>(ptrType->getValueType()))
+    {
+        emitOperand(inst, getInfo(EmitOp::General));
+        return;
+    }
+    // Otherwise, we need to emit a cast.
+    m_writer->emit("((atomic_");
+    emitType(inst->getDataType());
+    m_writer->emit(")(");
+    emitOperand(inst, getInfo(EmitOp::General));
+    m_writer->emit("))");
+}
+
+void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
+{
+    if (!isImage)
+    {
+        emitOperand(inst, getInfo(EmitOp::General));
+        return;
+    }
+    // If we are emitting a source operand for an atomic image operation,
+    // we need to convert it into a 4-vector.
+    m_writer->emit("vec<");
+    emitType(inst->getDataType());
+    m_writer->emit(", 4>(");
+    emitOperand(inst, getInfo(EmitOp::General));
+    m_writer->emit(")");
+}
+
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
+        {
+            emitInstResultDecl(inst);
+            bool isImageOp = false;
+            if (auto imageSubscript = isTextureAccess(inst))
+            {
+                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
+                m_writer->emit(".");
+                m_writer->emit(imageFunc);
+                m_writer->emit("(");
+                emitAtomicImageCoord(imageSubscript);
+                isImageOp = true;
+            }
+            else
+            {
+                m_writer->emit(bufferFunc);
+                m_writer->emit("(");
+                emitAtomicDestOperand(inst->getOperand(0));
+            }
+            m_writer->emit(", ");
+            emitAtomicSrcOperand(isImageOp, inst->getOperand(1));
+            if (!isImageOp)
+            {
+                m_writer->emit(", ");
+                emitMemoryOrderOperand(inst->getOperand(inst->getOperandCount() - 1));
+            }
+            if (isImageOp)
+                m_writer->emit(").x;\n");
+            else
+                m_writer->emit(");\n");
+        };
+    auto diagnoseFloatAtommic = [&]()
+        {
+            getSink()->diagnose(inst, Diagnostics::unsupportedTargetIntrinsic, "floating point atomic operation");
+        };
     switch (inst->getOp())
     {
     case kIROp_discard:
@@ -287,160 +397,216 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
     case kIROp_AtomicLoad:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
         emitInstResultDecl(inst);
-        m_writer->emit("atomic_load_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(1));
-        m_writer->emit(");\n");
+        bool isImageOp = false;
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
+            m_writer->emit(".atomic_load(");
+            emitAtomicImageCoord(imageSubscript);
+            isImageOp = true;
+        }
+        else
+        {
+            m_writer->emit("atomic_load_explicit(");
+            emitAtomicDestOperand(inst->getOperand(0));
+        }
+        if (!isImageOp)
+        {
+            m_writer->emit(", ");
+            emitMemoryOrderOperand(inst->getOperand(1));
+        }
+        if (isImageOp)
+            m_writer->emit(").x;\n");
+        else
+            m_writer->emit(");\n");
         return true;
     }
     case kIROp_AtomicStore:
     {
-        m_writer->emit("atomic_store_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        bool isImageOp = false;
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
+            m_writer->emit(".atomic_store(");
+            emitAtomicImageCoord(imageSubscript);
+            isImageOp = true;
+        }
+        else
+        {
+            m_writer->emit("atomic_store_explicit(");
+            emitAtomicDestOperand(inst->getOperand(0));
+        }
         m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
+        emitAtomicSrcOperand(isImageOp, inst->getOperand(1));
+        if (!isImageOp)
+        {
+            m_writer->emit(", ");
+            emitMemoryOrderOperand(inst->getOperand(2));
+        }
         m_writer->emit(");\n");
         return true;
     }
     case kIROp_AtomicExchange:
     {
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_exchange_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
-        m_writer->emit(");\n");
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
+        emitAtomicOp("atomic_exchange", "atomic_exchange_explicit");
         return true;
     }
     case kIROp_AtomicCompareExchange:
     {
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
+        bool isImageOp = false;
+        auto imageSubscript = isTextureAccess(inst);
+        isImageOp = (imageSubscript != nullptr);
+
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n{\n");
-        emitType(inst->getDataType(), "_metal_cas_comparand");
+        if (isImageOp)
+            m_writer->emit("vec<");
+        emitType(inst->getDataType());
+        if (isImageOp)
+            m_writer->emit(", 4>");
+        m_writer->emit(" _metal_cas_comparand");
         m_writer->emit(" = ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(";\n");
-
-        m_writer->emit(getName(inst));
-        m_writer->emit(" = atomic_compare_exchange_weak_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (imageSubscript)
+        {
+            emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
+            m_writer->emit(".atomic_compare_exchange_weak(");
+            emitAtomicImageCoord(imageSubscript);
+        }
+        else
+        {
+            m_writer->emit("atomic_compare_exchange_weak_explicit(");
+            emitAtomicDestOperand(inst->getOperand(0));
+        }
         m_writer->emit(", &_metal_cas_comparand, ");
-        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(3));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(4));
-        m_writer->emit(");\n}\n");
+        emitAtomicSrcOperand(isImageOp, inst->getOperand(2));
+        if (!isImageOp)
+        {
+            m_writer->emit(", ");
+            emitMemoryOrderOperand(inst->getOperand(3));
+            m_writer->emit(", ");
+            emitMemoryOrderOperand(inst->getOperand(4));
+        }
+        m_writer->emit(");\n");
+        m_writer->emit(getName(inst));
+        m_writer->emit(" = _metal_cas_comparand");
+        if (isImageOp)
+            m_writer->emit(".x");
+        m_writer->emit(";\n}\n");
         return true;
     }
     case kIROp_AtomicAdd:
     {
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_add_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
-        m_writer->emit(");\n");
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
+        emitAtomicOp("atomic_fetch_add", "atomic_fetch_add_explicit");
         return true;
     }
     case kIROp_AtomicSub:
     {
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_sub_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
-        m_writer->emit(");\n");
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
+        emitAtomicOp("atomic_fetch_sub", "atomic_fetch_sub_explicit");
         return true;
     }
     case kIROp_AtomicAnd:
     {
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_and_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
-        m_writer->emit(");\n");
+        emitAtomicOp("atomic_fetch_and", "atomic_fetch_and_explicit");
         return true;
     }
     case kIROp_AtomicOr:
     {
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_or_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
-        m_writer->emit(");\n");
+        emitAtomicOp("atomic_fetch_or", "atomic_fetch_or_explicit");
         return true;
     }
     case kIROp_AtomicXor:
     {
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_xor_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
-        m_writer->emit(");\n");
+        emitAtomicOp("atomic_fetch_xor", "atomic_fetch_xor_explicit");
         return true;
     }
     case kIROp_AtomicMin:
     {
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_min_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
-        m_writer->emit(");\n");
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
+        emitAtomicOp("atomic_fetch_min", "atomic_fetch_min_explicit");
         return true;
     }
     case kIROp_AtomicMax:
     {
-        emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_max_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitMemoryOrderOperand(inst->getOperand(2));
-        m_writer->emit(");\n");
+        if (isFloatingType(inst->getDataType()))
+            diagnoseFloatAtommic();
+
+        emitAtomicOp("atomic_fetch_max", "atomic_fetch_max_explicit");
         return true;
     }
     case kIROp_AtomicInc:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_add_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", 1, ");
-        emitMemoryOrderOperand(inst->getOperand(1));
-        m_writer->emit(");\n");
+        bool isImageOp = false;
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
+            m_writer->emit(".atomic_fetch_add(");
+            emitAtomicImageCoord(imageSubscript);
+            isImageOp = true;
+        }
+        else
+        {
+            m_writer->emit("atomic_fetch_add_explicit(");
+            emitAtomicDestOperand(inst->getOperand(0));
+        }
+        m_writer->emit(", 1");
+        if (!isImageOp)
+        {
+            m_writer->emit(", ");
+            emitMemoryOrderOperand(inst->getOperand(1));
+        }
+        if (isImageOp)
+            m_writer->emit(").x;\n");
+        else
+            m_writer->emit(");\n");
         return true;
     }
     case kIROp_AtomicDec:
     {
         emitInstResultDecl(inst);
-        m_writer->emit("atomic_fetch_sub_explicit(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", 1, ");
-        emitMemoryOrderOperand(inst->getOperand(1));
-        m_writer->emit(");\n");
+        bool isImageOp = false;
+        if (auto imageSubscript = isTextureAccess(inst))
+        {
+            emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
+            m_writer->emit(".atomic_fetch_sub(");
+            emitAtomicImageCoord(imageSubscript);
+            isImageOp = true;
+        }
+        else
+        {
+            m_writer->emit("atomic_fetch_sub_explicit(");
+            emitAtomicDestOperand(inst->getOperand(0));
+        }
+        m_writer->emit(", 1");
+        if (!isImageOp)
+        {
+            m_writer->emit(", ");
+            emitMemoryOrderOperand(inst->getOperand(1));
+        }
+        if (isImageOp)
+            m_writer->emit(").x;\n");
+        else
+            m_writer->emit(");\n");
         return true;
     }
     }
@@ -644,7 +810,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
         case kIROp_ImageStore:
         {
-            
             auto imageOp = as<IRImageStore>(inst);
             emitOperand(imageOp->getImage(), getInfo(EmitOp::General));
             m_writer->emit(".write(");
@@ -655,11 +820,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             {
                 m_writer->emit(",");
                 emitOperand(imageOp->getAuxCoord1(), getInfo(EmitOp::General));
-            }
-            if(imageOp->hasAuxCoord2())
-            {
-                m_writer->emit(",");
-                emitOperand(imageOp->getAuxCoord2(), getInfo(EmitOp::General));
             }
             m_writer->emit(")");
             return true;

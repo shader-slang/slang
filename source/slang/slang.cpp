@@ -260,8 +260,11 @@ void Session::_initCodeGenTransitionMap()
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::Metal, CodeGenTarget::MetalLib, PassThroughMode::MetalC);
+    map.addTransition(CodeGenTarget::WGSL, CodeGenTarget::WGSLSPIRV, PassThroughMode::Tint);
     // To assembly
     map.addTransition(CodeGenTarget::SPIRV, CodeGenTarget::SPIRVAssembly, PassThroughMode::Glslang);
+    // We use glslang to turn SPIR-V into SPIR-V assembly.
+    map.addTransition(CodeGenTarget::WGSLSPIRV, CodeGenTarget::WGSLSPIRVAssembly, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::DXIL, CodeGenTarget::DXILAssembly, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::DXBytecode, CodeGenTarget::DXBytecodeAssembly, PassThroughMode::Fxc);
     map.addTransition(CodeGenTarget::MetalLib, CodeGenTarget::MetalLibAssembly, PassThroughMode::MetalC);
@@ -309,8 +312,40 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
     return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
 }
 
+void Session::writeStdlibDoc(String config)
+{
+    ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();
+    SourceManager* sourceManager = getBuiltinSourceManager();
+
+    DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
+
+    List<String> docStrings;
+
+    // For all the modules add their doc output to docStrings
+    for (Module* stdlibModule : stdlibModules)
+    {
+        RefPtr<ASTMarkup> markup(new ASTMarkup);
+        ASTMarkupUtil::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
+
+        DocMarkdownWriter writer(markup, astBuilder, &sink);
+        auto rootPage = writer.writeAll(config.getUnownedSlice());
+        File::writeAllText("toc.html", writer.writeTOC());
+        rootPage->writeToDisk();
+        rootPage->writeSummary(toSlice("summary.txt"));
+    }
+    ComPtr<ISlangBlob> diagnosticBlob;
+    sink.getBlobIfNeeded(diagnosticBlob.writeRef());
+    if (diagnosticBlob && diagnosticBlob->getBufferSize() != 0)
+    {
+        // Write the diagnostic blob to stdout.
+        fprintf(stderr, "%s", (const char*)diagnosticBlob->getBufferPointer());
+    }
+}
+
 SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 {
+    SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
+
     if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
         // Already have a StdLib loaded
@@ -336,40 +371,15 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
     if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
     {
-        // Not 100% clear where best to get the ASTBuilder from, but from the linkage shouldn't
-        // cause any problems with scoping
-
-        ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();
-        SourceManager* sourceManager = getBuiltinSourceManager();
-
-        DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
-
-        List<String> docStrings;
-
-        // For all the modules add their doc output to docStrings
-        for (Module* stdlibModule : stdlibModules)
+        // Load config file first.
+        String configText;
+        if (SLANG_FAILED(File::readAllText("config.txt", configText)))
         {
-            RefPtr<ASTMarkup> markup(new ASTMarkup);
-            ASTMarkupUtil::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
-
-            DocMarkdownWriter writer(markup, astBuilder);
-            writer.writeAll();
-            docStrings.add(writer.getOutput());
+            fprintf(stderr, "Error writing documentation: config file not found on current working directory.\n");
         }
-
-        // Combine all together in stdlib-doc.md output fiel
+        else
         {
-            String fileName("stdlib-doc.md");
-
-            RefPtr<FileStream> stream = new FileStream;
-            SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Create));
-            StreamWriter writer;
-            SLANG_RETURN_ON_FAIL(writer.init(stream));
-
-            for (auto& docString : docStrings)
-            {
-                SLANG_RETURN_ON_FAIL(writer.write(docString));
-            }
+            writeStdlibDoc(configText);
         }
     }
 
@@ -3158,28 +3168,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     // After semantic checking is performed we can try and output doc information for this
     if (optionSet.getBoolOption(CompilerOptionName::Doc))
     {
-        // Not 100% clear where best to get the ASTBuilder from, but from the linkage shouldn't
-        // cause any problems with scoping
-        ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
-
-        ISlangWriter* writer = getSink()->writer;
-
-        // Write output to the diagnostic writer
-        if (writer)
-        {
-            for (TranslationUnitRequest* translationUnit : translationUnits)
-            {
-                RefPtr<ASTMarkup> markup(new ASTMarkup);
-                ASTMarkupUtil::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
-
-                // Convert to markdown
-                DocMarkdownWriter markdownWriter(markup, astBuilder);
-                markdownWriter.writeAll();
-
-                UnownedStringSlice docText = markdownWriter.getOutput().getUnownedSlice();
-                writer->write(docText.begin(), docText.getLength());
-            }
-        }
+        // TODO: implement the logic to output generated documents to target directory/zip file.
     }
 
     // Look up all the entry points that are expected,
@@ -4284,6 +4273,8 @@ ISlangUnknown* Module::getInterface(const Guid& guid)
 {
     if(guid == IModule::getTypeGuid())
         return asExternal(this);
+    if (guid == IModulePrecompileService_Experimental::getTypeGuid())
+        return static_cast<slang::IModulePrecompileService_Experimental*>(this);
     return Super::getInterface(guid);
 }
 
@@ -4500,6 +4491,8 @@ ISlangUnknown* ComponentType::getInterface(Guid const& guid)
     {
         return static_cast<slang::IComponentType*>(this);
     }
+    if(guid == IModulePrecompileService_Experimental::getTypeGuid())    
+        return static_cast<slang::IModulePrecompileService_Experimental*>(this);
     return nullptr;
 }
 
@@ -5865,7 +5858,7 @@ void Session::addBuiltinSource(
 
         SLANG_UNEXPECTED("error in Slang standard library");
     }
-
+    
     // Compiling stdlib should not yield any warnings.
     SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
 

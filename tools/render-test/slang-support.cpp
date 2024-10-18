@@ -51,7 +51,9 @@ void ShaderCompilerUtil::Output::reset()
     sessionDesc.preprocessorMacros = macros.getBuffer();
 
     ComPtr<SlangCompileRequest> slangRequest = nullptr;
+    SLANG_ALLOW_DEPRECATED_BEGIN
     globalSession->createCompileRequest(slangRequest.writeRef());
+    SLANG_ALLOW_DEPRECATED_END
     out.m_requestForKernels = slangRequest;
     out.session = globalSession;
 
@@ -119,6 +121,9 @@ void ShaderCompilerUtil::Output::reset()
             break;
         case SLANG_SOURCE_LANGUAGE_CUDA:
             spAddPreprocessorDefine(slangRequest, "__CUDA__", "1");
+            break;
+        case SLANG_SOURCE_LANGUAGE_WGSL:
+            spAddPreprocessorDefine(slangRequest, "__WGSL__", "1");
             break;
 
         default:

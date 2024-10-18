@@ -42,3 +42,8 @@ function(enum_option name init description)
     endforeach()
     message(FATAL_ERROR "${name} must be one of ${enums}")
 endfunction()
+
+function(advanced_option name description default)
+    option(${name} ${description} ${default})
+    mark_as_advanced(${name})
+endfunction()

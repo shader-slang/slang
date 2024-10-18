@@ -23,7 +23,9 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession*
     }
 
     ComPtr<slang::ICompileRequest> compileRequest;
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SLANG_RETURN_ON_FAIL(session->createCompileRequest(compileRequest.writeRef()));
+    SLANG_ALLOW_DEPRECATED_END
 
     auto compilerExecutablePath = Path::getParentDirectory(Path::getExecutablePath());
     compileRequest->addSearchPath(compilerExecutablePath.getBuffer());

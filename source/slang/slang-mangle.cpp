@@ -444,6 +444,11 @@ namespace Slang
             // be treated as equivalent to the type itself.
             emit(context, "X");
             emitType(context, getTargetType(context->astBuilder, extensionDeclRef));
+            for (auto inheritanceDecl : getMembersOfType<InheritanceDecl>(context->astBuilder, extensionDeclRef))
+            {
+                emit(context, "I");
+                emitType(context, getSup(context->astBuilder, inheritanceDecl));
+            }
             return;
         }
 
@@ -823,7 +828,7 @@ namespace Slang
         builder << "_Sh";
         builder.append(uint64_t(hash), 16);
 
-        return std::move(builder);
+        return builder;
     }
 
 }

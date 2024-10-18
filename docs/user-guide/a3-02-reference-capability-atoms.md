@@ -42,6 +42,9 @@ Targets
 `spirv`
 > Represents the SPIR-V code generation target.
 
+`wgsl`
+> Represents the WebGPU shading language code generation target.
+
 Stages
 ----------------------
 *Capabilities to specify code generation stages (`vertex`, `fragment`...)*
@@ -690,8 +693,14 @@ Compound Capabilities
 `cpp_cuda_glsl_hlsl_spirv`
 > CPP, CUDA, GLSL, HLSL, and SPIRV code-gen targets
 
+`cpp_cuda_glsl_hlsl_spirv_wgsl`
+> CPP, CUDA, GLSL, HLSL, SPIRV and WGSL code-gen targets
+
 `cpp_cuda_glsl_hlsl_metal_spirv`
 > CPP, CUDA, GLSL, HLSL, Metal and SPIRV code-gen targets
+
+`cpp_cuda_glsl_hlsl_metal_spirv_wgsl`
+> CPP, CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
 
 `cpp_cuda_hlsl`
 > CPP, CUDA, and HLSL code-gen targets
@@ -708,8 +717,14 @@ Compound Capabilities
 `cpp_glsl_hlsl_spirv`
 > CPP, GLSL, HLSL, and SPIRV code-gen targets
 
+`cpp_glsl_hlsl_spirv_wgsl`
+> CPP, GLSL, HLSL, SPIRV and WGSL code-gen targets
+
 `cpp_glsl_hlsl_metal_spirv`
 > CPP, GLSL, HLSL, Metal, and SPIRV code-gen targets
+
+`cpp_glsl_hlsl_metal_spirv_wgsl`
+> CPP, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
 
 `cpp_hlsl`
 > CPP, and HLSL code-gen targets
@@ -726,11 +741,17 @@ Compound Capabilities
 `cuda_glsl_hlsl_metal_spirv`
 > CUDA, GLSL, HLSL, Metal, and SPIRV code-gen targets
 
+`cuda_glsl_hlsl_metal_spirv_wgsl`
+> CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+
 `cuda_glsl_spirv`
 > CUDA, GLSL, and SPIRV code-gen targets
 
 `cuda_glsl_metal_spirv`
 > CUDA, GLSL, Metal, and SPIRV code-gen targets
+
+`cuda_glsl_metal_spirv_wgsl`
+> CUDA, GLSL, Metal, SPIRV and WGSL code-gen targets
 
 `cuda_hlsl`
 > CUDA, and HLSL code-gen targets
@@ -741,11 +762,20 @@ Compound Capabilities
 `glsl_hlsl_spirv`
 > GLSL, HLSL, and SPIRV code-gen targets
 
+`glsl_hlsl_spirv_wgsl`
+> GLSL, HLSL, SPIRV and WGSL code-gen targets
+
 `glsl_hlsl_metal_spirv`
 > GLSL, HLSL, Metal, and SPIRV code-gen targets
 
+`glsl_hlsl_metal_spirv_wgsl`
+> GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+
 `glsl_metal_spirv`
 > GLSL, Metal, and SPIRV code-gen targets
+
+`glsl_metal_spirv_wgsl`
+> GLSL, Metal, SPIRV and WGSL code-gen targets
 
 `glsl_spirv`
 > GLSL, and SPIRV code-gen targets

@@ -1261,7 +1261,14 @@ struct ByteAddressBuffer
         memcpy(&data, ((const char*)this->data) + index, sizeof(T));
         return data;
     }
-    
+    template<typename T>
+    SLANG_CUDA_CALL StructuredBuffer<T> asStructuredBuffer() const
+    {
+        StructuredBuffer<T> rs;
+        rs.data = (T*)data;
+        rs.count = sizeInBytes / sizeof(T);
+        return rs;
+    }
     const uint32_t* data;
     size_t sizeInBytes;  //< Must be multiple of 4
 };
@@ -1348,7 +1355,14 @@ struct RWByteAddressBuffer
         SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
         return (T*)(((char*)data) + index);
     }
-    
+    template<typename T>
+    SLANG_CUDA_CALL RWStructuredBuffer<T> asStructuredBuffer() const
+    {
+        RWStructuredBuffer<T> rs;
+        rs.data = (T*)data;
+        rs.count = sizeInBytes / sizeof(T);
+        return rs;
+    }
     uint32_t* data;
     size_t sizeInBytes; //< Must be multiple of 4 
 };

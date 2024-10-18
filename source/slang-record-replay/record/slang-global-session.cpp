@@ -236,7 +236,9 @@ namespace SlangRecord
             recorder = m_recordManager->endMethodRecord();
         }
 
+        SLANG_ALLOW_DEPRECATED_BEGIN
         SlangResult res = m_actualGlobalSession->createCompileRequest(outCompileRequest);
+        SLANG_ALLOW_DEPRECATED_END
 
         {
             recorder->recordAddress(*outCompileRequest);

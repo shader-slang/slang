@@ -97,6 +97,8 @@ namespace Slang
         MetalLib            = SLANG_METAL_LIB,
         MetalLibAssembly    = SLANG_METAL_LIB_ASM,
         WGSL                = SLANG_WGSL,
+        WGSLSPIRVAssembly   = SLANG_WGSL_SPIRV_ASM,
+        WGSLSPIRV           = SLANG_WGSL_SPIRV,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -294,7 +296,7 @@ namespace Slang
         /// Base class for "component types" that represent the pieces a final
         /// shader program gets linked together from.
         ///
-    class ComponentType : public RefObject, public slang::IComponentType
+    class ComponentType : public RefObject, public slang::IComponentType, public slang::IModulePrecompileService_Experimental
     {
     public:
         //
@@ -369,6 +371,27 @@ namespace Slang
             uint32_t count,
             slang::CompilerOptionEntry* entries,
             ISlangBlob** outDiagnostics) override;
+
+
+        //
+        // slang::IModulePrecompileService interface
+        //
+        SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
+            SlangCompileTarget target,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getPrecompiledTargetCode(
+            SlangCompileTarget target,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
+
+        SLANG_NO_THROW SlangInt SLANG_MCALL getModuleDependencyCount()
+            SLANG_OVERRIDE;
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getModuleDependency(
+            SlangInt dependencyIndex,
+            slang::IModule** outModule,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
         CompilerOptionSet& getOptionSet() { return m_optionSet; }
 
@@ -1336,6 +1359,7 @@ namespace Slang
         LLVM = SLANG_PASS_THROUGH_LLVM,                     ///< LLVM 'compiler'
         SpirvOpt = SLANG_PASS_THROUGH_SPIRV_OPT,            ///< pass thorugh spirv to spirv-opt
         MetalC = SLANG_PASS_THROUGH_METAL,
+        Tint = SLANG_PASS_THROUGH_TINT,                     ///< pass through spirv to Tint API
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
@@ -1550,10 +1574,25 @@ namespace Slang
         virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(
             SlangInt32 index) override;
 
+
+        // IModulePrecompileService_Experimental
         /// Precompile TU to target language
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL precompileForTarget(
             SlangCompileTarget target,
             slang::IBlob** outDiagnostics) override;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPrecompiledTargetCode(
+            SlangCompileTarget target,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics = nullptr) override;
+
+        virtual SLANG_NO_THROW SlangInt SLANG_MCALL getModuleDependencyCount()
+            SLANG_OVERRIDE;
+
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getModuleDependency(
+            SlangInt dependencyIndex,
+            slang::IModule** outModule,
+            slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
         virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
@@ -3233,6 +3272,7 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL checkCompileTargetSupport(SlangCompileTarget target) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(SlangPassThrough passThrough) override;
 
+        void writeStdlibDoc(String config);
         SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib(slang::CompileStdLibFlags flags) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
