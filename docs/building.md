@@ -12,8 +12,9 @@ Please install:
 - CMake (3.25 preferred, but 3.22 works[^1])
 - A C++ compiler with support for C++17. GCC, Clang and MSVC are supported
 - A CMake compatible backend, for example Visual Studio or Ninja
+- Python3 (a dependency for building spirv-tools)
 
-Optional dependencies include
+Optional dependencies for tests include
 
 - CUDA
 - OptiX
@@ -121,25 +122,25 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 
 ### CMake options
 
-| Option                            | Default          | Description                                                                                  |
-|-----------------------------------|------------------|----------------------------------------------------------------------------------------------|
-| `SLANG_VERSION`                   | Latest `v*` tag  | The project version, detected using git if available                                         |
-| `SLANG_EMBED_STDLIB`              | `FALSE`          | Build slang with an embedded version of the stdlib                                           |
-| `SLANG_EMBED_STDLIB_SOURCE`       | `TRUE`           | Embed stdlib source in the binary                                                            |
-| `SLANG_ENABLE_ASAN`               | `FALSE`          | Enable ASAN (address sanitizer)                                                              |
-| `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`          | Enable full IR validation (SLOW!)                                                            |
-| `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`          | Enable IR BreakAlloc functionality for debugging.                                            |
-| `SLANG_ENABLE_GFX`                | `TRUE`           | Enable gfx targets                                                                           |
-| `SLANG_ENABLE_SLANGD`             | `TRUE`           | Enable language server target                                                                |
-| `SLANG_ENABLE_SLANGC`             | `TRUE`           | Enable standalone compiler target                                                            |
-| `SLANG_ENABLE_SLANGRT`            | `TRUE`           | Enable runtime target                                                                        |
-| `SLANG_ENABLE_SLANG_GLSLANG`      | `TRUE`           | Enable glslang dependency and slang-glslang wrapper target                                   |
-| `SLANG_ENABLE_TESTS`              | `TRUE`           | Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT |
-| `SLANG_ENABLE_EXAMPLES`           | `TRUE`           | Enable example targets, requires SLANG_ENABLE_GFX                                            |
-| `SLANG_LIB_TYPE`                  | `SHARED`         | How to build the slang library                                                               |
-| `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY`   | How to set up llvm support                                                                   |
-| `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent | URL specifying the location of the slang-llvm prebuilt library                               |
-| `SLANG_GENERATORS_PATH`           | ``               | Path to an installed `all-generators` target for cross compilation                           |
+| Option                            | Default                    | Description                                                                                  |
+|-----------------------------------|----------------------------|----------------------------------------------------------------------------------------------|
+| `SLANG_VERSION`                   | Latest `v*` tag            | The project version, detected using git if available                                         |
+| `SLANG_EMBED_STDLIB`              | `FALSE`                    | Build slang with an embedded version of the stdlib                                           |
+| `SLANG_EMBED_STDLIB_SOURCE`       | `TRUE`                     | Embed stdlib source in the binary                                                            |
+| `SLANG_ENABLE_ASAN`               | `FALSE`                    | Enable ASAN (address sanitizer)                                                              |
+| `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`                    | Enable full IR validation (SLOW!)                                                            |
+| `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`                    | Enable IR BreakAlloc functionality for debugging.                                            |
+| `SLANG_ENABLE_GFX`                | `TRUE`                     | Enable gfx targets                                                                           |
+| `SLANG_ENABLE_SLANGD`             | `TRUE`                     | Enable language server target                                                                |
+| `SLANG_ENABLE_SLANGC`             | `TRUE`                     | Enable standalone compiler target                                                            |
+| `SLANG_ENABLE_SLANGRT`            | `TRUE`                     | Enable runtime target                                                                        |
+| `SLANG_ENABLE_SLANG_GLSLANG`      | `TRUE`                     | Enable glslang dependency and slang-glslang wrapper target                                   |
+| `SLANG_ENABLE_TESTS`              | `TRUE`                     | Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT |
+| `SLANG_ENABLE_EXAMPLES`           | `TRUE`                     | Enable example targets, requires SLANG_ENABLE_GFX                                            |
+| `SLANG_LIB_TYPE`                  | `SHARED`                   | How to build the slang library                                                               |
+| `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY_IF_POSSIBLE` | How to set up llvm support                                                                   |
+| `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                               |
+| `SLANG_GENERATORS_PATH`           | ``                         | Path to an installed `all-generators` target for cross compilation                           |
 
 The following options relate to optional dependencies for additional backends
 and running additional tests. Left unchanged they are auto detected, however
@@ -172,7 +173,7 @@ error if they can't be found.
 There are several options for getting llvm-support:
 
 - Use a prebuilt binary slang-llvm library:
-  `-DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY`, this is the default
+  `-DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY` or `-DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY_IF_POSSIBLE` (this is the default)
     - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
       `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
       containing such a file
@@ -180,6 +181,9 @@ There are several options for getting llvm-support:
       release on github matching the current tag. If such a tag doesn't exist
       or doesn't have the correct os*arch combination then the latest release
       will be tried.
+    - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
+      the case that a prebuilt binary can't be found then the build will proceed
+      as though `DISABLE` was chosen
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
   must have llvm-13.0 and a matching libclang installed. It's important that
   either:
@@ -190,12 +194,6 @@ There are several options for getting llvm-support:
       compiling LLVM without the dynamic library.
     - Anything else which may be linked in (for example Mesa, also dynamically
       loads the same llvm object)
-- Have the Slang build system build LLVM:
-  `-DSLANG_SLANG_LLVM_FLAVOR=BUILD_LLVM`, this will build LLVM binaries at
-  configure time and use that. This is only intended to be used as part of the
-  process of generating the portable binary slang-llvm library. This always
-  builds a `Release` LLVM, so is unsuitable to use when building a `Debug`
-  `slang-llvm` on Windows as the runtime libraries will be incompatible.
 - Do not enable LLVM support: `-DSLANG_SLANG_LLVM_FLAVOR=DISABLE`
 
 To build only a standalone slang-llvm, you can run:
