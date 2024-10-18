@@ -21,10 +21,7 @@ public:
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
-    virtual void emitSwitchCaseSelectorsImpl(
-        IRBasicType *const switchCondition,
-        const SwitchRegion::Case *const currentCase,
-        const bool isDefault) SLANG_OVERRIDE;
+    virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault) SLANG_OVERRIDE;
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void emitVarKeywordImpl(IRType * type, IRInst* varDecl) SLANG_OVERRIDE;
     virtual void emitDeclaratorImpl(DeclaratorInfo* declarator) SLANG_OVERRIDE;
