@@ -2105,6 +2105,8 @@ namespace Slang
         case IntegerConstantExpressionCoercionType::AnyInteger:
             if (isScalarIntegerType(inExpr->type))
                 expr = inExpr;
+            else if (auto enumDecl = isEnumType(inExpr->type))
+                expr = coerce(CoercionSite::General, enumDecl->tagType, inExpr);
             else
                 expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
             break;

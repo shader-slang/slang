@@ -35,15 +35,10 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     // "case 2: case 3: case 4: ...;".
 
     m_writer->emit("case ");
-    bool isFirst = false;
     for (auto caseVal : currentCase->values)
     {
-        if (!isFirst)
-        {
-            m_writer->emit(", ");
-        }
-        isFirst = false;
         emitOperand(caseVal, getInfo(EmitOp::General));
+        m_writer->emit(", ");
     }
     if (isDefault)
     {
