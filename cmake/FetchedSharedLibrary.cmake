@@ -4,17 +4,22 @@ function(download_and_extract archive_name url)
     set(archive_path "${CMAKE_CURRENT_BINARY_DIR}/${archive_name}${extension}")
     set(extract_dir "${CMAKE_CURRENT_BINARY_DIR}/${archive_name}")
 
-    message(STATUS "Fetching ${archive_name} from ${url}")
-    file(DOWNLOAD ${url} ${archive_path}
-         # SHOW_PROGRESS
-         STATUS status
-    )
+    if(EXISTS ${url})
+        message(STATUS "Using local file for ${archive_name}: ${url}")
+        set(archive_path ${url})
+    else()
+        message(STATUS "Fetching ${archive_name} from ${url}")
+        file(DOWNLOAD ${url} ${archive_path}
+             # SHOW_PROGRESS
+             STATUS status
+        )
 
-    list(GET status 0 status_code)
-    list(GET status 1 status_string)
-    if(NOT status_code EQUAL 0)
-        message(WARNING "Failed to download ${archive_name} from ${url}: ${status_string}")
-        return()
+        list(GET status 0 status_code)
+        list(GET status 1 status_string)
+        if(NOT status_code EQUAL 0)
+            message(WARNING "Failed to download ${archive_name} from ${url}: ${status_string}")
+            return()
+        endif()
     endif()
 
     file(ARCHIVE_EXTRACT
