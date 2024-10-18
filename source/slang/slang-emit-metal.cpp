@@ -588,13 +588,13 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         if (auto imageSubscript = isTextureAccess(inst))
         {
             emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-            m_writer->emit(".atomic_fetch_add(");
+            m_writer->emit(".atomic_fetch_sub(");
             emitAtomicImageCoord(imageSubscript);
             isImageOp = true;
         }
         else
         {
-            m_writer->emit("atomic_fetch_add_explicit(");
+            m_writer->emit("atomic_fetch_sub_explicit(");
             emitAtomicDestOperand(inst->getOperand(0));
         }
         m_writer->emit(", 1");
