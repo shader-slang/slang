@@ -817,6 +817,31 @@ static LegalVal legalizeLoad(
     }
 }
 
+static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<LegalVal> args)
+{
+    ShortList<IRInst*> legalArgs;
+    for (auto arg : args)
+    {
+        switch (arg.flavor)
+        {
+        case LegalVal::Flavor::none:
+            break;
+        case LegalVal::Flavor::simple:
+            legalArgs.add(arg.getSimple());
+            break;
+        case LegalVal::Flavor::pair:
+            legalArgs.add(arg.getPair()->ordinaryVal.getSimple());
+            break;
+        default:
+            SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for printf operand");
+        }
+    }
+    return LegalVal::simple(context->builder->emitIntrinsicInst(context->builder->getVoidType(),
+        kIROp_Printf,
+        (UInt)legalArgs.getCount(),
+        legalArgs.getArrayView().getBuffer()));
+}
+
 static LegalVal legalizeDebugVar(IRTypeLegalizationContext* context, LegalType type, IRDebugVar* originalInst)
 {
     // For now we just discard any special part and keep the ordinary part.
@@ -2166,6 +2191,9 @@ static LegalVal legalizeInst(
     case kIROp_unconditionalBranch:
     case kIROp_loop:
         result = legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);
+        break;
+    case kIROp_Printf:
+        result = legalizePrintf(context, args);
         break;
     case kIROp_undefined:
         return LegalVal();

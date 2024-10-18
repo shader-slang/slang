@@ -10788,53 +10788,24 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 // Output message
 // TODO: add check to ensure format is const literal.
 
-${{{{
-for (int argCount = 0; argCount < 12; argCount++)
-{
-    StringBuilder paramList;
-    StringBuilder argList;
-    StringBuilder spirvArgList;
-    StringBuilder genericParamList;
-    if (argCount > 0)
-        genericParamList << "<";
-    for (int i = 0; i < argCount; i++)
-    {
-        if (i > 0)
-            genericParamList << ", ";
-        genericParamList << "T" << i;
-
-        paramList << ", T" << i << " v" << i;
-        argList << ", $" << i+1;
-        spirvArgList << " $v" << i;
-    }
-    if (argCount > 0)
-        genericParamList << ">";
-    auto params = paramList.toString();
-    auto args = argList.toString();
-    auto spirvArgs = spirvArgList.toString();
-}}}}
-__glsl_extension(GL_EXT_debug_printf)
+/// Print a message to the debug output.
+/// @param T The variadic type pack parameter for the arguments to be printed.
+/// @param format The format string.
+/// @param args (optional) The arguments to be printed.
+/// @remarks The function maps to `printf` for HLSL, CPU and CUDA targets, and maps to `OpDebugPrintf` for SPIR-V target,
+/// and maps to `debugPrintfEXT` for GLSL target. Depending on the target and execution environment, the function may have
+/// no effect.
+/// @example
+/// ```cpp
+/// void test(int x, float y)
+/// {
+///     printf("hello world!\n");
+///     printf(R"(x = "%d", y = "%f")", x, y);
+/// }
+/// ```
 [require(cpp_cuda_glsl_hlsl_spirv, printf)]
-void printf$(genericParamList.toString())(NativeString format $(paramList))
-{
-    __target_switch
-    {
-    case hlsl:
-    case cpp:
-    case cuda:
-        __intrinsic_asm "printf";
-    case glsl:
-        __intrinsic_asm "debugPrintfEXT($0 $(argList))";
-    case spirv:
-        spirv_asm {
-          OpExtension "SPV_KHR_non_semantic_info";
-          result:$$void = OpExtInst debugPrintf 1 $format $(spirvArgs);
-        };
-    }
-}
-${{{{
-}
-}}}}
+__intrinsic_op($(kIROp_Printf))
+void printf<each T>(NativeString format, expand each T args);
 
 // Tessellation factor fixup routines
 /// @category tessellation Tessellation functions

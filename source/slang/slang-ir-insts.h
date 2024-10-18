@@ -2930,6 +2930,11 @@ struct IRMakeValuePack : IRInst
     IR_LEAF_ISA(MakeValuePack)
 };
 
+struct IRMakeStruct : IRInst
+{
+    IR_LEAF_ISA(MakeStruct)
+};
+
 struct IRMakeWitnessPack : IRInst
 {
     IR_LEAF_ISA(MakeWitnessPack)

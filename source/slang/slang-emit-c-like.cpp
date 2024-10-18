@@ -2847,6 +2847,26 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
     }
+    case kIROp_Printf:
+    {
+        m_writer->emit("printf(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (inst->getOperandCount() == 2)
+        {
+            auto operand = inst->getOperand(1);
+            if (auto makeStruct = as<IRMakeStruct>(operand))
+            {
+                // Flatten the tuple resulting from the variadic pack.
+                for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
+                {
+                    m_writer->emit(", ");
+                    emitOperand(makeStruct->getOperand(bb), getInfo(EmitOp::General));
+                }
+            }
+        }
+        m_writer->emit(")");
+        break;
+    }
     case kIROp_RequireGLSLExtension:
     {
         break; //should already have set requirement; case covered for empty intrinsic block

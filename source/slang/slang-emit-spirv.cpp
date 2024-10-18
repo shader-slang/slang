@@ -3426,6 +3426,27 @@ struct SPIRVEmitContext
                 emitInst(parent, inst, SpvOpControlBarrier, executionScope, memoryScope, memorySemantics);
             }
             break;
+        case kIROp_Printf:
+            {
+                List<IRInst*> operands;
+                operands.add(inst->getOperand(0));
+                if (inst->getOperandCount() == 2)
+                {
+                    auto operand = inst->getOperand(1);
+                    if (auto makeStruct = as<IRMakeStruct>(operand))
+                    {
+                        // Flatten the tuple resulting from the variadic pack.
+                        for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
+                        {
+                            operands.add(makeStruct->getOperand(bb));
+                        }
+                    }
+                }
+                ensureExtensionDeclaration(toSlice("SPV_KHR_non_semantic_info"));
+                result = emitInst(parent, inst, SpvOpExtInst, inst->getFullType(), kResultID,
+                    getNonSemanticDebugPrintfExtInst(), SpvLiteralInteger::from32(1), operands.getArrayView());
+            }
+            break;
         }
         if (result)
             emitDecorations(inst, getID(result));
