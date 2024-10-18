@@ -487,13 +487,21 @@ endif()
 
 if(SLANG_ENABLE_PREBUILT_BINARIES)
     if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+        # DX Agility SDK requires the D3D12*.DLL files to be placed under a sub-directory, "D3D12".
+        # https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#d3d12sdkpath-should-not-be-the-same-directory-as-the-application-exe
         file(GLOB prebuilt_binaries "${CMAKE_SOURCE_DIR}/external/slang-binaries/bin/windows-x64/*")
+        file(GLOB prebuilt_d3d12_binaries "${CMAKE_SOURCE_DIR}/external/slang-binaries/bin/windows-x64/[dD]3[dD]12*")
+        list(REMOVE_ITEM prebuilt_binaries ${prebuilt_d3d12_binaries})
         add_custom_target(
             copy-prebuilt-binaries ALL
             COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
             COMMAND ${CMAKE_COMMAND} -E copy_if_different 
                 ${prebuilt_binaries}
                 ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/D3D12
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${prebuilt_d3d12_binaries}
+                ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/D3D12
             VERBATIM
         )
     endif()
