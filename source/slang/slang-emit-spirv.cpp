@@ -1437,7 +1437,7 @@ struct SPIRVEmitContext
         if (m_addressingMode == SpvAddressingModelPhysicalStorageBuffer64)
             return;
         ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
-        requireSPIRVCapability(SpvCapabilityVariablePointers);
+        requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
         ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_physical_storage_buffer"));
         requireSPIRVCapability(SpvCapabilityPhysicalStorageBufferAddresses);
         m_addressingMode = SpvAddressingModelPhysicalStorageBuffer64;
