@@ -2,7 +2,7 @@ Proposals
 =========
 
 This directory contains proposals / "RFCs" for Slang language/compiler/system features.
-In general, proposals are used for features that are large or complicated enough that the design and/or plan benefits from being discussed in detail before we commit to making code changes.
+In general, proposals are used for features that changes the language, the stdlib core module, or the the Slang compiler API. 
 
 ## How to make a proposal ##
 
