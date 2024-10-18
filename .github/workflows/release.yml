@@ -68,14 +68,12 @@ jobs:
       - name: Change dev tools to host arch (linux and macos)
         run: |
           if [[ "${{matrix.os}}" == linux* && "${{matrix.platform}}" == "aarch64" && "$(uname -m)" != "aarch64" ]]; then
-            export CC=aarch64-linux-gnu-gcc
-            export CXX=aarch64-linux-gnu-g++
+            export CMAKE_TOOLCHAIN_FILE=cmake/ubuntu-cross-aarch64.cmake
           fi
           CMAKE_OSX_ARCHITECTURES="${{matrix.platform}}"
           CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES//aarch64/arm64}
 
-          echo "CC=$CC" >> "$GITHUB_ENV"
-          echo "CXX=$CXX" >> "$GITHUB_ENV"
+          echo "CMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE" >> "$GITHUB_ENV"
           echo "CMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES" >> "$GITHUB_ENV"
 
       - name: Build Slang
