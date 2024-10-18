@@ -3405,6 +3405,7 @@ struct SPIRVEmitContext
                 List<IRInst*> operands;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                     operands.add(inst->getOperand(i));
+                ensureExtensionDeclaration(toSlice("SPV_KHR_non_semantic_info"));
                 result = emitInst(parent, inst, SpvOpExtInst, inst->getFullType(), kResultID,
                     getNonSemanticDebugPrintfExtInst(), SpvLiteralInteger::from32(1), operands.getArrayView());
             }
