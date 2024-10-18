@@ -53,9 +53,7 @@
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-loop-unroll.h"
-#include "slang-ir-legalize-extract-from-texture-access.h"
 #include "slang-ir-legalize-image-subscript.h"
-#include "slang-ir-legalize-is-texture-access.h"
 #include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
@@ -1058,9 +1056,6 @@ Result linkAndOptimizeIR(
 
     legalizeVectorTypes(irModule, sink);
 
-    // Legalize `__isTextureAccess` and related.
-    legalizeIsTextureAccess(irModule, sink);
-
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
     // to see if we can clean up any temporaries created by legalization.
@@ -1335,8 +1330,6 @@ Result linkAndOptimizeIR(
     // Create aliases for all dynamic resource parameters.
     if(requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         legalizeDynamicResourcesForGLSL(codeGenContext, irModule);
-    
-    legalizeExtractFromTextureAccess(irModule);
 
     // Legalize `ImageSubscript` loads.
     switch (target)

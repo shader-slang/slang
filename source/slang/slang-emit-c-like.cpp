@@ -2472,6 +2472,16 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
+    case kIROp_GetEquivalentStructuredBuffer:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".asStructuredBuffer<");
+            emitType(as<IRHLSLStructuredBufferTypeBase>(inst->getDataType())->getElementType());
+            m_writer->emit(">()");
+        }
+        break;
+
     case kIROp_RWStructuredBufferStore:
         {
             auto base = inst->getOperand(0);
