@@ -498,6 +498,10 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
 
 bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    auto diagnoseFloatAtommic = [&]()
+        {
+            getSink()->diagnose(inst, Diagnostics::unsupportedTargetIntrinsic, "floating point atomic operation");
+        };
     switch (inst->getOp())
     {
     case kIROp_AtomicLoad:
@@ -519,7 +523,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedExchange(");
+        m_writer->emit("InterlockedExchange");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -532,7 +537,10 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedCompareExchange(");
+        m_writer->emit("InterlockedCompareExchange");
+        if (inst->getDataType()->getOp() == kIROp_FloatType)
+            m_writer->emit("FloatBitwise");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -547,7 +555,12 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedAdd(");
+        if (inst->getDataType()->getOp() == kIROp_FloatType)
+        {
+            diagnoseFloatAtommic();
+        }
+        m_writer->emit("InterlockedAdd");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -560,7 +573,12 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedAdd(");
+        if (inst->getDataType()->getOp() == kIROp_FloatType)
+        {
+            diagnoseFloatAtommic();
+        }
+        m_writer->emit("InterlockedAdd");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", -(");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -573,7 +591,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedAnd(");
+        m_writer->emit("InterlockedAnd");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -586,7 +605,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedOr(");
+        m_writer->emit("InterlockedOr");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -599,7 +619,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedXor(");
+        m_writer->emit("InterlockedXor");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -612,7 +633,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedMin(");
+        m_writer->emit("InterlockedMin");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -625,7 +647,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedMax(");
+        m_writer->emit("InterlockedMax");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -638,7 +661,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedAdd(");
+        m_writer->emit("InterlockedAdd");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", 1, ");
         m_writer->emit(getName(inst));
@@ -649,7 +673,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitType(inst->getDataType(), getName(inst));
         m_writer->emit(";\n");
-        m_writer->emit("InterlockedAdd(");
+        m_writer->emit("InterlockedAdd");
+        m_writer->emit("(");
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(", -1, ");
         m_writer->emit(getName(inst));

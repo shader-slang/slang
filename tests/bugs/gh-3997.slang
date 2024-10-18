@@ -10,7 +10,7 @@ float atomicAdd(__ref float value, float amount)
         __requirePrelude("#include <atomic>");
         __intrinsic_asm "std::atomic_ref(*$0).fetch_add($1)";
     case spirv:
-        return __atomicAdd(value, amount);
+        return __atomic_add(value, amount);
     }
 }
 

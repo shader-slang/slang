@@ -133,6 +133,8 @@ protected:
 
     void _emitSpecialFloatImpl(IRType* type, const char* valueExpr);
 
+    void emitAtomicImageCoord(IRImageSubscript* operand);
+
     Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
 
     RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;

@@ -515,7 +515,17 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitInstResultDecl(inst);
         m_writer->emit("atomicAdd(");
+        bool needCloseTypeCast = false;
+        if (inst->getDataType()->getOp() == kIROp_Int64Type)
+        {
+            m_writer->emit("(unsigned long long*)(");
+            needCloseTypeCast = true;
+        }
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (needCloseTypeCast)
+        {
+            m_writer->emit(")");
+        }
         m_writer->emit(", ");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(");\n");
@@ -525,7 +535,17 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitInstResultDecl(inst);
         m_writer->emit("atomicAdd(");
+        bool needCloseTypeCast = false;
+        if (inst->getDataType()->getOp() == kIROp_Int64Type)
+        {
+            m_writer->emit("(unsigned long long*)(");
+            needCloseTypeCast = true;
+        }
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (needCloseTypeCast)
+        {
+            m_writer->emit(")");
+        }
         m_writer->emit(", -(");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit("));\n");

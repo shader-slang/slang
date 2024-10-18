@@ -299,6 +299,18 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
+/// Represent a `int` or `uint` type.
+[sealed]
+[builtin]
+interface __BuiltinInt32Type : __BuiltinIntegerType
+{}
+
+/// Represent a `int64_t` or `uint64_t` type.
+[sealed]
+[builtin]
+interface __BuiltinInt64Type : __BuiltinIntegerType
+{}
+
 /// Represent builtin types that can represent a real number.
 [sealed]
 [builtin]
@@ -602,6 +614,14 @@ ${{{{
 }}}}
     ,  __BuiltinArithmeticType
     ,  __BuiltinIntegerType
+${{{{
+    if (kBaseTypes[tt].tag == BaseType::Int || kBaseTypes[tt].tag == BaseType::UInt)
+}}}}
+    ,  __BuiltinInt32Type
+${{{{
+    if (kBaseTypes[tt].tag == BaseType::Int64 || kBaseTypes[tt].tag == BaseType::UInt64)
+}}}}
+    ,  __BuiltinInt64Type
 ${{{{
         ; // fall through
     case BaseType::Bool:

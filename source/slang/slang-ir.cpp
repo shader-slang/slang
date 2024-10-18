@@ -5092,7 +5092,7 @@ namespace Slang
         auto inst = createInst<IRAtomicStore>(
             this,
             kIROp_AtomicStore,
-            nullptr,
+            getVoidType(),
             dstPtr,
             srcVal,
             memoryOrder);

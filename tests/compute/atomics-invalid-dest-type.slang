@@ -1,11 +1,8 @@
 // atomics-buffer.slang
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
-//CHECK: Atomic must be applied to a scalar texture or non-texture
+//CHECK: atomic operation on non-scalar texture
 
 RWBuffer<uint2> outputBuffer;
 

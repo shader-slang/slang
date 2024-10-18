@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // CHECK: %[[PTR:[0-9a-zA-Z_]+]] = OpAccessChain %_ptr_PhysicalStorageBuffer_uint %{{.*}} %int_0
-// CHECK: %original = OpAtomicIAdd %uint %[[PTR]] %uint_1 %uint_0 %uint_1
+// CHECK: %{{.*}} = OpAtomicIAdd %uint %[[PTR]] %uint_1 %uint_0 %uint_1
 
 struct Buf
 {

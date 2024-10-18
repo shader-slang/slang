@@ -260,7 +260,6 @@ public:
     bool hasExplicitConstantBufferOffset(IRInst* cbufferType);
     bool isSingleElementConstantBuffer(IRInst* cbufferType);
     bool shouldForceUnpackConstantBufferElements(IRInst* cbufferType);
-
     //
     // Expressions
     //
