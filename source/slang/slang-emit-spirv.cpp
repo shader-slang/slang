@@ -2929,7 +2929,7 @@ struct SPIRVEmitContext
 
     void ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
     {
-        auto typeOp = getVectorElementType(atomicInst->getDataType())->getOp();
+        auto typeOp = atomicInst->getDataType()->getOp();
         switch (op)
         {
         case SpvOpAtomicFAddEXT:
@@ -2947,6 +2947,13 @@ struct SPIRVEmitContext
             case kIROp_HalfType:
                 ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float16_add"));
                 requireSPIRVCapability(SpvCapabilityAtomicFloat16AddEXT);
+                break;
+            case kIROp_VectorType:
+                if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() == kIROp_HalfType)
+                {
+                    ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                    requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
+                }
                 break;
             }
         }
@@ -2967,6 +2974,13 @@ struct SPIRVEmitContext
             case kIROp_HalfType:
                 ensureExtensionDeclaration(toSlice("SPV_EXT_shader_atomic_float_min_max"));
                 requireSPIRVCapability(SpvCapabilityAtomicFloat16MinMaxEXT);
+                break;
+            case kIROp_VectorType:
+                if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() == kIROp_HalfType)
+                {
+                    ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                    requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
+                }
                 break;
             }
         }
