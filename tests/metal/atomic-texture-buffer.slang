@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=METAL_FLOAT): -target metal -stage compute -entry computeMain -DFLOAT
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
-// METAL_FLOAT: 'float' atomic texture operations are disallowed with Metal target's
+// METAL_FLOAT: floating point atomic operation
 
 //METALLIB: @computeMain
 

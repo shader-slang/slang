@@ -60,6 +60,7 @@ public:
     Module(slang::IModule* interface) : ComponentType(interface) {}
 
     EntryPoint* findEntryPointByName(const std::string& name);
+    EntryPoint* findAndCheckEntryPoint(const std::string& name, int stage);
 
     slang::IModule* moduleInterface() const {
         return static_cast<slang::IModule*>(interface());

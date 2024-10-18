@@ -21,8 +21,7 @@ namespace renderer_test
     {
         for (int i = 0; i < int(Format::_Count); ++i)
         {
-            FormatInfo info;
-            rhiGetFormatInfo(Format(i), &info);
+            const FormatInfo& info = getFormatInfo(Format(i));
             if (slice == info.name)
             {
                 return Format(i);
@@ -1161,7 +1160,7 @@ namespace renderer_test
 
     // T for type to return, F for function pointer to operate on uint8->T
     template<typename T, typename F>
-    void generateTextureDataWithTargetTStorage(TextureData& output, const InputTextureDesc& desc, rhi::FormatInfo& formatInfo, F loadUint8ToT)
+    void generateTextureDataWithTargetTStorage(TextureData& output, const InputTextureDesc& desc, const rhi::FormatInfo& formatInfo, F loadUint8ToT)
     {
         // the following function assumes input of 0 or 1 since our testing framework only tests with 0 or 1
         TextureData work;
@@ -1235,8 +1234,7 @@ namespace renderer_test
     }
     void generateTextureData(TextureData& output, const InputTextureDesc& desc)
     {
-        rhi::FormatInfo formatInfo;
-        rhiGetFormatInfo(desc.format, &formatInfo);
+        const FormatInfo& formatInfo = getFormatInfo(desc.format);
 
         switch (desc.format)
         {
@@ -1354,8 +1352,7 @@ namespace renderer_test
             kFloat,
         };
         SimpleScalarType type;
-        rhi::FormatInfo formatInfo;
-        rhiGetFormatInfo(inputDesc.format, &formatInfo);
+        const rhi::FormatInfo& formatInfo = getFormatInfo(inputDesc.format);
         switch (formatInfo.channelType)
         {
         case SLANG_SCALAR_TYPE_UINT64:
