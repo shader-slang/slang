@@ -2151,10 +2151,18 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_debug_printf"));
             m_writer->emit("debugPrintfEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            for (UInt aa = 1; aa < inst->getOperandCount(); ++aa)
+            if (inst->getOperandCount() == 2)
             {
-                m_writer->emit(", ");
-                emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+                auto operand = inst->getOperand(1);
+                if (auto makeStruct = as<IRMakeStruct>(operand))
+                {
+                    // Flatten the tuple resulting from the variadic pack.
+                    for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
+                    {
+                        m_writer->emit(", ");
+                        emitOperand(makeStruct->getOperand(bb), getInfo(EmitOp::General));
+                    }
+                }
             }
             m_writer->emit(")");
             return true;
