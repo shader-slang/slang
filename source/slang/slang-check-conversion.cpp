@@ -1403,7 +1403,6 @@ namespace Slang
         {
             getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
         }
-
         return _failedCoercion(toType, outToExpr, fromExpr);
     }
 
