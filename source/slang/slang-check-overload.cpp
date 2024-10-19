@@ -2097,7 +2097,7 @@ namespace Slang
         // by doing so we could weed out cases where a type is "constructed"
         // from a value of the same type. There is no need in Slang for
         // "copy constructors" but the stdlib currently has to define
-        // some just to make code that does, e.g., `float(1.0f)` work.
+        // some just to make code that does, e.g., `float(1.0f)` work.)
 
         LookupResult initializers = lookUpMember(
             m_astBuilder,
@@ -2404,7 +2404,7 @@ namespace Slang
         return argsListBuilder.produceString();
     }
 
-    Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr * expr)
+    Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         OverloadResolveContext context;
         // check if this is a stdlib operator call, if so we want to use cached results
@@ -2470,7 +2470,7 @@ namespace Slang
         context.sourceScope = m_outerScope;
         context.baseExpr = GetBaseExpr(funcExpr);
 
-        // TODO: We should have a special case here where an `InvokeExpr`
+        // We run a special case here where an `InvokeExpr`
         // with a single argument where the base/func expression names
         // a type should always be treated as an explicit type coercion
         // (and hence bottleneck through `coerce()`) instead of just
@@ -2484,8 +2484,33 @@ namespace Slang
         // that `(T) expr` and `T(expr)` continue to be semantically
         // `visitTypeCastExpr`) would allow us to continue to ensure
         // equivalent in (almost) all cases.
+        // If callee is a type, and we are calling with one argument, then treat it as a
+        // type coercion.
+        bool typeOverloadChecked = false;
 
-        if (!context.bestCandidate)
+        if (expr->arguments.getCount() == 1)
+        {
+            if (const auto typeType = as<TypeType>(funcExpr->type))
+            {
+                if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
+                {
+                    Expr* resultExpr = nullptr;
+                    DiagnosticSink tempSink(getSourceManager(), nullptr);
+                    ConversionCost conversionCost = kConversionCost_None;
+                    auto coerceResult = SemanticsVisitor(withSink(&tempSink))._coerce(
+                        CoercionSite::ExplicitCoercion,
+                        typeType->getType(),
+                        &resultExpr,
+                        expr->arguments[0]->type,
+                        expr->arguments[0],
+                        &conversionCost);
+                    if (coerceResult)
+                        return resultExpr;
+                    typeOverloadChecked = true;
+                }
+            }
+        }
+        if (!context.bestCandidate && !typeOverloadChecked)
         {
             AddOverloadCandidates(funcExpr, context);
         }

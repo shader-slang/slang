@@ -1979,17 +1979,23 @@ namespace Slang
             }
         }
 
-        if(auto castExpr = expr.as<TypeCastExpr>())
+        SubstExpr<Expr> typeCastOperand;
+        if (auto typeCastExpr = expr.as<TypeCastExpr>())
+            typeCastOperand = getArg(typeCastExpr, 0);
+        else if (auto builtinCastExpr = expr.as<BuiltinCastExpr>())
+            typeCastOperand = getBaseExpr(builtinCastExpr);
+        
+        if (typeCastOperand)
         {
             auto substType = getType(m_astBuilder, expr);
             if (!substType)
                 return nullptr;
             if (!isValidCompileTimeConstantType(substType))
                 return nullptr;
-            auto val = tryConstantFoldExpr(getArg(castExpr, 0), kind, circularityInfo);
+            auto val = tryConstantFoldExpr(typeCastOperand, kind, circularityInfo);
             if (val)
             {
-                if (!castExpr.getExpr()->type)
+                if (!expr.getExpr()->type)
                     return nullptr;
                 auto foldVal = as<IntVal>(
                     TypeCastIntVal::tryFoldImpl(m_astBuilder, substType, val, getSink()));
@@ -2106,7 +2112,7 @@ namespace Slang
             if (isScalarIntegerType(inExpr->type))
                 expr = inExpr;
             else if (auto enumDecl = isEnumType(inExpr->type))
-                expr = coerce(CoercionSite::General, enumDecl->tagType, inExpr);
+                expr = inExpr;
             else
                 expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
             break;
@@ -3491,6 +3497,12 @@ namespace Slang
         sizeOfLikeExpr->sizedType = type;
 
         return sizeOfLikeExpr;
+    }
+
+    Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)
+    {
+        // All builtin cast exprs should already be checked.
+        return expr;
     }
 
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
