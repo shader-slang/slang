@@ -2111,7 +2111,7 @@ namespace Slang
         case IntegerConstantExpressionCoercionType::AnyInteger:
             if (isScalarIntegerType(inExpr->type))
                 expr = inExpr;
-            else if (auto enumDecl = isEnumType(inExpr->type))
+            else if (isEnumType(inExpr->type))
                 expr = inExpr;
             else
                 expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
