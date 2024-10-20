@@ -896,24 +896,43 @@ static LegalType createLegalUniformBufferType(
 // Create a pointer type with a given legalized value type.
 static LegalType createLegalPtrType(
     TypeLegalizationContext*    context,
-    IROp                        op,
+    IRInst*                     originalPtrType,
     LegalType                   legalValueType)
 {
     switch (legalValueType.flavor)
     {
     case LegalType::Flavor::none:
+        if (auto ptrType = as<IRPtrType>(originalPtrType))
+        {
+            // If this is a physical pointer, we need to create an untyped pointer if
+            // the element type is nothing.
+            return LegalType::simple(
+                context->getBuilder()->getPtrType(
+                    ptrType->getOp(),
+                    context->getBuilder()->getVoidType(),
+                    ptrType->getAddressSpace()));
+        }
         return LegalType();
 
     case LegalType::Flavor::simple:
         {
-            // Easy case: we just have a simple element type,
-            // so we want to create a uniform buffer that wraps it.
-            return LegalType::simple(createBuiltinGenericType(
-                context,
-                op,
-                legalValueType.getSimple()));
+            // Easy case: we just have a simple element type.
+            if (auto ptrTypeBase = as<IRPtrTypeBase>(originalPtrType))
+            {
+                return LegalType::simple(
+                    context->getBuilder()->getPtrType(
+                        ptrTypeBase->getOp(),
+                        legalValueType.getSimple(),
+                        ptrTypeBase->getAddressSpace()));
+            }
+            else
+            {
+                return LegalType::simple(createBuiltinGenericType(
+                    context,
+                    originalPtrType->getOp(),
+                    legalValueType.getSimple()));
+            }
         }
-        break;
 
     case LegalType::Flavor::implicitDeref:
         {
@@ -936,7 +955,7 @@ static LegalType createLegalPtrType(
             // will matter.
             return LegalType::implicitDeref(createLegalPtrType(
                 context,
-                op,
+                originalPtrType,
                 legalValueType.getImplicitDeref()->valueType));
         }
         break;
@@ -948,11 +967,11 @@ static LegalType createLegalPtrType(
 
             auto ordinaryType = createLegalPtrType(
                 context,
-                op,
+                originalPtrType,
                 pairType->ordinaryType);
             auto specialType = createLegalPtrType(
                 context,
-                op,
+                originalPtrType,
                 pairType->specialType);
 
             return LegalType::pair(ordinaryType, specialType, pairType->pairInfo);
@@ -974,7 +993,7 @@ static LegalType createLegalPtrType(
                 newElement.key = ee.key;
                 newElement.type = createLegalPtrType(
                     context,
-                    op,
+                    originalPtrType,
                     ee.type);
 
                 ptrPseudoTupleType->elements.add(newElement);
@@ -1310,7 +1329,7 @@ LegalType legalizeTypeImpl(
         if (legalValueType.flavor == LegalType::Flavor::simple &&
             legalValueType.getSimple() == ptrType->getValueType())
             return LegalType::simple(ptrType);
-        return createLegalPtrType(context, ptrType->getOp(), legalValueType);
+        return createLegalPtrType(context, ptrType, legalValueType);
     }
     else if(auto structType = as<IRStructType>(type))
     {
