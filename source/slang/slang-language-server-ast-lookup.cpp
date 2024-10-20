@@ -144,6 +144,11 @@ public:
         return dispatchIfNotNull(expr->base);
     }
 
+    bool visitBuiltinCastExpr(BuiltinCastExpr* expr)
+    {
+        return dispatchIfNotNull(expr->base);
+    }
+
     bool visitAssignExpr(AssignExpr* expr)
     {
         if (dispatchIfNotNull(expr->left))
