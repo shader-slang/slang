@@ -329,6 +329,14 @@ class ImplicitCastExpr : public TypeCastExpr
     SLANG_AST_CLASS(ImplicitCastExpr)
 };
 
+// A builtin cast expr generated during semantic checking, where there is
+// no associated conversion function decl.
+class BuiltinCastExpr : public Expr
+{
+    SLANG_AST_CLASS(BuiltinCastExpr);
+    Expr* base = nullptr;
+};
+
 class LValueImplicitCastExpr : public TypeCastExpr
 {
     SLANG_AST_CLASS(LValueImplicitCastExpr)

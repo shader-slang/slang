@@ -3232,7 +3232,7 @@ void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSe
     emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, EmitLayoutSemanticOption::kPostType);
 }
 
-void CLikeSourceEmitter::emitSwitchCaseSelectorsImpl(IRBasicType *const /* switchCondition */, const SwitchRegion::Case *const currentCase, const bool isDefault)
+void CLikeSourceEmitter::emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault)
 {
     for(auto caseVal : currentCase->values)
     {
@@ -3401,9 +3401,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 auto defaultCase = switchRegion->defaultCase;
                 for(auto currentCase : switchRegion->cases)
                 {
-                    const bool isDefault {currentCase.Ptr() == defaultCase};
-                    IRBasicType *const switchConditionType {as<IRBasicType>(switchRegion->getCondition()->getDataType())};
-                    emitSwitchCaseSelectors(switchConditionType, currentCase.Ptr(), isDefault);
+                    bool isDefault = (currentCase.Ptr() == defaultCase);
+                    emitSwitchCaseSelectors(currentCase.Ptr(), isDefault);
                     m_writer->indent();
                     m_writer->emit("{\n");
                     m_writer->indent();

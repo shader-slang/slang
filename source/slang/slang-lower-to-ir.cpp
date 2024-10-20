@@ -4936,6 +4936,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return sharedLoweringContext.visitInvokeExprImpl(expr, LoweredValInfo(), TryClauseEnvironment());
     }
 
+    LoweredValInfo visitBuiltinCastExpr(BuiltinCastExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        auto irVal = getSimpleVal(context, lowerRValueExpr(context, expr->base));
+        return LoweredValInfo::simple(context->irBuilder->emitCast(irType, irVal));
+    }
+
         /// Emit code for a `try` invoke.
     LoweredValInfo visitTryExpr(TryExpr* expr)
     {
