@@ -911,10 +911,9 @@ static LegalType createLegalPtrType(
                 // If this is a physical pointer, we need to create an untyped pointer if
                 // the element type is nothing.
                 return LegalType::simple(
-                    context->getBuilder()->getPtrType(
-                        ptrType->getOp(),
+                    context->getBuilder()->getPtrTypeWithAddressSpace(
                         context->getBuilder()->getVoidType(),
-                        ptrType->getAddressSpace()));
+                        ptrType));
             }
         }
         return LegalType();
@@ -924,19 +923,18 @@ static LegalType createLegalPtrType(
             // Easy case: we just have a simple element type.
             if (auto ptrTypeBase = as<IRPtrTypeBase>(originalPtrType))
             {
-                return LegalType::simple(
-                    context->getBuilder()->getPtrType(
-                        ptrTypeBase->getOp(),
-                        legalValueType.getSimple(),
-                        ptrTypeBase->getAddressSpace()));
+                if (ptrTypeBase->hasAddressSpace())
+                {
+                    return LegalType::simple(
+                        context->getBuilder()->getPtrTypeWithAddressSpace(
+                            legalValueType.getSimple(),
+                            ptrTypeBase));
+                }
             }
-            else
-            {
-                return LegalType::simple(createBuiltinGenericType(
-                    context,
-                    originalPtrType->getOp(),
-                    legalValueType.getSimple()));
-            }
+            return LegalType::simple(createBuiltinGenericType(
+                context,
+                originalPtrType->getOp(),
+                legalValueType.getSimple()));
         }
 
     case LegalType::Flavor::implicitDeref:
