@@ -904,13 +904,18 @@ static LegalType createLegalPtrType(
     case LegalType::Flavor::none:
         if (auto ptrType = as<IRPtrType>(originalPtrType))
         {
-            // If this is a physical pointer, we need to create an untyped pointer if
-            // the element type is nothing.
-            return LegalType::simple(
-                context->getBuilder()->getPtrType(
-                    ptrType->getOp(),
-                    context->getBuilder()->getVoidType(),
-                    ptrType->getAddressSpace()));
+            switch (ptrType->getAddressSpace())
+            {
+            case AddressSpace::UserPointer:
+            case AddressSpace::Global:
+                // If this is a physical pointer, we need to create an untyped pointer if
+                // the element type is nothing.
+                return LegalType::simple(
+                    context->getBuilder()->getPtrType(
+                        ptrType->getOp(),
+                        context->getBuilder()->getVoidType(),
+                        ptrType->getAddressSpace()));
+            }
         }
         return LegalType();
 
