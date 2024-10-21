@@ -83,6 +83,7 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+/// Represents types that can be initialized with a default constructor.
 __magic_type(DefaultInitializableType)
 interface IDefaultInitializable
 {
@@ -90,18 +91,26 @@ interface IDefaultInitializable
     __init();
 }
 
+
+/// Represents types that can be compared.
+/// Implemented by all builtin integer and floating point scalar or vector types.
 interface IComparable
 {
+    /// Returns true if two values of the conforming type are equal.
     __builtin_requirement($( (int)BuiltinRequirementKind::Equals))
     bool equals(This other);
 
+    /// Returns true if `this` is less than `other`.
     __builtin_requirement($( (int)BuiltinRequirementKind::LessThan))
     bool lessThan(This other);
 
+    /// Returns true if `this` is less than or equal to `other`.
     __builtin_requirement($( (int)BuiltinRequirementKind::LessThanOrEquals))
     bool lessThanOrEquals(This other);
 }
 
+/// Represents types that has a defined range of values.
+/// Implemented by all builtin integer and floating point types.
 interface IRangedValue
 {
     static const This maxValue;
@@ -111,6 +120,7 @@ interface IRangedValue
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
+/// Represents types that provide arithmetic operations.
 interface IArithmetic : IComparable
 {
     This add(This other);
@@ -126,6 +136,7 @@ interface IArithmetic : IComparable
     __init(This value);
 }
 
+/// Represents types that provide logical operations.
 interface ILogical : IComparable
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::Shl) )
@@ -159,7 +170,7 @@ interface ILogical : IComparable
     __init(int val);
 }
 
-/// Represent a type that can be used for integer arithmetic operations.
+/// Represents a type that can be used for integer arithmetic operations.
 /// 
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`.
 ///
@@ -200,7 +211,7 @@ interface IInteger : IArithmetic, ILogical
     __init(int64_t val);
 }
 
-/// Represent a type that can be used for floating point arithmetic operations.
+/// Represents a type that can be used for floating point arithmetic operations.
 /// 
 /// Implemented by builtin scalar types: `float`, `half`, `double`.
 ///
@@ -233,33 +244,42 @@ interface IInteger : IArithmetic, ILogical
 ///
 interface IFloat : IArithmetic, IDifferentiable
 {
+    /// Initializes a value of the conforming type form a `float`.
     [TreatAsDifferentiable]
     __init(float value);
 
+    /// Converts a value of the conforming type into a `float`.
     [TreatAsDifferentiable]
     float toFloat();
 
+    /// Computes the arithmetic sum of two values of the conforming type.
     [TreatAsDifferentiable]
     This add(This other);
 
+    /// Computes the arithmetic subtraction from values of the conforming type.
     [TreatAsDifferentiable]
     This sub(This other);
 
+    /// Computes the arithmetic multiplication from values of the conforming type.
     [TreatAsDifferentiable]
     This mul(This other);
 
+    /// Computes the arithmetic division from values of the conforming type.
     [TreatAsDifferentiable]
     This div(This other);
 
+    /// Computes the arithmetic remainder from values of the conforming type.
     [TreatAsDifferentiable]
     This mod(This other);
 
+    /// Computes the arithmetic negation of the conforming type.
     [TreatAsDifferentiable]
     This neg();
 
     [TreatAsDifferentiable]
     __init(This value);
 
+    /// Multiplies a value of the conforming type by a floating point scale factor..
     [TreatAsDifferentiable]
     This scale<T:__BuiltinFloatingPointType>(T scale);
 }
@@ -288,30 +308,30 @@ interface __BuiltinLogicalType : __BuiltinType, ILogical
 {
 }
 
-/// Represent builtin types that logically have a sign (positive/negative/zero).
+/// Represents builtin types that logically have a sign (positive/negative/zero).
 [sealed]
 [builtin]
 interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 
-/// Represent builtin types that can represent integers.
+/// Represents builtin types that can represent integers.
 [sealed]
 [builtin]
 interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
-/// Represent a `int` or `uint` type.
+/// Represents a `int` or `uint` type.
 [sealed]
 [builtin]
 interface __BuiltinInt32Type : __BuiltinIntegerType
 {}
 
-/// Represent a `int64_t` or `uint64_t` type.
+/// Represents a `int64_t` or `uint64_t` type.
 [sealed]
 [builtin]
 interface __BuiltinInt64Type : __BuiltinIntegerType
 {}
 
-/// Represent builtin types that can represent a real number.
+/// Represents builtin types that can represent a real number.
 [sealed]
 [builtin]
 interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
@@ -341,6 +361,10 @@ void __requirePrelude(constexpr String preludeText);
 __intrinsic_op($(kIROp_RequireGLSLExtension))
 void __requireGLSLExtension(constexpr String preludeText);
 
+/// @experimetal
+/// Perform a compile-time condition check and emit a compile-time error if the condition is false.
+/// @param condition The compile-time condition to check.
+/// @param errorMessage The error message to emit if the condition is false.
 __intrinsic_op($(kIROp_StaticAssert))
 void static_assert(constexpr bool condition, NativeString errorMessage);
 
@@ -483,6 +507,8 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 
 /// Represents builtin floating point scalar types.
 /// To define generic functions that work with both scalar and vector types, use `IFloat` instead.
+///
+/// Implemented by `float`, `half` and `double` types.
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
@@ -511,17 +537,94 @@ interface __EnumType : ILogical
 };
 
 
+//@public:
+
+/// Represents types that provide a subscript operator so that they can be used like an immutable array.
+/// @param T The element type returned by the subscript operator.
+/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.
+/// @example The follow example shows how to define a generic function that computes the sum of all elements in an array-like type.
+/// ```csharp
+/// T sum<T:IFloat, U:IArray<T>>(U array)
+/// {
+///     T result = T(0);
+///     for (int i = 0; i < array.getCount(); i++)
+///     {
+///         result = result + array[i];
+///     }
+///     return result;
+/// }
+/// 
+/// RWStructuredBuffer<float> outputBuffer;
+/// 
+/// [numthreads(1, 1, 1)]
+/// void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+/// {
+///     float arr[3] = { 1.0, 2.0, 3.0 };
+///     float4 v = float4(1.0, 2.0, 3.0, 4.0);
+///     float2x2 m = float2x2(1.0, 2.0, 3.0, 4.0);
+///
+///     outputBuffer[0] = sum(arr);  // 6.0
+///
+///     // treat `v` as array of `float`.
+///     outputBuffer[1] = sum(v);    // 10.0
+///
+///     // treat `m` as array of `float2`.
+///     float2 innerSum = sum(m); 
+///     outputBuffer[2] = sum(innerSum); // 10.0
+/// }
+/// ```
 interface IArray<T>
 {
+    /// Returns the number of elements in the conforming type.
     int getCount();
+
+    /// The subscript operator to be provided by a conforming type. Provides both a `get` accessor.
     __subscript(int index) -> T
     {
         get;
     }
 }
 
+/// Represents types that provide a subscript operator so that they can be used like a mutable array.
+/// @param T The element type returned by the subscript operator.
+/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.
+/// @example The follow example shows how to define a generic function uses the `IRWArray` interface to mutate an array-like value.
+/// ```csharp
+/// void writeToArray<U, T : IRWArray<U>>(inout T array, int index, U value) { array[index] = value; }
+/// void writeToBuffer<U, T : IRWArray<U>>(T array, int index, U value) { array[index] = value; }
+/// U readFromArray<U, T:IArray<U>>(T array, int index) { return array[index]; }
+/// 
+/// //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+/// RWStructuredBuffer<float> outputBuffer;
+/// 
+/// [numthreads(1, 1, 1)]
+/// void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
+/// {
+///     float arr[3] = { 1.0, 2.0, 3.0 };
+///     float4 v = float4(1.0, 2.0, 3.0, 4.0);
+///     float2x2 m = float2x2(1.0, 2.0, 3.0, 4.0);
+/// 
+///     // treat `outputBuffer` as a mutable array of `float`.
+///     writeToBuffer(outputBuffer, 0, 1.0f);
+/// 
+///     // treat `arr` as a mutable array of `float`.
+///     writeToArray(arr, 0, 4.0f);
+///     outputBuffer[1] = readFromArray(arr, 0); // 4.0
+/// 
+///     // treat `v` as a mutable array of `float`.
+///     writeToArray(v, 3, 3.0f);
+///     outputBuffer[2] = readFromArray(v, 3);  // 3.0
+/// 
+///     // treat `m` as a mutable array of `float2`.
+///     writeToArray(m, 1, float2(10.0f, 20.0f));
+///     outputBuffer[3] = readFromArray(m, 1).x + readFromArray(m, 1).y; // 30.0
+/// 
+///     writeToBuffer(outputBuffer, 0, readFromArray(outputBuffer, 0));
+/// }
+/// ```
 interface IRWArray<T> : IArray<T>
 {
+    /// The subscript operator to be provided by a conforming type. Provides both a `get` and a `set` accessor.
     __subscript(int index)->T
     {
         get;
@@ -839,6 +942,9 @@ struct __none_t
 };
 
 //@public:
+/// Represents a pointer type.
+/// @param T The type of the value pointed to.
+/// @remarks `T* val` is equivalent to `Ptr<T> val`.
 __generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
@@ -1200,6 +1306,9 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 }
 
 //@public:
+
+/// Represents a string.
+/// This type can only be used on the CPU target.
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
@@ -1228,9 +1337,11 @@ struct String
     __intrinsic_op($(kIROp_MakeString))
     __init(double val);
 
+    /// Returns the length of the string.
     [require(cpp)]
     int64_t getLength();
 
+    /// Returns the length of the string.
     property int length
     {
         get { return (int)getLength(); }
@@ -2966,15 +3077,15 @@ enum MemoryOrder
     SeqCst = $(kIRMemoryOrder_SeqCst),
 }
 
-/// Represent types that can be used in any atomic operations.
+/// Represents types that can be used in any atomic operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.
 [sealed] interface IAtomicable {}
 
-/// Represent types that can be used in atomic arithmetic operations.
+/// Represents types that can be used in atomic arithmetic operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.
 [sealed] interface IArithmeticAtomicable : IAtomicable, IArithmetic {}
 
-/// Represent types that can be used in atomic bit operations.
+/// Represents types that can be used in atomic bit operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`.
 [sealed] interface IBitAtomicable : IArithmeticAtomicable, IInteger {}
 
@@ -3460,7 +3571,7 @@ attribute_syntax [__ref] : RefAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__readNone] : ReadNoneAttribute;
 
-/// Represent the applicable target for an attribute.
+/// Represents the applicable target for an attribute.
 enum _AttributeTargets
 {
     Struct = $( (int) UserDefinedAttributeTargets::Struct), /// Struct types.
