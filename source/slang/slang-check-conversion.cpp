@@ -960,7 +960,11 @@ namespace Slang
                 }
                 if (outToExpr)
                 {
-                    *outToExpr = fromExpr;
+                    auto rsExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    rsExpr->type = toType;
+                    rsExpr->loc = fromExpr->loc;
+                    rsExpr->base = fromExpr;
+                    *outToExpr = rsExpr;
                 }
                 return true;
             }
@@ -1150,7 +1154,7 @@ namespace Slang
         // call to one of the initializers in the target type.
 
         OverloadResolveContext overloadContext;
-        overloadContext.disallowNestedConversions = true;
+        overloadContext.disallowNestedConversions = (site != CoercionSite::ExplicitCoercion);
         overloadContext.argCount = 1;
         List<Expr*> args;
         args.add(fromExpr);
@@ -1295,7 +1299,7 @@ namespace Slang
             // but then emit a diagnostic when actually reifying
             // the result expression.
             //
-            if (outToExpr)
+            if (outToExpr && site != CoercionSite::ExplicitCoercion)
             {
                 if (cost >= kConversionCost_Explicit)
                 {
@@ -1362,7 +1366,9 @@ namespace Slang
                 // base expression (the callee), since that will come
                 // from the selected overload candidate.
                 //
-                auto castExpr = createImplicitCastExpr();
+                InvokeExpr* castExpr = (site == CoercionSite::ExplicitCoercion)
+                    ? m_astBuilder->create<ExplicitCastExpr>()
+                    : createImplicitCastExpr();
                 castExpr->loc = fromExpr->loc;
                 castExpr->arguments.add(fromExpr);
                 //
@@ -1379,7 +1385,7 @@ namespace Slang
                 // "argument list" was just a pointer to `fromExpr`.
                 //
                 // That means we need to clear the argument list and
-                // reload it from `fromExpr` to make sure that we
+                // reload it from `args[0]` to make sure that we
                 // got the arguments *after* any transformations
                 // were applied.
                 // For right now this probably doesn't matter,
@@ -1387,7 +1393,7 @@ namespace Slang
                 // but I'd rather play it safe.
                 //
                 castExpr->arguments.clear();
-                castExpr->arguments.add(fromExpr);
+                castExpr->arguments.add(args[0]);
             }
             if (!cachedMethod)
                 getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{ *overloadContext.bestCandidate, cost });

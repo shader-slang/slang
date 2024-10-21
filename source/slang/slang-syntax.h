@@ -247,6 +247,11 @@ namespace Slang
         return substituteExpr(expr.getSubsts(), expr.getExpr()->base);
     }
 
+    inline SubstExpr<Expr> getBaseExpr(SubstExpr<BuiltinCastExpr> expr)
+    {
+        return substituteExpr(expr.getSubsts(), expr.getExpr()->base);
+    }
+
     inline SubstExpr<Expr> getBaseExpr(SubstExpr<InvokeExpr> expr)
     {
         return substituteExpr(expr.getSubsts(), expr.getExpr()->functionExpr);

@@ -265,11 +265,11 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
             return Desc::make(Kind::Source, Payload::GLSL, Style::Kernel, 0);
         }
         case SLANG_HLSL:                    return Desc::make(Kind::Source, Payload::HLSL, Style::Kernel, 0);
-        case SLANG_SPIRV:                   return Desc::make(Kind::Executable, Payload::SPIRV, Style::Kernel, 0);
+        case SLANG_SPIRV:                   return Desc::make(Kind::ObjectCode, Payload::SPIRV, Style::Kernel, 0);
         case SLANG_SPIRV_ASM:               return Desc::make(Kind::Assembly, Payload::SPIRV, Style::Kernel, 0);
-        case SLANG_DXBC:                    return Desc::make(Kind::Executable, Payload::DXBC, Style::Kernel, 0);
+        case SLANG_DXBC:                    return Desc::make(Kind::ObjectCode, Payload::DXBC, Style::Kernel, 0);
         case SLANG_DXBC_ASM:                return Desc::make(Kind::Assembly, Payload::DXBC, Style::Kernel, 0);
-        case SLANG_DXIL:                    return Desc::make(Kind::Executable, Payload::DXIL, Style::Kernel, 0);
+        case SLANG_DXIL:                    return Desc::make(Kind::ObjectCode, Payload::DXIL, Style::Kernel, 0);
         case SLANG_DXIL_ASM:                return Desc::make(Kind::Assembly, Payload::DXIL, Style::Kernel, 0);
         case SLANG_C_SOURCE:                return Desc::make(Kind::Source, Payload::C, Style::Kernel, 0);
         case SLANG_CPP_SOURCE:              return Desc::make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
@@ -284,15 +284,15 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
             // Not entirely clear how best to represent PTX here. We could mark as 'Assembly'. Saying it is 
             // 'Executable' implies it is Binary (which PTX isn't). Executable also implies 'complete for executation', 
             // irrespective of it being text.
-        case SLANG_PTX:                     return Desc::make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
+        case SLANG_PTX:                     return Desc::make(Kind::ObjectCode, Payload::PTX, Style::Kernel, 0);
         case SLANG_OBJECT_CODE:             return Desc::make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
         case SLANG_HOST_HOST_CALLABLE:      return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
         case SLANG_METAL:                   return Desc::make(Kind::Source, Payload::Metal, Style::Kernel, 0);
-        case SLANG_METAL_LIB:               return Desc::make(Kind::Executable, Payload::MetalAIR, Style::Kernel, 0);
+        case SLANG_METAL_LIB:               return Desc::make(Kind::ObjectCode, Payload::MetalAIR, Style::Kernel, 0);
         case SLANG_METAL_LIB_ASM:           return Desc::make(Kind::Assembly, Payload::MetalAIR, Style::Kernel, 0);
         case SLANG_WGSL:                    return Desc::make(Kind::Source, Payload::WGSL, Style::Kernel, 0);
         case SLANG_WGSL_SPIRV_ASM:          return Desc::make(Kind::Assembly, Payload::WGSL_SPIRV, Style::Kernel, 0);
-        case SLANG_WGSL_SPIRV:              return Desc::make(Kind::Executable, Payload::WGSL_SPIRV, Style::Kernel, 0);
+        case SLANG_WGSL_SPIRV:              return Desc::make(Kind::ObjectCode, Payload::WGSL_SPIRV, Style::Kernel, 0);
         default: break;
     }
 
