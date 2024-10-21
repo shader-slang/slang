@@ -1523,15 +1523,15 @@ Result DeviceImpl::createTextureView(
                 : D3D12_UAV_DIMENSION_TEXTURE1D;
             if(isArray)
             {
-                d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
-            }
-            else
-            {
                 d3d12desc.Texture1DArray.MipSlice = desc.subresourceRange.mipLevel;
                 d3d12desc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount == 0
                     ? resourceDesc.arraySize
                     : desc.subresourceRange.layerCount;
                 d3d12desc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+            }
+            else
+            {
+                d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
             }
             break;
         case IResource::Type::Texture2D:
