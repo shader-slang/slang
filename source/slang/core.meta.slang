@@ -1054,7 +1054,18 @@ bool operator!=(__none_t noneVal, Optional<T> val)
 
 //@public:
 
-/// An anonymous product type.
+/// A variadic generic storing the product of several types.
+///
+/// The member names of individual values are `_0`, `_1`, `_2`, ...
+///
+/// New tuples can also be constructed by swizzling an existing tuple with the
+/// concatenation of these names, for example `x._2_1_0` will return the first
+/// three members of the tuple `x` in reverse order.
+///
+/// When all tuple elements conform to `IComparable` tuples can themselves be
+/// compared according to a lexicographic ordering.
+///
+/// The number of elements in a tuple is given by the `countof` function.
 __generic<each T>
 __magic_type(TupleType)
 struct Tuple
@@ -1063,9 +1074,11 @@ struct Tuple
     __init(expand each T);
 }
 
+/// Construct a tuple from several values in order
 __intrinsic_op($(kIROp_MakeTuple))
 Tuple<T> makeTuple<each T>(T v);
 
+/// Return a tuple containing the values of both input tuples in order
 Tuple<T, U> concat<each T, each U>(Tuple<T> t, Tuple<U> u)
 {
     return makeTuple(expand each t, expand each u);
