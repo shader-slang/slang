@@ -57,7 +57,10 @@ struct ExtractPrimalFuncContext
             return createGenericIntermediateType(as<IRGeneric>(func));
         IRBuilder builder(module);
         builder.setInsertBefore(func);
+
         auto intermediateType = builder.createStructType();
+
+        builder.addDecoration(intermediateType, kIROp_OptimizableTypeDecoration);
         if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
         {
             StringBuilder newName;
@@ -65,6 +68,7 @@ struct ExtractPrimalFuncContext
             builder.addNameHintDecoration(
                 intermediateType, UnownedStringSlice(newName.getBuffer()));
         }
+
         return intermediateType;
     }
 
@@ -306,6 +310,21 @@ static void copyPrimalValueStructKeyDecorations(IRInst* inst, IRCloneEnv& cloneE
     }
 }
 
+IRBlock* getFirstRecomputeBlock(IRFunc* func)
+{
+    // This logic is a bit fragile.
+    // We shouldn't necessarily make the 
+    // assumption that the order in the list of blocks is related to the 
+    // control-flow order, but it works with the current system.
+    //
+    for (auto block : func->getBlocks())
+    {
+        if (block->findDecoration<IRRecomputeBlockDecoration>())
+            return block;
+    }
+    return nullptr;
+}
+
 IRFunc* DiffUnzipPass::extractPrimalFunc(
     IRFunc* func,
     IRFunc* originalFunc,
@@ -363,9 +382,11 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
 
     // Copy PrimalValueStructKey decorations from primal func.
     copyPrimalValueStructKeyDecorations(func, subEnv);
-    
-    auto paramBlock = func->getFirstBlock();
-    auto firstBlock = *(paramBlock->getSuccessors().begin());
+
+    auto firstRecomputeBlock = getFirstRecomputeBlock(func);
+    SLANG_ASSERT(firstRecomputeBlock);
+
+    auto firstBlock = firstRecomputeBlock;
     builder.setInsertBefore(firstBlock->getFirstInst());
     auto intermediateVar = func->getLastParam();
 
@@ -446,6 +467,50 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
             removePhiArgs(inst);
         inst->removeAndDeallocate();
     }
+
+    auto paramBlock = func->getFirstBlock();
+    auto paramPreludeBlock = paramBlock->getNextBlock();
+
+    // Remove primal blocks from the propagate func & wire the param block directly to the first
+    // recompute block.
+    //
+    {
+        auto terminator = cast<IRUnconditionalBranch>(paramPreludeBlock->getTerminator());
+        builder.replaceOperand(&(terminator->block), firstRecomputeBlock);
+    }
+
+    // Erase all primal blocks (except for the param & prelude blocks).
+    // TODO: Lots of ways to clean this up.
+    //
+    List<IRBlock*> blocksToRemove;
+    for (auto block : func->getBlocks())
+    {
+        if (block != paramBlock &&
+            block != paramPreludeBlock &&
+            !block->findDecoration<IRRecomputeBlockDecoration>() &&
+            !block->findDecoration<IRDifferentialInstDecoration>())
+            blocksToRemove.add(block);
+    }
+
+    // Before erasing the blocks, go through and 're-hoist' any hoistable instructions (such as types)
+    // Any remaining valid instructions should be automatically moved to the recompute blocks.
+    // The rest can be removed.
+    // 
+    List<IRInst*> instsToReHoist;
+    for (auto block : blocksToRemove)
+        for (auto inst : block->getChildren())
+            if (getIROpInfo(inst->getOp()).flags & kIROpFlag_Hoistable)
+                instsToReHoist.add(inst);
+
+    for (auto inst : instsToReHoist)
+    {
+        inst->removeFromParent();
+        addHoistableInst(&builder, inst);
+    }
+
+    for (auto block : blocksToRemove)
+        block->removeAndDeallocate();
+
 
     return primalFunc;
 }

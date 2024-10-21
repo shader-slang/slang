@@ -1119,6 +1119,32 @@ struct IRDifferentiableCallDecoration : IRDecoration
     IR_LEAF_ISA(DifferentiableCallDecoration)
 };
 
+// Mark a type as being eligible for trimming if necessary. If
+// any fields don't have any effective loads from them, they can be 
+// removed.
+//
+struct IROptimizableTypeDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_OptimizableTypeDecoration
+    };
+    IR_LEAF_ISA(OptimizableTypeDecoration)
+};
+
+// Informs the DCE pass to ignore side-effects on this call for
+// the purposes of dead code elimination, even if the call does have
+// side-effects.
+//
+struct IRIgnoreSideEffectsDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_IgnoreSideEffectsDecoration
+    };
+    IR_LEAF_ISA(IgnoreSideEffectsDecoration)
+};
+
 // Treat a call to a non-differentiable function as a differentiable call.
 struct IRTreatCallAsDifferentiableDecoration : IRDecoration
 {

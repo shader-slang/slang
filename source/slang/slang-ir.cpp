@@ -8482,7 +8482,7 @@ namespace Slang
                 // common subexpression elimination, etc.
                 //
                 auto call = cast<IRCall>(this);
-                return !isSideEffectFreeFunctionalCall(call, options);
+                return !(isSideEffectFreeFunctionalCall(call, options));
             }
             break;
 

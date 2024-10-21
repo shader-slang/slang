@@ -64,6 +64,7 @@ namespace Slang
             changed |= removeUnusedGenericParam(module);
             changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
             changed |= peepholeOptimizeGlobalScope(target, module);
+            changed |= trimOptimizableTypes(module);
 
             for (auto inst : module->getGlobalInsts())
             {

@@ -1107,6 +1107,7 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
         {
         case kIROp_NoSideEffectDecoration:
         case kIROp_ReadNoneDecoration:
+        case kIROp_IgnoreSideEffectsDecoration:
             return false;
         }
     }
