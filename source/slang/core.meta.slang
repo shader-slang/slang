@@ -83,7 +83,7 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
-/// Represent types that can be initialized with a default constructor.
+/// Represents types that can be initialized with a default constructor.
 __magic_type(DefaultInitializableType)
 interface IDefaultInitializable
 {
@@ -92,7 +92,7 @@ interface IDefaultInitializable
 }
 
 
-/// Represent types that can be compared.
+/// Represents types that can be compared.
 /// Implemented by all builtin integer and floating point scalar or vector types.
 interface IComparable
 {
@@ -109,7 +109,7 @@ interface IComparable
     bool lessThanOrEquals(This other);
 }
 
-/// Represent types that has a defined range of values.
+/// Represents types that has a defined range of values.
 /// Implemented by all builtin integer and floating point types.
 interface IRangedValue
 {
@@ -120,7 +120,7 @@ interface IRangedValue
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
-/// Represent types that provide arithmetic operations.
+/// Represents types that provide arithmetic operations.
 interface IArithmetic : IComparable
 {
     This add(This other);
@@ -136,7 +136,7 @@ interface IArithmetic : IComparable
     __init(This value);
 }
 
-/// Represent types that provide logical operations.
+/// Represents types that provide logical operations.
 interface ILogical : IComparable
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::Shl) )
@@ -170,7 +170,7 @@ interface ILogical : IComparable
     __init(int val);
 }
 
-/// Represent a type that can be used for integer arithmetic operations.
+/// Represents a type that can be used for integer arithmetic operations.
 /// 
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`.
 ///
@@ -211,7 +211,7 @@ interface IInteger : IArithmetic, ILogical
     __init(int64_t val);
 }
 
-/// Represent a type that can be used for floating point arithmetic operations.
+/// Represents a type that can be used for floating point arithmetic operations.
 /// 
 /// Implemented by builtin scalar types: `float`, `half`, `double`.
 ///
@@ -308,30 +308,30 @@ interface __BuiltinLogicalType : __BuiltinType, ILogical
 {
 }
 
-/// Represent builtin types that logically have a sign (positive/negative/zero).
+/// Represents builtin types that logically have a sign (positive/negative/zero).
 [sealed]
 [builtin]
 interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 
-/// Represent builtin types that can represent integers.
+/// Represents builtin types that can represent integers.
 [sealed]
 [builtin]
 interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
-/// Represent a `int` or `uint` type.
+/// Represents a `int` or `uint` type.
 [sealed]
 [builtin]
 interface __BuiltinInt32Type : __BuiltinIntegerType
 {}
 
-/// Represent a `int64_t` or `uint64_t` type.
+/// Represents a `int64_t` or `uint64_t` type.
 [sealed]
 [builtin]
 interface __BuiltinInt64Type : __BuiltinIntegerType
 {}
 
-/// Represent builtin types that can represent a real number.
+/// Represents builtin types that can represent a real number.
 [sealed]
 [builtin]
 interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
@@ -539,7 +539,7 @@ interface __EnumType : ILogical
 
 //@public:
 
-/// Represent types that provide a subscript operator so that they can be used like an immutable array.
+/// Represents types that provide a subscript operator so that they can be used like an immutable array.
 /// @param T The element type returned by the subscript operator.
 /// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.
 /// @example The follow example shows how to define a generic function that computes the sum of all elements in an array-like type.
@@ -585,7 +585,7 @@ interface IArray<T>
     }
 }
 
-/// Represent types that provide a subscript operator so that they can be used like a mutable array.
+/// Represents types that provide a subscript operator so that they can be used like a mutable array.
 /// @param T The element type returned by the subscript operator.
 /// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.
 /// @example The follow example shows how to define a generic function uses the `IRWArray` interface to mutate an array-like value.
@@ -1277,7 +1277,7 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 
 //@public:
 
-/// Represent a string.
+/// Represents a string.
 /// This type can only be used on the CPU target.
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
@@ -3042,15 +3042,15 @@ enum MemoryOrder
     SeqCst = $(kIRMemoryOrder_SeqCst),
 }
 
-/// Represent types that can be used in any atomic operations.
+/// Represents types that can be used in any atomic operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.
 [sealed] interface IAtomicable {}
 
-/// Represent types that can be used in atomic arithmetic operations.
+/// Represents types that can be used in atomic arithmetic operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.
 [sealed] interface IArithmeticAtomicable : IAtomicable, IArithmetic {}
 
-/// Represent types that can be used in atomic bit operations.
+/// Represents types that can be used in atomic bit operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`.
 [sealed] interface IBitAtomicable : IArithmeticAtomicable, IInteger {}
 
@@ -3483,7 +3483,7 @@ attribute_syntax [__ref] : RefAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__readNone] : ReadNoneAttribute;
 
-/// Represent the applicable target for an attribute.
+/// Represents the applicable target for an attribute.
 enum _AttributeTargets
 {
     Struct = $( (int) UserDefinedAttributeTargets::Struct), /// Struct types.
