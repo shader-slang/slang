@@ -989,17 +989,32 @@ struct ConstRef
 typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
 
 //@public:
+
+/// `Optional<T>` is a type with one extra value than `T`, this extra value is
+/// used to represent a "missing" or "invalid" `T`. This extra value is called
+/// `none`. 
+///
+/// `none` can be compared against with the operators `==` or `!=`.
+///
+/// An `Optional<T>` value can also be implicitly or explicitly constructed from
+/// a value of type `T`
+///
+/// `Optional<T>` values can be deconstructed with `if(let myT = myOptionalT) ...` 
+/// where this branch will only be taken if `myOptionalT` contains a value
+/// of type `T` (to be put into scope as `myT`).
 __generic<T>
 __magic_type(OptionalType)
 __intrinsic_type($(kIROp_OptionalType))
 struct Optional
 {
+    /// Return `true` iff this `Optional` contains a value of type `T`
     property bool hasValue
     {
         __intrinsic_op($(kIROp_OptionalHasValue))
         get;
     }
 
+    /// If this `Optional` contains a value of type `T` return that.
     property T value
     {
         __intrinsic_op($(kIROp_GetOptionalValue))
@@ -1038,6 +1053,8 @@ bool operator!=(__none_t noneVal, Optional<T> val)
 }
 
 //@public:
+
+/// An anonymous product type.
 __generic<each T>
 __magic_type(TupleType)
 struct Tuple
