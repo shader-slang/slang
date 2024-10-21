@@ -745,6 +745,16 @@ namespace Slang
             m_mapTypePairToImplicitCastMethod[key] = candidate;
         }
 
+        bool* isCStyleStruct(StructDecl* structDecl)
+        {
+            return m_isCStyleStructCache.tryGetValue(structDecl);
+        }
+
+        void cacheCStyleStruct(StructDecl* structDecl, bool isCStyle)
+        {
+            m_isCStyleStructCache.addIfNotExists(structDecl, isCStyle);
+        }
+
         // Get the inner most generic decl that a decl-ref is dependent on.
         // For example, `Foo<T>` depends on the generic decl that defines `T`.
         //
@@ -870,6 +880,7 @@ namespace Slang
         Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
         Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
         Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
+        Dictionary<StructDecl*, bool> m_isCStyleStructCache;
     };
 
         /// Local/scoped state of the semantic-checking system
@@ -1052,6 +1063,10 @@ namespace Slang
 
         OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
 
+        void setCheckForSynthesizedCtor(bool checkForSynthesizedCtor)
+        {
+            m_checkForSynthesizedCtor = checkForSynthesizedCtor;
+        }
     private:
         SharedSemanticsContext* m_shared = nullptr;
 
@@ -1097,6 +1112,9 @@ namespace Slang
         ExpandExpr* m_parentExpandExpr = nullptr;
 
         OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+
+        // Flag to indicate whether this check is to check a synthesized constructor
+        bool m_checkForSynthesizedCtor = false;
     };
 
     struct OuterScopeContextRAII
@@ -1504,7 +1522,7 @@ namespace Slang
             Type*                toType,
             Expr**               outToExpr,
             InitializerListExpr* fromInitializerListExpr,
-            UInt                       &ioInitArgIndex);
+            UInt                 &ioInitArgIndex);
 
             /// Read an aggregate value from an initializer list expression.
             ///
@@ -1529,7 +1547,7 @@ namespace Slang
             Type*                inToType,
             Expr**               outToExpr,
             InitializerListExpr* fromInitializerListExpr,
-            UInt                       &ioArgIndex);
+            UInt                 &ioArgIndex);
 
             /// Coerce an initializer-list expression to a specific type.
             ///
@@ -2767,6 +2785,14 @@ namespace Slang
 
         void suggestCompletionItems(
             CompletionSuggestions::ScopeKind scopeKind, LookupResult const& lookupResult);
+
+        bool _invokeExprForExplicitCtor(Type* toType, InitializerListExpr* fromInitializerListExpr, Expr** outExpr);
+        bool _invokeExprForSynthesizedCtor(Type* toType, InitializerListExpr* fromInitializerListExpr, Expr** outExpr);
+        Expr* _createCtorInvokeExpr(Type* toType, const SourceLoc& loc, const List<Expr*>& coercedArgs);
+        bool _hasExplicitConstructor(StructDecl* structDecl, bool checkBaseType);
+        ConstructorDecl* _getSynthesizedConstructor(StructDecl* structDecl, ConstructorDecl::ConstructorTags tags);
+        bool isCStyleStruct(StructDecl* structDecl);
+        bool _cStyleStructBasicCheck(Decl* decl);
     };
 
 
