@@ -371,7 +371,7 @@ public:
     void emitFuncHeader(IRFunc* func) { emitFuncHeaderImpl(func); }
     void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
 
-    void emitSwitchCaseSelectors(IRBasicType *const switchConditionType, const SwitchRegion::Case *const currentCase, const bool isDefault) {emitSwitchCaseSelectorsImpl(switchConditionType, currentCase, isDefault);}
+    void emitSwitchCaseSelectors(const SwitchRegion::Case* currentCase, bool isDefault) {emitSwitchCaseSelectorsImpl(currentCase, isDefault);}
 
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
@@ -524,7 +524,7 @@ public:
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) { SLANG_UNUSED(decl); }
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) { SLANG_UNUSED(switchInst); }
-    virtual void emitSwitchCaseSelectorsImpl(IRBasicType *const switchConditionType, const SwitchRegion::Case *const currentCase, const bool isDefault);
+    virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault);
     
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
     virtual void emitLivenessImpl(IRInst* inst);

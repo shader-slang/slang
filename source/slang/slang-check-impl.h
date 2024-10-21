@@ -292,6 +292,7 @@ namespace Slang
         Argument,
         Return,
         Initializer,
+        ExplicitCoercion
     };
 
     struct FacetImpl;
@@ -2817,6 +2818,8 @@ namespace Slang
         Expr* visitVarExpr(VarExpr *expr);
 
         Expr* visitTypeCastExpr(TypeCastExpr * expr);
+
+        Expr* visitBuiltinCastExpr(BuiltinCastExpr* expr);
 
         Expr* visitTryExpr(TryExpr* expr);
 
