@@ -2924,10 +2924,15 @@ void __requireComputeDerivative();
 /// @category misc_types 
 enum MemoryOrder
 {
+    /// No memory operation ordering constraints
     Relaxed = $(kIRMemoryOrder_Relaxed),
+    /// Ensures that all subsequent memory operations in the same thread are not reordered before it
     Acquire = $(kIRMemoryOrder_Acquire),
+    /// Ensures that all prior memory operations in the same thread are not reordered after it
     Release = $(kIRMemoryOrder_Release),
+    /// Combines both acquire and release semantics
     AcquireRelease = $(kIRMemoryOrder_AcquireRelease),
+    /// Provides the strongest ordering: total order exists between all SeqCst operations
     SeqCst = $(kIRMemoryOrder_SeqCst),
 }
 
@@ -2951,20 +2956,45 @@ extension double : IArithmeticAtomicable {}
 extension float : IArithmeticAtomicable {}
 extension half : IArithmeticAtomicable {}
 
+/// A wrapper for `IAtomicable` types to introduce atomic load and store
+/// operations. Values of this type are to be stored in buffers or groupshared
+/// memory.
+///
+/// All operations take a `MemoryOrder` parameter which influenced the
+/// semantics of the performed operation
+///
+/// All operations take place at the device scope.
+///
+/// Operators `+=`, `-=`, `&=`, `|=`, `^=`, `++`, `--` are overloaded to
+/// operate on `Atomic<T>`.
 __magic_type(AtomicType)
 __intrinsic_type($(kIROp_AtomicType))
 [require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 struct Atomic<T : IAtomicable>
 {
+    /// Atomically load the stored `T` value
     __intrinsic_op($(kIROp_AtomicLoad))
     [__ref] T load(MemoryOrder order = MemoryOrder.Relaxed);
 
+    /// Atomically store a new `T` value
     __intrinsic_op($(kIROp_AtomicStore))
     [__ref] void store(T newValue, MemoryOrder order = MemoryOrder.Relaxed);
 
+    /// Atomically replace the stored `T` value with a new `T` value and return
+    /// replaced value
     __intrinsic_op($(kIROp_AtomicExchange))
     [__ref] T exchange(T newValue, MemoryOrder order = MemoryOrder.Relaxed); // returns old value
 
+    /// Atomically replace and return the stored `T` value with a new `T` value
+    /// only if the stored value is equal to the specified comparison value.
+    ///
+    /// If the comparison value is equal to the stored value, then the
+    /// `successOrder` `MemoryOrder` is used, otherwise the `failOrder`
+    /// `MemoryOrder` is used. 
+    /// 
+    /// `successOrder` must be at least as strong as `failOrder`
+    ///
+    /// `failOrder` must not be `MemoryOrder.Release` or `MemoryOrder.AcquireRelease`
     __intrinsic_op($(kIROp_AtomicCompareExchange))
     [__ref] T compareExchange(
         T compareValue,
@@ -2973,30 +3003,58 @@ struct Atomic<T : IAtomicable>
         MemoryOrder failOrder = MemoryOrder.Relaxed);
 }
 
-/// These addtional members are only available when `T` conforms to `IArithmeticAtomicable`.
+/// These additional members are only available when `T` conforms to `IArithmeticAtomicable`.
 extension<T : IArithmeticAtomicable> Atomic<T>
 {
+    /// Atomically adds the given value to the stored value and returns the
+    /// original stored value.
     __intrinsic_op($(kIROp_AtomicAdd))
-    [__ref] T add(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    [__ref] T add(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically subtracts the given value from the stored value and returns
+    /// the original stored value.
     __intrinsic_op($(kIROp_AtomicSub))
-    [__ref] T sub(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    [__ref] T sub(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically computes the maximum of the stored value and the given
+    /// value, storing the result and returning the original stored value.
     __intrinsic_op($(kIROp_AtomicMax))
-    [__ref] T max(T value, MemoryOrder order = MemoryOrder.Relaxed);             // returns original value
+    [__ref] T max(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically computes the minimum of the stored value and the given
+    /// value, storing the result and returning the original stored value.
     __intrinsic_op($(kIROp_AtomicMin))
-    [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed);
 }
 
-/// These addtional members are only available when `T` conforms to `IBitAtomicable`.
+/// These additional members are only available when `T` conforms to `IBitAtomicable`.
 extension<T : IBitAtomicable> Atomic<T>
 {
+    /// Atomically performs a bitwise AND operation between the stored value
+    /// and the given value, storing the result and returning the original
+    /// stored value.
     __intrinsic_op($(kIROp_AtomicAnd))
-    [__ref] T and(T value, MemoryOrder order = MemoryOrder.Relaxed);      // returns original value
+    [__ref] T and(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically performs a bitwise OR operation between the stored value and
+    /// the given value, storing the result and returning the original stored
+    /// value.
     __intrinsic_op($(kIROp_AtomicOr))
-    [__ref] T or(T value, MemoryOrder order = MemoryOrder.Relaxed);         // returns original value
+    [__ref] T or(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically performs a bitwise XOR operation between the stored value
+    /// and the given value, storing the result and returning the original
+    /// stored value.
     __intrinsic_op($(kIROp_AtomicXor))
-    [__ref] T xor(T value, MemoryOrder order = MemoryOrder.Relaxed); // returns original value
+    [__ref] T xor(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically increments the stored value and returns the original stored
+    /// value.
     __intrinsic_op($(kIROp_AtomicInc))
     [__ref] T increment(MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically decrements the stored value and returns the original stored
+    /// value.
     __intrinsic_op($(kIROp_AtomicDec))
     [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed);
 }
