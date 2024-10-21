@@ -3624,6 +3624,10 @@ public:
     IRGenericKind*  getGenericKind();
 
     IRPtrType*  getPtrType(IRType* valueType);
+
+    // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
+    IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
+
     IROutType*  getOutType(IRType* valueType);
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType, AddressSpace addrSpace);

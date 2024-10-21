@@ -2881,6 +2881,13 @@ namespace Slang
             operands);
     }
 
+    IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace)
+    {
+        if (ptrWithAddrSpace->hasAddressSpace())
+            return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType, ptrWithAddrSpace->getAddressSpace());
+        return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType);
+    }
+
     IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
     {
         return (IRPtrType*)getPtrType(op, valueType, getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
