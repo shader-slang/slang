@@ -1569,7 +1569,7 @@ Result DeviceImpl::createTextureView(
             d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
             d3d12desc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
             d3d12desc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
-            d3d12desc.Texture3D.WSize = resourceDesc.size.depth;
+            d3d12desc.Texture3D.WSize = resourceDesc.size.depth >> desc.subresourceRange.mipLevel;
             break;
         default:
             return SLANG_FAIL;
