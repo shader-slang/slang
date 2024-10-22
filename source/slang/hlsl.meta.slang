@@ -7073,6 +7073,10 @@ ${{{{
 const char* diffDimensions[2] = {"x", "y"};
 for (auto xOrY : diffDimensions) {
 }}}}
+/// Take the partial derivative of `x` with respect to $(xOrY) in screen space.
+/// @param x The value to take partial derivative for.
+/// @return The partial derivative of `x`
+/// @remarks for SPIR-V, this function maps to `OpDPd$(xOrY)`.
 /// @category derivative Derivative functions
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7135,6 +7139,10 @@ matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> x)
     }
 }
 
+/// Take the coarse partial derivative of `x` with respect to $(xOrY) in screen space.
+/// @param x The value to take partial derivative for.
+/// @return The partial derivative of `x`
+/// @remarks for SPIR-V, this function maps to `OpDPd$(xOrY)Coarse`.
 /// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
@@ -7181,6 +7189,10 @@ matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> x)
     }
 }
 
+/// Take the fine partial derivative of `x` with respect to $(xOrY) in screen space.
+/// @param x The value to take partial derivative for.
+/// @return The partial derivative of `x`
+/// @remarks for SPIR-V, this function maps to `OpDPd$(xOrY)Fine`.
 /// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
@@ -8542,6 +8554,9 @@ matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 }
 
 /// Texture filter width.
+/// @param x The value to sum x and y partial derivative magnitudes for.
+/// @return The sum of abs(ddx(`x`)) and abs(ddy(`x`)).
+/// @remarks for SPIR-V, this function maps to `OpFwidth`.
 /// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
