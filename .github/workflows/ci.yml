@@ -23,7 +23,7 @@ jobs:
     strategy:
       matrix:
         os: [linux, macos, windows]
-        config: [debug, release]
+        config: [debug, releaseWithDebugInfo]
         compiler: [gcc, clang, cl]
         platform: [x86_64, aarch64, wasm]
         exclude:
@@ -54,14 +54,14 @@ jobs:
           # quick or full conditionally otherwise
           - test-category: smoke
           - { os: windows, test-category: quick }
-          - { config: release, test-category: full }
+          - { config: releaseWithDebugInfo, test-category: full }
           # default not full gpu tests
           - full-gpu-tests: false
           # The runners don't have a GPU by default except for the self-hosted ones
           - has-gpu: false
           # Self-hosted aarch64 build
           - os: linux
-            config: release
+            config: releaseWithDebugInfo
             compiler: gcc
             platform: aarch64
             test-category: smoke
@@ -70,7 +70,7 @@ jobs:
             has-gpu: true
           # Self-hosted full gpu build
           - os: windows
-            config: release
+            config: releaseWithDebugInfo
             compiler: cl
             platform: x86_64
             test-category: full
@@ -109,13 +109,13 @@ jobs:
               cmake --workflow --preset generators --fresh
               mkdir generators
               cmake --install build --prefix generators --component generators
-              emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja" -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
-              cmake --build --preset emscripten --target slang
-              [ -f "build.em/Release/lib/libslang.a" ]
-              [ -f "build.em/Release/lib/libcompiler-core.a" ]
-              [ -f "build.em/Release/lib/libcore.a" ]
+              emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+              cmake --build --preset emscripten --config "$cmake_config" --target slang
+              [ -f "build.em/$cmake_config/lib/libslang.a" ]
+              [ -f "build.em/$cmake_config/lib/libcompiler-core.a" ]
+              [ -f "build.em/$cmake_config/lib/libcore.a" ]
           else
-            if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" ]]; then
+            if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
               # is a problem on Windows, so make slang-llvm in release build and use
               # that as though it's a fetched binary via these presets.
@@ -127,7 +127,7 @@ jobs:
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}"
               cmake --workflow --preset "${{matrix.config}}"
             else
-              # Otherwise, use the system llvm we have just build or got from the
+              # Otherwise, use the "system" llvm we have just build or got from the
               # cache in the setup phase
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \

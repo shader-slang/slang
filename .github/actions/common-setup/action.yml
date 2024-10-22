@@ -66,10 +66,16 @@ runs:
 
         # Some useful variables
         config=${{inputs.config}}
-        Config=$(echo "${{inputs.config}}" | sed 's/debug/Debug/;s/release/Release/')
-        bin_dir=$(pwd)/build/$Config/bin
-        lib_dir=$(pwd)/build/$Config/lib
+        cmake_config=$(echo "${{inputs.config}}" | sed '
+            s/^debug$/Debug/
+            s/^release$/Release/
+            s/^releaseWithDebugInfo$/RelWithDebInfo/
+            s/^minSizeRelease$/MinSizeRel/
+        ')
+        bin_dir=$(pwd)/build/$cmake_config/bin
+        lib_dir=$(pwd)/build/$cmake_config/lib
         echo "config=$config" >> "$GITHUB_ENV"
+        echo "cmake_config=$cmake_config" >> "$GITHUB_ENV"
         echo "bin_dir=$bin_dir" >> "$GITHUB_ENV"
         echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
 

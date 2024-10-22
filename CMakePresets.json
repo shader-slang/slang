@@ -18,7 +18,7 @@
     {
       "name": "emscripten",
       "description": "Emscripten-based Wasm build",
-      "generator": "ninja",
+      "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build.em",
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
@@ -34,7 +34,8 @@
       "description": "Options specific for MSVC",
       "cacheVariables": {
         "CMAKE_C_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP",
-        "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP"
+        "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP",
+        "CMAKE_DEFAULT_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {
@@ -87,6 +88,11 @@
       "configuration": "Release"
     },
     {
+      "name": "releaseWithDebugInfo",
+      "configurePreset": "default",
+      "configuration": "RelWithDebInfo"
+    },
+    {
       "name": "emscripten",
       "configurePreset": "emscripten",
       "configuration": "Release",
@@ -131,6 +137,14 @@
         "Release"
       ],
       "packageDirectory": "dist-release"
+    },
+    {
+      "name": "releaseWithDebugInfo",
+      "inherits": "base",
+      "configurations": [
+        "RelWithDebInfo"
+      ],
+      "packageDirectory": "dist-releaseWithDebugInfo"
     },
     {
       "name": "debug",
@@ -191,6 +205,23 @@
         {
           "type": "package",
           "name": "release"
+        }
+      ]
+    },
+    {
+      "name": "releaseWithDebugInfo",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "releaseWithDebugInfo"
+        },
+        {
+          "type": "package",
+          "name": "releaseWithDebugInfo"
         }
       ]
     },
