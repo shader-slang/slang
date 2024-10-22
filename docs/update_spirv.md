@@ -39,13 +39,9 @@ In order for Slang to use the latest changes from `KhronosGroup/SPIRV-Tools`, `s
 The steps above will create a branch called `merge/update`. You can use a different name but this document will use the name.
 
 
-## Test the branch before creating a Pull Request
+## Modify `.gitmodules` and use the `merge/update` branch
 
-Before creating a Pull Request, it will be a good idea to test if it works.
-But if you are confident, you may skip the testing step.
-
-
-### Modify `.gitmodules` and use the `merge/update` branch
+Before creating a Pull Request for `merge/update`, you should test and make sure everything works.
 
 On a Slang repo side, you need to create a branch for the following changes.
 ```
@@ -82,7 +78,7 @@ git checkout merge/update # use merger/update branch
 ```
 
 
-### Build spirv-tools
+## Build spirv-tools
 
 A directory, `external/spirv-tools/generated`, holds a set of files generated from spirv-tools directory.
 You need to build spirv-tools in order to generate them.
@@ -96,7 +92,7 @@ cmake.exe --build build --config Release
 ```
 
 
-### Copy the generated files from `spirv-tools` to `spirv-tools-generated`
+## Copy the generated files from `spirv-tools` to `spirv-tools-generated`
 
 Copy some of generated files from `external/spirv-tools/build/` to `external/spirv-tools-generated/`.
 The following files are ones you need to copy at the momment, but the list may change in the future.
@@ -124,7 +120,7 @@ spv-amd-shader-trinary-minmax.insts.inc
 ```
 
 
-### Build Slang and run slang-test
+## Build Slang and run slang-test
 
 There are many ways to build Slang executables. Refer to the [document](https://github.com/shader-slang/slang/blob/master/docs/building.md) for more detail.
 For a quick reference, you can build with the following commands,
@@ -139,7 +135,7 @@ set SLANG_RUN_SPIRV_VALIDATION=1
 build\Release\bin\slang-test.exe -use-test-server -server-count 8
 ```
 
-It is often the case that some of tests fail at this step, because of the changes on SPIRV-Header side.
+It is often the case that some of tests fail, because of the changes on SPIRV-Header.
 You need to properly resolve them before proceed.
 
 
@@ -170,6 +166,7 @@ git submodule update --init --recursive
 ```
 
 You need to stage and commit the latest commit IDs of spirv-tools and spirv-headers.
+Note that when you want to use a new commit IDs of the submodules, you have to stage with git-add command for the directy of the submodule itself.
 ```
 cd external
 
@@ -196,5 +193,3 @@ git commit
 git push origin update_spirv
 ```
 Once all changes are pushed to GitHub, you can create a Pull Request on `shader-slang/slang`.
-
-
