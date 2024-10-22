@@ -3602,7 +3602,7 @@ SLANG_API char const* spReflectionEntryPoint_getNameOverride(SlangReflectionEntr
     return nullptr;
 }
 
-SLANG_API SlangReflectionFunction* spReflectionEntryPoint_GetFunction(SlangReflectionEntryPoint* inEntryPoint)
+SLANG_API SlangReflectionFunction* spReflectionEntryPoint_getFunction(SlangReflectionEntryPoint* inEntryPoint)
 {
     auto entryPointLayout = convert(inEntryPoint);
     if (entryPointLayout)

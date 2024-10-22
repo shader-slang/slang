@@ -38,7 +38,7 @@ namespace Slang
                 snprintf(buffer, sizeof(buffer), "[*] %30s", func.key);
                 out << buffer << " \t";
                 auto milliseconds = std::chrono::duration_cast< std::chrono::milliseconds >(func.value.duration);
-                out << func.value.invocationCount << " \t" << milliseconds.count() << "ms\n";
+                out << func.value.invocationCount << " \t" << static_cast<uint64_t>(milliseconds.count()) << "ms\n";
             }
         }
         virtual void clear() override

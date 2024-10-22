@@ -2881,6 +2881,13 @@ namespace Slang
             operands);
     }
 
+    IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace)
+    {
+        if (ptrWithAddrSpace->hasAddressSpace())
+            return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType, ptrWithAddrSpace->getAddressSpace());
+        return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType);
+    }
+
     IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
     {
         return (IRPtrType*)getPtrType(op, valueType, getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
@@ -5092,7 +5099,7 @@ namespace Slang
         auto inst = createInst<IRAtomicStore>(
             this,
             kIROp_AtomicStore,
-            nullptr,
+            getVoidType(),
             dstPtr,
             srcVal,
             memoryOrder);
@@ -5462,6 +5469,12 @@ namespace Slang
             this, kIROp_UpdateElement, base->getFullType(), (Int)args.getCount(), args.getBuffer());
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::emitGetOffsetPtr(IRInst* base, IRInst* offset)
+    {
+        IRInst* args[] = { base, offset };
+        return emitIntrinsicInst(base->getDataType(), kIROp_GetOffsetPtr, 2, args);
     }
 
     IRInst* IRBuilder::emitGetAddress(
@@ -7678,7 +7691,7 @@ namespace Slang
     {
         StringBuilder sb;
         printSlangIRAssembly(sb, module, options, sourceManager);
-        return std::move(sb);
+        return sb;
     }
 
     void dumpIR(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer)

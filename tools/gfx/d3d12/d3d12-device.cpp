@@ -1523,15 +1523,15 @@ Result DeviceImpl::createTextureView(
                 : D3D12_UAV_DIMENSION_TEXTURE1D;
             if(isArray)
             {
-                d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
-            }
-            else
-            {
                 d3d12desc.Texture1DArray.MipSlice = desc.subresourceRange.mipLevel;
                 d3d12desc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount == 0
                     ? resourceDesc.arraySize
                     : desc.subresourceRange.layerCount;
                 d3d12desc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+            }
+            else
+            {
+                d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
             }
             break;
         case IResource::Type::Texture2D:
@@ -1569,7 +1569,7 @@ Result DeviceImpl::createTextureView(
             d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
             d3d12desc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
             d3d12desc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
-            d3d12desc.Texture3D.WSize = resourceDesc.size.depth;
+            d3d12desc.Texture3D.WSize = resourceDesc.size.depth >> desc.subresourceRange.mipLevel;
             break;
         default:
             return SLANG_FAIL;

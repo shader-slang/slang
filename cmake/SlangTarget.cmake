@@ -18,6 +18,9 @@ function(slang_add_target dir type)
         WIN32_EXECUTABLE
         # Install this target for a non-component install
         INSTALL
+        # Don't include any source in this target, this is a complement to
+        # EXPLICIT_SOURCE, and doesn't interact with EXTRA_SOURCE_DIRS
+        NO_SOURCE
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -35,6 +38,10 @@ function(slang_add_target dir type)
         # ${EXPORT_MACRO_PREFIX}_DYNAMIC_EXPORT macros are set for using and
         # building respectively
         EXPORT_MACRO_PREFIX
+        # Ignore target type and use a particular style of export macro
+        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT 
+        # pass in STATIC or SHARED
+        EXPORT_TYPE_AS
         # The folder in which to place this target for IDE-based generators (VS
         # and XCode)
         FOLDER
@@ -55,10 +62,16 @@ function(slang_add_target dir type)
         EXTRA_COMPILE_OPTIONS_PRIVATE
         # Targets with which to link privately
         LINK_WITH_PRIVATE
+        # Targets with which to link publicly, for example if their headers
+        # appear in our headers
+        LINK_WITH_PUBLIC
         # Frameworks with which to link privately
         LINK_WITH_FRAMEWORK
         # Targets whose headers we use, but don't link with
         INCLUDE_FROM_PRIVATE
+        # Targets whose headers we use in our headers, so need to make sure
+        # dependencies of this target also include them
+        INCLUDE_FROM_PUBLIC
         # Any include directories other targets need to use this target
         INCLUDE_DIRECTORIES_PUBLIC
         # Any include directories this target only needs
@@ -109,7 +122,8 @@ function(slang_add_target dir type)
     #
     # Find the source for this target
     #
-    if(ARG_EXPLICIT_SOURCE)
+    if(ARG_NO_SOURCE)
+    elseif(ARG_EXPLICIT_SOURCE)
         list(APPEND source ${ARG_EXPLICIT_SOURCE})
     else()
         slang_glob_sources(source ${dir})
@@ -214,6 +228,7 @@ function(slang_add_target dir type)
     # Link and include from dependencies
     #
     target_link_libraries(${target} PRIVATE ${ARG_LINK_WITH_PRIVATE})
+    target_link_libraries(${target} PUBLIC ${ARG_LINK_WITH_PUBLIC})
 
     if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
         foreach(link_framework ${ARG_LINK_WITH_FRAMEWORK})
@@ -225,6 +240,13 @@ function(slang_add_target dir type)
         target_include_directories(
             ${target}
             PRIVATE
+                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+        )
+    endforeach()
+    foreach(include_from ${ARG_INCLUDE_FROM_PUBLIC})
+        target_include_directories(
+            ${target}
+            PUBLIC
                 $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
         )
     endforeach()
@@ -255,6 +277,8 @@ function(slang_add_target dir type)
         if(
             target_type STREQUAL SHARED_LIBRARY
             OR target_type STREQUAL MODULE_LIBRARY
+            OR ARG_EXPORT_TYPE_AS STREQUAL SHARED
+            OR ARG_EXPORT_TYPE_AS STREQUAL MODULE
         )
             target_compile_definitions(
                 ${target}
@@ -263,11 +287,14 @@ function(slang_add_target dir type)
             )
         elseif(
             target_type STREQUAL STATIC_LIBRARY
+            OR ARG_EXPORT_TYPE_AS STREQUAL STATIC
         )
             target_compile_definitions(
                 ${target}
                 PUBLIC "${ARG_EXPORT_MACRO_PREFIX}_STATIC"
             )
+        else()
+            message(WARNING "unhandled case in slang_add_target while setting export macro")
         endif()
     endif()
 
@@ -363,35 +390,29 @@ function(slang_add_target dir type)
     #
     # Mark for installation
     #
-    if(ARG_INSTALL OR ARG_INSTALL_COMPONENT)
-        set(component_args)
-        if(ARG_INSTALL_COMPONENT)
-            set(component_args COMPONENT ${ARG_INSTALL_COMPONENT})
-        endif()
-        set(exclude_arg)
-        if(NOT ARG_INSTALL)
-            set(exclude_arg EXCLUDE_FROM_ALL)
-        endif()
+    macro(i)
         install(
             TARGETS ${target}
             EXPORT SlangTargets
             ARCHIVE
             DESTINATION ${archive_subdir}
-            ${component_args}
-            ${exclude_arg}
+            ${ARGN}
             LIBRARY
             DESTINATION ${library_subdir}
-            ${component_args}
-            ${exclude_arg}
+            ${ARGN}
             RUNTIME
             DESTINATION ${runtime_subdir}
-            ${component_args}
-            ${exclude_arg}
+            ${ARGN}
             PUBLIC_HEADER
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            ${component_args}
-            ${exclude_arg}
+            ${ARGN}
         )
+    endmacro()
+    if(ARG_INSTALL)
+        i()
+    endif()
+    if(ARG_INSTALL_COMPONENT)
+        i(EXCLUDE_FROM_ALL COMPONENT ${ARG_INSTALL_COMPONENT})
     endif()
 endfunction()
 

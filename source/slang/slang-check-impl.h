@@ -38,6 +38,10 @@ namespace Slang
 
     bool isUniformParameterType(Type* type);
 
+        /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
+    RefPtr<ComponentType> fillRequirements(
+        ComponentType* inComponentType);
+
     Type* checkProperType(
         Linkage*        linkage,
         TypeExp         typeExp,
@@ -288,6 +292,7 @@ namespace Slang
         Argument,
         Return,
         Initializer,
+        ExplicitCoercion
     };
 
     struct FacetImpl;
@@ -2085,6 +2090,11 @@ namespace Slang
             ConstantFoldingKind             kind,
             ConstantFoldingCircularityInfo* circularityInfo);
 
+        IntVal* tryFoldIndexExpr(
+            SubstExpr<IndexExpr> expr,
+            ConstantFoldingKind             kind,
+            ConstantFoldingCircularityInfo* circularityInfo);
+
         // Enforce that an expression resolves to an integer constant, and get its value
         enum class IntegerConstantExpressionCoercionType
         {
@@ -2808,6 +2818,8 @@ namespace Slang
         Expr* visitVarExpr(VarExpr *expr);
 
         Expr* visitTypeCastExpr(TypeCastExpr * expr);
+
+        Expr* visitBuiltinCastExpr(BuiltinCastExpr* expr);
 
         Expr* visitTryExpr(TryExpr* expr);
 

@@ -213,17 +213,6 @@ namespace SlangRecord
         return res;
     }
 
-    SLANG_NO_THROW SlangResult ModuleRecorder::precompileForTarget(
-        SlangCompileTarget target,
-        ISlangBlob** outDiagnostics)
-    {
-        // TODO: We should record this call
-        // https://github.com/shader-slang/slang/issues/4853
-        slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-        SlangResult res = m_actualModule->precompileForTarget(target, outDiagnostics);
-        return res;
-    }
-
     IEntryPointRecorder* ModuleRecorder::getEntryPointRecorder(slang::IEntryPoint* entryPoint)
     {
         IEntryPointRecorder* entryPointRecord = nullptr;

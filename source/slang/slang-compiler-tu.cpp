@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-capability.h"
+#include "slang-check-impl.h"
 
 namespace Slang
 {
@@ -103,7 +104,7 @@ namespace Slang
         applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
         applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-        TargetRequest* targetReq = new TargetRequest(linkage, targetEnum);
+        RefPtr<TargetRequest> targetReq = new TargetRequest(linkage, targetEnum);
 
         List<RefPtr<ComponentType>> allComponentTypes;
         allComponentTypes.add(this); // Add Module as a component type
@@ -116,6 +117,8 @@ namespace Slang
         auto composite = CompositeComponentType::create(
             linkage,
             allComponentTypes);
+
+        composite = fillRequirements(composite);
 
         TargetProgram tp(composite, targetReq);
         tp.getOrCreateLayout(&sink);
@@ -203,14 +206,94 @@ namespace Slang
             }
         }
 
-        ISlangBlob* blob;
-        outArtifact->loadBlob(ArtifactKeep::Yes, &blob);
+        ComPtr<ISlangBlob> blob;
+        outArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef());
 
         // Add the precompiled blob to the module
         builder.setInsertInto(module);
 
         builder.emitEmbeddedDownstreamIR(targetReq->getTarget(), blob);
+        return SLANG_OK;
+    }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL Module::getPrecompiledTargetCode(
+        SlangCompileTarget target,
+        slang::IBlob** outCode,
+        slang::IBlob** outDiagnostics)
+    {
+        SLANG_UNUSED(outDiagnostics);
+        for (auto globalInst : getIRModule()->getModuleInst()->getChildren())
+        {            
+            if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
+            {
+                static_assert(CodeGenTarget::DXIL == static_cast<CodeGenTarget>(SLANG_DXIL));
+                static_assert(CodeGenTarget::SPIRV == static_cast<CodeGenTarget>(SLANG_SPIRV));
+                if (inst->getTarget() == static_cast<CodeGenTarget>(target))
+                {
+                    auto slice = inst->getBlob()->getStringSlice();
+                    auto blob = StringBlob::create(slice);                    
+                    *outCode = blob.detach();
+                    return SLANG_OK;
+                }
+            }            
+        }        
+        return SLANG_FAIL;
+    }
+
+    SLANG_NO_THROW SlangInt SLANG_MCALL Module::getModuleDependencyCount()
+    {
+        return 0;
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL Module::getModuleDependency(
+        SlangInt dependencyIndex,
+        IModule** outModule,
+        slang::IBlob** outDiagnostics)
+    {
+        SLANG_UNUSED(dependencyIndex);
+        SLANG_UNUSED(outModule);
+        SLANG_UNUSED(outDiagnostics);
+        return SLANG_OK;
+    }
+
+    // ComponentType
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::precompileForTarget(
+        SlangCompileTarget target,
+        slang::IBlob** outDiagnostics)
+    {
+        SLANG_UNUSED(target);
+        SLANG_UNUSED(outDiagnostics);
+        return SLANG_FAIL;
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getPrecompiledTargetCode(
+        SlangCompileTarget target,
+        slang::IBlob** outCode,
+        slang::IBlob** outDiagnostics)
+    {
+        SLANG_UNUSED(target);
+        SLANG_UNUSED(outCode);
+        SLANG_UNUSED(outDiagnostics);
+        return SLANG_FAIL;
+    }
+
+    SLANG_NO_THROW SlangInt SLANG_MCALL ComponentType::getModuleDependencyCount()
+    {
+        return getModuleDependencies().getCount();        
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getModuleDependency(
+        SlangInt dependencyIndex,
+        slang::IModule** outModule,
+        slang::IBlob** outDiagnostics)
+    {
+        SLANG_UNUSED(outDiagnostics);
+        if (dependencyIndex < 0 || dependencyIndex >= getModuleDependencies().getCount())
+        {
+            return SLANG_E_INVALID_ARG;
+        }
+        *outModule = getModuleDependencies()[dependencyIndex];
         return SLANG_OK;
     }
 }

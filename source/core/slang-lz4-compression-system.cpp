@@ -5,7 +5,7 @@
 
 #include "slang-blob.h"
 
-#include "../../external/lz4/lib/lz4.h"
+#include <lz4.h>
 
 namespace Slang
 {

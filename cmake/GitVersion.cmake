@@ -24,7 +24,7 @@ function(get_git_version var_numeric var dir)
             if(NOT result EQUAL 0)
                 message(
                     WARNING
-                    "Getting ${var} failed: ${command} returned ${result}"
+                    "Getting ${var} failed: ${command} returned ${result}\nIs this a Git repo with tags?\nConsider settings -D${var} to specify a version manually"
                 )
             elseif("${version_out}" MATCHES "^v(([0-9]+(\\.[0-9]+)*).*)")
                 set(version "${CMAKE_MATCH_1}")
@@ -32,13 +32,13 @@ function(get_git_version var_numeric var dir)
             else()
                 message(
                     WARNING
-                    "Couldn't parse version (like v1.2.3 or v1.2.3-foo) from ${version_out}"
+                    "Couldn't parse version (like v1.2.3 or v1.2.3-foo) from ${version_out}, using ${version} for now"
                 )
             endif()
         else()
             message(
                 WARNING
-                "Couldn't find git executable to get ${var}, please use -D${var}"
+                "Couldn't find git executable to get ${var}, please use -D${var}, using ${version} for now"
             )
         endif()
     endif()

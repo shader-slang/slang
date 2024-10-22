@@ -2565,13 +2565,9 @@ struct IRImageStore : IRInst
     IRInst* getValue() { return getOperand(2); }
 
     /// If GLSL/SPIR-V, Sample coord
-    /// If Metal, Array or Sample coord
+    /// Metal array/face index
     bool hasAuxCoord1() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
     IRInst* getAuxCoord1() { return getOperand(3); }
-
-    /// If Metal, Sample coord
-    bool hasAuxCoord2() { return getOperandCount() > 4 && getOperand(4) != nullptr; }
-    IRInst* getAuxCoord2() { return getOperand(4); }
 };
 // Terminators
 
@@ -2958,6 +2954,11 @@ struct IRMakeTuple : IRInst
 struct IRMakeValuePack : IRInst
 {
     IR_LEAF_ISA(MakeValuePack)
+};
+
+struct IRMakeStruct : IRInst
+{
+    IR_LEAF_ISA(MakeStruct)
 };
 
 struct IRMakeWitnessPack : IRInst
@@ -3649,6 +3650,10 @@ public:
     IRGenericKind*  getGenericKind();
 
     IRPtrType*  getPtrType(IRType* valueType);
+
+    // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
+    IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
+
     IROutType*  getOutType(IRType* valueType);
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType, AddressSpace addrSpace);
@@ -4356,7 +4361,7 @@ public:
     IRInst* emitUpdateElement(IRInst* base, IRInst* index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, IRIntegerValue index, IRInst* newElement);
     IRInst* emitUpdateElement(IRInst* base, ArrayView<IRInst*> accessChain, IRInst* newElement);
-
+    IRInst* emitGetOffsetPtr(IRInst* base, IRInst* offset);
     IRInst* emitGetAddress(
         IRType* type,
         IRInst* value);

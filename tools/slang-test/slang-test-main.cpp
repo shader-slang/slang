@@ -103,6 +103,14 @@ struct TestOptions
     bool isSynthesized = false;
 };
 
+struct FileTestInfoImpl : public FileTestInfo
+{
+    String testName;
+    String filePath;
+    String outputStem;
+    TestOptions options;
+};
+
 struct TestDetails
 {
     TestDetails() {}
@@ -972,6 +980,11 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         {
             return 0;
         }
+        case SLANG_WGSL_SPIRV:
+        case SLANG_WGSL_SPIRV_ASM:
+        {
+            return PassThroughFlag::Tint;
+        }
         case SLANG_DXBC:
         case SLANG_DXBC_ASM:
         {
@@ -1116,6 +1129,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             target = SLANG_PTX;
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
             passThru = SLANG_PASS_THROUGH_NVRTC;
+            break;
+        case RenderApiType::WebGPU:
+            target = SLANG_WGSL;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;
+            passThru = SLANG_PASS_THROUGH_TINT;
             break;
     }
 
@@ -1659,6 +1677,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     args.add("exe");
     args.add("-Xgenericcpp");
     args.add("-I./include");
+    args.add("-Xgenericcpp");
+    args.add("-I./external/unordered_dense/include");
     for (auto arg : args)
     {
         // If unescaping is needed, do it
@@ -2426,7 +2446,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     TerminatedCharSlice includePaths[] = { TerminatedCharSlice(".") };
 
     options.sourceArtifacts = makeSlice(sourceArtifact.readRef(), 1);
-    options.includePaths = makeSlice(includePaths, 1);
+    options.includePaths = makeSlice(includePaths, SLANG_COUNT_OF(includePaths));
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
@@ -4031,13 +4051,29 @@ static SlangResult _runTestsOnFile(
             if (_canIgnore(context, testDetails))
             {
                 testResult = TestResult::Ignored;
+                context->getTestReporter()->addResult(testResult);
             }
             else
             {
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
+                if (testResult == TestResult::Fail
+                    && !context->getTestReporter()->m_expectedFailureList.contains(testName))
+                {
+                    RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
+                    fileTestInfo->filePath = filePath;
+                    fileTestInfo->testName = testName;
+                    fileTestInfo->outputStem = outputStem;
+                    fileTestInfo->options = testDetails.options;
+
+                    std::lock_guard lock(context->mutexFailedFileTests);
+                    context->failedFileTests.add(fileTestInfo);
+                }
+                else
+                {
+                    context->getTestReporter()->addResult(testResult);
+                }
             }
 
-            context->getTestReporter()->addResult(testResult);
 
             // Could determine if to continue or not here... based on result
         }        
@@ -4602,6 +4638,34 @@ SlangResult innerMain(int argc, char** argv)
             }
              
             TestReporter::set(nullptr);
+        }
+
+        // If we have a couple failed tests, they maybe intermittent failures due to parallel
+        // excution or driver instability. We can try running them again.
+        static constexpr int kFailedTestLimitForRetry = 16;
+        if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
+        {
+            if (context.failedFileTests.getCount() > 0)
+                printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
+            for (auto& test : context.failedFileTests)
+            {
+                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                auto newResult = runTest(&context, fileTestInfo->filePath, fileTestInfo->outputStem, fileTestInfo->testName, fileTestInfo->options);
+                reporter.addResult(newResult);
+            }
+        }
+        else
+        {
+            // If there are too many failed tests, don't bother retrying.
+            for (auto& test : context.failedFileTests)
+            {
+                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                reporter.addResult(TestResult::Fail);
+            }
         }
 
         reporter.outputSummary();

@@ -1085,7 +1085,19 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
             // use the appropriate options for glslang to
             // make it support a non-`main` name.
             //
-            return "main";
+            // A function may have an entry-point deocration if it
+            // is declared by the user as an entry-point function.
+            // However it may not actually be compiled as an entry-point
+            // when generating code for targets that doesn't support
+            // multiple entry-points.
+            // We only want to emit "main" for user-marked entrypoint
+            // functions that are actually being selected as entrypoint
+            // for current compilation. We can do so by checking if
+            // a layout decoration existed on the function.
+            if (inst->findDecoration<IRLayoutDecoration>())
+            {
+                return "main";
+            }
         }
 
         return generateEntryPointNameImpl(entryPointDecor);
@@ -2460,6 +2472,16 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
+    case kIROp_GetEquivalentStructuredBuffer:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, outerPrec);
+            m_writer->emit(".asStructuredBuffer<");
+            emitType(as<IRHLSLStructuredBufferTypeBase>(inst->getDataType())->getElementType());
+            m_writer->emit(">()");
+        }
+        break;
+
     case kIROp_RWStructuredBufferStore:
         {
             auto base = inst->getOperand(0);
@@ -2823,6 +2845,26 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             // Couldn't handle 
             diagnoseUnhandledInst(inst);
         }
+        break;
+    }
+    case kIROp_Printf:
+    {
+        m_writer->emit("printf(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        if (inst->getOperandCount() == 2)
+        {
+            auto operand = inst->getOperand(1);
+            if (auto makeStruct = as<IRMakeStruct>(operand))
+            {
+                // Flatten the tuple resulting from the variadic pack.
+                for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
+                {
+                    m_writer->emit(", ");
+                    emitOperand(makeStruct->getOperand(bb), getInfo(EmitOp::General));
+                }
+            }
+        }
+        m_writer->emit(")");
         break;
     }
     case kIROp_RequireGLSLExtension:
@@ -3190,7 +3232,7 @@ void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSe
     emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, EmitLayoutSemanticOption::kPostType);
 }
 
-void CLikeSourceEmitter::emitSwitchCaseSelectorsImpl(IRBasicType *const /* switchCondition */, const SwitchRegion::Case *const currentCase, const bool isDefault)
+void CLikeSourceEmitter::emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault)
 {
     for(auto caseVal : currentCase->values)
     {
@@ -3359,9 +3401,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 auto defaultCase = switchRegion->defaultCase;
                 for(auto currentCase : switchRegion->cases)
                 {
-                    const bool isDefault {currentCase.Ptr() == defaultCase};
-                    IRBasicType *const switchConditionType {as<IRBasicType>(switchRegion->getCondition()->getDataType())};
-                    emitSwitchCaseSelectors(switchConditionType, currentCase.Ptr(), isDefault);
+                    bool isDefault = (currentCase.Ptr() == defaultCase);
+                    emitSwitchCaseSelectors(currentCase.Ptr(), isDefault);
                     m_writer->indent();
                     m_writer->emit("{\n");
                     m_writer->indent();

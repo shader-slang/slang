@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 enum MyId : uint {}
 extension MyId { uint get() { return (uint)this; } }

@@ -73,6 +73,10 @@ struct ASTIterator
                 dispatchIfNotNull(arg);
         }
 
+        void visitBuiltinCastExpr(BuiltinCastExpr* expr)
+        {
+            dispatchIfNotNull(expr->base);
+        }
         void visitParenExpr(ParenExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

@@ -1979,17 +1979,23 @@ namespace Slang
             }
         }
 
-        if(auto castExpr = expr.as<TypeCastExpr>())
+        SubstExpr<Expr> typeCastOperand;
+        if (auto typeCastExpr = expr.as<TypeCastExpr>())
+            typeCastOperand = getArg(typeCastExpr, 0);
+        else if (auto builtinCastExpr = expr.as<BuiltinCastExpr>())
+            typeCastOperand = getBaseExpr(builtinCastExpr);
+        
+        if (typeCastOperand)
         {
             auto substType = getType(m_astBuilder, expr);
             if (!substType)
                 return nullptr;
             if (!isValidCompileTimeConstantType(substType))
                 return nullptr;
-            auto val = tryConstantFoldExpr(getArg(castExpr, 0), kind, circularityInfo);
+            auto val = tryConstantFoldExpr(typeCastOperand, kind, circularityInfo);
             if (val)
             {
-                if (!castExpr.getExpr()->type)
+                if (!expr.getExpr()->type)
                     return nullptr;
                 auto foldVal = as<IntVal>(
                     TypeCastIntVal::tryFoldImpl(m_astBuilder, substType, val, getSink()));
@@ -2021,8 +2027,58 @@ namespace Slang
             // We can return as an IntVal
             return getASTBuilder()->getIntVal(expr.getExpr()->type, value);
         }
-        
+        else if (auto indexExpr = expr.as<IndexExpr>())
+        {
+            return tryFoldIndexExpr(indexExpr.getExpr(), kind, circularityInfo);
+        }
         return nullptr;
+    }
+
+    IntVal* SemanticsVisitor::tryFoldIndexExpr(
+        SubstExpr<IndexExpr>            expr,
+        ConstantFoldingKind             kind,
+        ConstantFoldingCircularityInfo* circularityInfo)
+    {
+        // Ad-hoc constant folding for index expressions.
+        // TOOD: we should generalize this by extending `Val` to support compile-time constants that are
+        // not just integers, but also arrays and structs etc, so that we can independently fold
+        // the base expression and the index expression, and then form a ElementExtractVal() from an
+        // index expr.
+        // For now we just specialize case for array expression that is an initialization list.
+        // And this won't work if the array is a link-time constant.
+        //
+        auto declRefExpr = as<DeclRefExpr>(expr.getExpr()->baseExpression);
+        if (!declRefExpr)
+            return nullptr;
+        auto varDecl = as<VarDecl>(declRefExpr->declRef.getDecl());
+        if (!varDecl)
+            return nullptr;
+        auto type = varDecl->getType();
+        if (!type)
+            return nullptr;
+        auto arrayType = as<ArrayExpressionType>(type);
+        if (!arrayType)
+            return nullptr;
+        if (!varDecl->hasModifier<ConstModifier>())
+            return nullptr;
+        if (isGlobalDecl(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>())
+            return nullptr;
+        if (!varDecl->initExpr)
+            return nullptr;
+        auto arrayContentExpr = as<InitializerListExpr>(varDecl->initExpr);
+        if (!arrayContentExpr)
+            return nullptr;
+        if (expr.getExpr()->indexExprs.getCount() != 1)
+            return nullptr;
+        auto indexVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+            expr.getExpr()->indexExprs[0], kind, circularityInfo));
+        if (!indexVal)
+            return nullptr;
+        auto index = indexVal->getValue();
+        if (index < 0 || index >= arrayContentExpr->args.getCount())
+            return nullptr;
+        auto elementExpr = arrayContentExpr->args[Index(index)];
+        return tryFoldIntegerConstantExpression(elementExpr, kind, circularityInfo);
     }
 
     IntVal* SemanticsVisitor::tryFoldIntegerConstantExpression(
@@ -2054,6 +2110,8 @@ namespace Slang
             break;
         case IntegerConstantExpressionCoercionType::AnyInteger:
             if (isScalarIntegerType(inExpr->type))
+                expr = inExpr;
+            else if (isEnumType(inExpr->type))
                 expr = inExpr;
             else
                 expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
@@ -3441,6 +3499,12 @@ namespace Slang
         return sizeOfLikeExpr;
     }
 
+    Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)
+    {
+        // All builtin cast exprs should already be checked.
+        return expr;
+    }
+
     Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
     {
         if (expr->type)
@@ -4754,7 +4818,9 @@ namespace Slang
             scope = scope->parent;
         }
 
-        getSink()->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
+        if (auto sink = getSink())
+            sink->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
+            
         return CreateErrorExpr(expr);
     }
 

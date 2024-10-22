@@ -27,7 +27,6 @@ namespace Slang
 {
 
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
-    IRBasicType *const switchConditionType,
     const SwitchRegion::Case *const currentCase,
     const bool isDefault)
 {
@@ -38,39 +37,7 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     m_writer->emit("case ");
     for (auto caseVal : currentCase->values)
     {
-        // TODO: Fix this in the front-end [1], remove the if-path and just do the else-path.
-        //       We can't do that at the moment because it would break Falcor [2].
-        //       [1] https://github.com/shader-slang/slang/pull/5025/commits/a32156ef52f43b8503b2c77f2f1d51220ab9bdea
-        //       [2] https://github.com/shader-slang/slang/pull/5025#issuecomment-2334495120
-        if (caseVal->getOp() == kIROp_IntLit)
-        {
-            auto caseLitInst = static_cast<IRConstant*>(caseVal);
-            IRBasicType *const caseInstType = as<IRBasicType>(caseLitInst->getDataType());
-            // WGSL doesn't allow switch condition and case type mismatches, see [1].
-            // Thus we need to insert explicit conversions.
-            // Doing a wrapping cast will match Slang's de facto semantics, according to
-            // [2].
-            // (This is just a bitcast, assuming a two's complement representation.)
-            // [1] https://www.w3.org/TR/WGSL/#switch-statement
-            // [2] https://github.com/shader-slang/slang/issues/4921
-            const bool needBitcast =
-                caseInstType->getBaseType() != switchConditionType->getBaseType();
-            if (needBitcast)
-            {
-                m_writer->emit("bitcast<");
-                emitType(switchConditionType);
-                m_writer->emit(">(");
-            }
-            emitOperand(caseVal, getInfo(EmitOp::General));
-            if (needBitcast)
-            {
-                m_writer->emit(")");
-            }
-        }
-        else
-        {
-            emitOperand(caseVal, getInfo(EmitOp::General));
-        }
+        emitOperand(caseVal, getInfo(EmitOp::General));
         m_writer->emit(", ");
     }
     if (isDefault)
@@ -348,6 +315,13 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
     break;
 
+    case kIROp_HLSLByteAddressBufferType:
+    case kIROp_HLSLRWByteAddressBufferType:
+    {
+        m_writer->emit("array<u32>");
+    }
+    break;
+
     case kIROp_VoidType:
     {
         // There is no void type in WGSL.
@@ -590,17 +564,34 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType * type, IRInst* varDecl)
         m_writer->emit("<workgroup>");
     }
     else if (type->getOp() == kIROp_HLSLRWStructuredBufferType ||
-        type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType)
+        type->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+        type->getOp() == kIROp_HLSLRWByteAddressBufferType)
     {
         m_writer->emit("<");
         m_writer->emit("storage, read_write");
         m_writer->emit(">");
     }
-    else if (type->getOp() == kIROp_HLSLStructuredBufferType)
+    else if (type->getOp() == kIROp_HLSLStructuredBufferType ||
+        type->getOp() == kIROp_HLSLByteAddressBufferType)
     {
         m_writer->emit("<");
         m_writer->emit("storage, read");
         m_writer->emit(">");
+    }
+    else if(varDecl->getOp() == kIROp_GlobalVar)
+    {
+        // Global ("module-scope") non-handle variables need to specify storage space
+
+        // https://www.w3.org/TR/WGSL/#var-decls
+        // "
+        // Variables in the private, storage, uniform, workgroup, and handle address
+        // spaces must only be declared in module scope, while variables in the function
+        // address space must only be declared in function scope. The address space must
+        // be specified for all address spaces except handle and function. The handle
+        // address space must not be specified. Specifying the function address space is
+        // optional.
+        // "
+        m_writer->emit("<private>");
     }
 }
 
@@ -1163,6 +1154,33 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     }
     break;
+
+    case kIROp_ByteAddressBufferLoad:
+    {
+        // Indices in Slang code count bytes, but in WASM they count u32's since
+        // byte address buffers translate to array<u32> in WASM, so divide by 4.
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("[(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(")/4]");
+        return true;
+    }
+    break;
+
+    case kIROp_ByteAddressBufferStore:
+    {
+        // Indices in Slang code count bytes, but in WASM they count u32's since
+        // byte address buffers translate to array<u32> in WASM, so divide by 4.
+        auto base = inst->getOperand(0);
+        emitOperand(base, EmitOpInfo());
+        m_writer->emit("[(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(")/4] = ");
+        emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
+        return true;
+    }
+    break;
+
     }
 
     return false;

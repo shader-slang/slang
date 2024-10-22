@@ -114,7 +114,9 @@ SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSessi
     }
 
     ComPtr<slang::ICompileRequest> compileRequest;
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SLANG_RETURN_ON_FAIL(session->createCompileRequest(compileRequest.writeRef()));
+    SLANG_ALLOW_DEPRECATED_END
 
     // Do any app specific configuration
     for (int i = 0; i < int{SLANG_WRITER_CHANNEL_COUNT_OF}; ++i)

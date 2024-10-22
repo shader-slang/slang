@@ -329,6 +329,7 @@ DIAGNOSTIC(30068, Warning, mutatingMethodOnFunctionInputParameterWarning, "mutat
 
 DIAGNOSTIC(30070, Error, unsizedMemberMustAppearLast, "member with unknown size at compile time can only appear as the last member in a composite type.")
 DIAGNOSTIC(30071, Error, varCannotBeUnsized, "cannot instantiate a variable of unsized type.")
+DIAGNOSTIC(30072, Error, paramCannotBeUnsized, "function parameter cannot be unsized.")
 
 DIAGNOSTIC(30075, Error, cannotSpecializeGeneric, "cannot specialize generic '$0' with the provided arguments.")
 
@@ -463,8 +464,11 @@ DIAGNOSTIC(31151, Error, cannotResolveGenericArgumentForDerivativeFunction,
     "[BackwardDerivativeOf], and [PrimalSubstituteOf] attributes are not supported when the generic arguments to the derivatives cannot be automatically deduced.")
 DIAGNOSTIC(31152, Error, cannotAssociateInterfaceRequirementWithDerivative, "cannot associate an interface requirement with a derivative.")
 DIAGNOSTIC(31153, Error, cannotUseInterfaceRequirementAsDerivative, "cannot use an interface requirement as a derivative.")
-DIAGNOSTIC(31154, Error, customDerivativeSignatureThisParamMismatch, "custom derivative does not match expected signature on `this`. Either both the original and the derivative function are static, or they must have the same `this` type.")
+DIAGNOSTIC(31154, Error, customDerivativeSignatureThisParamMismatch, "custom derivative does not match expected signature on `this`. Both original and derivative function must have the same `this` type.")
 DIAGNOSTIC(31155, Error, customDerivativeNotAllowedForMemberFunctionsOfDifferentiableType, "custom derivative is not allowed for non-static member functions of a differentiable type.")
+DIAGNOSTIC(31156, Error, customDerivativeExpectedStatic, "expected a static definition for the custom derivative.")
+DIAGNOSTIC(31157, Error, overloadedFuncUsedWithDerivativeOfAttributes, "cannot resolve overloaded functions for derivative-of attributes.")
+
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
 DIAGNOSTIC(31202, Error, duplicateModifier, "modifier '$0' is redundant or conflicting with existing modifier '$1'")
@@ -879,6 +883,7 @@ DIAGNOSTIC(55200, Error, unsupportedBuiltinType, "'$0' is not a supported builti
 DIAGNOSTIC(55201, Error, unsupportedRecursion, "recursion detected in call to '$0', but the current code generation target does not allow recursion.")
 DIAGNOSTIC(55202, Error, systemValueAttributeNotSupported, "system value semantic '$0' is not supported for the current target.")
 DIAGNOSTIC(55203, Error, systemValueTypeIncompatible, "system value semantic '$0' should have type '$1' or be convertible to type '$1'.")
+DIAGNOSTIC(55204, Error, unsupportedTargetIntrinsic, "intrinsic operation '$0' is not supported for the current target.")
 DIAGNOSTIC(56001, Error, unableToAutoMapCUDATypeToHostType, "Could not automatically map '$0' to a host type. Automatic binding generation failed for '$1'")
 DIAGNOSTIC(56002, Error, attemptToQuerySizeOfUnsizedArray, "cannot obtain the size of an unsized array.")
 
@@ -900,6 +905,9 @@ DIAGNOSTIC(-1, Note, reportCheckpointIntermediates, "checkpointing context of $1
 DIAGNOSTIC(-1, Note, reportCheckpointVariable, "$0 bytes ($1) used to checkpoint the following item:")
 DIAGNOSTIC(-1, Note, reportCheckpointCounter, "$0 bytes ($1) used for a loop counter here:")
 DIAGNOSTIC(-1, Note, reportCheckpointNone, "no checkpoint contexts to report")
+
+// 9xxxx - Documentation generation
+DIAGNOSTIC(90001, Warning, ignoredDocumentationOnOverloadCandidate, "documentation comment on overload candidate '$0' is ignored")
 
 //
 // 8xxxx - Issues specific to a particular library/technology/platform/etc.

@@ -921,6 +921,11 @@ int main(
 
         FILE* outputStream;
         fopen_s(&outputStream, outputPath.getBuffer(), "w");
+        if (!outputStream)
+        {
+            fprintf(stderr, "unable to open file for writing: %s.\n", outputPath.getBuffer());
+            exit(1);
+        }
 
         emitTemplateNodes(sourceFile, outputStream, node);
 

@@ -1740,6 +1740,46 @@ namespace Slang
         }
     };
 
+    // metal textures only support writing 4-component values, even if the texture is only 1, 2, or 3-component
+    // in this case the other channels get ignored, but the signature still doesnt match
+    // so now we have to replace the value being written with a 4-component vector where 
+    // the new components get ignored, nice
+    void legalizeImageStoreValue(IRBuilder& builder, IRImageStore* imageStore)
+    {
+        builder.setInsertBefore(imageStore);
+        auto originalValue = imageStore->getValue();
+        auto valueBaseType = originalValue->getDataType();
+        IRType* elementType = nullptr;
+        List<IRInst*> components;
+        if(auto valueVectorType = as<IRVectorType>(valueBaseType))
+        {
+            if(auto originalElementCount = as<IRIntLit>(valueVectorType->getElementCount()))
+            {
+                if(originalElementCount->getValue() == 4)
+                {
+                    return;
+                }
+            }
+            elementType = valueVectorType->getElementType();
+            auto vectorValue = as<IRMakeVector>(originalValue);
+            for(UInt i = 0; i < vectorValue->getOperandCount(); i++)
+            {
+                components.add(vectorValue->getOperand(i));
+            }
+        }
+        else
+        {
+            elementType = valueBaseType;
+            components.add(originalValue);
+        }
+        for(UInt i = components.getCount(); i < 4; i++)
+        {
+            components.add(builder.getIntValue(builder.getIntType(), 0));
+        }
+        auto fourComponentVectorType = builder.getVectorType(elementType, 4);
+        imageStore->setOperand(2, builder.emitMakeVector(fourComponentVectorType, components));
+    }
+
     void legalizeFuncBody(IRFunc* func)
     {
         IRBuilder builder(func);
@@ -1795,6 +1835,10 @@ namespace Slang
                         builder.emitStore(addr, builder.emitLoad(valueType, temp));
                         arg->set(temp);
                     }
+                }
+                if(auto write = as<IRImageStore>(inst))
+                {
+                    legalizeImageStoreValue(builder, write);
                 }
             }
         }

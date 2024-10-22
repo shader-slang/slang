@@ -34,11 +34,13 @@ The Slang system is designed to provide developers of real-time graphics applica
 Getting Started
 ---------------
 
-If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Shader Playground](docs/shader-playground.md).
-
 The fastest way to get started using Slang in your own development is to use a pre-built binary package, available through GitHub [releases](https://github.com/shader-slang/slang/releases).
+Slang binaries are also included in the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) since version 1.3.296.0.
+
 There are packages built for 32- and 64-bit Windows, as well as 64-bit Ubuntu.
 Each binary release includes the command-line `slangc` compiler, a shared library for the compiler, and the `slang.h` header.
+
+If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Shader Playground](docs/shader-playground.md).
 
 If you would like to build Slang from source, please consult the [build instructions](docs/building.md).
 
@@ -46,6 +48,8 @@ Documentation
 -------------
 
 The Slang project provides a variety of different [documentation](docs/), but most users would be well served starting with the [User's Guide](https://shader-slang.github.io/slang/user-guide/).
+
+For developers writing Slang code, the [Slang Standard Library Reference](https://shader-slang.com/stdlib-reference/) provides detailed documentation on Slang's built-in types and functions.
 
 We also provide a few [examples](examples/) of how to integrate Slang into a rendering application.
 
@@ -71,28 +75,45 @@ Limitations and Support
 -----------------------
 
 ### Platform support
-|   Windows       |     Linux      |    MacOS     |      WebAssembly     |
-|:---------------:|:--------------:|:------------:|:--------------------:|
-|   supported     |   supported    |  supported   |      experimental    |
+
+The Slang compiler and libraries can be built on the following platforms:
+
+|  Windows  |   Linux   |   MacOS   |  WebAssembly |
+|:---------:|:---------:|:---------:|:------------:|
+| supported | supported | supported | experimental |
+
+Both `x86_64` and `aarch64` architectures are supported on Windows, Linux and MacOS platforms.
 
 ### Target support
-|   Target         |     Status     |     Output Formats     |
-|:----------------:|:--------------:|:----------------------:|
-|  Direct3D 11     |    supported   |  HLSL                   |
-|  Direct3D 12     |    supported   |  HLSL                   |
-|  Vulkan          |    supported   |  SPIRV, GLSL            |
-|  Metal           |  experimental* |  Metal Shading Language |
-|  WebGPU          |  experimental* |  WGSL                   |
-|  CUDA            |   supported    | C++ (compute only)      |
-|  Optix           |   experimental | C++ (WIP)      |
-|  CPU             |  experimental  | C++ (kernel), C++ (host), standalone executable, dynamic library |
 
-*Slang currently supports generating vertex, fragment, compute, task and mesh shaders for Metal. WGSL support is still work in-progress.
-For greater detail, see the [Supported Compilation Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the [User Guide](https://shader-slang.github.io/slang/user-guide/)
+Slang can compile shader code to the following targets:
 
-The Slang project has been used for production applications and large shader codebases, but it is still under active development.
-Support is currently focused on the platforms (Windows, Linux) and target APIs (Direct3D 12, Vulkan) where Slang is used most heavily.
-Users who are looking for support on other platforms or APIs should coordinate with the development team via the issue tracker to make sure that their use case(s) can be supported.
+|    Target   |                                         Status                                        |                          Output Formats                          |
+|:-----------:|:-------------------------------------------------------------------------------------:|:----------------------------------------------------------------:|
+| Direct3D 11 |    [supported](https://shader-slang.com/slang/user-guide/targets.html#direct3d-11)    |                               HLSL                               |
+| Direct3D 12 |    [supported](https://shader-slang.com/slang/user-guide/targets.html#direct3d-12)    |                               HLSL                               |
+|    Vulkan   |       [supported](https://shader-slang.com/slang/user-guide/targets.html#vulkan)      |                            SPIRV, GLSL                           |
+|    Metal    |     [experimental*](https://shader-slang.com/slang/user-guide/targets.html#metal)     |                      Metal Shading Language                      |
+|    WebGPU   |                                     experimental**                                    |                               WGSL                               |
+|     CUDA    |   [supported](https://shader-slang.com/slang/user-guide/targets.html#cuda-and-optix)  |                        C++ (compute only)                        |
+|    Optix    | [experimental](https://shader-slang.com/slang/user-guide/targets.html#cuda-and-optix) |                             C++ (WIP)                            |
+|     CPU     |   [experimental](https://shader-slang.com/slang/user-guide/targets.html#cpu-compute)  | C++ (kernel), C++ (host), standalone executable, dynamic library |
+
+> *Slang currently supports generating vertex, fragment, compute, task and mesh
+> shaders for Metal.
+
+> **WGSL support is still work in-progress.
+
+For greater detail, see the [Supported Compilation
+Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the
+[User Guide](https://shader-slang.github.io/slang/user-guide/)
+
+The Slang project has been used for production applications and large shader
+codebases, but it is still under active development. Support is currently
+focused on the platforms (Windows, Linux) and target APIs (Direct3D 12, Vulkan)
+where Slang is used most heavily. Users who are looking for support on other
+platforms or APIs should coordinate with the development team via the issue
+tracker to make sure that their use cases can be supported.
 
 License
 -------
