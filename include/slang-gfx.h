@@ -199,6 +199,7 @@ public:
 // TODO: Confirm with Yong that we really want this naming convention
 // TODO: Rename to what?
 // Dont' change without keeping in sync with Format
+// clang-format off
 #define GFX_FORMAT(x) \
     x( Unknown, 0, 0) \
     \
@@ -304,8 +305,9 @@ public:
     \
     x(R64_UINT, 8, 1) \
     \
-    x(R64_SINT, 8, 1) \
-    \
+    x(R64_SINT, 8, 1)
+// clang-format on
+
 // TODO: This should be generated from above
 // TODO: enum class should be explicitly uint32_t or whatever's appropriate
 /// Different formats of things like pixels or elements of vertices

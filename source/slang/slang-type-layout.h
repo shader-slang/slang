@@ -244,6 +244,7 @@ struct UniformArrayLayoutInfo : UniformLayoutInfo
 typedef slang::ParameterCategory LayoutResourceKind;
 
 // Any change to slang::ParameterCategory, requires a change to this macro.
+// clang-format off
 #define SLANG_PARAMETER_CATEGORIES(x) \
     x(None) \
     x(Mixed) \
@@ -277,6 +278,7 @@ typedef slang::ParameterCategory LayoutResourceKind;
     x(MetalBuffer) \
     x(MetalTexture) \
     x(MetalArgumentBufferElement)
+// clang-format on
 
 #define SLANG_PARAMETER_CATEGORY_FLAG(x) x = ParameterCategoryFlags(1) << int(slang::x), 
 

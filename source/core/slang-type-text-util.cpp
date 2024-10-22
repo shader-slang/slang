@@ -9,6 +9,7 @@ namespace Slang
 
 namespace { // anonymous
 
+// clang-format off
 #define SLANG_SCALAR_TYPES(x) \
     x(None, none) \
     x(Void, void) \
@@ -20,6 +21,7 @@ namespace { // anonymous
     x(UInt64, uint64_t) \
     x(Float32, float) \
     x(Float64, double) 
+// clang-format on
 
 struct ScalarTypeInfo
 {

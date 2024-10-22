@@ -11,10 +11,12 @@ namespace renderer_test
 {
     using namespace Slang;
 
+// clang-format off
 #define SLANG_SCALAR_TYPES(x) \
     x("int", INT32) \
     x("uint", UINT32) \
     x("float", FLOAT32)
+// clang-format on
 
 
     Format _getFormatFromName(const UnownedStringSlice& slice)
