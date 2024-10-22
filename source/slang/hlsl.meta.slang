@@ -8554,6 +8554,7 @@ matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 }
 
 /// Texture filter width.
+/// Calculates the sum abs(ddx(`p`)) + abs(ddy(`p`)).
 /// @param p The value to sum x and y partial derivative magnitudes for.
 /// @return The sum of abs(ddx(`p`)) and abs(ddy(`p`)).
 /// @remarks For SPIR-V, this function maps to `OpFwidth`.
