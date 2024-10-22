@@ -154,6 +154,7 @@ bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.i
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactKind !!!!!!!!!!!!!!!!!!!!!!! */
 
+// clang-format off
 #define SLANG_ARTIFACT_KIND(x) \
     x(Invalid, Invalid) \
     x(Base, Invalid) \
@@ -245,6 +246,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_
             x(Kernel, CodeLike) \
             x(Host, CodeLike) \
         x(Obfuscated, Base) 
+// clang-format on
 
 #define SLANG_ARTIFACT_STYLE_ENTRY(TYPE, PARENT) { Index(ArtifactStyle::TYPE), Index(ArtifactStyle::PARENT), #TYPE },
 

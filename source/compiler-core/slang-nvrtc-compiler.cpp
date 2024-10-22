@@ -41,6 +41,7 @@ typedef enum {
 
 typedef struct _nvrtcProgram *nvrtcProgram;
 
+// clang-format off
 #define SLANG_NVRTC_FUNCS(x) \
     x(const char*, nvrtcGetErrorString, (nvrtcResult result)) \
     x(nvrtcResult, nvrtcVersion, (int *major, int *minor)) \
@@ -53,6 +54,7 @@ typedef struct _nvrtcProgram *nvrtcProgram;
     x(nvrtcResult, nvrtcGetProgramLog, (nvrtcProgram prog, char *log))\
     x(nvrtcResult, nvrtcAddNameExpression, (nvrtcProgram prog, const char * const name_expression)) \
     x(nvrtcResult, nvrtcGetLoweredName, (nvrtcProgram prog, const char *const name_expression, const char** lowered_name))
+// clang-format on
 
 } // namespace nvrtc
 

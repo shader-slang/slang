@@ -5,6 +5,7 @@
 
 namespace gfx {
 
+// clang-format off
 #define VK_API_GLOBAL_PROCS(x) \
     x(vkGetInstanceProcAddr) \
     x(vkCreateInstance) \
@@ -235,7 +236,7 @@ namespace gfx {
     /* */
 
 #define VK_API_DECLARE_PROC(NAME) PFN_##NAME NAME = nullptr;
-
+// clang-format on
 
 struct VulkanExtendedFeatureProperties
 {

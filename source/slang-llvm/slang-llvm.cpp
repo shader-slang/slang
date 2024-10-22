@@ -386,10 +386,12 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
 
 #endif
 
+
 // These are only the functions that cannot be implemented with 'reasonable performance' in the prelude.
 // It is assumed that calling from JIT to C function whilst not super expensive, is an issue. 
 
 // name, cppName, retType, paramTypes
+// clang-format off
 #define SLANG_LLVM_FUNCS(x) \
     x(F64_ceil, ceil, double, (double)) \
     x(F64_floor, floor, double, (double)) \
@@ -476,6 +478,7 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
     \
     x(__bzero, OSXSpecific::bzero, void, (void*, size_t))
 #endif
+// clang-format on
 
 #if SLANG_WINDOWS_FAMILY 
 #   if SLANG_PROCESSOR_X86

@@ -20,6 +20,8 @@ struct glsl_SPIRVVersion
     int major, minor, patch;
 };
 
+// clang-format off
+
 #define SLANG_GLSLANG_COMPILE_REQUEST_1_0(x)  \
     x(sourcePath) \
     x(inputBegin) \
@@ -34,6 +36,8 @@ struct glsl_SPIRVVersion
     x(debugInfoType)
 
 #define SLANG_GLSLANG_FIELD_COPY(name) name = in.name;
+
+// clang-format on
 
 // Pre-declare
 struct glslang_CompileRequest_1_1;

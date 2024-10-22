@@ -912,10 +912,12 @@ bool findImageFormatByName(const UnownedStringSlice& name, ImageFormat* outForma
 }
 
 // https://github.com/microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#id71
+// clang-format off
 #define SLANG_VK_TO_IMAGE_FORMAT(x) \
     x(r11g11b10f, r11f_g11f_b10f) \
     x(rgb10a2, rgb10_a2) \
     x(rgb10a2ui, rgb10_a2ui) 
+// clang-format on
 
 struct VkImageFormatInfo
 {

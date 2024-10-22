@@ -26,6 +26,7 @@ namespace Slang
 
 // x macro of precedence of types in order.
 // Used because in header, need to prefix macros to avoid clashes, and this style allows for prefixing without additional clutter
+// clang-format off
 #define SLANG_PRECEDENCE(x) \
     x(None,         NON_ASSOC) \
     x(Comma,        LEFT) \
@@ -50,6 +51,7 @@ namespace Slang
     x(Prefix,       RIGHT) \
     x(Postfix,      LEFT) \
     x(Atomic,       NON_ASSOC)
+// clang-format on
 
 // Precedence enum produced from the SLANG_PRECEDENCE macro
 enum EPrecedence
@@ -59,6 +61,7 @@ enum EPrecedence
 
 // Macro for define OpInfo and an associated enum type. Order or macro parameters is
 // Op, OpName, Precedence
+// clang-format off
 #define SLANG_OP_INFO(x) \
     x(None, "", None) \
     \
@@ -111,6 +114,7 @@ enum EPrecedence
     x(Not, "!", Prefix) \
     x(Neg, "-", Prefix) \
     x(BitNot, "~", Prefix)
+// clang-format on
 
 #define SLANG_OP_INFO_ENUM(op, name, precedence) op,
 
