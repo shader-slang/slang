@@ -6960,6 +6960,10 @@ vector<T,N> cospi(vector<T,N> x)
 
 
 /// Population count.
+/// Counts the number of set bits in the binary representation of a value.
+/// @param value The value to count bits in.
+/// @return The number of bits in the binary representation of `value` that are set to one.
+/// @remarks For SPIR-V, this function maps to `OpBitCount`.
 /// @category bitops
 [__readNone]
 [ForceInline]
@@ -8022,6 +8026,12 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 }
 
 /// Find first set bit starting at high bit and working down.
+/// @param value The signed value to find set bits in.
+/// @return The bit index number of the most significant bit,
+///         or returns -1 if `value` is either 0 or -1.
+/// @remarks If `value` is positive, the bit index returned is the highest 1-bit.
+///          If `value` is negative, the bit index returned is the highest 0-bit.
+///          For SPIR-V, this function maps to GLSL extended instruction `FindSMsb`.
 /// @category bitops Bit operation functions
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -8060,6 +8070,11 @@ vector<int, N> firstbithigh(vector<int, N> value)
     }
 }
 
+/// Find first set bit starting at high bit and working down.
+/// @param value The unsigned value to find set bits in.
+/// @return The bit index number of the most significant bit,
+///         or all ones (-1 when interpretted as signed) if `value` is 0.
+/// @remarks For SPIR-V, this function maps to GLSL extended instruction `FindUMsb`.
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint firstbithigh(uint value)
@@ -8098,6 +8113,10 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
 }
 
 /// Find first set bit starting at low bit and working up.
+/// @param value The value to find set bits in.
+/// @return The bit index number of the least significant set bit,
+///         or all ones (-1 when interpretted as signed) if `value` is 0.
+/// @remarks For SPIR-V, this function maps to GLSL extended instruction `FindILsb`.
 /// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -11080,6 +11099,9 @@ T refract(T i, T n, T eta)
 }
 
 /// Reverse order of bits.
+/// @param value The value to reverse bits of.
+/// @return The bits of `value`, reversed such that bit n of the result is equal to bit (width - 1 - n) of `value`.
+/// @remarks For SPIR-V, this function maps to `OpBitReverse`.
 /// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
