@@ -39,7 +39,6 @@ enable_language(C CXX)
 
 include(FindPackageHandleStandardArgs)
 include(CMakeDependentOption)
-include(FetchContent)
 include(GNUInstallDirs)
 
 include(CCacheDebugInfoWorkaround)
@@ -148,11 +147,13 @@ set(SLANG_GENERATORS_PATH
 enum_option(
     SLANG_SLANG_LLVM_FLAVOR
     # Default
-    FETCH_BINARY
+    FETCH_BINARY_IF_POSSIBLE
     "How to get or build slang-llvm:"
     # Options
     FETCH_BINARY
-    "Use a binary distribution of the slang-llvm library instead of building or using LLVM (default)"
+    "Use a binary distribution of the slang-llvm library instead of building or using LLVM"
+    FETCH_BINARY_IF_POSSIBLE
+    "Like FETCH_BINARY, except falls back to DISABLE if a prebuilt slang-llvm can't be downloaded"
     USE_SYSTEM_LLVM
     "Build slang-llvm using system-provided LLVM and Clang binaries"
     DISABLE
@@ -164,7 +165,11 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
         get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
         if(NOT DEFINED url)
-            message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
+            if(SLANG_SLANG_LLVM_FLAVOR STREQUAL FETCH_BINARY_IF_POSSIBLE)
+                message(WARNING "Unable to find a prebuilt binary for slang-llvm, Slang will be built without LLVM support. Please consider setting SLANG_SLANG_LLVM_BINARY_URL manually")
+            else()
+                message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
+            endif()
         endif()
     endif()
     set(SLANG_SLANG_LLVM_BINARY_URL
@@ -446,7 +451,14 @@ if(SLANG_SLANG_TINT_BINARY_URL)
 endif()
 
 if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY")
-  install_fetched_shared_library("slang-llvm" "${SLANG_SLANG_LLVM_BINARY_URL}")
+    install_fetched_shared_library("slang-llvm" "${SLANG_SLANG_LLVM_BINARY_URL}")
+elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "FETCH_BINARY_IF_POSSIBLE")
+    if(SLANG_SLANG_LLVM_BINARY_URL)
+        install_fetched_shared_library("slang-llvm" "${SLANG_SLANG_LLVM_BINARY_URL}" IGNORE_FAILURE)
+        if(NOT TARGET slang-llvm)
+            message(WARNING "Unable to fetch slang-llvm prebuilt binary, configuring without LLVM support")
+        endif()
+    endif()
 elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
     llvm_target_from_components(llvm-dep filecheck native orcjit)
     clang_target_from_libs(

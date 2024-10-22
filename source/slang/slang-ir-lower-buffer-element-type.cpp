@@ -671,7 +671,26 @@ namespace Slang
                             if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
                             {
                                 builder.setInsertBefore(ptrVal);
-                                auto newArrayPtrVal = builder.emitGetOffsetPtr(fieldAddr->getBase(), builder.getIntValue(builder.getIntType(), 1));
+                                auto newArrayPtrVal = fieldAddr->getBase();
+                                // Is base a pointer to an empty struct? If so, don't offset it.
+                                // For example, if the user has written:
+                                // ```
+                                // struct S {int arr[]};
+                                // uniform S* p;
+                                // void test() { p->arr[1]; }
+                                // ```
+                                // Then `S` will become an empty struct after we remove `arr[]`.
+                                // And `p` will be come a `void*`.
+                                // We don't want to offset `p` to `p+1` to get the starting address of the array in this case.
+                                IRSizeAndAlignment parentStructSize = {};
+                                getNaturalSizeAndAlignment(
+                                    target->getOptionSet(),
+                                    tryGetPointedToType(&builder, fieldAddr->getBase()->getDataType()),
+                                    &parentStructSize);
+                                if (parentStructSize.size != 0)
+                                {
+                                    newArrayPtrVal = builder.emitGetOffsetPtr(fieldAddr->getBase(), builder.getIntValue(builder.getIntType(), 1));
+                                }
                                 auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), layoutRules);
                                 
                                 IRSizeAndAlignment arrayElementSizeAlignment;
@@ -685,12 +704,14 @@ namespace Slang
                                     &baseSizeAlignment);
 
                                 // Convert pointer to uint64 and adjust offset.
-                                auto rawPtr = builder.emitBitCast(builder.getUInt64Type(), newArrayPtrVal);
                                 IRIntegerValue offset = baseSizeAlignment.size;
                                 offset = align(offset, arrayElementSizeAlignment.alignment);
-                                newArrayPtrVal = builder.emitAdd(rawPtr->getFullType(), rawPtr,
-                                    builder.getIntValue(builder.getUInt64Type(), offset));
-
+                                if (offset != 0)
+                                {
+                                    auto rawPtr = builder.emitBitCast(builder.getUInt64Type(), newArrayPtrVal);
+                                    newArrayPtrVal = builder.emitAdd(rawPtr->getFullType(), rawPtr,
+                                        builder.getIntValue(builder.getUInt64Type(), offset));
+                                }
                                 newArrayPtrVal = builder.emitBitCast(
                                     builder.getPtrType(loweredInnerType.loweredType,
                                         ptrType->getAddressSpace()), newArrayPtrVal);

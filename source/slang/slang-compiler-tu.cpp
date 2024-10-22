@@ -104,7 +104,7 @@ namespace Slang
         applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
         applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-        TargetRequest* targetReq = new TargetRequest(linkage, targetEnum);
+        RefPtr<TargetRequest> targetReq = new TargetRequest(linkage, targetEnum);
 
         List<RefPtr<ComponentType>> allComponentTypes;
         allComponentTypes.add(this); // Add Module as a component type
@@ -206,8 +206,8 @@ namespace Slang
             }
         }
 
-        ISlangBlob* blob;
-        outArtifact->loadBlob(ArtifactKeep::Yes, &blob);
+        ComPtr<ISlangBlob> blob;
+        outArtifact->loadBlob(ArtifactKeep::Yes, blob.writeRef());
 
         // Add the precompiled blob to the module
         builder.setInsertInto(module);

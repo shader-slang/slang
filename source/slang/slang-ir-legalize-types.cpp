@@ -934,6 +934,8 @@ static LegalVal legalizeStore(
 
     case LegalVal::Flavor::simple:
     {
+        if (legalVal.flavor == LegalVal::Flavor::none)
+            return LegalVal();
         context->builder->emitStore(legalPtrVal.getSimple(), legalVal.getSimple());
         return legalVal;
     }
@@ -2248,7 +2250,7 @@ static LegalVal legalizeLocalVar(
             // Easy case: the type is usable as-is, and we
             // should just do that.
             auto type = maybeSimpleType.getSimple();
-            type = context->builder->getPtrType(type);
+            type = context->builder->getPtrTypeWithAddressSpace(type, irLocalVar->getDataType());
             if( originalRate )
             {
                 type = context->builder->getRateQualifiedType(
@@ -3669,7 +3671,7 @@ static LegalVal legalizeGlobalVar(
     auto legalValueType = legalizeType(
         context,
         originalValueType);
-
+    auto varPtrType = as<IRPtrTypeBase>(irGlobalVar->getDataType());
     switch (legalValueType.flavor)
     {
     case LegalType::Flavor::simple:
@@ -3678,7 +3680,8 @@ static LegalVal legalizeGlobalVar(
         context->builder->setDataType(
             irGlobalVar,
             context->builder->getPtrType(
-                legalValueType.getSimple()));
+                legalValueType.getSimple(),
+                varPtrType ? varPtrType->getAddressSpace():AddressSpace::Global));
         return LegalVal::simple(irGlobalVar);
 
     default:

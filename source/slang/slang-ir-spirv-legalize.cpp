@@ -23,6 +23,7 @@
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-specialize-address-space.h"
+#include "slang-legalize-types.h"
 
 namespace Slang
 {
@@ -37,6 +38,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     IRModule* m_module;
     
+    DiagnosticSink* m_sink;
+
     struct LoweredStructuredBufferTypeInfo
     {
         IRType* structType;
@@ -173,8 +176,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    SPIRVLegalizationContext(SPIRVEmitSharedContext* sharedContext, IRModule* module)
-        : m_sharedContext(sharedContext), m_module(module)
+    SPIRVLegalizationContext(SPIRVEmitSharedContext* sharedContext, IRModule* module, DiagnosticSink* sink)
+        : m_sharedContext(sharedContext), m_module(module), m_sink(sink)
     {
     }
 
@@ -2108,6 +2111,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // safely lower the pointer load stores early together with other buffer types.
         lowerBufferElementTypeToStorageType(m_sharedContext->m_targetProgram, m_module, true);
 
+        // The above step may produce empty struct types, so we need to lower them out of existence.
+        legalizeEmptyTypes(m_sharedContext->m_targetProgram, m_module, m_sink);
+
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner);
@@ -2184,9 +2190,9 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     return snippet;
 }
 
-void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
+void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module, DiagnosticSink* sink)
 {
-    SPIRVLegalizationContext context(sharedContext, module);
+    SPIRVLegalizationContext context(sharedContext, module, sink);
     context.processModule();
 }
 
@@ -2326,7 +2332,7 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-    legalizeSPIRV(context, module);
+    legalizeSPIRV(context, module, codeGenContext->getSink());
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
     insertFragmentShaderInterlock(context, module);

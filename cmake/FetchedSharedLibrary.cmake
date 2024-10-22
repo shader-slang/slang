@@ -1,3 +1,36 @@
+# Helper function to download and extract an archive
+function(download_and_extract archive_name url)
+    get_filename_component(extension ${url} EXT)
+    set(archive_path "${CMAKE_CURRENT_BINARY_DIR}/${archive_name}${extension}")
+    set(extract_dir "${CMAKE_CURRENT_BINARY_DIR}/${archive_name}")
+
+    if(EXISTS ${url})
+        message(STATUS "Using local file for ${archive_name}: ${url}")
+        set(archive_path ${url})
+    else()
+        message(STATUS "Fetching ${archive_name} from ${url}")
+        file(DOWNLOAD ${url} ${archive_path}
+             # SHOW_PROGRESS
+             STATUS status
+        )
+
+        list(GET status 0 status_code)
+        list(GET status 1 status_string)
+        if(NOT status_code EQUAL 0)
+            message(WARNING "Failed to download ${archive_name} from ${url}: ${status_string}")
+            return()
+        endif()
+    endif()
+
+    file(ARCHIVE_EXTRACT
+         INPUT ${archive_path}
+         DESTINATION ${extract_dir}
+    )
+
+    set(${archive_name}_SOURCE_DIR ${extract_dir} PARENT_SCOPE)
+    message(STATUS "${archive_name} downloaded and extracted to ${extract_dir}")
+endfunction()
+
 # Add rules to copy & install shared library of name 'library_name' in the 'module_subdir' directory.
 # If 'url' is a directory, the shared library (with platform-specific shared library prefixes and suffixes) will be
 # taken from the directory, and whatever is found there will be used to produce the install rule.
@@ -6,6 +39,13 @@
 # Otherwise, the 'url' is interpreted as an URL, and the content of the URL will be fetched, extracted and searched
 # for the shared library to produce the install rule.
 function(copy_fetched_shared_library library_name url)
+    cmake_parse_arguments(ARG "IGNORE_FAILURE" "" "" ${ARGN})
+    if(ARG_IGNORE_FAILURE)
+        set(error_type STATUS)
+    else()
+        set(error_type SEND_ERROR)
+    endif()
+
     set(shared_library_filename
         "${CMAKE_SHARED_LIBRARY_PREFIX}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
     )
@@ -18,12 +58,12 @@ function(copy_fetched_shared_library library_name url)
         list(LENGTH source_object nmatches)
         if(nmatches EQUAL 0)
             message(
-                SEND_ERROR
+                ${error_type}
                 "Unable to find ${shared_library_filename} in ${url}"
             )
         elseif(nmatches GREATER 1)
             message(
-                SEND_ERROR
+                ${error_type}
                 "Found multiple files named ${shared_library_filename} in ${url}"
             )
         endif()
@@ -42,9 +82,21 @@ function(copy_fetched_shared_library library_name url)
         set(source_object "${url}")
     else()
         # Otherwise, download and extract from whatever URL we have
-        fetchcontent_declare(${library_name} URL "${url}")
-        fetchcontent_populate(${library_name})
-        from_glob(${${library_name}_SOURCE_DIR})
+        download_and_extract("${library_name}" "${url}")
+        if(DEFINED ${library_name}_SOURCE_DIR)
+            from_glob(${${library_name}_SOURCE_DIR})
+        elseif(ARG_IGNORE_FAILURE)
+            return()
+        else()
+            message(SEND_ERROR "Unable to download and extract ${library_name} from ${url}")
+            return()
+        endif()
+    endif()
+
+    # We didn't find it, just return and don't create a target and operation
+    # which will fail
+    if(NOT EXISTS ${source_object} AND ARG_IGNORE_FAILURE)
+        return()
     endif()
 
     set(dest_object
@@ -72,12 +124,14 @@ function(copy_fetched_shared_library library_name url)
 endfunction()
 
 function(install_fetched_shared_library library_name url)
-    copy_fetched_shared_library(${library_name} ${url})
+    copy_fetched_shared_library(${library_name} ${url} ${ARGN})
     set(shared_library_filename
         "${CMAKE_SHARED_LIBRARY_PREFIX}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
     )
     set(dest_object
         ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${shared_library_filename}
     )
-    install(PROGRAMS ${dest_object} DESTINATION ${module_subdir})
+    if(TARGET ${library_name})
+        install(PROGRAMS ${dest_object} DESTINATION ${module_subdir})
+    endif()
 endfunction()
