@@ -7077,11 +7077,15 @@ ${{{{
 const char* diffDimensions[2] = {"x", "y"};
 for (auto xOrY : diffDimensions) {
 }}}}
+/// Take the partial derivative of `p` with respect to $(xOrY) in screen space.
+/// @param p The value to take partial derivative for.
+/// @return The partial derivative of `p`.
+/// @remarks For SPIR-V, this function maps to `OpDPd$(xOrY)`.
 /// @category derivative Derivative functions
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
-T dd$(xOrY)(T x)
+T dd$(xOrY)(T p)
 {
     __requireComputeDerivative();
     __target_switch
@@ -7095,7 +7099,7 @@ T dd$(xOrY)(T x)
     case metal:
         __intrinsic_asm "dfd$(xOrY)";
     case spirv:
-        return spirv_asm {OpDPd$(xOrY) $$T result $x};
+        return spirv_asm {OpDPd$(xOrY) $$T result $p};
     case wgsl:
         __intrinsic_asm "dpd$(xOrY)";
     }
@@ -7104,7 +7108,7 @@ T dd$(xOrY)(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
-vector<T, N> dd$(xOrY)(vector<T, N> x)
+vector<T, N> dd$(xOrY)(vector<T, N> p)
 {
     __requireComputeDerivative();
     __target_switch
@@ -7118,7 +7122,7 @@ vector<T, N> dd$(xOrY)(vector<T, N> x)
     case metal:
         __intrinsic_asm "dfd$(xOrY)";
     case spirv:
-        return spirv_asm {OpDPd$(xOrY) $$vector<T, N> result $x};
+        return spirv_asm {OpDPd$(xOrY) $$vector<T, N> result $p};
     case wgsl:
         __intrinsic_asm "dpd$(xOrY)";
     }
@@ -7127,31 +7131,35 @@ vector<T, N> dd$(xOrY)(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
-matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> x)
+matrix<T, N, M> dd$(xOrY)(matrix<T, N, M> p)
 {
-    __requireComputeDerivative();    
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "dd$(xOrY)";
     default:
-        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY), x);
+        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY), p);
     }
 }
 
+/// Take the coarse partial derivative of `p` with respect to $(xOrY) in screen space.
+/// @param p The value to take partial derivative for.
+/// @return The partial derivative of `p`.
+/// @remarks For SPIR-V, this function maps to `OpDPd$(xOrY)Coarse`.
 /// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
-T dd$(xOrY)_coarse(T x)
+T dd$(xOrY)_coarse(T p)
 {
     __requireComputeDerivative();
     __target_switch
     {
     case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
     case glsl: __intrinsic_asm "dFd$(xOrY)Coarse";
-    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Coarse $x};
+    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Coarse $p};
     }
 }
 
@@ -7159,45 +7167,49 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
-vector<T, N> dd$(xOrY)_coarse(vector<T, N> x)
+vector<T, N> dd$(xOrY)_coarse(vector<T, N> p)
 {
     __requireComputeDerivative();
     __target_switch
     {
     case hlsl: __intrinsic_asm "dd$(xOrY)_coarse";
     case glsl: __intrinsic_asm "dFd$(xOrY)Coarse";
-    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Coarse $x};
+    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Coarse $p};
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
-matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> x)
+matrix<T, N, M> dd$(xOrY)_coarse(matrix<T, N, M> p)
 {
-    __requireComputeDerivative();    
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "dd$(xOrY)_coarse";
     default:
-        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_coarse, x);
+        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_coarse, p);
     }
 }
 
+/// Take the fine partial derivative of `p` with respect to $(xOrY) in screen space.
+/// @param p The value to take partial derivative for.
+/// @return The partial derivative of `p`.
+/// @remarks For SPIR-V, this function maps to `OpDPd$(xOrY)Fine`.
 /// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
-T dd$(xOrY)_fine(T x)
+T dd$(xOrY)_fine(T p)
 {
     __requireComputeDerivative();
     __target_switch
     {
     case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
     case glsl: __intrinsic_asm "dFd$(xOrY)Fine";
-    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Fine $x};
+    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$T = OpDPd$(xOrY)Fine $p};
     }
 }
 
@@ -7205,29 +7217,29 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 __glsl_extension(GL_ARB_derivative_control)
 [__readNone]
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
-vector<T, N> dd$(xOrY)_fine(vector<T, N> x)
+vector<T, N> dd$(xOrY)_fine(vector<T, N> p)
 {
     __requireComputeDerivative();
     __target_switch
     {
     case hlsl: __intrinsic_asm "dd$(xOrY)_fine";
     case glsl: __intrinsic_asm "dFd$(xOrY)Fine";
-    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Fine $x};
+    case spirv: return spirv_asm {OpCapability DerivativeControl; result:$$vector<T,N> = OpDPd$(xOrY)Fine $p};
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
-matrix<T, N, M> dd$(xOrY)_fine(matrix<T, N, M> x)
+matrix<T, N, M> dd$(xOrY)_fine(matrix<T, N, M> p)
 {
-    __requireComputeDerivative();    
+    __requireComputeDerivative();
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "dd$(xOrY)_fine";
     default:
-        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_fine, x);
+        MATRIX_MAP_UNARY(T, N, M, dd$(xOrY)_fine, p);
     }
 }
 
@@ -8558,11 +8570,15 @@ matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 }
 
 /// Texture filter width.
+/// Calculates the sum abs(ddx(`p`)) + abs(ddy(`p`)).
+/// @param p The value to sum x and y partial derivative magnitudes for.
+/// @return The sum of abs(ddx(`p`)) and abs(ddy(`p`)).
+/// @remarks For SPIR-V, this function maps to `OpFwidth`.
 /// @category derivative
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
-T fwidth(T x)
+T fwidth(T p)
 {
     __requireComputeDerivative();
     __target_switch
@@ -8576,7 +8592,7 @@ T fwidth(T x)
     case spirv:
         return spirv_asm
         {
-            OpFwidth $$T result $x;
+            OpFwidth $$T result $p;
         };
     case wgsl:
         __intrinsic_asm "fwidth($0)";

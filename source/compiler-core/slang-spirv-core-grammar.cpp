@@ -60,6 +60,7 @@ struct Enumerant
     UnownedStringSlice enumerant;
     JSONValue value;
     List<UnownedStringSlice> capabilities;
+    List<UnownedStringSlice> aliases;
     // List<Operand> parameters;
     // UnownedStringSlice version;
     // UnownedStringSlice lastVersion;
@@ -70,6 +71,7 @@ SLANG_MAKE_STRUCT_RTTI_INFO(
     SLANG_RTTI_FIELD(enumerant),
     SLANG_RTTI_FIELD(value),
     SLANG_OPTIONAL_RTTI_FIELD(capabilities),
+    SLANG_OPTIONAL_RTTI_FIELD(aliases),
     // SLANG_OPTIONAL_RTTI_FIELD(parameters),
     // SLANG_OPTIONAL_RTTI_FIELD(version),
     // SLANG_OPTIONAL_RTTI_FIELD(lastVersion),
@@ -152,6 +154,11 @@ static Dictionary<UnownedStringSlice, SpvWord> operandKindToDict(
                 );
         }
         dict.add(e.enumerant, valueInt);
+
+        for (auto alias : e.aliases)
+        {
+            dict.add(alias, valueInt);
+        }
     }
     return dict;
 }
