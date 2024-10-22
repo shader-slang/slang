@@ -2281,6 +2281,8 @@ namespace Slang
             Expr*               funcExpr,
             List<Type*>         argTypes,
             DiagnosticSink*     sink);
+        
+        bool isSpecialized(DeclRef<Decl> declRef);
 
         DiagnosticSink::Flags diagnosticSinkFlags = 0;
 

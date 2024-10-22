@@ -1369,14 +1369,53 @@ DeclRef<GenericDecl> getGenericParentDeclRef(
     // Create substituted parent decl ref.
     auto decl = declRef.getDecl();
 
-    while (!as<GenericDecl>(decl))
+    while (decl && !as<GenericDecl>(decl))
     {
         decl = decl->parentDecl;
+    }
+
+    if (!decl)
+    {
+        // No generic parent
+        return DeclRef<GenericDecl>();
     }
 
     auto genericDecl = as<GenericDecl>(decl);
     auto genericDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, DeclRef(genericDecl)).as<GenericDecl>();
     return substituteDeclRef(SubstitutionSet(declRef), astBuilder, genericDeclRef).as<GenericDecl>();
+}
+
+bool Linkage::isSpecialized(DeclRef<Decl> declRef)
+{
+    // For now, we only support two 'states': fully applied or not at all.
+    // If we add support for partial specialization, we will need to update this logic.
+    // 
+    // If it's not specialized, then declRef will be the one with default substitutions.
+    //
+    SemanticsVisitor visitor(getSemanticsForReflection());
+
+    auto decl = declRef.getDecl();
+    while (decl && !as<GenericDecl>(decl))
+    {
+        decl = decl->parentDecl;
+    }
+
+    if(!decl)
+        return true; // no generics => always specialized
+    
+    auto defaultArgs = getDefaultSubstitutionArgs(getASTBuilder(), &visitor, as<GenericDecl>(decl));
+    auto currentArgs = SubstitutionSet(declRef).findGenericAppDeclRef(as<GenericDecl>(decl))->getArgs();
+    
+    if (defaultArgs.getCount() != currentArgs.getCount()) // should really never happen.
+        return true;
+
+    for (Index i = 0; i < defaultArgs.getCount(); ++i)
+    {
+        if (defaultArgs[i] != currentArgs[i])
+            return true;
+    }
+
+    return false;
 }
 
 DeclRef<Decl> Linkage::specializeWithArgTypes(
@@ -1387,16 +1426,22 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     SemanticsVisitor visitor(getSemanticsForReflection());
     visitor = visitor.withSink(sink);
 
-    ASTBuilder* astBuilder = getASTBuilder();
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
     
     if (auto declRefFuncExpr = as<DeclRefExpr>(funcExpr))
     {
-        auto genericDeclRefExpr = astBuilder->create<DeclRefExpr>();
-        genericDeclRefExpr->declRef = getGenericParentDeclRef(
-            getASTBuilder(),
-            &visitor,
-            declRefFuncExpr->declRef);
-        funcExpr = genericDeclRefExpr;
+        if (!isSpecialized(declRefFuncExpr->declRef))
+        {
+            if (auto genericDeclRef = getGenericParentDeclRef(
+                getCurrentASTBuilder(),
+                &visitor,
+                declRefFuncExpr->declRef))
+            {
+                auto genericDeclRefExpr = getCurrentASTBuilder()->create<DeclRefExpr>();
+                genericDeclRefExpr->declRef = genericDeclRef;
+                funcExpr = genericDeclRefExpr;
+            }
+        }
     }
 
     List<Expr*> argExprs;
@@ -1407,17 +1452,18 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
         // Create an 'empty' expr with the given type. Ideally, the expression itself should not matter
         // only its checked type.
         //
-        auto argExpr = astBuilder->create<VarExpr>();
+        auto argExpr = getCurrentASTBuilder()->create<VarExpr>();
         argExpr->type = argType;
         argExprs.add(argExpr);
     }
 
     // Construct invoke expr.
-    auto invokeExpr = astBuilder->create<InvokeExpr>();
+    auto invokeExpr = getCurrentASTBuilder()->create<InvokeExpr>();
     invokeExpr->functionExpr = funcExpr;
     invokeExpr->arguments = argExprs;
 
     auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
+
     return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
 }
 

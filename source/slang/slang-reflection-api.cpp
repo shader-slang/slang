@@ -3194,7 +3194,12 @@ SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
     try 
     {
         DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-        return convert(linkage->specializeWithArgTypes(funcExpr, argTypeList, &sink).as<FunctionDeclBase>());
+        auto resultFunc = linkage->specializeWithArgTypes(funcExpr, argTypeList, &sink).as<FunctionDeclBase>();
+
+        if (sink.getErrorCount() != 0)
+            return nullptr; // Failed coercion.
+
+        return convert(resultFunc);
     }
     catch (...)
     {
