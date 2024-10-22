@@ -300,6 +300,8 @@ bool isPtrUsed(IRInst* ptrInst)
     {
         if (as<IRLoad>(use->getUser()))
             return true;
+        else if (as<IRCall>(use->getUser())) // TODO: narrow this case to 'inout' parameters only.
+            return true;
         else if (as<IRPtrTypeBase>(use->getUser()->getDataType()) &&
             isPtrUsed(use->getUser()))
             return true;
