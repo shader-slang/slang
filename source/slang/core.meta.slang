@@ -113,7 +113,12 @@ interface IComparable
 /// Implemented by all builtin integer and floating point types.
 interface IRangedValue
 {
+    /// The maximum value that an instance of the type can hold.
+    /// This is a constant value specific to the type.
     static const This maxValue;
+
+    /// The minimum value that an instance of the type can hold.
+    /// This is a constant value specific to the type.
     static const This minValue;
 }
 
@@ -123,11 +128,33 @@ attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 /// Represents types that provide arithmetic operations.
 interface IArithmetic : IComparable
 {
+    /// Adds two values of the conforming type.
+    /// @param other The value to add to `this`.
+    /// @return The sum of `this` and `other`.
     This add(This other);
+
+    /// Subtracts one value of the conforming type from another.
+    /// @param other The value to subtract from `this`.
+    /// @return The difference of `this` and `other`.
     This sub(This other);
+
+    /// Multiplies two values of the conforming type.
+    /// @param other The value to multiply with `this`.
+    /// @return The product of `this` and `other`.
     This mul(This other);
+
+    /// Divides one value of the conforming type by another.
+    /// @param other The value by which to divide `this`.
+    /// @return The quotient of `this` divided by `other`.
     This div(This other);
+
+    /// Computes the remainder of division of one value of the conforming type by another.
+    /// @param other The divisor used to divide `this`.
+    /// @return The remainder of `this` divided by `other`.
     This mod(This other);
+
+    /// Negates a value of the conforming type.
+    /// @return The negation of `this`.
     This neg();
 
     __init(int val);
@@ -139,30 +166,39 @@ interface IArithmetic : IComparable
 /// Represents types that provide logical operations.
 interface ILogical : IComparable
 {
+    /// Shifts the bits of this value to the left by the specified number of positions.
     __builtin_requirement($( (int)BuiltinRequirementKind::Shl) )
     This shl(int value);
 
+    /// Shifts the bits of this value to the right by the specified number of positions.
     __builtin_requirement($( (int)BuiltinRequirementKind::Shr) )
     This shr(int value);
 
+    /// Performs a bitwise AND operation on this value with another value of the same type.
     __builtin_requirement($( (int)BuiltinRequirementKind::BitAnd) )
     This bitAnd(This other);
 
+    /// Performs a bitwise OR operation on this value with another value of the same type.
     __builtin_requirement($( (int)BuiltinRequirementKind::BitOr) )
     This bitOr(This other);
 
+    /// Performs a bitwise XOR operation on this value with another value of the same type.
     __builtin_requirement($( (int)BuiltinRequirementKind::BitXor) )
     This bitXor(This other);
 
+    /// Performs a bitwise NOT operation on this value, flipping all bits.
     __builtin_requirement($( (int)BuiltinRequirementKind::BitNot) )
     This bitNot();
 
+    /// Performs a logical AND operation on this value with another value of the same type.
     __builtin_requirement($( (int)BuiltinRequirementKind::And) )
     This and(This other);
 
+    /// Performs a logical OR operation on this value with another value of the same type.
     __builtin_requirement($( (int)BuiltinRequirementKind::Or) )
     This or(This other);
 
+    /// Performs a logical NOT operation on this value, returning the logical negation.
     __builtin_requirement($( (int)BuiltinRequirementKind::Not) )
     This not();
 
@@ -203,10 +239,22 @@ interface ILogical : IComparable
 ///
 interface IInteger : IArithmetic, ILogical
 {
+    /// Converts the value of the current instance to an `int`.
+    /// @return The converted `int` value.
     int toInt();
+
+    /// Converts the value of the current instance to an `int64_t`.
+    /// @return The converted `int64_t` value.
     int64_t toInt64();
+
+    /// Converts the value of the current instance to an `uint`.
+    /// @return The converted `uint` value.
     uint toUInt();
+
+    /// Converts the value of the current instance to an `uint64_t`.
+    /// @return The converted `uint64_t` value.
     uint64_t toUInt64();
+
     __init(int val);
     __init(int64_t val);
 }
@@ -384,17 +432,23 @@ interface IDifferentiable
     __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialType) )
     associatedtype Differential : IDifferentiable;
 
+    /// Returns a zero-initialized value of the differential type.
     __builtin_requirement($( (int)BuiltinRequirementKind::DZeroFunc) )
     static Differential dzero();
 
+    /// Adds two differential values and returns the result.
     __builtin_requirement($( (int)BuiltinRequirementKind::DAddFunc) )
     static Differential dadd(Differential, Differential);
 
+    /// Multiplies a scalar value of a built-in real type with a differential value and returns the result.
     __builtin_requirement($( (int)BuiltinRequirementKind::DMulFunc) )
     __generic<T : __BuiltinRealType>
     static Differential dmul(T, Differential);
 };
 
+/// Represents a type that supports differentiation operations for pointer types.
+/// This interface is used to define operations that are specific to pointer types
+/// in the context of automatic differentiation.
 __magic_type(DifferentiablePtrType)
 interface IDifferentiablePtrType
 {
@@ -578,7 +632,7 @@ interface IArray<T>
     /// Returns the number of elements in the conforming type.
     int getCount();
 
-    /// The subscript operator to be provided by a conforming type. Provides both a `get` accessor.
+    /// The subscript operator to be provided by a conforming type.
     __subscript(int index) -> T
     {
         get;
@@ -1258,26 +1312,41 @@ extension Tuple<T> : IComparable
     }
 }
 
+/// Represents an interface for a mutating function that can take multiple parameters.
+/// The function allows to modify the state of the object it belongs to.
 interface IMutatingFunc<TR, each TP>
 {
+    /// Defines a mutating function that takes multiple parameters and returns a result of type `TR`.
+    /// This function can modify the state of the object it is called on.
     [mutating]
     TR operator()(expand each TP p);
 }
 
+/// Represents an interface for a function that can take multiple parameters.
+/// This interface inherits from `IMutatingFunc` but is used for non-mutating functions.
 interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
 {
+    /// Defines a non-mutating function that takes multiple parameters and returns a result of type `TR`.
     TR operator()(expand each TP p);
 }
 
+/// Represents an interface for a mutating function that can take multiple differentiable parameters.
+/// The function allows to modify the state of the object it belongs to and supports differentiation.
 interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
 {
+    /// Defines a mutating function that takes multiple differentiable parameters and returns a differentiable result of type `TR`.
+    /// This function can modify the state of the object it is called on and supports automatic differentiation.
     [Differentiable]
     [mutating]
     TR operator()(expand each TP p);
 }
 
+/// Represents an interface for a function that can take multiple differentiable parameters and supports differentiation.
+/// This interface inherits from both `IFunc` and `IDifferentiableMutatingFunc` but is used for non-mutating differentiable functions.
 interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
 {
+    /// Defines a non-mutating function that takes multiple differentiable parameters and returns a differentiable result of type `TR`.
+    /// This function supports automatic differentiation.
     [Differentiable]
     TR operator()(expand each TP p);
 }
