@@ -38,7 +38,7 @@ namespace Slang
             builder.addNameHintDecoration(info.texture, toSlice("texture"));
             info.type = structType;
 
-            bool isMutable = getIntVal(textureType->getAccessInst()) == kStdlibResourceAccessReadOnly ? false : true;
+            bool isMutable = getIntVal(textureType->getAccessInst()) == kCoreModule_ResourceAccessReadOnly ? false : true;
 
             info.textureType = builder.getTextureType(textureType->getElementType(),
                 textureType->getShapeInst(),

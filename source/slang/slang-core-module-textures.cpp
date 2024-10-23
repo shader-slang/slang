@@ -100,7 +100,7 @@ void TextureTypeInfo::writeFuncBody(
         if (spirvDefault.getLength() && spirvCombined.getLength())
         {
             sb << i << "case spirv:\n";
-            sb << i << "if (access == " << kStdlibResourceAccessReadWrite << ")\n";
+            sb << i << "if (access == " << kCoreModule_ResourceAccessReadWrite << ")\n";
             sb << i << "return spirv_asm\n";
             {
                 BraceScope spirvRWScope{ i, sb, ";\n" };
@@ -365,7 +365,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                             glsl << ", ($" << aa++ << " = textureQueryLevels($0))";
                         }
                     };
-                glsl << "if (access == " << kStdlibResourceAccessReadOnly << ") __intrinsic_asm \"";
+                glsl << "if (access == " << kCoreModule_ResourceAccessReadOnly << ") __intrinsic_asm \"";
                 emitIntrinsic(toSlice("textureSize"), !isMultisample);
                 glsl << "\";\n";
                 glsl << "__intrinsic_asm \"";
