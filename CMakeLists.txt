@@ -246,11 +246,6 @@ file(REMOVE external/miniz/miniz_export.h)
 
 find_package(Threads REQUIRED)
 
-if(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
-    find_package(LLVM 13.0 REQUIRED CONFIG)
-    find_package(Clang REQUIRED CONFIG)
-endif()
-
 if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     find_package(unordered_dense CONFIG QUIET)
 endif()

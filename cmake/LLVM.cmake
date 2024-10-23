@@ -50,6 +50,9 @@ function(fetch_or_build_slang_llvm)
             endif()
         endif()
     elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
+        find_package(LLVM 13.0 REQUIRED CONFIG)
+        find_package(Clang REQUIRED CONFIG)
+
         llvm_target_from_components(llvm-dep filecheck native orcjit)
         clang_target_from_libs(
             clang-dep
