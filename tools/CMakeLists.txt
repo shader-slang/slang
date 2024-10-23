@@ -1,3 +1,70 @@
+#
+# Tools used to generate source during the build:
+#
+
+add_custom_target(
+    all-generators
+    COMMENT "meta target which depends on all generators"
+)
+set_target_properties(all-generators PROPERTIES FOLDER generators)
+
+if(CMAKE_HOST_WIN32)
+  set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
+else()
+  set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
+endif()
+function(generator dir)
+    if(SLANG_GENERATORS_PATH)
+        cmake_parse_arguments(ARG "" "TARGET_NAME" "" ${ARGN})
+        if(ARG_TARGET_NAME)
+            set(target ${ARG_TARGET_NAME})
+        else()
+            get_filename_component(target ${dir} NAME)
+        endif()
+        add_executable(${target} IMPORTED)
+        set_property(
+            TARGET ${target}
+            PROPERTY
+                IMPORTED_LOCATION
+                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_HOST_EXECUTABLE_SUFFIX}"
+        )
+    else()
+        slang_add_target(
+            ${dir}
+            EXECUTABLE
+            EXCLUDE_FROM_ALL
+            USE_FEWER_WARNINGS
+            LINK_WITH_PRIVATE core
+            OUTPUT_DIR generators
+            REQUIRED_BY all-generators
+            FOLDER generators
+            INSTALL_COMPONENT generators
+            ${ARGN}
+        )
+    endif()
+endfunction()
+
+generator(slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
+generator(slang-embed)
+generator(slang-generate USE_FEWER_WARNINGS)
+generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
+generator(slang-capability-generator LINK_WITH_PRIVATE compiler-core)
+generator(slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
+generator(
+    ${slang_SOURCE_DIR}/source/slangc
+    TARGET_NAME slang-bootstrap
+    USE_FEWER_WARNINGS
+    LINK_WITH_PRIVATE 
+        prelude 
+        slang-without-embedded-stdlib 
+        slang-capability-lookup 
+        slang-lookup-tables 
+        Threads::Threads
+)
+
+#
+# Language Server
+#
 if(SLANG_ENABLE_SLANGD)
     slang_add_target(
         slangd

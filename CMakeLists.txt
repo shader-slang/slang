@@ -257,124 +257,10 @@ endif()
 
 add_subdirectory(external)
 
-set(SLANG_CORE_LIBRARIES "")
-list(APPEND SLANG_CORE_LIBRARIES miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS})
-
-#
-# Our targets
-#
-
-slang_add_target(
-    source/core
-    STATIC
-    EXCLUDE_FROM_ALL
-    USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE ${SLANG_CORE_LIBRARIES}
-    LINK_WITH_PUBLIC unordered_dense::unordered_dense
-    INCLUDE_DIRECTORIES_PUBLIC source include
-)
-
-if(SLANG_ENABLE_SLANGRT)
-    slang_add_target(
-        source/slang-rt
-        SHARED
-        # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
-        EXTRA_SOURCE_DIRS source/core
-        USE_EXTRA_WARNINGS
-        LINK_WITH_PRIVATE ${SLANG_CORE_LIBRARIES}
-        LINK_WITH_PUBLIC unordered_dense::unordered_dense
-        EXPORT_MACRO_PREFIX SLANG_RT
-        INCLUDE_DIRECTORIES_PUBLIC include
-        INSTALL
-    )
-endif()
-
-slang_add_target(
-    source/compiler-core
-    STATIC
-    EXCLUDE_FROM_ALL
-    USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE core
-    INCLUDE_FROM_PUBLIC SPIRV-Headers
-)
-if(NOT MSVC)
-    # This is necessary to compile the DXC headers
-    set_source_files_properties(
-        source/compiler-core/slang-dxc-compiler.cpp
-        PROPERTIES COMPILE_OPTIONS "-fms-extensions"
-        DIRECTORY ${slang_SOURCE_DIR}
-    )
-endif()
-
-#
-# Tools used to generate source during the build:
-#
-
-add_custom_target(
-    all-generators
-    COMMENT "meta target which depends on all generators"
-)
-
-if(CMAKE_HOST_WIN32)
-  set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
-else()
-  set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
-endif()
-
-set_target_properties(all-generators PROPERTIES FOLDER generators)
-function(generator dir)
-    if(SLANG_GENERATORS_PATH)
-        cmake_parse_arguments(ARG "" "TARGET_NAME" "" ${ARGN})
-        if(ARG_TARGET_NAME)
-            set(target ${ARG_TARGET_NAME})
-        else()
-            get_filename_component(target ${dir} NAME)
-        endif()
-        add_executable(${target} IMPORTED)
-        set_property(
-            TARGET ${target}
-            PROPERTY
-                IMPORTED_LOCATION
-                    "${SLANG_GENERATORS_PATH}/${target}${CMAKE_HOST_EXECUTABLE_SUFFIX}"
-        )
-    else()
-        slang_add_target(
-            ${dir}
-            EXECUTABLE
-            EXCLUDE_FROM_ALL
-            USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE core
-            OUTPUT_DIR generators
-            REQUIRED_BY all-generators
-            FOLDER generators
-            INSTALL_COMPONENT generators
-            ${ARGN}
-        )
-    endif()
-endfunction()
-
-generator(tools/slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
-generator(tools/slang-embed)
-generator(tools/slang-generate USE_FEWER_WARNINGS)
-generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
-generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
-generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
-generator(
-    source/slangc
-    TARGET_NAME slang-bootstrap
-    USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE 
-        prelude 
-        slang-without-embedded-stdlib 
-        slang-capability-lookup 
-        slang-lookup-tables 
-        Threads::Threads
-)
-
 # webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
 # trees are too large and onerous for us to depend on.
 if(SLANG_WEBGPU_DAWN_BINARY_URL)
-  copy_fetched_shared_library("webgpu_dawn" "${SLANG_WEBGPU_DAWN_BINARY_URL}")
+    copy_fetched_shared_library("webgpu_dawn" "${SLANG_WEBGPU_DAWN_BINARY_URL}")
 endif()
 
 # slang-tint is only available as a fetched shared library, since it's hosted in the Dawn
@@ -384,19 +270,22 @@ if(SLANG_SLANG_TINT_BINARY_URL)
     copy_fetched_shared_library("slang-tint" "${SLANG_SLANG_TINT_BINARY_URL}")
 endif()
 
+fetch_or_build_slang_llvm()
 
 #
-# The compiler itself
+# Our targets
 #
-# keep these non-trivial targets in their own directories so as not to clutter
-# this file
+
+add_subdirectory(source/core)
+add_subdirectory(source/slang-rt)
+add_subdirectory(source/compiler-core)
+add_subdirectory(source/slang-wasm)
+add_subdirectory(source/slang-glslang)
+add_subdirectory(tools)
 add_subdirectory(prelude)
 add_subdirectory(source/slang-stdlib)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
-add_subdirectory(source/slang-wasm)
-add_subdirectory(source/slang-glslang)
-add_subdirectory(tools)
 add_subdirectory(examples)
 
 #
