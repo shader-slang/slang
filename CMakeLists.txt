@@ -224,22 +224,6 @@ if(SLANG_ENABLE_TESTS AND NOT SLANG_ENABLE_GFX)
 endif()
 
 #
-# Clean files from premake
-#
-# The premake builds places generated files in the source tree, make sure these
-# aren't present
-glob_append(
-    premake_generated_files
-    "source/slang/*.meta.slang.h"
-    "source/slang/*-generated-*.h"
-    "source/slang/slang-lookup-*.cpp"
-)
-if(premake_generated_files)
-    file(REMOVE ${premake_generated_files})
-endif()
-file(REMOVE external/miniz/miniz_export.h)
-
-#
 # Dependencies, most of these are however handled inside the "auto_option"
 # calls above
 #
