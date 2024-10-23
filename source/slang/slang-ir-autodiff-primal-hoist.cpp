@@ -2260,8 +2260,8 @@ static bool shouldStoreVar(IRVar* var)
             // of the var will be the same as the decision for the call.
             return shouldStoreInst(callUser);
         }
-        // Default behavior is to store if we can.
-        return true;
+        // Default behavior is to recompute stuff.
+        return false;
     }
     // If the var has never been written to, don't store it.
     return false;

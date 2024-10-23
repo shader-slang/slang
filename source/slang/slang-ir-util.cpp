@@ -1074,6 +1074,14 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
         }
         else
         {
+            // If our parameter is not a local variable or known value type, we can assume
+            // that we've hit a pointer-like local value. In some cases, we synthesize
+            // duplicate calls where we know that any side effects can be ignored. For such
+            // calls, we ignore the side effects of the call.
+            //
+            if (getResolvedInstForDecorations(call->getCallee())->findDecoration<IRIgnoreSideEffectsDecoration>())
+                continue;
+
             return false;
         }
     }
@@ -1092,6 +1100,9 @@ bool isPureFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
 
 bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
 {
+    //if (getResolvedInstForDecorations(call->getCallee())->findDecoration<IRIgnoreSideEffectsDecoration>())
+    //    return true;
+
     if (!doesCalleeHaveSideEffect(call->getCallee()))
     {
         return areCallArgumentsSideEffectFree(call, options);

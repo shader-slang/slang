@@ -450,6 +450,23 @@ bool trimMakeStructOperands(IRStructField* field)
     return changed;
 }
 
+bool isStructEmpty(IRType* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return false;
+    
+    UCount fieldCount = 0;
+    for (auto field : structType->getFields())
+    {
+        if (as<IRVoidType>(field->getFieldType()))
+            continue;
+        fieldCount++;
+    }
+
+    return fieldCount == 0;
+}
+
 bool trimOptimizableType(IRStructType* type)
 {
     bool changed = false;
@@ -459,7 +476,11 @@ bool trimOptimizableType(IRStructType* type)
         // We'll ignore void-type fields, since they're handled differently.
         if (as<IRVoidType>(field->getFieldType()))
             continue;
-
+        
+        // ... same for empty struct fields.
+        if(as<IRStructType>(field->getFieldType()) && isStructEmpty(field->getFieldType()))
+            continue;
+        
         if (!isFieldUsed(field))
             fieldsToRemove.add(field);
     }
@@ -468,6 +489,7 @@ bool trimOptimizableType(IRStructType* type)
     {
         changed |= removeStoresIntoField(field);
         changed |= trimMakeStructOperands(field);
+        field->removeFromParent();
     }
 
     for (auto field : fieldsToRemove)

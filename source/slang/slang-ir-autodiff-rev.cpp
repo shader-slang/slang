@@ -367,6 +367,7 @@ namespace Slang
             auto newName = this->getTranscribedFuncName(&builder, origFunc);
             builder.addNameHintDecoration(diffFunc, newName);
         }
+        addTranscribedFuncDecoration(builder, primalFunc, diffFunc);
 
         // Transfer checkpoint hint decorations
         copyCheckpointHints(&builder, origFunc, diffFunc);

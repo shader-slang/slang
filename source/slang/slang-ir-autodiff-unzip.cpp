@@ -378,6 +378,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     {
         auto primalName = String("s_primal_ctx_") + UnownedStringSlice(originalNameHint->getName());
         builder.addNameHintDecoration(primalFunc, builder.getStringValue(primalName.getUnownedSlice()));
+        builder.addDecoration(primalFunc, kIROp_IgnoreSideEffectsDecoration);
     }
 
     // Copy PrimalValueStructKey decorations from primal func.
