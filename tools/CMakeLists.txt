@@ -21,7 +21,7 @@ function(generator dir)
         else()
             get_filename_component(target ${dir} NAME)
         endif()
-        add_executable(${target} IMPORTED)
+        add_executable(${target} IMPORTED GLOBAL)
         set_property(
             TARGET ${target}
             PROPERTY
