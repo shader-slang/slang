@@ -75,6 +75,8 @@ namespace Slang
                 int funcIterationCount = 0;
                 while (funcChanged && funcIterationCount < kMaxFuncIterations)
                 {
+                    
+                    eliminateDeadCode(func, options.deadCodeElimOptions);
                     funcChanged = false;
                     funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                     funcChanged |= peepholeOptimize(target, func);
@@ -84,6 +86,8 @@ namespace Slang
                     // Note: we disregard the `changed` state from dead code elimination pass since
                     // SCCP pass could be generating temporarily evaluated constant values and never actually use them.
                     // DCE will always remove those nearly generated consts and always returns true here.
+                    // Run eliminate-dead-code twice to ensure optimizations are applied on the dce'd code.
+                    //
                     eliminateDeadCode(func, options.deadCodeElimOptions);
                     if (funcIterationCount == 0)
                         funcChanged |= constructSSA(func);
