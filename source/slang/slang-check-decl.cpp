@@ -7861,6 +7861,13 @@ namespace Slang
                 if (semantics)
                     semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
                 auto constraintDeclRef = astBuilder->getDirectDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl);
+                auto supType = getSup(astBuilder, constraintDeclRef);
+                if (!supType)
+                {
+                    args.add(astBuilder->getErrorType());
+                    shouldCache = false;
+                    continue;
+                }
                 auto witness =
                     astBuilder->getDeclaredSubtypeWitness(
                         getSub(astBuilder, constraintDeclRef),
