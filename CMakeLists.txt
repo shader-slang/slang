@@ -219,6 +219,10 @@ if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
     message(SEND_ERROR "SLANG_ENABLE_NVAPI is only supported on Windows")
 endif()
 
+if(SLANG_ENABLE_TESTS AND NOT SLANG_ENABLE_GFX)
+    message(SEND_ERROR "SLANG_ENABLE_TESTS requires SLANG_ENABLE_GFX")
+endif()
+
 #
 # Clean files from premake
 #
@@ -355,7 +359,6 @@ generator(tools/slang-generate USE_FEWER_WARNINGS)
 generator(tools/slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-capability-generator LINK_WITH_PRIVATE compiler-core)
 generator(tools/slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
-
 generator(
     source/slangc
     TARGET_NAME slang-bootstrap
@@ -452,6 +455,7 @@ endif()
 
 
 #
+# The compiler itself
 #
 # keep these non-trivial targets in their own directories so as not to clutter
 # this file
