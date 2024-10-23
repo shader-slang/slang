@@ -7,6 +7,8 @@ __intrinsic_op($(kIROp_RequireGLSLExtension))
 void __requireGLSLExtension(String extensionName);
 
 //@public:
+/// Represents an interface for buffer data layout.
+/// This interface is used as a base for defining specific data layouts for buffers.
 [sealed]
 interface IBufferDataLayout
 {
