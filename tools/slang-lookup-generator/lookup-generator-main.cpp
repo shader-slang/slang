@@ -38,6 +38,7 @@ static List<String> extractOpNames(UnownedStringSlice& error, const JSONValue& v
     // List<String> result = match(myJSONValue, "instructions", AsArray, "opname", AsString);
     const auto instKey = container.findKey(UnownedStringSlice("instructions"));
     const auto opnameKey = container.findKey(UnownedStringSlice("opname"));
+    const auto aliasesKey = container.findKey(UnownedStringSlice("aliases"));
     if (!instKey)
     {
         error = UnownedStringSlice("JSON parsing failed, no \"instructions\" key\n");
@@ -64,6 +65,18 @@ static List<String> extractOpNames(UnownedStringSlice& error, const JSONValue& v
             return {};
         }
         opnames.add(container.getString(opname));
+
+        if (aliasesKey)
+        {
+            auto aliases = container.findObjectValue(inst, aliasesKey);
+            if (aliases.isValid() && aliases.type == JSONValue::Type::Array)
+            {
+                for (auto& alias : container.getArray(aliases))
+                {
+                    opnames.add(container.getString(alias));
+                }
+            }
+        }
     }
 
     return opnames;
