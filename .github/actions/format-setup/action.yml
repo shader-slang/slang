@@ -16,6 +16,6 @@ runs:
         tmpdir=$(mktemp -d)
         curl -L -H "Authorization: token ${{github.token}}" \
           -o "$tmpdir/clang-format" \
-          https://github.com/shader-slang/slang-binaries/raw/4e88845ec51641b4c92e68027e359090bdb219e0/clang-format/x86_64-linux/bin/clang-format
+          https://github.com/shader-slang/slang-binaries/raw/306d22efc0f5f72c7230b0b6b7c99f03c46995bd/clang-format/x86_64-linux/bin/clang-format
         chmod +x "$tmpdir/clang-format"
         echo "$tmpdir" >> $GITHUB_PATH
