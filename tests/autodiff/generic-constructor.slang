@@ -19,6 +19,16 @@ struct Impl : IFoo
     {
         x = v.x;
     }
+
+    // We have to add this __init so that the following code can still work:
+    // Impl.Differential v0 = { (float)x };
+    // because when there is a explicit constructor defined, we will not fall back
+    // to legacy constructor. So this construction will fail.
+    [Differentiable]
+    __init(float v)
+    {
+        x = v;
+    }
 }
 
 [Differentiable]
