@@ -10,7 +10,7 @@ if(
 )
     message(
         NOTICE
-        "Setting embedded debug info for MSVC to work around (s)ccache's inability to cache shared debug info files, Note that this requires CMake 3.25 or greater"
+        "Setting embedded debug info for MSVC to work around (s)ccache's inability to cache shared debug info files"
     )
     cmake_minimum_required(VERSION 3.25)
     cmake_policy(GET CMP0141 cmp0141)
