@@ -1,8 +1,8 @@
 // d3d12-resource-views.h
 #pragma once
 
-#include "d3d12-base.h"
 #include "../d3d/d3d-util.h"
+#include "d3d12-base.h"
 #include "d3d12-buffer.h"
 
 namespace gfx
@@ -32,7 +32,8 @@ public:
         DeviceImpl* device,
         ResourceViewImpl* view,
         uint32_t bufferStride,
-        D3D12Descriptor& outDescriptor);
+        D3D12Descriptor& outDescriptor
+    );
 };
 
 SlangResult createD3D12BufferDescriptor(
@@ -42,11 +43,10 @@ SlangResult createD3D12BufferDescriptor(
     uint32_t bufferStride,
     DeviceImpl* device,
     D3D12GeneralExpandingDescriptorHeap* descriptorHeap,
-    D3D12Descriptor* outDescriptor);
+    D3D12Descriptor* outDescriptor
+);
 
-class ResourceViewImpl
-    : public ResourceViewBase
-    , public ResourceViewInternalImpl
+class ResourceViewImpl : public ResourceViewBase, public ResourceViewInternalImpl
 {
 public:
     Slang::RefPtr<Resource> m_resource;
@@ -57,9 +57,7 @@ public:
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
 
-class AccelerationStructureImpl
-    : public AccelerationStructureBase
-    , public ResourceViewInternalImpl
+class AccelerationStructureImpl : public AccelerationStructureBase, public ResourceViewInternalImpl
 {
 public:
     RefPtr<BufferResourceImpl> m_buffer;

@@ -1,8 +1,8 @@
 #include "slang-ir-propagate-func-properties.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 
 namespace Slang
@@ -19,15 +19,13 @@ static bool isResourceLoad(IROp op)
 {
     switch (op)
     {
-    case kIROp_ImageLoad:
-    case kIROp_StructuredBufferLoad:
-    case kIROp_ByteAddressBufferLoad:
-    case kIROp_StructuredBufferLoadStatus:
-    case kIROp_RWStructuredBufferLoad:
-    case kIROp_RWStructuredBufferLoadStatus:
-        return true;
-    default:
-        return false;
+        case kIROp_ImageLoad:
+        case kIROp_StructuredBufferLoad:
+        case kIROp_ByteAddressBufferLoad:
+        case kIROp_StructuredBufferLoadStatus:
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoadStatus: return true;
+        default:                                 return false;
     }
 }
 
@@ -35,19 +33,17 @@ static bool isKnownOpCodeWithSideEffect(IROp op)
 {
     switch (op)
     {
-    case kIROp_ifElse:
-    case kIROp_unconditionalBranch:
-    case kIROp_Switch:
-    case kIROp_Return:
-    case kIROp_loop:
-    case kIROp_Call:
-    case kIROp_Param:
-    case kIROp_Unreachable:
-    case kIROp_Store:
-    case kIROp_SwizzledStore:
-        return true;
-    default:
-        return false;
+        case kIROp_ifElse:
+        case kIROp_unconditionalBranch:
+        case kIROp_Switch:
+        case kIROp_Return:
+        case kIROp_loop:
+        case kIROp_Call:
+        case kIROp_Param:
+        case kIROp_Unreachable:
+        case kIROp_Store:
+        case kIROp_SwizzledStore:       return true;
+        default:                        return false;
     }
 }
 
@@ -61,8 +57,7 @@ public:
         {
             switch (decoration->getOp())
             {
-            case kIROp_ReadNoneDecoration:
-                return true;
+                case kIROp_ReadNoneDecoration: return true;
             }
         }
         return false;
@@ -74,9 +69,8 @@ public:
         {
             switch (decoration->getOp())
             {
-            case kIROp_ReadNoneDecoration:
-            case kIROp_TargetIntrinsicDecoration:
-                return false;
+                case kIROp_ReadNoneDecoration:
+                case kIROp_TargetIntrinsicDecoration: return false;
             }
         }
         return true;
@@ -94,9 +88,8 @@ public:
                 {
                     if (inst->mightHaveSideEffects() || isResourceLoad(inst->getOp()))
                     {
-                        // We have a inst that has side effect that is not understood by this method,
-                        // e.g. bufferStore, discard, etc.
-                        // or we are seeing a resource load.
+                        // We have a inst that has side effect that is not understood by this
+                        // method, e.g. bufferStore, discard, etc. or we are seeing a resource load.
                         // These operations are not movable or removable,
                         // and should not be treated as ReadNone.
                         hasReadNoneCall = true;
@@ -109,17 +102,17 @@ public:
                     auto callee = getResolvedInstForDecorations(call->getCallee());
                     switch (callee->getOp())
                     {
-                    default:
-                        // We are calling an unknown function, so we have to assume
-                        // there are side effects in the call.
-                        hasReadNoneCall = true;
-                        break;
-                    case kIROp_Func:
-                        if (!callee->findDecoration<IRReadNoneDecoration>())
-                        {
+                        default:
+                            // We are calling an unknown function, so we have to assume
+                            // there are side effects in the call.
                             hasReadNoneCall = true;
                             break;
-                        }
+                        case kIROp_Func:
+                            if (!callee->findDecoration<IRReadNoneDecoration>())
+                            {
+                                hasReadNoneCall = true;
+                                break;
+                            }
                     }
                 }
 
@@ -263,10 +256,9 @@ public:
         {
             switch (decoration->getOp())
             {
-            case kIROp_ReadNoneDecoration:
-            case kIROp_NoSideEffectDecoration:
-            case kIROp_TargetIntrinsicDecoration:
-                return false;
+                case kIROp_ReadNoneDecoration:
+                case kIROp_NoSideEffectDecoration:
+                case kIROp_TargetIntrinsicDecoration: return false;
             }
         }
         return true;
@@ -278,9 +270,8 @@ public:
         {
             switch (decoration->getOp())
             {
-            case kIROp_ReadNoneDecoration:
-            case kIROp_NoSideEffectDecoration:
-                return true;
+                case kIROp_ReadNoneDecoration:
+                case kIROp_NoSideEffectDecoration: return true;
             }
         }
         return false;
@@ -314,18 +305,18 @@ public:
                     auto callee = getResolvedInstForDecorations(call->getCallee());
                     switch (callee->getOp())
                     {
-                    default:
-                        // We are calling an unknown function, so we have to assume
-                        // there are side effects in the call.
-                        hasSideEffectCall = true;
-                        break;
-                    case kIROp_Func:
-                        if (!callee->findDecoration<IRReadNoneDecoration>() &&
-                            !callee->findDecoration<IRNoSideEffectDecoration>())
-                        {
+                        default:
+                            // We are calling an unknown function, so we have to assume
+                            // there are side effects in the call.
                             hasSideEffectCall = true;
                             break;
-                        }
+                        case kIROp_Func:
+                            if (!callee->findDecoration<IRReadNoneDecoration>() &&
+                                !callee->findDecoration<IRNoSideEffectDecoration>())
+                            {
+                                hasSideEffectCall = true;
+                                break;
+                            }
                     }
                 }
 
@@ -364,8 +355,8 @@ bool propagateFuncProperties(IRModule* module)
     bool changed = propagateFuncPropertiesImpl(module, &readNoneContext);
 
     NoSideEffectFuncPropertyPropagationContext noSideEffectContext;
-    changed|= propagateFuncPropertiesImpl(module, &noSideEffectContext);
+    changed |= propagateFuncPropertiesImpl(module, &noSideEffectContext);
 
     return changed;
 }
-}
+} // namespace Slang

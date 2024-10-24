@@ -2,9 +2,9 @@
 #ifndef SLANG_GLSLANG_H_INCLUDED
 #define SLANG_GLSLANG_H_INCLUDED
 
-#include <stddef.h>
-#include <memory>
 #include <cstring>
+#include <memory>
+#include <stddef.h>
 
 typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 
@@ -47,64 +47,32 @@ struct glslang_CompileRequest_1_0
 {
     void set(const glslang_CompileRequest_1_1& in);
 
-    char const*         sourcePath;
+    char const* sourcePath;
 
-    void const*         inputBegin;
-    void const*         inputEnd;
+    void const* inputBegin;
+    void const* inputEnd;
 
-    glslang_OutputFunc  diagnosticFunc;
-    void*               diagnosticUserData;
+    glslang_OutputFunc diagnosticFunc;
+    void* diagnosticUserData;
 
-    glslang_OutputFunc  outputFunc;
-    void*               outputUserData;
+    glslang_OutputFunc outputFunc;
+    void* outputUserData;
 
-    int                 slangStage;
+    int slangStage;
 
-    unsigned            action;
+    unsigned action;
 
-    unsigned            optimizationLevel;
-    unsigned            debugInfoType;   
+    unsigned optimizationLevel;
+    unsigned debugInfoType;
 };
 
 // 1.1 version
 struct glslang_CompileRequest_1_1
 {
-        /// Set from 1.0 
+    /// Set from 1.0
     void set(const glslang_CompileRequest_1_0& in);
 
-    size_t              sizeInBytes;            ///< Size in bytes of this structure
-
-    // START! Embed the glslang_CompileRequest_1_0 fields
-    char const*         sourcePath;
-
-    void const*         inputBegin;
-    void const*         inputEnd;
-
-    glslang_OutputFunc  diagnosticFunc;
-    void*               diagnosticUserData;
-
-    glslang_OutputFunc  outputFunc;
-    void*               outputUserData;
-
-    int                 slangStage;
-
-    unsigned            action;
-
-    unsigned            optimizationLevel;
-    unsigned            debugInfoType;
-    // END! Embed the glslang_CompileRequest_1_0 fields
-
-    const char*         spirvTargetName;            /// A valid TargetName. If null will use universal based on the spirVersion.
-    glsl_SPIRVVersion   spirvVersion;               ///< The SPIR-V version. If all are 0 will use the default which is 1.2 currently
-};
-
-// 1.2 version
-struct glslang_CompileRequest_1_2
-{
-    /// Set from 1.1 
-    void set(const glslang_CompileRequest_1_1& in);
-
-    size_t              sizeInBytes;            ///< Size in bytes of this structure
+    size_t sizeInBytes; ///< Size in bytes of this structure
 
     // START! Embed the glslang_CompileRequest_1_0 fields
     char const* sourcePath;
@@ -112,22 +80,58 @@ struct glslang_CompileRequest_1_2
     void const* inputBegin;
     void const* inputEnd;
 
-    glslang_OutputFunc  diagnosticFunc;
+    glslang_OutputFunc diagnosticFunc;
     void* diagnosticUserData;
 
-    glslang_OutputFunc  outputFunc;
+    glslang_OutputFunc outputFunc;
     void* outputUserData;
 
-    int                 slangStage;
+    int slangStage;
 
-    unsigned            action;
+    unsigned action;
 
-    unsigned            optimizationLevel;
-    unsigned            debugInfoType;
+    unsigned optimizationLevel;
+    unsigned debugInfoType;
     // END! Embed the glslang_CompileRequest_1_0 fields
 
-    const char* spirvTargetName;            /// A valid TargetName. If null will use universal based on the spirVersion.
-    glsl_SPIRVVersion   spirvVersion;               ///< The SPIR-V version. If all are 0 will use the default which is 1.2 currently
+    const char* spirvTargetName;    /// A valid TargetName. If null will use universal based on the
+                                    /// spirVersion.
+    glsl_SPIRVVersion spirvVersion; ///< The SPIR-V version. If all are 0 will use the default which
+                                    ///< is 1.2 currently
+};
+
+// 1.2 version
+struct glslang_CompileRequest_1_2
+{
+    /// Set from 1.1
+    void set(const glslang_CompileRequest_1_1& in);
+
+    size_t sizeInBytes; ///< Size in bytes of this structure
+
+    // START! Embed the glslang_CompileRequest_1_0 fields
+    char const* sourcePath;
+
+    void const* inputBegin;
+    void const* inputEnd;
+
+    glslang_OutputFunc diagnosticFunc;
+    void* diagnosticUserData;
+
+    glslang_OutputFunc outputFunc;
+    void* outputUserData;
+
+    int slangStage;
+
+    unsigned action;
+
+    unsigned optimizationLevel;
+    unsigned debugInfoType;
+    // END! Embed the glslang_CompileRequest_1_0 fields
+
+    const char* spirvTargetName;    /// A valid TargetName. If null will use universal based on the
+                                    /// spirVersion.
+    glsl_SPIRVVersion spirvVersion; ///< The SPIR-V version. If all are 0 will use the default which
+                                    ///< is 1.2 currently
 
     // glslang_CompileRequest_1_2 fields
     const char* entryPointName; // The name of the entrypoint that will appear in output spirv.

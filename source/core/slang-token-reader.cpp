@@ -1,63 +1,87 @@
 #include "slang-token-reader.h"
 
-namespace Slang {
-namespace Misc {
+namespace Slang
+{
+namespace Misc
+{
 
-    enum class TokenizeErrorType
-    {
-        InvalidCharacter, InvalidEscapeSequence
-    };
+enum class TokenizeErrorType
+{
+    InvalidCharacter,
+    InvalidEscapeSequence
+};
 
-    enum class State
-    {
-        Start, Identifier, Operator, Int, Hex, Fixed, Double, Char, String, MultiComment, SingleComment
-    };
+enum class State
+{
+    Start,
+    Identifier,
+    Operator,
+    Int,
+    Hex,
+    Fixed,
+    Double,
+    Char,
+    String,
+    MultiComment,
+    SingleComment
+};
 
-    enum class LexDerivative
-    {
-        None, Line, File
-    };
+enum class LexDerivative
+{
+    None,
+    Line,
+    File
+};
 
-    inline bool IsLetter(char ch)
-    {
-        return ((ch >= 'a' && ch <= 'z') ||
-            (ch >= 'A' && ch <= 'Z') || ch == '_');
-    }
+inline bool IsLetter(char ch)
+{
+    return ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_');
+}
 
-    inline bool IsDigit(char ch)
-    {
-        return ch >= '0' && ch <= '9';
-    }
+inline bool IsDigit(char ch)
+{
+    return ch >= '0' && ch <= '9';
+}
 
-    inline bool IsPunctuation(char ch)
-    {
-        return  ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%' ||
-            ch == '!' || ch == '^' || ch == '&' || ch == '(' || ch == ')' ||
-            ch == '=' || ch == '{' || ch == '}' || ch == '[' || ch == ']' ||
-            ch == '|' || ch == ';' || ch == ',' || ch == '.' || ch == '<' ||
-            ch == '>' || ch == '~' || ch == '@' || ch == ':' || ch == '?' || ch == '#';
-    }
+inline bool IsPunctuation(char ch)
+{
+    return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%' || ch == '!' ||
+           ch == '^' || ch == '&' || ch == '(' || ch == ')' || ch == '=' || ch == '{' ||
+           ch == '}' || ch == '[' || ch == ']' || ch == '|' || ch == ';' || ch == ',' ||
+           ch == '.' || ch == '<' || ch == '>' || ch == '~' || ch == '@' || ch == ':' ||
+           ch == '?' || ch == '#';
+}
 
-    inline bool IsWhiteSpace(char ch)
-    {
-        return (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v');
-    }
+inline bool IsWhiteSpace(char ch)
+{
+    return (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v');
+}
 
-    void ParseOperators(const String & str, List<Token> & tokens, TokenFlags& tokenFlags, int line, int col, int startPos, String fileName)
+void ParseOperators(
+    const String& str,
+    List<Token>& tokens,
+    TokenFlags& tokenFlags,
+    int line,
+    int col,
+    int startPos,
+    String fileName
+)
+{
+    Index pos = 0;
+    while (pos < str.getLength())
     {
-        Index pos = 0;
-        while (pos < str.getLength())
+        wchar_t curChar = str[pos];
+        wchar_t nextChar = (pos < str.getLength() - 1) ? str[pos + 1] : '\0';
+        wchar_t nextNextChar = (pos < str.getLength() - 2) ? str[pos + 2] : '\0';
+        auto InsertToken = [&](TokenType type, const String& ct)
         {
-            wchar_t curChar = str[pos];
-            wchar_t nextChar = (pos < str.getLength() - 1) ? str[pos + 1] : '\0';
-            wchar_t nextNextChar = (pos < str.getLength() - 2) ? str[pos + 2] : '\0';
-            auto InsertToken = [&](TokenType type, const String & ct)
-            {
-                tokens.add(Token(type, ct, line, int(col + pos), int(pos + startPos), fileName, tokenFlags));
-                tokenFlags = 0;
-            };
-            switch (curChar)
-            {
+            tokens.add(
+                Token(type, ct, line, int(col + pos), int(pos + startPos), fileName, tokenFlags)
+            );
+            tokenFlags = 0;
+        };
+        switch (curChar)
+        {
             case '+':
                 if (nextChar == '+')
                 {
@@ -318,72 +342,62 @@ namespace Misc {
                 InsertToken(TokenType::RParent, ")");
                 pos++;
                 break;
-            }
         }
     }
+}
 
-    List<Token> TokenizeText(const String & fileName, const String & text)
+List<Token> TokenizeText(const String& fileName, const String& text)
+{
+    Index lastPos = 0, pos = 0;
+    int line = 1, col = 0;
+    String file = fileName;
+    State state = State::Start;
+    StringBuilder tokenBuilder;
+    int tokenLine, tokenCol;
+    List<Token> tokenList;
+    LexDerivative derivative = LexDerivative::None;
+    TokenFlags tokenFlags = TokenFlag::AtStartOfLine;
+    auto InsertToken = [&](TokenType type)
     {
-        Index lastPos = 0, pos = 0;
-        int line = 1, col = 0;
-        String file = fileName;
-        State state = State::Start;
-        StringBuilder tokenBuilder;
-        int tokenLine, tokenCol;
-        List<Token> tokenList;
-        LexDerivative derivative = LexDerivative::None;
-        TokenFlags tokenFlags = TokenFlag::AtStartOfLine;
-        auto InsertToken = [&](TokenType type)
+        derivative = LexDerivative::None;
+        tokenList.add(
+            Token(type, tokenBuilder.toString(), tokenLine, tokenCol, int(pos), file, tokenFlags)
+        );
+        tokenFlags = 0;
+        tokenBuilder.clear();
+    };
+    auto ProcessTransferChar = [&](char nextChar)
+    {
+        switch (nextChar)
         {
-            derivative = LexDerivative::None;
-            tokenList.add(Token(type, tokenBuilder.toString(), tokenLine, tokenCol, int(pos), file, tokenFlags));
-            tokenFlags = 0;
-            tokenBuilder.clear();
-        };
-        auto ProcessTransferChar = [&](char nextChar)
-        {
-            switch (nextChar)
-            {
             case '\\':
             case '\"':
-            case '\'':
-                tokenBuilder.append(nextChar);
-                break;
-            case 't':
-                tokenBuilder.append('\t');
-                break;
-            case 's':
-                tokenBuilder.append(' ');
-                break;
-            case 'n':
-                tokenBuilder.append('\n');
-                break;
-            case 'r':
-                tokenBuilder.append('\r');
-                break;
-            case 'b':
-                tokenBuilder.append('\b');
-                break;
-            }
-        };
-        while (pos <= text.getLength())
+            case '\'': tokenBuilder.append(nextChar); break;
+            case 't':  tokenBuilder.append('\t'); break;
+            case 's':  tokenBuilder.append(' '); break;
+            case 'n':  tokenBuilder.append('\n'); break;
+            case 'r':  tokenBuilder.append('\r'); break;
+            case 'b':  tokenBuilder.append('\b'); break;
+        }
+    };
+    while (pos <= text.getLength())
+    {
+        char curChar = (pos < text.getLength() ? text[pos] : ' ');
+        char nextChar = (pos < text.getLength() - 1) ? text[pos + 1] : '\0';
+        if (lastPos != pos)
         {
-            char curChar = (pos < text.getLength() ? text[pos] : ' ');
-            char nextChar = (pos < text.getLength() - 1) ? text[pos + 1] : '\0';
-            if (lastPos != pos)
+            if (curChar == '\n')
             {
-                if (curChar == '\n')
-                {
-                    line++;
-                    col = 0;
-                }
-                else
-                    col++;
-                lastPos = pos;
+                line++;
+                col = 0;
             }
+            else
+                col++;
+            lastPos = pos;
+        }
 
-            switch (state)
-            {
+        switch (state)
+        {
             case State::Start:
                 if (IsLetter(curChar))
                 {
@@ -416,7 +430,8 @@ namespace Misc {
                     tokenFlags |= TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
                     pos++;
                 }
-                else if (curChar == ' ' || curChar == '\t' || curChar == '\xC2' || curChar == '\xA0') // -62/-96:non-break space
+                else if (curChar == ' ' || curChar == '\t' || curChar == '\xC2' ||
+                         curChar == '\xA0') // -62/-96:non-break space
                 {
                     tokenFlags |= TokenFlag::AfterWhitespace;
                     pos++;
@@ -478,20 +493,29 @@ namespace Misc {
                     }
                     else
 #endif
-                        InsertToken(TokenType::Identifier);
+                    InsertToken(TokenType::Identifier);
                     state = State::Start;
                 }
                 break;
             case State::Operator:
-                if (IsPunctuation(curChar) && !((curChar == '/' && nextChar == '/') || (curChar == '/' && nextChar == '*')))
+                if (IsPunctuation(curChar) &&
+                    !((curChar == '/' && nextChar == '/') || (curChar == '/' && nextChar == '*')))
                 {
                     tokenBuilder.append(curChar);
                     pos++;
                 }
                 else
                 {
-                    //do token analyze
-                    ParseOperators(tokenBuilder.toString(), tokenList, tokenFlags, tokenLine, tokenCol, (int)(pos - tokenBuilder.getLength()), file);
+                    // do token analyze
+                    ParseOperators(
+                        tokenBuilder.toString(),
+                        tokenList,
+                        tokenFlags,
+                        tokenLine,
+                        tokenCol,
+                        (int)(pos - tokenBuilder.getLength()),
+                        file
+                    );
                     tokenBuilder.clear();
                     state = State::Start;
                 }
@@ -549,7 +573,8 @@ namespace Misc {
                 }
                 break;
             case State::Hex:
-                if (IsDigit(curChar) || (curChar >= 'a' && curChar <= 'f') || (curChar >= 'A' && curChar <= 'F'))
+                if (IsDigit(curChar) || (curChar >= 'a' && curChar <= 'f') ||
+                    (curChar >= 'A' && curChar <= 'F'))
                 {
                     tokenBuilder.append(curChar);
                     pos++;
@@ -662,20 +687,20 @@ namespace Misc {
                 else
                     pos++;
                 break;
-            }
         }
-        return tokenList;
     }
-    List<Token> TokenizeText(const String & text)
-    {
-        return TokenizeText("", text);
-    }
+    return tokenList;
+}
+List<Token> TokenizeText(const String& text)
+{
+    return TokenizeText("", text);
+}
 
-    TokenReader::TokenReader(String text)
-    {
-        this->tokens = TokenizeText("", text);
-        tokenPtr = 0;
-    }
+TokenReader::TokenReader(String text)
+{
+    this->tokens = TokenizeText("", text);
+    tokenPtr = 0;
+}
 
 } // namespace Misc
 } // namespace Slang

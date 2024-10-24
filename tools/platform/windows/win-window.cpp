@@ -1,12 +1,12 @@
 #ifdef _WIN32
 
-#include "../window.h"
+    #include "../window.h"
 
-#include <windows.h>
-#include <windowsx.h>
+    #include <windows.h>
+    #include <windowsx.h>
 using namespace Slang;
 
-#pragma comment(lib, "Gdi32")
+    #pragma comment(lib, "Gdi32")
 
 namespace platform
 {
@@ -74,25 +74,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     Win32AppContext::windows.tryGetValue(hWnd, window);
     switch (message)
     {
-    case WM_LBUTTONUP:
-    case WM_MBUTTONUP:
-    case WM_RBUTTONUP:
+        case WM_LBUTTONUP:
+        case WM_MBUTTONUP:
+        case WM_RBUTTONUP:
         {
             int mx = GET_X_LPARAM(lParam);
             int my = GET_Y_LPARAM(lParam);
             bool processed = false;
             if (window)
             {
-                window->events.mouseUp(MouseEventArgs{
-                    mx,
-                    my,
-                    0, getModifierState(wParam)});
+                window->events.mouseUp(MouseEventArgs{mx, my, 0, getModifierState(wParam)});
             }
         }
         break;
-    case WM_LBUTTONDOWN:
-    case WM_MBUTTONDOWN:
-    case WM_RBUTTONDOWN:
+        case WM_LBUTTONDOWN:
+        case WM_MBUTTONDOWN:
+        case WM_RBUTTONDOWN:
         {
             int mx = GET_X_LPARAM(lParam);
             int my = GET_Y_LPARAM(lParam);
@@ -103,7 +100,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_MOUSEMOVE:
+        case WM_MOUSEMOVE:
         {
             int mx = GET_X_LPARAM(lParam);
             int my = GET_Y_LPARAM(lParam);
@@ -113,7 +110,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_MOUSEWHEEL:
+        case WM_MOUSEWHEEL:
         {
             int delta = GET_WHEEL_DELTA_WPARAM(wParam);
             if (window)
@@ -122,19 +119,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_CHAR:
+        case WM_CHAR:
         {
             if (window)
             {
-                KeyEventArgs keyEventArgs = {
-                    KeyCode::None, (wchar_t)(wParam), ButtonState::Enum::None, false};
+                KeyEventArgs keyEventArgs =
+                    {KeyCode::None, (wchar_t)(wParam), ButtonState::Enum::None, false};
                 window->events.keyPress(keyEventArgs);
                 if (keyEventArgs.cancelEvent)
                     useDefProc = false;
             }
         }
         break;
-    case WM_KEYDOWN:
+        case WM_KEYDOWN:
         {
             if (window)
             {
@@ -145,7 +142,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_KEYUP:
+        case WM_KEYUP:
         {
             if (window)
             {
@@ -156,7 +153,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_SETFOCUS:
+        case WM_SETFOCUS:
         {
             if (window)
             {
@@ -164,7 +161,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_KILLFOCUS:
+        case WM_KILLFOCUS:
         {
             if (window)
             {
@@ -172,7 +169,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_SIZE:
+        case WM_SIZE:
         {
             if (window)
             {
@@ -180,15 +177,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_NCCREATE:
+        case WM_NCCREATE:
         {
             if (Win32AppContext::enableNonClientDpiScaling)
                 Win32AppContext::enableNonClientDpiScaling(hWnd);
             return DefWindowProc(hWnd, message, wParam, lParam);
         }
         break;
-    default:
-        break;
+        default: break;
     }
     if (message == WM_DESTROY && hWnd == Win32AppContext::mainWindowHandle)
     {
@@ -221,9 +217,13 @@ void registerWindowClass()
     RegisterClassExW(&wcex);
 }
 
-void unregisterWindowClass() { UnregisterClassW(kWindowClassName, GetModuleHandle(NULL)); }
+void unregisterWindowClass()
+{
+    UnregisterClassW(kWindowClassName, GetModuleHandle(NULL));
+}
 
-HRESULT(WINAPI* getDpiForMonitor) (void* hmonitor, int dpiType, unsigned int* dpiX, unsigned int* dpiY);
+HRESULT(WINAPI* getDpiForMonitor)
+(void* hmonitor, int dpiType, unsigned int* dpiX, unsigned int* dpiY);
 
 void Application::init()
 {
@@ -272,9 +272,15 @@ void doEventsImpl(bool waitForEvents)
     } while (!Win32AppContext::isTerminated && hasMsg);
 }
 
-void Application::doEvents() { doEventsImpl(false); }
+void Application::doEvents()
+{
+    doEventsImpl(false);
+}
 
-void Application::quit() { Win32AppContext::isTerminated = true; }
+void Application::quit()
+{
+    Win32AppContext::isTerminated = true;
+}
 
 void Application::dispose()
 {
@@ -340,7 +346,8 @@ public:
             NULL, // parent
             NULL, // menu
             instance,
-            NULL);
+            NULL
+        );
         if (handle)
             Win32AppContext::windows[handle] = this;
     }
@@ -365,7 +372,8 @@ public:
             windowRect.top,
             windowRect.right - windowRect.left,
             windowRect.bottom - windowRect.top,
-            FALSE);
+            FALSE
+        );
     }
 
     virtual Rect getClientRect() override
@@ -407,10 +415,7 @@ public:
     }
     virtual bool getFocused() override { return GetFocus() == handle; }
     virtual bool getVisible() override { return visible; }
-    virtual WindowHandle getNativeHandle() override
-    {
-        return WindowHandle::fromHwnd(handle);
-    }
+    virtual WindowHandle getNativeHandle() override { return WindowHandle::fromHwnd(handle); }
     virtual void setText(Slang::String text) override
     {
         SetWindowText(handle, text.toWString().begin());
@@ -434,7 +439,8 @@ public:
                 MonitorFromWindow(handle, MONITOR_DEFAULTTOPRIMARY),
                 0,
                 (UINT*)&dpi,
-                (UINT*)&dpi);
+                (UINT*)&dpi
+            );
             return dpi;
         }
         dpi = GetDeviceCaps(NULL, LOGPIXELSY);
@@ -442,9 +448,12 @@ public:
     }
 };
 
-Window* Application::createWindow(const WindowDesc& desc) { return new Win32PlatformWindow(desc); }
+Window* Application::createWindow(const WindowDesc& desc)
+{
+    return new Win32PlatformWindow(desc);
+}
 
 
-} // namespace gfx
+} // namespace platform
 
 #endif

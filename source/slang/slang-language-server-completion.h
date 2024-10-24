@@ -1,8 +1,8 @@
 // slang-language-server-completion.h
 #pragma once
 
-#include "slang-workspace-version.h"
 #include "slang-language-server-ast-lookup.h"
+#include "slang-workspace-version.h"
 
 namespace Slang
 {
@@ -33,12 +33,16 @@ struct CompletionContext
     SlangResult tryCompleteAttributes();
     SlangResult tryCompleteImport();
     SlangResult tryCompleteInclude();
-    SlangResult tryCompleteRawFileName(UnownedStringSlice lineContent, Index fileNameStartPos, bool isImportString);
+    SlangResult tryCompleteRawFileName(
+        UnownedStringSlice lineContent,
+        Index fileNameStartPos,
+        bool isImportString
+    );
 
 
     List<LanguageServerProtocol::CompletionItem> collectMembersAndSymbols();
-    List<LanguageServerProtocol::CompletionItem> createSwizzleCandidates(
-        Type* baseType, IntegerLiteralValue elementCount[2]);
+    List<LanguageServerProtocol::CompletionItem>
+    createSwizzleCandidates(Type* baseType, IntegerLiteralValue elementCount[2]);
     List<LanguageServerProtocol::CompletionItem> createCapabilityCandidates();
     List<LanguageServerProtocol::CompletionItem> collectAttributes();
     LanguageServerProtocol::CompletionItem generateGUIDCompletionItem();
@@ -50,7 +54,8 @@ struct CompletionContext
         Index fileNameEnd,
         Index sectionStart,
         Index sectionEnd,
-        char closingChar);
+        char closingChar
+    );
 };
 
 } // namespace Slang

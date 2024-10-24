@@ -4,23 +4,24 @@
 
 #include "slang-ast-base.h"
 
-namespace Slang {
+namespace Slang
+{
 
 using SpvWord = uint32_t;
 
 // Syntax class definitions for expressions.
-// 
-    // A placeholder for where an Expr is expected but is missing from source.
+//
+// A placeholder for where an Expr is expected but is missing from source.
 class IncompleteExpr : public Expr
 {
     SLANG_AST_CLASS(IncompleteExpr)
 };
-    // Base class for expressions that will reference declarations
-class DeclRefExpr: public Expr
+// Base class for expressions that will reference declarations
+class DeclRefExpr : public Expr
 {
     SLANG_ABSTRACT_AST_CLASS(DeclRefExpr)
 
-    
+
     // The declaration of the symbol being referenced
 
     DeclRef<Decl> declRef;
@@ -66,7 +67,7 @@ class OverloadedExpr : public Expr
 
 // An expression that references an overloaded set of declarations
 // having the same name.
-class OverloadedExpr2: public Expr
+class OverloadedExpr2 : public Expr
 {
     SLANG_AST_CLASS(OverloadedExpr2)
 
@@ -94,7 +95,7 @@ class IntegerLiteralExpr : public LiteralExpr
     IntegerLiteralValue value;
 };
 
-class FloatingPointLiteralExpr: public LiteralExpr
+class FloatingPointLiteralExpr : public LiteralExpr
 {
     SLANG_AST_CLASS(FloatingPointLiteralExpr)
     FloatingPointLiteralValue value;
@@ -122,7 +123,7 @@ class StringLiteralExpr : public LiteralExpr
 
     // TODO: consider storing the "segments" of the string
     // literal, in the case where multiple literals were
-    //lined up at the lexer level, e.g.:
+    // lined up at the lexer level, e.g.:
     //
     //      "first" "second" "third"
     //
@@ -187,7 +188,7 @@ class AppExprBase : public ExprWithArgsBase
     List<SourceLoc> argumentDelimeterLocs;
 };
 
-class InvokeExpr: public AppExprBase
+class InvokeExpr : public AppExprBase
 {
     SLANG_AST_CLASS(InvokeExpr)
 };
@@ -197,7 +198,8 @@ enum class TryClauseType
     None,
     Standard, // Normal `try` clause
     Optional, // (Not implemented) `try?` clause that returns an optional value.
-    Assert, // (Not implemented) `try!` clause that should always succeed and triggers runtime error if failed.
+    Assert, // (Not implemented) `try!` clause that should always succeed and triggers runtime error
+            // if failed.
 };
 
 char const* getTryClauseTypeName(TryClauseType value);
@@ -219,25 +221,25 @@ class NewExpr : public InvokeExpr
     SLANG_AST_CLASS(NewExpr)
 };
 
-class OperatorExpr: public InvokeExpr
+class OperatorExpr : public InvokeExpr
 {
     SLANG_AST_CLASS(OperatorExpr)
 };
 
-class InfixExpr: public OperatorExpr
+class InfixExpr : public OperatorExpr
 {
     SLANG_AST_CLASS(InfixExpr)
 };
-class PrefixExpr: public OperatorExpr
+class PrefixExpr : public OperatorExpr
 {
     SLANG_AST_CLASS(PrefixExpr)
 };
-class PostfixExpr: public OperatorExpr
+class PostfixExpr : public OperatorExpr
 {
     SLANG_AST_CLASS(PostfixExpr)
 };
 
-class IndexExpr: public Expr
+class IndexExpr : public Expr
 {
     SLANG_AST_CLASS(IndexExpr)
     Expr* baseExpression;
@@ -248,7 +250,7 @@ class IndexExpr: public Expr
     List<SourceLoc> argumentDelimeterLocs;
 };
 
-class MemberExpr: public DeclRefExpr
+class MemberExpr : public DeclRefExpr
 {
     SLANG_AST_CLASS(MemberExpr)
     Expr* baseExpression = nullptr;
@@ -262,7 +264,7 @@ class DerefMemberExpr : public MemberExpr
 };
 
 // Member looked up on a type, rather than a value
-class StaticMemberExpr: public DeclRefExpr
+class StaticMemberExpr : public DeclRefExpr
 {
     SLANG_AST_CLASS(StaticMemberExpr)
     Expr* baseExpression = nullptr;
@@ -273,7 +275,7 @@ struct MatrixCoord
 {
     bool operator==(const MatrixCoord& rhs) const { return row == rhs.row && col == rhs.col; };
     bool operator!=(const MatrixCoord& rhs) const { return !(*this == rhs); };
-    // Rows and columns are zero indexed 
+    // Rows and columns are zero indexed
     int row;
     int col;
 };
@@ -287,7 +289,7 @@ class MatrixSwizzleExpr : public Expr
     SourceLoc memberOpLoc;
 };
 
-class SwizzleExpr: public Expr
+class SwizzleExpr : public Expr
 {
     SLANG_AST_CLASS(SwizzleExpr)
     Expr* base = nullptr;
@@ -303,22 +305,22 @@ class MakeRefExpr : public Expr
 };
 
 // A dereference of a pointer or pointer-like type
-class DerefExpr: public Expr
+class DerefExpr : public Expr
 {
     SLANG_AST_CLASS(DerefExpr)
     Expr* base = nullptr;
 };
 
 // Any operation that performs type-casting
-class TypeCastExpr: public InvokeExpr
+class TypeCastExpr : public InvokeExpr
 {
     SLANG_AST_CLASS(TypeCastExpr)
-//    TypeExp TargetType;
-//    Expr* Expression = nullptr;
+    //    TypeExp TargetType;
+    //    Expr* Expression = nullptr;
 };
 
 // An explicit type-cast that appear in the user's code with `(type) expr` syntax
-class ExplicitCastExpr: public TypeCastExpr
+class ExplicitCastExpr : public TypeCastExpr
 {
     SLANG_AST_CLASS(ExplicitCastExpr)
 };
@@ -341,7 +343,10 @@ class LValueImplicitCastExpr : public TypeCastExpr
 {
     SLANG_AST_CLASS(LValueImplicitCastExpr)
 
-    explicit LValueImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
+    explicit LValueImplicitCastExpr(const TypeCastExpr& rhs)
+        : Super(rhs)
+    {
+    }
 };
 
 // To work around situations like int += uint
@@ -351,8 +356,11 @@ class OutImplicitCastExpr : public LValueImplicitCastExpr
 {
     SLANG_AST_CLASS(OutImplicitCastExpr)
 
-        /// Allow explict construction from any TypeCastExpr
-    explicit OutImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
+    /// Allow explict construction from any TypeCastExpr
+    explicit OutImplicitCastExpr(const TypeCastExpr& rhs)
+        : Super(rhs)
+    {
+    }
 };
 
 class InOutImplicitCastExpr : public LValueImplicitCastExpr
@@ -360,14 +368,17 @@ class InOutImplicitCastExpr : public LValueImplicitCastExpr
     SLANG_AST_CLASS(InOutImplicitCastExpr)
 
     /// Allow explict construction from any TypeCastExpr
-    explicit InOutImplicitCastExpr(const TypeCastExpr& rhs) :Super(rhs) {}
+    explicit InOutImplicitCastExpr(const TypeCastExpr& rhs)
+        : Super(rhs)
+    {
+    }
 };
 
-    /// A cast of a value to a super-type of its type.
-    ///
-    /// The type being cast to is stored as this expression's `type`.
-    ///
-class CastToSuperTypeExpr: public Expr
+/// A cast of a value to a super-type of its type.
+///
+/// The type being cast to is stored as this expression's `type`.
+///
+class CastToSuperTypeExpr : public Expr
 {
     SLANG_AST_CLASS(CastToSuperTypeExpr)
 
@@ -377,12 +388,12 @@ class CastToSuperTypeExpr: public Expr
     ///
     Expr* valueArg = nullptr;
 
-    /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`   
+    /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`
     Val* witnessArg = nullptr;
 };
 
-    /// A `value is Type` expression that evaluates to `true` if type of `value` is a sub-type of
-    /// `Type`.
+/// A `value is Type` expression that evaluates to `true` if type of `value` is a sub-type of
+/// `Type`.
 class IsTypeExpr : public Expr
 {
     SLANG_AST_CLASS(IsTypeExpr)
@@ -397,8 +408,8 @@ class IsTypeExpr : public Expr
     BoolLiteralExpr* constantVal = nullptr;
 };
 
-    /// A `value as Type` expression that casts `value` to `Type` within type hierarchy.
-    /// The result is undefined if `value` is not `Type`.
+/// A `value as Type` expression that casts `value` to `Type` within type hierarchy.
+/// The result is undefined if `value` is not `Type`.
 class AsTypeExpr : public Expr
 {
     SLANG_AST_CLASS(AsTypeExpr)
@@ -408,7 +419,6 @@ class AsTypeExpr : public Expr
 
     // A witness showing that `typeExpr` is a subtype of `typeof(value)`.
     Val* witnessArg = nullptr;
-
 };
 
 class SizeOfLikeExpr : public Expr
@@ -441,15 +451,15 @@ class MakeOptionalExpr : public Expr
 {
     SLANG_AST_CLASS(MakeOptionalExpr)
 
-        // If `value` is null, this constructs an `Optional<T>` that doesn't have a value.
+    // If `value` is null, this constructs an `Optional<T>` that doesn't have a value.
     Expr* value = nullptr;
     Expr* typeExpr = nullptr;
 };
 
-    /// A cast of a value to the same type, with different modifiers.
-    ///
-    /// The type being cast to is stored as this expression's `type`.
-    ///
+/// A cast of a value to the same type, with different modifiers.
+///
+/// The type being cast to is stored as this expression's `type`.
+///
 class ModifierCastExpr : public Expr
 {
     SLANG_AST_CLASS(ModifierCastExpr)
@@ -461,39 +471,39 @@ class ModifierCastExpr : public Expr
     Expr* valueArg = nullptr;
 };
 
-class SelectExpr: public OperatorExpr
+class SelectExpr : public OperatorExpr
 {
     SLANG_AST_CLASS(SelectExpr)
 };
 
-class LogicOperatorShortCircuitExpr: public OperatorExpr
+class LogicOperatorShortCircuitExpr : public OperatorExpr
 {
     SLANG_AST_CLASS(LogicOperatorShortCircuitExpr)
 public:
     enum Flavor
     {
-        And,    // &&
-        Or,     // ||
+        And, // &&
+        Or,  // ||
     };
     Flavor flavor;
 };
 
 
-class GenericAppExpr: public AppExprBase
+class GenericAppExpr : public AppExprBase
 {
     SLANG_AST_CLASS(GenericAppExpr)
 };
 
 // An expression representing re-use of the syntax for a type in more
 // than once conceptually-distinct declaration
-class SharedTypeExpr: public Expr
+class SharedTypeExpr : public Expr
 {
     SLANG_AST_CLASS(SharedTypeExpr)
     // The underlying type expression that we want to share
     TypeExp base;
 };
 
-class AssignExpr: public Expr
+class AssignExpr : public Expr
 {
     SLANG_AST_CLASS(AssignExpr)
     Expr* left = nullptr;
@@ -504,7 +514,7 @@ class AssignExpr: public Expr
 //
 // We keep this around explicitly to be sure we don't lose any structure
 // when we do rewriter stuff.
-class ParenExpr: public Expr
+class ParenExpr : public Expr
 {
     SLANG_AST_CLASS(ParenExpr)
     Expr* base = nullptr;
@@ -512,7 +522,7 @@ class ParenExpr: public Expr
 
 // An object-oriented `this` expression, used to
 // refer to the current instance of an enclosing type.
-class ThisExpr: public Expr
+class ThisExpr : public Expr
 {
     SLANG_AST_CLASS(ThisExpr)
 
@@ -531,14 +541,14 @@ class ReturnValExpr : public Expr
 };
 
 // An expression that binds a temporary variable in a local expression context
-class LetExpr: public Expr
+class LetExpr : public Expr
 {
     SLANG_AST_CLASS(LetExpr)
     VarDecl* decl = nullptr;
     Expr* body = nullptr;
 };
 
-class ExtractExistentialValueExpr: public Expr
+class ExtractExistentialValueExpr : public Expr
 {
     SLANG_AST_CLASS(ExtractExistentialValueExpr)
     DeclRef<VarDeclBase> declRef;
@@ -559,9 +569,9 @@ class DetachExpr : public Expr
     Expr* inner = nullptr;
 };
 
-    /// Base class for higher-order function application
-    /// Eg: foo(fn) where fn is a function expression.
-    ///
+/// Base class for higher-order function application
+/// Eg: foo(fn) where fn is a function expression.
+///
 class HigherOrderInvokeExpr : public Expr
 {
     SLANG_ABSTRACT_AST_CLASS(HigherOrderInvokeExpr)
@@ -579,25 +589,25 @@ class DifferentiateExpr : public HigherOrderInvokeExpr
     SLANG_ABSTRACT_AST_CLASS(DifferentiateExpr)
 };
 
-    /// An expression of the form `__fwd_diff(fn)` to access the 
-    /// forward-mode derivative version of the function `fn`
-    ///
-class ForwardDifferentiateExpr: public DifferentiateExpr
+/// An expression of the form `__fwd_diff(fn)` to access the
+/// forward-mode derivative version of the function `fn`
+///
+class ForwardDifferentiateExpr : public DifferentiateExpr
 {
     SLANG_AST_CLASS(ForwardDifferentiateExpr)
 };
 
-    /// An expression of the form `__bwd_diff(fn)` to access the 
-    /// forward-mode derivative version of the function `fn`
-    ///
-class BackwardDifferentiateExpr: public DifferentiateExpr
+/// An expression of the form `__bwd_diff(fn)` to access the
+/// forward-mode derivative version of the function `fn`
+///
+class BackwardDifferentiateExpr : public DifferentiateExpr
 {
     SLANG_AST_CLASS(BackwardDifferentiateExpr)
 };
 
-    /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
-    /// dispatch a compute kernel from host.
-    ///
+/// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
+/// dispatch a compute kernel from host.
+///
 class DispatchKernelExpr : public HigherOrderInvokeExpr
 {
     SLANG_AST_CLASS(DispatchKernelExpr)
@@ -605,37 +615,37 @@ class DispatchKernelExpr : public HigherOrderInvokeExpr
     Expr* dispatchSize;
 };
 
-    /// An express to mark its inner expression as an intended non-differential call.
+/// An express to mark its inner expression as an intended non-differential call.
 class TreatAsDifferentiableExpr : public Expr
 {
     SLANG_AST_CLASS(TreatAsDifferentiableExpr)
 
     Expr* innerExpr;
     Scope* scope;
-    
-    enum Flavor 
+
+    enum Flavor
     {
         /// Represents a no_diff wrapper over
         /// a non-differentiable method.
         /// i.e. no_diff(fn(...))
-        /// 
+        ///
         NoDiff,
 
         /// Represents a call to a method that
         /// is either marked differentiable, or has
         /// a user-defined derivative in scope.
-        /// 
+        ///
         Differentiable
     };
 
     Flavor flavor;
 };
 
-    /// A type expression of the form `This`
-    ///
-    /// Refers to the type of `this` in the current context.
-    ///
-class ThisTypeExpr: public Expr
+/// A type expression of the form `This`
+///
+/// Refers to the type of `this` in the current context.
+///
+class ThisTypeExpr : public Expr
 {
     SLANG_AST_CLASS(ThisTypeExpr)
 
@@ -643,7 +653,7 @@ class ThisTypeExpr: public Expr
     Scope* scope = nullptr;
 };
 
-    /// A type expression of the form `Left & Right`.
+/// A type expression of the form `Left & Right`.
 class AndTypeExpr : public Expr
 {
     SLANG_AST_CLASS(AndTypeExpr);
@@ -652,7 +662,7 @@ class AndTypeExpr : public Expr
     TypeExp right;
 };
 
-    /// A type exprssion that applies one or more modifiers to another type
+/// A type exprssion that applies one or more modifiers to another type
 class ModifiedTypeExpr : public Expr
 {
     SLANG_AST_CLASS(ModifiedTypeExpr);
@@ -661,7 +671,7 @@ class ModifiedTypeExpr : public Expr
     TypeExp base;
 };
 
-    /// A type expression that rrepresents a pointer type, e.g. T*
+/// A type expression that rrepresents a pointer type, e.g. T*
 class PointerTypeExpr : public Expr
 {
     SLANG_AST_CLASS(PointerTypeExpr);
@@ -669,7 +679,7 @@ class PointerTypeExpr : public Expr
     TypeExp base;
 };
 
-    /// A type expression that represents a function type, e.g. (bool, int) -> float
+/// A type expression that represents a function type, e.g. (bool, int) -> float
 class FuncTypeExpr : public Expr
 {
     SLANG_AST_CLASS(FuncTypeExpr);
@@ -685,9 +695,9 @@ class TupleTypeExpr : public Expr
     List<TypeExp> members;
 };
 
-    /// An expression that applies a generic to arguments for some,
-    /// but not all, of its explicit parameters.
-    ///
+/// An expression that applies a generic to arguments for some,
+/// but not all, of its explicit parameters.
+///
 class PartiallyAppliedGenericExpr : public Expr
 {
     SLANG_AST_CLASS(PartiallyAppliedGenericExpr);
@@ -695,17 +705,17 @@ class PartiallyAppliedGenericExpr : public Expr
 public:
     Expr* originalExpr = nullptr;
 
-        /// The generic being applied
+    /// The generic being applied
     DeclRef<GenericDecl> baseGenericDeclRef;
 
-        /// A substitution that includes the generic arguments known so far
+    /// A substitution that includes the generic arguments known so far
     List<Val*> knownGenericArgs;
 };
 
-   
-    /// An expression that holds a set of argument exprs that got matched to a pack parameter
-    /// during overload resolution.
-    ///
+
+/// An expression that holds a set of argument exprs that got matched to a pack parameter
+/// during overload resolution.
+///
 class PackExpr : public Expr
 {
     SLANG_AST_CLASS(PackExpr)
@@ -720,24 +730,29 @@ class SPIRVAsmOperand
 public:
     enum Flavor
     {
-        Literal, // No prefix
-        Id, // Prefixed with %
+        Literal,      // No prefix
+        Id,           // Prefixed with %
         ResultMarker, // "result" (without quotes)
-        NamedValue, // Any other identifier
+        NamedValue,   // Any other identifier
         SlangValue,
         SlangValueAddr,
         SlangImmediateValue,
         SlangType,
         SampledType, // __sampledType(T), this becomes a 4 vector of the component type of T
-        ImageType, // __imageType(texture), returns the equivalaent OpTypeImage of a given texture typed value.
-        SampledImageType, // __sampledImageType(texture), returns the equivalent OpTypeSampledImage of a given texture typed value.
-        ConvertTexel, // __convertTexel(value), converts `value` to the native texel type of a texture.
-        TruncateMarker, // __truncate, an invented instruction which coerces to the result type by truncating the element count
-        EntryPoint, // __entryPoint, a placeholder for the id of a referencing entryPoint.
+        ImageType,   // __imageType(texture), returns the equivalaent OpTypeImage of a given texture
+                     // typed value.
+        SampledImageType, // __sampledImageType(texture), returns the equivalent OpTypeSampledImage
+                          // of a given texture typed value.
+        ConvertTexel,     // __convertTexel(value), converts `value` to the native texel type of a
+                          // texture.
+        TruncateMarker,   // __truncate, an invented instruction which coerces to the result type by
+                          // truncating the element count
+        EntryPoint,       // __entryPoint, a placeholder for the id of a referencing entryPoint.
         BuiltinVar,
         GLSL450Set,
         NonSemanticDebugPrintfExtSet,
-        RayPayloadFromLocation, //insert from scope of all payloads in the spir-v shader the payload identified by the integer value provided
+        RayPayloadFromLocation, // insert from scope of all payloads in the spir-v shader the
+                                // payload identified by the integer value provided
         RayAttributeFromLocation,
         RayCallableFromLocation,
     };

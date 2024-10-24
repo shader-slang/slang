@@ -3,15 +3,17 @@
 
 #include "../../source/slang/slang-diagnostics.h"
 
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
 
-namespace CPPDiagnostics {
+namespace CPPDiagnostics
+{
 
 #define DIAGNOSTIC(id, severity, name, messageFormat) extern const DiagnosticInfo name;
 #include "diagnostic-defs.h"
 
-} // CPPDiagnostics
-} // CppExtract
+} // namespace CPPDiagnostics
+} // namespace CppExtract
 
 #endif

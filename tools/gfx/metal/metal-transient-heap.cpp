@@ -17,14 +17,13 @@ Result TransientResourceHeapImpl::init(const ITransientResourceHeap::Desc& desc,
     Super::init(
         desc,
         256, // TODO
-        device);
+        device
+    );
 
     return SLANG_OK;
 }
 
-TransientResourceHeapImpl::~TransientResourceHeapImpl()
-{
-}
+TransientResourceHeapImpl::~TransientResourceHeapImpl() {}
 
 Result TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer** outCmdBuffer)
 {

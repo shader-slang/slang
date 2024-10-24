@@ -33,10 +33,13 @@ public:
         const char* entryPointName,
         ISlangBlob* code,
         VkShaderStageFlagBits stage,
-        VkShaderModule& outShaderModule);
+        VkShaderModule& outShaderModule
+    );
 
     virtual Result createShaderModule(
-        slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode) override;
+        slang::EntryPointReflection* entryPointInfo,
+        ComPtr<ISlangBlob> kernelCode
+    ) override;
 };
 
 

@@ -2,10 +2,8 @@
 #define SLANG_LZ4_COMPRESSION_SYSTEM_H
 
 #include "slang-basic.h"
-
-#include "slang-compression-system.h"
-
 #include "slang-com-ptr.h"
+#include "slang-compression-system.h"
 
 namespace Slang
 {
@@ -17,6 +15,6 @@ public:
     static ICompressionSystem* getSingleton();
 };
 
-}
+} // namespace Slang
 
 #endif

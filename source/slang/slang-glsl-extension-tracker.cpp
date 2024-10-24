@@ -1,7 +1,8 @@
 // slang-glsl-extension-tracker.cpp
 #include "slang-glsl-extension-tracker.h"
 
-namespace Slang {
+namespace Slang
+{
 
 void GLSLExtensionTracker::appendExtensionRequireLines(StringBuilder& ioBuilder) const
 {
@@ -47,7 +48,9 @@ void GLSLExtensionTracker::requireBaseTypeExtension(BaseType baseType)
             requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_8bit_storage"));
 
             // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
-            requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types"));
+            requireExtension(
+                UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types")
+            );
             break;
         }
         case BaseType::Half:
@@ -58,22 +61,30 @@ void GLSLExtensionTracker::requireBaseTypeExtension(BaseType baseType)
             requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_16bit_storage"));
 
             // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
-            requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types"));
+            requireExtension(
+                UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types")
+            );
             break;
         }
         case BaseType::UInt64:
         case BaseType::Int64:
         {
-            requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types_int64"));
-            m_hasBaseTypeFlags |= _getFlag(BaseType::UInt64) | _getFlag(BaseType::Int64) | _getFlag(BaseType::IntPtr) | _getFlag(BaseType::UIntPtr);
+            requireExtension(
+                UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types_int64")
+            );
+            m_hasBaseTypeFlags |= _getFlag(BaseType::UInt64) | _getFlag(BaseType::Int64) |
+                                  _getFlag(BaseType::IntPtr) | _getFlag(BaseType::UIntPtr);
             break;
         }
         case BaseType::IntPtr:
         case BaseType::UIntPtr:
         {
 #if SLANG_PTR_IS_64
-            requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types_int64"));
-            m_hasBaseTypeFlags |= _getFlag(BaseType::UInt64) | _getFlag(BaseType::Int64) | _getFlag(BaseType::IntPtr) | _getFlag(BaseType::UIntPtr);
+            requireExtension(
+                UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types_int64")
+            );
+            m_hasBaseTypeFlags |= _getFlag(BaseType::UInt64) | _getFlag(BaseType::Int64) |
+                                  _getFlag(BaseType::IntPtr) | _getFlag(BaseType::UIntPtr);
 #endif
             break;
         }

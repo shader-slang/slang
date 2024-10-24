@@ -5,7 +5,8 @@ namespace Slang
 Expr* ASTSynthesizer::emitBinaryExpr(UnownedStringSlice operatorToken, Expr* left, Expr* right)
 {
     auto infixExpr = m_builder->create<InfixExpr>();
-    infixExpr->functionExpr = emitVarExpr(m_namePool->getName(operatorToken));;
+    infixExpr->functionExpr = emitVarExpr(m_namePool->getName(operatorToken));
+    ;
     infixExpr->arguments.add(left);
     infixExpr->arguments.add(right);
     return infixExpr;
@@ -14,7 +15,8 @@ Expr* ASTSynthesizer::emitBinaryExpr(UnownedStringSlice operatorToken, Expr* lef
 Expr* ASTSynthesizer::emitPrefixExpr(UnownedStringSlice operatorToken, Expr* base)
 {
     auto prefixExpr = m_builder->create<PrefixExpr>();
-    prefixExpr->functionExpr = emitVarExpr(m_namePool->getName(operatorToken));;
+    prefixExpr->functionExpr = emitVarExpr(m_namePool->getName(operatorToken));
+    ;
     prefixExpr->arguments.add(base);
     return prefixExpr;
 }
@@ -22,12 +24,13 @@ Expr* ASTSynthesizer::emitPrefixExpr(UnownedStringSlice operatorToken, Expr* bas
 Expr* ASTSynthesizer::emitPostfixExpr(UnownedStringSlice operatorToken, Expr* base)
 {
     auto postfixExpr = m_builder->create<PostfixExpr>();
-    postfixExpr->functionExpr = emitVarExpr(m_namePool->getName(operatorToken));;
+    postfixExpr->functionExpr = emitVarExpr(m_namePool->getName(operatorToken));
+    ;
     postfixExpr->arguments.add(base);
     return postfixExpr;
 }
 
-ForStmt* ASTSynthesizer::emitFor(Expr* initVal, Expr* finalVal, VarDecl* &outIndexVar)
+ForStmt* ASTSynthesizer::emitFor(Expr* initVal, Expr* finalVal, VarDecl*& outIndexVar)
 {
     auto parentStmt = getCurrentScope().m_parentSeqStmt;
     auto seqStmt = m_builder->create<SeqStmt>();
@@ -38,7 +41,8 @@ ForStmt* ASTSynthesizer::emitFor(Expr* initVal, Expr* finalVal, VarDecl* &outInd
     auto declStmt = emitVarDeclStmt(nullptr, m_namePool->getName("S_synth_loop_index"), initVal);
     stmt->initialStatement = declStmt;
     outIndexVar = (VarDecl*)declStmt->decl;
-    auto predicateExpr = emitBinaryExpr(UnownedStringSlice("<"), emitVarExpr(outIndexVar), finalVal);
+    auto predicateExpr =
+        emitBinaryExpr(UnownedStringSlice("<"), emitVarExpr(outIndexVar), finalVal);
     stmt->predicateExpression = predicateExpr;
     stmt->sideEffectExpression = emitPrefixExpr(UnownedStringSlice("++"), emitVarExpr(outIndexVar));
     parentStmt->stmts.add(stmt);
@@ -183,4 +187,4 @@ DeclStmt* ASTSynthesizer::emitVarDeclStmt(Type* type, Name* name, Expr* initVal)
     return stmt;
 }
 
-}
+} // namespace Slang

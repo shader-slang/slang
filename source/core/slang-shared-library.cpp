@@ -1,19 +1,18 @@
 #include "slang-shared-library.h"
 
 #include "slang-com-ptr.h"
-
 #include "slang-io.h"
 #include "slang-string-util.h"
 
 #if defined(_WIN32)
-#include <windows.h>
+    #include <windows.h>
 #elif defined(__linux__) || defined(SLANG_OSX)
-#include <dlfcn.h>
+    #include <dlfcn.h>
 #endif
 #include <sys/stat.h>
 #include <sys/types.h>
 #ifndef _WIN32
-#    include <unistd.h>
+    #include <unistd.h>
 #endif
 
 namespace Slang
@@ -21,14 +20,20 @@ namespace Slang
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! DefaultSharedLibraryLoader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */DefaultSharedLibraryLoader DefaultSharedLibraryLoader::s_singleton;
+/* static */ DefaultSharedLibraryLoader DefaultSharedLibraryLoader::s_singleton;
 
 ISlangUnknown* DefaultSharedLibraryLoader::getInterface(const Guid& guid)
 {
-    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangSharedLibraryLoader::getTypeGuid()) ? static_cast<ISlangSharedLibraryLoader*>(this) : nullptr;
+    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangSharedLibraryLoader::getTypeGuid()
+           )
+               ? static_cast<ISlangSharedLibraryLoader*>(this)
+               : nullptr;
 }
 
-SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISlangSharedLibrary** outSharedLibrary)
+SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(
+    const char* path,
+    ISlangSharedLibrary** outSharedLibrary
+)
 {
     *outSharedLibrary = nullptr;
     // Try loading
@@ -38,7 +43,10 @@ SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(const char* path, ISla
     return SLANG_OK;
 }
 
-SlangResult DefaultSharedLibraryLoader::loadPlatformSharedLibrary(const char* path, ISlangSharedLibrary** outSharedLibrary)
+SlangResult DefaultSharedLibraryLoader::loadPlatformSharedLibrary(
+    const char* path,
+    ISlangSharedLibrary** outSharedLibrary
+)
 {
     *outSharedLibrary = nullptr;
     // Try loading
@@ -48,7 +56,12 @@ SlangResult DefaultSharedLibraryLoader::loadPlatformSharedLibrary(const char* pa
     return SLANG_OK;
 }
 
-/* static */SlangResult DefaultSharedLibraryLoader::load(ISlangSharedLibraryLoader* loader, const String& path, const String& name, ISlangSharedLibrary** outLibrary)
+/* static */ SlangResult DefaultSharedLibraryLoader::load(
+    ISlangSharedLibraryLoader* loader,
+    const String& path,
+    const String& name,
+    ISlangSharedLibrary** outLibrary
+)
 {
     if (path.getLength())
     {
@@ -99,8 +112,7 @@ void* DefaultSharedLibrary::castAs(const SlangUUID& guid)
 
 void* DefaultSharedLibrary::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
         guid == ISlangSharedLibrary::getTypeGuid())
     {
         return static_cast<ISlangSharedLibrary*>(this);
@@ -126,7 +138,8 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
     GetModuleHandleExA(
         GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
         (LPCSTR)symbolInLib,
-        &moduleHandle);
+        &moduleHandle
+    );
     const int maxLength = 1024;
     wchar_t filenameBuffer[maxLength];
     auto length = GetModuleFileNameW(moduleHandle, filenameBuffer, maxLength);
@@ -164,4 +177,4 @@ uint64_t SharedLibraryUtils::getSharedLibraryTimestamp(void* symbolInLib)
     return 0;
 }
 
-} 
+} // namespace Slang

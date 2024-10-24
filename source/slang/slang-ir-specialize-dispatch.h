@@ -10,4 +10,4 @@ struct SharedGenericsLoweringContext;
 /// This is only used on GPU targets where function pointers are not supported
 /// or are not efficient.
 void specializeDispatchFunctions(SharedGenericsLoweringContext* sharedContext);
-}
+} // namespace Slang

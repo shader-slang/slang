@@ -13,7 +13,7 @@ namespace cuda
 {
 
 void ResourceCommandEncoderImpl::init(CommandBufferImpl* cmdBuffer)
-{ 
+{
     m_writer = cmdBuffer;
 }
 
@@ -22,19 +22,24 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::copyBuffer(
     Offset dstOffset,
     IBufferResource* src,
     Offset srcOffset,
-    Size size)
+    Size size
+)
 {
     m_writer->copyBuffer(dst, dstOffset, src, srcOffset, size);
 }
 
 SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::uploadBufferData(
-    IBufferResource* dst, Offset offset, Size size, void* data)
+    IBufferResource* dst,
+    Offset offset,
+    Size size,
+    void* data
+)
 {
     m_writer->uploadBufferData(dst, offset, size, data);
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    ResourceCommandEncoderImpl::writeTimestamp(IQueryPool* pool, GfxIndex index)
+ResourceCommandEncoderImpl::writeTimestamp(IQueryPool* pool, GfxIndex index)
 {
     m_writer->writeTimestamp(pool, index);
 }
@@ -48,7 +53,8 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::copyTexture(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Extents extent)
+    ITextureResource::Extents extent
+)
 {
     SLANG_UNUSED(dst);
     SLANG_UNUSED(dstState);
@@ -68,7 +74,8 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::uploadTextureData(
     ITextureResource::Offset3D offset,
     ITextureResource::Extents extent,
     ITextureResource::SubresourceData* subResourceData,
-    GfxCount subResourceDataCount)
+    GfxCount subResourceDataCount
+)
 {
     SLANG_UNUSED(dst);
     SLANG_UNUSED(subResourceRange);
@@ -82,7 +89,8 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::uploadTextureData(
 SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::clearResourceView(
     IResourceView* view,
     ClearValue* clearValue,
-    ClearResourceViewFlags::Enum flags)
+    ClearResourceViewFlags::Enum flags
+)
 {
     SLANG_UNUSED(view);
     SLANG_UNUSED(clearValue);
@@ -96,7 +104,8 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::resolveResource(
     SubresourceRange sourceRange,
     ITextureResource* dest,
     ResourceState destState,
-    SubresourceRange destRange)
+    SubresourceRange destRange
+)
 {
     SLANG_UNUSED(source);
     SLANG_UNUSED(sourceState);
@@ -112,7 +121,8 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::resolveQuery(
     GfxIndex index,
     GfxCount count,
     IBufferResource* buffer,
-    Offset offset)
+    Offset offset
+)
 {
     SLANG_UNUSED(queryPool);
     SLANG_UNUSED(index);
@@ -131,7 +141,8 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::copyTextureToBuffer(
     ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Extents extent)
+    ITextureResource::Extents extent
+)
 {
     SLANG_UNUSED(dst);
     SLANG_UNUSED(dstOffset);
@@ -149,7 +160,8 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::textureSubresourceBa
     ITextureResource* texture,
     SubresourceRange subresourceRange,
     ResourceState src,
-    ResourceState dst)
+    ResourceState dst
+)
 {
     SLANG_UNUSED(texture);
     SLANG_UNUSED(subresourceRange);
@@ -159,7 +171,7 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::textureSubresourceBa
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    ResourceCommandEncoderImpl::beginDebugEvent(const char* name, float rgbColor[3])
+ResourceCommandEncoderImpl::beginDebugEvent(const char* name, float rgbColor[3])
 {
     SLANG_UNUSED(name);
     SLANG_UNUSED(rgbColor);
@@ -172,23 +184,29 @@ void ComputeCommandEncoderImpl::init(CommandBufferImpl* cmdBuffer)
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ComputeCommandEncoderImpl::bindPipeline(IPipelineState* state, IShaderObject** outRootObject)
+ComputeCommandEncoderImpl::bindPipeline(IPipelineState* state, IShaderObject** outRootObject)
 {
     m_writer->setPipelineState(state);
     PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
     SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
-        pipelineImpl->m_program, m_rootObject.writeRef()));
+        pipelineImpl->m_program,
+        m_rootObject.writeRef()
+    ));
     returnComPtr(outRootObject, m_rootObject);
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL
-    ComputeCommandEncoderImpl::bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject)
+SLANG_NO_THROW Result SLANG_MCALL ComputeCommandEncoderImpl::bindPipelineWithRootObject(
+    IPipelineState* state,
+    IShaderObject* rootObject
+)
 {
     m_writer->setPipelineState(state);
     PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
     SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
-        pipelineImpl->m_program, m_rootObject.writeRef()));
+        pipelineImpl->m_program,
+        m_rootObject.writeRef()
+    ));
     m_rootObject->copyFrom(rootObject, m_commandBuffer->m_transientHeap);
     return SLANG_OK;
 }
@@ -201,7 +219,7 @@ SLANG_NO_THROW Result SLANG_MCALL ComputeCommandEncoderImpl::dispatchCompute(int
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
+ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
     SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
 }

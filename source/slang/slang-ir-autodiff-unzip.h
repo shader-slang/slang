@@ -1,18 +1,17 @@
 // slang-ir-autodiff-unzip.h
 #pragma once
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
 #include "slang-compiler.h"
-
-#include "slang-ir-autodiff.h"
 #include "slang-ir-autodiff-fwd.h"
-#include "slang-ir-autodiff-propagate.h"
-#include "slang-ir-autodiff-transcriber-base.h"
-#include "slang-ir-autodiff-region.h"
 #include "slang-ir-autodiff-primal-hoist.h"
-#include "slang-ir-validate.h"
+#include "slang-ir-autodiff-propagate.h"
+#include "slang-ir-autodiff-region.h"
+#include "slang-ir-autodiff-transcriber-base.h"
+#include "slang-ir-autodiff.h"
+#include "slang-ir-insts.h"
 #include "slang-ir-ssa.h"
+#include "slang-ir-validate.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -21,53 +20,46 @@ struct ParameterBlockTransposeInfo;
 
 struct DiffUnzipPass
 {
-    AutoDiffSharedContext*                  autodiffContext;
+    AutoDiffSharedContext* autodiffContext;
 
-    IRCloneEnv                              cloneEnv;
+    IRCloneEnv cloneEnv;
 
-    DifferentiableTypeConformanceContext    diffTypeContext;
+    DifferentiableTypeConformanceContext diffTypeContext;
 
     // Maps used to keep track of primal and
     // differential versions of split insts.
-    // 
-    Dictionary<IRInst*, IRInst*>            primalMap;
-    Dictionary<IRInst*, IRInst*>            diffMap;
-    Dictionary<IRBlock*, IRBlock*>          recomputeBlockMap;
+    //
+    Dictionary<IRInst*, IRInst*> primalMap;
+    Dictionary<IRInst*, IRInst*> diffMap;
+    Dictionary<IRBlock*, IRBlock*> recomputeBlockMap;
 
     // First diff block.
     // TODO: Can the same pass object can be used for multiple functions?
     // might run into an issue here?
-    IRBlock*                                firstDiffBlock;
+    IRBlock* firstDiffBlock;
 
-    RefPtr<IndexedRegionMap>                      indexRegionMap;
+    RefPtr<IndexedRegionMap> indexRegionMap;
 
-    DiffUnzipPass(
-        AutoDiffSharedContext* autodiffContext)
-        : autodiffContext(autodiffContext)
-        , diffTypeContext(autodiffContext)
-    { }
-
-    IRInst* lookupPrimalInst(IRInst* inst)
+    DiffUnzipPass(AutoDiffSharedContext* autodiffContext)
+        : autodiffContext(autodiffContext), diffTypeContext(autodiffContext)
     {
-        return primalMap[inst];
     }
 
-    IRInst* lookupDiffInst(IRInst* inst)
-    {
-        return diffMap[inst];
-    }
+    IRInst* lookupPrimalInst(IRInst* inst) { return primalMap[inst]; }
+
+    IRInst* lookupDiffInst(IRInst* inst) { return diffMap[inst]; }
 
     void unzipDiffInsts(IRFunc* func)
     {
         diffTypeContext.setFunc(func);
-        
+
         // Build a map of blocks to loop regions.
         // This will be used later to insert tracking indices
-        // 
+        //
         indexRegionMap = buildIndexedRegionMap(func);
 
         IRBuilder builderStorage(autodiffContext->moduleInst->getModule());
-        
+
         IRBuilder* builder = &builderStorage;
 
         IRFunc* unzippedFunc = func;
@@ -79,7 +71,8 @@ struct DiffUnzipPass
         // a use from the primal or diff part of the program.
         builder->setInsertBefore(unzippedFunc->getFirstBlock()->getTerminator());
 
-        for (auto primalParam = unzippedFunc->getFirstParam(); primalParam; primalParam = primalParam->getNextParam())
+        for (auto primalParam = unzippedFunc->getFirstParam(); primalParam;
+             primalParam = primalParam->getNextParam())
         {
             auto type = primalParam->getFullType();
             if (auto ptrType = as<IRPtrTypeBase>(type))
@@ -90,7 +83,8 @@ struct DiffUnzipPass
             {
                 IRInst* diffType = diffTypeContext.getDiffTypeFromPairType(builder, pairType);
                 if (as<IRPtrTypeBase>(primalParam->getFullType()))
-                    diffType = builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
+                    diffType =
+                        builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
                 auto primalRef = builder->emitPrimalParamRef(primalParam);
                 auto diffRef = builder->emitDiffParamRef((IRType*)diffType, primalParam);
                 builder->markInstAsDifferential(diffRef, pairType->getValueType());
@@ -104,8 +98,10 @@ struct DiffUnzipPass
         //
         SLANG_ASSERT(unzippedFunc->getFirstBlock() != nullptr);
         SLANG_ASSERT(unzippedFunc->getFirstBlock()->getNextBlock() != nullptr);
-        
-        IRBlock* firstBlock = as<IRUnconditionalBranch>(unzippedFunc->getFirstBlock()->getTerminator())->getTargetBlock();
+
+        IRBlock* firstBlock =
+            as<IRUnconditionalBranch>(unzippedFunc->getFirstBlock()->getTerminator())
+                ->getTargetBlock();
 
         List<IRBlock*> mixedBlocks;
         for (IRBlock* block = firstBlock; block; block = block->getNextBlock())
@@ -118,7 +114,7 @@ struct DiffUnzipPass
         }
 
         IRBlock* firstPrimalBlock = nullptr;
-        
+
         // Emit an empty primal block for every mixed block.
         for (auto block : mixedBlocks)
         {
@@ -132,23 +128,23 @@ struct DiffUnzipPass
         // Emit an empty differential block for every mixed block.
         for (auto block : mixedBlocks)
         {
-            IRBlock* diffBlock = builder->emitBlock(); 
+            IRBlock* diffBlock = builder->emitBlock();
             diffMap[block] = diffBlock;
 
-            // Mark the differential block as a differential inst 
+            // Mark the differential block as a differential inst
             // (and add a reference to the primal block)
-            builder->markInstAsDifferential(
-                diffBlock, builder->getBasicBlockType(), primalMap[block]);
+            builder
+                ->markInstAsDifferential(diffBlock, builder->getBasicBlockType(), primalMap[block]);
 
             // Record the first differential (code) block,
             // since we want all 'return' insts in primal blocks
             // to be replaced with a brahcn into this block.
-            // 
+            //
             if (block == firstBlock)
                 this->firstDiffBlock = diffBlock;
         }
 
-        // Split each block into two. 
+        // Split each block into two.
         for (auto block : mixedBlocks)
         {
             splitBlock(block, as<IRBlock>(primalMap[block]), as<IRBlock>(diffMap[block]));
@@ -165,13 +161,17 @@ struct DiffUnzipPass
             for (auto block : workList)
             {
                 if (primalMap.containsKey(block))
-                    indexRegionMap->map[as<IRBlock>(primalMap[block])] = (IndexedRegion*)indexRegionMap->map[block];
-                
+                    indexRegionMap->map[as<IRBlock>(primalMap[block])] =
+                        (IndexedRegion*)indexRegionMap->map[block];
+
                 if (diffMap.containsKey(block))
-                    indexRegionMap->map.set(as<IRBlock>(diffMap[block]), (IndexedRegion*)indexRegionMap->map[block]);
+                    indexRegionMap->map.set(
+                        as<IRBlock>(diffMap[block]),
+                        (IndexedRegion*)indexRegionMap->map[block]
+                    );
             }
         }
-        
+
         // Swap the first block's occurences out for the first primal block.
         firstBlock->replaceUsesWith(firstPrimalBlock);
 
@@ -179,7 +179,8 @@ struct DiffUnzipPass
 
         for (auto block : mixedBlocks)
             if (primalMap.containsKey(block))
-                splitInfo->diffBlockMap[as<IRBlock>(primalMap[block])] = as<IRBlock>(diffMap[block]);
+                splitInfo->diffBlockMap[as<IRBlock>(primalMap[block])] =
+                    as<IRBlock>(diffMap[block]);
 
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
@@ -190,8 +191,9 @@ struct DiffUnzipPass
         IRFunc* originalFunc,
         HoistedPrimalsInfo* primalsInfo,
         ParameterBlockTransposeInfo& paramInfo,
-        IRInst*& intermediateType);
-    
+        IRInst*& intermediateType
+    );
+
     static IRInst* _getOriginalFunc(IRInst* call)
     {
         if (auto decor = call->findDecoration<IRAutoDiffOriginalValueDecoration>())
@@ -208,7 +210,9 @@ struct DiffUnzipPass
         SLANG_RELEASE_ASSERT(baseFn);
 
         auto primalFuncType = autodiffContext->transcriberSet.primalTranscriber->transcribe(
-                    primalBuilder, baseFn->getDataType());
+            primalBuilder,
+            baseFn->getDataType()
+        );
 
         IRInst* intermediateType = nullptr;
 
@@ -231,7 +235,8 @@ struct DiffUnzipPass
                     primalBuilder->getTypeKind(),
                     intermediateType,
                     args.getCount(),
-                    args.getBuffer());
+                    args.getBuffer()
+                );
             }
         }
         else
@@ -252,8 +257,12 @@ struct DiffUnzipPass
         IRInst* primalFn = nullptr;
         if (intermediateVar)
         {
-            primalBuilder->addBackwardDerivativePrimalContextDecoration(intermediateVar, intermediateVar);
-            primalFn = primalBuilder->emitBackwardDifferentiatePrimalInst((IRType*)primalFuncType, baseFn);
+            primalBuilder->addBackwardDerivativePrimalContextDecoration(
+                intermediateVar,
+                intermediateVar
+            );
+            primalFn =
+                primalBuilder->emitBackwardDifferentiatePrimalInst((IRType*)primalFuncType, baseFn);
         }
         else
         {
@@ -286,7 +295,8 @@ struct DiffUnzipPass
         if (auto fwdPairResultType = as<IRDifferentialPairType>(mixedDecoration->getPairType()))
         {
             primalType = fwdPairResultType->getValueType();
-            diffType = (IRType*)diffTypeContext.getDiffTypeFromPairType(&globalBuilder, fwdPairResultType);
+            diffType =
+                (IRType*)diffTypeContext.getDiffTypeFromPairType(&globalBuilder, fwdPairResultType);
             SLANG_ASSERT(diffType);
             resultType = fwdPairResultType;
         }
@@ -318,15 +328,16 @@ struct DiffUnzipPass
                 SLANG_ASSERT(primalArg);
                 SLANG_ASSERT(diffArg);
                 auto primalParamType = resolvedPrimalFuncType->getParamType(ii);
-                
+
                 if (const auto outType = as<IROutType>(primalParamType))
                 {
                     // For `out` parameters that expects an input derivative to propagate through,
-                    // we insert a `LoadReverseGradient` inst here to signify the logic in `transposeStore`
-                    // that this argument should actually be the currently accumulated derivative on
-                    // this variable. The end purpose is that we will generate a load(diffArg) in the
-                    // final transposed code and use that as the argument for the call, but we can't just
-                    // emit a normal load inst here because the transposition logic will turn loads into stores.
+                    // we insert a `LoadReverseGradient` inst here to signify the logic in
+                    // `transposeStore` that this argument should actually be the currently
+                    // accumulated derivative on this variable. The end purpose is that we will
+                    // generate a load(diffArg) in the final transposed code and use that as the
+                    // argument for the call, but we can't just emit a normal load inst here because
+                    // the transposition logic will turn loads into stores.
                     auto outDiffType = cast<IRPtrTypeBase>(diffArg->getDataType())->getValueType();
                     auto gradArg = diffBuilder->emitLoadReverseGradient(outDiffType, diffArg);
                     diffBuilder->markInstAsDifferential(gradArg, primalArg->getDataType());
@@ -336,13 +347,16 @@ struct DiffUnzipPass
                 {
                     // Since arg is split into separate vars, we need a new temp var that represents
                     // the remerged diff pair.
-                    auto diffPairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(arg->getDataType())->getValueType());
+                    auto diffPairType = as<IRDifferentialPairType>(
+                        as<IRPtrTypeBase>(arg->getDataType())->getValueType()
+                    );
                     auto primalValueType = diffPairType->getValueType();
-                    
-                    // We can't simply reuse primalArg for an inout parameter since this will represent the value 
-                    // after the primal call which can potentially alter primalArg. Therefore, we will find the
-                    // first store into primalArg, and create a temp var holding that value (i.e. value prior to primal call)
-                    // 
+
+                    // We can't simply reuse primalArg for an inout parameter since this will
+                    // represent the value after the primal call which can potentially alter
+                    // primalArg. Therefore, we will find the first store into primalArg, and create
+                    // a temp var holding that value (i.e. value prior to primal call)
+                    //
                     auto storeUse = findUniqueStoredVal(cast<IRVar>(primalArg));
                     auto storeInst = cast<IRStore>(storeUse->getUser());
 
@@ -351,8 +365,12 @@ struct DiffUnzipPass
                     // Emit the temp var into the primal blocks since it's holding a primal value.
                     auto tempPrimalVar = primalBuilder->emitVar(primalValueType);
                     primalBuilder->emitStore(tempPrimalVar, storedVal);
-                    
-                    auto diffPairRef = diffBuilder->emitReverseGradientDiffPairRef(arg->getDataType(), tempPrimalVar, diffArg);
+
+                    auto diffPairRef = diffBuilder->emitReverseGradientDiffPairRef(
+                        arg->getDataType(),
+                        tempPrimalVar,
+                        diffArg
+                    );
                     diffBuilder->markInstAsDifferential(diffPairRef, primalValueType);
                     diffArgs.add(diffPairRef);
                 }
@@ -364,7 +382,8 @@ struct DiffUnzipPass
                     auto pairArg = diffBuilder->emitMakeDifferentialPair(
                         arg->getDataType(),
                         primalArg,
-                        diffArg);
+                        diffArg
+                    );
 
                     diffBuilder->markInstAsDifferential(pairArg, primalArg->getDataType());
                     diffArgs.add(pairArg);
@@ -375,10 +394,12 @@ struct DiffUnzipPass
                 if (as<IRInOutType>(resolvedPrimalFuncType->getParamType(ii)))
                 {
                     // For 'inout' parameter we need to create a temp var to hold the value
-                    // before the primal call. This logic is similar to the 'inout' case for differentiable params
-                    // only we don't need to deal with pair types.
+                    // before the primal call. This logic is similar to the 'inout' case for
+                    // differentiable params only we don't need to deal with pair types.
                     //
-                    auto tempPrimalVar = primalBuilder->emitVar(as<IRPtrTypeBase>(arg->getDataType())->getValueType());
+                    auto tempPrimalVar =
+                        primalBuilder->emitVar(as<IRPtrTypeBase>(arg->getDataType())->getValueType()
+                        );
 
                     auto storeUse = findUniqueStoredVal(cast<IRVar>(arg));
                     auto storeInst = cast<IRStore>(storeUse->getUser());
@@ -392,23 +413,20 @@ struct DiffUnzipPass
                 {
                     // For pure 'in' type. Simply re-use the original argument inst.
                     //
-                    // For 'out' type parameters, it doesn't really matter what we pass in here, since
-                    // the tranposition logic will discard the argument anyway (we'll pass in the old arg, 
-                    // just to keep the number of arguments consistent)
-                    // 
+                    // For 'out' type parameters, it doesn't really matter what we pass in here,
+                    // since the tranposition logic will discard the argument anyway (we'll pass in
+                    // the old arg, just to keep the number of arguments consistent)
+                    //
                     diffArgs.add(arg);
                 }
             }
         }
-        
+
         auto newFwdCallee = diffBuilder->emitForwardDifferentiateInst(fwdCalleeType, baseFn);
 
         diffBuilder->markInstAsDifferential(newFwdCallee);
 
-        auto callInst = diffBuilder->emitCallInst(
-            resultType,
-            newFwdCallee,
-            diffArgs);
+        auto callInst = diffBuilder->emitCallInst(resultType, newFwdCallee, diffArgs);
         diffBuilder->markInstAsDifferential(callInst, primalType);
 
         if (intermediateVar)
@@ -459,9 +477,10 @@ struct DiffUnzipPass
 
     InstPair splitVar(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRVar* mixedVar)
     {
-        auto pairType = as<IRDifferentialPairType>(as<IRPtrTypeBase>(mixedVar->getDataType())->getValueType());
+        auto pairType =
+            as<IRDifferentialPairType>(as<IRPtrTypeBase>(mixedVar->getDataType())->getValueType());
         auto primalType = pairType->getValueType();
-        auto diffType = (IRType*) diffTypeContext.getDifferentialForType(primalBuilder, primalType);
+        auto diffType = (IRType*)diffTypeContext.getDifferentialForType(primalBuilder, primalType);
         auto primalVar = primalBuilder->emitVar(primalType);
         auto diffVar = diffBuilder->emitVar(diffType);
         diffBuilder->markInstAsDifferential(diffVar, diffBuilder->getPtrType(primalType));
@@ -478,15 +497,18 @@ struct DiffUnzipPass
 
             // Check that we have an unambiguous 'first' differential block.
             SLANG_ASSERT(firstDiffBlock);
-            
+
             auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
             primalBuilder->addBackwardDerivativePrimalReturnDecoration(
-                primalBranch, lookupPrimalInst(mixedReturn->getVal()));
+                primalBranch,
+                lookupPrimalInst(mixedReturn->getVal())
+            );
 
             auto pairVal = diffBuilder->emitMakeDifferentialPair(
                 pairType,
                 lookupPrimalInst(mixedReturn->getVal()),
-                lookupDiffInst(mixedReturn->getVal()));
+                lookupDiffInst(mixedReturn->getVal())
+            );
             diffBuilder->markInstAsDifferential(pairVal, primalType);
 
             auto returnInst = diffBuilder->emitReturn(pairVal);
@@ -499,7 +521,9 @@ struct DiffUnzipPass
             // If return value is not differentiable, just turn it into a trivial branch.
             auto primalBranch = primalBuilder->emitBranch(firstDiffBlock);
             primalBuilder->addBackwardDerivativePrimalReturnDecoration(
-                primalBranch, mixedReturn->getVal());
+                primalBranch,
+                mixedReturn->getVal()
+            );
 
             auto returnInst = diffBuilder->emitReturn();
             diffBuilder->markInstAsDifferential(returnInst, nullptr);
@@ -508,19 +532,19 @@ struct DiffUnzipPass
     }
 
     // Splitting a loop is one of the trickiest parts of the unzip pass.
-    // Thus far, we've been dealing with blocks that are only run once, so we 
+    // Thus far, we've been dealing with blocks that are only run once, so we
     // could arbitrarily move intermediate instructions to other blocks since they are
     // generated and consumed at-most one time.
-    // 
+    //
     // Intermediate instructions in a loop can take on a different value each iteration
     // and thus need to be stored explicitly to an array.
-    // 
-    // We also need to ascertain an upper limit on the iteration count. 
+    //
+    // We also need to ascertain an upper limit on the iteration count.
     // With very few exceptions, this is a fundamental requirement.
-    // 
+    //
     InstPair splitLoop(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRLoop* mixedLoop)
     {
-        
+
         auto breakBlock = mixedLoop->getBreakBlock();
         auto continueBlock = mixedLoop->getContinueBlock();
         auto nextBlock = mixedLoop->getTargetBlock();
@@ -541,14 +565,16 @@ struct DiffUnzipPass
             as<IRBlock>(primalMap[breakBlock]),
             as<IRBlock>(primalMap[continueBlock]),
             primalArgs.getCount(),
-            primalArgs.getBuffer());
+            primalArgs.getBuffer()
+        );
 
         auto diffLoop = diffBuilder->emitLoop(
             as<IRBlock>(diffMap[nextBlock]),
             as<IRBlock>(diffMap[breakBlock]),
             as<IRBlock>(diffMap[continueBlock]),
             diffArgs.getCount(),
-            diffArgs.getBuffer());
+            diffArgs.getBuffer()
+        );
 
         if (auto maxItersDecoration = mixedLoop->findDecoration<IRLoopMaxItersDecoration>())
         {
@@ -563,11 +589,11 @@ struct DiffUnzipPass
     {
         switch (branchInst->getOp())
         {
-        case kIROp_unconditionalBranch:
+            case kIROp_unconditionalBranch:
             {
                 auto uncondBranchInst = as<IRUnconditionalBranch>(branchInst);
                 auto targetBlock = uncondBranchInst->getTargetBlock();
-                
+
                 // Split args.
                 List<IRInst*> primalArgs;
                 List<IRInst*> diffArgs;
@@ -578,19 +604,22 @@ struct DiffUnzipPass
                     else
                         primalArgs.add(uncondBranchInst->getArg(ii));
                 }
-                
+
                 return InstPair(
                     primalBuilder->emitBranch(
                         as<IRBlock>(primalMap[targetBlock]),
                         primalArgs.getCount(),
-                        primalArgs.getBuffer()),
+                        primalArgs.getBuffer()
+                    ),
                     diffBuilder->emitBranch(
                         as<IRBlock>(diffMap[targetBlock]),
                         diffArgs.getCount(),
-                        diffArgs.getBuffer()));
+                        diffArgs.getBuffer()
+                    )
+                );
             }
-        
-        case kIROp_conditionalBranch:
+
+            case kIROp_conditionalBranch:
             {
                 auto trueBlock = as<IRConditionalBranch>(branchInst)->getTrueBlock();
                 auto falseBlock = as<IRConditionalBranch>(branchInst)->getFalseBlock();
@@ -600,14 +629,17 @@ struct DiffUnzipPass
                     primalBuilder->emitBranch(
                         condInst,
                         as<IRBlock>(primalMap[trueBlock]),
-                        as<IRBlock>(primalMap[falseBlock])),
+                        as<IRBlock>(primalMap[falseBlock])
+                    ),
                     diffBuilder->emitBranch(
                         condInst,
                         as<IRBlock>(diffMap[trueBlock]),
-                        as<IRBlock>(diffMap[falseBlock])));
+                        as<IRBlock>(diffMap[falseBlock])
+                    )
+                );
             }
-        
-        case kIROp_ifElse:
+
+            case kIROp_ifElse:
             {
                 auto trueBlock = as<IRIfElse>(branchInst)->getTrueBlock();
                 auto falseBlock = as<IRIfElse>(branchInst)->getFalseBlock();
@@ -619,15 +651,18 @@ struct DiffUnzipPass
                         condInst,
                         as<IRBlock>(primalMap[trueBlock]),
                         as<IRBlock>(primalMap[falseBlock]),
-                        as<IRBlock>(primalMap[afterBlock])),
+                        as<IRBlock>(primalMap[afterBlock])
+                    ),
                     diffBuilder->emitIfElse(
                         condInst,
                         as<IRBlock>(diffMap[trueBlock]),
                         as<IRBlock>(diffMap[falseBlock]),
-                        as<IRBlock>(diffMap[afterBlock])));
+                        as<IRBlock>(diffMap[afterBlock])
+                    )
+                );
             }
-        
-        case kIROp_Switch:
+
+            case kIROp_Switch:
             {
                 auto switchInst = as<IRSwitch>(branchInst);
                 auto breakBlock = switchInst->getBreakLabel();
@@ -637,7 +672,7 @@ struct DiffUnzipPass
                 List<IRInst*> primalCaseArgs;
                 List<IRInst*> diffCaseArgs;
 
-                for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii ++)
+                for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii++)
                 {
                     primalCaseArgs.add(switchInst->getCaseValue(ii));
                     diffCaseArgs.add(switchInst->getCaseValue(ii));
@@ -652,58 +687,51 @@ struct DiffUnzipPass
                         as<IRBlock>(primalMap[breakBlock]),
                         as<IRBlock>(primalMap[defaultBlock]),
                         primalCaseArgs.getCount(),
-                        primalCaseArgs.getBuffer()),
+                        primalCaseArgs.getBuffer()
+                    ),
                     diffBuilder->emitSwitch(
                         condInst,
                         as<IRBlock>(diffMap[breakBlock]),
                         as<IRBlock>(diffMap[defaultBlock]),
                         diffCaseArgs.getCount(),
-                        diffCaseArgs.getBuffer()));
+                        diffCaseArgs.getBuffer()
+                    )
+                );
             }
-        
-        case kIROp_loop:
-            return splitLoop(primalBuilder, diffBuilder, as<IRLoop>(branchInst));
-        
-        default:
-            SLANG_UNEXPECTED("Unhandled instruction");
+
+            case kIROp_loop: return splitLoop(primalBuilder, diffBuilder, as<IRLoop>(branchInst));
+
+            default: SLANG_UNEXPECTED("Unhandled instruction");
         }
     }
-    
+
     InstPair _splitMixedInst(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRInst* inst)
     {
         switch (inst->getOp())
         {
-        case kIROp_Call:
-            return splitCall(primalBuilder, diffBuilder, as<IRCall>(inst));
+            case kIROp_Call: return splitCall(primalBuilder, diffBuilder, as<IRCall>(inst));
 
-        case kIROp_Var:
-            return splitVar(primalBuilder, diffBuilder, as<IRVar>(inst));
+            case kIROp_Var: return splitVar(primalBuilder, diffBuilder, as<IRVar>(inst));
 
-        case kIROp_MakeDifferentialPair:
-            return splitMakePair(primalBuilder, diffBuilder, as<IRMakeDifferentialPair>(inst));
- 
-        case kIROp_Load:
-            return splitLoad(primalBuilder, diffBuilder, as<IRLoad>(inst));
-        
-        case kIROp_Store:
-            return splitStore(primalBuilder, diffBuilder, as<IRStore>(inst));
+            case kIROp_MakeDifferentialPair:
+                return splitMakePair(primalBuilder, diffBuilder, as<IRMakeDifferentialPair>(inst));
 
-        case kIROp_Return:
-            return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
+            case kIROp_Load: return splitLoad(primalBuilder, diffBuilder, as<IRLoad>(inst));
 
-        case kIROp_unconditionalBranch:
-        case kIROp_conditionalBranch:
-        case kIROp_ifElse:
-        case kIROp_Switch:
-        case kIROp_loop:
-            return splitControlFlow(primalBuilder, diffBuilder, inst);
-        
-        case kIROp_Unreachable:
-            return InstPair(primalBuilder->emitUnreachable(),
-                diffBuilder->emitUnreachable());
+            case kIROp_Store: return splitStore(primalBuilder, diffBuilder, as<IRStore>(inst));
 
-        default:
-            SLANG_ASSERT_FAILURE("Unhandled mixed diff inst");
+            case kIROp_Return: return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
+
+            case kIROp_unconditionalBranch:
+            case kIROp_conditionalBranch:
+            case kIROp_ifElse:
+            case kIROp_Switch:
+            case kIROp_loop:                return splitControlFlow(primalBuilder, diffBuilder, inst);
+
+            case kIROp_Unreachable:
+                return InstPair(primalBuilder->emitUnreachable(), diffBuilder->emitUnreachable());
+
+            default: SLANG_ASSERT_FAILURE("Unhandled mixed diff inst");
         }
     }
 
@@ -777,8 +805,10 @@ struct DiffUnzipPass
             // Consistency check.
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {
-                SLANG_RELEASE_ASSERT((use->getUser()->getParent() != primalBlock) && 
-                    (use->getUser()->getParent() != diffBlock));
+                SLANG_RELEASE_ASSERT(
+                    (use->getUser()->getParent() != primalBlock) &&
+                    (use->getUser()->getParent() != diffBlock)
+                );
             }
 
             // Leave terminator in to keep CFG info.
@@ -791,4 +821,4 @@ struct DiffUnzipPass
     }
 };
 
-}
+} // namespace Slang

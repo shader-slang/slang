@@ -1,9 +1,9 @@
 // slang-ir-specialize-arrays.cpp
 #include "slang-ir-specialize-arrays.h"
 
+#include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir.h"
-#include "slang-ir-insts.h"
 
 namespace Slang
 {
@@ -84,13 +84,11 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
     CodeGenContext* codeGenContext = nullptr;
 };
 
-void specializeArrayParameters(
-    CodeGenContext* codeGenContext,
-    IRModule*       module)
+void specializeArrayParameters(CodeGenContext* codeGenContext, IRModule* module)
 {
     ArrayParameterSpecializationCondition condition;
     condition.codeGenContext = codeGenContext;
     specializeFunctionCalls(codeGenContext, module, &condition);
 }
 
-} // namesapce Slang
+} // namespace Slang

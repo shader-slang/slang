@@ -1,9 +1,9 @@
 // slang-ir-dce.cpp
 #include "slang-ir-dce.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -16,9 +16,9 @@ struct DeadCodeEliminationContext
     // the parameters that were passed to the top-level
     // `eliminateDeadCode` function.
     //
-    IRModule*                       module;
+    IRModule* module;
 
-    IRDeadCodeEliminationOptions    options;
+    IRDeadCodeEliminationOptions options;
 
     // If we removed an inst, there may be still "weak references" to the inst.
     // These uses will be replaced with `undefInst`.
@@ -36,7 +36,8 @@ struct DeadCodeEliminationContext
     //
     bool isInstAlive(IRInst* inst)
     {
-        if (!inst) return false;
+        if (!inst)
+            return false;
         return inst->scratchData != 0;
     }
 
@@ -64,7 +65,8 @@ struct DeadCodeEliminationContext
         // Again, we safeguard against null instructions
         // just in case.
         //
-        if(!inst) return;
+        if (!inst)
+            return;
 
         if (!inst->scratchData)
         {
@@ -212,10 +214,7 @@ struct DeadCodeEliminationContext
     // dive into the task of actually finding all
     // the live code in a module.
     //
-    bool processModule()
-    {
-        return processInst(module->getModuleInst());
-    }
+    bool processModule() { return processInst(module->getModuleInst()); }
 
     bool eliminateDeadInstsRec(IRInst* inst)
     {
@@ -225,7 +224,7 @@ struct DeadCodeEliminationContext
         //
         // The easy case is if `inst` is dead (that is, not live).
         //
-        if( !isInstAlive(inst) )
+        if (!isInstAlive(inst))
         {
             // We can simply remove and deallocate `inst` because it is
             // dead, and not worry about any of its descendents,
@@ -261,7 +260,7 @@ struct DeadCodeEliminationContext
             List<IRInst*> children;
             for (auto child : inst->getDecorationsAndChildren())
                 children.add(child);
-            for(IRInst* child : children)
+            for (IRInst* child : children)
             {
                 changed |= eliminateDeadInstsRec(child);
             }
@@ -308,8 +307,8 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     // when it is executed, then we should keep it around.
     //
     SideEffectAnalysisOptions sideEffectOptions = options.useFastAnalysis
-        ? SideEffectAnalysisOptions::None
-        : SideEffectAnalysisOptions::UseDominanceTree;
+                                                      ? SideEffectAnalysisOptions::None
+                                                      : SideEffectAnalysisOptions::UseDominanceTree;
 
     if (inst->mightHaveSideEffects(sideEffectOptions))
     {
@@ -354,22 +353,17 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
         {
             switch (decor->getOp())
             {
-            case kIROp_ExportDecoration:
-                return true;
-            case kIROp_ImportDecoration:
-                isImported = true;
-                break;
+                case kIROp_ExportDecoration: return true;
+                case kIROp_ImportDecoration: isImported = true; break;
             }
         }
         for (auto decor : innerInst->getDecorations())
         {
             switch (decor->getOp())
             {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_PrimalSubstituteDecoration:
-                shouldKeptAliveIfImported = true;
-                break;
+                case kIROp_ForwardDerivativeDecoration:
+                case kIROp_UserDefinedBackwardDerivativeDecoration:
+                case kIROp_PrimalSubstituteDecoration:              shouldKeptAliveIfImported = true; break;
             }
         }
         if (isImported && shouldKeptAliveIfImported)
@@ -402,31 +396,28 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     //
     switch (inst->getOp())
     {
-        // Function parameters obviously shouldn't get eliminated,
-        // even if nothing references them.
-        //
-    case kIROp_Param:
-        return isFirstBlock(inst->getParent());
+            // Function parameters obviously shouldn't get eliminated,
+            // even if nothing references them.
+            //
+        case kIROp_Param:
+            return isFirstBlock(inst->getParent());
 
-        // IR struct types and witness tables are currently kludged
-        // so that they have child instructions that represent their
-        // entries (effectively `(key,value)` pairs), and those child
-        // instructions are never directly referenced (e.g., an access
-        // to a struct field references the *key* but not the `(key,value)`
-        // pair that is the `IRField` instruction.
-        //
-        // TODO: at some point the IR should use a different representation
-        // for struct types and witness tables that does away with
-        // this problem.
-        //
-    case kIROp_StructField:
-    case kIROp_WitnessTableEntry:
-        return true;
+            // IR struct types and witness tables are currently kludged
+            // so that they have child instructions that represent their
+            // entries (effectively `(key,value)` pairs), and those child
+            // instructions are never directly referenced (e.g., an access
+            // to a struct field references the *key* but not the `(key,value)`
+            // pair that is the `IRField` instruction.
+            //
+            // TODO: at some point the IR should use a different representation
+            // for struct types and witness tables that does away with
+            // this problem.
+            //
+        case kIROp_StructField:
+        case kIROp_WitnessTableEntry: return true;
 
-    case kIROp_GlobalParam:
-        return options.keepGlobalParamsAlive;
-    default:
-        break;
+        case kIROp_GlobalParam: return options.keepGlobalParamsAlive;
+        default:                break;
     }
 
     // If none of the explicit cases above matched, then we will consider
@@ -445,16 +436,15 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
     // to be replaced with `undef`.
     switch (inst->getOp())
     {
-    case kIROp_BoundInterfaceType:
-        if (inst->getOperand(operandIndex)->getOp() == kIROp_WitnessTable)
+        case kIROp_BoundInterfaceType:
+            if (inst->getOperand(operandIndex)->getOp() == kIROp_WitnessTable)
+                return true;
+            break;
+        case kIROp_SpecializationDictionaryItem:
+            // Ignore all operands of SpecializationDictionaryItem.
+            // This inst is used as a cache and shouldn't hold anything alive.
             return true;
-        break;
-    case kIROp_SpecializationDictionaryItem:
-        // Ignore all operands of SpecializationDictionaryItem.
-        // This inst is used as a cache and shouldn't hold anything alive.
-        return true;
-    default:
-        break;
+        default: break;
     }
     return false;
 }
@@ -463,9 +453,7 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
 // is straighforward. We set up the context object
 // and then defer to it for the real work.
 //
-bool eliminateDeadCode(
-    IRModule*                           module,
-    IRDeadCodeEliminationOptions const& options)
+bool eliminateDeadCode(IRModule* module, IRDeadCodeEliminationOptions const& options)
 {
     DeadCodeEliminationContext context;
     context.module = module;
@@ -473,9 +461,7 @@ bool eliminateDeadCode(
     return context.processModule();
 }
 
-bool eliminateDeadCode(
-    IRInst* root,
-    IRDeadCodeEliminationOptions const& options)
+bool eliminateDeadCode(IRInst* root, IRDeadCodeEliminationOptions const& options)
 {
     DeadCodeEliminationContext context;
     context.module = root->getModule();
@@ -483,4 +469,4 @@ bool eliminateDeadCode(
     return context.processInst(root);
 }
 
-}
+} // namespace Slang

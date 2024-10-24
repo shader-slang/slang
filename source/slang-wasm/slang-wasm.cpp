@@ -1,10 +1,12 @@
-#include <vector>
-#include <string>
-#include <slang.h>
-#include <slang-com-ptr.h>
 #include "slang-wasm.h"
+
 #include "../core/slang-blob.h"
 #include "../core/slang-exception.h"
+
+#include <slang-com-ptr.h>
+#include <slang.h>
+#include <string>
+#include <vector>
 
 using namespace slang;
 
@@ -65,20 +67,20 @@ Module* Session::loadModuleFromSource(const std::string& slangCode)
 {
     Slang::ComPtr<IModule> module;
     {
-        const char * name = "";
-        const char * path = "";
+        const char* name = "";
+        const char* path = "";
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-        Slang::ComPtr<ISlangBlob> slangCodeBlob = Slang::RawBlob::create(
-            slangCode.c_str(), slangCode.size());
-        module = m_interface->loadModuleFromSource(
-            name, path, slangCodeBlob, diagnosticsBlob.writeRef());
+        Slang::ComPtr<ISlangBlob> slangCodeBlob =
+            Slang::RawBlob::create(slangCode.c_str(), slangCode.size());
+        module = m_interface
+                     ->loadModuleFromSource(name, path, slangCodeBlob, diagnosticsBlob.writeRef());
         if (!module)
         {
             g_error.type = std::string("USER");
             g_error.message = std::string(
                 (char*)diagnosticsBlob->getBufferPointer(),
-                (char*)diagnosticsBlob->getBufferPointer() +
-                diagnosticsBlob->getBufferSize());
+                (char*)diagnosticsBlob->getBufferPointer() + diagnosticsBlob->getBufferSize()
+            );
             return nullptr;
         }
     }
@@ -90,8 +92,8 @@ EntryPoint* Module::findEntryPointByName(const std::string& name)
 {
     Slang::ComPtr<IEntryPoint> entryPoint;
     {
-        SlangResult result = moduleInterface()->findEntryPointByName(
-            name.c_str(), entryPoint.writeRef());
+        SlangResult result =
+            moduleInterface()->findEntryPointByName(name.c_str(), entryPoint.writeRef());
         if (result != SLANG_OK)
         {
             g_error.type = std::string("USER");
@@ -110,7 +112,11 @@ EntryPoint* Module::findAndCheckEntryPoint(const std::string& name, int stage)
     {
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
         SlangResult result = moduleInterface()->findAndCheckEntryPoint(
-            name.c_str(), (SlangStage)stage, entryPoint.writeRef(), diagnosticsBlob.writeRef());
+            name.c_str(),
+            (SlangStage)stage,
+            entryPoint.writeRef(),
+            diagnosticsBlob.writeRef()
+        );
         if (!SLANG_SUCCEEDED(result))
         {
             g_error.type = std::string("USER");
@@ -128,8 +134,7 @@ EntryPoint* Module::findAndCheckEntryPoint(const std::string& name, int stage)
     return new EntryPoint(entryPoint);
 }
 
-ComponentType* Session::createCompositeComponentType(
-    const std::vector<ComponentType*>& components)
+ComponentType* Session::createCompositeComponentType(const std::vector<ComponentType*>& components)
 {
     Slang::ComPtr<IComponentType> composite;
     {
@@ -139,7 +144,8 @@ ComponentType* Session::createCompositeComponentType(
         SlangResult result = m_interface->createCompositeComponentType(
             nativeComponents.data(),
             (SlangInt)nativeComponents.size(),
-            composite.writeRef());
+            composite.writeRef()
+        );
         if (result != SLANG_OK)
         {
             g_error.type = std::string("USER");
@@ -156,16 +162,15 @@ ComponentType* ComponentType::link()
     Slang::ComPtr<IComponentType> linkedProgram;
     {
         Slang::ComPtr<ISlangBlob> diagnosticBlob;
-        SlangResult result = interface()->link(
-            linkedProgram.writeRef(), diagnosticBlob.writeRef());
+        SlangResult result = interface()->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
         if (result != SLANG_OK)
         {
             g_error.type = std::string("USER");
             g_error.result = result;
             g_error.message = std::string(
                 (char*)diagnosticBlob->getBufferPointer(),
-                (char*)diagnosticBlob->getBufferPointer() +
-                diagnosticBlob->getBufferSize());
+                (char*)diagnosticBlob->getBufferPointer() + diagnosticBlob->getBufferSize()
+            );
             return nullptr;
         }
     }
@@ -182,20 +187,22 @@ std::string ComponentType::getEntryPointCode(int entryPointIndex, int targetInde
             entryPointIndex,
             targetIndex,
             kernelBlob.writeRef(),
-            diagnosticBlob.writeRef());
+            diagnosticBlob.writeRef()
+        );
         if (result != SLANG_OK)
         {
             g_error.type = std::string("USER");
             g_error.result = result;
             g_error.message = std::string(
                 (char*)diagnosticBlob->getBufferPointer(),
-                (char*)diagnosticBlob->getBufferPointer() +
-                diagnosticBlob->getBufferSize());
+                (char*)diagnosticBlob->getBufferPointer() + diagnosticBlob->getBufferSize()
+            );
             return "";
         }
         std::string wgslCode = std::string(
             (char*)kernelBlob->getBufferPointer(),
-            (char*)kernelBlob->getBufferPointer() + kernelBlob->getBufferSize());
+            (char*)kernelBlob->getBufferPointer() + kernelBlob->getBufferSize()
+        );
         return wgslCode;
     }
 

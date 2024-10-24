@@ -1,31 +1,33 @@
 #pragma once
 
+#include "../core/slang-string.h"
 #include "slang-ir.h"
 #include "slang-type-system-shared.h"
-#include "../core/slang-string.h"
 
 namespace Slang
 {
 
-static const struct BaseTextureShapeInfo {
-    char const*			    shapeName;
-    SlangResourceShape      baseShape;
-    int					    coordCount;
+static const struct BaseTextureShapeInfo
+{
+    char const* shapeName;
+    SlangResourceShape baseShape;
+    int coordCount;
 } kBaseTextureShapes[] = {
-    { "1D",		SLANG_TEXTURE_1D,	1 },
-    { "2D",		SLANG_TEXTURE_2D,	2 },
-    { "3D",		SLANG_TEXTURE_3D,	3 },
-    { "Cube",	SLANG_TEXTURE_CUBE, 3 },
+    {"1D", SLANG_TEXTURE_1D, 1},
+    {"2D", SLANG_TEXTURE_2D, 2},
+    {"3D", SLANG_TEXTURE_3D, 3},
+    {"Cube", SLANG_TEXTURE_CUBE, 3},
 };
 
-static const struct BaseTextureAccessInfo {
+static const struct BaseTextureAccessInfo
+{
     char const* name;
     SlangResourceAccess access;
 } kBaseTextureAccessLevels[] = {
-    { "",                   SLANG_RESOURCE_ACCESS_READ },
-    { "RW",                 SLANG_RESOURCE_ACCESS_READ_WRITE },
-    { "RasterizerOrdered",  SLANG_RESOURCE_ACCESS_RASTER_ORDERED },
-    { "Feedback",           SLANG_RESOURCE_ACCESS_FEEDBACK },
+    {"", SLANG_RESOURCE_ACCESS_READ},
+    {"RW", SLANG_RESOURCE_ACCESS_READ_WRITE},
+    {"RasterizerOrdered", SLANG_RESOURCE_ACCESS_RASTER_ORDERED},
+    {"Feedback", SLANG_RESOURCE_ACCESS_FEEDBACK},
 };
 
 struct TextureTypeInfo
@@ -36,7 +38,8 @@ struct TextureTypeInfo
         bool isMultisample,
         bool isShadow,
         StringBuilder& inSB,
-        String const& inPath);
+        String const& inPath
+    );
 
     BaseTextureShapeInfo const& base;
     bool isArray;
@@ -71,7 +74,7 @@ public:
         const String& spirvCombined,
         const String& metal,
         const String& wgsl
-        );
+    );
     void writeFuncWithSig(
         const char* funcName,
         const String& sig,
@@ -102,4 +105,4 @@ public:
     const char* i;
 };
 
-}
+} // namespace Slang

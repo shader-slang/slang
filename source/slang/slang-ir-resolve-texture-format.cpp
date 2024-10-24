@@ -1,13 +1,14 @@
 #include "slang-ir-resolve-texture-format.h"
-#include "slang-ir-insts.h"
+
 #include "slang-ir-clone.h"
+#include "slang-ir-insts.h"
 
 namespace Slang
 {
-    static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementType)
+static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementType)
+{
+    switch (originalType->getOp())
     {
-        switch (originalType->getOp())
-        {
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
         case kIROp_PtrType:
@@ -16,7 +17,8 @@ namespace Slang
         case kIROp_ConstRefType:
         case kIROp_InOutType:
         {
-            auto newInnerType = replaceImageElementType(originalType->getOperand(0), newElementType);
+            auto newInnerType =
+                replaceImageElementType(originalType->getOperand(0), newElementType);
             if (newInnerType != originalType->getOperand(0))
             {
                 IRBuilder builder(originalType);
@@ -32,61 +34,63 @@ namespace Slang
             if (as<IRResourceTypeBase>(originalType))
                 return (IRType*)newElementType;
             return (IRType*)originalType;
-        }
     }
+}
 
-    static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeBase* textureType)
+static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeBase* textureType)
+{
+    ImageFormat format = (ImageFormat)(textureType->getFormat());
+    auto decor = textureInst->findDecoration<IRFormatDecoration>();
+    if (!decor)
+        return;
+    if (decor->getFormat() == (ImageFormat)textureType->getFormat())
+        return;
+
+    format = decor->getFormat();
+    if (format != ImageFormat::unknown)
     {
-        ImageFormat format = (ImageFormat)(textureType->getFormat());
-        auto decor = textureInst->findDecoration<IRFormatDecoration>();
-        if (!decor)
-            return;
-        if (decor->getFormat() == (ImageFormat)textureType->getFormat())
-            return;
+        IRBuilder builder(textureInst->getModule());
+        builder.setInsertBefore(textureInst);
+        auto formatArg = builder.getIntValue(builder.getUIntType(), IRIntegerValue(format));
 
-        format = decor->getFormat();
-        if (format != ImageFormat::unknown)
+        auto newType = builder.getTextureType(
+            textureType->getElementType(),
+            textureType->getShapeInst(),
+            textureType->getIsArrayInst(),
+            textureType->getIsMultisampleInst(),
+            textureType->getSampleCountInst(),
+            textureType->getAccessInst(),
+            textureType->getIsShadowInst(),
+            textureType->getIsCombinedInst(),
+            formatArg
+        );
+
+        List<IRUse*> typeReplacementWorkList;
+        HashSet<IRUse*> typeReplacementWorkListSet;
+
+        auto newInstType = (IRType*)replaceImageElementType(textureInst->getFullType(), newType);
+        textureInst->setFullType(newInstType);
+
+        for (auto use = textureInst->firstUse; use; use = use->nextUse)
         {
-            IRBuilder builder(textureInst->getModule());
-            builder.setInsertBefore(textureInst);
-            auto formatArg = builder.getIntValue(builder.getUIntType(), IRIntegerValue(format));
+            if (typeReplacementWorkListSet.add(use))
+                typeReplacementWorkList.add(use);
+        }
 
-            auto newType = builder.getTextureType(
-                textureType->getElementType(),
-                textureType->getShapeInst(),
-                textureType->getIsArrayInst(),
-                textureType->getIsMultisampleInst(),
-                textureType->getSampleCountInst(),
-                textureType->getAccessInst(),
-                textureType->getIsShadowInst(),
-                textureType->getIsCombinedInst(),
-                formatArg);
-
-            List<IRUse*> typeReplacementWorkList;
-            HashSet<IRUse*> typeReplacementWorkListSet;
-
-            auto newInstType = (IRType*)replaceImageElementType(textureInst->getFullType(), newType);
-            textureInst->setFullType(newInstType);
-          
-            for (auto use = textureInst->firstUse; use; use = use->nextUse)
+        // Update the types on dependent insts.
+        for (Index i = 0; i < typeReplacementWorkList.getCount(); i++)
+        {
+            auto use = typeReplacementWorkList[i];
+            auto user = use->getUser();
+            switch (user->getOp())
             {
-                if (typeReplacementWorkListSet.add(use))
-                    typeReplacementWorkList.add(use);
-            }
-
-            // Update the types on dependent insts.
-            for (Index i = 0; i < typeReplacementWorkList.getCount(); i++)
-            {
-                auto use = typeReplacementWorkList[i];
-                auto user = use->getUser();
-                switch (user->getOp())
-                {
                 case kIROp_GetElementPtr:
                 case kIROp_GetElement:
                 case kIROp_Load:
                 case kIROp_Var:
                 {
-                    auto newUserType = (IRType*)replaceImageElementType(user->getFullType(), newType);
+                    auto newUserType =
+                        (IRType*)replaceImageElementType(user->getFullType(), newType);
                     if (newUserType != user->getFullType())
                     {
                         user->setFullType(newUserType);
@@ -104,7 +108,8 @@ namespace Slang
                     if (use == store->getValUse())
                     {
                         auto ptr = store->getPtr();
-                        auto newPtrType = (IRType*)replaceImageElementType(ptr->getFullType(), newType);
+                        auto newPtrType =
+                            (IRType*)replaceImageElementType(ptr->getFullType(), newType);
                         if (newPtrType != ptr->getFullType())
                         {
                             ptr->setFullType(newPtrType);
@@ -117,26 +122,32 @@ namespace Slang
                     }
                     break;
                 }
-                }
-            }
-        }
-    }
-
-    void resolveTextureFormat(IRModule* module)
-    {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (as<IRTextureTypeBase>(globalInst->getDataType()))
-            {
-                resolveTextureFormatForParameter(globalInst, (IRTextureTypeBase*)globalInst->getDataType());
-            }
-            else if (auto arrayType = as<IRArrayTypeBase>(globalInst->getDataType()))
-            {
-                if (as<IRTextureTypeBase>(arrayType->getElementType()))
-                {
-                    resolveTextureFormatForParameter(globalInst, (IRTextureTypeBase*)arrayType->getElementType());
-                }
             }
         }
     }
 }
+
+void resolveTextureFormat(IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (as<IRTextureTypeBase>(globalInst->getDataType()))
+        {
+            resolveTextureFormatForParameter(
+                globalInst,
+                (IRTextureTypeBase*)globalInst->getDataType()
+            );
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(globalInst->getDataType()))
+        {
+            if (as<IRTextureTypeBase>(arrayType->getElementType()))
+            {
+                resolveTextureFormatForParameter(
+                    globalInst,
+                    (IRTextureTypeBase*)arrayType->getElementType()
+                );
+            }
+        }
+    }
+}
+} // namespace Slang

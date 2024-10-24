@@ -4,7 +4,7 @@
 
 namespace Slang
 {
-    class DiagnosticSink;
+class DiagnosticSink;
 
-    void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink);
-}
+void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink);
+} // namespace Slang

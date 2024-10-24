@@ -1,15 +1,15 @@
 // slang-json-parser.cpp
 #include "slang-json-parser.h"
 
-#include "slang-json-diagnostics.h"
-
 #include "../core/slang-string-escape-util.h"
+#include "slang-json-diagnostics.h"
 
 /*
 https://www.json.org/json-en.html
 */
 
-namespace Slang {
+namespace Slang
+{
 
 SlangResult JSONParser::_parseObject()
 {
@@ -114,7 +114,11 @@ SlangResult JSONParser::_parseValue()
         }
         default:
         {
-            m_sink->diagnose(m_lexer->peekLoc(), JSONDiagnostics::unexpectedToken, getJSONTokenAsText(m_lexer->peekType()));
+            m_sink->diagnose(
+                m_lexer->peekLoc(),
+                JSONDiagnostics::unexpectedToken,
+                getJSONTokenAsText(m_lexer->peekType())
+            );
             return SLANG_FAIL;
         }
         case JSONTokenType::Invalid:
@@ -125,7 +129,12 @@ SlangResult JSONParser::_parseValue()
     }
 }
 
-SlangResult JSONParser::parse(JSONLexer* lexer, SourceView* sourceView, JSONListener* listener, DiagnosticSink* sink)
+SlangResult JSONParser::parse(
+    JSONLexer* lexer,
+    SourceView* sourceView,
+    JSONListener* listener,
+    DiagnosticSink* sink
+)
 {
     m_sourceView = sourceView;
     m_lexer = lexer;
@@ -180,7 +189,8 @@ void JSONWriter::_nextLine()
 
 void JSONWriter::_maybeNextLine()
 {
-    // Nothing has been emitted, because nothing has been indented, and we must indent before an emit
+    // Nothing has been emitted, because nothing has been indented, and we must indent before an
+    // emit
     if (m_emittedIndent < 0)
     {
     }
@@ -200,7 +210,7 @@ void JSONWriter::_handleFormat(Location loc)
             {
                 _maybeNextLine();
             }
-            else 
+            else
             {
                 if (isBefore(loc))
                 {
@@ -231,7 +241,7 @@ void JSONWriter::_handleFormat(Location loc)
                     _maybeNextLine();
                 }
             }
-            else 
+            else
             {
                 if (isBefore(loc))
                 {
@@ -321,7 +331,7 @@ void JSONWriter::startArray(SourceLoc loc)
 
     _handleFormat(Location::BeforeOpenArray);
     _maybeEmitIndent();
-    m_builder << "[";    
+    m_builder << "[";
     _handleFormat(Location::AfterOpenArray);
 
     m_state.m_flags |= State::Flag::HasPrevious;
@@ -352,7 +362,9 @@ void JSONWriter::endArray(SourceLoc loc)
 void JSONWriter::addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc)
 {
     SLANG_UNUSED(loc);
-    SLANG_ASSERT(m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
+    SLANG_ASSERT(
+        m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0
+    );
 
     _maybeEmitFieldComma();
     _maybeEmitIndent();
@@ -371,7 +383,9 @@ void JSONWriter::addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc)
 void JSONWriter::addQuotedKey(const UnownedStringSlice& key, SourceLoc loc)
 {
     SLANG_UNUSED(loc);
-    SLANG_ASSERT(m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
+    SLANG_ASSERT(
+        m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0
+    );
 
     // It should be quoted
     SLANG_ASSERT(key.getLength() >= 2 && key[0] == '"' && key[key.getLength() - 1] == '"');
@@ -460,7 +474,8 @@ void JSONWriter::addFloatValue(double value, SourceLoc loc)
 void JSONWriter::addBoolValue(bool inValue, SourceLoc loc)
 {
     _preValue(loc);
-    const UnownedStringSlice slice = inValue ? UnownedStringSlice::fromLiteral("true") : UnownedStringSlice::fromLiteral("false");
+    const UnownedStringSlice slice = inValue ? UnownedStringSlice::fromLiteral("true")
+                                             : UnownedStringSlice::fromLiteral("false");
     m_builder << slice;
     _postValue();
 }

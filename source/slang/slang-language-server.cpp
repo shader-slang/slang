@@ -4,31 +4,31 @@
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
 
 
+#include "slang-language-server.h"
+
+#include "../../tools/platform/performance-counter.h"
+#include "../compiler-core/slang-json-native.h"
+#include "../compiler-core/slang-json-rpc-connection.h"
+#include "../compiler-core/slang-language-server-protocol.h"
+#include "../core/slang-char-util.h"
+#include "../core/slang-secure-crt.h"
+#include "../core/slang-string-util.h"
+#include "slang-ast-print.h"
+#include "slang-check-impl.h"
+#include "slang-com-helper.h"
+#include "slang-doc-markdown-writer.h"
+#include "slang-language-server-ast-lookup.h"
+#include "slang-language-server-completion.h"
+#include "slang-language-server-document-symbols.h"
+#include "slang-language-server-inlay-hints.h"
+#include "slang-language-server-semantic-tokens.h"
+#include "slang-mangle.h"
+#include "slang-workspace-version.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#include "../core/slang-secure-crt.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-string-util.h"
-
-#include "slang-com-helper.h"
-#include "../compiler-core/slang-json-native.h"
-#include "../compiler-core/slang-json-rpc-connection.h"
-#include "../compiler-core/slang-language-server-protocol.h"
-#include "slang-check-impl.h"
-#include "slang-language-server.h"
-#include "slang-workspace-version.h"
-#include "slang-language-server-ast-lookup.h"
-#include "slang-language-server-completion.h"
-#include "slang-language-server-semantic-tokens.h"
-#include "slang-language-server-document-symbols.h"
-#include "slang-language-server-inlay-hints.h"
-#include "slang-ast-print.h"
-#include "slang-doc-markdown-writer.h"
-#include "slang-mangle.h"
-#include "../../tools/platform/performance-counter.h"
 
 namespace Slang
 {
@@ -45,7 +45,7 @@ ArrayView<const char*> getCommitChars()
 SlangResult LanguageServer::init(const InitializeParams& args)
 {
     SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams(JSONRPCConnection::CallStyle::Object));
-    
+
     m_typeMap = JSONNativeUtil::getTypeFuncsMap();
 
     m_workspaceFolders = args.workspaceFolders;
@@ -73,7 +73,10 @@ slang::IGlobalSession* LanguageServer::getOrCreateGlobalSession()
     return m_session;
 }
 
-void LanguageServer::resetDiagnosticUpdateTime() { m_lastDiagnosticUpdateTime = std::chrono::system_clock::now(); }
+void LanguageServer::resetDiagnosticUpdateTime()
+{
+    m_lastDiagnosticUpdateTime = std::chrono::system_clock::now();
+}
 
 String uriToCanonicalPath(const String& uri)
 {
@@ -88,7 +91,7 @@ SlangResult LanguageServer::parseNextMessage()
 
     switch (msgType)
     {
-    case JSONRPCMessageType::Call:
+        case JSONRPCMessageType::Call:
         {
             JSONRPCCall call;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
@@ -175,35 +178,34 @@ SlangResult LanguageServer::parseNextMessage()
                 queueJSONCall(call);
                 return SLANG_OK;
             }
-
         }
-    case JSONRPCMessageType::Result:
+        case JSONRPCMessageType::Result:
         {
             JSONResultResponse response;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&response));
             auto responseId = (int)m_connection->getContainer()->asInteger(response.id);
             switch (responseId)
             {
-            case kConfigResponseId:
-                if (response.result.getKind() == JSONValue::Kind::Array)
-                {
-                    auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 12)
+                case kConfigResponseId:
+                    if (response.result.getKind() == JSONValue::Kind::Array)
                     {
-                        updatePredefinedMacros(arr[0]);
-                        updateSearchPaths(arr[1]);
-                        updateSearchInWorkspace(arr[2]);
-                        updateCommitCharacters(arr[3]);
-                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8]);
-                        updateInlayHintOptions(arr[9], arr[10]);
-                        updateTraceOptions(arr[11]);
+                        auto arr = m_connection->getContainer()->getArray(response.result);
+                        if (arr.getCount() == 12)
+                        {
+                            updatePredefinedMacros(arr[0]);
+                            updateSearchPaths(arr[1]);
+                            updateSearchInWorkspace(arr[2]);
+                            updateCommitCharacters(arr[3]);
+                            updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8]);
+                            updateInlayHintOptions(arr[9], arr[10]);
+                            updateTraceOptions(arr[11]);
+                        }
                     }
-                }
-                break;
+                    break;
             }
             return SLANG_OK;
         }
-    case JSONRPCMessageType::Error:
+        case JSONRPCMessageType::Error:
         {
 #if 0 // Enable for debug only
             JSONRPCErrorResponse error;
@@ -212,10 +214,12 @@ SlangResult LanguageServer::parseNextMessage()
             return SLANG_OK;
         }
         break;
-    default:
+        default:
         {
             return m_connection->sendError(
-                JSONRPC::ErrorCode::InvalidRequest, m_connection->getCurrentMessageId());
+                JSONRPC::ErrorCode::InvalidRequest,
+                m_connection->getCurrentMessageId()
+            );
         }
     }
 }
@@ -292,56 +296,59 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
         ASTPrinter printer(
             astBuilder,
             ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
-                ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+                ASTPrinter::OptionFlag::SimplifiedBuiltinType
+        );
         printer.getStringBuilder() << getDeclKindString(declRef);
         printer.addDeclSignature(declRef);
         auto printInitExpr = [&](Module* module, Type* declType, Expr* initExpr)
-            {
-                auto& sb = printer.getStringBuilder();
+        {
+            auto& sb = printer.getStringBuilder();
 
-                if (auto litExpr = as<LiteralExpr>(initExpr))
+            if (auto litExpr = as<LiteralExpr>(initExpr))
+            {
+                if (litExpr->token.type != TokenType::Unknown)
+                    sb << " = " << litExpr->token.getContent();
+                else if (auto intLit = as<IntegerLiteralExpr>(litExpr))
+                    sb << " = " << intLit->value;
+            }
+            else if (auto isTypeDecl = as<IsTypeExpr>(initExpr))
+            {
+                if (isTypeDecl->constantVal)
                 {
-                    if (litExpr->token.type != TokenType::Unknown)
-                        sb << " = " << litExpr->token.getContent();
-                    else if (auto intLit = as<IntegerLiteralExpr>(litExpr))
-                        sb << " = " << intLit->value;
+                    sb << " = " << (isTypeDecl->constantVal->value ? "true" : "false");
                 }
-                else if (auto isTypeDecl = as<IsTypeExpr>(initExpr))
-                {
-                    if (isTypeDecl->constantVal)
-                    {
-                        sb << " = " << (isTypeDecl->constantVal->value ? "true" : "false");
-                    }
-                }
-                else if (initExpr)
-                {
-                    DiagnosticSink sink;
-                    SharedSemanticsContext semanticContext(version->linkage, module, &sink);
-                    SemanticsVisitor semanticsVisitor(&semanticContext);
-                    if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
+            }
+            else if (initExpr)
+            {
+                DiagnosticSink sink;
+                SharedSemanticsContext semanticContext(version->linkage, module, &sink);
+                SemanticsVisitor semanticsVisitor(&semanticContext);
+                if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
                         declRef.substitute(version->linkage->getASTBuilder(), initExpr),
-                        SemanticsVisitor::ConstantFoldingKind::LinkTime, nullptr))
+                        SemanticsVisitor::ConstantFoldingKind::LinkTime,
+                        nullptr
+                    ))
+                {
+                    if (auto constantInt = as<ConstantIntVal>(intVal))
                     {
-                        if (auto constantInt = as<ConstantIntVal>(intVal))
+                        sb << " = ";
+                        if (isBoolType(declType))
                         {
-                            sb << " = ";
-                            if (isBoolType(declType))
-                            {
-                                sb << (constantInt->getValue() ? "true" : "false");
-                            }
-                            else
-                            {
-                                sb << constantInt->getValue();
-                            }
+                            sb << (constantInt->getValue() ? "true" : "false");
                         }
                         else
                         {
-                            sb << " = ";
-                            intVal->toText(sb);
+                            sb << constantInt->getValue();
                         }
                     }
+                    else
+                    {
+                        sb << " = ";
+                        intVal->toText(sb);
+                    }
                 }
-            };
+            }
+        };
         if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
         {
             if (!varDecl->findModifier<ConstModifier>() && !as<LetDecl>(declRef.getDecl()))
@@ -396,10 +403,12 @@ static String _formatDocumentation(String doc)
                 if (trimedLine.getLength() > 0 && trimedLine[0] == '[')
                 {
                     endOfParamName = trimedLine.indexOf(']') + 1;
-                    while (endOfParamName < trimedLine.getLength() && CharUtil::isWhitespace(trimedLine[endOfParamName]))
+                    while (endOfParamName < trimedLine.getLength() &&
+                           CharUtil::isWhitespace(trimedLine[endOfParamName]))
                         endOfParamName++;
                 }
-                while (endOfParamName < trimedLine.getLength() && !CharUtil::isWhitespace(trimedLine[endOfParamName]))
+                while (endOfParamName < trimedLine.getLength() &&
+                       !CharUtil::isWhitespace(trimedLine[endOfParamName]))
                     endOfParamName++;
                 if (isFirstParam)
                 {
@@ -496,8 +505,7 @@ HumaneSourceLoc getModuleLoc(SourceManager* manager, ContainerDecl* moduleDecl)
 {
     if (moduleDecl)
     {
-        if (moduleDecl->members.getCount() &&
-            moduleDecl->members[0])
+        if (moduleDecl->members.getCount() && moduleDecl->members[0])
         {
             auto loc = moduleDecl->members[0]->loc;
             if (loc.isValid())
@@ -512,8 +520,8 @@ HumaneSourceLoc getModuleLoc(SourceManager* manager, ContainerDecl* moduleDecl)
     return HumaneSourceLoc();
 }
 
-SlangResult LanguageServer::hover(
-    const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId)
+SlangResult
+LanguageServer::hover(const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
@@ -541,7 +549,8 @@ SlangResult LanguageServer::hover(
         ASTLookupType::Decl,
         canonicalPath.getUnownedSlice(),
         line,
-        col);
+        col
+    );
     if (findResult.getCount() == 0 || findResult[0].path.getCount() == 0)
     {
         if (SLANG_SUCCEEDED(tryGetMacroHoverInfo(version, doc, line, col, responseId)))
@@ -572,7 +581,8 @@ SlangResult LanguageServer::hover(
         if (numOverloads > 1)
         {
             sb << "\n +" << numOverloads - 1 << " overload";
-            if (numOverloads > 2) sb << "s";
+            if (numOverloads > 2)
+                sb << "s";
         }
     };
 
@@ -580,16 +590,18 @@ SlangResult LanguageServer::hover(
     {
         if (declRef.getDecl())
         {
-            sb << "```\n"
-                << getDeclSignatureString(declRef, version)
-                << "\n```\n";
-            
+            sb << "```\n" << getDeclSignatureString(declRef, version) << "\n```\n";
+
             _tryGetDocumentation(sb, version, declRef.getDecl());
 
             if (auto funcDecl = as<FunctionDeclBase>(declRef.getDecl()))
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(version->linkage, getModule(funcDecl), &sink);
+                SharedSemanticsContext semanticContext(
+                    version->linkage,
+                    getModule(funcDecl),
+                    &sink
+                );
                 SemanticsVisitor semanticsVisitor(&semanticContext);
 
                 auto assocDecls = semanticContext.getAssociatedDeclsForDecl(funcDecl);
@@ -653,16 +665,18 @@ SlangResult LanguageServer::hover(
             }
 
             auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
-                declRef.getLoc(), SourceLocType::Actual);
+                declRef.getLoc(),
+                SourceLocType::Actual
+            );
             appendDefinitionLocation(sb, m_workspace, humaneLoc);
             maybeAppendAdditionalOverloadsHint();
-            auto nodeHumaneLoc =
-                version->linkage->getSourceManager()->getHumaneLoc(leafNode->loc);
+            auto nodeHumaneLoc = version->linkage->getSourceManager()->getHumaneLoc(leafNode->loc);
             doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
                 nodeHumaneLoc.line,
                 nodeHumaneLoc.column,
                 hover.range.start.line,
-                hover.range.start.character);
+                hover.range.start.character
+            );
             hover.range.end = hover.range.start;
             if (!name)
                 name = declRef.getName();
@@ -676,19 +690,28 @@ SlangResult LanguageServer::hover(
             }
             if (name)
             {
-                hover.range.end.character = hover.range.start.character + (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice());
+                hover.range.end.character =
+                    hover.range.start.character +
+                    (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice());
             }
         }
     };
     auto fillLoc = [&](SourceLoc loc)
     {
-        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(loc, SourceLocType::Actual);
-        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, hover.range.start.line, hover.range.start.character);
+        auto humaneLoc =
+            version->linkage->getSourceManager()->getHumaneLoc(loc, SourceLocType::Actual);
+        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+            humaneLoc.line,
+            humaneLoc.column,
+            hover.range.start.line,
+            hover.range.start.character
+        );
         doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
             humaneLoc.line,
             humaneLoc.column + doc->getTokenLength(humaneLoc.line, humaneLoc.column),
             hover.range.end.line,
-            hover.range.end.character);
+            hover.range.end.character
+        );
     };
     auto fillExprHoverInfo = [&](Expr* expr)
     {
@@ -727,7 +750,11 @@ SlangResult LanguageServer::hover(
         {
             if (countOfExpr->sizedType)
             {
-                if (auto foldedVal = as<ConstantIntVal>(CountOfIntVal::tryFoldOrNull(version->linkage->getASTBuilder(), expr->type.type, countOfExpr->sizedType)))
+                if (auto foldedVal = as<ConstantIntVal>(CountOfIntVal::tryFoldOrNull(
+                        version->linkage->getASTBuilder(),
+                        expr->type.type,
+                        countOfExpr->sizedType
+                    )))
                 {
                     sb << "```\n" << "countof(";
                     countOfExpr->sizedType->toText(sb);
@@ -742,9 +769,7 @@ SlangResult LanguageServer::hover(
             String signature = getExprDeclSignature(expr, &documentation, nullptr);
             if (signature.getLength() == 0)
                 return;
-            sb << "```\n"
-                << signature
-                << "\n```\n";
+            sb << "```\n" << signature << "\n```\n";
             sb << documentation;
             maybeAppendAdditionalOverloadsHint();
             fillLoc(expr->loc);
@@ -785,42 +810,72 @@ SlangResult LanguageServer::hover(
     }
     else if (auto importDecl = as<ImportDecl>(leafNode))
     {
-        auto moduleLoc = getModuleLoc(version->linkage->getSourceManager(), importDecl->importedModuleDecl);
+        auto moduleLoc =
+            getModuleLoc(version->linkage->getSourceManager(), importDecl->importedModuleDecl);
         if (moduleLoc.pathInfo.hasFoundPath())
         {
             String path = moduleLoc.pathInfo.foundPath;
             Path::getCanonical(path, path);
             sb << path;
             auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
-                importDecl->startLoc, SourceLocType::Actual);
+                importDecl->startLoc,
+                SourceLocType::Actual
+            );
             Index utf16Line, utf16Col;
-            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, utf16Line, utf16Col);
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                humaneLoc.line,
+                humaneLoc.column,
+                utf16Line,
+                utf16Col
+            );
             hover.range.start.line = (int)utf16Line;
             hover.range.start.character = (int)utf16Col;
             humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
-                importDecl->endLoc, SourceLocType::Actual);
-            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, utf16Line, utf16Col);
+                importDecl->endLoc,
+                SourceLocType::Actual
+            );
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                humaneLoc.line,
+                humaneLoc.column,
+                utf16Line,
+                utf16Col
+            );
             hover.range.end.line = (int)utf16Line;
             hover.range.end.character = (int)utf16Col;
         }
     }
     else if (auto includeDeclBase = as<IncludeDeclBase>(leafNode))
     {
-        auto moduleLoc = getModuleLoc(version->linkage->getSourceManager(), includeDeclBase->fileDecl);
+        auto moduleLoc =
+            getModuleLoc(version->linkage->getSourceManager(), includeDeclBase->fileDecl);
         if (moduleLoc.pathInfo.hasFoundPath())
         {
             String path = moduleLoc.pathInfo.foundPath;
             Path::getCanonical(path, path);
             sb << path;
             auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
-                includeDeclBase->startLoc, SourceLocType::Actual);
+                includeDeclBase->startLoc,
+                SourceLocType::Actual
+            );
             Index utf16Line, utf16Col;
-            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, utf16Line, utf16Col);
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                humaneLoc.line,
+                humaneLoc.column,
+                utf16Line,
+                utf16Col
+            );
             hover.range.start.line = (int)utf16Line;
             hover.range.start.character = (int)utf16Col;
             humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
-                includeDeclBase->endLoc, SourceLocType::Actual);
-            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, utf16Line, utf16Col);
+                includeDeclBase->endLoc,
+                SourceLocType::Actual
+            );
+            doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                humaneLoc.line,
+                humaneLoc.column,
+                utf16Line,
+                utf16Col
+            );
             hover.range.end.line = (int)utf16Line;
             hover.range.end.character = (int)utf16Col;
         }
@@ -832,7 +887,8 @@ SlangResult LanguageServer::hover(
     else if (auto attr = as<Attribute>(leafNode))
     {
         fillDeclRefHoverInfo(makeDeclRef(attr->attributeDecl), nullptr);
-        hover.range.end.character = hover.range.start.character + (int)attr->originalIdentifierToken.getContentLength();
+        hover.range.end.character =
+            hover.range.start.character + (int)attr->originalIdentifierToken.getContentLength();
     }
     if (sb.getLength() == 0)
     {
@@ -849,7 +905,9 @@ SlangResult LanguageServer::hover(
 }
 
 SlangResult LanguageServer::gotoDefinition(
-    const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId)
+    const LanguageServerProtocol::DefinitionParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
@@ -877,7 +935,8 @@ SlangResult LanguageServer::gotoDefinition(
         ASTLookupType::Decl,
         canonicalPath.getUnownedSlice(),
         line,
-        col);
+        col
+    );
     if (findResult.getCount() == 0 || findResult[0].path.getCount() == 0)
     {
         if (SLANG_SUCCEEDED(tryGotoMacroDefinition(version, doc, line, col, responseId)))
@@ -899,11 +958,15 @@ SlangResult LanguageServer::gotoDefinition(
         if (declRefExpr->declRef.getDecl())
         {
             auto location = version->linkage->getSourceManager()->getHumaneLoc(
-                    declRefExpr->declRef.getNameLoc().isValid() ? declRefExpr->declRef.getNameLoc()
-                                                                : declRefExpr->declRef.getLoc(),
-                    SourceLocType::Actual);
+                declRefExpr->declRef.getNameLoc().isValid() ? declRefExpr->declRef.getNameLoc()
+                                                            : declRefExpr->declRef.getLoc(),
+                SourceLocType::Actual
+            );
             auto name = declRefExpr->declRef.getName();
-            locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
+            locations.add(LocationResult{
+                location,
+                name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0
+            });
         }
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(leafNode))
@@ -913,37 +976,49 @@ SlangResult LanguageServer::gotoDefinition(
             for (auto item : overloadedExpr->lookupResult2.items)
             {
                 auto location = version->linkage->getSourceManager()->getHumaneLoc(
-                    item.declRef.getNameLoc(), SourceLocType::Actual);
+                    item.declRef.getNameLoc(),
+                    SourceLocType::Actual
+                );
                 auto name = item.declRef.getName();
-                locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
+                locations.add(LocationResult{
+                    location,
+                    name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0
+                });
             }
         }
-        else 
+        else
         {
             LookupResultItem& item = overloadedExpr->lookupResult2.item;
             if (item.declRef.getDecl() != nullptr)
             {
                 auto location = version->linkage->getSourceManager()->getHumaneLoc(
-                    item.declRef.getNameLoc(), SourceLocType::Actual);
+                    item.declRef.getNameLoc(),
+                    SourceLocType::Actual
+                );
                 auto name = item.declRef.getName();
-                locations.add(LocationResult{location, name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
+                locations.add(LocationResult{
+                    location,
+                    name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0
+                });
             }
         }
     }
     else if (auto importDecl = as<ImportDecl>(leafNode))
     {
-        auto location = getModuleLoc(version->linkage->getSourceManager(), importDecl->importedModuleDecl);
+        auto location =
+            getModuleLoc(version->linkage->getSourceManager(), importDecl->importedModuleDecl);
         if (location.pathInfo.hasFoundPath())
         {
-            locations.add(LocationResult{ location, 0 });
+            locations.add(LocationResult{location, 0});
         }
     }
     else if (auto includeDeclBase = as<IncludeDeclBase>(leafNode))
     {
-        auto location = getModuleLoc(version->linkage->getSourceManager(), includeDeclBase->fileDecl);
+        auto location =
+            getModuleLoc(version->linkage->getSourceManager(), includeDeclBase->fileDecl);
         if (location.pathInfo.hasFoundPath())
         {
-            locations.add(LocationResult{ location, 0 });
+            locations.add(LocationResult{location, 0});
         }
     }
     if (locations.getCount() == 0)
@@ -965,7 +1040,8 @@ SlangResult LanguageServer::gotoDefinition(
                     loc.loc.line,
                     loc.loc.column,
                     result.range.start.line,
-                    result.range.start.character);
+                    result.range.start.character
+                );
                 result.range.end = result.range.start;
                 result.range.end.character += loc.length;
                 results.add(result);
@@ -976,18 +1052,26 @@ SlangResult LanguageServer::gotoDefinition(
     }
 }
 
-template <typename Func> struct Deferred
+template<typename Func>
+struct Deferred
 {
     Func f;
     Deferred(const Func& func)
         : f(func)
-    {}
+    {
+    }
     ~Deferred() { f(); }
 };
-template <typename Func> Deferred<Func> makeDeferred(const Func& f) { return Deferred<Func>(f); }
+template<typename Func>
+Deferred<Func> makeDeferred(const Func& f)
+{
+    return Deferred<Func>(f);
+}
 
 SlangResult LanguageServer::completion(
-    const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId)
+    const LanguageServerProtocol::CompletionParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
@@ -999,8 +1083,7 @@ SlangResult LanguageServer::completion(
     }
 
     // Don't show completion at case label or after single '>' operator.
-    if (args.context.triggerKind ==
-            LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter)
+    if (args.context.triggerKind == LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter)
     {
         char requiredPrevChar = 0;
         if (args.context.triggerCharacter == ":")
@@ -1012,7 +1095,8 @@ SlangResult LanguageServer::completion(
             // Check if the previous character is the required character (':' or '-'
             auto line = doc->getLine((Int)args.position.line + 1);
             auto prevCharPos = args.position.character - 2;
-            if (prevCharPos >= 0 && prevCharPos < line.getLength() && line[prevCharPos] != requiredPrevChar)
+            if (prevCharPos >= 0 && prevCharPos < line.getLength() &&
+                line[prevCharPos] != requiredPrevChar)
             {
                 m_connection->sendResult(NullResponse::get(), responseId);
                 return SLANG_OK;
@@ -1022,7 +1106,11 @@ SlangResult LanguageServer::completion(
 
     Index utf8Line, utf8Col;
     doc->zeroBasedUTF16LocToOneBasedUTF8Loc(
-        args.position.line, args.position.character, utf8Line, utf8Col);
+        args.position.line,
+        args.position.character,
+        utf8Line,
+        utf8Col
+    );
     auto cursorOffset = doc->getOffset(utf8Line, utf8Col);
     if (cursorOffset == -1 || doc->getText().getLength() == 0)
     {
@@ -1038,7 +1126,8 @@ SlangResult LanguageServer::completion(
     }
 
     // Never show suggestions when the user is typing a number.
-    if (cursorOffset + 1 >= 0 && cursorOffset + 1 < doc->getText().getLength() && CharUtil::isDigit(doc->getText()[cursorOffset + 1]))
+    if (cursorOffset + 1 >= 0 && cursorOffset + 1 < doc->getText().getLength() &&
+        CharUtil::isDigit(doc->getText()[cursorOffset + 1]))
     {
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
@@ -1063,9 +1152,11 @@ SlangResult LanguageServer::completion(
     context.col = utf8Col;
     context.commitCharacterBehavior = m_commitCharacterBehavior;
     if (args.context.triggerKind == kCompletionTriggerKindTriggerCharacter &&
-        (args.context.triggerCharacter == " " || args.context.triggerCharacter == "[" || args.context.triggerCharacter == "("))
+        (args.context.triggerCharacter == " " || args.context.triggerCharacter == "[" ||
+         args.context.triggerCharacter == "("))
     {
-        // Never use commit character if completion request is triggerred by these characters to prevent annoyance.
+        // Never use commit character if completion request is triggerred by these characters to
+        // prevent annoyance.
         context.commitCharacterBehavior = CommitCharacterBehavior::Disabled;
     }
 
@@ -1079,7 +1170,7 @@ SlangResult LanguageServer::completion(
     }
 
     if (args.context.triggerKind ==
-        LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
+            LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
         (args.context.triggerCharacter == "\"" || args.context.triggerCharacter == "/"))
     {
         // Trigger characters '"' and '/' are for include only.
@@ -1092,7 +1183,7 @@ SlangResult LanguageServer::completion(
     auto originalText = doc->getText();
     StringBuilder newText;
     newText << originalText.getUnownedSlice().head(cursorOffset + 1) << "#?"
-        << originalText.getUnownedSlice().tail(cursorOffset + 1);
+            << originalText.getUnownedSlice().tail(cursorOffset + 1);
     doc->setText(newText.produceString());
     auto restoreDocText = makeDeferred([&]() { doc->setText(originalText); });
 
@@ -1111,7 +1202,7 @@ SlangResult LanguageServer::completion(
 
     // Don't generate completion suggestions after typing '['.
     if (args.context.triggerKind ==
-        LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
+            LanguageServerProtocol::kCompletionTriggerKindTriggerCharacter &&
         args.context.triggerCharacter == "[")
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1131,7 +1222,10 @@ SlangResult LanguageServer::completion(
 }
 
 SlangResult LanguageServer::completionResolve(
-    const LanguageServerProtocol::CompletionItem& args, const LanguageServerProtocol::TextEditCompletionItem& editItem, const JSONValue& responseId)
+    const LanguageServerProtocol::CompletionItem& args,
+    const LanguageServerProtocol::TextEditCompletionItem& editItem,
+    const JSONValue& responseId
+)
 {
     if (args.data.getLength() == 0)
     {
@@ -1168,7 +1262,9 @@ SlangResult LanguageServer::completionResolve(
 }
 
 SlangResult LanguageServer::semanticTokens(
-    const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId)
+    const LanguageServerProtocol::SemanticTokensParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
 
@@ -1189,14 +1285,23 @@ SlangResult LanguageServer::semanticTokens(
         return SLANG_OK;
     }
 
-    auto tokens = getSemanticTokens(version->linkage, parsedModule, canonicalPath.getUnownedSlice(), doc.Ptr());
+    auto tokens = getSemanticTokens(
+        version->linkage,
+        parsedModule,
+        canonicalPath.getUnownedSlice(),
+        doc.Ptr()
+    );
     for (auto& token : tokens)
     {
         Index line, col;
         doc->oneBasedUTF8LocToZeroBasedUTF16Loc(token.line, token.col, line, col);
         Index lineEnd, colEnd;
         doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
-            token.line, token.col + token.length, lineEnd, colEnd);
+            token.line,
+            token.col + token.length,
+            lineEnd,
+            colEnd
+        );
         token.line = (int)line;
         token.col = (int)col;
         token.length = (int)(colEnd - col);
@@ -1208,7 +1313,11 @@ SlangResult LanguageServer::semanticTokens(
     return SLANG_OK;
 }
 
-String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges)
+String LanguageServer::getExprDeclSignature(
+    Expr* expr,
+    String* outDocumentation,
+    List<Slang::Range<Index>>* outParamRanges
+)
 {
     if (auto declRefExpr = as<DeclRefExpr>(expr))
     {
@@ -1233,7 +1342,8 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
     ASTPrinter printer(
         version->linkage->getASTBuilder(),
         ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
-        ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+            ASTPrinter::OptionFlag::SimplifiedBuiltinType
+    );
 
     printer.addDeclKindPrefix(declRefExpr->declRef.getDecl());
     auto inner = higherOrderExpr;
@@ -1260,7 +1370,8 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
         {
             if (higherOrderExpr->newParameterNames[paramIndex])
             {
-                printer.getStringBuilder() << higherOrderExpr->newParameterNames[paramIndex]->text << ": ";
+                printer.getStringBuilder()
+                    << higherOrderExpr->newParameterNames[paramIndex]->text << ": ";
             }
         }
         printer.addType(param);
@@ -1276,7 +1387,10 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
     if (outDocumentation)
     {
         StringBuilder docSB;
-        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRefExpr->declRef.getLoc(), SourceLocType::Actual);
+        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
+            declRefExpr->declRef.getLoc(),
+            SourceLocType::Actual
+        );
         _tryGetDocumentation(docSB, version, declRefExpr->declRef.getDecl());
         appendDefinitionLocation(docSB, m_workspace, humaneLoc);
         *outDocumentation = docSB.produceString();
@@ -1285,7 +1399,11 @@ String LanguageServer::getExprDeclSignature(Expr* expr, String* outDocumentation
     return printer.getString();
 }
 
-String LanguageServer::getDeclRefSignature(DeclRef<Decl> declRef, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges)
+String LanguageServer::getDeclRefSignature(
+    DeclRef<Decl> declRef,
+    String* outDocumentation,
+    List<Slang::Range<Index>>* outParamRanges
+)
 {
     auto version = m_workspace->getCurrentVersion();
     SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
@@ -1293,7 +1411,8 @@ String LanguageServer::getDeclRefSignature(DeclRef<Decl> declRef, String* outDoc
     ASTPrinter printer(
         version->linkage->getASTBuilder(),
         ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
-        ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+            ASTPrinter::OptionFlag::SimplifiedBuiltinType
+    );
 
     printer.addDeclKindPrefix(declRef.getDecl());
     printer.addDeclPath(declRef);
@@ -1303,7 +1422,10 @@ String LanguageServer::getDeclRefSignature(DeclRef<Decl> declRef, String* outDoc
     if (outDocumentation)
     {
         StringBuilder docSB;
-        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(declRef.getLoc(), SourceLocType::Actual);
+        auto humaneLoc = version->linkage->getSourceManager()->getHumaneLoc(
+            declRef.getLoc(),
+            SourceLocType::Actual
+        );
         _tryGetDocumentation(docSB, version, declRef.getDecl());
         appendDefinitionLocation(docSB, m_workspace, humaneLoc);
         *outDocumentation = docSB.produceString();
@@ -1312,7 +1434,9 @@ String LanguageServer::getDeclRefSignature(DeclRef<Decl> declRef, String* outDoc
 }
 
 SlangResult LanguageServer::signatureHelp(
-    const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId)
+    const LanguageServerProtocol::SignatureHelpParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
@@ -1341,7 +1465,8 @@ SlangResult LanguageServer::signatureHelp(
         ASTLookupType::Invoke,
         canonicalPath.getUnownedSlice(),
         line,
-        col);
+        col
+    );
 
     if (findResult.getCount() == 0)
     {
@@ -1360,9 +1485,14 @@ SlangResult LanguageServer::signatureHelp(
             // This allows us to skip the invoke expr nodes for operators/implcit casts.
             if (expr->argumentDelimeterLocs.getCount())
             {
-                auto start = Loc::fromSourceLoc(version->linkage->getSourceManager(), expr->argumentDelimeterLocs.getFirst());
+                auto start = Loc::fromSourceLoc(
+                    version->linkage->getSourceManager(),
+                    expr->argumentDelimeterLocs.getFirst()
+                );
                 auto end = Loc::fromSourceLoc(
-                    version->linkage->getSourceManager(), expr->argumentDelimeterLocs.getLast());
+                    version->linkage->getSourceManager(),
+                    expr->argumentDelimeterLocs.getLast()
+                );
                 if (start < currentLoc && currentLoc <= end)
                 {
                     appExpr = expr;
@@ -1455,7 +1585,8 @@ SlangResult LanguageServer::signatureHelp(
         ASTPrinter printer(
             version->linkage->getASTBuilder(),
             ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
-            ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+                ASTPrinter::OptionFlag::SimplifiedBuiltinType
+        );
 
         printer.getStringBuilder() << "func (";
         bool isFirst = true;
@@ -1488,7 +1619,8 @@ SlangResult LanguageServer::signatureHelp(
         if (auto aggDeclRef = as<AggTypeDecl>(declRefExpr->declRef))
         {
             // Look for initializers
-            for (auto member : getMembersOfType<ConstructorDecl>(version->linkage->getASTBuilder(), aggDeclRef))
+            for (auto member :
+                 getMembersOfType<ConstructorDecl>(version->linkage->getASTBuilder(), aggDeclRef))
             {
                 addDeclRef(member);
             }
@@ -1525,9 +1657,12 @@ SlangResult LanguageServer::signatureHelp(
     for (int i = 1; i < appExpr->argumentDelimeterLocs.getCount(); i++)
     {
         auto delimLoc = version->linkage->getSourceManager()->getHumaneLoc(
-            appExpr->argumentDelimeterLocs[i], SourceLocType::Actual);
+            appExpr->argumentDelimeterLocs[i],
+            SourceLocType::Actual
+        );
         if (delimLoc.line > args.position.line + 1 ||
-            delimLoc.line == args.position.line + 1 && delimLoc.column >= args.position.character + 1)
+            delimLoc.line == args.position.line + 1 &&
+                delimLoc.column >= args.position.character + 1)
         {
             response.activeParameter = i - 1;
             break;
@@ -1539,7 +1674,9 @@ SlangResult LanguageServer::signatureHelp(
 }
 
 SlangResult LanguageServer::documentSymbol(
-    const LanguageServerProtocol::DocumentSymbolParams& args, const JSONValue& responseId)
+    const LanguageServerProtocol::DocumentSymbolParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
@@ -1557,12 +1694,20 @@ SlangResult LanguageServer::documentSymbol(
         m_connection->sendResult(NullResponse::get(), responseId);
         return SLANG_OK;
     }
-    List<DocumentSymbol> symbols = getDocumentSymbols(version->linkage, parsedModule, canonicalPath.getUnownedSlice(), doc.Ptr());
+    List<DocumentSymbol> symbols = getDocumentSymbols(
+        version->linkage,
+        parsedModule,
+        canonicalPath.getUnownedSlice(),
+        doc.Ptr()
+    );
     m_connection->sendResult(&symbols, responseId);
     return SLANG_OK;
 }
 
-SlangResult LanguageServer::inlayHint(const LanguageServerProtocol::InlayHintParams& args, const JSONValue& responseId)
+SlangResult LanguageServer::inlayHint(
+    const LanguageServerProtocol::InlayHintParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
@@ -1586,7 +1731,8 @@ SlangResult LanguageServer::inlayHint(const LanguageServerProtocol::InlayHintPar
         canonicalPath.getUnownedSlice(),
         doc.Ptr(),
         args.range,
-        m_inlayHintOptions);
+        m_inlayHintOptions
+    );
     m_connection->sendResult(&hints, responseId);
     return SLANG_OK;
 }
@@ -1613,7 +1759,10 @@ List<LanguageServerProtocol::TextEdit> translateTextEdits(DocumentVersion* doc, 
     return result;
 }
 
-SlangResult LanguageServer::formatting(const LanguageServerProtocol::DocumentFormattingParams& args, const JSONValue& responseId)
+SlangResult LanguageServer::formatting(
+    const LanguageServerProtocol::DocumentFormattingParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
@@ -1626,14 +1775,19 @@ SlangResult LanguageServer::formatting(const LanguageServerProtocol::DocumentFor
         m_formatOptions.clangFormatLocation = findClangFormatTool();
     auto options = getFormatOptions(m_workspace, m_formatOptions);
     options.fileName = canonicalPath;
-    List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
-    auto edits = formatSource(doc->getText().getUnownedSlice(), -1, -1, -1, exclusionRange, options);
+    List<TextRange> exclusionRange =
+        extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
+    auto edits =
+        formatSource(doc->getText().getUnownedSlice(), -1, -1, -1, exclusionRange, options);
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;
 }
 
-SlangResult LanguageServer::rangeFormatting(const LanguageServerProtocol::DocumentRangeFormattingParams& args, const JSONValue& responseId)
+SlangResult LanguageServer::rangeFormatting(
+    const LanguageServerProtocol::DocumentRangeFormattingParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
@@ -1643,21 +1797,37 @@ SlangResult LanguageServer::rangeFormatting(const LanguageServerProtocol::Docume
         return SLANG_OK;
     }
     Index endLine, endCol;
-    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.range.end.line, args.range.end.character, endLine, endCol);
+    doc->zeroBasedUTF16LocToOneBasedUTF8Loc(
+        args.range.end.line,
+        args.range.end.character,
+        endLine,
+        endCol
+    );
     Index endOffset = doc->getOffset(endLine, endCol);
     if (m_formatOptions.clangFormatLocation.getLength() == 0)
         m_formatOptions.clangFormatLocation = findClangFormatTool();
     auto options = getFormatOptions(m_workspace, m_formatOptions);
     if (!m_formatOptions.allowLineBreakInRangeFormatting)
         options.behavior = FormatBehavior::PreserveLineBreak;
-    List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
-    auto edits = formatSource(doc->getText().getUnownedSlice(), args.range.start.line, args.range.end.line, endOffset, exclusionRange, options);
+    List<TextRange> exclusionRange =
+        extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
+    auto edits = formatSource(
+        doc->getText().getUnownedSlice(),
+        args.range.start.line,
+        args.range.end.line,
+        endOffset,
+        exclusionRange,
+        options
+    );
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;
 }
 
-SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::DocumentOnTypeFormattingParams& args, const JSONValue& responseId)
+SlangResult LanguageServer::onTypeFormatting(
+    const LanguageServerProtocol::DocumentOnTypeFormattingParams& args,
+    const JSONValue& responseId
+)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
@@ -1679,8 +1849,16 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
     auto options = getFormatOptions(m_workspace, m_formatOptions);
     if (!m_formatOptions.allowLineBreakInOnTypeFormatting)
         options.behavior = FormatBehavior::PreserveLineBreak;
-    List<TextRange> exclusionRange = extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
-    auto edits = formatSource(doc->getText().getUnownedSlice(), args.position.line, args.position.line, cursorOffset, exclusionRange, options);
+    List<TextRange> exclusionRange =
+        extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
+    auto edits = formatSource(
+        doc->getText().getUnownedSlice(),
+        args.position.line,
+        args.position.line,
+        cursorOffset,
+        exclusionRange,
+        options
+    );
     auto textEdits = translateTextEdits(doc, edits);
     m_connection->sendResult(&textEdits, responseId);
     return SLANG_OK;
@@ -1689,7 +1867,8 @@ SlangResult LanguageServer::onTypeFormatting(const LanguageServerProtocol::Docum
 void LanguageServer::publishDiagnostics()
 {
 
-    if (std::chrono::system_clock::now() - m_lastDiagnosticUpdateTime < std::chrono::milliseconds(1000))
+    if (std::chrono::system_clock::now() - m_lastDiagnosticUpdateTime <
+        std::chrono::milliseconds(1000))
     {
         return;
     }
@@ -1733,9 +1912,10 @@ void LanguageServer::publishDiagnostics()
 void sendRefreshRequests(JSONRPCConnection* connection)
 {
     connection->sendCall(
-        UnownedStringSlice("workspace/semanticTokens/refresh"), JSONValue::makeInt(0));
-    connection->sendCall(
-        UnownedStringSlice("workspace/inlayHint/refresh"), JSONValue::makeInt(0));
+        UnownedStringSlice("workspace/semanticTokens/refresh"),
+        JSONValue::makeInt(0)
+    );
+    connection->sendCall(UnownedStringSlice("workspace/inlayHint/refresh"), JSONValue::makeInt(0));
 }
 
 void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
@@ -1814,7 +1994,13 @@ void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
     }
 }
 
-void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle, const JSONValue& clangFormatFallbackStyle, const JSONValue& allowLineBreakOnType, const JSONValue& allowLineBreakInRange)
+void LanguageServer::updateFormattingOptions(
+    const JSONValue& clangFormatLoc,
+    const JSONValue& clangFormatStyle,
+    const JSONValue& clangFormatFallbackStyle,
+    const JSONValue& allowLineBreakOnType,
+    const JSONValue& allowLineBreakInRange
+)
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
@@ -1832,7 +2018,10 @@ void LanguageServer::updateFormattingOptions(const JSONValue& clangFormatLoc, co
         m_formatOptions.style = Slang::FormatOptions().style;
 }
 
-void LanguageServer::updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames)
+void LanguageServer::updateInlayHintOptions(
+    const JSONValue& deducedTypes,
+    const JSONValue& parameterNames
+)
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
@@ -1840,10 +2029,13 @@ void LanguageServer::updateInlayHintOptions(const JSONValue& deducedTypes, const
     bool showParameterNames = false;
     converter.convert(deducedTypes, &showDeducedType);
     converter.convert(parameterNames, &showParameterNames);
-    if (showDeducedType != m_inlayHintOptions.showDeducedType || showParameterNames != m_inlayHintOptions.showParameterNames)
+    if (showDeducedType != m_inlayHintOptions.showDeducedType ||
+        showParameterNames != m_inlayHintOptions.showParameterNames)
     {
         m_connection->sendCall(
-            UnownedStringSlice("workspace/inlayHint/refresh"), JSONValue::makeInt(0));
+            UnownedStringSlice("workspace/inlayHint/refresh"),
+            JSONValue::makeInt(0)
+        );
     }
     m_inlayHintOptions.showDeducedType = showDeducedType;
     m_inlayHintOptions.showParameterNames = showParameterNames;
@@ -1896,10 +2088,8 @@ void LanguageServer::sendConfigRequest()
     args.items.add(item);
     item.section = "slangLanguageServer.trace.server";
     args.items.add(item);
-    m_connection->sendCall(
-        ConfigurationParams::methodName,
-        &args,
-        JSONValue::makeInt(kConfigResponseId));
+    m_connection
+        ->sendCall(ConfigurationParams::methodName, &args, JSONValue::makeInt(kConfigResponseId));
 }
 
 void LanguageServer::registerCapability(const char* methodName)
@@ -1909,8 +2099,8 @@ void LanguageServer::registerCapability(const char* methodName)
     reg.method = methodName;
     reg.id = reg.method;
     args.registrations.add(reg);
-    m_connection->sendCall(
-        UnownedStringSlice("client/registerCapability"), &args, JSONValue::makeInt(999));
+    m_connection
+        ->sendCall(UnownedStringSlice("client/registerCapability"), &args, JSONValue::makeInt(999));
 }
 
 void LanguageServer::logMessage(int type, String message)
@@ -1929,13 +2119,19 @@ FormatOptions LanguageServer::getFormatOptions(Workspace* workspace, FormatOptio
         result.clangFormatLocation = StringUtil::replaceAll(
             result.clangFormatLocation.getUnownedSlice(),
             toSlice("${workspaceFolder}"),
-            workspace->rootDirectories.getFirst().getUnownedSlice());
+            workspace->rootDirectories.getFirst().getUnownedSlice()
+        );
     }
     return result;
 }
 
 SlangResult LanguageServer::tryGetMacroHoverInfo(
-    WorkspaceVersion* version, DocumentVersion* doc, Index line, Index col, JSONValue responseId)
+    WorkspaceVersion* version,
+    DocumentVersion* doc,
+    Index line,
+    Index col,
+    JSONValue responseId
+)
 {
     Index startOffset = 0;
     auto identifier = doc->peekIdentifier(line, col, startOffset);
@@ -1986,7 +2182,12 @@ SlangResult LanguageServer::tryGetMacroHoverInfo(
 }
 
 SlangResult LanguageServer::tryGotoMacroDefinition(
-    WorkspaceVersion* version, DocumentVersion* doc, Index line, Index col, JSONValue responseId)
+    WorkspaceVersion* version,
+    DocumentVersion* doc,
+    Index line,
+    Index col,
+    JSONValue responseId
+)
 {
     Index startOffset = 0;
     auto identifier = doc->peekIdentifier(line, col, startOffset);
@@ -2010,7 +2211,11 @@ SlangResult LanguageServer::tryGotoMacroDefinition(
 }
 
 SlangResult LanguageServer::tryGotoFileInclude(
-    WorkspaceVersion* version, DocumentVersion* doc, Index line, JSONValue responseId)
+    WorkspaceVersion* version,
+    DocumentVersion* doc,
+    Index line,
+    JSONValue responseId
+)
 {
     auto lineContent = doc->getLine(line).trim();
     if (!lineContent.startsWith("#") || lineContent.indexOf(UnownedStringSlice("include")) == -1)
@@ -2078,7 +2283,12 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
     else if (call.method == SemanticTokensParams::methodName)
     {
         SemanticTokensParams args;
-        SLANG_RETURN_ON_FAIL(m_connection->checkArrayObjectWrap( call.params, GetRttiInfo<SemanticTokensParams>::get(), &args, call.id ));
+        SLANG_RETURN_ON_FAIL(m_connection->checkArrayObjectWrap(
+            call.params,
+            GetRttiInfo<SemanticTokensParams>::get(),
+            &args,
+            call.id
+        ));
         cmd.semanticTokenArgs = args;
     }
     else if (call.method == SignatureHelpParams::methodName)
@@ -2093,13 +2303,19 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
         SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
         cmd.completionResolveArgs = args;
         Slang::LanguageServerProtocol::TextEditCompletionItem editArgs;
-        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &editArgs, call.id));
+        SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &editArgs, call.id)
+        );
         cmd.textEditCompletionResolveArgs = editArgs;
     }
     else if (call.method == DocumentSymbolParams::methodName)
     {
         DocumentSymbolParams args;
-        SLANG_RETURN_ON_FAIL(m_connection->checkArrayObjectWrap( call.params, GetRttiInfo<DocumentSymbolParams>::get(), &args, call.id ));
+        SLANG_RETURN_ON_FAIL(m_connection->checkArrayObjectWrap(
+            call.params,
+            GetRttiInfo<DocumentSymbolParams>::get(),
+            &args,
+            call.id
+        ));
         cmd.documentSymbolArgs = args;
     }
     else if (call.method == DocumentFormattingParams::methodName)
@@ -2196,7 +2412,11 @@ SlangResult LanguageServer::runCommand(Command& call)
         }
         else if (call.method == "completionItem/resolve")
         {
-            return completionResolve(call.completionResolveArgs.get(), call.textEditCompletionResolveArgs.get(), call.id);
+            return completionResolve(
+                call.completionResolveArgs.get(),
+                call.textEditCompletionResolveArgs.get(),
+                call.id
+            );
         }
         else if (call.method == DocumentSymbolParams::methodName)
         {
@@ -2254,7 +2474,8 @@ void LanguageServer::processCommands()
     const int kErrorRequestCanceled = -32800;
     for (auto& cmd : commands)
     {
-        if (cmd.id.getKind() == JSONValue::Kind::Integer && canceledIDs.contains(cmd.id.asInteger()))
+        if (cmd.id.getKind() == JSONValue::Kind::Integer &&
+            canceledIDs.contains(cmd.id.asInteger()))
         {
             m_connection->sendError((JSONRPC::ErrorCode)kErrorRequestCanceled, cmd.id);
         }
@@ -2282,7 +2503,8 @@ SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentPar
 }
 
 SlangResult LanguageServer::didChangeConfiguration(
-    const LanguageServerProtocol::DidChangeConfigurationParams& args)
+    const LanguageServerProtocol::DidChangeConfigurationParams& args
+)
 {
     if (args.settings.isValid())
     {
@@ -2308,8 +2530,8 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         return;
     auto obj = m_connection->getContainer()->getObject(jsonVal);
     if (obj.getCount() == 1 &&
-        (m_connection->getContainer()->getStringFromKey(obj[0].key) == "settings"
-            || m_connection->getContainer()->getStringFromKey(obj[0].key) == "RootElement"))
+        (m_connection->getContainer()->getStringFromKey(obj[0].key) == "settings" ||
+         m_connection->getContainer()->getStringFromKey(obj[0].key) == "RootElement"))
     {
         updateConfigFromJSON(obj[0].value);
         return;
@@ -2343,7 +2565,7 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         }
         else if (key == "slang.format.allowLineBreakChangesInOnTypeFormatting")
         {
-            updateFormattingOptions(JSONValue(), JSONValue(),  JSONValue(), kv.value, JSONValue());
+            updateFormattingOptions(JSONValue(), JSONValue(), JSONValue(), kv.value, JSONValue());
         }
         else if (key == "slang.format.allowLineBreakChangesInRangeFormatting")
         {
@@ -2364,7 +2586,7 @@ SlangResult LanguageServer::execute()
 {
     m_connection = new JSONRPCConnection();
     m_connection->initWithStdStreams();
-    
+
     while (m_connection->isActive() && !m_quit)
     {
         // Consume all messages first.

@@ -30,13 +30,17 @@ ShaderProgramImpl::~ShaderProgramImpl()
     }
 }
 
-void ShaderProgramImpl::comFree() { m_device.breakStrongReference(); }
+void ShaderProgramImpl::comFree()
+{
+    m_device.breakStrongReference();
+}
 
 VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
     const char* entryPointName,
     ISlangBlob* code,
     VkShaderStageFlagBits stage,
-    VkShaderModule& outShaderModule)
+    VkShaderModule& outShaderModule
+)
 {
     char const* dataBegin = (char const*)code->getBufferPointer();
     char const* dataEnd = (char const*)code->getBufferPointer() + code->getBufferSize();
@@ -49,12 +53,15 @@ VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
     moduleCreateInfo.codeSize = code->getBufferSize();
 
     VkShaderModule module;
-    SLANG_VK_CHECK(m_device->m_api.vkCreateShaderModule(
-        m_device->m_device, &moduleCreateInfo, nullptr, &module));
+    SLANG_VK_CHECK(
+        m_device->m_api
+            .vkCreateShaderModule(m_device->m_device, &moduleCreateInfo, nullptr, &module)
+    );
     outShaderModule = module;
 
     VkPipelineShaderStageCreateInfo shaderStageCreateInfo = {
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO
+    };
     shaderStageCreateInfo.stage = stage;
 
     shaderStageCreateInfo.module = module;
@@ -64,7 +71,9 @@ VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
 }
 
 Result ShaderProgramImpl::createShaderModule(
-    slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode)
+    slang::EntryPointReflection* entryPointInfo,
+    ComPtr<ISlangBlob> kernelCode
+)
 {
     m_codeBlobs.add(kernelCode);
     VkShaderModule shaderModule;
@@ -74,7 +83,8 @@ Result ShaderProgramImpl::createShaderModule(
         spirvBinaryEntryPointName,
         kernelCode,
         (VkShaderStageFlagBits)VulkanUtil::getShaderStage(entryPointInfo->getStage()),
-        shaderModule));
+        shaderModule
+    ));
     m_entryPointNames.add(realEntryPointName);
     m_modules.add(shaderModule);
     return SLANG_OK;

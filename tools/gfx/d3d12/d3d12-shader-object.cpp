@@ -4,12 +4,11 @@
 #include "d3d12-buffer.h"
 #include "d3d12-command-encoder.h"
 #include "d3d12-device.h"
+#include "d3d12-helper-functions.h"
 #include "d3d12-resource-views.h"
 #include "d3d12-sampler.h"
 #include "d3d12-shader-object-layout.h"
 #include "d3d12-transient-heap.h"
-
-#include "d3d12-helper-functions.h"
 
 namespace gfx
 {
@@ -18,7 +17,10 @@ namespace d3d12
 
 using namespace Slang;
 
-GfxCount ShaderObjectImpl::getEntryPointCount() { return 0; }
+GfxCount ShaderObjectImpl::getEntryPointCount()
+{
+    return 0;
+}
 
 Result ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
@@ -26,9 +28,15 @@ Result ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryP
     return SLANG_OK;
 }
 
-const void* ShaderObjectImpl::getRawData() { return m_data.getBuffer(); }
+const void* ShaderObjectImpl::getRawData()
+{
+    return m_data.getBuffer();
+}
 
-Size ShaderObjectImpl::getSize() { return (Size)m_data.getCount(); }
+Size ShaderObjectImpl::getSize()
+{
+    return (Size)m_data.getCount();
+}
 
 // TODO: Change Index to Offset/Size?
 Result ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
@@ -89,15 +97,20 @@ Result ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* s
     d3dDevice->CopyDescriptorsSimple(
         1,
         m_descriptorSet.samplerTable.getCpuHandle(
-            bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
+            bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex
+        ),
         samplerImpl->m_descriptor.cpuHandle,
-        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER
+    );
     m_version++;
     return SLANG_OK;
 }
 
 Result ShaderObjectImpl::setCombinedTextureSampler(
-    ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler)
+    ShaderOffset const& offset,
+    IResourceView* textureView,
+    ISamplerState* sampler
+)
 {
 #if 0
     if (offset.bindingRangeIndex < 0)
@@ -134,7 +147,8 @@ Result ShaderObjectImpl::init(
     DeviceImpl* device,
     ShaderObjectLayoutImpl* layout,
     DescriptorHeapReference viewHeap,
-    DescriptorHeapReference samplerHeap)
+    DescriptorHeapReference samplerHeap
+)
 {
     m_device = device;
 
@@ -163,7 +177,8 @@ Result ShaderObjectImpl::init(
     memset(
         m_rootArguments.getBuffer(),
         0,
-        sizeof(D3D12_GPU_VIRTUAL_ADDRESS) * m_rootArguments.getCount());
+        sizeof(D3D12_GPU_VIRTUAL_ADDRESS) * m_rootArguments.getCount()
+    );
     // Each shader object will own CPU descriptor heap memory
     // for any resource or sampler descriptors it might store
     // as part of its value.
@@ -182,7 +197,7 @@ Result ShaderObjectImpl::init(
         // freed while the object is still live.
         //
         // The doubling here is because any buffer resource could
-        // have a counter buffer associated with it, which we 
+        // have a counter buffer associated with it, which we
         // also need to ensure isn't destroyed prematurely.
         m_boundResources.setCount(resourceCount);
         m_boundCounterResources.setCount(resourceCount);
@@ -220,7 +235,8 @@ Result ShaderObjectImpl::init(
         {
             RefPtr<ShaderObjectImpl> subObject;
             SLANG_RETURN_ON_FAIL(
-                ShaderObjectImpl::create(device, subObjectLayout, subObject.writeRef()));
+                ShaderObjectImpl::create(device, subObjectLayout, subObject.writeRef())
+            );
             m_objects[bindingRangeInfo.subObjectIndex + i] = subObject;
         }
     }
@@ -236,7 +252,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
     BufferResourceImpl* buffer,
     Offset offset,
     Size destSize,
-    ShaderObjectLayoutImpl* specializedLayout)
+    ShaderObjectLayoutImpl* specializedLayout
+)
 {
     auto src = m_data.getBuffer();
     auto srcSize = Size(m_data.getCount());
@@ -250,7 +267,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
         buffer,
         offset,
         srcSize,
-        src);
+        src
+    );
 
     // In the case where this object has any sub-objects of
     // existential/interface type, we need to recurse on those objects
@@ -334,7 +352,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
                 buffer,
                 offset + subObjectOffset,
                 destSize - subObjectOffset,
-                subObjectLayout);
+                subObjectLayout
+            );
         }
     }
 
@@ -354,7 +373,9 @@ bool ShaderObjectImpl::shouldAllocateConstantBuffer(TransientResourceHeapImpl* t
 /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
 
 Result ShaderObjectImpl::_ensureOrdinaryDataBufferCreatedIfNeeded(
-    PipelineCommandEncoder* encoder, ShaderObjectLayoutImpl* specializedLayout)
+    PipelineCommandEncoder* encoder,
+    ShaderObjectLayoutImpl* specializedLayout
+)
 {
     // If data has been changed since last allocation/filling of constant buffer,
     // we will need to allocate a new one.
@@ -385,7 +406,10 @@ Result ShaderObjectImpl::_ensureOrdinaryDataBufferCreatedIfNeeded(
     //
     auto alignedConstantBufferSize = D3DUtil::calcAligned(m_constantBufferSize, 256);
     SLANG_RETURN_ON_FAIL(encoder->m_commandBuffer->m_transientHeap->allocateConstantBuffer(
-        alignedConstantBufferSize, m_constantBufferWeakPtr, m_constantBufferOffset));
+        alignedConstantBufferSize,
+        m_constantBufferWeakPtr,
+        m_constantBufferOffset
+    ));
 
     // Once the buffer is allocated, we can use `_writeOrdinaryData` to fill it in.
     //
@@ -398,7 +422,8 @@ Result ShaderObjectImpl::_ensureOrdinaryDataBufferCreatedIfNeeded(
         static_cast<BufferResourceImpl*>(m_constantBufferWeakPtr),
         m_constantBufferOffset,
         m_constantBufferSize,
-        specializedLayout));
+        specializedLayout
+    ));
 
     {
         // We also create and store a descriptor for our root constant buffer
@@ -410,9 +435,9 @@ Result ShaderObjectImpl::_ensureOrdinaryDataBufferCreatedIfNeeded(
         auto descriptorTable = m_descriptorSet.resourceTable;
         D3D12_CONSTANT_BUFFER_VIEW_DESC viewDesc = {};
         viewDesc.BufferLocation = static_cast<BufferResourceImpl*>(m_constantBufferWeakPtr)
-            ->m_resource.getResource()
-            ->GetGPUVirtualAddress() +
-            m_constantBufferOffset;
+                                      ->m_resource.getResource()
+                                      ->GetGPUVirtualAddress() +
+                                  m_constantBufferOffset;
         viewDesc.SizeInBytes = (UINT)alignedConstantBufferSize;
         encoder->m_device->CreateConstantBufferView(&viewDesc, descriptorTable.getCpuHandle());
     }
@@ -426,21 +451,22 @@ void ShaderObjectImpl::updateSubObjectsRecursive()
         return;
     auto& subObjectRanges = getLayout()->getSubObjectRanges();
     for (Slang::Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRanges.getCount();
-        subObjectRangeIndex++)
+         subObjectRangeIndex++)
     {
         auto const& subObjectRange = subObjectRanges[subObjectRangeIndex];
         auto const& bindingRange = getLayout()->getBindingRange(subObjectRange.bindingRangeIndex);
         Slang::Index count = bindingRange.count;
 
         for (Slang::Index subObjectIndexInRange = 0; subObjectIndexInRange < count;
-            subObjectIndexInRange++)
+             subObjectIndexInRange++)
         {
             Slang::Index objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
             auto subObject = m_objects[objectIndex].Ptr();
             if (!subObject)
                 continue;
             subObject->updateSubObjectsRecursive();
-            if (m_subObjectVersions.getCount() > objectIndex && m_subObjectVersions[objectIndex] != m_objects[objectIndex]->m_version)
+            if (m_subObjectVersions.getCount() > objectIndex &&
+                m_subObjectVersions[objectIndex] != m_objects[objectIndex]->m_version)
             {
                 ShaderOffset offset;
                 offset.bindingRangeIndex = (GfxIndex)subObjectRange.bindingRangeIndex;
@@ -476,7 +502,8 @@ Result ShaderObjectImpl::prepareToBindAsParameterBlock(
     BindingContext* context,
     BindingOffset& ioOffset,
     ShaderObjectLayoutImpl* specializedLayout,
-    DescriptorSet& outDescriptorSet)
+    DescriptorSet& outDescriptorSet
+)
 {
     auto transientHeap = context->transientHeap;
     auto submitter = context->submitter;
@@ -516,7 +543,9 @@ Result ShaderObjectImpl::prepareToBindAsParameterBlock(
         // root parameter.
         //
         auto tableRootParamIndex = rootParamIndex++;
-        context->pendingTableBindings->add(PendingDescriptorTableBinding{ tableRootParamIndex, table.getGpuHandle() });
+        context->pendingTableBindings->add(
+            PendingDescriptorTableBinding{tableRootParamIndex, table.getGpuHandle()}
+        );
     }
     if (auto descriptorCount = specializedLayout->getTotalSamplerDescriptorCount())
     {
@@ -539,7 +568,9 @@ Result ShaderObjectImpl::prepareToBindAsParameterBlock(
         // root parameter.
         //
         auto tableRootParamIndex = rootParamIndex++;
-        context->pendingTableBindings->add(PendingDescriptorTableBinding{ tableRootParamIndex, table.getGpuHandle() });
+        context->pendingTableBindings->add(
+            PendingDescriptorTableBinding{tableRootParamIndex, table.getGpuHandle()}
+        );
     }
 
     return SLANG_OK;
@@ -553,16 +584,16 @@ bool ShaderObjectImpl::checkIfCachedDescriptorSetIsValidRecursive(BindingContext
         return false;
     if (m_cachedGPUDescriptorSet.resourceTable.getDescriptorCount() != 0 &&
         m_cachedGPUDescriptorSet.resourceTable.m_heap.ptr.linearHeap->getHeap() !=
-        m_cachedTransientHeap->getCurrentViewHeap().getHeap())
+            m_cachedTransientHeap->getCurrentViewHeap().getHeap())
         return false;
     if (m_cachedGPUDescriptorSet.samplerTable.getDescriptorCount() != 0 &&
         m_cachedGPUDescriptorSet.samplerTable.m_heap.ptr.linearHeap->getHeap() !=
-        m_cachedTransientHeap->getCurrentSamplerHeap().getHeap())
+            m_cachedTransientHeap->getCurrentSamplerHeap().getHeap())
         return false;
 
     auto& subObjectRanges = getLayout()->getSubObjectRanges();
     for (Slang::Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRanges.getCount();
-        subObjectRangeIndex++)
+         subObjectRangeIndex++)
     {
         auto const& subObjectRange = subObjectRanges[subObjectRangeIndex];
         auto const& bindingRange = getLayout()->getBindingRange(subObjectRange.bindingRangeIndex);
@@ -571,7 +602,7 @@ bool ShaderObjectImpl::checkIfCachedDescriptorSetIsValidRecursive(BindingContext
         Slang::Index count = bindingRange.count;
 
         for (Slang::Index subObjectIndexInRange = 0; subObjectIndexInRange < count;
-            subObjectIndexInRange++)
+             subObjectIndexInRange++)
         {
             Slang::Index objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
             auto subObject = m_objects[objectIndex].Ptr();
@@ -587,7 +618,10 @@ bool ShaderObjectImpl::checkIfCachedDescriptorSetIsValidRecursive(BindingContext
 /// Bind this object as a `ParameterBlock<X>`
 
 Result ShaderObjectImpl::bindAsParameterBlock(
-    BindingContext* context, BindingOffset const& offset, ShaderObjectLayoutImpl* specializedLayout)
+    BindingContext* context,
+    BindingOffset const& offset,
+    ShaderObjectLayoutImpl* specializedLayout
+)
 {
     if (checkIfCachedDescriptorSetIsValidRecursive(context))
     {
@@ -598,13 +632,17 @@ Result ShaderObjectImpl::bindAsParameterBlock(
         {
             auto tableRootParamIndex = rootParamIndex++;
             context->submitter->setRootDescriptorTable(
-                tableRootParamIndex, m_cachedGPUDescriptorSet.resourceTable.getGpuHandle());
+                tableRootParamIndex,
+                m_cachedGPUDescriptorSet.resourceTable.getGpuHandle()
+            );
         }
         if (m_cachedGPUDescriptorSet.samplerTable.getDescriptorCount())
         {
             auto tableRootParamIndex = rootParamIndex++;
             context->submitter->setRootDescriptorTable(
-                tableRootParamIndex, m_cachedGPUDescriptorSet.samplerTable.getGpuHandle());
+                tableRootParamIndex,
+                m_cachedGPUDescriptorSet.samplerTable.getGpuHandle()
+            );
         }
         return SLANG_OK;
     }
@@ -619,13 +657,18 @@ Result ShaderObjectImpl::bindAsParameterBlock(
     context->pendingTableBindings = &pendingTableBindings;
 
     SLANG_RETURN_ON_FAIL(prepareToBindAsParameterBlock(
-        context, /* inout */ subOffset, specializedLayout, m_cachedGPUDescriptorSet));
+        context,
+        /* inout */ subOffset,
+        specializedLayout,
+        m_cachedGPUDescriptorSet
+    ));
 
     // Next we bind the object into that descriptor set as if it were being used
     // as a `ConstantBuffer<X>`.
     //
     SLANG_RETURN_ON_FAIL(
-        bindAsConstantBuffer(context, m_cachedGPUDescriptorSet, subOffset, specializedLayout));
+        bindAsConstantBuffer(context, m_cachedGPUDescriptorSet, subOffset, specializedLayout)
+    );
 
     bindPendingTables(context);
     context->pendingTableBindings = oldPendingTableBindings;
@@ -640,13 +683,15 @@ Result ShaderObjectImpl::bindAsConstantBuffer(
     BindingContext* context,
     DescriptorSet const& descriptorSet,
     BindingOffset const& offset,
-    ShaderObjectLayoutImpl* specializedLayout)
+    ShaderObjectLayoutImpl* specializedLayout
+)
 {
     // If we are to bind as a constant buffer we first need to ensure that
     // the ordinary data buffer is created, if this object needs one.
     //
     SLANG_RETURN_ON_FAIL(
-        _ensureOrdinaryDataBufferCreatedIfNeeded(context->encoder, specializedLayout));
+        _ensureOrdinaryDataBufferCreatedIfNeeded(context->encoder, specializedLayout)
+    );
 
     // Next, we need to bind all of the resource descriptors for this object
     // (including any ordinary data buffer) into the provided `descriptorSet`.
@@ -661,7 +706,8 @@ Result ShaderObjectImpl::bindAsConstantBuffer(
             UINT(resourceCount),
             dstTable.getCpuHandle(offset.resource),
             srcTable.getCpuHandle(),
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
     }
 
     // Finally, we delegate to `_bindImpl` to bind samplers and sub-objects,
@@ -677,7 +723,8 @@ Result ShaderObjectImpl::bindAsValue(
     BindingContext* context,
     DescriptorSet const& descriptorSet,
     BindingOffset const& offset,
-    ShaderObjectLayoutImpl* specializedLayout)
+    ShaderObjectLayoutImpl* specializedLayout
+)
 {
     // When binding a value for an interface-type field we do *not* want
     // to bind a buffer for the ordinary data (if there is any) because
@@ -701,7 +748,8 @@ Result ShaderObjectImpl::bindAsValue(
             UINT(resourceCount),
             dstTable.getCpuHandle(offset.resource),
             srcTable.getCpuHandle(skipResourceCount),
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
     }
 
     // Finally, we delegate to `_bindImpl` to bind samplers and sub-objects,
@@ -728,7 +776,8 @@ Result ShaderObjectImpl::_bindImpl(
     BindingContext* context,
     DescriptorSet const& descriptorSet,
     BindingOffset const& offset,
-    ShaderObjectLayoutImpl* specializedLayout)
+    ShaderObjectLayoutImpl* specializedLayout
+)
 {
     // We start by binding all the sampler decriptors, if needed.
     //
@@ -744,7 +793,8 @@ Result ShaderObjectImpl::_bindImpl(
             UINT(samplerCount),
             dstTable.getCpuHandle(offset.sampler),
             srcTable.getCpuHandle(),
-            D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+            D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER
+        );
     }
 
     // Next we iterate over the sub-object ranges and bind anything they require.
@@ -765,45 +815,51 @@ Result ShaderObjectImpl::_bindImpl(
 
         switch (bindingRange.bindingType)
         {
-        case slang::BindingType::ConstantBuffer:
-        {
-            auto objOffset = rangeOffset;
-            for (uint32_t j = 0; j < bindingRange.count; j++)
+            case slang::BindingType::ConstantBuffer:
             {
-                auto& object = m_objects[subObjectIndex + j];
-                SLANG_RETURN_ON_FAIL(object->bindAsConstantBuffer(
-                    context, descriptorSet, objOffset, subObjectLayout));
-                objOffset += rangeStride;
+                auto objOffset = rangeOffset;
+                for (uint32_t j = 0; j < bindingRange.count; j++)
+                {
+                    auto& object = m_objects[subObjectIndex + j];
+                    SLANG_RETURN_ON_FAIL(object->bindAsConstantBuffer(
+                        context,
+                        descriptorSet,
+                        objOffset,
+                        subObjectLayout
+                    ));
+                    objOffset += rangeStride;
+                }
             }
-        }
-        break;
+            break;
 
-        case slang::BindingType::ParameterBlock:
-        {
-            auto objOffset = rangeOffset;
-            for (uint32_t j = 0; j < bindingRange.count; j++)
-            {
-                auto& object = m_objects[subObjectIndex + j];
-                SLANG_RETURN_ON_FAIL(
-                    object->bindAsParameterBlock(context, objOffset, subObjectLayout));
-                objOffset += rangeStride;
-            }
-        }
-        break;
-
-        case slang::BindingType::ExistentialValue:
-            if (subObjectLayout)
+            case slang::BindingType::ParameterBlock:
             {
                 auto objOffset = rangeOffset;
                 for (uint32_t j = 0; j < bindingRange.count; j++)
                 {
                     auto& object = m_objects[subObjectIndex + j];
                     SLANG_RETURN_ON_FAIL(
-                        object->bindAsValue(context, descriptorSet, objOffset, subObjectLayout));
+                        object->bindAsParameterBlock(context, objOffset, subObjectLayout)
+                    );
                     objOffset += rangeStride;
                 }
             }
             break;
+
+            case slang::BindingType::ExistentialValue:
+                if (subObjectLayout)
+                {
+                    auto objOffset = rangeOffset;
+                    for (uint32_t j = 0; j < bindingRange.count; j++)
+                    {
+                        auto& object = m_objects[subObjectIndex + j];
+                        SLANG_RETURN_ON_FAIL(
+                            object->bindAsValue(context, descriptorSet, objOffset, subObjectLayout)
+                        );
+                        objOffset += rangeStride;
+                    }
+                }
+                break;
         }
     }
 
@@ -817,15 +873,14 @@ Result ShaderObjectImpl::bindRootArguments(BindingContext* context, uint32_t& in
     {
         switch (layoutImpl->getRootParameterInfo(i).type)
         {
-        case IResourceView::Type::ShaderResource:
-        case IResourceView::Type::AccelerationStructure:
-            context->submitter->setRootSRV(index, m_rootArguments[i]);
-            break;
-        case IResourceView::Type::UnorderedAccess:
-            context->submitter->setRootUAV(index, m_rootArguments[i]);
-            break;
-        default:
-            continue;
+            case IResourceView::Type::ShaderResource:
+            case IResourceView::Type::AccelerationStructure:
+                context->submitter->setRootSRV(index, m_rootArguments[i]);
+                break;
+            case IResourceView::Type::UnorderedAccess:
+                context->submitter->setRootUAV(index, m_rootArguments[i]);
+                break;
+            default: continue;
         }
         index++;
     }
@@ -871,7 +926,8 @@ Result ShaderObjectImpl::_createSpecializedLayout(ShaderObjectLayoutImpl** outLa
         m_layout->m_slangSession,
         extendedType.slangType,
         m_layout->getContainerType(),
-        (ShaderObjectLayoutBase**)layout.writeRef()));
+        (ShaderObjectLayoutBase**)layout.writeRef()
+    ));
 
     returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
@@ -896,32 +952,33 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
         auto& rootArg = m_rootArguments[bindingRange.baseIndex];
         switch (resourceView->getViewDesc()->type)
         {
-        case IResourceView::Type::AccelerationStructure:
-        {
-            auto resourceViewImpl = static_cast<AccelerationStructureImpl*>(resourceView);
-            rootArg = resourceViewImpl->getDeviceAddress();
-        }
-        break;
-        case IResourceView::Type::ShaderResource:
-        case IResourceView::Type::UnorderedAccess:
-        {
-            auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
-            if (resourceViewImpl->m_resource->isBuffer())
+            case IResourceView::Type::AccelerationStructure:
             {
-                rootArg = static_cast<BufferResourceImpl*>(resourceViewImpl->m_resource.Ptr())
-                    ->getDeviceAddress();
+                auto resourceViewImpl = static_cast<AccelerationStructureImpl*>(resourceView);
+                rootArg = resourceViewImpl->getDeviceAddress();
             }
-            else
+            break;
+            case IResourceView::Type::ShaderResource:
+            case IResourceView::Type::UnorderedAccess:
             {
-                getDebugCallback()->handleMessage(
-                    DebugMessageType::Error,
-                    DebugMessageSource::Layer,
-                    "The shader parameter at the specified offset is a root parameter, and "
-                    "therefore can only be a buffer view.");
-                return SLANG_FAIL;
+                auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
+                if (resourceViewImpl->m_resource->isBuffer())
+                {
+                    rootArg = static_cast<BufferResourceImpl*>(resourceViewImpl->m_resource.Ptr())
+                                  ->getDeviceAddress();
+                }
+                else
+                {
+                    getDebugCallback()->handleMessage(
+                        DebugMessageType::Error,
+                        DebugMessageSource::Layer,
+                        "The shader parameter at the specified offset is a root parameter, and "
+                        "therefore can only be a buffer view."
+                    );
+                    return SLANG_FAIL;
+                }
             }
-        }
-        break;
+            break;
         }
         return SLANG_OK;
     }
@@ -932,7 +989,8 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
         {
             // Create null descriptor for the binding.
             auto destDescriptor = m_descriptorSet.resourceTable.getCpuHandle(
-                bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex);
+                bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex
+            );
             return createNullDescriptor(d3dDevice, destDescriptor, bindingRange);
         }
         return SLANG_OK;
@@ -944,24 +1002,24 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
     switch (resourceView->getViewDesc()->type)
     {
 #if SLANG_GFX_HAS_DXR_SUPPORT
-    case IResourceView::Type::AccelerationStructure:
-    {
-        auto asImpl = static_cast<AccelerationStructureImpl*>(resourceView);
-        // Hold a reference to the resource to prevent its destruction.
-        m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] = asImpl->m_buffer;
-        internalResourceView = asImpl;
-    }
-    break;
+        case IResourceView::Type::AccelerationStructure:
+        {
+            auto asImpl = static_cast<AccelerationStructureImpl*>(resourceView);
+            // Hold a reference to the resource to prevent its destruction.
+            m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] = asImpl->m_buffer;
+            internalResourceView = asImpl;
+        }
+        break;
 #endif
-    default:
-    {
-        // Hold a reference to the resource to prevent its destruction.
-        const auto resourceOffset = bindingRange.baseIndex + offset.bindingArrayIndex;
-        m_boundResources[resourceOffset] = resourceViewImpl->m_resource;
-        m_boundCounterResources[resourceOffset] = resourceViewImpl->m_counterResource;
-        internalResourceView = resourceViewImpl;
-    }
-    break;
+        default:
+        {
+            // Hold a reference to the resource to prevent its destruction.
+            const auto resourceOffset = bindingRange.baseIndex + offset.bindingArrayIndex;
+            m_boundResources[resourceOffset] = resourceViewImpl->m_resource;
+            m_boundCounterResources[resourceOffset] = resourceViewImpl->m_counterResource;
+            internalResourceView = resourceViewImpl;
+        }
+        break;
     }
 
     auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
@@ -974,7 +1032,8 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
             static_cast<DeviceImpl*>(m_device.get()),
             resourceViewImpl,
             bindingRange.bufferElementStride,
-            srcDescriptor));
+            srcDescriptor
+        ));
     }
 
     if (srcDescriptor.cpuHandle.ptr)
@@ -982,9 +1041,11 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
         d3dDevice->CopyDescriptorsSimple(
             1,
             m_descriptorSet.resourceTable.getCpuHandle(
-                bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
+                bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex
+            ),
             srcDescriptor.cpuHandle,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+        );
     }
     else
     {
@@ -992,30 +1053,41 @@ Result ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* 
             DebugMessageType::Error,
             DebugMessageSource::Layer,
             "IShaderObject::setResource: the resource view cannot be set to this shader parameter. "
-            "A possible reason is that the view is too large to be supported by D3D12.");
+            "A possible reason is that the view is too large to be supported by D3D12."
+        );
         return SLANG_FAIL;
     }
     return SLANG_OK;
 }
 
 Result ShaderObjectImpl::create(
-    DeviceImpl* device, ShaderObjectLayoutImpl* layout, ShaderObjectImpl** outShaderObject)
+    DeviceImpl* device,
+    ShaderObjectLayoutImpl* layout,
+    ShaderObjectImpl** outShaderObject
+)
 {
     auto object = RefPtr<ShaderObjectImpl>(new ShaderObjectImpl());
     SLANG_RETURN_ON_FAIL(
-        object->init(device, layout, device->m_cpuViewHeap.Ptr(), device->m_cpuSamplerHeap.Ptr()));
+        object->init(device, layout, device->m_cpuViewHeap.Ptr(), device->m_cpuSamplerHeap.Ptr())
+    );
     returnRefPtrMove(outShaderObject, object);
     return SLANG_OK;
 }
 
-ShaderObjectImpl::~ShaderObjectImpl() { m_descriptorSet.freeIfSupported(); }
+ShaderObjectImpl::~ShaderObjectImpl()
+{
+    m_descriptorSet.freeIfSupported();
+}
 
 RootShaderObjectLayoutImpl* RootShaderObjectImpl::getLayout()
 {
     return static_cast<RootShaderObjectLayoutImpl*>(m_layout.Ptr());
 }
 
-GfxCount RootShaderObjectImpl::getEntryPointCount() { return (GfxCount)m_entryPoints.getCount(); }
+GfxCount RootShaderObjectImpl::getEntryPointCount()
+{
+    return (GfxCount)m_entryPoints.getCount();
+}
 
 SlangResult RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
@@ -1082,14 +1154,16 @@ Result RootShaderObjectImpl::_createSpecializedLayout(ShaderObjectLayoutImpl** o
         specializationArgs.components.getArrayView().getBuffer(),
         specializationArgs.getCount(),
         specializedComponentType.writeRef(),
-        diagnosticBlob.writeRef());
+        diagnosticBlob.writeRef()
+    );
 
     if (diagnosticBlob && diagnosticBlob->getBufferSize())
     {
         getDebugCallback()->handleMessage(
             SLANG_FAILED(result) ? DebugMessageType::Error : DebugMessageType::Info,
             DebugMessageSource::Layer,
-            (const char*)diagnosticBlob->getBufferPointer());
+            (const char*)diagnosticBlob->getBufferPointer()
+        );
     }
 
     if (SLANG_FAILED(result))
@@ -1103,7 +1177,8 @@ Result RootShaderObjectImpl::_createSpecializedLayout(ShaderObjectLayoutImpl** o
         specializedComponentType,
         slangSpecializedLayout,
         specializedLayout.writeRef(),
-        d3dDiagnosticBlob.writeRef());
+        d3dDiagnosticBlob.writeRef()
+    );
 
     if (SLANG_FAILED(rootLayoutResult))
     {
@@ -1141,7 +1216,9 @@ Result RootShaderObjectImpl::copyFrom(IShaderObject* object, ITransientResourceH
 }
 
 Result RootShaderObjectImpl::bindAsRoot(
-    BindingContext* context, RootShaderObjectLayoutImpl* specializedLayout)
+    BindingContext* context,
+    RootShaderObjectLayoutImpl* specializedLayout
+)
 {
     // Pull updates from sub-objects when this is a mutable root shader object.
     updateSubObjectsRecursive();
@@ -1159,16 +1236,21 @@ Result RootShaderObjectImpl::bindAsRoot(
     context->pendingTableBindings = &pendingTableBindings;
 
     BindingOffset rootOffset;
-    
+
     // Bind all root parameters first.
     Super::bindRootArguments(context, rootOffset.rootParam);
 
     DescriptorSet descriptorSet;
     SLANG_RETURN_ON_FAIL(prepareToBindAsParameterBlock(
-        context, /* inout */ rootOffset, specializedLayout, descriptorSet));
+        context,
+        /* inout */ rootOffset,
+        specializedLayout,
+        descriptorSet
+    ));
 
     SLANG_RETURN_ON_FAIL(
-        Super::bindAsConstantBuffer(context, descriptorSet, rootOffset, specializedLayout));
+        Super::bindAsConstantBuffer(context, descriptorSet, rootOffset, specializedLayout)
+    );
 
     auto entryPointCount = m_entryPoints.getCount();
     for (Index i = 0; i < entryPointCount; ++i)
@@ -1182,7 +1264,11 @@ Result RootShaderObjectImpl::bindAsRoot(
         entryPoint->updateSubObjectsRecursive();
 
         SLANG_RETURN_ON_FAIL(entryPoint->bindAsConstantBuffer(
-            context, descriptorSet, entryPointOffset, entryPointInfo.layout));
+            context,
+            descriptorSet,
+            entryPointOffset,
+            entryPointInfo.layout
+        ));
     }
 
     bindPendingTables(context);
@@ -1196,7 +1282,8 @@ Result RootShaderObjectImpl::resetImpl(
     RootShaderObjectLayoutImpl* layout,
     DescriptorHeapReference viewHeap,
     DescriptorHeapReference samplerHeap,
-    bool isMutable)
+    bool isMutable
+)
 {
     SLANG_RETURN_ON_FAIL(Super::init(device, layout, viewHeap, samplerHeap));
     m_isMutable = isMutable;
@@ -1206,7 +1293,8 @@ Result RootShaderObjectImpl::resetImpl(
     {
         RefPtr<ShaderObjectImpl> entryPoint;
         SLANG_RETURN_ON_FAIL(
-            ShaderObjectImpl::create(device, entryPointInfo.layout, entryPoint.writeRef()));
+            ShaderObjectImpl::create(device, entryPointInfo.layout, entryPoint.writeRef())
+        );
         entryPoint->m_isMutable = isMutable;
         m_entryPoints.add(entryPoint);
     }
@@ -1214,10 +1302,18 @@ Result RootShaderObjectImpl::resetImpl(
 }
 
 Result RootShaderObjectImpl::reset(
-    DeviceImpl* device, RootShaderObjectLayoutImpl* layout, TransientResourceHeapImpl* heap)
+    DeviceImpl* device,
+    RootShaderObjectLayoutImpl* layout,
+    TransientResourceHeapImpl* heap
+)
 {
     return resetImpl(
-        device, layout, &heap->m_stagingCpuViewHeap, &heap->m_stagingCpuSamplerHeap, false);
+        device,
+        layout,
+        &heap->m_stagingCpuViewHeap,
+        &heap->m_stagingCpuSamplerHeap,
+        false
+    );
 }
 
 } // namespace d3d12

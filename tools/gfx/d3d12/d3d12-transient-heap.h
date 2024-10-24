@@ -11,8 +11,8 @@ namespace d3d12
 using namespace Slang;
 
 class TransientResourceHeapImpl
-    : public TransientResourceHeapBaseImpl<DeviceImpl, BufferResourceImpl>
-    , public ITransientResourceHeapD3D12
+    : public TransientResourceHeapBaseImpl<DeviceImpl, BufferResourceImpl>,
+      public ITransientResourceHeapD3D12
 {
 private:
     typedef TransientResourceHeapBaseImpl<DeviceImpl, BufferResourceImpl> Super;
@@ -39,7 +39,7 @@ public:
     //
     // We will thus keep a single heap of each type that we hope will hold
     // all the descriptors that actually get needed in a frame.
-    ShortList<D3D12DescriptorHeap, 4> m_viewHeaps; // Cbv, Srv, Uav
+    ShortList<D3D12DescriptorHeap, 4> m_viewHeaps;    // Cbv, Srv, Uav
     ShortList<D3D12DescriptorHeap, 4> m_samplerHeaps; // Heap for samplers
     int32_t m_currentViewHeapIndex = -1;
     int32_t m_currentSamplerHeapIndex = -1;
@@ -55,7 +55,7 @@ public:
     D3D12LinearExpandingDescriptorHeap m_stagingCpuSamplerHeap;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        queryInterface(SlangUUID const& uuid, void** outObject) override;
+    queryInterface(SlangUUID const& uuid, void** outObject) override;
 
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return Super::addRef(); }
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return Super::release(); }
@@ -64,7 +64,8 @@ public:
         DescriptorType type,
         GfxCount count,
         Offset& outDescriptorOffset,
-        void** outD3DDescriptorHeapHandle) override;
+        void** outD3DDescriptorHeapHandle
+    ) override;
 
     ~TransientResourceHeapImpl();
 
@@ -74,14 +75,15 @@ public:
         const ITransientResourceHeap::Desc& desc,
         DeviceImpl* device,
         uint32_t viewHeapSize,
-        uint32_t samplerHeapSize);
+        uint32_t samplerHeapSize
+    );
 
     Result allocateNewViewDescriptorHeap(DeviceImpl* device);
 
     Result allocateNewSamplerDescriptorHeap(DeviceImpl* device);
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createCommandBuffer(ICommandBuffer** outCommandBuffer
+    ) override;
 
     Result synchronize();
 

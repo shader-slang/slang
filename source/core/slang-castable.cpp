@@ -1,11 +1,12 @@
 // slang-castable.cpp
 #include "slang-castable.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CastableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */ComPtr<ICastable> CastableUtil::getCastable(ISlangUnknown* unk)
+/* static */ ComPtr<ICastable> CastableUtil::getCastable(ISlangUnknown* unk)
 {
     SLANG_ASSERT(unk);
     ComPtr<ICastable> castable;
@@ -52,8 +53,7 @@ void* UnknownCastableAdapter::castAs(const Guid& guid)
 
 void* UnknownCastableAdapter::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
         guid == IUnknownCastableAdapter::getTypeGuid())
     {
         return static_cast<IUnknownCastableAdapter*>(this);

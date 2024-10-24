@@ -3,13 +3,11 @@
 
 namespace Slang
 {
-    struct IRModule;
+struct IRModule;
 
-        /// Wrap structured buffer types of matrices for
-        /// targets that compute incorrect layouts for such
-        /// types.
-        ///
-    void wrapStructuredBuffersOfMatrices(
-        IRModule*                           module);
-}
-
+/// Wrap structured buffer types of matrices for
+/// targets that compute incorrect layouts for such
+/// types.
+///
+void wrapStructuredBuffersOfMatrices(IRModule* module);
+} // namespace Slang

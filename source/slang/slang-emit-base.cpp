@@ -1,4 +1,5 @@
 #include "slang-emit-base.h"
+
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -70,4 +71,4 @@ BaseType SourceEmitterBase::extractBaseType(IRType* inType)
     }
 }
 
-}
+} // namespace Slang

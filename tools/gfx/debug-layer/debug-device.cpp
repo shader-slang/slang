@@ -45,7 +45,8 @@ Result DebugDevice::getNativeDeviceHandles(InteropHandles* outHandles)
     return baseObject->getNativeDeviceHandles(outHandles);
 }
 
-Result DebugDevice::getFeatures(const char** outFeatures, Size bufferSize, GfxCount* outFeatureCount)
+Result
+DebugDevice::getFeatures(const char** outFeatures, Size bufferSize, GfxCount* outFeatureCount)
 {
     SLANG_GFX_API_FUNC;
 
@@ -80,7 +81,8 @@ Result DebugDevice::getSlangSession(slang::ISession** outSlangSession)
 
 Result DebugDevice::createTransientResourceHeap(
     const ITransientResourceHeap::Desc& desc,
-    ITransientResourceHeap** outHeap)
+    ITransientResourceHeap** outHeap
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -95,7 +97,8 @@ Result DebugDevice::createTransientResourceHeap(
 Result DebugDevice::createTextureResource(
     const ITextureResource::Desc& desc,
     const ITextureResource::SubresourceData* initData,
-    ITextureResource** outResource)
+    ITextureResource** outResource
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -111,12 +114,17 @@ Result DebugDevice::createTextureResource(
 Result DebugDevice::createTextureFromNativeHandle(
     InteropHandle handle,
     const ITextureResource::Desc& srcDesc,
-    ITextureResource** outResource)
+    ITextureResource** outResource
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugTextureResource> outObject = new DebugTextureResource();
-    auto result = baseObject->createTextureFromNativeHandle(handle, srcDesc, outObject->baseObject.writeRef());
+    auto result = baseObject->createTextureFromNativeHandle(
+        handle,
+        srcDesc,
+        outObject->baseObject.writeRef()
+    );
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outResource, outObject);
@@ -127,12 +135,18 @@ Result DebugDevice::createTextureFromSharedHandle(
     InteropHandle handle,
     const ITextureResource::Desc& srcDesc,
     const size_t size,
-    ITextureResource** outResource)
+    ITextureResource** outResource
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugTextureResource> outObject = new DebugTextureResource();
-    auto result = baseObject->createTextureFromSharedHandle(handle, srcDesc, size, outObject->baseObject.writeRef());
+    auto result = baseObject->createTextureFromSharedHandle(
+        handle,
+        srcDesc,
+        size,
+        outObject->baseObject.writeRef()
+    );
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outResource, outObject);
@@ -142,12 +156,14 @@ Result DebugDevice::createTextureFromSharedHandle(
 Result DebugDevice::createBufferResource(
     const IBufferResource::Desc& desc,
     const void* initData,
-    IBufferResource** outResource)
+    IBufferResource** outResource
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
-    auto result = baseObject->createBufferResource(desc, initData, outObject->baseObject.writeRef());
+    auto result =
+        baseObject->createBufferResource(desc, initData, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outResource, outObject);
@@ -157,12 +173,14 @@ Result DebugDevice::createBufferResource(
 Result DebugDevice::createBufferFromNativeHandle(
     InteropHandle handle,
     const IBufferResource::Desc& srcDesc,
-    IBufferResource** outResource)
+    IBufferResource** outResource
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
-    auto result = baseObject->createBufferFromNativeHandle(handle, srcDesc, outObject->baseObject.writeRef());
+    auto result =
+        baseObject->createBufferFromNativeHandle(handle, srcDesc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outResource, outObject);
@@ -172,12 +190,14 @@ Result DebugDevice::createBufferFromNativeHandle(
 Result DebugDevice::createBufferFromSharedHandle(
     InteropHandle handle,
     const IBufferResource::Desc& srcDesc,
-    IBufferResource** outResource)
+    IBufferResource** outResource
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
-    auto result = baseObject->createBufferFromSharedHandle(handle, srcDesc, outObject->baseObject.writeRef());
+    auto result =
+        baseObject->createBufferFromSharedHandle(handle, srcDesc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outResource, outObject);
@@ -199,15 +219,14 @@ Result DebugDevice::createSamplerState(ISamplerState::Desc const& desc, ISampler
 Result DebugDevice::createTextureView(
     ITextureResource* texture,
     IResourceView::Desc const& desc,
-    IResourceView** outView)
+    IResourceView** outView
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugResourceView> outObject = new DebugResourceView();
-    auto result = baseObject->createTextureView(
-        getInnerObj(texture),
-        desc,
-        outObject->baseObject.writeRef());
+    auto result =
+        baseObject->createTextureView(getInnerObj(texture), desc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outView, outObject);
@@ -218,7 +237,8 @@ Result DebugDevice::createBufferView(
     IBufferResource* buffer,
     IBufferResource* counterBuffer,
     IResourceView::Desc const& desc,
-    IResourceView** outView)
+    IResourceView** outView
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -227,7 +247,8 @@ Result DebugDevice::createBufferView(
         getInnerObj(buffer),
         getInnerObj(counterBuffer),
         desc,
-        outObject->baseObject.writeRef());
+        outObject->baseObject.writeRef()
+    );
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outView, outObject);
@@ -236,7 +257,8 @@ Result DebugDevice::createBufferView(
 
 Result DebugDevice::getAccelerationStructurePrebuildInfo(
     const IAccelerationStructure::BuildInputs& buildInputs,
-    IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
+    IAccelerationStructure::PrebuildInfo* outPrebuildInfo
+)
 {
     SLANG_GFX_API_FUNC;
     validateAccelerationStructureBuildInputs(buildInputs);
@@ -245,13 +267,15 @@ Result DebugDevice::getAccelerationStructurePrebuildInfo(
 
 Result DebugDevice::createAccelerationStructure(
     const IAccelerationStructure::CreateDesc& desc,
-    IAccelerationStructure** outAS)
+    IAccelerationStructure** outAS
+)
 {
     SLANG_GFX_API_FUNC;
     auto innerDesc = desc;
     innerDesc.buffer = getInnerObj(innerDesc.buffer);
     RefPtr<DebugAccelerationStructure> outObject = new DebugAccelerationStructure();
-    auto result = baseObject->createAccelerationStructure(innerDesc, outObject->baseObject.writeRef());
+    auto result =
+        baseObject->createAccelerationStructure(innerDesc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outAS, outObject);
@@ -260,7 +284,8 @@ Result DebugDevice::createAccelerationStructure(
 
 Result DebugDevice::createFramebufferLayout(
     IFramebufferLayout::Desc const& desc,
-    IFramebufferLayout** outFrameBuffer)
+    IFramebufferLayout** outFrameBuffer
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -297,7 +322,8 @@ Result DebugDevice::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuff
 
 Result DebugDevice::createRenderPassLayout(
     const IRenderPassLayout::Desc& desc,
-    IRenderPassLayout** outRenderPassLayout)
+    IRenderPassLayout** outRenderPassLayout
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -314,7 +340,8 @@ Result DebugDevice::createRenderPassLayout(
 Result DebugDevice::createSwapchain(
     ISwapchain::Desc const& desc,
     WindowHandle window,
-    ISwapchain** outSwapchain)
+    ISwapchain** outSwapchain
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -329,15 +356,12 @@ Result DebugDevice::createSwapchain(
     return Result();
 }
 
-Result DebugDevice::createInputLayout(
-    IInputLayout::Desc const& desc,
-    IInputLayout** outLayout)
+Result DebugDevice::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugInputLayout> outObject = new DebugInputLayout();
-    auto result = baseObject->createInputLayout(
-        desc, outObject->baseObject.writeRef());
+    auto result = baseObject->createInputLayout(desc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outLayout, outObject);
@@ -359,7 +383,8 @@ Result DebugDevice::createCommandQueue(const ICommandQueue::Desc& desc, ICommand
 Result DebugDevice::createShaderObject(
     slang::TypeReflection* type,
     ShaderObjectContainerType containerType,
-    IShaderObject** outShaderObject)
+    IShaderObject** outShaderObject
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -380,14 +405,16 @@ Result DebugDevice::createShaderObject2(
     slang::ISession* session,
     slang::TypeReflection* type,
     ShaderObjectContainerType containerType,
-    IShaderObject** outShaderObject)
+    IShaderObject** outShaderObject
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
     auto typeName = type->getName();
     auto result =
-        baseObject->createShaderObject2(session, type, containerType, outObject->baseObject.writeRef());
+        baseObject
+            ->createShaderObject2(session, type, containerType, outObject->baseObject.writeRef());
     outObject->m_typeName = typeName;
     outObject->m_device = this;
     outObject->m_slangType = type;
@@ -400,14 +427,18 @@ Result DebugDevice::createShaderObject2(
 Result DebugDevice::createMutableShaderObject(
     slang::TypeReflection* type,
     ShaderObjectContainerType containerType,
-    IShaderObject** outShaderObject)
+    IShaderObject** outShaderObject
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
     auto typeName = type->getName();
-    auto result =
-        baseObject->createMutableShaderObject(type, containerType, outObject->baseObject.writeRef());
+    auto result = baseObject->createMutableShaderObject(
+        type,
+        containerType,
+        outObject->baseObject.writeRef()
+    );
     outObject->m_typeName = typeName;
     outObject->m_device = this;
     outObject->m_slangType = type;
@@ -421,14 +452,19 @@ Result DebugDevice::createMutableShaderObject2(
     slang::ISession* session,
     slang::TypeReflection* type,
     ShaderObjectContainerType containerType,
-    IShaderObject** outShaderObject)
+    IShaderObject** outShaderObject
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
     auto typeName = type->getName();
-    auto result =
-        baseObject->createMutableShaderObject2(session, type, containerType, outObject->baseObject.writeRef());
+    auto result = baseObject->createMutableShaderObject2(
+        session,
+        type,
+        containerType,
+        outObject->baseObject.writeRef()
+    );
     outObject->m_typeName = typeName;
     outObject->m_device = this;
     outObject->m_slangType = type;
@@ -438,13 +474,15 @@ Result DebugDevice::createMutableShaderObject2(
     return result;
 }
 
-Result DebugDevice::createMutableRootShaderObject(
-    IShaderProgram* program, IShaderObject** outRootObject)
+Result
+DebugDevice::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outRootObject)
 {
     SLANG_GFX_API_FUNC;
     RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
     auto result = baseObject->createMutableRootShaderObject(
-        getInnerObj(program), outObject->baseObject.writeRef());
+        getInnerObj(program),
+        outObject->baseObject.writeRef()
+    );
     if (SLANG_FAILED(result))
         return result;
     outObject->m_device = this;
@@ -455,12 +493,15 @@ Result DebugDevice::createMutableRootShaderObject(
 }
 
 Result DebugDevice::createShaderObjectFromTypeLayout(
-    slang::TypeLayoutReflection* typeLayout, IShaderObject** outShaderObject)
+    slang::TypeLayoutReflection* typeLayout,
+    IShaderObject** outShaderObject
+)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
-    auto result = baseObject->createShaderObjectFromTypeLayout(typeLayout, outObject->baseObject.writeRef());
+    auto result =
+        baseObject->createShaderObjectFromTypeLayout(typeLayout, outObject->baseObject.writeRef());
     auto type = typeLayout->getType();
     auto typeName = type->getName();
     outObject->m_typeName = typeName;
@@ -473,12 +514,16 @@ Result DebugDevice::createShaderObjectFromTypeLayout(
 }
 
 Result DebugDevice::createMutableShaderObjectFromTypeLayout(
-    slang::TypeLayoutReflection* typeLayout, IShaderObject** outShaderObject)
+    slang::TypeLayoutReflection* typeLayout,
+    IShaderObject** outShaderObject
+)
 {
     SLANG_GFX_API_FUNC;
     RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
     auto result = baseObject->createMutableShaderObjectFromTypeLayout(
-        typeLayout, outObject->baseObject.writeRef());
+        typeLayout,
+        outObject->baseObject.writeRef()
+    );
     if (SLANG_FAILED(result))
         return result;
     auto type = typeLayout->getType();
@@ -491,7 +536,10 @@ Result DebugDevice::createMutableShaderObjectFromTypeLayout(
 }
 
 Result DebugDevice::createProgram(
-    const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics)
+    const IShaderProgram::Desc& desc,
+    IShaderProgram** outProgram,
+    ISlangBlob** outDiagnostics
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -505,12 +553,16 @@ Result DebugDevice::createProgram(
 }
 
 Result DebugDevice::createProgram2(
-    const IShaderProgram::CreateDesc2& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics)
+    const IShaderProgram::CreateDesc2& desc,
+    IShaderProgram** outProgram,
+    ISlangBlob** outDiagnostics
+)
 {
     SLANG_GFX_API_FUNC;
     IShaderProgram::Desc desc1 = {};
     RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram();
-    auto result = baseObject->createProgram2(desc, outObject->baseObject.writeRef(), outDiagnostics);
+    auto result =
+        baseObject->createProgram2(desc, outObject->baseObject.writeRef(), outDiagnostics);
     if (SLANG_FAILED(result))
         return result;
     auto base = static_cast<ShaderProgramBase*>(outObject->baseObject.get());
@@ -521,7 +573,8 @@ Result DebugDevice::createProgram2(
 
 Result DebugDevice::createGraphicsPipelineState(
     const GraphicsPipelineStateDesc& desc,
-    IPipelineState** outState)
+    IPipelineState** outState
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -540,7 +593,8 @@ Result DebugDevice::createGraphicsPipelineState(
 
 Result DebugDevice::createComputePipelineState(
     const ComputePipelineStateDesc& desc,
-    IPipelineState** outState)
+    IPipelineState** outState
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -558,7 +612,8 @@ Result DebugDevice::createComputePipelineState(
 
 Result DebugDevice::createRayTracingPipelineState(
     const RayTracingPipelineStateDesc& desc,
-    IPipelineState** outState)
+    IPipelineState** outState
+)
 {
     SLANG_GFX_API_FUNC;
 
@@ -579,18 +634,20 @@ SlangResult DebugDevice::readTextureResource(
     ResourceState state,
     ISlangBlob** outBlob,
     size_t* outRowPitch,
-    size_t* outPixelSize)
+    size_t* outPixelSize
+)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->readTextureResource(
-        getInnerObj(resource), state, outBlob, outRowPitch, outPixelSize);
+    return baseObject
+        ->readTextureResource(getInnerObj(resource), state, outBlob, outRowPitch, outPixelSize);
 }
 
 SlangResult DebugDevice::readBufferResource(
     IBufferResource* buffer,
     size_t offset,
     size_t size,
-    ISlangBlob** outBlob)
+    ISlangBlob** outBlob
+)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->readBufferResource(getInnerObj(buffer), offset, size, outBlob);
@@ -622,7 +679,12 @@ Result DebugDevice::createFence(const IFence::Desc& desc, IFence** outFence)
 }
 
 Result DebugDevice::waitForFences(
-    GfxCount fenceCount, IFence** fences, uint64_t* values , bool waitForAll, uint64_t timeout)
+    GfxCount fenceCount,
+    IFence** fences,
+    uint64_t* values,
+    bool waitForAll,
+    uint64_t timeout
+)
 {
     SLANG_GFX_API_FUNC;
     ShortList<IFence*> innerFences;
@@ -630,11 +692,20 @@ Result DebugDevice::waitForFences(
     {
         innerFences.add(getInnerObj(fences[i]));
     }
-    return baseObject->waitForFences(fenceCount, innerFences.getArrayView().getBuffer(), values, waitForAll, timeout);
+    return baseObject->waitForFences(
+        fenceCount,
+        innerFences.getArrayView().getBuffer(),
+        values,
+        waitForAll,
+        timeout
+    );
 }
 
 Result DebugDevice::getTextureAllocationInfo(
-    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+    const ITextureResource::Desc& desc,
+    size_t* outSize,
+    size_t* outAlignment
+)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getTextureAllocationInfo(desc, outSize, outAlignment);

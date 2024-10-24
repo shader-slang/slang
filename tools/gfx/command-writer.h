@@ -1,9 +1,9 @@
 #pragma once
 
-#include "slang-gfx.h"
-#include "slang-com-ptr.h"
 #include "core/slang-basic.h"
 #include "renderer-shared.h"
+#include "slang-com-ptr.h"
+#include "slang-gfx.h"
 
 namespace gfx
 {
@@ -69,7 +69,8 @@ struct Command
         uint32_t op2,
         uint32_t op3,
         uint32_t op4,
-        uint32_t op5)
+        uint32_t op5
+    )
         : name(inName)
     {
         operands[0] = op1;
@@ -115,12 +116,14 @@ public:
         return offset;
     }
 
-    template <typename T> T* getObject(uint32_t offset)
+    template<typename T>
+    T* getObject(uint32_t offset)
     {
         return static_cast<T*>(m_objects[offset].Ptr());
     }
 
-    template <typename T> T* getData(Offset offset)
+    template<typename T>
+    T* getData(Offset offset)
     {
         return reinterpret_cast<T*>(m_data.getBuffer() + offset);
     }
@@ -146,7 +149,8 @@ public:
             (uint32_t)bufferOffset,
             (uint32_t)offset,
             (uint32_t)size,
-            (uint32_t)dataOffset));
+            (uint32_t)dataOffset
+        ));
     }
 
     void copyBuffer(
@@ -154,7 +158,8 @@ public:
         Offset dstOffset,
         IBufferResource* src,
         Offset srcOffset,
-        Size size)
+        Size size
+    )
     {
         auto dstBuffer = encodeObject(static_cast<BufferResource*>(dst));
         auto srcBuffer = encodeObject(static_cast<BufferResource*>(src));
@@ -164,7 +169,8 @@ public:
             (uint32_t)dstOffset,
             (uint32_t)srcBuffer,
             (uint32_t)srcOffset,
-            (uint32_t)size));
+            (uint32_t)size
+        ));
     }
 
     void setFramebuffer(IFramebuffer* frameBuffer)
@@ -176,7 +182,11 @@ public:
     void clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil)
     {
         m_commands.add(Command(
-            CommandName::ClearFrame, colorBufferMask, clearDepth ? 1 : 0, clearStencil ? 1 : 0));
+            CommandName::ClearFrame,
+            colorBufferMask,
+            clearDepth ? 1 : 0,
+            clearStencil ? 1 : 0
+        ));
     }
 
     void setViewports(GfxCount count, const Viewport* viewports)
@@ -200,7 +210,8 @@ public:
         GfxIndex startSlot,
         GfxCount slotCount,
         IBufferResource* const* buffers,
-        const Offset* offsets)
+        const Offset* offsets
+    )
     {
         Offset bufferOffset = 0;
         for (GfxCount i = 0; i < slotCount; i++)
@@ -215,14 +226,19 @@ public:
             (uint32_t)startSlot,
             (uint32_t)slotCount,
             (uint32_t)bufferOffset,
-            (uint32_t)offsetsOffset));
+            (uint32_t)offsetsOffset
+        ));
     }
 
     void setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset)
     {
         auto bufferOffset = encodeObject(static_cast<BufferResource*>(buffer));
         m_commands.add(Command(
-            CommandName::SetIndexBuffer, (uint32_t)bufferOffset, (uint32_t)indexFormat, (uint32_t)offset));
+            CommandName::SetIndexBuffer,
+            (uint32_t)bufferOffset,
+            (uint32_t)indexFormat,
+            (uint32_t)offset
+        ));
     }
 
     void draw(GfxCount vertexCount, GfxIndex startVertex)
@@ -236,21 +252,24 @@ public:
             CommandName::DrawIndexed,
             (uint32_t)indexCount,
             (uint32_t)startIndex,
-            (uint32_t)baseVertex));
+            (uint32_t)baseVertex
+        ));
     }
 
     void drawInstanced(
         GfxCount vertexCount,
         GfxCount instanceCount,
         GfxIndex startVertex,
-        GfxIndex startInstanceLocation)
+        GfxIndex startInstanceLocation
+    )
     {
         m_commands.add(Command(
             CommandName::DrawInstanced,
             (uint32_t)vertexCount,
             (uint32_t)instanceCount,
             (uint32_t)startVertex,
-            (uint32_t)startInstanceLocation));
+            (uint32_t)startInstanceLocation
+        ));
     }
 
     void drawIndexedInstanced(
@@ -258,7 +277,8 @@ public:
         GfxCount instanceCount,
         GfxIndex startIndexLocation,
         GfxIndex baseVertexLocation,
-        GfxIndex startInstanceLocation)
+        GfxIndex startInstanceLocation
+    )
     {
         m_commands.add(Command(
             CommandName::DrawIndexedInstanced,
@@ -266,7 +286,8 @@ public:
             (uint32_t)instanceCount,
             (uint32_t)startIndexLocation,
             (uint32_t)baseVertexLocation,
-            (uint32_t)startInstanceLocation));
+            (uint32_t)startInstanceLocation
+        ));
     }
 
     void setStencilReference(uint32_t referenceValue)
@@ -276,16 +297,15 @@ public:
 
     void dispatchCompute(int x, int y, int z)
     {
-        m_commands.add(
-            Command(CommandName::DispatchCompute, (uint32_t)x, (uint32_t)y, (uint32_t)z));
+        m_commands.add(Command(CommandName::DispatchCompute, (uint32_t)x, (uint32_t)y, (uint32_t)z)
+        );
     }
 
     void writeTimestamp(IQueryPool* pool, GfxIndex index)
     {
         auto poolOffset = encodeObject(static_cast<QueryPoolBase*>(pool));
-        m_commands.add(
-            Command(CommandName::WriteTimestamp, (uint32_t)poolOffset, (uint32_t)index));
+        m_commands.add(Command(CommandName::WriteTimestamp, (uint32_t)poolOffset, (uint32_t)index));
         m_hasWriteTimestamps = true;
     }
 };
-}
+} // namespace gfx

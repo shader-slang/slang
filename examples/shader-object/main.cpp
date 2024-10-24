@@ -8,14 +8,14 @@
 // simplifies shader specialization and parameter binding when using `interface` typed
 // shader parameters.
 //
-#include "slang.h"
 #include "slang-com-ptr.h"
+#include "slang.h"
 using Slang::ComPtr;
 
-#include "slang-gfx.h"
-#include "gfx-util/shader-cursor.h"
-#include "source/core/slang-basic.h"
 #include "examples/example-base/example-base.h"
+#include "gfx-util/shader-cursor.h"
+#include "slang-gfx.h"
+#include "source/core/slang-basic.h"
 
 using namespace gfx;
 
@@ -28,7 +28,8 @@ static TestBase testBase;
 Result loadShaderProgram(
     gfx::IDevice* device,
     ComPtr<gfx::IShaderProgram>& outShaderProgram,
-    slang::ProgramLayout*& slangReflection)
+    slang::ProgramLayout*& slangReflection
+)
 {
     // We need to obtain a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
@@ -37,7 +38,7 @@ Result loadShaderProgram(
     // creates a Slang compilation session for us, so we just grab and use it here.
     ComPtr<slang::ISession> slangSession;
     SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
-    
+
     // Once the session has been obtained, we can start loading code into it.
     //
     // The simplest way to load code is by calling `loadModule` with the name of a Slang
@@ -61,7 +62,7 @@ Result loadShaderProgram(
     Slang::String path = resourceBase.resolveResource("shader-object.slang");
     slang::IModule* module = slangSession->loadModule(path.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
-    if(!module)
+    if (!module)
         return SLANG_FAIL;
 
     // Loading the `shader-object` module will compile and check all the shader code in it,
@@ -74,13 +75,14 @@ Result loadShaderProgram(
     // is no umambiguous way for the compiler to know which functions represent entry
     // points when it parses your code via `loadModule()`.
     //
-    char const* computeEntryPointName    = "computeMain";
+    char const* computeEntryPointName = "computeMain";
     ComPtr<slang::IEntryPoint> computeEntryPoint;
     SLANG_RETURN_ON_FAIL(
-        module->findEntryPointByName(computeEntryPointName, computeEntryPoint.writeRef()));
-  
+        module->findEntryPointByName(computeEntryPointName, computeEntryPoint.writeRef())
+    );
+
     // At this point we have a few different Slang API objects that represent
-    // pieces of our code: `module`, `vertexEntryPoint`, and `fragmentEntryPoint`.   
+    // pieces of our code: `module`, `vertexEntryPoint`, and `fragmentEntryPoint`.
     //
     // A single Slang module could contain many different entry points (e.g.,
     // four vertex entry points, three fragment entry points, and two compute
@@ -107,7 +109,8 @@ Result loadShaderProgram(
         componentTypes.getBuffer(),
         componentTypes.getCount(),
         composedProgram.writeRef(),
-        diagnosticsBlob.writeRef());
+        diagnosticsBlob.writeRef()
+    );
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
     if (testBase.isTestMode())
@@ -145,7 +148,8 @@ int main(int argc, char* argv[])
     ITransientResourceHeap::Desc transientHeapDesc = {};
     transientHeapDesc.constantBufferSize = 4096;
     SLANG_RETURN_ON_FAIL(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
+        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef())
+    );
 
     // Now we can load the shader code.
     // A `gfx::IShaderProgram` object for use in the `gfx` layer.
@@ -158,8 +162,8 @@ int main(int argc, char* argv[])
     gfx::ComputePipelineStateDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<gfx::IPipelineState> pipelineState;
-    SLANG_RETURN_ON_FAIL(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    SLANG_RETURN_ON_FAIL(device->createComputePipelineState(pipelineDesc, pipelineState.writeRef())
+    );
 
     // Create and initiate our input/output buffer.
     const int numberCount = 4;
@@ -172,15 +176,15 @@ int main(int argc, char* argv[])
         ResourceState::ShaderResource,
         ResourceState::UnorderedAccess,
         ResourceState::CopyDestination,
-        ResourceState::CopySource);
+        ResourceState::CopySource
+    );
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<gfx::IBufferResource> numbersBuffer;
-    SLANG_RETURN_ON_FAIL(device->createBufferResource(
-        bufferDesc,
-        (void*)initialData,
-        numbersBuffer.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef())
+    );
 
     // Create a resource view for the buffer.
     ComPtr<gfx::IResourceView> bufferView;
@@ -188,7 +192,8 @@ int main(int argc, char* argv[])
     viewDesc.type = gfx::IResourceView::Type::UnorderedAccess;
     viewDesc.format = gfx::Format::Unknown;
     SLANG_RETURN_ON_FAIL(
-        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef())
+    );
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
@@ -217,7 +222,10 @@ int main(int argc, char* argv[])
         // Now we can use this type to create a shader object that can be bound to the root object.
         ComPtr<gfx::IShaderObject> transformer;
         SLANG_RETURN_ON_FAIL(device->createShaderObject(
-            addTransformerType, ShaderObjectContainerType::None, transformer.writeRef()));
+            addTransformerType,
+            ShaderObjectContainerType::None,
+            transformer.writeRef()
+        ));
         // Set the `c` field of the `AddTransformer`.
         float c = 1.0f;
         gfx::ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));
@@ -227,8 +235,8 @@ int main(int argc, char* argv[])
         // parameter. We implemented these logic in the `ShaderCursor` helper class, which
         // simplifies the user code to find shader parameters. Here we demonstrate how to set
         // parameters with `ShaderCursor`.
-        gfx::ShaderCursor entryPointCursor(
-            rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
+        gfx::ShaderCursor entryPointCursor(rootObject->getEntryPoint(0)
+        ); // get a cursor the the first entry-point.
         // Bind buffer view to the entry point.
         entryPointCursor.getPath("buffer").setResource(bufferView);
 
@@ -244,7 +252,11 @@ int main(int argc, char* argv[])
     // Read back the results.
     ComPtr<ISlangBlob> resultBlob;
     SLANG_RETURN_ON_FAIL(device->readBufferResource(
-        numbersBuffer, 0, numberCount * sizeof(float), resultBlob.writeRef()));
+        numbersBuffer,
+        0,
+        numberCount * sizeof(float),
+        resultBlob.writeRef()
+    ));
     auto result = reinterpret_cast<const float*>(resultBlob->getBufferPointer());
     for (int i = 0; i < numberCount; i++)
         printf("%f\n", result[i]);

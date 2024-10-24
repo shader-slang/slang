@@ -15,8 +15,8 @@ struct ShaderOffsetKey
     bool operator==(ShaderOffsetKey other) const
     {
         return offset.bindingArrayIndex == other.offset.bindingArrayIndex &&
-            offset.bindingRangeIndex == other.offset.bindingRangeIndex &&
-            offset.uniformOffset == other.offset.uniformOffset;
+               offset.bindingRangeIndex == other.offset.bindingRangeIndex &&
+               offset.uniformOffset == other.offset.uniformOffset;
     }
     Slang::HashCode getHashCode() const
     {
@@ -24,7 +24,9 @@ struct ShaderOffsetKey
             (Slang::HashCode)offset.uniformOffset,
             Slang::combineHash(
                 (Slang::HashCode)offset.bindingArrayIndex,
-                (Slang::HashCode)offset.bindingRangeIndex));
+                (Slang::HashCode)offset.bindingRangeIndex
+            )
+        );
     }
 };
 
@@ -40,32 +42,34 @@ public:
     virtual SLANG_NO_THROW ShaderObjectContainerType SLANG_MCALL getContainerType() override;
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(GfxIndex index, IShaderObject** entryPoint) override;
+    getEntryPoint(GfxIndex index, IShaderObject** entryPoint) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& offset, void const* data, size_t size) override;
+    setData(ShaderOffset const& offset, void const* data, size_t size) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getObject(ShaderOffset const& offset, IShaderObject** object) override;
+    getObject(ShaderOffset const& offset, IShaderObject** object) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setObject(ShaderOffset const& offset, IShaderObject* object) override;
+    setObject(ShaderOffset const& offset, IShaderObject* object) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setResource(ShaderOffset const& offset, IResourceView* resourceView) override;
+    setResource(ShaderOffset const& offset, IResourceView* resourceView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
+    setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
         ShaderOffset const& offset,
         IResourceView* textureView,
-        ISamplerState* sampler) override;
+        ISamplerState* sampler
+    ) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
         ShaderOffset const& offset,
         const slang::SpecializationArg* args,
-        GfxCount count) override;
+        GfxCount count
+    ) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
-        ITransientResourceHeap* transientHeap, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    getCurrentVersion(ITransientResourceHeap* transientHeap, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
     virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setConstantBufferOverride(IBufferResource* constantBuffer) override;
+    setConstantBufferOverride(IBufferResource* constantBuffer) override;
 
 public:
     // Type name of an ordinary shader object.
@@ -95,7 +99,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
         ShaderOffset const& offset,
         const slang::SpecializationArg* args,
-        GfxCount count) override;
+        GfxCount count
+    ) override;
     void reset();
 };
 

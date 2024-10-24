@@ -7,8 +7,6 @@ namespace Slang
 {
 class DiagnosticSink;
 
-SlangResult eliminateAddressInsts(
-    IRFunc* func,
-    DiagnosticSink* sink);
+SlangResult eliminateAddressInsts(IRFunc* func, DiagnosticSink* sink);
 
-}
+} // namespace Slang

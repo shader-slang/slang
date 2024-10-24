@@ -29,7 +29,8 @@ Result FenceImpl::init(DeviceImpl* device, const IFence::Desc& desc)
     SLANG_RETURN_ON_FAIL(device->m_device->CreateFence(
         desc.initialValue,
         desc.isShared ? D3D12_FENCE_FLAG_SHARED : D3D12_FENCE_FLAG_NONE,
-        IID_PPV_ARGS(m_fence.writeRef())));
+        IID_PPV_ARGS(m_fence.writeRef())
+    ));
     return SLANG_OK;
 }
 
@@ -60,7 +61,12 @@ Result FenceImpl::getSharedHandle(InteropHandle* outHandle)
     ComPtr<ID3D12Device> devicePtr;
     m_fence->GetDevice(IID_PPV_ARGS(devicePtr.writeRef()));
     SLANG_RETURN_ON_FAIL(devicePtr->CreateSharedHandle(
-        m_fence, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
+        m_fence,
+        NULL,
+        GENERIC_ALL,
+        nullptr,
+        (HANDLE*)&outHandle->handleValue
+    ));
     outHandle->api = InteropHandleAPI::D3D12;
     sharedHandle = *outHandle;
     return SLANG_OK;

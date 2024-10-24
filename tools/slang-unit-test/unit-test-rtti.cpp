@@ -1,12 +1,12 @@
 // unit-test-rtti.cpp
 
 #include "../../source/core/slang-rtti-info.h"
-
 #include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
-namespace { // anonymous 
+namespace
+{ // anonymous
 
 struct SomeStruct
 {
@@ -18,7 +18,7 @@ struct SomeStruct
     static const StructRttiInfo g_rttiInfo;
 };
 
-} // anonymous
+} // namespace
 
 static const StructRttiInfo _makeSomeStructRtti()
 {
@@ -32,14 +32,13 @@ static const StructRttiInfo _makeSomeStructRtti()
 
     return builder.make();
 }
-/* static */const StructRttiInfo SomeStruct::g_rttiInfo = _makeSomeStructRtti();
+/* static */ const StructRttiInfo SomeStruct::g_rttiInfo = _makeSomeStructRtti();
 
 SLANG_UNIT_TEST(Rtti)
 {
     using namespace Slang;
 
-    const RttiInfo* types[] =
-    {
+    const RttiInfo* types[] = {
         GetRttiInfo<int32_t>::get(),
         GetRttiInfo<int32_t[10]>::get(),
         GetRttiInfo<String>::get(),
@@ -48,7 +47,7 @@ SLANG_UNIT_TEST(Rtti)
         GetRttiInfo<int32_t[2][3]>::get(),
         GetRttiInfo<SomeStruct>::get(),
         GetRttiInfo<SomeStruct*>::get(),
-        GetRttiInfo<const float*const>::get(),
+        GetRttiInfo<const float* const>::get(),
     };
 
     StringBuilder buf;
@@ -59,16 +58,15 @@ SLANG_UNIT_TEST(Rtti)
         buf << "\n";
     }
 
-    const char expected[] =
-        "int32_t\n"
-        "int32_t[10]\n"
-        "String\n"
-        "List<String>\n"
-        "List<List<String>>\n"
-        "int32_t[2][3]\n"
-        "SomeStruct\n"
-        "SomeStruct*\n"
-        "float*\n";
+    const char expected[] = "int32_t\n"
+                            "int32_t[10]\n"
+                            "String\n"
+                            "List<String>\n"
+                            "List<List<String>>\n"
+                            "int32_t[2][3]\n"
+                            "SomeStruct\n"
+                            "SomeStruct*\n"
+                            "float*\n";
 
     SLANG_CHECK(buf == expected)
 }

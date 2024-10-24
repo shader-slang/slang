@@ -5,8 +5,8 @@
 
 namespace Slang
 {
-    struct IRModule;
+struct IRModule;
 
-    // Turn opaque mesh output types into regular arrays
-    void legalizeMeshOutputTypes(IRModule* module);
-}
+// Turn opaque mesh output types into regular arrays
+void legalizeMeshOutputTypes(IRModule* module);
+} // namespace Slang

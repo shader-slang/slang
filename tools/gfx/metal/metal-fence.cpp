@@ -1,5 +1,6 @@
 // metal-fence.cpp
 #include "metal-fence.h"
+
 #include "metal-device.h"
 
 namespace gfx
@@ -10,9 +11,7 @@ using namespace Slang;
 namespace metal
 {
 
-FenceImpl::~FenceImpl()
-{
-}
+FenceImpl::~FenceImpl() {}
 
 Result FenceImpl::init(DeviceImpl* device, const IFence::Desc& desc)
 {

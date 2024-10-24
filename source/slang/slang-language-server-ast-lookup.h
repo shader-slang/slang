@@ -36,6 +36,7 @@ List<ASTLookupResult> findASTNodesAt(
     ASTLookupType findType,
     UnownedStringSlice fileName,
     Int line,
-    Int col);
+    Int col
+);
 
-} // namespace LanguageServerProtocol
+} // namespace Slang

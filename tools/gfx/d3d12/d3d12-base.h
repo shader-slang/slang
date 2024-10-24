@@ -12,8 +12,8 @@
 #include "core/slang-blob.h"
 #include "core/slang-chunked-list.h"
 #include "d3d12-descriptor-heap.h"
-#include "d3d12-resource.h"
 #include "d3d12-posix-synchapi.h"
+#include "d3d12-resource.h"
 
 #pragma push_macro("WIN32_LEAN_AND_MEAN")
 #pragma push_macro("NOMINMAX")
@@ -35,47 +35,48 @@
 #ifndef __ID3D12GraphicsCommandList1_FWD_DEFINED__
 // If can't find a definition of CommandList1, just use an empty definition
 struct ID3D12GraphicsCommandList1
-{};
+{
+};
 #endif
 
 namespace gfx
 {
 namespace d3d12
 {
-    class DeviceImpl;
-    class BufferResourceImpl;
-    class TextureResourceImpl;
-    class CommandBufferImpl;
-    class PipelineCommandEncoder;
-    class ResourceCommandEncoderImpl;
-    class ComputeCommandEncoderImpl;
-    class RenderCommandEncoderImpl;
-    class CommandQueueImpl;
-    class FenceImpl;
-    class FramebufferLayoutImpl;
-    class FramebufferImpl;
-    class QueryPoolImpl;
-    class PlainBufferProxyQueryPoolImpl;
-    class PipelineStateImpl;
-    class RenderPassLayoutImpl;
-    class ResourceViewInternalImpl;
-    class ResourceViewImpl;
-    class AccelerationStructureImpl;
-    class SamplerStateImpl;
-    class ShaderObjectImpl;
-    class RootShaderObjectImpl;
-    class MutableRootShaderObjectImpl;
-    class ShaderObjectLayoutImpl;
-    class RootShaderObjectLayoutImpl;
-    class ShaderProgramImpl;
-    class ShaderTableImpl;
-    class SwapChainImpl;
-    class TransientResourceHeapImpl;
-    class InputLayoutImpl;
+class DeviceImpl;
+class BufferResourceImpl;
+class TextureResourceImpl;
+class CommandBufferImpl;
+class PipelineCommandEncoder;
+class ResourceCommandEncoderImpl;
+class ComputeCommandEncoderImpl;
+class RenderCommandEncoderImpl;
+class CommandQueueImpl;
+class FenceImpl;
+class FramebufferLayoutImpl;
+class FramebufferImpl;
+class QueryPoolImpl;
+class PlainBufferProxyQueryPoolImpl;
+class PipelineStateImpl;
+class RenderPassLayoutImpl;
+class ResourceViewInternalImpl;
+class ResourceViewImpl;
+class AccelerationStructureImpl;
+class SamplerStateImpl;
+class ShaderObjectImpl;
+class RootShaderObjectImpl;
+class MutableRootShaderObjectImpl;
+class ShaderObjectLayoutImpl;
+class RootShaderObjectLayoutImpl;
+class ShaderProgramImpl;
+class ShaderTableImpl;
+class SwapChainImpl;
+class TransientResourceHeapImpl;
+class InputLayoutImpl;
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
-    class RayTracingCommandEncoderImpl;
-    class RayTracingPipelineStateImpl;
+class RayTracingCommandEncoderImpl;
+class RayTracingPipelineStateImpl;
 #endif
-}
-}
+} // namespace d3d12
+} // namespace gfx

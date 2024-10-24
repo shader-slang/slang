@@ -1,9 +1,10 @@
 #include "slang-language-server-inlay-hints.h"
-#include "slang-visitor.h"
-#include "slang-ast-support-types.h"
-#include "slang-ast-iterator.h"
-#include "slang-language-server.h"
+
 #include "../core/slang-char-util.h"
+#include "slang-ast-iterator.h"
+#include "slang-ast-support-types.h"
+#include "slang-language-server.h"
+#include "slang-visitor.h"
 
 namespace Slang
 {
@@ -13,12 +14,17 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
     UnownedStringSlice fileName,
     DocumentVersion* doc,
     LanguageServerProtocol::Range range,
-    const InlayHintOptions& options)
+    const InlayHintOptions& options
+)
 {
     List<LanguageServerProtocol::InlayHint> result;
     auto manager = linkage->getSourceManager();
     auto docText = doc->getText().getUnownedSlice();
-    iterateASTWithLanguageServerFilter(fileName, manager, module->getModuleDecl(), [&](SyntaxNode* node)
+    iterateASTWithLanguageServerFilter(
+        fileName,
+        manager,
+        module->getModuleDecl(),
+        [&](SyntaxNode* node)
         {
             if (auto invokeExpr = as<InvokeExpr>(node))
             {
@@ -49,21 +55,31 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                         auto loc = manager->getHumaneLoc(invokeExpr->argumentDelimeterLocs[i]);
                         auto offset = doc->getOffset(loc.line, loc.column);
                         offset++;
-                        while (offset < docText.getLength() && CharUtil::isWhitespace(docText[offset]))
+                        while (offset < docText.getLength() &&
+                               CharUtil::isWhitespace(docText[offset]))
                             offset++;
                         Index posLine, posCol;
                         doc->offsetToLineCol(offset, posLine, posCol);
                         Index utf16line, utf16col;
-                        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(posLine, posCol, utf16line, utf16col);
+                        doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                            posLine,
+                            posCol,
+                            utf16line,
+                            utf16col
+                        );
                         hint.position.line = (int)utf16line;
                         hint.position.character = (int)utf16col;
                         hint.paddingLeft = false;
                         hint.kind = LanguageServerProtocol::kInlayHintKindParameter;
                         StringBuilder lblSb;
-                        if (param->hasModifier<OutModifier>()) lblSb << "out ";
-                        else if (param->hasModifier<InOutModifier>()) lblSb << "inout ";
-                        else if (param->hasModifier<RefModifier>()) lblSb << "ref ";
-                        else if (param->hasModifier<ConstRefModifier>()) lblSb << "constref ";
+                        if (param->hasModifier<OutModifier>())
+                            lblSb << "out ";
+                        else if (param->hasModifier<InOutModifier>())
+                            lblSb << "inout ";
+                        else if (param->hasModifier<RefModifier>())
+                            lblSb << "ref ";
+                        else if (param->hasModifier<ConstRefModifier>())
+                            lblSb << "constref ";
                         lblSb << name->text;
                         lblSb << ":";
                         hint.label = lblSb.produceString();
@@ -114,7 +130,8 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                 hint.textEdits.add(edit);
                 result.add(hint);
             }
-        });
+        }
+    );
     return result;
 }
 

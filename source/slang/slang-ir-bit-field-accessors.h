@@ -2,6 +2,6 @@
 
 namespace Slang
 {
-    struct IRModule;
-    void synthesizeBitFieldAccessors(IRModule* module);
-}
+struct IRModule;
+void synthesizeBitFieldAccessors(IRModule* module);
+} // namespace Slang

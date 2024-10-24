@@ -8,13 +8,17 @@ using namespace Slang;
 namespace cpu
 {
 
-ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* layout)
+ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(
+    RendererBase* renderer,
+    slang::ISession* session,
+    slang::TypeLayoutReflection* layout
+)
 {
     initBase(renderer, session, layout);
 
     m_subObjectCount = 0;
     m_resourceCount = 0;
-    
+
     m_elementTypeLayout = _unwrapParameterGroups(layout, m_containerType);
     m_size = m_elementTypeLayout->getSize();
 
@@ -44,35 +48,37 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::IS
         // linear search over the descriptor ranges for a specific binding range.
         //
         auto uniformOffset = m_elementTypeLayout->getDescriptorSetDescriptorRangeIndexOffset(
-            descriptorSetIndex, rangeIndexInDescriptorSet);
+            descriptorSetIndex,
+            rangeIndexInDescriptorSet
+        );
 
         Index baseIndex = 0;
         Index subObjectIndex = 0;
         switch (slangBindingType)
         {
-        case slang::BindingType::ConstantBuffer:
-        case slang::BindingType::ParameterBlock:
-        case slang::BindingType::ExistentialValue:
-            baseIndex = m_subObjectCount;
-            subObjectIndex = baseIndex;
-            m_subObjectCount += count;
-            break;
-        case slang::BindingType::RawBuffer:
-        case slang::BindingType::MutableRawBuffer:
-            if (slangLeafTypeLayout->getType()->getElementType() != nullptr)
-            {
-                // A structured buffer occupies both a resource slot and
-                // a sub-object slot.
-                subObjectIndex = m_subObjectCount;
+            case slang::BindingType::ConstantBuffer:
+            case slang::BindingType::ParameterBlock:
+            case slang::BindingType::ExistentialValue:
+                baseIndex = m_subObjectCount;
+                subObjectIndex = baseIndex;
                 m_subObjectCount += count;
-            }
-            baseIndex = m_resourceCount;
-            m_resourceCount += count;
-            break;
-        default:
-            baseIndex = m_resourceCount;
-            m_resourceCount += count;
-            break;
+                break;
+            case slang::BindingType::RawBuffer:
+            case slang::BindingType::MutableRawBuffer:
+                if (slangLeafTypeLayout->getType()->getElementType() != nullptr)
+                {
+                    // A structured buffer occupies both a resource slot and
+                    // a sub-object slot.
+                    subObjectIndex = m_subObjectCount;
+                    m_subObjectCount += count;
+                }
+                baseIndex = m_resourceCount;
+                m_resourceCount += count;
+                break;
+            default:
+                baseIndex = m_resourceCount;
+                m_resourceCount += count;
+                break;
         }
 
         BindingRangeInfo bindingRangeInfo;
@@ -103,8 +109,11 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::IS
         RefPtr<ShaderObjectLayoutImpl> subObjectLayout;
         if (slangBindingType != slang::BindingType::ExistentialValue)
         {
-            subObjectLayout =
-                new ShaderObjectLayoutImpl(renderer, m_slangSession, slangLeafTypeLayout->getElementTypeLayout());
+            subObjectLayout = new ShaderObjectLayoutImpl(
+                renderer,
+                m_slangSession,
+                slangLeafTypeLayout->getElementTypeLayout()
+            );
         }
 
         SubObjectRangeInfo subObjectRange;
@@ -119,35 +128,52 @@ size_t ShaderObjectLayoutImpl::getSize()
     return m_size;
 }
 
-Index ShaderObjectLayoutImpl::getResourceCount() const { return m_resourceCount; }
-Index ShaderObjectLayoutImpl::getSubObjectCount() const { return m_subObjectCount; }
-List<SubObjectRangeInfo>& ShaderObjectLayoutImpl::getSubObjectRanges() { return subObjectRanges; }
-BindingRangeInfo ShaderObjectLayoutImpl::getBindingRange(Index index) { return m_bindingRanges[index]; }
-Index ShaderObjectLayoutImpl::getBindingRangeCount() const { return m_bindingRanges.getCount(); }
+Index ShaderObjectLayoutImpl::getResourceCount() const
+{
+    return m_resourceCount;
+}
+Index ShaderObjectLayoutImpl::getSubObjectCount() const
+{
+    return m_subObjectCount;
+}
+List<SubObjectRangeInfo>& ShaderObjectLayoutImpl::getSubObjectRanges()
+{
+    return subObjectRanges;
+}
+BindingRangeInfo ShaderObjectLayoutImpl::getBindingRange(Index index)
+{
+    return m_bindingRanges[index];
+}
+Index ShaderObjectLayoutImpl::getBindingRangeCount() const
+{
+    return m_bindingRanges.getCount();
+}
 
 const char* EntryPointLayoutImpl::getEntryPointName()
 {
     return m_entryPointLayout->getName();
 }
 
-RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::ProgramLayout* programLayout)
+RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(
+    RendererBase* renderer,
+    slang::ISession* session,
+    slang::ProgramLayout* programLayout
+)
     : ShaderObjectLayoutImpl(renderer, session, programLayout->getGlobalParamsTypeLayout())
     , m_programLayout(programLayout)
 {
-    for (UInt i =0; i< programLayout->getEntryPointCount(); i++)
+    for (UInt i = 0; i < programLayout->getEntryPointCount(); i++)
     {
-        m_entryPointLayouts.add(new EntryPointLayoutImpl(
-            renderer,
-            session,
-            programLayout->getEntryPointByIndex(i)));
+        m_entryPointLayouts.add(
+            new EntryPointLayoutImpl(renderer, session, programLayout->getEntryPointByIndex(i))
+        );
     }
-
 }
 
 int RootShaderObjectLayoutImpl::getKernelIndex(UnownedStringSlice kernelName)
 {
-    auto entryPointCount = (int) m_programLayout->getEntryPointCount();
-    for(int i = 0; i < entryPointCount; i++)
+    auto entryPointCount = (int)m_programLayout->getEntryPointCount();
+    for (int i = 0; i < entryPointCount; i++)
     {
         auto entryPoint = m_programLayout->getEntryPointByIndex(i);
         if (kernelName == entryPoint->getName())
@@ -164,7 +190,10 @@ void RootShaderObjectLayoutImpl::getKernelThreadGroupSize(int kernelIndex, UInt*
     entryPoint->getComputeThreadGroupSize(3, threadGroupSizes);
 }
 
-EntryPointLayoutImpl* RootShaderObjectLayoutImpl::getEntryPoint(Index index) { return m_entryPointLayouts[index]; }
+EntryPointLayoutImpl* RootShaderObjectLayoutImpl::getEntryPoint(Index index)
+{
+    return m_entryPointLayouts[index];
+}
 
 } // namespace cpu
 } // namespace gfx

@@ -3,8 +3,8 @@
 
 namespace Slang
 {
-    struct IRModule;
-    class TargetRequest;
+struct IRModule;
+class TargetRequest;
 
-    void simplifyForEmit(IRModule* inModule, TargetRequest* req);
-}
+void simplifyForEmit(IRModule* inModule, TargetRequest* req);
+} // namespace Slang

@@ -1,8 +1,8 @@
 // vk-swap-chain.cpp
 #include "vk-swap-chain.h"
 
-#include "vk-util.h"
 #include "../apple/cocoa-util.h"
+#include "vk-util.h"
 
 namespace gfx
 {
@@ -44,7 +44,10 @@ void SwapchainImpl::getWindowSize(int* widthOut, int* heightOut) const
 #elif defined(SLANG_ENABLE_XLIB)
     XWindowAttributes winAttr = {};
     XGetWindowAttributes(
-        (Display*)m_windowHandle.handleValues[0], (Window)m_windowHandle.handleValues[1], &winAttr);
+        (Display*)m_windowHandle.handleValues[0],
+        (Window)m_windowHandle.handleValues[1],
+        &winAttr
+    );
 
     *widthOut = winAttr.width;
     *heightOut = winAttr.height;
@@ -78,22 +81,33 @@ Result SwapchainImpl::createSwapchainAndImages()
         VkSurfaceCapabilitiesKHR surfaceCaps;
 
         SLANG_VK_RETURN_ON_FAIL(m_api->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-            m_api->m_physicalDevice, m_surface, &surfaceCaps));
+            m_api->m_physicalDevice,
+            m_surface,
+            &surfaceCaps
+        ));
     }
 
     VkPresentModeKHR presentMode;
     List<VkPresentModeKHR> presentModes;
     uint32_t numPresentModes = 0;
     m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(
-        m_api->m_physicalDevice, m_surface, &numPresentModes, nullptr);
+        m_api->m_physicalDevice,
+        m_surface,
+        &numPresentModes,
+        nullptr
+    );
     presentModes.setCount(numPresentModes);
     m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(
-        m_api->m_physicalDevice, m_surface, &numPresentModes, presentModes.getBuffer());
+        m_api->m_physicalDevice,
+        m_surface,
+        &numPresentModes,
+        presentModes.getBuffer()
+    );
 
     {
         int numCheckPresentOptions = 3;
-        VkPresentModeKHR presentOptions[] = {
-            VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR};
+        VkPresentModeKHR presentOptions[] =
+            {VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR};
         if (m_desc.enableVSync)
         {
             presentOptions[0] = VK_PRESENT_MODE_FIFO_KHR;
@@ -139,7 +153,8 @@ Result SwapchainImpl::createSwapchainAndImages()
     swapchainDesc.oldSwapchain = oldSwapchain;
 
     SLANG_VK_RETURN_ON_FAIL(
-        m_api->vkCreateSwapchainKHR(m_api->m_device, &swapchainDesc, nullptr, &m_swapChain));
+        m_api->vkCreateSwapchainKHR(m_api->m_device, &swapchainDesc, nullptr, &m_swapChain)
+    );
 
     uint32_t numSwapChainImages = 0;
     m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, nullptr);
@@ -147,14 +162,21 @@ Result SwapchainImpl::createSwapchainAndImages()
     {
         vkImages.setCount(numSwapChainImages);
         m_api->vkGetSwapchainImagesKHR(
-            m_api->m_device, m_swapChain, &numSwapChainImages, vkImages.getBuffer());
+            m_api->m_device,
+            m_swapChain,
+            &numSwapChainImages,
+            vkImages.getBuffer()
+        );
     }
 
     for (GfxIndex i = 0; i < m_desc.imageCount; i++)
     {
         ITextureResource::Desc imageDesc = {};
         imageDesc.allowedStates = ResourceStateSet(
-            ResourceState::Present, ResourceState::RenderTarget, ResourceState::CopyDestination);
+            ResourceState::Present,
+            ResourceState::RenderTarget,
+            ResourceState::CopyDestination
+        );
         imageDesc.type = IResource::Type::Texture2D;
         imageDesc.arraySize = 0;
         imageDesc.format = m_desc.format;
@@ -213,7 +235,11 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
     semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     SLANG_VK_RETURN_ON_FAIL(renderer->m_api.vkCreateSemaphore(
-        renderer->m_api.m_device, &semaphoreCreateInfo, nullptr, &m_nextImageSemaphore));
+        renderer->m_api.m_device,
+        &semaphoreCreateInfo,
+        nullptr,
+        &m_nextImageSemaphore
+    ));
 
     m_queue = static_cast<CommandQueueImpl*>(desc.queue);
 
@@ -226,36 +252,51 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
     surfaceCreateInfo.hinstance = ::GetModuleHandle(nullptr);
     surfaceCreateInfo.hwnd = (HWND)window.handleValues[0];
     SLANG_VK_RETURN_ON_FAIL(
-        m_api->vkCreateWin32SurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
+        m_api->vkCreateWin32SurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface)
+    );
 #elif SLANG_APPLE_FAMILY
     m_metalLayer = CocoaUtil::createMetalLayer((void*)window.handleValues[0]);
     VkMetalSurfaceCreateInfoEXT surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
     surfaceCreateInfo.pLayer = (CAMetalLayer*)m_metalLayer;
     SLANG_VK_RETURN_ON_FAIL(
-        m_api->vkCreateMetalSurfaceEXT(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
+        m_api->vkCreateMetalSurfaceEXT(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface)
+    );
 #elif SLANG_ENABLE_XLIB
     VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
     surfaceCreateInfo.dpy = (Display*)window.handleValues[0];
     surfaceCreateInfo.window = (Window)window.handleValues[1];
     SLANG_VK_RETURN_ON_FAIL(
-        m_api->vkCreateXlibSurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
+        m_api->vkCreateXlibSurfaceKHR(m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface)
+    );
 #else
     return SLANG_E_NOT_AVAILABLE;
 #endif
 
     VkBool32 supported = false;
     m_api->vkGetPhysicalDeviceSurfaceSupportKHR(
-        m_api->m_physicalDevice, renderer->m_queueFamilyIndex, m_surface, &supported);
+        m_api->m_physicalDevice,
+        renderer->m_queueFamilyIndex,
+        m_surface,
+        &supported
+    );
 
     uint32_t numSurfaceFormats = 0;
     List<VkSurfaceFormatKHR> surfaceFormats;
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(
-        m_api->m_physicalDevice, m_surface, &numSurfaceFormats, nullptr);
+        m_api->m_physicalDevice,
+        m_surface,
+        &numSurfaceFormats,
+        nullptr
+    );
     surfaceFormats.setCount(int(numSurfaceFormats));
     m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(
-        m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.getBuffer());
+        m_api->m_physicalDevice,
+        m_surface,
+        &numSurfaceFormats,
+        surfaceFormats.getBuffer()
+    );
 
     // Look for a suitable format
     List<VkFormat> formats;
@@ -358,10 +399,10 @@ int SwapchainImpl::acquireNextImage()
         UINT64_MAX,
         m_nextImageSemaphore,
         VK_NULL_HANDLE,
-        (uint32_t*)&m_currentImageIndex);
+        (uint32_t*)&m_currentImageIndex
+    );
 
-    if (
-        result != VK_SUCCESS
+    if (result != VK_SUCCESS
 #if SLANG_APPLE_FAMILY
         && result != VK_SUBOPTIMAL_KHR
 #endif
@@ -376,7 +417,10 @@ int SwapchainImpl::acquireNextImage()
     return m_currentImageIndex;
 }
 
-Result SwapchainImpl::setFullScreenMode(bool mode) { return SLANG_FAIL; }
+Result SwapchainImpl::setFullScreenMode(bool mode)
+{
+    return SLANG_FAIL;
+}
 
 } // namespace vk
 } // namespace gfx

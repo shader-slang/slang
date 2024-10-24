@@ -1,11 +1,11 @@
 // vk-api.cpp
+#include "core/slang-string.h"
 #include "vk-api.h"
 
-#include "core/slang-string.h"
-
-namespace gfx {
+namespace gfx
+{
 
 void installPipelineDumpLayer(VulkanApi& api);
 void writePipelineDump(Slang::UnownedStringSlice path);
 
-} // renderer_test
+} // namespace gfx

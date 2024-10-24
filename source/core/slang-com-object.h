@@ -2,34 +2,35 @@
 #define SLANG_COM_OBJECT_H
 
 #include "slang-basic.h"
+
 #include <atomic>
 
 namespace Slang
 {
 
-/// A base class for COM interfaces that require atomic ref counting 
+/// A base class for COM interfaces that require atomic ref counting
 /// and are *NOT* derived from RefObject
 class ComBaseObject
 {
 public:
-    
-        /// If assigned the the ref count is *NOT* copied
+    /// If assigned the the ref count is *NOT* copied
     ComBaseObject& operator=(const ComBaseObject&) { return *this; }
 
-        /// Copy Ctor, does not copy ref count
-    ComBaseObject(const ComBaseObject&) :
-        m_refCount(0)
-    {}
+    /// Copy Ctor, does not copy ref count
+    ComBaseObject(const ComBaseObject&)
+        : m_refCount(0)
+    {
+    }
 
-        /// Default Ctor sets with no refs
+    /// Default Ctor sets with no refs
     ComBaseObject()
         : m_refCount(0)
-    {}
+    {
+    }
 
-        /// Dtor needs to be virtual to avoid needing to 
-        /// Implement release for all derived types.
-    virtual ~ComBaseObject()
-    {}
+    /// Dtor needs to be virtual to avoid needing to
+    /// Implement release for all derived types.
+    virtual ~ComBaseObject() {}
 
 protected:
     inline uint32_t _releaseImpl();
@@ -50,7 +51,7 @@ inline uint32_t ComBaseObject::_releaseImpl()
     return count;
 }
 
-#define SLANG_COM_BASE_IUNKNOWN_QUERY_INTERFACE                                                  \
+#define SLANG_COM_BASE_IUNKNOWN_QUERY_INTERFACE                                                    \
     SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) \
         SLANG_OVERRIDE                                                                             \
     {                                                                                              \
@@ -63,10 +64,16 @@ inline uint32_t ComBaseObject::_releaseImpl()
         }                                                                                          \
         return SLANG_E_NO_INTERFACE;                                                               \
     }
-#define SLANG_COM_BASE_IUNKNOWN_ADD_REF \
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return ++m_refCount; }
-#define SLANG_COM_BASE_IUNKNOWN_RELEASE \
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return _releaseImpl(); }
+#define SLANG_COM_BASE_IUNKNOWN_ADD_REF                         \
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE \
+    {                                                           \
+        return ++m_refCount;                                    \
+    }
+#define SLANG_COM_BASE_IUNKNOWN_RELEASE                          \
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE \
+    {                                                            \
+        return _releaseImpl();                                   \
+    }
 #define SLANG_COM_BASE_IUNKNOWN_ALL         \
     SLANG_COM_BASE_IUNKNOWN_QUERY_INTERFACE \
     SLANG_COM_BASE_IUNKNOWN_ADD_REF         \
@@ -82,11 +89,12 @@ protected:
 public:
     ComObject()
         : comRefCount(0)
-    {}
-    ComObject(const ComObject& rhs) :
-        RefObject(rhs),
-        comRefCount(0) 
-    {}
+    {
+    }
+    ComObject(const ComObject& rhs)
+        : RefObject(rhs), comRefCount(0)
+    {
+    }
 
     ComObject& operator=(const ComObject&) { return *this; }
 
@@ -125,10 +133,16 @@ public:
         }                                                                                          \
         return SLANG_E_NO_INTERFACE;                                                               \
     }
-#define SLANG_COM_OBJECT_IUNKNOWN_ADD_REF \
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return addRefImpl(); }
-#define SLANG_COM_OBJECT_IUNKNOWN_RELEASE \
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return releaseImpl(); }
+#define SLANG_COM_OBJECT_IUNKNOWN_ADD_REF                       \
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE \
+    {                                                           \
+        return addRefImpl();                                    \
+    }
+#define SLANG_COM_OBJECT_IUNKNOWN_RELEASE                        \
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE \
+    {                                                            \
+        return releaseImpl();                                    \
+    }
 #define SLANG_COM_OBJECT_IUNKNOWN_ALL         \
     SLANG_COM_OBJECT_IUNKNOWN_QUERY_INTERFACE \
     SLANG_COM_OBJECT_IUNKNOWN_ADD_REF         \

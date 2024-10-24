@@ -15,7 +15,7 @@ SLANG_NO_THROW DeviceAddress SLANG_MCALL BufferResourceImpl::getDeviceAddress()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    BufferResourceImpl::map(MemoryRange* rangeToRead, void** outPointer)
+BufferResourceImpl::map(MemoryRange* rangeToRead, void** outPointer)
 {
     SLANG_UNUSED(rangeToRead);
     SLANG_UNUSED(outPointer);

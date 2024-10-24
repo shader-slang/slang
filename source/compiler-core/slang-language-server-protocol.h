@@ -1,11 +1,10 @@
 #pragma once
 
+#include "../../source/compiler-core/slang-json-value.h"
+#include "../../source/core/slang-rtti-info.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
-
-#include "../../source/core/slang-rtti-info.h"
-#include "../../source/compiler-core/slang-json-value.h"
 
 namespace Slang
 {
@@ -191,7 +190,6 @@ struct TextEdit
     String newText;
 
     static const StructRttiInfo g_rttiInfo;
-
 };
 
 struct DidOpenTextDocumentParams
@@ -263,7 +261,6 @@ struct InlayHintOptions
      */
     bool resolveProvider = false;
     static const StructRttiInfo g_rttiInfo;
-
 };
 
 struct DocumentOnTypeFormattingOptions
@@ -435,8 +432,7 @@ struct Diagnostic
 
     HashCode getHashCode() const
     {
-        return combineHash(
-            code, combineHash(range.start.line, message.getHashCode()));
+        return combineHash(code, combineHash(range.start.line, message.getHashCode()));
     }
 
     static const StructRttiInfo g_rttiInfo;
@@ -472,17 +468,13 @@ struct TextDocumentPositionParams
     static const StructRttiInfo g_rttiInfo;
 };
 
-struct HoverParams
-    : WorkDoneProgressParams
-    ,TextDocumentPositionParams 
+struct HoverParams : WorkDoneProgressParams, TextDocumentPositionParams
 {
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
 };
 
-struct DefinitionParams
-    : WorkDoneProgressParams
-    , TextDocumentPositionParams
+struct DefinitionParams : WorkDoneProgressParams, TextDocumentPositionParams
 {
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
@@ -555,9 +547,7 @@ struct CompletionContext
     static const StructRttiInfo g_rttiInfo;
 };
 
-struct CompletionParams
-    : WorkDoneProgressParams
-    , TextDocumentPositionParams
+struct CompletionParams : WorkDoneProgressParams, TextDocumentPositionParams
 {
     CompletionContext context;
 
@@ -712,9 +702,7 @@ struct SemanticTokens
     static const StructRttiInfo g_rttiInfo;
 };
 
-struct SignatureHelpParams
-    : WorkDoneProgressParams
-    , TextDocumentPositionParams
+struct SignatureHelpParams : WorkDoneProgressParams, TextDocumentPositionParams
 {
     static const UnownedStringSlice methodName;
 
@@ -739,7 +727,7 @@ struct ParameterInformation
      * signature label. Its intended use case is to highlight the parameter
      * label part in the `SignatureInformation.label`.
      */
-    uint32_t label[2] = { 0, 0 };
+    uint32_t label[2] = {0, 0};
 
     /**
      * The human-readable doc-comment of this parameter. Will be shown
@@ -847,14 +835,14 @@ struct ConfigurationParams
 struct Registration
 {
     /**
-    * The id used to register the request. The id can be used to deregister
-    * the request again.
-    */
+     * The id used to register the request. The id can be used to deregister
+     * the request again.
+     */
     String id;
 
     /**
-    * The method / capability to register for.
-    */
+     * The method / capability to register for.
+     */
     String method;
 
     static const StructRttiInfo g_rttiInfo;
@@ -1051,7 +1039,6 @@ struct InlayHint
     bool paddingRight = false;
 
     static const StructRttiInfo g_rttiInfo;
-
 };
 
 struct DocumentOnTypeFormattingParams
@@ -1079,7 +1066,7 @@ struct DocumentOnTypeFormattingParams
     /**
      * The formatting options.
      */
-    //FormattingOptions options;
+    // FormattingOptions options;
 
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
@@ -1100,7 +1087,7 @@ struct DocumentRangeFormattingParams
     /**
      * The format options
      */
-    //FormattingOptions options;
+    // FormattingOptions options;
 
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;
@@ -1116,7 +1103,7 @@ struct DocumentFormattingParams
     /**
      * The format options
      */
-    //FormattingOptions options;
+    // FormattingOptions options;
 
     static const StructRttiInfo g_rttiInfo;
     static const UnownedStringSlice methodName;

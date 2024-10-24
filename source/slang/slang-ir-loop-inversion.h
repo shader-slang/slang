@@ -2,9 +2,8 @@
 
 namespace Slang
 {
-    struct IRModule;
-    struct IRInst;
+struct IRModule;
+struct IRInst;
 
-    bool invertLoops(IRModule* module);
-}
-
+bool invertLoops(IRModule* module);
+} // namespace Slang

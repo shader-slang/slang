@@ -2,9 +2,8 @@
 #include "debug-swap-chain.h"
 
 #include "debug-command-queue.h"
-#include "debug-texture.h"
-
 #include "debug-helper-functions.h"
+#include "debug-texture.h"
 
 namespace gfx
 {
@@ -30,7 +29,8 @@ Result DebugSwapchain::getImage(GfxIndex index, ITextureResource** outResource)
         GFX_DIAGNOSE_ERROR_FORMAT(
             "`index`(%d) must not exceed total number of images (%d) in the swapchain.",
             index,
-            (uint32_t)m_images.getCount());
+            (uint32_t)m_images.getCount()
+        );
     }
     returnComPtr(outResource, m_images[index]);
     return SLANG_OK;

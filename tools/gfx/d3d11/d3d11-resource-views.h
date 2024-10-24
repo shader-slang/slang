@@ -27,26 +27,26 @@ public:
 class ShaderResourceViewImpl : public ResourceViewImpl
 {
 public:
-    ComPtr<ID3D11ShaderResourceView>    m_srv;
+    ComPtr<ID3D11ShaderResourceView> m_srv;
 };
 
 class UnorderedAccessViewImpl : public ResourceViewImpl
 {
 public:
-    ComPtr<ID3D11UnorderedAccessView>   m_uav;
+    ComPtr<ID3D11UnorderedAccessView> m_uav;
 };
 
 class DepthStencilViewImpl : public ResourceViewImpl
 {
 public:
-    ComPtr<ID3D11DepthStencilView>      m_dsv;
+    ComPtr<ID3D11DepthStencilView> m_dsv;
     DepthStencilClearValue m_clearValue;
 };
 
 class RenderTargetViewImpl : public ResourceViewImpl
 {
 public:
-    ComPtr<ID3D11RenderTargetView>      m_rtv;
+    ComPtr<ID3D11RenderTargetView> m_rtv;
     float m_clearValue[4];
 };
 

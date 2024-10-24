@@ -2,10 +2,10 @@
 #pragma once
 
 #include "vk-base.h"
+#include "vk-helper-functions.h"
 #include "vk-resource-views.h"
 #include "vk-sampler.h"
 #include "vk-shader-object-layout.h"
-#include "vk-helper-functions.h"
 
 namespace gfx
 {
@@ -26,15 +26,15 @@ class ShaderObjectImpl
     : public ShaderObjectBaseImpl<ShaderObjectImpl, ShaderObjectLayoutImpl, SimpleShaderObjectData>
 {
 public:
-    static Result create(
-        IDevice* device, ShaderObjectLayoutImpl* layout, ShaderObjectImpl** outShaderObject);
+    static Result
+    create(IDevice* device, ShaderObjectLayoutImpl* layout, ShaderObjectImpl** outShaderObject);
 
     RendererBase* getDevice();
 
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
 
@@ -42,16 +42,19 @@ public:
 
     // TODO: Changed size_t to Size? inSize assigned to an Index variable inside implementation
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& inOffset, void const* data, size_t inSize) override;
+    setData(ShaderOffset const& inOffset, void const* data, size_t inSize) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setResource(ShaderOffset const& offset, IResourceView* resourceView) override;
+    setResource(ShaderOffset const& offset, IResourceView* resourceView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
+    setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
-        ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) override;
+        ShaderOffset const& offset,
+        IResourceView* textureView,
+        ISamplerState* sampler
+    ) override;
 
 protected:
     friend class RootShaderObjectLayout;
@@ -65,7 +68,8 @@ protected:
         IBufferResource* buffer,
         Offset offset,
         Size destSize,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
 public:
     /// Write a single descriptor using the Vulkan API
@@ -77,55 +81,65 @@ public:
         VkDescriptorType descriptorType,
         BufferResourceImpl* buffer,
         Offset bufferOffset,
-        Size bufferSize);
+        Size bufferSize
+    );
 
     static void writeBufferDescriptor(
         RootBindingContext& context,
         BindingOffset const& offset,
         VkDescriptorType descriptorType,
-        BufferResourceImpl* buffer);
+        BufferResourceImpl* buffer
+    );
 
     static void writePlainBufferDescriptor(
         RootBindingContext& context,
         BindingOffset const& offset,
         VkDescriptorType descriptorType,
-        ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews);
+        ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews
+    );
 
     static void writeTexelBufferDescriptor(
         RootBindingContext& context,
         BindingOffset const& offset,
         VkDescriptorType descriptorType,
-        ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews);
+        ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews
+    );
 
     static void writeTextureSamplerDescriptor(
         RootBindingContext& context,
         BindingOffset const& offset,
         VkDescriptorType descriptorType,
-        ArrayView<CombinedTextureSamplerSlot> slots);
+        ArrayView<CombinedTextureSamplerSlot> slots
+    );
 
     static void writeAccelerationStructureDescriptor(
         RootBindingContext& context,
         BindingOffset const& offset,
         VkDescriptorType descriptorType,
-        ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews);
+        ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews
+    );
 
     static void writeTextureDescriptor(
         RootBindingContext& context,
         BindingOffset const& offset,
         VkDescriptorType descriptorType,
-        ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews);
+        ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews
+    );
 
     static void writeSamplerDescriptor(
         RootBindingContext& context,
         BindingOffset const& offset,
         VkDescriptorType descriptorType,
-        ArrayView<RefPtr<SamplerStateImpl>> samplers);
+        ArrayView<RefPtr<SamplerStateImpl>> samplers
+    );
 
     bool shouldAllocateConstantBuffer(TransientResourceHeapImpl* transientHeap);
 
     /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
     Result _ensureOrdinaryDataBufferCreatedIfNeeded(
-        PipelineCommandEncoder* encoder, ShaderObjectLayoutImpl* specializedLayout);
+        PipelineCommandEncoder* encoder,
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
 public:
     /// Bind this shader object as a "value"
@@ -138,7 +152,8 @@ public:
         PipelineCommandEncoder* encoder,
         RootBindingContext& context,
         BindingOffset const& offset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     /// Allocate the descriptor sets needed for binding this object (but not nested parameter
     /// blocks)
@@ -146,28 +161,32 @@ public:
         PipelineCommandEncoder* encoder,
         RootBindingContext& context,
         BindingOffset const& offset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     /// Bind this object as a `ParameterBlock<X>`.
     Result bindAsParameterBlock(
         PipelineCommandEncoder* encoder,
         RootBindingContext& context,
         BindingOffset const& inOffset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     /// Bind the ordinary data buffer if needed.
     Result bindOrdinaryDataBufferIfNeeded(
         PipelineCommandEncoder* encoder,
         RootBindingContext& context,
         BindingOffset& ioOffset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     /// Bind this object as a `ConstantBuffer<X>`.
     Result bindAsConstantBuffer(
         PipelineCommandEncoder* encoder,
         RootBindingContext& context,
         BindingOffset const& inOffset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     List<RefPtr<ResourceViewInternalBase>> m_resourceViews;
 
@@ -210,8 +229,8 @@ class EntryPointShaderObject : public ShaderObjectImpl
     typedef ShaderObjectImpl Super;
 
 public:
-    static Result create(
-        IDevice* device, EntryPointLayout* layout, EntryPointShaderObject** outShaderObject);
+    static Result
+    create(IDevice* device, EntryPointLayout* layout, EntryPointShaderObject** outShaderObject);
 
     EntryPointLayout* getLayout();
 
@@ -220,7 +239,8 @@ public:
         PipelineCommandEncoder* encoder,
         RootBindingContext& context,
         BindingOffset const& inOffset,
-        EntryPointLayout* layout);
+        EntryPointLayout* layout
+    );
 
 protected:
     Result init(IDevice* device, EntryPointLayout* layout);
@@ -244,16 +264,18 @@ public:
     List<RefPtr<EntryPointShaderObject>> const& getEntryPoints() const;
 
     virtual GfxCount SLANG_MCALL getEntryPointCount() override;
-    virtual Result SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
+    virtual Result SLANG_MCALL
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
+    copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
 
     /// Bind this object as a root shader object
     Result bindAsRoot(
         PipelineCommandEncoder* encoder,
         RootBindingContext& context,
-        RootShaderObjectLayout* layout);
+        RootShaderObjectLayout* layout
+    );
 
     virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override;
 

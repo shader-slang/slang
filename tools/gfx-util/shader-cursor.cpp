@@ -7,11 +7,10 @@ Result gfx::ShaderCursor::getDereferenced(ShaderCursor& outCursor) const
 {
     switch (m_typeLayout->getKind())
     {
-    default:
-        return SLANG_E_INVALID_ARG;
+        default: return SLANG_E_INVALID_ARG;
 
-    case slang::TypeReflection::Kind::ConstantBuffer:
-    case slang::TypeReflection::Kind::ParameterBlock:
+        case slang::TypeReflection::Kind::ConstantBuffer:
+        case slang::TypeReflection::Kind::ParameterBlock:
         {
             auto subObject = m_baseObject->getObject(m_offset);
             outCursor = ShaderCursor(subObject);
@@ -26,7 +25,7 @@ ShaderCursor ShaderCursor::getExplicitCounter() const
 
     // The alternative to handling this here would be to augment IResourceView
     // with a `getCounterResourceView()`, and set that also in `setResource`
-    if(const auto counterVarLayout = m_typeLayout->getExplicitCounter())
+    if (const auto counterVarLayout = m_typeLayout->getExplicitCounter())
     {
         ShaderCursor counterCursor;
 
@@ -38,10 +37,11 @@ ShaderCursor ShaderCursor::getExplicitCounter() const
 
         // The byte offset is the current offset plus the relative offset of the counter.
         // The offset in binding ranges is computed similarly.
-        counterCursor.m_offset.uniformOffset
-            = m_offset.uniformOffset + SlangInt(counterVarLayout->getOffset());
-        counterCursor.m_offset.bindingRangeIndex
-            = m_offset.bindingRangeIndex + GfxIndex(m_typeLayout->getExplicitCounterBindingRangeOffset());
+        counterCursor.m_offset.uniformOffset =
+            m_offset.uniformOffset + SlangInt(counterVarLayout->getOffset());
+        counterCursor.m_offset.bindingRangeIndex =
+            m_offset.bindingRangeIndex +
+            GfxIndex(m_typeLayout->getExplicitCounterBindingRangeOffset());
 
         // The index of the counter within any binding ranges will be the same
         // as the index computed for the parent structure.
@@ -84,9 +84,9 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
     //
     switch (m_typeLayout->getKind())
     {
-        // The easy/expected case is when the value has a structure type.
-        //
-    case slang::TypeReflection::Kind::Struct:
+            // The easy/expected case is when the value has a structure type.
+            //
+        case slang::TypeReflection::Kind::Struct:
         {
             // We start by looking up the index of a field matching `name`.
             //
@@ -118,7 +118,8 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
             //
             fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + fieldLayout->getOffset();
             fieldCursor.m_offset.bindingRangeIndex =
-                m_offset.bindingRangeIndex + (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
+                m_offset.bindingRangeIndex +
+                (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
 
             // The index of the field within any binding ranges will be the same
             // as the index computed for the parent structure.
@@ -150,12 +151,12 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
         }
         break;
 
-    // In some cases the user might be trying to acess a field by name
-    // from a cursor that references a constant buffer or parameter block,
-    // and in these cases we want the access to Just Work.
-    //
-    case slang::TypeReflection::Kind::ConstantBuffer:
-    case slang::TypeReflection::Kind::ParameterBlock:
+        // In some cases the user might be trying to acess a field by name
+        // from a cursor that references a constant buffer or parameter block,
+        // and in these cases we want the access to Just Work.
+        //
+        case slang::TypeReflection::Kind::ConstantBuffer:
+        case slang::TypeReflection::Kind::ParameterBlock:
         {
             // We basically need to "dereference" the current cursor
             // to go from a pointer to a constant buffer to a pointer
@@ -178,8 +179,8 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
     //
     // TODO: figure out whether we should support this long-term.
     //
-    auto entryPointCount = (GfxIndex) m_baseObject->getEntryPointCount();
-    for( GfxIndex e = 0; e < entryPointCount; ++e )
+    auto entryPointCount = (GfxIndex)m_baseObject->getEntryPointCount();
+    for (GfxIndex e = 0; e < entryPointCount; ++e)
     {
         ComPtr<IShaderObject> entryPoint;
         m_baseObject->getEntryPoint(e, entryPoint.writeRef());
@@ -187,7 +188,7 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
         ShaderCursor entryPointCursor(entryPoint);
 
         auto result = entryPointCursor.getField(name, nameEnd, outCursor);
-        if(SLANG_SUCCEEDED(result))
+        if (SLANG_SUCCEEDED(result))
             return result;
     }
 
@@ -208,9 +209,9 @@ ShaderCursor ShaderCursor::getElement(GfxIndex index) const
         return elementCursor;
     }
 
-    switch( m_typeLayout->getKind() )
+    switch (m_typeLayout->getKind())
     {
-    case slang::TypeReflection::Kind::Array:
+        case slang::TypeReflection::Kind::Array:
         {
             ShaderCursor elementCursor;
             elementCursor.m_baseObject = m_baseObject;
@@ -225,7 +226,7 @@ ShaderCursor ShaderCursor::getElement(GfxIndex index) const
         }
         break;
 
-    case slang::TypeReflection::Kind::Struct:
+        case slang::TypeReflection::Kind::Struct:
         {
             // The logic here is similar to `getField()` except that we don't
             // need to look up the field index based on a name first.
@@ -233,7 +234,7 @@ ShaderCursor ShaderCursor::getElement(GfxIndex index) const
             auto fieldIndex = index;
             slang::VariableLayoutReflection* fieldLayout =
                 m_typeLayout->getFieldByIndex((unsigned int)fieldIndex);
-            if(!fieldLayout)
+            if (!fieldLayout)
                 return ShaderCursor();
 
             ShaderCursor fieldCursor;
@@ -241,20 +242,23 @@ ShaderCursor ShaderCursor::getElement(GfxIndex index) const
             fieldCursor.m_typeLayout = fieldLayout->getTypeLayout();
             fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + fieldLayout->getOffset();
             fieldCursor.m_offset.bindingRangeIndex =
-                m_offset.bindingRangeIndex + (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
+                m_offset.bindingRangeIndex +
+                (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
             fieldCursor.m_offset.bindingArrayIndex = m_offset.bindingArrayIndex;
 
             return fieldCursor;
         }
         break;
 
-    case slang::TypeReflection::Kind::Vector:
-    case slang::TypeReflection::Kind::Matrix:
+        case slang::TypeReflection::Kind::Vector:
+        case slang::TypeReflection::Kind::Matrix:
         {
             ShaderCursor fieldCursor;
             fieldCursor.m_baseObject = m_baseObject;
             fieldCursor.m_typeLayout = m_typeLayout->getElementTypeLayout();
-            fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + m_typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM) * index;
+            fieldCursor.m_offset.uniformOffset =
+                m_offset.uniformOffset +
+                m_typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM) * index;
             fieldCursor.m_offset.bindingRangeIndex = m_offset.bindingRangeIndex;
             fieldCursor.m_offset.bindingArrayIndex = m_offset.bindingArrayIndex;
             return fieldCursor;
@@ -347,14 +351,11 @@ Result ShaderCursor::followPath(const char* path, ShaderCursor& ioCursor)
             {
                 switch (_peek(rest))
                 {
-                default:
-                    _get(rest);
-                    continue;
+                    default: _get(rest); continue;
 
-                case -1:
-                case '.':
-                case '[':
-                    break;
+                    case -1:
+                    case '.':
+                    case '[': break;
                 }
                 break;
             }

@@ -25,7 +25,8 @@ void CommandBufferImpl::init(DeviceImpl* device, TransientResourceHeapBase* tran
 SLANG_NO_THROW void SLANG_MCALL CommandBufferImpl::encodeRenderCommands(
     IRenderPassLayout* renderPass,
     IFramebuffer* framebuffer,
-    IRenderCommandEncoder** outEncoder)
+    IRenderCommandEncoder** outEncoder
+)
 {
     SLANG_UNUSED(renderPass);
     SLANG_UNUSED(framebuffer);
@@ -33,21 +34,21 @@ SLANG_NO_THROW void SLANG_MCALL CommandBufferImpl::encodeRenderCommands(
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    CommandBufferImpl::encodeResourceCommands(IResourceCommandEncoder** outEncoder)
+CommandBufferImpl::encodeResourceCommands(IResourceCommandEncoder** outEncoder)
 {
     m_resourceCommandEncoder.init(this);
     *outEncoder = &m_resourceCommandEncoder;
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    CommandBufferImpl::encodeComputeCommands(IComputeCommandEncoder** outEncoder)
+CommandBufferImpl::encodeComputeCommands(IComputeCommandEncoder** outEncoder)
 {
     m_computeCommandEncoder.init(this);
     *outEncoder = &m_computeCommandEncoder;
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    CommandBufferImpl::encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder)
+CommandBufferImpl::encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder)
 {
     *outEncoder = nullptr;
 }

@@ -1,19 +1,19 @@
 #include "slang-riff.h"
 
 #include "slang-com-helper.h"
-
 #include "slang-hex-dump-util.h"
 
 namespace Slang
 {
 
-/* static */int64_t RiffUtil::calcChunkTotalSize(const RiffHeader& chunk)
+/* static */ int64_t RiffUtil::calcChunkTotalSize(const RiffHeader& chunk)
 {
     size_t size = chunk.size + sizeof(RiffHeader);
     return getPadSize(size);
 }
 
-/* static */SlangResult RiffUtil::skip(const RiffHeader& chunk, Stream* stream, int64_t* remainingBytesInOut)
+/* static */ SlangResult
+RiffUtil::skip(const RiffHeader& chunk, Stream* stream, int64_t* remainingBytesInOut)
 {
     int64_t chunkSize = calcChunkTotalSize(chunk);
     if (remainingBytesInOut)
@@ -26,7 +26,7 @@ namespace Slang
     return SLANG_OK;
 }
 
-/* static */SlangResult RiffUtil::readChunk(Stream* stream, RiffHeader& outChunk)
+/* static */ SlangResult RiffUtil::readChunk(Stream* stream, RiffHeader& outChunk)
 {
     size_t readBytes;
     SLANG_RETURN_ON_FAIL(stream->read(&outChunk, sizeof(RiffHeader), readBytes));
@@ -34,7 +34,13 @@ namespace Slang
     return (readBytes == sizeof(RiffHeader)) ? SLANG_OK : SLANG_FAIL;
 }
 
-/* static */SlangResult RiffUtil::writeData(const RiffHeader* header, size_t headerSize, const void* payload, size_t payloadSize, Stream* out)
+/* static */ SlangResult RiffUtil::writeData(
+    const RiffHeader* header,
+    size_t headerSize,
+    const void* payload,
+    size_t payloadSize,
+    Stream* out
+)
 {
     SLANG_ASSERT(uint64_t(payloadSize) <= uint64_t(0xfffffffff));
     SLANG_ASSERT(headerSize >= sizeof(RiffHeader));
@@ -62,14 +68,15 @@ namespace Slang
     size_t padSize = getPadSize(payloadSize);
     if (padSize - payloadSize)
     {
-        uint8_t end[kRiffPadSize] = { 0 };
+        uint8_t end[kRiffPadSize] = {0};
         SLANG_RETURN_ON_FAIL(out->write(end, padSize - payloadSize));
     }
-    
+
     return SLANG_OK;
 }
 
-/* static */SlangResult RiffUtil::readPayload(Stream* stream, size_t size, void* outData, size_t& outReadSize)
+/* static */ SlangResult
+RiffUtil::readPayload(Stream* stream, size_t size, void* outData, size_t& outReadSize)
 {
     outReadSize = 0;
 
@@ -85,7 +92,8 @@ namespace Slang
     return SLANG_OK;
 }
 
-/* static */SlangResult RiffUtil::readData(Stream* stream, RiffHeader* outHeader, size_t headerSize, List<uint8_t>& data)
+/* static */ SlangResult
+RiffUtil::readData(Stream* stream, RiffHeader* outHeader, size_t headerSize, List<uint8_t>& data)
 {
     RiffHeader chunk;
     SLANG_RETURN_ON_FAIL(readChunk(stream, chunk));
@@ -101,14 +109,14 @@ namespace Slang
     {
         SLANG_RETURN_ON_FAIL(stream->readExactly(outHeader + 1, headerSize - sizeof(RiffHeader)));
     }
- 
+
     const size_t payloadSize = chunk.size - (headerSize - sizeof(RiffHeader));
     size_t readSize;
     data.setCount(payloadSize);
     return readPayload(stream, payloadSize, data.getBuffer(), readSize);
 }
 
-/* static */SlangResult RiffUtil::readHeader(Stream* stream, RiffListHeader& outHeader)
+/* static */ SlangResult RiffUtil::readHeader(Stream* stream, RiffListHeader& outHeader)
 {
     // Need to read the chunk header
     SLANG_RETURN_ON_FAIL(readChunk(stream, outHeader.chunk));
@@ -117,13 +125,16 @@ namespace Slang
     if (isListType(outHeader.chunk.type))
     {
         // Read the sub type
-        SLANG_RETURN_ON_FAIL(stream->readExactly(&outHeader.subType, sizeof(RiffListHeader) - sizeof(RiffHeader)));
+        SLANG_RETURN_ON_FAIL(
+            stream->readExactly(&outHeader.subType, sizeof(RiffListHeader) - sizeof(RiffHeader))
+        );
     }
 
     return SLANG_OK;
 }
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct DumpVisitor : public RiffContainer::Visitor
 {
@@ -167,10 +178,8 @@ struct DumpVisitor : public RiffContainer::Visitor
         return SLANG_OK;
     }
 
-    DumpVisitor(WriterHelper writer, Chunk* rootChunk) :
-        m_writer(writer),
-        m_indent(0),
-        m_rootChunk(rootChunk)
+    DumpVisitor(WriterHelper writer, Chunk* rootChunk)
+        : m_writer(writer), m_indent(0), m_rootChunk(rootChunk)
     {
     }
 
@@ -199,15 +208,16 @@ struct DumpVisitor : public RiffContainer::Visitor
     WriterHelper m_writer;
 };
 
-}
+} // namespace
 
-/* static */void RiffUtil::dump(RiffContainer::Chunk* chunk, WriterHelper writer)
+/* static */ void RiffUtil::dump(RiffContainer::Chunk* chunk, WriterHelper writer)
 {
     DumpVisitor visitor(writer, chunk);
     chunk->visit(&visitor);
 }
 
-/* static */SlangResult RiffUtil::write(RiffContainer::ListChunk* list, bool isRoot, Stream* stream)
+/* static */ SlangResult
+RiffUtil::write(RiffContainer::ListChunk* list, bool isRoot, Stream* stream)
 {
     RiffListHeader listHeader;
 
@@ -218,7 +228,7 @@ struct DumpVisitor : public RiffContainer::Visitor
     // Write the header
     SLANG_RETURN_ON_FAIL(stream->write(&listHeader, sizeof(listHeader)));
 
-        // Write the contained chunks
+    // Write the contained chunks
     Chunk* chunk = list->m_containedChunks;
     while (chunk)
     {
@@ -252,11 +262,12 @@ struct DumpVisitor : public RiffContainer::Visitor
                 }
 
                 // Need to write for alignment
-                const size_t remainingSize = getPadSize(dataChunk->m_payloadSize) - dataChunk->m_payloadSize;
+                const size_t remainingSize =
+                    getPadSize(dataChunk->m_payloadSize) - dataChunk->m_payloadSize;
 
                 if (remainingSize)
                 {
-                    static const uint8_t trailing[kRiffPadSize] = { 0 };
+                    static const uint8_t trailing[kRiffPadSize] = {0};
                     SLANG_RETURN_ON_FAIL(stream->write(trailing, remainingSize));
                 }
             }
@@ -266,16 +277,16 @@ struct DumpVisitor : public RiffContainer::Visitor
         // Next
         chunk = chunk->m_next;
     }
-    
+
     return SLANG_OK;
 }
 
-/* static */SlangResult RiffUtil::write(RiffContainer* container, Stream* stream)
+/* static */ SlangResult RiffUtil::write(RiffContainer* container, Stream* stream)
 {
     return write(container->getRoot(), true, stream);
 }
 
-/* static */SlangResult RiffUtil::read(Stream* stream, RiffContainer& outContainer)
+/* static */ SlangResult RiffUtil::read(Stream* stream, RiffContainer& outContainer)
 {
     typedef RiffContainer::ScopeChunk ScopeChunk;
     outContainer.reset();
@@ -333,7 +344,7 @@ struct DumpVisitor : public RiffContainer::Visitor
                 const size_t padSize = getPadSize(header.chunk.size);
 
                 // Subtract the size of this chunk from remaining of the current chunk
-                remaining -= sizeof(RiffHeader) + padSize;                
+                remaining -= sizeof(RiffHeader) + padSize;
                 // Push it, for when we hit the end
                 remainingStack.add(remaining);
 
@@ -347,11 +358,13 @@ struct DumpVisitor : public RiffContainer::Visitor
             {
                 ScopeChunk scopeChunk(&outContainer, Chunk::Kind::Data, header.chunk.type);
                 RiffContainer::Data* data = outContainer.addData();
-                
+
                 outContainer.setPayload(data, nullptr, header.chunk.size);
 
                 size_t readSize;
-                SLANG_RETURN_ON_FAIL(readPayload(stream, header.chunk.size, data->getPayload(), readSize));
+                SLANG_RETURN_ON_FAIL(
+                    readPayload(stream, header.chunk.size, data->getPayload(), readSize)
+                );
 
                 // All read sizes must end up aligned
                 SLANG_ASSERT((readSize & kRiffPadMask) == 0);
@@ -453,15 +466,15 @@ size_t RiffContainer::Chunk::calcPayloadSize()
 {
     switch (m_kind)
     {
-        case Kind::Data:        return static_cast<DataChunk*>(this)->calcPayloadSize();
-        case Kind::List:        return static_cast<ListChunk*>(this)->calcPayloadSize();
-        default: return 0;
+        case Kind::Data: return static_cast<DataChunk*>(this)->calcPayloadSize();
+        case Kind::List: return static_cast<ListChunk*>(this)->calcPayloadSize();
+        default:         return 0;
     }
 }
 
 RiffContainer::Data* RiffContainer::Chunk::getSingleData() const
 {
-    return (m_kind == Kind::Data) ? static_cast<const DataChunk*>(this)->getSingleData(): nullptr;
+    return (m_kind == Kind::Data) ? static_cast<const DataChunk*>(this)->getSingleData() : nullptr;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::ListChunk !!!!!!!!!!!!!!!!!!!!!!
@@ -582,7 +595,7 @@ static RiffContainer::ListChunk* _findListRec(RiffContainer::ListChunk* list, Fo
     return nullptr;
 }
 
-/* static */RiffContainer::ListChunk* RiffContainer::ListChunk::findListRec(FourCC subType)
+/* static */ RiffContainer::ListChunk* RiffContainer::ListChunk::findListRec(FourCC subType)
 {
     return (getSubType() == subType) ? this : _findListRec(this, subType);
 }
@@ -683,8 +696,8 @@ bool RiffContainer::DataChunk::isEqual(const void* inData, size_t count) const
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-RiffContainer::RiffContainer() :
-    m_arena(4096)
+RiffContainer::RiffContainer()
+    : m_arena(4096)
 {
     m_rootList = nullptr;
     m_listChunk = nullptr;
@@ -723,7 +736,8 @@ void RiffContainer::_addChunk(Chunk* chunk)
     if (m_listChunk)
     {
         chunk->m_parent = m_listChunk;
-        Chunk*& next = m_listChunk->m_endChunk ? m_listChunk->m_endChunk->m_next : m_listChunk->m_containedChunks;
+        Chunk*& next = m_listChunk->m_endChunk ? m_listChunk->m_endChunk->m_next
+                                               : m_listChunk->m_containedChunks;
         SLANG_ASSERT(next == nullptr);
         next = chunk;
         m_listChunk->m_endChunk = chunk;
@@ -738,7 +752,8 @@ void RiffContainer::startChunk(Chunk::Kind kind, FourCC fourCC)
     {
         case Chunk::Kind::Data:
         {
-            // We can only start a data chunk if we are in a container, and we can't already be in data chunk
+            // We can only start a data chunk if we are in a container, and we can't already be in
+            // data chunk
             SLANG_ASSERT(m_listChunk && m_dataChunk == nullptr);
 
             DataChunk* chunk = _newDataChunk(fourCC);
@@ -771,7 +786,7 @@ void RiffContainer::endChunk()
 {
     size_t chunkPayloadSize;
 
-    // The chunk we are popping 
+    // The chunk we are popping
     // Only keep track of this in debug builds
     [[maybe_unused]] Chunk* chunk = nullptr;
 
@@ -782,7 +797,7 @@ void RiffContainer::endChunk()
 
         parent = m_dataChunk->m_parent;
         chunkPayloadSize = m_dataChunk->m_payloadSize;
-        
+
         m_dataChunk = nullptr;
     }
     else
@@ -824,7 +839,7 @@ void RiffContainer::setPayload(Data* data, const void* payload, size_t size)
 
     // Add current chunks data
     m_dataChunk->m_payloadSize += size;
-    
+
     data->m_ownership = Ownership::Arena;
     data->m_size = size;
 
@@ -901,7 +916,7 @@ RiffContainer::Data* RiffContainer::makeSingleData(DataChunk* dataChunk)
 
     {
         Data* data = dataChunk->m_dataList;
-        
+
         // Okay lets combine all into one block
         const size_t payloadSize = dataChunk->calcPayloadSize();
 
@@ -932,7 +947,7 @@ void RiffContainer::write(const void* inData, size_t size)
     {
         uint8_t* end = ((uint8_t*)endData->m_payload) + endData->m_size;
         // See if can just add to end of current data
-        if ( end == m_arena.getCursor() && m_arena.allocateCurrentUnaligned(size))
+        if (end == m_arena.getCursor() && m_arena.allocateCurrentUnaligned(size))
         {
             ::memcpy(end, inData, size);
             endData->m_size += size;
@@ -953,7 +968,7 @@ static SlangResult _isChunkOk(RiffContainer::Chunk* chunk, void* data)
     return chunk->calcPayloadSize() == chunk->m_payloadSize ? SLANG_OK : SLANG_FAIL;
 }
 
-/* static */bool RiffContainer::isChunkOk(Chunk* chunk)
+/* static */ bool RiffContainer::isChunkOk(Chunk* chunk)
 {
     return SLANG_SUCCEEDED(chunk->visitPostOrder(&_isChunkOk, nullptr));
 }
@@ -965,11 +980,10 @@ static SlangResult _calcAndSetSize(RiffContainer::Chunk* chunk, void* data)
     return SLANG_OK;
 }
 
-/* static */void RiffContainer::calcAndSetSize(Chunk* chunk)
+/* static */ void RiffContainer::calcAndSetSize(Chunk* chunk)
 {
     chunk->visitPostOrder(&_calcAndSetSize, nullptr);
 }
 
 
-
-}
+} // namespace Slang

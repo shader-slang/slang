@@ -1,12 +1,12 @@
 #include "slang-string-escape-util.h"
 
 #include "slang-char-util.h"
-#include "slang-text-io.h"
-#include "slang-memory-arena.h"
-
 #include "slang-com-helper.h"
+#include "slang-memory-arena.h"
+#include "slang-text-io.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!! SpaceStringEscapeHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -15,16 +15,24 @@ class SpaceStringEscapeHandler : public StringEscapeHandler
 public:
     typedef StringEscapeHandler Super;
 
-    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { return isEscapingNeeded(slice); }
- 
+    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE
+    {
+        return isEscapingNeeded(slice);
+    }
+
     virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
     virtual bool isUnescapingNeeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
 
-    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
-    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+        SLANG_OVERRIDE;
+    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+        SLANG_OVERRIDE;
     virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
 
-    SpaceStringEscapeHandler() : Super('"') {}
+    SpaceStringEscapeHandler()
+        : Super('"')
+    {
+    }
 };
 
 bool SpaceStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
@@ -39,7 +47,8 @@ bool SpaceStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& sli
     return false;
 }
 
-SlangResult SpaceStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult
+SpaceStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     if (slice.indexOf('"') >= 0)
     {
@@ -50,7 +59,8 @@ SlangResult SpaceStringEscapeHandler::appendUnescaped(const UnownedStringSlice& 
     return SLANG_OK;
 }
 
-SlangResult SpaceStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult
+SpaceStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     if (slice.indexOf('"') >= 0)
     {
@@ -60,7 +70,8 @@ SlangResult SpaceStringEscapeHandler::appendEscaped(const UnownedStringSlice& sl
     return SLANG_OK;
 }
 
-/* static */SlangResult SpaceStringEscapeHandler::lexQuoted(const char* cursor, const char** outCursor)
+/* static */ SlangResult
+SpaceStringEscapeHandler::lexQuoted(const char* cursor, const char** outCursor)
 {
     *outCursor = cursor;
 
@@ -97,7 +108,6 @@ SlangResult SpaceStringEscapeHandler::appendEscaped(const UnownedStringSlice& sl
 }
 
 
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!! CppStringEscapeHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class CppStringEscapeHandler : public StringEscapeHandler
@@ -105,31 +115,40 @@ class CppStringEscapeHandler : public StringEscapeHandler
 public:
     typedef StringEscapeHandler Super;
 
-    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { SLANG_UNUSED(slice); return true; }
+    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(slice);
+        return true;
+    }
     virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
     virtual bool isUnescapingNeeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
-    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
-    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+        SLANG_OVERRIDE;
+    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+        SLANG_OVERRIDE;
     virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
 
-    CppStringEscapeHandler() : Super('"') {}
+    CppStringEscapeHandler()
+        : Super('"')
+    {
+    }
 };
 
 static char _getCppEscapedChar(char c)
 {
     switch (c)
     {
-        case '\b':      return 'b';
-        case '\f':      return 'f';
-        case '\n':      return 'n';
-        case '\r':      return 'r';
-        case '\a':      return 'a';
-        case '\t':      return 't';
-        case '\v':      return 'v';
-        case '\'':      return '\'';
-        case '\"':      return '"';
-        case '\\':      return '\\';
-        default:        return 0;
+        case '\b': return 'b';
+        case '\f': return 'f';
+        case '\n': return 'n';
+        case '\r': return 'r';
+        case '\a': return 'a';
+        case '\t': return 't';
+        case '\v': return 'v';
+        case '\'': return '\'';
+        case '\"': return '"';
+        case '\\': return '\\';
+        default:   return 0;
     }
 }
 
@@ -137,17 +156,17 @@ static char _getCppUnescapedChar(char c)
 {
     switch (c)
     {
-        case 'b':      return '\b';
-        case 'f':      return '\f';
-        case 'n':      return '\n';
-        case 'r':      return '\r';
-        case 'a':      return '\a';
-        case 't':      return '\t';
-        case 'v':      return '\v';
-        case '\'':      return '\'';
-        case '\"':      return '"';
-        case '\\':      return '\\';
-        default:        return 0;
+        case 'b':  return '\b';
+        case 'f':  return '\f';
+        case 'n':  return '\n';
+        case 'r':  return '\r';
+        case 'a':  return '\a';
+        case 't':  return '\t';
+        case 'v':  return '\v';
+        case '\'': return '\'';
+        case '\"': return '"';
+        case '\\': return '\\';
+        default:   return 0;
     }
 }
 
@@ -156,10 +175,10 @@ bool CppStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice
     return slice.indexOf('\\') >= 0;
 }
 
-/* static */bool CppStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
+/* static */ bool CppStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
 {
     const char* cur = slice.begin();
-    const char*const end = slice.end();
+    const char* const end = slice.end();
 
     for (; cur < end; ++cur)
     {
@@ -171,7 +190,7 @@ bool CppStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice
             case '\"':
             case '\\':
             {
-                // Strictly speaking ' shouldn't need a quote if in a C style string. 
+                // Strictly speaking ' shouldn't need a quote if in a C style string.
                 return true;
             }
             default:
@@ -187,11 +206,12 @@ bool CppStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice
     return false;
 }
 
-SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult
+CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     const char* start = slice.begin();
     const char* cur = start;
-    const char*const end = slice.end();
+    const char* const end = slice.end();
 
     // TODO(JS): A cleverer implementation might support U and u prefixing for unicode characters.
     // For now we just stick with hex if it's not 'regular' ascii.
@@ -222,12 +242,12 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
                 out.append(start, cur);
             }
 
-            // NOTE! There is a possible flaw around checking 'next' character (used for outputting oct and hex)
-            // If a string is constructed appended in parts, the next character is not available so the problem below can still
-            // occur.
+            // NOTE! There is a possible flaw around checking 'next' character (used for outputting
+            // oct and hex) If a string is constructed appended in parts, the next character is not
+            // available so the problem below can still occur.
 
-            // Another solution to this problem would be to output "", but that makes some other assumptions
-            // For example Slang doesn't support that style.
+            // Another solution to this problem would be to output "", but that makes some other
+            // assumptions For example Slang doesn't support that style.
 
             // C++ greedily consumes hex/octal digits. This is a problem if we have bytes
             // 0, '1' as by default this will output as
@@ -240,10 +260,12 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
 
             // On testing in Visual Studio hex can indeed be more than 3 digits
 
-            // There is a problem outputting values in hex, because C++ allows *any* amount of hex digits. 
-            // We could work around with \u \U but they are later extensions (C++11) and have other issue
+            // There is a problem outputting values in hex, because C++ allows *any* amount of hex
+            // digits. We could work around with \u \U but they are later extensions (C++11) and
+            // have other issue
 
-            // The solution taken here is to always output as octal, because octal can be at most 3 digits.
+            // The solution taken here is to always output as octal, because octal can be at most 3
+            // digits.
 
             // Special case handling of 0
             if (c == 0 && !(cur + 1 < end && CharUtil::isOctalDigit(cur[1])))
@@ -253,8 +275,9 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
             }
             else
             {
-                // A slightly more sophisticated implementation could output less digits if needed, if not followed by an octal 
-                // digit, but for now we go simple and output all 3 digits
+                // A slightly more sophisticated implementation could output less digits if needed,
+                // if not followed by an octal digit, but for now we go simple and output all 3
+                // digits
 
                 const uint32_t v = uint32_t(c);
 
@@ -279,11 +302,12 @@ SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slic
     return SLANG_OK;
 }
 
-SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult
+CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     const char* start = slice.begin();
     const char* cur = start;
-    const char*const end = slice.end();
+    const char* const end = slice.end();
 
     while (cur < end)
     {
@@ -297,7 +321,7 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                 out.append(start, cur);
             }
 
-            /// Next 
+            /// Next
             cur++;
 
             if (cur >= end)
@@ -334,13 +358,20 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                     start = cur;
                     break;
                 }
-                case '0': case '1': case '2': case '3': case '4':
-                case '5': case '6': case '7':
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
                 {
                     // Rewind back a character, as first digit is the 'nextC'
                     --cur;
 
-                    // Don't need to check for enough characters, because there must be 1 - the nextC
+                    // Don't need to check for enough characters, because there must be 1 - the
+                    // nextC
 
                     // octal escape: up to 3 characters
                     int value = 0;
@@ -355,7 +386,7 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                         {
                             break;
                         }
-                        value = (value << 3) | digitValue; 
+                        value = (value << 3) | digitValue;
                     }
                     out.appendChar(char(value));
 
@@ -385,8 +416,8 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                     }
                     else
                     {
-                        // It's arguable what is appropriate. We only decode/encode 4, which the current spec has,
-                        // but 6 are possible, so lets go large.
+                        // It's arguable what is appropriate. We only decode/encode 4, which the
+                        // current spec has, but 6 are possible, so lets go large.
                         const Index maxUtf8EncodeCount = 6;
 
                         char* chars = out.prepareForAppend(maxUtf8EncodeCount);
@@ -433,8 +464,8 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
                     }
                     else
                     {
-                        // It's arguable what is appropriate. We only decode/encode 4, which the current spec has,
-                        // but 6 are possible, so lets go large.
+                        // It's arguable what is appropriate. We only decode/encode 4, which the
+                        // current spec has, but 6 are possible, so lets go large.
                         const Index maxUtf8EncodeCount = 6;
 
                         char* chars = out.prepareForAppend(maxUtf8EncodeCount);
@@ -515,8 +546,14 @@ SlangResult CppStringEscapeHandler::lexQuoted(const char* cursor, const char** o
                         ++cursor;
                         break;
                     }
-                    case '0': case '1': case '2': case '3': case '4':
-                    case '5': case '6': case '7':
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
                     {
                         // octal escape: up to 3 characters
                         ++cursor;
@@ -539,7 +576,8 @@ SlangResult CppStringEscapeHandler::lexQuoted(const char* cursor, const char** o
                     {
                         // hexadecimal escape: any number of characters
                         ++cursor;
-                        for (; CharUtil::isHexDigit(*cursor); ++cursor);
+                        for (; CharUtil::isHexDigit(*cursor); ++cursor)
+                            ;
 
                         // TODO: Unicode escape sequences
                         break;
@@ -563,14 +601,23 @@ class JSONStringEscapeHandler : public StringEscapeHandler
 public:
     typedef StringEscapeHandler Super;
 
-    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { SLANG_UNUSED(slice); return true; }
+    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(slice);
+        return true;
+    }
     virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
     virtual bool isUnescapingNeeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
-    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
-    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+        SLANG_OVERRIDE;
+    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+        SLANG_OVERRIDE;
     virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
 
-    JSONStringEscapeHandler() : Super('"') {}
+    JSONStringEscapeHandler()
+        : Super('"')
+    {
+    }
 };
 
 bool JSONStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice)
@@ -581,7 +628,7 @@ bool JSONStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slic
 bool JSONStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
 {
     const char* cur = slice.begin();
-    const char*const end = slice.end();
+    const char* const end = slice.end();
 
     for (; cur < end; ++cur)
     {
@@ -617,7 +664,7 @@ SlangResult JSONStringEscapeHandler::lexQuoted(const char* cursor, const char** 
 
         switch (c)
         {
-            case 0:     return SLANG_FAIL;
+            case 0: return SLANG_FAIL;
             case '"':
             {
                 *outCursor = cursor;
@@ -665,15 +712,15 @@ static char _getJSONEscapedChar(char c)
 {
     switch (c)
     {
-        case '\b':      return 'b';
-        case '\f':      return 'f';
-        case '\n':      return 'n';
-        case '\r':      return 'r';
-        case '\t':      return 't';
-        case '\\':      return '\\';
-        case '/':       return '/';
-        case '"':       return '"';
-        default:        return 0;
+        case '\b': return 'b';
+        case '\f': return 'f';
+        case '\n': return 'n';
+        case '\r': return 'r';
+        case '\t': return 't';
+        case '\\': return '\\';
+        case '/':  return '/';
+        case '"':  return '"';
+        default:   return 0;
     }
 }
 
@@ -681,15 +728,15 @@ static char _getJSONUnescapedChar(char c)
 {
     switch (c)
     {
-        case 'b':      return '\b';
-        case 'f':      return '\f';
-        case 'n':      return '\n';
-        case 'r':      return '\r';
-        case 't':      return '\t';
-        case '\\':      return '\\';
-        case '/':       return '/';
-        case '"':       return '"';
-        default:        return 0;
+        case 'b':  return '\b';
+        case 'f':  return '\f';
+        case 'n':  return '\n';
+        case 'r':  return '\r';
+        case 't':  return '\t';
+        case '\\': return '\\';
+        case '/':  return '/';
+        case '"':  return '"';
+        default:   return 0;
     }
 }
 
@@ -745,16 +792,17 @@ static void _appendHex16(uint32_t value, StringBuilder& out)
     out.append(UnownedStringSlice(buf, 6));
 }
 
-SlangResult JSONStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult
+JSONStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     const char* start = slice.begin();
     const char* cur = start;
-    const char*const end = slice.end();
+    const char* const end = slice.end();
 
     for (; cur < end; ++cur)
     {
         const char c = *cur;
-        
+
         const char escapedChar = _getJSONEscapedChar(c);
 
         if (escapedChar)
@@ -814,11 +862,12 @@ SlangResult JSONStringEscapeHandler::appendEscaped(const UnownedStringSlice& sli
     return SLANG_OK;
 }
 
-SlangResult JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult
+JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     const char* start = slice.begin();
     const char* cur = start;
-    const char*const end = slice.end();
+    const char* const end = slice.end();
 
     for (; cur < end; ++cur)
     {
@@ -832,7 +881,7 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& s
                 out.append(start, cur);
             }
 
-            /// Next 
+            /// Next
             cur++;
 
             if (cur >= end)
@@ -884,9 +933,9 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& s
                         }
                         else if (digitC >= 'a' && digitC <= 'f')
                         {
-                            digitValue = digitC -'a' + 10;
+                            digitValue = digitC - 'a' + 10;
                         }
-                        else if(digitC >= 'A' && digitC <= 'F')
+                        else if (digitC >= 'A' && digitC <= 'F')
                         {
                             digitValue = digitC - 'A' + 10;
                         }
@@ -899,9 +948,9 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& s
                     }
                     cur += 4;
 
-                    // NOTE! Strictly speaking we may want to combine 2 UTF16 surrogates to make a single
-                    // UTF8 encoded char.
-                    
+                    // NOTE! Strictly speaking we may want to combine 2 UTF16 surrogates to make a
+                    // single UTF8 encoded char.
+
                     // Need to encode in UTF8 to concat
 
                     char buf[8];
@@ -941,17 +990,22 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
 {
     switch (style)
     {
-        case Style::Cpp:    return &g_cppHandler;
-        case Style::Space:  return &g_spaceHandler;
-        case Style::JSON:   return &g_jsonHandler;
+        case Style::Cpp:   return &g_cppHandler;
+        case Style::Space: return &g_spaceHandler;
+        case Style::JSON:  return &g_jsonHandler;
         // TODO(JS): For now we make Slang language string encoding/decoding the same as C++
-        // That may not be desirable because C++ has a variety of surprising edge cases (for example around \x)
-        case Style::Slang:  return &g_cppHandler;
-        default:            return nullptr;
+        // That may not be desirable because C++ has a variety of surprising edge cases (for example
+        // around \x)
+        case Style::Slang: return &g_cppHandler;
+        default:           return nullptr;
     }
 }
 
-/* static */SlangResult StringEscapeUtil::appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */ SlangResult StringEscapeUtil::appendQuoted(
+    Handler* handler,
+    const UnownedStringSlice& slice,
+    StringBuilder& out
+)
 {
     const char quoteChar = handler->getQuoteChar();
     out.appendChar(quoteChar);
@@ -960,7 +1014,11 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     return res;
 }
 
-/* static */SlangResult StringEscapeUtil::appendUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */ SlangResult StringEscapeUtil::appendUnquoted(
+    Handler* handler,
+    const UnownedStringSlice& slice,
+    StringBuilder& out
+)
 {
     const Index len = slice.getLength();
 
@@ -973,7 +1031,11 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     return handler->appendUnescaped(slice.subString(1, len - 2), out);
 }
 
-/* static */SlangResult StringEscapeUtil::appendMaybeQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */ SlangResult StringEscapeUtil::appendMaybeQuoted(
+    Handler* handler,
+    const UnownedStringSlice& slice,
+    StringBuilder& out
+)
 {
     if (handler->isQuotingNeeded(slice))
     {
@@ -986,13 +1048,14 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     }
 }
 
-/* static */bool StringEscapeUtil::isQuoted(char quoteChar, UnownedStringSlice& slice)
+/* static */ bool StringEscapeUtil::isQuoted(char quoteChar, UnownedStringSlice& slice)
 {
     const Index len = slice.getLength();
     return len >= 2 && slice[0] == quoteChar && slice[len - 1] == quoteChar;
 }
 
-/* static */UnownedStringSlice StringEscapeUtil::unquote(char quoteChar, const UnownedStringSlice& slice)
+/* static */ UnownedStringSlice
+StringEscapeUtil::unquote(char quoteChar, const UnownedStringSlice& slice)
 {
     const Index len = slice.getLength();
     if (len >= 2 && slice[0] == quoteChar && slice[len - 1] == quoteChar)
@@ -1003,7 +1066,11 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     return UnownedStringSlice();
 }
 
-/* static */SlangResult StringEscapeUtil::appendMaybeUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */ SlangResult StringEscapeUtil::appendMaybeUnquoted(
+    Handler* handler,
+    const UnownedStringSlice& slice,
+    StringBuilder& out
+)
 {
     const char quoteChar = handler->getQuoteChar();
 
@@ -1020,12 +1087,17 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     }
 }
 
-/* static */SlangResult StringEscapeUtil::isUnescapeShellLikeNeeded(Handler* handler, const UnownedStringSlice& slice)
+/* static */ SlangResult
+StringEscapeUtil::isUnescapeShellLikeNeeded(Handler* handler, const UnownedStringSlice& slice)
 {
     return slice.indexOf(handler->getQuoteChar()) >= 0;
 }
 
-/* static */SlangResult StringEscapeUtil::unescapeShellLike(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */ SlangResult StringEscapeUtil::unescapeShellLike(
+    Handler* handler,
+    const UnownedStringSlice& slice,
+    StringBuilder& out
+)
 {
     StringBuilder buf;
     const char quoteChar = handler->getQuoteChar();
@@ -1051,7 +1123,9 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
         SLANG_RETURN_ON_FAIL(handler->lexQuoted(remaining.begin() + index, &quotedEnd));
 
         // Unescape it
-        SLANG_RETURN_ON_FAIL(appendUnquoted(handler, UnownedStringSlice(remaining.begin() + index, quotedEnd), out));
+        SLANG_RETURN_ON_FAIL(
+            appendUnquoted(handler, UnownedStringSlice(remaining.begin() + index, quotedEnd), out)
+        );
 
         // Fix up remaining
         remaining = UnownedStringSlice(quotedEnd, remaining.end());

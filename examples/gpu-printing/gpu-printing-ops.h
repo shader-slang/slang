@@ -15,7 +15,7 @@
 // macro appropriately, before including this file.
 //
 #ifndef GPU_PRINTING_OP
-#error "Must define 'GPU_PRINTING_OP(NAME)' before including"
+    #error "Must define 'GPU_PRINTING_OP(NAME)' before including"
 #endif
 
 // The `Nop` opcode is used to represent a vacuous

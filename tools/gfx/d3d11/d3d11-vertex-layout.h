@@ -11,10 +11,10 @@ using namespace Slang;
 namespace d3d11
 {
 
-class InputLayoutImpl: public InputLayoutBase
+class InputLayoutImpl : public InputLayoutBase
 {
 public:
-	ComPtr<ID3D11InputLayout> m_layout;
+    ComPtr<ID3D11InputLayout> m_layout;
     List<UINT> m_vertexStreamStrides;
 };
 

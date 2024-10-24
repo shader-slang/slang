@@ -11,17 +11,14 @@ struct CommandOptions;
 
 UnownedStringSlice getCodeGenTargetName(SlangCompileTarget target);
 
-SlangResult parseOptions(
-    SlangCompileRequest*    compileRequestIn,
-    int                     argc,
-    char const* const*      argv);
+SlangResult parseOptions(SlangCompileRequest* compileRequestIn, int argc, char const* const* argv);
 
-// Initialize command options. Holds the details how parsing works. 
+// Initialize command options. Holds the details how parsing works.
 void initCommandOptions(CommandOptions& commandOptions);
 
 enum class Stage : SlangUInt32;
 
 SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage);
 
-}
+} // namespace Slang
 #endif

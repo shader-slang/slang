@@ -1,7 +1,6 @@
 // unit-test-offset-container.cpp
 
 #include "../../source/core/slang-offset-container.h"
-
 #include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -19,16 +18,17 @@ static void _checkEncodeDecode(uint32_t size)
     SLANG_CHECK(chars - (const char*)encode == encodeSize);
 }
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct Root
 {
-    Offset32Array<Offset32Ptr<OffsetString> > dirs;
+    Offset32Array<Offset32Ptr<OffsetString>> dirs;
     Offset32Ptr<OffsetString> name;
     float value;
 };
 
-} // anonymous
+} // namespace
 
 SLANG_UNIT_TEST(offsetContainer)
 {
@@ -41,9 +41,8 @@ SLANG_UNIT_TEST(offsetContainer)
 
     {
         OffsetContainer container;
-        
-        const char* strings[] =
-        {
+
+        const char* strings[] = {
             "Hello",
             "World",
             nullptr,
@@ -65,7 +64,7 @@ SLANG_UNIT_TEST(offsetContainer)
         {
             List<uint8_t> copy;
             copy.addRange(container.getData(), container.getDataCount());
-            
+
             MemoryOffsetBase base;
             base.set(copy.getBuffer(), copy.getCount());
 
@@ -109,7 +108,7 @@ SLANG_UNIT_TEST(offsetContainer)
                         SLANG_CHECK(str == nullptr);
                     }
 
-                    index ++;
+                    index++;
                 }
             }
         }

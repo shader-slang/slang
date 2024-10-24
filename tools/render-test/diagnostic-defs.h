@@ -14,8 +14,8 @@
 // for any arguments.
 
 #ifndef DIAGNOSTIC
-#error Need to #define DIAGNOSTIC(...) before including 
-#define DIAGNOSTIC(id, severity, name, messageFormat) /* */
+    #error Need to #define DIAGNOSTIC(...) before including
+    #define DIAGNOSTIC(id, severity, name, messageFormat) /* */
 #endif
 
 //
@@ -23,8 +23,18 @@
 //
 
 
-DIAGNOSTIC(1001, Error, expectingCommaComputeDispatch, "expected 3 comma separated integers for compute dispatch size")
-DIAGNOSTIC(1002, Error, expectingPositiveComputeDispatch, "expected 3 comma positive integers for compute dispatch size")
+DIAGNOSTIC(
+    1001,
+    Error,
+    expectingCommaComputeDispatch,
+    "expected 3 comma separated integers for compute dispatch size"
+)
+DIAGNOSTIC(
+    1002,
+    Error,
+    expectingPositiveComputeDispatch,
+    "expected 3 comma positive integers for compute dispatch size"
+)
 DIAGNOSTIC(1003, Error, unknownSourceLanguage, "unknown source language name")
 DIAGNOSTIC(1003, Error, unknown, "unknown source language name")
 DIAGNOSTIC(1004, Error, unknownCommandLineOption, "unknown command-line option '$0'")

@@ -28,19 +28,19 @@ struct ConvertEntryPointPtrParamsToRawPtrsPass
         // Now we loop over global-scope instructions searching
         // for any entry points.
         //
-        for( auto inst : m_module->getGlobalInsts() )
+        for (auto inst : m_module->getGlobalInsts())
         {
             auto func = as<IRFunc>(inst);
-            if(!func)
+            if (!func)
                 continue;
 
-            if( !func->findDecoration<IREntryPointDecoration>() )
+            if (!func->findDecoration<IREntryPointDecoration>())
                 continue;
 
             // We can only modify entry points with definitions here.
             //
             auto firstBlock = func->getFirstBlock();
-            if(!firstBlock)
+            if (!firstBlock)
                 continue;
 
             // Any code we introduce for casts will need to be inserted
@@ -51,7 +51,7 @@ struct ConvertEntryPointPtrParamsToRawPtrsPass
 
             // Note: because we are inserting code right after the parameters
             // it doesn't work here to use `firstBlock->getParams()`, because
-            // that captures a begin/end range where the "end" is the 
+            // that captures a begin/end range where the "end" is the
             // first ordinary instruction at the time of the call, which will
             // chane when we insert code.
             //
@@ -60,13 +60,13 @@ struct ConvertEntryPointPtrParamsToRawPtrsPass
             // that ranges are robust against changes to instructions outside
             // of a range.
             //
-            for( auto param = firstBlock->getFirstParam(); param; param = param->getNextParam() )
+            for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
             {
                 // We only want to transform parameters of pointer or
                 // pointer-like type.
                 //
                 auto paramType = param->getDataType();
-                if(!as<IRPtrTypeBase>(paramType) && !as<IRPointerLikeType>(paramType))
+                if (!as<IRPtrTypeBase>(paramType) && !as<IRPointerLikeType>(paramType))
                     continue;
 
                 // We will overwrite the type of the parameter to
@@ -84,7 +84,7 @@ struct ConvertEntryPointPtrParamsToRawPtrsPass
                 // the bit cast instruction.
                 //
                 List<IRUse*> uses;
-                for(auto use = param->firstUse; use; use = use->nextUse)
+                for (auto use = param->firstUse; use; use = use->nextUse)
                     uses.add(use);
 
                 // Now we emit a bit-cast operation into the first block
@@ -96,7 +96,7 @@ struct ConvertEntryPointPtrParamsToRawPtrsPass
                 // Now we can replace all the (captured) uses of the
                 // parameter with the bit-cast operation instead.
                 //
-                for(auto use : uses)
+                for (auto use : uses)
                     use->set(cast);
             }
 
@@ -109,12 +109,11 @@ struct ConvertEntryPointPtrParamsToRawPtrsPass
     }
 };
 
-void convertEntryPointPtrParamsToRawPtrs(
-    IRModule*   module)
+void convertEntryPointPtrParamsToRawPtrs(IRModule* module)
 {
     ConvertEntryPointPtrParamsToRawPtrsPass pass;
     pass.m_module = module;
     pass.processModule();
 }
 
-}
+} // namespace Slang

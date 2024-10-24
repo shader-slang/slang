@@ -1,13 +1,14 @@
 #include "slang-ir-loop-unroll.h"
-#include "slang-ir.h"
+
+#include "../core/slang-performance-profiler.h"
+#include "slang-ir-clone.h"
+#include "slang-ir-dce.h"
+#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-peephole.h"
-#include "slang-ir-dominators.h"
-#include "slang-ir-clone.h"
-#include "slang-ir-util.h"
 #include "slang-ir-simplify-cfg.h"
-#include "slang-ir-dce.h"
-#include "../core/slang-performance-profiler.h"
+#include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -60,8 +61,7 @@ static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
     auto maxIterCount = as<IRIntLit>(forceUnrollDecor->getOperand(0));
     if (maxIterCount && maxIterCount->getValue() != 0)
     {
-        maxIterations =
-            Math::Min((int)maxIterCount->getValue() + 1, kMaxIterationsToAttempt);
+        maxIterations = Math::Min((int)maxIterCount->getValue() + 1, kMaxIterationsToAttempt);
     }
     return maxIterations;
 }
@@ -71,7 +71,8 @@ static void _foldAndSimplifyLoopIteration(
     IRBuilder& builder,
     List<IRBlock*>& clonedBlocks,
     IRBlock* firstIterationBreakBlock,
-    IRBlock* unreachableBlock)
+    IRBlock* unreachableBlock
+)
 {
     for (;;)
     {
@@ -100,7 +101,9 @@ static void _foldAndSimplifyLoopIteration(
             {
                 if (auto constCondition = as<IRConstant>(cbranch->getCondition()))
                 {
-                    auto targetBlock = (constCondition->value.intVal != 0) ? cbranch->getTrueBlock() : cbranch->getFalseBlock();
+                    auto targetBlock = (constCondition->value.intVal != 0)
+                                           ? cbranch->getTrueBlock()
+                                           : cbranch->getFalseBlock();
                     builder.setInsertBefore(cbranch);
                     builder.emitBranch(targetBlock);
                     cbranch->removeAndDeallocate();
@@ -146,12 +149,14 @@ static void _foldAndSimplifyLoopIteration(
 
 // Unroll loop up to a predefined maximum number of iterations.
 // Returns true if we can statically determine that the loop terminated within the iteration limit.
-// This operation assumes the loop does not have `continue` jumps, i.e. continueBlock == targetBlock.
+// This operation assumes the loop does not have `continue` jumps, i.e. continueBlock ==
+// targetBlock.
 static bool _unrollLoop(
     TargetProgram* targetProgram,
     IRModule* module,
     IRLoop* loopInst,
-    List<IRBlock*>& blocks)
+    List<IRBlock*>& blocks
+)
 {
     if (blocks.getCount() == 0)
     {
@@ -173,13 +178,14 @@ static bool _unrollLoop(
     // Insert an outer breakable region so we have a break label to use as the target for
     // any `break` jumps in the unrolled loop.
     // Transform CFG from [..., loopInst] -> [loopTarget] ->... [originalLoopBreakBlock]
-    // Into: [..., loop] -> [outerBreakableRegionHeader, loopInst(phi_arg)] -> [(phi_param) loopTarget] -> ... ->
+    // Into: [..., loop] -> [outerBreakableRegionHeader, loopInst(phi_arg)] -> [(phi_param)
+    // loopTarget] -> ... ->
     //       [newLoopBreakBlock] -> [originalLoopBreakBlock/outerBreakableRegionBreakBlock]
-    // After this transform, the original break block of the loop will serve as the break block for the
-    // outer breakable region.
+    // After this transform, the original break block of the loop will serve as the break block for
+    // the outer breakable region.
 
     IRBuilder builder(module);
-    
+
     auto unreachableBlock = builder.createBlock();
     builder.setInsertInto(unreachableBlock);
     builder.emitUnreachable();
@@ -187,7 +193,7 @@ static bool _unrollLoop(
 
     auto outerBreakableRegionHeader = builder.createBlock();
     outerBreakableRegionHeader->insertBefore(loopInst->getTargetBlock());
-    
+
     auto newLoopBreakableRegionBreakBlock = builder.createBlock();
     newLoopBreakableRegionBreakBlock->insertBefore(loopInst->getBreakBlock());
 
@@ -224,7 +230,8 @@ static bool _unrollLoop(
         builder.emitLoop(
             outerBreakableRegionHeader,
             outerBreakableRegionBreakBlock,
-            outerBreakableRegionHeader);
+            outerBreakableRegionHeader
+        );
 
         // The original loop inst should now be moved into `outerBreakableRegionHeader`.
         loopInst->insertAtEnd(outerBreakableRegionHeader);
@@ -265,15 +272,18 @@ static bool _unrollLoop(
         cloneEnv.mapOldValToNew[loopInst->getTargetBlock()] = firstIterationBreakBlock;
 
         // Wire up the breakable region blocks.
-        // Note that the breakable region header will never have any phi params because there will never
-        // be back jumps into the header (it is a single iteration loop just for the break label).
+        // Note that the breakable region header will never have any phi params because there will
+        // never be back jumps into the header (it is a single iteration loop just for the break
+        // label).
 
         builder.setInsertBefore(loopInst);
-        builder.emitLoop(firstIterationLoopHeader, firstIterationBreakBlock, firstIterationLoopHeader);
+        builder
+            .emitLoop(firstIterationLoopHeader, firstIterationBreakBlock, firstIterationLoopHeader);
 
-        // The `firstIterationBreakBlock` is supposed to act as the `targetBlock` for the back-jump in the
-        // loop body. Therefore, if the original loop target block has any phi params, we will need the
-        // same set of phi params in `firstIterationBreakBlock` so keep those branches valid.
+        // The `firstIterationBreakBlock` is supposed to act as the `targetBlock` for the back-jump
+        // in the loop body. Therefore, if the original loop target block has any phi params, we
+        // will need the same set of phi params in `firstIterationBreakBlock` so keep those branches
+        // valid.
 
         builder.setInsertInto(firstIterationBreakBlock);
         {
@@ -291,16 +301,18 @@ static bool _unrollLoop(
                 loopInst->getBreakBlock(),
                 loopInst->getContinueBlock(),
                 newParams.getCount(),
-                newParams.getBuffer()));
+                newParams.getBuffer()
+            ));
             loopInst->removeAndDeallocate();
 
-            // Update `loopInst` to represent the remaining loop iterations that are yet to be unrolled.
+            // Update `loopInst` to represent the remaining loop iterations that are yet to be
+            // unrolled.
             loopInst = newLoopInst;
         }
 
-        // With the break region set up and wired, we can now clone the loop body into the break region.
-        // We create all the blocks first, and setup the clone mapping for the blocks so when we
-        // clone the insts later, the branch targets will automatically set to their clones.
+        // With the break region set up and wired, we can now clone the loop body into the break
+        // region. We create all the blocks first, and setup the clone mapping for the blocks so
+        // when we clone the insts later, the branch targets will automatically set to their clones.
 
         List<IRBlock*> clonedBlocks;
         for (auto b : blocks)
@@ -341,7 +353,12 @@ static bool _unrollLoop(
         // conditional jumps can be folded into unconditional jumps.
 
         _foldAndSimplifyLoopIteration(
-            targetProgram, builder, clonedBlocks, firstIterationBreakBlock, unreachableBlock);
+            targetProgram,
+            builder,
+            clonedBlocks,
+            firstIterationBreakBlock,
+            unreachableBlock
+        );
 
         // Now we have peeled off one iteration from the loop, we check if there are any
         // branches into next iteration, if not, the loop terminates and we are done.
@@ -438,10 +455,13 @@ bool unrollLoopsInFunc(
     TargetProgram* targetProgram,
     IRModule* module,
     IRGlobalValueWithCode* func,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink
+)
 {
     List<IRLoop*> loops = collectLoopsInFunc(
-        func, [](IRLoop* l) { return l->findDecoration<IRForceUnrollDecoration>() != nullptr; });
+        func,
+        [](IRLoop* l) { return l->findDecoration<IRForceUnrollDecoration>() != nullptr; }
+    );
 
     if (loops.getCount() == 0)
         return true;
@@ -476,7 +496,7 @@ bool unrollLoopsInModule(TargetProgram* target, IRModule* module, DiagnosticSink
     {
         if (as<IRGeneric>(inst))
             continue;
-            
+
         if (auto func = as<IRGlobalValueWithCode>(inst))
         {
             bool result = unrollLoopsInFunc(target, module, func, sink);
@@ -527,7 +547,7 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
 
     IRBuilder builder(module);
     IRBuilderSourceLocRAII sourceLocationScope(&builder, loopInst->sourceLoc);
-   
+
     auto targetBlock = loopInst->getTargetBlock();
 
     auto innerBreakableRegionHeader = builder.createBlock();
@@ -548,14 +568,14 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
     builder.emitLoop(targetBlock, innerBreakableRegionBreakBlock, targetBlock);
 
     continueBlock->replaceUsesWith(innerBreakableRegionBreakBlock);
-    
+
     builder.setInsertInto(innerBreakableRegionBreakBlock);
     moveParams(innerBreakableRegionBreakBlock, continueBlock);
     builder.emitBranch(continueBlock);
 
     // If the original loop can be executed up to N times, the new loop may be executed
     // upto N+1 times (although most insts are skipped in the last traversal)
-    // 
+    //
     if (auto maxItersDecoration = loopInst->findDecoration<IRLoopMaxItersDecoration>())
     {
         auto maxIters = maxItersDecoration->getMaxIters();
@@ -567,7 +587,9 @@ void eliminateContinueBlocks(IRModule* module, IRLoop* loopInst)
 void eliminateContinueBlocksInFunc(IRModule* module, IRGlobalValueWithCode* func)
 {
     List<IRLoop*> loops = collectLoopsInFunc(
-        func, [](IRLoop* l) { return l->getContinueBlock() != l->getTargetBlock(); });
+        func,
+        [](IRLoop* l) { return l->getContinueBlock() != l->getTargetBlock(); }
+    );
 
     if (loops.getCount() == 0)
         return;
@@ -578,4 +600,4 @@ void eliminateContinueBlocksInFunc(IRModule* module, IRGlobalValueWithCode* func
     }
 }
 
-}
+} // namespace Slang

@@ -1,10 +1,11 @@
 #include "immediate-renderer-base.h"
-#include "simple-render-pass-layout.h"
-#include "simple-transient-resource-heap.h"
+
+#include "command-encoder-com-forward.h"
 #include "command-writer.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
-#include "command-encoder-com-forward.h"
+#include "simple-render-pass-layout.h"
+#include "simple-transient-resource-heap.h"
 
 namespace gfx
 {
@@ -44,10 +45,7 @@ public:
         m_transientHeap = transientHeap;
     }
 
-    void reset()
-    {
-        m_writer.clear();
-    }
+    void reset() { m_writer.clear(); }
 
     class ResourceCommandEncoderImpl : public IResourceCommandEncoder
     {
@@ -62,14 +60,15 @@ public:
 
         virtual void* getInterface(SlangUUID const& uuid)
         {
-            if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+            if (uuid == GfxGUID::IID_IResourceCommandEncoder ||
+                uuid == ISlangUnknown::getTypeGuid())
             {
                 return this;
             }
             return nullptr;
         }
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-            queryInterface(SlangUUID const& uuid, void** outObject) override
+        queryInterface(SlangUUID const& uuid, void** outObject) override
         {
             if (auto ptr = getInterface(uuid))
             {
@@ -87,19 +86,20 @@ public:
             size_t dstOffset,
             IBufferResource* src,
             size_t srcOffset,
-            size_t size) override
+            size_t size
+        ) override
         {
             m_writer->copyBuffer(dst, dstOffset, src, srcOffset, size);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override
+        uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override
         {
             m_writer->uploadBufferData(dst, offset, size, data);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            writeTimestamp(IQueryPool* pool, GfxIndex index) override
+        writeTimestamp(IQueryPool* pool, GfxIndex index) override
         {
             m_writer->writeTimestamp(pool, index);
         }
@@ -108,15 +108,19 @@ public:
             GfxCount count,
             ITextureResource* const* textures,
             ResourceState src,
-            ResourceState dst) override
-        {}
+            ResourceState dst
+        ) override
+        {
+        }
 
         virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
             GfxCount count,
             IBufferResource* const* buffers,
             ResourceState src,
-            ResourceState dst) override
-        {}
+            ResourceState dst
+        ) override
+        {
+        }
 
         virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
             ITextureResource* dst,
@@ -127,7 +131,8 @@ public:
             ResourceState srcState,
             SubresourceRange srcSubresource,
             ITextureResource::Offset3D srcOffset,
-            ITextureResource::Extents extent) override
+            ITextureResource::Extents extent
+        ) override
         {
             SLANG_UNUSED(dst);
             SLANG_UNUSED(dstState);
@@ -147,7 +152,8 @@ public:
             ITextureResource::Offset3D offset,
             ITextureResource::Extents extend,
             ITextureResource::SubresourceData* subResourceData,
-            GfxCount subResourceDataCount) override
+            GfxCount subResourceDataCount
+        ) override
         {
             SLANG_UNUSED(dst);
             SLANG_UNUSED(subResourceRange);
@@ -161,7 +167,8 @@ public:
         virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
             IResourceView* view,
             ClearValue* clearValue,
-            ClearResourceViewFlags::Enum flags) override
+            ClearResourceViewFlags::Enum flags
+        ) override
         {
             SLANG_UNUSED(view);
             SLANG_UNUSED(clearValue);
@@ -175,7 +182,8 @@ public:
             SubresourceRange sourceRange,
             ITextureResource* dest,
             ResourceState destState,
-            SubresourceRange destRange) override
+            SubresourceRange destRange
+        ) override
         {
             SLANG_UNUSED(source);
             SLANG_UNUSED(sourceState);
@@ -191,7 +199,8 @@ public:
             GfxIndex index,
             GfxCount count,
             IBufferResource* buffer,
-            Offset offset) override
+            Offset offset
+        ) override
         {
             SLANG_UNUSED(queryPool);
             SLANG_UNUSED(index);
@@ -210,7 +219,8 @@ public:
             ResourceState srcState,
             SubresourceRange srcSubresource,
             ITextureResource::Offset3D srcOffset,
-            ITextureResource::Extents extent) override
+            ITextureResource::Extents extent
+        ) override
         {
             SLANG_UNUSED(dst);
             SLANG_UNUSED(dstOffset);
@@ -228,7 +238,8 @@ public:
             ITextureResource* texture,
             SubresourceRange subresourceRange,
             ResourceState src,
-            ResourceState dst) override
+            ResourceState dst
+        ) override
         {
             SLANG_UNUSED(texture);
             SLANG_UNUSED(subresourceRange);
@@ -238,43 +249,45 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            beginDebugEvent(const char* name, float rgbColor[3]) override
+        beginDebugEvent(const char* name, float rgbColor[3]) override
         {
             SLANG_UNUSED(name);
             SLANG_UNUSED(rgbColor);
         }
-        virtual SLANG_NO_THROW void SLANG_MCALL endDebugEvent() override
-        {
-        }
+        virtual SLANG_NO_THROW void SLANG_MCALL endDebugEvent() override {}
     };
 
     ResourceCommandEncoderImpl m_resourceCommandEncoder;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeResourceCommands(IResourceCommandEncoder** outEncoder) override
+    encodeResourceCommands(IResourceCommandEncoder** outEncoder) override
     {
         m_resourceCommandEncoder.init(this);
         *outEncoder = &m_resourceCommandEncoder;
     }
 
-    class RenderCommandEncoderImpl
-        : public IRenderCommandEncoder
-        , public ResourceCommandEncoderImpl
+    class RenderCommandEncoderImpl : public IRenderCommandEncoder, public ResourceCommandEncoderImpl
     {
     public:
         SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
         virtual void* getInterface(SlangUUID const& uuid) override
         {
-            if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IRenderCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+            if (uuid == GfxGUID::IID_IResourceCommandEncoder ||
+                uuid == GfxGUID::IID_IRenderCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
             {
                 return this;
             }
             return nullptr;
         }
+
     public:
         virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
 
-        void init(CommandBufferImpl* cmdBuffer, SimpleRenderPassLayout* renderPass, IFramebuffer* framebuffer)
+        void init(
+            CommandBufferImpl* cmdBuffer,
+            SimpleRenderPassLayout* renderPass,
+            IFramebuffer* framebuffer
+        )
         {
             ResourceCommandEncoderImpl::init(cmdBuffer);
 
@@ -310,38 +323,46 @@ public:
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
+        bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
         {
             m_writer->setPipelineState(state);
             auto stateImpl = static_cast<PipelineStateBase*>(state);
             SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
-                stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
+                stateImpl->m_program,
+                m_commandBuffer->m_rootShaderObject.writeRef()
+            ));
             *outRootObject = m_commandBuffer->m_rootShaderObject.Ptr();
             return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override
+        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override
         {
             m_writer->setPipelineState(state);
             auto stateImpl = static_cast<PipelineStateBase*>(state);
             SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
-                stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
-            m_commandBuffer->m_rootShaderObject->copyFrom(rootObject, m_commandBuffer->m_transientHeap);
+                stateImpl->m_program,
+                m_commandBuffer->m_rootShaderObject.writeRef()
+            ));
+            m_commandBuffer->m_rootShaderObject->copyFrom(
+                rootObject,
+                m_commandBuffer->m_transientHeap
+            );
             return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setViewports(GfxCount count, const Viewport* viewports) override
+        setViewports(GfxCount count, const Viewport* viewports) override
         {
             m_writer->setViewports(count, viewports);
         }
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setScissorRects(GfxCount count, const ScissorRect* scissors) override
+        setScissorRects(GfxCount count, const ScissorRect* scissors) override
         {
             m_writer->setScissorRects(count, scissors);
         }
-        virtual SLANG_NO_THROW void SLANG_MCALL setPrimitiveTopology(PrimitiveTopology topology) override
+        virtual SLANG_NO_THROW void SLANG_MCALL setPrimitiveTopology(PrimitiveTopology topology
+        ) override
         {
             m_writer->setPrimitiveTopology(topology);
         }
@@ -349,19 +370,20 @@ public:
             GfxIndex startSlot,
             GfxCount slotCount,
             IBufferResource* const* buffers,
-            const Offset* offsets) override
+            const Offset* offsets
+        ) override
         {
             m_writer->setVertexBuffers(startSlot, slotCount, buffers, offsets);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset) override
+        setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset) override
         {
             m_writer->setIndexBuffer(buffer, indexFormat, offset);
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            draw(GfxCount vertexCount, GfxIndex startVertex) override
+        draw(GfxCount vertexCount, GfxIndex startVertex) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->draw(vertexCount, startVertex);
@@ -369,14 +391,15 @@ public:
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex) override
+        drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawIndexed(indexCount, startIndex, baseVertex);
             return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override
+        virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue
+        ) override
         {
             m_writer->setStencilReference(referenceValue);
         }
@@ -386,7 +409,8 @@ public:
             IBufferResource* argBuffer,
             Offset argOffset,
             IBufferResource* countBuffer,
-            Offset countOffset) override
+            Offset countOffset
+        ) override
         {
             SLANG_UNUSED(maxDrawCount);
             SLANG_UNUSED(argBuffer);
@@ -402,7 +426,8 @@ public:
             IBufferResource* argBuffer,
             Offset argOffset,
             IBufferResource* countBuffer,
-            Offset countOffset) override
+            Offset countOffset
+        ) override
         {
             SLANG_UNUSED(maxDrawCount);
             SLANG_UNUSED(argBuffer);
@@ -421,7 +446,8 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
             GfxCount samplesPerPixel,
             GfxCount pixelCount,
-            const SamplePosition* samplePositions) override
+            const SamplePosition* samplePositions
+        ) override
         {
             SLANG_UNUSED(samplesPerPixel);
             SLANG_UNUSED(pixelCount);
@@ -433,7 +459,8 @@ public:
             GfxCount vertexCount,
             GfxCount instanceCount,
             GfxIndex startVertex,
-            GfxIndex startInstanceLocation) override
+            GfxIndex startInstanceLocation
+        ) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
@@ -445,10 +472,17 @@ public:
             GfxCount instanceCount,
             GfxIndex startIndexLocation,
             GfxIndex baseVertexLocation,
-            GfxIndex startInstanceLocation) override
+            GfxIndex startInstanceLocation
+        ) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
-            m_writer->drawIndexedInstanced(indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+            m_writer->drawIndexedInstanced(
+                indexCount,
+                instanceCount,
+                startIndexLocation,
+                baseVertexLocation,
+                startInstanceLocation
+            );
             return SLANG_OK;
         }
     };
@@ -457,54 +491,58 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL encodeRenderCommands(
         IRenderPassLayout* renderPass,
         IFramebuffer* framebuffer,
-        IRenderCommandEncoder** outEncoder) override
+        IRenderCommandEncoder** outEncoder
+    ) override
     {
-        m_renderCommandEncoder.init(
-            this,
-            static_cast<SimpleRenderPassLayout*>(renderPass),
-            framebuffer);
+        m_renderCommandEncoder
+            .init(this, static_cast<SimpleRenderPassLayout*>(renderPass), framebuffer);
         *outEncoder = &m_renderCommandEncoder;
     }
 
-    class ComputeCommandEncoderImpl
-        : public IComputeCommandEncoder
-        , public ResourceCommandEncoderImpl
+    class ComputeCommandEncoderImpl : public IComputeCommandEncoder,
+                                      public ResourceCommandEncoderImpl
     {
     public:
         SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
         virtual void* getInterface(SlangUUID const& uuid) override
         {
-            if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IComputeCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+            if (uuid == GfxGUID::IID_IResourceCommandEncoder ||
+                uuid == GfxGUID::IID_IComputeCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
             {
                 return this;
             }
             return nullptr;
         }
+
     public:
-        virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
-        {
-        }
+        virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
+        bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
         {
             m_writer->setPipelineState(state);
             auto stateImpl = static_cast<PipelineStateBase*>(state);
             SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
-                stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
+                stateImpl->m_program,
+                m_commandBuffer->m_rootShaderObject.writeRef()
+            ));
             *outRootObject = m_commandBuffer->m_rootShaderObject.Ptr();
             return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override
+        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override
         {
             m_writer->setPipelineState(state);
             auto stateImpl = static_cast<PipelineStateBase*>(state);
             SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
-                stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
+                stateImpl->m_program,
+                m_commandBuffer->m_rootShaderObject.writeRef()
+            ));
             m_commandBuffer->m_rootShaderObject->copyFrom(
-                rootObject, m_commandBuffer->m_transientHeap);
+                rootObject,
+                m_commandBuffer->m_transientHeap
+            );
             return SLANG_OK;
         }
 
@@ -515,7 +553,8 @@ public:
             return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+        dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override
         {
             SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::dispatchComputeIndirect");
         }
@@ -523,19 +562,19 @@ public:
 
     ComputeCommandEncoderImpl m_computeCommandEncoder;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeComputeCommands(IComputeCommandEncoder** outEncoder) override
+    encodeComputeCommands(IComputeCommandEncoder** outEncoder) override
     {
         m_computeCommandEncoder.init(this);
         *outEncoder = &m_computeCommandEncoder;
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
+    encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
     {
         *outEncoder = nullptr;
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL close() override { }
+    virtual SLANG_NO_THROW void SLANG_MCALL close() override {}
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
     {
@@ -549,94 +588,120 @@ public:
             auto name = cmd.name;
             switch (name)
             {
-            case CommandName::SetPipelineState:
-                m_renderer->setPipelineState(m_writer.getObject<PipelineStateBase>(cmd.operands[0]));
-                break;
-            case CommandName::BindRootShaderObject:
-                m_renderer->bindRootShaderObject(m_writer.getObject<ShaderObjectBase>(cmd.operands[0]));
-                break;
-            case CommandName::SetFramebuffer:
-                m_renderer->setFramebuffer(m_writer.getObject<FramebufferBase>(cmd.operands[0]));
-                break;
-            case CommandName::ClearFrame:
-                m_renderer->clearFrame(
-                    cmd.operands[0], (cmd.operands[1] != 0), (cmd.operands[2] != 0));
-                break;
-            case CommandName::SetViewports:
-                m_renderer->setViewports(
-                    (UInt)cmd.operands[0], m_writer.getData<Viewport>(cmd.operands[1]));
-                break;
-            case CommandName::SetScissorRects:
-                m_renderer->setScissorRects(
-                    (UInt)cmd.operands[0], m_writer.getData<ScissorRect>(cmd.operands[1]));
-                break;
-            case CommandName::SetPrimitiveTopology:
-                m_renderer->setPrimitiveTopology((PrimitiveTopology)cmd.operands[0]);
-                break;
-            case CommandName::SetVertexBuffers:
+                case CommandName::SetPipelineState:
+                    m_renderer->setPipelineState(
+                        m_writer.getObject<PipelineStateBase>(cmd.operands[0])
+                    );
+                    break;
+                case CommandName::BindRootShaderObject:
+                    m_renderer->bindRootShaderObject(
+                        m_writer.getObject<ShaderObjectBase>(cmd.operands[0])
+                    );
+                    break;
+                case CommandName::SetFramebuffer:
+                    m_renderer->setFramebuffer(m_writer.getObject<FramebufferBase>(cmd.operands[0])
+                    );
+                    break;
+                case CommandName::ClearFrame:
+                    m_renderer->clearFrame(
+                        cmd.operands[0],
+                        (cmd.operands[1] != 0),
+                        (cmd.operands[2] != 0)
+                    );
+                    break;
+                case CommandName::SetViewports:
+                    m_renderer->setViewports(
+                        (UInt)cmd.operands[0],
+                        m_writer.getData<Viewport>(cmd.operands[1])
+                    );
+                    break;
+                case CommandName::SetScissorRects:
+                    m_renderer->setScissorRects(
+                        (UInt)cmd.operands[0],
+                        m_writer.getData<ScissorRect>(cmd.operands[1])
+                    );
+                    break;
+                case CommandName::SetPrimitiveTopology:
+                    m_renderer->setPrimitiveTopology((PrimitiveTopology)cmd.operands[0]);
+                    break;
+                case CommandName::SetVertexBuffers:
                 {
                     ShortList<IBufferResource*> bufferResources;
                     for (uint32_t i = 0; i < cmd.operands[1]; i++)
                     {
-                        bufferResources.add(
-                            m_writer.getObject<BufferResource>(cmd.operands[2] + i));
+                        bufferResources.add(m_writer.getObject<BufferResource>(cmd.operands[2] + i)
+                        );
                     }
                     m_renderer->setVertexBuffers(
                         cmd.operands[0],
                         cmd.operands[1],
                         bufferResources.getArrayView().getBuffer(),
-                        m_writer.getData<Offset>(cmd.operands[3]));
+                        m_writer.getData<Offset>(cmd.operands[3])
+                    );
                 }
                 break;
-            case CommandName::SetIndexBuffer:
-                m_renderer->setIndexBuffer(
-                    m_writer.getObject<BufferResource>(cmd.operands[0]),
-                    (Format)cmd.operands[1],
-                    (UInt)cmd.operands[2]);
-                break;
-            case CommandName::Draw:
-                m_renderer->draw(cmd.operands[0], cmd.operands[1]);
-                break;
-            case CommandName::DrawIndexed:
-                m_renderer->drawIndexed(
-                    cmd.operands[0], cmd.operands[1], cmd.operands[2]);
-                break;
-            case CommandName::DrawInstanced:
-                m_renderer->drawInstanced(
-                    cmd.operands[0], cmd.operands[1], cmd.operands[2], cmd.operands[3]);
-                break;
-            case CommandName::DrawIndexedInstanced:
-                m_renderer->drawIndexedInstanced(
-                    cmd.operands[0], cmd.operands[1], cmd.operands[2], cmd.operands[3], cmd.operands[4]);
-                break;
-            case CommandName::SetStencilReference:
-                m_renderer->setStencilReference(cmd.operands[0]);
-                break;
-            case CommandName::DispatchCompute:
-                m_renderer->dispatchCompute(
-                    int(cmd.operands[0]), int(cmd.operands[1]), int(cmd.operands[2]));
-                break;
-            case CommandName::UploadBufferData:
-                m_renderer->uploadBufferData(
-                    m_writer.getObject<BufferResource>(cmd.operands[0]),
-                    cmd.operands[1],
-                    cmd.operands[2],
-                    m_writer.getData<uint8_t>(cmd.operands[3]));
-                break;
-            case CommandName::CopyBuffer:
-                m_renderer->copyBuffer(
-                    m_writer.getObject<BufferResource>(cmd.operands[0]),
-                    cmd.operands[1],
-                    m_writer.getObject<BufferResource>(cmd.operands[2]),
-                    cmd.operands[3],
-                    cmd.operands[4]);
-                break;
-            case CommandName::WriteTimestamp:
-                m_renderer->writeTimestamp(m_writer.getObject<QueryPoolBase>(cmd.operands[0]), (GfxIndex)cmd.operands[1]);
-                break;
-            default:
-                assert(!"unknown command");
-                break;
+                case CommandName::SetIndexBuffer:
+                    m_renderer->setIndexBuffer(
+                        m_writer.getObject<BufferResource>(cmd.operands[0]),
+                        (Format)cmd.operands[1],
+                        (UInt)cmd.operands[2]
+                    );
+                    break;
+                case CommandName::Draw: m_renderer->draw(cmd.operands[0], cmd.operands[1]); break;
+                case CommandName::DrawIndexed:
+                    m_renderer->drawIndexed(cmd.operands[0], cmd.operands[1], cmd.operands[2]);
+                    break;
+                case CommandName::DrawInstanced:
+                    m_renderer->drawInstanced(
+                        cmd.operands[0],
+                        cmd.operands[1],
+                        cmd.operands[2],
+                        cmd.operands[3]
+                    );
+                    break;
+                case CommandName::DrawIndexedInstanced:
+                    m_renderer->drawIndexedInstanced(
+                        cmd.operands[0],
+                        cmd.operands[1],
+                        cmd.operands[2],
+                        cmd.operands[3],
+                        cmd.operands[4]
+                    );
+                    break;
+                case CommandName::SetStencilReference:
+                    m_renderer->setStencilReference(cmd.operands[0]);
+                    break;
+                case CommandName::DispatchCompute:
+                    m_renderer->dispatchCompute(
+                        int(cmd.operands[0]),
+                        int(cmd.operands[1]),
+                        int(cmd.operands[2])
+                    );
+                    break;
+                case CommandName::UploadBufferData:
+                    m_renderer->uploadBufferData(
+                        m_writer.getObject<BufferResource>(cmd.operands[0]),
+                        cmd.operands[1],
+                        cmd.operands[2],
+                        m_writer.getData<uint8_t>(cmd.operands[3])
+                    );
+                    break;
+                case CommandName::CopyBuffer:
+                    m_renderer->copyBuffer(
+                        m_writer.getObject<BufferResource>(cmd.operands[0]),
+                        cmd.operands[1],
+                        m_writer.getObject<BufferResource>(cmd.operands[2]),
+                        cmd.operands[3],
+                        cmd.operands[4]
+                    );
+                    break;
+                case CommandName::WriteTimestamp:
+                    m_renderer->writeTimestamp(
+                        m_writer.getObject<QueryPoolBase>(cmd.operands[0]),
+                        (GfxIndex)cmd.operands[1]
+                    );
+                    break;
+                default: assert(!"unknown command"); break;
             }
         }
         m_writer.clear();
@@ -668,7 +733,11 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-        GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
+        GfxCount count,
+        ICommandBuffer* const* commandBuffers,
+        IFence* fence,
+        uint64_t valueToSignal
+    ) override
     {
         // TODO: implement fence signal.
         assert(fence == nullptr);
@@ -676,7 +745,8 @@ public:
         CommandBufferInfo info = {};
         for (GfxIndex i = 0; i < count; i++)
         {
-            info.hasWriteTimestamps |= static_cast<CommandBufferImpl*>(commandBuffers[i])->m_writer.m_hasWriteTimestamps;
+            info.hasWriteTimestamps |=
+                static_cast<CommandBufferImpl*>(commandBuffers[i])->m_writer.m_hasWriteTimestamps;
         }
         static_cast<ImmediateRendererBase*>(m_renderer.get())->beginCommandBuffer(info);
         for (GfxIndex i = 0; i < count; i++)
@@ -688,8 +758,8 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override { getRenderer()->waitForGpu(); }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
-        GfxCount fenceCount, IFence** fences, uint64_t* waitValues) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    waitForFenceValuesOnDevice(GfxCount fenceCount, IFence** fences, uint64_t* waitValues) override
     {
         return SLANG_FAIL;
     }
@@ -703,7 +773,7 @@ public:
 using TransientResourceHeapImpl =
     SimpleTransientResourceHeap<ImmediateRendererBase, CommandBufferImpl>;
 
-}
+} // namespace
 
 ImmediateRendererBase::ImmediateRendererBase()
 {
@@ -712,7 +782,8 @@ ImmediateRendererBase::ImmediateRendererBase()
 
 SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createTransientResourceHeap(
     const ITransientResourceHeap::Desc& desc,
-    ITransientResourceHeap** outHeap)
+    ITransientResourceHeap** outHeap
+)
 {
     RefPtr<TransientResourceHeapImpl> result = new TransientResourceHeapImpl();
     SLANG_RETURN_ON_FAIL(result->init(this, desc));
@@ -720,9 +791,8 @@ SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createTransientResource
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createCommandQueue(
-    const ICommandQueue::Desc& desc,
-    ICommandQueue** outQueue)
+SLANG_NO_THROW Result SLANG_MCALL
+ImmediateRendererBase::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue)
 {
     SLANG_UNUSED(desc);
     // Only one queue is supported.
@@ -735,7 +805,8 @@ SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createCommandQueue(
 
 SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createRenderPassLayout(
     const IRenderPassLayout::Desc& desc,
-    IRenderPassLayout** outRenderPassLayout)
+    IRenderPassLayout** outRenderPassLayout
+)
 {
     RefPtr<SimpleRenderPassLayout> renderPass = new SimpleRenderPassLayout();
     renderPass->init(desc);
@@ -747,7 +818,8 @@ void ImmediateRendererBase::uploadBufferData(
     IBufferResource* dst,
     size_t offset,
     size_t size,
-    void* data)
+    void* data
+)
 {
     auto buffer = map(dst, gfx::MapFlavor::WriteDiscard);
     memcpy((uint8_t*)buffer + offset, data, size);
@@ -758,7 +830,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ImmediateRendererBase::readBufferResource
     IBufferResource* buffer,
     size_t offset,
     size_t size,
-    ISlangBlob** outBlob)
+    ISlangBlob** outBlob
+)
 {
     List<uint8_t> blobData;
 
@@ -775,4 +848,4 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ImmediateRendererBase::readBufferResource
     return SLANG_OK;
 }
 
-}
+} // namespace gfx

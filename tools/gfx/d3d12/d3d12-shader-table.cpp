@@ -15,7 +15,8 @@ using namespace Slang;
 RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     PipelineStateBase* pipeline,
     TransientResourceHeapBase* transientHeap,
-    IResourceCommandEncoder* encoder)
+    IResourceCommandEncoder* encoder
+)
 {
     uint32_t raygenTableSize = m_rayGenShaderCount * kRayGenRecordSize;
     uint32_t missTableSize = m_missShaderCount * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
@@ -24,9 +25,13 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     m_rayGenTableOffset = 0;
     m_missTableOffset = raygenTableSize;
     m_hitGroupTableOffset = (uint32_t)D3DUtil::calcAligned(
-        m_missTableOffset + missTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+        m_missTableOffset + missTableSize,
+        D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT
+    );
     m_callableTableOffset = (uint32_t)D3DUtil::calcAligned(
-        m_hitGroupTableOffset + hitgroupTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+        m_hitGroupTableOffset + hitgroupTableSize,
+        D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT
+    );
     uint32_t tableSize = m_callableTableOffset + callableTableSize;
 
     auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
@@ -47,8 +52,8 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
 
     IBufferResource* stagingBuffer = nullptr;
     Offset stagingBufferOffset = 0;
-    transientHeapImpl->allocateStagingBuffer(
-        tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
+    transientHeapImpl
+        ->allocateStagingBuffer(tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
     assert(stagingBuffer);
     void* stagingPtr = nullptr;
@@ -75,28 +80,32 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         copyShaderIdInto(
             stagingBufferPtr + m_rayGenTableOffset + kRayGenRecordSize * i,
             m_shaderGroupNames[i],
-            m_recordOverwrites[i]);
+            m_recordOverwrites[i]
+        );
     }
     for (uint32_t i = 0; i < m_missShaderCount; i++)
     {
         copyShaderIdInto(
             stagingBufferPtr + m_missTableOffset + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
             m_shaderGroupNames[m_rayGenShaderCount + i],
-            m_recordOverwrites[m_rayGenShaderCount + i]);
+            m_recordOverwrites[m_rayGenShaderCount + i]
+        );
     }
     for (uint32_t i = 0; i < m_hitGroupCount; i++)
     {
         copyShaderIdInto(
             stagingBufferPtr + m_hitGroupTableOffset + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
             m_shaderGroupNames[m_rayGenShaderCount + m_missShaderCount + i],
-            m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + i]);
+            m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + i]
+        );
     }
     for (uint32_t i = 0; i < m_callableShaderCount; i++)
     {
         copyShaderIdInto(
             stagingBufferPtr + m_callableTableOffset + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
             m_shaderGroupNames[m_rayGenShaderCount + m_missShaderCount + m_hitGroupCount + i],
-            m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + m_hitGroupCount + i]);
+            m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + m_hitGroupCount + i]
+        );
     }
 
     stagingBuffer->unmap(nullptr);
@@ -105,7 +114,8 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
         1,
         bufferResource.readRef(),
         gfx::ResourceState::CopyDestination,
-        gfx::ResourceState::NonPixelShaderResource);
+        gfx::ResourceState::NonPixelShaderResource
+    );
     RefPtr<BufferResource> resultPtr = static_cast<BufferResource*>(bufferResource.get());
     return _Move(resultPtr);
 }

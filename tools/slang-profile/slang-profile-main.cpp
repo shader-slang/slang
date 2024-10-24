@@ -1,13 +1,10 @@
 // slang-profile-main.cpp
 
 #include "../../source/core/slang-io.h"
-#include "../../source/core/slang-std-writers.h"
-
 #include "../../source/core/slang-process-util.h"
-
-#include "slang-com-helper.h"
-
+#include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-string-util.h"
+#include "slang-com-helper.h"
 
 using namespace Slang;
 
