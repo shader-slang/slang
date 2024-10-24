@@ -170,6 +170,7 @@ struct AddressInstEliminationContext
                 case kIROp_GetElementPtr:
                 case kIROp_FieldAddress:
                 case kIROp_Unmodified:
+                case kIROp_DebugValue:
                     break;
                 default:
                     sink->diagnose(use->getUser()->sourceLoc, Diagnostics::unsupportedUseOfLValueForAutoDiff);

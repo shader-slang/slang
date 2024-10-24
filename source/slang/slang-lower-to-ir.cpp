@@ -2969,6 +2969,10 @@ Type* getThisParamTypeForCallable(
     return getThisParamTypeForContainer(context, parentDeclRef);
 }
 
+struct StmtLoweringVisitor;
+
+void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stmt* stmt, SourceLoc loc = SourceLoc());
+
 // When lowering something callable (most commonly a function declaration),
 // we need to construct an appropriate parameter list for the IR function
 // that folds in any contributions from both the declaration itself *and*
@@ -5982,6 +5986,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (const auto condExpr = stmt->predicateExpression)
         {
+            maybeEmitDebugLine(context, *this, stmt, condExpr->loc);
+
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, stmt->predicateExpression));
 
@@ -6031,6 +6037,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(continueLabel);
         if (auto incrExpr = stmt->sideEffectExpression)
         {
+            maybeEmitDebugLine(context, *this, stmt, incrExpr->loc);
             lowerRValueExpr(context, incrExpr);
         }
 
@@ -6082,6 +6089,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (auto condExpr = stmt->predicate)
         {
+            maybeEmitDebugLine(context, *this, stmt, condExpr->loc);
+
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
 
@@ -6149,6 +6158,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (auto condExpr = stmt->predicate)
         {
+            maybeEmitDebugLine(context, *this, stmt, stmt->predicate->loc);
+
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
 
@@ -6805,22 +6816,24 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
     return debugSrcInst;
 }
 
-void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stmt* stmt)
+void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stmt* stmt, SourceLoc loc)
 {
     if (!context->includeDebugInfo)
         return;
     if (as<EmptyStmt>(stmt))
         return;
+    if (!loc.isValid())
+        loc = stmt->loc;
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(stmt->loc);
+    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(loc);
     if (!sourceView)
         return;
 
     IRInst* debugSourceInst = nullptr;
-    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Emit);
+    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(loc, SourceLocType::Emit);
 
     // Do a best-effort attempt to retrieve the nominal source file.
-    auto pathInfo = sourceView->getPathInfo(stmt->loc, SourceLocType::Emit);
+    auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
 
     // If the source file path correspond to an existing SourceFile in the source manager, use it.
     auto source = sourceManager->findSourceFileByPathRecursively(pathInfo.foundPath);
@@ -6867,7 +6880,7 @@ void lowerStmt(
 
     try
     {
-        maybeEmitDebugLine(context, visitor, stmt);
+        maybeEmitDebugLine(context, visitor, stmt, stmt->loc);
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`

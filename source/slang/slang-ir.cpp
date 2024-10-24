@@ -3325,12 +3325,12 @@ namespace Slang
         if (argIndex)
         {
             IRInst* args[] = { source, line, col, argIndex };
-            return emitIntrinsicInst(type, kIROp_DebugVar, 4, args);
+            return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
         }
         else
         {
             IRInst* args[] = { source, line, col };
-            return emitIntrinsicInst(type, kIROp_DebugVar, 3, args);
+            return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 3, args);
         }
     }
 

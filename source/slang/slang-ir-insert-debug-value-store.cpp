@@ -172,36 +172,11 @@ namespace Slang
 
             // Helper func to insert debugValue updates.
             auto setDebugValue = [&](
-                IRInst* debugVar, IRInst* rootVar, IRInst* newValue,
-                ArrayView<IRInst*> accessChain, ArrayView<IRInst*> types)
+                IRInst* debugVar, IRInst* /*rootVar*/, IRInst* newValue,
+                ArrayView<IRInst*> accessChain, ArrayView<IRInst*> /*types*/)
                 {
-                    // SPIRV does not allow dynamic indices in DebugValue,
-                    // so we need to stop the access chain at the first dynamic index.
-                    Index i = 0;
-                    for (; i < accessChain.getCount(); i++)
-                    {
-                        if (as<IRStructKey>(accessChain[i]))
-                        {
-                            continue;
-                        }
-                        if (as<IRIntLit>(accessChain[i]))
-                        {
-                            continue;
-                        }
-                        break;
-                    }
-                    // If everything is static on the access chain, we can simply emit a DebugValue.
-                    if (i == accessChain.getCount())
-                    {
-                        builder.emitDebugValue(debugVar, newValue, accessChain);
-                        return;
-                    }
-
-                    // Otherwise we need to load the entire composite value starting at the dynamic index access chain
-                    // and set it.
-                    auto compositePtr = builder.emitElementAddress(rootVar, accessChain.head(i), types.head(i));
-                    auto compositeVal = builder.emitLoad(compositePtr);
-                    builder.emitDebugValue(debugVar, compositeVal, accessChain.head(i));
+                    auto ptr = builder.emitElementAddress(debugVar, accessChain);
+                    builder.emitDebugValue(ptr, newValue, ArrayView<IRInst*>());
                 };
             for (auto block : func->getBlocks())
             {
