@@ -306,48 +306,48 @@ namespace SlangRecord
         return res;
     }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::compileStdLib(slang::CompileStdLibFlags flags)
+    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::compileCoreModule(slang::CompileStandardModulesFlags flags)
     {
         slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
 
         ParameterRecorder* recorder {};
         {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_compileStdLib, m_globalSessionHandle);
+            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_compileCoreModule, m_globalSessionHandle);
             recorder->recordEnumValue(flags);
             m_recordManager->endMethodRecord();
         }
 
-        SlangResult res = m_actualGlobalSession->compileStdLib(flags);
+        SlangResult res = m_actualGlobalSession->compileCoreModule(flags);
         return res;
     }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
+    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::loadStandardModules(const void* standardModules, size_t standardModulesSizeInBytes)
     {
         slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
 
         ParameterRecorder* recorder {};
         {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_loadStdLib, m_globalSessionHandle);
-            recorder->recordPointer(stdLib, false, stdLibSizeInBytes);
+            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_loadStandardModules, m_globalSessionHandle);
+            recorder->recordPointer(standardModules, false, standardModulesSizeInBytes);
             m_recordManager->endMethodRecord();
         }
 
-        SlangResult res = m_actualGlobalSession->loadStdLib(stdLib, stdLibSizeInBytes);
+        SlangResult res = m_actualGlobalSession->loadStandardModules(standardModules, standardModulesSizeInBytes);
         return res;
     }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob)
+    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::saveStandardModules(SlangArchiveType archiveType, ISlangBlob** outBlob)
     {
         slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
 
         ParameterRecorder* recorder {};
         {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_saveStdLib, m_globalSessionHandle);
+            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_saveStandardModules, m_globalSessionHandle);
             recorder->recordEnumValue(archiveType);
             recorder = m_recordManager->endMethodRecord();
         }
 
-        SlangResult res = m_actualGlobalSession->saveStdLib(archiveType, outBlob);
+        SlangResult res = m_actualGlobalSession->saveStandardModules(archiveType, outBlob);
 
         {
             recorder->recordAddress(*outBlob);

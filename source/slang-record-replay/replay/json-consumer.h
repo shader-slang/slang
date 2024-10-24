@@ -77,9 +77,9 @@ namespace SlangRecord
         virtual void IGlobalSession_getSharedLibraryLoader(ObjectID objectId, ObjectID outLoaderId);
         virtual void IGlobalSession_checkCompileTargetSupport(ObjectID objectId, SlangCompileTarget target);
         virtual void IGlobalSession_checkPassThroughSupport(ObjectID objectId, SlangPassThrough passThrough);
-        virtual void IGlobalSession_compileStdLib(ObjectID objectId, slang::CompileStdLibFlags flags);
-        virtual void IGlobalSession_loadStdLib(ObjectID objectId, const void* stdLib, size_t stdLibSizeInBytes);
-        virtual void IGlobalSession_saveStdLib(ObjectID objectId, SlangArchiveType archiveType, ObjectID outBlobId);
+        virtual void IGlobalSession_compileCoreModule(ObjectID objectId, slang::CompileStandardModulesFlags flags);
+        virtual void IGlobalSession_loadStandardModules(ObjectID objectId, const void* standardModules, size_t standardModulesSizeInBytes);
+        virtual void IGlobalSession_saveStandardModules(ObjectID objectId, SlangArchiveType archiveType, ObjectID outBlobId);
         virtual void IGlobalSession_findCapability(ObjectID objectId, char const* name);
         virtual void IGlobalSession_setDownstreamCompilerForTransition(ObjectID objectId, SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler);
         virtual void IGlobalSession_getDownstreamCompilerForTransition(ObjectID objectId, SlangCompileTarget source, SlangCompileTarget target);

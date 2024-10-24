@@ -342,7 +342,7 @@ void Session::writeStdlibDoc(String config)
     }
 }
 
-SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
+SlangResult Session::compileCoreModule(slang::CompileStandardModulesFlags compileFlags)
 {
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
@@ -369,7 +369,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     auto stdLibSrcBlob = StringBlob::moveCreate(stdLibSrcBuilder.produceString());
     addBuiltinSource(coreLanguageScope, "core", stdLibSrcBlob);
 
-    if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
+    if (compileFlags & slang::CompileStandardModulesFlag::WriteDocumentation)
     {
         // Load config file first.
         String configText;
@@ -393,7 +393,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     return SLANG_OK;
 }
 
-SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
+SlangResult Session::loadStandardModules(const void* standardModules, size_t standardModulesSizeInBytes)
 {
     SLANG_PROFILE;
 
@@ -407,7 +407,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
     // Make a file system to read it from
     ComPtr<ISlangFileSystemExt> fileSystem;
-    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(standardModules, standardModulesSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
@@ -416,7 +416,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     return SLANG_OK;
 }
 
-SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob)
+SlangResult Session::saveStandardModules(SlangArchiveType archiveType, ISlangBlob** outBlob)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.getCount() == 0)
     {

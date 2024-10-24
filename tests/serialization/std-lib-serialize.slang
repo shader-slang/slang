@@ -1,5 +1,5 @@
-//TEST:COMPILE: -save-stdlib slang-std-lib.zip
-//TEST:COMPARE_COMPUTE: -compile-arg -load-stdlib -compile-arg slang-std-lib.zip -shaderobj
+//TEST:COMPILE: -save-standard-modules slang-std-lib.zip
+//TEST:COMPARE_COMPUTE: -compile-arg -load-standard-modules -compile-arg slang-std-lib.zip -shaderobj
 
 struct A
 {
