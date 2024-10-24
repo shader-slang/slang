@@ -808,9 +808,9 @@ SlangReflectionFunction* tryConvertExprToFunctionReflection(ASTBuilder* astBuild
         auto declRef = declRefExpr->declRef;
         if (auto genericDeclRef = declRef.as<GenericDecl>())
         {
-            auto innerDeclRef = substituteDeclRef(
-                SubstitutionSet(genericDeclRef), astBuilder, genericDeclRef.getDecl()->inner);
-            declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, innerDeclRef);
+            auto innerDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, genericDeclRef.getDecl()->inner);
+            declRef = substituteDeclRef(
+                SubstitutionSet(genericDeclRef), astBuilder, innerDeclRef);
         }
 
         if (auto funcDeclRef = declRef.as<FunctionDeclBase>())

@@ -1418,6 +1418,19 @@ bool Linkage::isSpecialized(DeclRef<Decl> declRef)
     return false;
 }
 
+bool isFuncGeneric(DeclRef<Decl> declRef)
+{
+    if (auto funcDecl = as<FuncDecl>(declRef.getDecl()))
+    {
+        if (funcDecl->parentDecl && as<GenericDecl>(funcDecl->parentDecl))
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 DeclRef<Decl> Linkage::specializeWithArgTypes(
     Expr*               funcExpr,
     List<Type*>         argTypes,
@@ -1430,7 +1443,7 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     
     if (auto declRefFuncExpr = as<DeclRefExpr>(funcExpr))
     {
-        if (!isSpecialized(declRefFuncExpr->declRef))
+        if (isFuncGeneric(declRefFuncExpr->declRef) && !isSpecialized(declRefFuncExpr->declRef))
         {
             if (auto genericDeclRef = getGenericParentDeclRef(
                 getCurrentASTBuilder(),
@@ -1454,6 +1467,7 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
         //
         auto argExpr = getCurrentASTBuilder()->create<VarExpr>();
         argExpr->type = argType;
+        argExpr->type.isLeftValue = true;
         argExprs.add(argExpr);
     }
 
