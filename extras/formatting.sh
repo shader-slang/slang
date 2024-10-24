@@ -46,13 +46,29 @@ require_bin() {
   fi
 }
 
+require_bin() {
+  local name="$1"
+  local required="$2"
+  local version
+
+  if ! command -v "$name" &>/dev/null; then
+    echo "This script needs $name, but it isn't in \$PATH"
+    missing_bin=1
+    return
+  fi
+
+  version=$("$name" --version | grep -oP "\d+\.\d+\.?\d*" | head -n1)
+  if ! printf '%s\n%s\n' "$required" "$version" | sort -V -C; then
+    echo "$name version $version is too old. Version $required or newer is required."
+    missing_bin=1
+  fi
+}
+
 require_bin "git" "1.8"
+require_bin "xargs" "3"
+require_bin "diff" "2"
 require_bin "gersemi" "0.16.2"
 require_bin "clang-format" "18"
-
-if [ "${missing_bin:-}" = "1" ]; then
-  exit 1
-fi
 
 if [ "$missing_bin" ]; then
   exit 1
