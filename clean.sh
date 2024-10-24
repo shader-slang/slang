@@ -1,0 +1,1 @@
+../slang-ellie/clean.sh
