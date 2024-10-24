@@ -2,7 +2,7 @@ Slang Design and Implementation Notes
 =====================================
 
 This directory contains documents that are primarily intended for developers working on the Slang implementation.
-They are not indended to be helpful to Slang users.
+They are not intended to be helpful to Slang users.
 
 These documents can only be trusted to reflect the state of the codebase or the plans of their authors at the time they were written. Changes to the implementation are not expected to always come with matching changes to these documents, so some amount of drift is to be expected.
 
