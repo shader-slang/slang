@@ -3015,12 +3015,16 @@ struct SPIRVEmitContext
         if (!scope)
             return nullptr;
 
+        if (!m_mapIRInstToSpvInst.containsKey(debugVar))
+            return nullptr;
+
         IRBuilder builder(debugVar);
         builder.setInsertBefore(debugVar);
 
         auto name = getName(debugVar);
+        auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
+        auto debugType = emitDebugType(varType);
 
-        auto debugType = emitDebugType(debugVar->getDataType());
         auto spvDebugLocalVar = emitOpDebugLocalVariable(getSection(SpvLogicalSectionID::ConstantsAndTypes), nullptr, m_voidType, getNonSemanticDebugInfoExtInst(),
             name, debugType, debugVar->getSource(), debugVar->getLine(), debugVar->getCol(), scope,
             builder.getIntValue(builder.getUIntType(), 0), debugVar->getArgIndex());
@@ -3038,10 +3042,16 @@ struct SPIRVEmitContext
 
         IRBuilder builder(debugVar);
         builder.setInsertBefore(debugVar);
-
-        auto debugVarPtrType = builder.getPtrType(debugVar->getDataType(), AddressSpace::Function);
-        auto actualHelperVar = emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
-        return actualHelperVar;
+        auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
+        IRSizeAndAlignment sizeAlignment;
+        getNaturalSizeAndAlignment(this->m_targetRequest->getOptionSet(), varType, &sizeAlignment);
+        if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
+        {
+            auto debugVarPtrType = builder.getPtrType(varType, AddressSpace::Function);
+            auto actualHelperVar = emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
+            return actualHelperVar;
+        }
+        return nullptr;
     }
 
     // The instructions that appear inside the basic blocks of
@@ -6263,6 +6273,12 @@ struct SPIRVEmitContext
         // accesschain defined in the debug value inst.
         //
         IRBuilder builder(debugValue);
+
+        // If the root variable isn't representable as a normal spirv variable,
+        // don't emit anything for now.
+        auto rootVar = getRootAddr(debugValue->getDebugVar());
+        if (!m_mapIRInstToSpvInst.containsKey(rootVar))
+            return nullptr;
 
         List<SpvInst*> accessChain;
         auto type = unwrapAttributedType(debugValue->getDebugVar()->getDataType());
