@@ -53,6 +53,7 @@ CompileTargets::CompileTargets()
         MAKE_PAIR(HLSL),
         MAKE_PAIR(WGSL),
         MAKE_PAIR(SPIRV),
+        MAKE_PAIR(METAL),
     };
 }
 
