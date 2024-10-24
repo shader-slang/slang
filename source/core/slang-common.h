@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 #include <assert.h>
 

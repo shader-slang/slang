@@ -1,7 +1,7 @@
 #ifndef SLANG_FILE_SYSTEM_H_INCLUDED
 #define SLANG_FILE_SYSTEM_H_INCLUDED
 
-#include "../../include/slang.h"
+#include "slang.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 

@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_FREE_LIST_H
 #define SLANG_CORE_FREE_LIST_H
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 #include "slang-common.h"
 

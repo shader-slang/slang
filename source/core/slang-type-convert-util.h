@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_TYPE_CONVERT_UTIL_H
 #define SLANG_CORE_TYPE_CONVERT_UTIL_H
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 namespace Slang
 {
