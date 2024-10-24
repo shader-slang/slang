@@ -3049,6 +3049,7 @@ struct SPIRVEmitContext
         {
             auto debugVarPtrType = builder.getPtrType(varType, AddressSpace::Function);
             auto actualHelperVar = emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
+            maybeEmitPointerDecoration(actualHelperVar, debugVar);
             return actualHelperVar;
         }
         return nullptr;
@@ -4864,7 +4865,8 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_Var ? SpvDecorationAliasedPointer : SpvDecorationAliased)
+                    (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_Var || inst->getOp() == kIROp_DebugVar
+                        ? SpvDecorationAliasedPointer : SpvDecorationAliased)
                 );
             }
         }
