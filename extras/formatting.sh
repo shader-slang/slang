@@ -60,6 +60,7 @@ require_bin() {
 
 require_bin "git" "1.8"
 require_bin "gersemi" "0.17"
+require_bin "clang-format" "18"
 
 if [ "$missing_bin" ]; then
   exit 1
@@ -84,7 +85,32 @@ cmake_formatting() {
   fi
 }
 
+cpp_formatting() {
+  readarray -t files < <(git ls-files '*.cpp' '*.hpp' '*.c' '*.h')
+
+  if [ "$check_only" -eq 1 ]; then
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+
+    printf '%s\n' "${files[@]}" | xargs -P "$(nproc)" -I{} bash -c "
+      mkdir -p \"\$(dirname \"$tmpdir/{}\")\"
+      diff -u --color=always --label \"{}\" --label \"{}\" \"{}\" <(clang-format \"{}\") > \"$tmpdir/{}\" 
+      :
+    "
+
+    for file in "${files[@]}"; do
+      if [ -s "$tmpdir/$file" ]; then
+        cat "$tmpdir/$file"
+        exit_code=1
+      fi
+    done
+  else
+    printf '%s\n' "${files[@]}" | xargs -n1 -P "$(nproc)" clang-format -i
+  fi
+}
+
 cmake_formatting
+cpp_formatting
 
 exit $exit_code
-
