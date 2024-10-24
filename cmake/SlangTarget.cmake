@@ -232,7 +232,10 @@ function(slang_add_target dir type)
 
     if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
         foreach(link_framework ${ARG_LINK_WITH_FRAMEWORK})
-            target_link_libraries(${target} PRIVATE "-framework ${link_framework}")
+            target_link_libraries(
+                ${target}
+                PRIVATE "-framework ${link_framework}"
+            )
         endforeach()
     endif()
 
@@ -294,7 +297,10 @@ function(slang_add_target dir type)
                 PUBLIC "${ARG_EXPORT_MACRO_PREFIX}_STATIC"
             )
         else()
-            message(WARNING "unhandled case in slang_add_target while setting export macro")
+            message(
+                WARNING
+                "unhandled case in slang_add_target while setting export macro"
+            )
         endif()
     endif()
 
@@ -394,18 +400,10 @@ function(slang_add_target dir type)
         install(
             TARGETS ${target}
             EXPORT SlangTargets
-            ARCHIVE
-            DESTINATION ${archive_subdir}
-            ${ARGN}
-            LIBRARY
-            DESTINATION ${library_subdir}
-            ${ARGN}
-            RUNTIME
-            DESTINATION ${runtime_subdir}
-            ${ARGN}
-            PUBLIC_HEADER
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            ${ARGN}
+            ARCHIVE DESTINATION ${archive_subdir} ${ARGN}
+            LIBRARY DESTINATION ${library_subdir} ${ARGN}
+            RUNTIME DESTINATION ${runtime_subdir} ${ARGN}
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} ${ARGN}
         )
     endmacro()
     if(ARG_INSTALL)

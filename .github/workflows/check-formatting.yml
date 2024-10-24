@@ -1,0 +1,14 @@
+name: Check Formatting
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+jobs:
+  check-formatting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip3 install gersemi
+      - run: ./extras/formatting.sh --check-only
