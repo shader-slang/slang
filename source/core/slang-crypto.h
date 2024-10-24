@@ -1,5 +1,5 @@
 #pragma once
-#include "../../include/slang.h"
+#include "slang.h"
 #include "../core/slang-string.h"
 #include "../core/slang-blob.h"
 #include "../core/slang-list.h"

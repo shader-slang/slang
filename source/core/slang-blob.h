@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_BLOB_H
 #define SLANG_CORE_BLOB_H
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 #include "slang-string.h"
 #include "slang-list.h"

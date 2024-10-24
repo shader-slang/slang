@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_MEMORY_ARENA_H
 #define SLANG_CORE_MEMORY_ARENA_H
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 #include <stdlib.h>
 #include <string.h>

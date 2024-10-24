@@ -4,8 +4,9 @@
 #include "slang-common.h"
 #include "slang-hash.h"
 #include "slang-type-traits.h"
+#include "slang.h"
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 namespace Slang
 {
