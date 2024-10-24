@@ -2724,14 +2724,23 @@ struct SPIRVEmitContext
             auto spvBlock = emitOpLabel(spvFunc, irBlock);
             if (irBlock == irFunc->getFirstBlock())
             {
-                // OpVariable
+                // OpVariable and OpDebugVariable
                 // All variables used in the function must be declared before anything else.
                 for (auto block : irFunc->getBlocks())
                 {
                     for (auto inst : block->getChildren())
                     {
-                        if (as<IRVar>(inst))
+                        switch (inst->getOp())
+                        {
+                        case kIROp_Var:
                             emitLocalInst(spvBlock, inst);
+                            break;
+                        case kIROp_DebugVar:
+                            // Declare an ordinary local variable for debugDeclare association of a debug variable.
+                            // This variable is what we will actually write values to upon a `kIROp_DebugValue` inst.
+                            emitDebugVarBackingLocalVarDeclaration(spvBlock, as<IRDebugVar>(inst));
+                            break;
+                        }
                     }
                 }
                 // DebugInfo.
@@ -2991,6 +3000,48 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityInt64Atomics);
             break;
         }
+    }
+
+    SpvInst* emitDebugVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
+    {
+        // For every DebugVar, we will declare:
+        // - An OpDebugLocalVariable `spvDebugLocalVar`
+        // - An OpVariable `actualHelperVar`
+        // - An OpDebugDeclare to associate `spvDebugLocalVar` with `actualHelperVar`
+        // The `actualHelperVar` is used to update the actual value of the variable
+        // at each kIROp_DebugValue instruction.
+        //
+        auto scope = findDebugScope(debugVar);
+        if (!scope)
+            return nullptr;
+
+        IRBuilder builder(debugVar);
+        builder.setInsertBefore(debugVar);
+
+        auto name = getName(debugVar);
+
+        auto debugType = emitDebugType(debugVar->getDataType());
+        auto spvDebugLocalVar = emitOpDebugLocalVariable(getSection(SpvLogicalSectionID::ConstantsAndTypes), nullptr, m_voidType, getNonSemanticDebugInfoExtInst(),
+            name, debugType, debugVar->getSource(), debugVar->getLine(), debugVar->getCol(), scope,
+            builder.getIntValue(builder.getUIntType(), 0), debugVar->getArgIndex());
+        emitOpDebugDeclare(parent, nullptr, m_voidType, getNonSemanticDebugInfoExtInst(),
+            spvDebugLocalVar, debugVar, getDwarfExpr(), List<SpvInst*>());
+
+        return spvDebugLocalVar;
+    }
+
+    SpvInst* emitDebugVarBackingLocalVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
+    {
+        auto scope = findDebugScope(debugVar);
+        if (!scope)
+            return nullptr;
+
+        IRBuilder builder(debugVar);
+        builder.setInsertBefore(debugVar);
+
+        auto debugVarPtrType = builder.getPtrType(debugVar->getDataType(), AddressSpace::Function);
+        auto actualHelperVar = emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
+        return actualHelperVar;
     }
 
     // The instructions that appear inside the basic blocks of
@@ -3310,7 +3361,7 @@ struct SPIRVEmitContext
             result = emitDebugLine(parent, as<IRDebugLine>(inst));
             break;
         case kIROp_DebugVar:
-            result = emitDebugVar(parent, as<IRDebugVar>(inst));
+            result = emitDebugVarDeclaration(parent, as<IRDebugVar>(inst));
             break;
         case kIROp_DebugValue:
             result = emitDebugValue(parent, as<IRDebugValue>(inst));
@@ -6188,21 +6239,6 @@ struct SPIRVEmitContext
             debugLine->getColEnd());
     }
 
-    SpvInst* emitDebugVar(SpvInstParent* parent, IRDebugVar* debugVar)
-    {
-        SLANG_UNUSED(parent);
-        auto scope = findDebugScope(debugVar);
-        if (!scope)
-            return nullptr;
-        IRBuilder builder(debugVar);
-        auto name = getName(debugVar);
-        auto debugType = emitDebugType(debugVar->getDataType());
-        auto spvLocalVar = emitOpDebugLocalVariable(getSection(SpvLogicalSectionID::ConstantsAndTypes), debugVar, m_voidType, getNonSemanticDebugInfoExtInst(),
-            name, debugType, debugVar->getSource(), debugVar->getLine(), debugVar->getCol(), scope,
-            builder.getIntValue(builder.getUIntType(), 0), debugVar->getArgIndex());
-        return spvLocalVar;
-    }
-
     SpvInst* getDwarfExpr()
     {
         if (m_nullDwarfExpr)
@@ -6218,6 +6254,14 @@ struct SPIRVEmitContext
 
     SpvInst* emitDebugValue(SpvInstParent* parent, IRDebugValue* debugValue)
     {
+        // We are asked to update the value for a debug variable.
+        // A debug variable is already emited as a OpDebugVariable + 
+        // OpVariable + OpDebugDeclare. We only need to store the new value
+        // into the associated OpVariable. The `debugValue->getDebugVar()` inst
+        // already maps to the `OpVariable` SpvInst, so we just need to emit
+        // code for a store into the subset of the OpVariable with the correct
+        // accesschain defined in the debug value inst.
+        //
         IRBuilder builder(debugValue);
 
         List<SpvInst*> accessChain;
@@ -6256,8 +6300,13 @@ struct SPIRVEmitContext
                 accessChain.add(ensureInst(element));
             }
         }
-        return emitOpDebugValue(parent, debugValue, m_voidType, getNonSemanticDebugInfoExtInst(),
-            debugValue->getDebugVar(), debugValue->getValue(),  getDwarfExpr(), accessChain);
+        builder.setInsertBefore(debugValue);
+        auto ptrValueType = builder.getPtrType(
+            debugValue->getValue()->getDataType(),
+            AddressSpace::Function);
+        auto debugVarAccessChain = emitOpAccessChain(
+            parent, nullptr, ptrValueType, debugValue->getDebugVar(), accessChain);
+        return emitOpStore(parent, debugValue, debugVarAccessChain, debugValue->getValue());
     }
 
     IRInst* getName(IRInst* inst)
