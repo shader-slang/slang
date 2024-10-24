@@ -32,8 +32,8 @@ struct ParameterBlockTransposeInfo
 
     // The value with which a primal specific parameter should be replaced in propagate func.
     OrderedDictionary<IRInst*, IRInst*> mapPrimalSpecificParamToReplacementInPropFunc;
+    
     // The insts added that is specific for propagate functions and should be removed
-
     // from the future primal func.
     List<IRInst*> propagateFuncSpecificPrimalInsts;
 

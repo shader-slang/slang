@@ -9885,6 +9885,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         addVarDecorations(context, irParam, paramDecl);
                         subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                        irParam->sourceLoc = paramDecl->loc;
                     }
                     addParamNameHint(irParam, paramInfo);
 
@@ -9916,6 +9917,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     {
                         addVarDecorations(context, irParam, paramDecl);
                         subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                        irParam->sourceLoc = paramDecl->loc;
                     }
                     addParamNameHint(irParam, paramInfo);
                     paramVal = LoweredValInfo::simple(irParam);

@@ -331,6 +331,12 @@ case kIROp_##TYPE##Type:                                        \
     case kIROp_DefaultBufferLayoutType:
         *outSizeAndAlignment = IRSizeAndAlignment(0, 4);
         return SLANG_OK;
+    case kIROp_AttributedType:
+    {
+        auto attributedType = cast<IRAttributedType>(type);
+        SLANG_ASSERT(attributedType->getAttr()->getOp() == kIROp_NoDiffAttr); 
+        return getSizeAndAlignment(optionSet, rules, attributedType->getBaseType(), outSizeAndAlignment);
+    }
     default:
         break;
     }
