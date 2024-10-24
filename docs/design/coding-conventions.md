@@ -11,7 +11,7 @@ The first goal is to make the code look relatively consistent so that it is easy
 Having varying styles across different modules, files, functions, or lines of code makes the overall design and intention of the codebase harder to follow.
 
 The second goal is to minimize the scope complexity of diffs when multiple maintainers work together on the codebase.
-In the absence of an enforced style, developers tend to "clean up" code they encoutner to match their personal preferences, and in so doing create additional diffs that increase the chances of merge conflicts and pain down the line.
+In the absence of an enforced style, developers tend to "clean up" code they encounter to match their personal preferences, and in so doing create additional diffs that increase the chances of merge conflicts and pain down the line.
 
 Because the Slang codebase has passed through many hands and evolved without a pre-existing convention, these two goals can come into conflict.
 We encourage developers to err on the side of leaving well enough alone (favoring the second goal).
@@ -175,7 +175,7 @@ struct Vec1
 
 There is no hard limit on line length, but if you are going past 80-100 columns quite often, maybe think about breaking lines.
 
-When you decide to break lines for a paramter or argument list, always break after the opening `(`, and put each argument/parameter on its own line:
+When you decide to break lines for a parameter or argument list, always break after the opening `(`, and put each argument/parameter on its own line:
 
 ```c++
 float bigFunc(
@@ -400,14 +400,14 @@ enum
 
 ### General
 
-Names should default to the English language and US spellings, to match the dominant conventiosn of contemporary open-source projects.
+Names should default to the English language and US spellings, to match the dominant conventions of contemporary open-source projects.
 
 Function names should either be named with action verbs (`get`, `set`, `create`, `emit`, `parse`, etc.) or read as questions (`isEnabled`, `shouldEmit`, etc.).
 
 Whenever possible, compiler concepts should be named using the most widely-understood term available: e.g., we use `Token` over `Lexeme`, and `Lexer` over `Scanner` simply because they appear to be the more common names.
 
 Avoid abbreviations and initialisms unless they are already widely established across the codebase; a longer name may be cumbersome to write in the moment, but the code will probably be read many more times than it is written, so clarity should be preferred.
-An important exception to this is common compiler concepts or techqniues which may have laboriously long names: e.g., Static Single Assignment (SSA), Sparse Conditional Copy Propagation (SCCP), etc.
+An important exception to this is common compiler concepts or techniques which may have laboriously long names: e.g., Static Single Assignment (SSA), Sparse Conditional Copy Propagation (SCCP), etc.
 
 One gotcha particular to compiler front-ends is that almost every synonym for "type" has some kind of established technical meaning; most notably the term "kind" has a precise meaning that is relevant in our domain.
 It is common practice in C and C++ to define tagged union types with a selector field called a "type" or "kind," which does not usually match this technical definition.

@@ -145,7 +145,7 @@ RWTexture2D<float2> rwt2D_2;
 
 The format names used are the same as for [GLSL layout format types](https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)). If no format is specified Slang will *assume* that the format is the same as the type specified.
 
-Note that the format attribution is on variables/paramters/fields and not part of the type system. This means that if you have a scenario like...
+Note that the format attribution is on variables/parameters/fields and not part of the type system. This means that if you have a scenario like...
 
 ```
 [format(rg16f)]
