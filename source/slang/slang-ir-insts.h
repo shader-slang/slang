@@ -433,6 +433,7 @@ IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
 IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
 IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
+IR_SIMPLE_DECORATION(DownstreamModuleImportDecoration)
 
 struct IRAvailableInDownstreamIRDecoration : IRDecoration
 {
