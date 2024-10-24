@@ -6,6 +6,7 @@ namespace Slang
 {
 
 struct IRModule;
+class TargetRequest;
 
 /// This pass correct the scope of variables in loop regions
 ///

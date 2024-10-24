@@ -4,6 +4,7 @@
 #include "../../include/slang.h"
 
 #include "slang-allocator.h"
+#include "slang-list.h"
 #include <type_traits>
 
 namespace Slang

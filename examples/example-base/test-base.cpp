@@ -1,8 +1,11 @@
 #include "test-base.h"
 
 #ifdef _WIN32
-#include <windows.h>
-#include <shellapi.h>
+// clang-format off
+// include ordering sensitive
+#    include <windows.h>
+#    include <shellapi.h>
+// clang-format on
 #endif
 
 int TestBase::parseOption(int argc, char** argv)

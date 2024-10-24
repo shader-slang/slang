@@ -1,6 +1,7 @@
 #ifndef SLANG_CORE_MATH_H
 #define SLANG_CORE_MATH_H
 
+#include "slang.h"
 #include <cmath>
 
 namespace Slang

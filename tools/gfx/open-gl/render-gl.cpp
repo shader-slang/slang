@@ -34,9 +34,11 @@
 
 #pragma comment(lib, "opengl32")
 
-#include <GL/GL.h>
-#include "external/glext.h"
-#include "external/wglext.h"
+// clang-format off
+#    include <GL/GL.h>
+#    include "external/glext.h"
+#    include "external/wglext.h"
+// clang-format on
 
 // We define an "X-macro" for mapping over loadable OpenGL
 // extension entry point that we will use, so that we can
