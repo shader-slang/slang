@@ -757,13 +757,13 @@ SLANG_NO_THROW void SLANG_MCALL Session::getLanguagePrelude(
     ISlangBlob** outPrelude)
 {
     SourceLanguage sourceLanguage = SourceLanguage(inSourceLanguage);
-    SLANG_ASSERT(int(sourceLanguage) > int(SourceLanguage::Unknown) && int(sourceLanguage) < int(SourceLanguage::CountOf));
-
-    SLANG_ASSERT(sourceLanguage != SourceLanguage::Unknown);
 
     *outPrelude = nullptr;
     if (sourceLanguage != SourceLanguage::Unknown)
     {
+        SLANG_ASSERT(int(sourceLanguage) > int(SourceLanguage::Unknown) && int(sourceLanguage) < int(SourceLanguage::CountOf));
+        SLANG_ASSERT(sourceLanguage != SourceLanguage::Unknown);
+
         *outPrelude = Slang::StringUtil::createStringBlob(m_languagePreludes[int(sourceLanguage)]).detach();
     }
 }
