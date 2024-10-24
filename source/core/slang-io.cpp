@@ -15,9 +15,12 @@
 #include <sys/stat.h>
 
 #ifdef _WIN32
-#   include <direct.h>
-#   include <windows.h>
-#   include <shellapi.h>
+// clang-format off
+// include ordering sensitive
+#    include <windows.h>
+#    include <direct.h>
+#    include <shellapi.h>
+// clang-format on
 #endif
 
 #if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY || SLANG_WASM

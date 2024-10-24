@@ -37,26 +37,33 @@
 // generate code on Windows.
 #if SLANG_ENABLE_DXIL_SUPPORT
 
-#   ifdef _WIN32
-#       include <windows.h>
-#       include <unknwn.h>
-#       include "../../external/dxc/dxcapi.h"
-#   else
-#       include "../../external/dxc/dxcapi.h"
+#    ifdef _WIN32
+#        include <unknwn.h>
+#        include <windows.h>
+#    endif
 
-#       ifdef __uuidof
-            // DXC's WinAdapter.h defines __uuidof(T) over types, but the existing
-            // usage in this file is over values (both are accepted on MSVC.)
-            // We also need to decay through Slang::ComPtr, hence the helper struct
-            template <typename T>
-            struct StripSlangComPtr { using type = T; };
-            template <typename T>
-            struct StripSlangComPtr<Slang::ComPtr<T>> { using type = T; };
-#           undef __uuidof
-#           define __uuidof(x) __emulated_uuidof<StripSlangComPtr<std::decay_t<decltype(x)>>::type>()
-#       endif
-#   endif
+#    include "../../external/dxc/dxcapi.h"
 
+#    ifndef _WIN32
+#        ifdef __uuidof
+// DXC's WinAdapter.h defines __uuidof(T) over types, but the existing
+// usage in this file is over values (both are accepted on MSVC.)
+// We also need to decay through Slang::ComPtr, hence the helper struct
+template<typename T>
+struct StripSlangComPtr
+{
+    using type = T;
+};
+template<typename T>
+struct StripSlangComPtr<Slang::ComPtr<T>>
+{
+    using type = T;
+};
+#            undef __uuidof
+#            define __uuidof(x) \
+                __emulated_uuidof<StripSlangComPtr<std::decay_t<decltype(x)>>::type>()
+#        endif
+#    endif
 #endif
 
 namespace Slang
