@@ -3,7 +3,7 @@
 #
 # This is an executable target because emcmake produces .a files without bindings if you just create a static library
 # https://stackoverflow.com/questions/63622009/static-library-built-with-cmake-as-a-with-emscripten-instead-of-wasm-js
-if (EMSCRIPTEN)
+if(EMSCRIPTEN)
     slang_add_target(
         .
         EXECUTABLE

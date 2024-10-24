@@ -1,10 +1,10 @@
-//TEST:SIMPLE: -entry main -target exe -pass-through c 
+// TEST:SIMPLE: -entry main -target exe -pass-through c
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(int argc, char** argv)
 {
     printf("Hello World!\n");
-	return 0;
+    return 0;
 }
