@@ -16,14 +16,14 @@ struct CPUTextureBaseShapeInfo
     int32_t implicitArrayElementCount;
 };
 
-static const CPUTextureBaseShapeInfo kCPUTextureBaseShapeInfos[(int)ITextureResource::Type::_Count] =
-{
-    /* Unknown */       { 0, 0, 0 },
-    /* Buffer */        { 1, 1, 1 },
-    /* Texture1D */     { 1, 1, 1 },
-    /* Texture2D */     { 2, 2, 1 },
-    /* Texture3D */     { 3, 3, 1 },
-    /* TextureCube */   { 2, 3, 6 },
+static const CPUTextureBaseShapeInfo
+    kCPUTextureBaseShapeInfos[(int)ITextureResource::Type::_Count] = {
+        /* Unknown */ {0, 0, 0},
+        /* Buffer */ {1, 1, 1},
+        /* Texture1D */ {1, 1, 1},
+        /* Texture2D */ {2, 2, 1},
+        /* Texture3D */ {3, 3, 1},
+        /* TextureCube */ {2, 3, 6},
 };
 
 static CPUTextureBaseShapeInfo const* _getBaseShapeInfo(ITextureResource::Type baseShape);
@@ -82,7 +82,10 @@ struct CPUFormatInfoMap
         auto& info = m_infos[Index(format)];
         info.unpackFunc = func;
     }
-    SLANG_FORCE_INLINE const CPUTextureFormatInfo& get(Format format) const { return m_infos[Index(format)]; }
+    SLANG_FORCE_INLINE const CPUTextureFormatInfo& get(Format format) const
+    {
+        return m_infos[Index(format)];
+    }
 
     CPUTextureFormatInfo m_infos[Index(Format::_Count)];
 };
@@ -97,12 +100,16 @@ static CPUTextureFormatInfo const* _getFormatInfo(Format format)
 
 class TextureResourceImpl : public TextureResource
 {
-    enum { kMaxRank = 3 };
+    enum
+    {
+        kMaxRank = 3
+    };
 
 public:
     TextureResourceImpl(const TextureResource::Desc& desc)
         : TextureResource(desc)
-    {}
+    {
+    }
     ~TextureResourceImpl();
 
     Result init(ITextureResource::SubresourceData const* initData);
@@ -119,11 +126,11 @@ public:
     struct MipLevel
     {
         int32_t extents[kMaxRank];
-        int64_t strides[kMaxRank+1];
+        int64_t strides[kMaxRank + 1];
         int64_t offset;
     };
-    List<MipLevel>  m_mipLevels;
-    void*           m_data = nullptr;
+    List<MipLevel> m_mipLevels;
+    void* m_data = nullptr;
 };
 
 } // namespace cpu

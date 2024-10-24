@@ -14,7 +14,8 @@ struct SearchDirectory
     SearchDirectory(SearchDirectory const& other) = default;
     SearchDirectory(String const& path)
         : path(path)
-    {}
+    {
+    }
     SearchDirectory& operator=(SearchDirectory const& other) = default;
 
     String path;
@@ -24,42 +25,60 @@ struct SearchDirectory
 struct SearchDirectoryList
 {
     // A parent list that should also be searched
-    SearchDirectoryList*    parent = nullptr;
+    SearchDirectoryList* parent = nullptr;
 
     // Directories to be searched
-    List<SearchDirectory>   searchDirectories;
+    List<SearchDirectory> searchDirectories;
 };
 
-/* A helper class that builds basic include handling on top of searchDirectories/fileSystemExt and optionally a sourceManager */
+/* A helper class that builds basic include handling on top of searchDirectories/fileSystemExt and
+ * optionally a sourceManager */
 struct IncludeSystem
 {
-    SlangResult findFile(const String& pathToInclude, const String& pathIncludedFrom, PathInfo& outPathInfo);
-    SlangResult findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& outPathInfo);
+    SlangResult findFile(
+        const String& pathToInclude,
+        const String& pathIncludedFrom,
+        PathInfo& outPathInfo);
+    SlangResult findFile(
+        SlangPathType fromPathType,
+        const String& fromPath,
+        const String& path,
+        PathInfo& outPathInfo);
     String simplifyPath(const String& path);
-    SlangResult loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>& outBlob, SourceFile*& outSourceFile);
+    SlangResult loadFile(
+        const PathInfo& pathInfo,
+        ComPtr<ISlangBlob>& outBlob,
+        SourceFile*& outSourceFile);
     inline SlangResult loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>& outBlob)
     {
         SourceFile* sourceFile;
         return loadFile(pathInfo, outBlob, sourceFile);
     }
 
-    SlangResult findAndLoadFile(const String& pathToInclude, const String& pathIncludedFrom, PathInfo& outPathInfo, ComPtr<ISlangBlob>& outBlob);
+    SlangResult findAndLoadFile(
+        const String& pathToInclude,
+        const String& pathIncludedFrom,
+        PathInfo& outPathInfo,
+        ComPtr<ISlangBlob>& outBlob);
 
     SearchDirectoryList* getSearchDirectoryList() const { return m_searchDirectories; }
     ISlangFileSystemExt* getFileSystem() const { return m_fileSystemExt; }
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
-        /// Ctor
+    /// Ctor
     IncludeSystem() = default;
-    IncludeSystem(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager = nullptr);
+    IncludeSystem(
+        SearchDirectoryList* searchDirectories,
+        ISlangFileSystemExt* fileSystemExt,
+        SourceManager* sourceManager = nullptr);
 
 protected:
-    
     SearchDirectoryList* m_searchDirectories;
     ISlangFileSystemExt* m_fileSystemExt;
-    SourceManager* m_sourceManager;                 ///< If not set, will not look up the content in the source manager
+    SourceManager*
+        m_sourceManager; ///< If not set, will not look up the content in the source manager
 };
 
-}
+} // namespace Slang
 
-#endif  // SLANG_INCLUDE_HANDLER_H
+#endif // SLANG_INCLUDE_HANDLER_H

@@ -1,7 +1,8 @@
 
 #include "slang-memory-arena.h"
 
-namespace Slang {
+namespace Slang
+{
 
 MemoryArena::MemoryArena()
 {
@@ -34,13 +35,13 @@ void MemoryArena::init(size_t blockPayloadSize, size_t blockAlignment)
     reset();
     _initialize(blockPayloadSize, blockAlignment);
 }
-  
+
 void MemoryArena::_initialize(size_t blockPayloadSize, size_t alignment)
 {
     // Alignment must be a power of 2
     assert(((alignment - 1) & alignment) == 0);
 
-    // Ensure it's alignment is at least kMinAlignment 
+    // Ensure it's alignment is at least kMinAlignment
     alignment = (alignment < kMinAlignment) ? kMinAlignment : alignment;
 
     const size_t alignMask = alignment - 1;
@@ -52,12 +53,13 @@ void MemoryArena::_initialize(size_t blockPayloadSize, size_t alignment)
 
     // If alignment required is larger then the backing allocators then
     // make larger to ensure when alignment correction takes place it will be aligned
-    const size_t blockAllocSize = (alignment > kMinAlignment) ? (blockPayloadSize + alignment) : blockPayloadSize;
-    
+    const size_t blockAllocSize =
+        (alignment > kMinAlignment) ? (blockPayloadSize + alignment) : blockPayloadSize;
+
     m_blockAllocSize = blockAllocSize;
     m_blockAlignment = alignment;
     m_availableBlocks = nullptr;
-    
+
     m_blockFreeList.init(sizeof(Block), sizeof(void*), 16);
 
     _resetCurrentBlock();
@@ -137,9 +139,11 @@ void MemoryArena::_deallocateBlocks(Block* start)
 
 bool MemoryArena::_isNormalBlock(Block* block)
 {
-    // The size of the block in total is from m_alloc to the m_end (ie the size that is passed into _newBlock)
+    // The size of the block in total is from m_alloc to the m_end (ie the size that is passed into
+    // _newBlock)
     const size_t blockSize = size_t(block->m_end - block->m_alloc);
-    return (blockSize == m_blockAllocSize) && ((size_t(block->m_start) & (m_blockAlignment - 1)) == 0);
+    return (blockSize == m_blockAllocSize) &&
+           ((size_t(block->m_start) & (m_blockAlignment - 1)) == 0);
 }
 
 void MemoryArena::_deallocateBlock(Block* block)
@@ -169,7 +173,7 @@ void MemoryArena::deallocateAll()
         _deallocateBlock(block);
         block = next;
     }
-    
+
     // Reset current block
     _resetCurrentBlock();
 }
@@ -341,14 +345,17 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
     // There are two scenarios
     // a) Allocate a new normal block and make current
     // b) Allocate a new 'odd-sized' block and make current
-    // 
-    // That by always allocating a new block if odd-sized, we lose more efficiency in terms of storage (the previous block
-    // may not have been used much). BUT doing so makes it easy to rewind - as the blocks are always in order of allocation.
     //
-    // An improvement might be to have some abstraction that sits on top that can do this tracking (or have the blocks
-    // themselves record if they alias over a previously used block - but we don't bother with this here.
-    // If the alignment is greater than regular alignment we need to handle specially
-    if (allocSize > m_blockPayloadSize || (alignment > m_blockAlignment && allocSize + alignment > m_blockPayloadSize)) 
+    // That by always allocating a new block if odd-sized, we lose more efficiency in terms of
+    // storage (the previous block may not have been used much). BUT doing so makes it easy to
+    // rewind - as the blocks are always in order of allocation.
+    //
+    // An improvement might be to have some abstraction that sits on top that can do this tracking
+    // (or have the blocks themselves record if they alias over a previously used block - but we
+    // don't bother with this here. If the alignment is greater than regular alignment we need to
+    // handle specially
+    if (allocSize > m_blockPayloadSize ||
+        (alignment > m_blockAlignment && allocSize + alignment > m_blockPayloadSize))
     {
         // This is an odd-sized block so just allocate the whole thing.
         block = _newBlock(allocSize, alignment);
@@ -366,10 +373,10 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
         return nullptr;
     }
 
-    // Make the current block 
+    // Make the current block
     _addCurrentBlock(block);
 
-    // Align the memory    
+    // Align the memory
     uint8_t* memory = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
 
     // It must be aligned
@@ -413,14 +420,14 @@ void MemoryArena::_rewindToCursor(const void* cursorIn)
         deallocateAll();
         return;
     }
-   
+
     // Find the block that contains the allocation
     Block* cursorBlock = _findNonCurrent(cursorIn);
     assert(cursorBlock);
     if (!cursorBlock)
     {
         // If not found it means this address is NOT part any of the active used heap!
-        // Probably an invalid cursor 
+        // Probably an invalid cursor
         return;
     }
 
@@ -436,7 +443,7 @@ void MemoryArena::_rewindToCursor(const void* cursorIn)
     }
 
     // The cursor block is now the current block
-    m_usedBlocks = cursorBlock; 
+    m_usedBlocks = cursorBlock;
     _setCurrentBlock(cursorBlock);
 
     const uint8_t* cursor = (const uint8_t*)cursorIn;
@@ -450,13 +457,12 @@ void MemoryArena::_rewindToCursor(const void* cursorIn)
 size_t MemoryArena::calcTotalMemoryUsed() const
 {
     return (m_usedBlocks ? _calcBlocksUsedMemory(m_usedBlocks->m_next) : 0) +
-        size_t(m_current - m_start);
+           size_t(m_current - m_start);
 }
 
 size_t MemoryArena::calcTotalMemoryAllocated() const
 {
-    return _calcBlocksAllocatedMemory(m_usedBlocks) +
-        _calcBlocksAllocatedMemory(m_availableBlocks);
+    return _calcBlocksAllocatedMemory(m_usedBlocks) + _calcBlocksAllocatedMemory(m_availableBlocks);
 }
 
 

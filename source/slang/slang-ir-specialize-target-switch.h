@@ -3,14 +3,14 @@
 
 namespace Slang
 {
-    struct IRModule;
-    class TargetRequest;
-    class DiagnosticSink;
+struct IRModule;
+class TargetRequest;
+class DiagnosticSink;
 
-    // Repalce all target_switch insts with the case that matches current target.
-    //
-    void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticSink* sink);
+// Repalce all target_switch insts with the case that matches current target.
+//
+void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticSink* sink);
 
-}
+} // namespace Slang
 
 #endif

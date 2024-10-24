@@ -1,17 +1,17 @@
 // slang-command-line.cpp
 #include "slang-command-line.h"
 
+#include "slang-com-helper.h"
 #include "slang-process.h"
-
-#include "slang-string.h"
 #include "slang-string-escape-util.h"
 #include "slang-string-util.h"
+#include "slang-string.h"
 
-#include "slang-com-helper.h"
+namespace Slang
+{
 
-namespace Slang {
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExecutableLocation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExecutableLocation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ */
 
 void ExecutableLocation::set(const String& dir, const String& name)
 {

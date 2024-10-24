@@ -13,7 +13,8 @@ using namespace Slang;
 struct Submitter
 {
     virtual void setRootConstantBufferView(
-        int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
+        int index,
+        D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
     virtual void setRootUAV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
     virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
     virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
@@ -28,12 +29,12 @@ struct Submitter
 
 struct GraphicsSubmitter : public Submitter
 {
-    virtual void setRootConstantBufferView(
-        int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override;
+    virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation)
+        override;
     virtual void setRootUAV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override;
     virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override;
-    virtual void setRootDescriptorTable(
-        int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override;
+    virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor)
+        override;
     virtual void setRootSignature(ID3D12RootSignature* rootSignature) override;
     virtual void setRootConstants(
         Index rootParamIndex,
@@ -44,19 +45,20 @@ struct GraphicsSubmitter : public Submitter
 
     GraphicsSubmitter(ID3D12GraphicsCommandList* commandList)
         : m_commandList(commandList)
-    {}
+    {
+    }
 
     ID3D12GraphicsCommandList* m_commandList;
 };
 
 struct ComputeSubmitter : public Submitter
 {
-    virtual void setRootConstantBufferView(
-        int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override;
+    virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation)
+        override;
     virtual void setRootUAV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override;
     virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override;
-    virtual void setRootDescriptorTable(
-        int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override;
+    virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor)
+        override;
     virtual void setRootSignature(ID3D12RootSignature* rootSignature) override;
     virtual void setRootConstants(
         Index rootParamIndex,
@@ -66,7 +68,8 @@ struct ComputeSubmitter : public Submitter
     virtual void setPipelineState(PipelineStateBase* pipeline) override;
     ComputeSubmitter(ID3D12GraphicsCommandList* commandList)
         : m_commandList(commandList)
-    {}
+    {
+    }
 
     ID3D12GraphicsCommandList* m_commandList;
 };

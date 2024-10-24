@@ -1,27 +1,27 @@
 #include "macro-writer.h"
 
-#include "slang-com-helper.h"
-
 #include "../../source/core/slang-list.h"
 #include "../../source/core/slang-string.h"
-//#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-io.h"
-
-#include "../../source/core/slang-writer.h"
-
+#include "slang-com-helper.h"
+// #include "../../source/core/slang-string-util.h"
 #include "../../source/compiler-core/slang-diagnostic-sink.h"
-//#include "../../source/compiler-core/slang-name.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-writer.h"
+// #include "../../source/compiler-core/slang-name.h"
 
 #include "diagnostics.h"
-#include "options.h"
-#include "node-tree.h"
 #include "file-util.h"
+#include "node-tree.h"
+#include "options.h"
 
 namespace CppExtract
 {
 using namespace Slang;
 
-SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out) { return FileUtil::indent(indentCount, out); }
+SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out)
+{
+    return FileUtil::indent(indentCount, out);
+}
 
 SlangResult MacroWriter::calcDef(NodeTree* tree, SourceOrigin* origin, StringBuilder& out)
 {
@@ -31,12 +31,14 @@ SlangResult MacroWriter::calcDef(NodeTree* tree, SourceOrigin* origin, StringBui
         {
             if (auto classLikeNode = as<ClassLikeNode>(node))
             {
-                if (classLikeNode->m_marker.getContent().indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
+                if (classLikeNode->m_marker.getContent().indexOf(
+                        UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
                 {
                     out << "ABSTRACT_";
                 }
 
-                out << "SYNTAX_CLASS(" << node->m_name.getContent() << ", " << classLikeNode->m_super.getContent() << ")\n";
+                out << "SYNTAX_CLASS(" << node->m_name.getContent() << ", "
+                    << classLikeNode->m_super.getContent() << ")\n";
                 out << "END_SYNTAX_CLASS()\n\n";
             }
         }
@@ -55,23 +57,24 @@ SlangResult MacroWriter::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, St
     List<ClassLikeNode*> classNodes;
     for (Index i = 0; i < baseTypes.getCount(); ++i)
     {
-        ClassLikeNode* baseType = baseTypes[i];        
+        ClassLikeNode* baseType = baseTypes[i];
         baseType->calcDerivedDepthFirst(classNodes);
     }
 
-    //Node::filter(Node::isClassLike, nodes);
+    // Node::filter(Node::isClassLike, nodes);
 
     List<ClassLikeNode*> derivedTypes;
 
     out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHILDREN !!!!!!!!!!!!!!!!!!!!!!!!!!!! */ \n\n";
 
-    // Now the children 
+    // Now the children
     for (ClassLikeNode* classNode : classNodes)
     {
         classNode->getReflectedDerivedTypes(derivedTypes);
 
         // Define the derived types
-        out << "#define " << m_options->m_markPrefix << "CHILDREN_" << reflectTypeName << "_"  << classNode->m_name.getContent() << "(x, param)";
+        out << "#define " << m_options->m_markPrefix << "CHILDREN_" << reflectTypeName << "_"
+            << classNode->m_name.getContent() << "(x, param)";
 
         if (derivedTypes.getCount())
         {
@@ -80,12 +83,13 @@ SlangResult MacroWriter::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, St
             {
                 Node* derivedType = derivedTypes[j];
                 _indent(1, out);
-                out << m_options->m_markPrefix << "ALL_" << reflectTypeName << "_" << derivedType->m_name.getContent() << "(x, param)";
+                out << m_options->m_markPrefix << "ALL_" << reflectTypeName << "_"
+                    << derivedType->m_name.getContent() << "(x, param)";
                 if (j < derivedTypes.getCount() - 1)
                 {
                     out << "\\\n";
                 }
-            }    
+            }
         }
         out << "\n\n";
     }
@@ -95,16 +99,19 @@ SlangResult MacroWriter::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, St
     for (ClassLikeNode* classNode : classNodes)
     {
         // Define the derived types
-        out << "#define " << m_options->m_markPrefix << "ALL_" << reflectTypeName << "_" << classNode->m_name.getContent() << "(x, param) \\\n";
+        out << "#define " << m_options->m_markPrefix << "ALL_" << reflectTypeName << "_"
+            << classNode->m_name.getContent() << "(x, param) \\\n";
         _indent(1, out);
-        out << m_options->m_markPrefix << reflectTypeName << "_"  << classNode->m_name.getContent() << "(x, param)";
+        out << m_options->m_markPrefix << reflectTypeName << "_" << classNode->m_name.getContent()
+            << "(x, param)";
 
         // If has derived types output them
         if (classNode->hasReflectedDerivedType())
         {
             out << " \\\n";
             _indent(1, out);
-            out << m_options->m_markPrefix << "CHILDREN_" << reflectTypeName << "_" << classNode->m_name.getContent() << "(x, param)";
+            out << m_options->m_markPrefix << "CHILDREN_" << reflectTypeName << "_"
+                << classNode->m_name.getContent() << "(x, param)";
         }
         out << "\n\n";
     }
@@ -116,7 +123,8 @@ SlangResult MacroWriter::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, St
         for (ClassLikeNode* classNode : classNodes)
         {
             // Define the derived types
-            out << "#define " << m_options->m_markPrefix << "FIELDS_" << reflectTypeName << "_" << classNode->m_name.getContent() << "(_x_, _param_)";
+            out << "#define " << m_options->m_markPrefix << "FIELDS_" << reflectTypeName << "_"
+                << classNode->m_name.getContent() << "(_x_, _param_)";
 
             // Find all of the instance fields fields
             List<FieldNode*> fields;
@@ -137,10 +145,10 @@ SlangResult MacroWriter::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, St
 
                 const Index fieldsCount = fields.getCount();
                 bool previousField = false;
-                for (Index j = 0; j < fieldsCount; ++j) 
+                for (Index j = 0; j < fieldsCount; ++j)
                 {
                     const FieldNode* field = fields[j];
-                        
+
                     if (field->isReflected())
                     {
                         if (previousField)
@@ -150,14 +158,15 @@ SlangResult MacroWriter::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, St
 
                         _indent(1, out);
 
-                        // NOTE! We put the type field in brackets, such that there is no issue with templates containing a comma.
-                        // If stringified
-                        out << "_x_(" << field->m_name.getContent() << ", (" << field->m_fieldType << "), _param_)";
+                        // NOTE! We put the type field in brackets, such that there is no issue with
+                        // templates containing a comma. If stringified
+                        out << "_x_(" << field->m_name.getContent() << ", (" << field->m_fieldType
+                            << "), _param_)";
                         previousField = true;
                     }
                 }
             }
-                
+
             out << "\n\n";
         }
     }
@@ -172,8 +181,9 @@ SlangResult MacroWriter::calcOriginHeader(NodeTree* tree, StringBuilder& out)
     out << "// Origin macros\n\n";
 
     for (SourceOrigin* origin : tree->getSourceOrigins())
-    {   
-        out << "#define " << m_options->m_markPrefix << "ORIGIN_" << origin->m_macroOrigin << "(x, param) \\\n";
+    {
+        out << "#define " << m_options->m_markPrefix << "ORIGIN_" << origin->m_macroOrigin
+            << "(x, param) \\\n";
 
         for (Node* node : origin->m_nodes)
         {
@@ -279,14 +289,17 @@ SlangResult MacroWriter::calcTypeHeader(NodeTree* tree, TypeSet* typeSet, String
         out << "// SUPER - is the super class name (or NO_SUPER)\n";
         out << "// ORIGIN - where the definition was found\n";
         out << "// LAST - is the class name for the last in the range (or NO_LAST)\n";
-        out << "// MARKER - is the text inbetween in the prefix/postix (like ABSTRACT). If no inbetween text is is 'NONE'\n";
-        out << "// TYPE - Can be BASE, INNER or LEAF for the overall base class, an INNER class, or a LEAF class\n";
+        out << "// MARKER - is the text inbetween in the prefix/postix (like ABSTRACT). If no "
+               "inbetween text is is 'NONE'\n";
+        out << "// TYPE - Can be BASE, INNER or LEAF for the overall base class, an INNER class, "
+               "or a LEAF class\n";
         out << "// param is a user defined parameter that can be parsed to the invoked x macro\n\n";
 
         // Output all of the definitions for each type
         for (ClassLikeNode* node : nodes)
         {
-            out << "#define " << m_options->m_markPrefix <<  reflectTypeName << "_" << node->m_name.getContent() << "(x, param) ";
+            out << "#define " << m_options->m_markPrefix << reflectTypeName << "_"
+                << node->m_name.getContent() << "(x, param) ";
 
             // Output the X macro part
             _indent(1, out);
@@ -319,9 +332,12 @@ SlangResult MacroWriter::calcTypeHeader(NodeTree* tree, TypeSet* typeSet, String
             // Output any specifics of the markup
             UnownedStringSlice marker = node->m_marker.getContent();
             // Need to extract the name
-            if (marker.getLength() > m_options->m_markPrefix.getLength() + m_options->m_markSuffix.getLength())
+            if (marker.getLength() >
+                m_options->m_markPrefix.getLength() + m_options->m_markSuffix.getLength())
             {
-                marker = UnownedStringSlice(marker.begin() + m_options->m_markPrefix.getLength(), marker.end() - m_options->m_markSuffix.getLength());
+                marker = UnownedStringSlice(
+                    marker.begin() + m_options->m_markPrefix.getLength(),
+                    marker.end() - m_options->m_markSuffix.getLength());
             }
             else
             {
@@ -417,7 +433,8 @@ SlangResult MacroWriter::writeOutput(NodeTree* tree)
 
             StringBuilder headerPath;
             headerPath << path << "-" << typeSet->m_fileMark << "." << ext;
-            SLANG_RETURN_ON_FAIL(FileUtil::writeAllText(headerPath, m_sink, header.getUnownedSlice()));
+            SLANG_RETURN_ON_FAIL(
+                FileUtil::writeAllText(headerPath, m_sink, header.getUnownedSlice()));
         }
 
         {
@@ -426,7 +443,8 @@ SlangResult MacroWriter::writeOutput(NodeTree* tree)
 
             StringBuilder headerPath;
             headerPath << path << "-" << typeSet->m_fileMark << "-macro." + ext;
-            SLANG_RETURN_ON_FAIL(FileUtil::writeAllText(headerPath, m_sink, childrenHeader.getUnownedSlice()));
+            SLANG_RETURN_ON_FAIL(
+                FileUtil::writeAllText(headerPath, m_sink, childrenHeader.getUnownedSlice()));
         }
     }
 
@@ -434,4 +452,3 @@ SlangResult MacroWriter::writeOutput(NodeTree* tree)
 }
 
 } // namespace CppExtract
-

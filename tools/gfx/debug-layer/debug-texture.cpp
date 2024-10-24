@@ -39,7 +39,10 @@ Result DebugTextureResource::setDebugName(const char* name)
     return baseObject->setDebugName(name);
 }
 
-const char* DebugTextureResource::getDebugName() { return baseObject->getDebugName(); }
+const char* DebugTextureResource::getDebugName()
+{
+    return baseObject->getDebugName();
+}
 
 } // namespace debug
 } // namespace gfx

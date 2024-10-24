@@ -17,22 +17,21 @@ using namespace Slang;
 #define MAIN main
 #endif
 
-static void _diagnosticCallback(
-    char const* message,
-    void*       /*userData*/)
+static void _diagnosticCallback(char const* message, void* /*userData*/)
 {
     auto stdError = StdWriters::getError();
     stdError.put(message);
     stdError.flush();
 }
 
-static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char*const* argv)
+static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char* const* argv)
 {
     spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
     spSetCommandLineCompilerMode(compileRequest);
 
     char const* appName = "slangc";
-    if (argc > 0) appName = argv[0];
+    if (argc > 0)
+        appName = argv[0];
 
     {
         const SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
@@ -49,10 +48,12 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     try
 #endif
     {
-        // Run the compiler (this will produce any diagnostics through SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
+        // Run the compiler (this will produce any diagnostics through
+        // SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
         res = spCompile(compileRequest);
         // If the compilation failed, then get out of here...
-        // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
+        // Turn into an internal Result -> such that return code can be used to vary result to match
+        // previous behavior
         res = SLANG_FAILED(res) ? SLANG_E_INTERNAL_FAIL : res;
     }
 #ifndef _DEBUG
@@ -76,7 +77,11 @@ bool shouldEmbedPrelude(const char* const* argv, int argc)
     return false;
 }
 
-SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char*const* argv)
+SLANG_TEST_TOOL_API SlangResult innerMain(
+    StdWriters* stdWriters,
+    slang::IGlobalSession* sharedSession,
+    int argc,
+    const char* const* argv)
 {
     StdWriters::setSingleton(stdWriters);
 
@@ -85,10 +90,12 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobal
 
     // The sharedSession always has a pre-loaded core module, is sharedSession is not nullptr.
     // This differed test checks if the command line has an option to setup the core module.
-    // If so we *don't* use the sharedSession, and create a new session without the core module just for this compilation. 
+    // If so we *don't* use the sharedSession, and create a new session without the core module just
+    // for this compilation.
     if (TestToolUtil::hasDeferredCoreModule(Index(argc - 1), argv + 1))
     {
-        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, session.writeRef()));
+        SLANG_RETURN_ON_FAIL(
+            slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, session.writeRef()));
     }
     else if (!session)
     {
@@ -126,17 +133,17 @@ int wmain(int argc, wchar_t** argv)
         // since that is what Slang expects on the API side.
 
         List<String> args;
-        for(int ii = 0; ii < argc; ++ii)
+        for (int ii = 0; ii < argc; ++ii)
         {
             args.add(String::fromWString(argv[ii]));
         }
         List<char const*> argBuffers;
-        for(int ii = 0; ii < argc; ++ii)
+        for (int ii = 0; ii < argc; ++ii)
         {
             argBuffers.add(args[ii].getBuffer());
         }
 
-        result = MAIN(argc, (char**) &argBuffers[0]);
+        result = MAIN(argc, (char**)&argBuffers[0]);
     }
 
 #ifdef _MSC_VER

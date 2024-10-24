@@ -26,9 +26,9 @@ public:
 
 public:
     ResourceViewImpl(ViewType viewType, DeviceImpl* device)
-        : m_type(viewType)
-        , m_device(device)
-    {}
+        : m_type(viewType), m_device(device)
+    {
+    }
     ViewType m_type;
     RefPtr<DeviceImpl> m_device;
 };
@@ -38,7 +38,8 @@ class TextureResourceViewImpl : public ResourceViewImpl
 public:
     TextureResourceViewImpl(DeviceImpl* device)
         : ResourceViewImpl(ViewType::Texture, device)
-    {}
+    {
+    }
     ~TextureResourceViewImpl();
     RefPtr<TextureResourceImpl> m_texture;
     NS::SharedPtr<MTL::Texture> m_textureView;
@@ -51,7 +52,8 @@ class BufferResourceViewImpl : public ResourceViewImpl
 public:
     BufferResourceViewImpl(DeviceImpl* device)
         : ResourceViewImpl(ViewType::Buffer, device)
-    {}
+    {
+    }
     ~BufferResourceViewImpl();
     RefPtr<BufferResourceImpl> m_buffer;
     Offset m_offset;

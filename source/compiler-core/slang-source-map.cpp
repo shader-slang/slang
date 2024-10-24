@@ -1,6 +1,7 @@
 #include "slang-source-map.h"
 
-namespace Slang {
+namespace Slang
+{
 
 void SourceMap::clear()
 {
@@ -35,7 +36,10 @@ void SourceMap::swapWith(ThisType& rhs)
     m_slicePool.swapWith(rhs.m_slicePool);
 }
 
-static bool _areEqual(const List<StringSlicePool::Handle>& a, const List<StringSlicePool::Handle>& b, const List<Index>& bToAMap)
+static bool _areEqual(
+    const List<StringSlicePool::Handle>& a,
+    const List<StringSlicePool::Handle>& b,
+    const List<Index>& bToAMap)
 {
     const auto count = a.getCount();
     if (count != b.getCount())
@@ -57,16 +61,20 @@ static bool _areEqual(const List<StringSlicePool::Handle>& a, const List<StringS
     return true;
 }
 
-static bool _areEqual(const SourceMap::Entry& a, const SourceMap::Entry& b, const List<Index>& bToAMap)
+static bool _areEqual(
+    const SourceMap::Entry& a,
+    const SourceMap::Entry& b,
+    const List<Index>& bToAMap)
 {
-    return a.generatedColumn == b.generatedColumn &&
-        a.sourceLine == b.sourceLine &&
-        a.sourceColumn == b.sourceColumn &&
-        a.sourceFileIndex == bToAMap[b.sourceFileIndex] &&
-        a.nameIndex == bToAMap[b.nameIndex];
+    return a.generatedColumn == b.generatedColumn && a.sourceLine == b.sourceLine &&
+           a.sourceColumn == b.sourceColumn && a.sourceFileIndex == bToAMap[b.sourceFileIndex] &&
+           a.nameIndex == bToAMap[b.nameIndex];
 }
 
-static bool _areEqual(const List<SourceMap::Entry>& a, const List<SourceMap::Entry>&b, const List<Index>& bToAMap)
+static bool _areEqual(
+    const List<SourceMap::Entry>& a,
+    const List<SourceMap::Entry>& b,
+    const List<Index>& bToAMap)
 {
     const auto count = a.getCount();
     if (count != b.getCount())
@@ -92,8 +100,7 @@ bool SourceMap::operator==(const ThisType& rhs) const
         return true;
     }
 
-    if (m_file != rhs.m_file ||
-        m_sourceRoot != rhs.m_sourceRoot ||
+    if (m_file != rhs.m_file || m_sourceRoot != rhs.m_sourceRoot ||
         m_lineStarts != rhs.m_lineStarts)
     {
         return false;
@@ -102,21 +109,19 @@ bool SourceMap::operator==(const ThisType& rhs) const
     if (m_slicePool == rhs.m_slicePool)
     {
         // If the slice pools are the same we can just compare indices directly
-        return m_sources == rhs.m_sources &&
-            m_sourcesContent == rhs.m_sourcesContent &&
-            m_names == rhs.m_names &&
-            m_lineEntries == rhs.m_lineEntries;
+        return m_sources == rhs.m_sources && m_sourcesContent == rhs.m_sourcesContent &&
+               m_names == rhs.m_names && m_lineEntries == rhs.m_lineEntries;
     }
     else
     {
         // Otherwise we need to remap the indices
-        // Maps a pool handle from the rhs source map to the 
+        // Maps a pool handle from the rhs source map to the
         List<Index> rhsMap;
 
         Count count = rhs.m_slicePool.getSlicesCount();
 
         rhsMap.setCount(count);
-        
+
         const auto startIndex = rhs.m_slicePool.getFirstAddedIndex();
 
         // Work out the map
@@ -128,9 +133,9 @@ bool SourceMap::operator==(const ThisType& rhs) const
 
         // Do the comparison taking into account the mapping.
         return _areEqual(m_sources, rhs.m_sources, rhsMap) &&
-            _areEqual(m_sourcesContent, rhs.m_sourcesContent, rhsMap) &&
-            _areEqual(m_names, rhs.m_names, rhsMap) &&
-            _areEqual(m_lineEntries, rhs.m_lineEntries, rhsMap);
+               _areEqual(m_sourcesContent, rhs.m_sourcesContent, rhsMap) &&
+               _areEqual(m_names, rhs.m_names, rhsMap) &&
+               _areEqual(m_lineEntries, rhs.m_lineEntries, rhsMap);
     }
 }
 
@@ -139,7 +144,7 @@ void SourceMap::advanceToLine(Index nextLineIndex)
     const Count currentLineIndex = getGeneratedLineCount() - 1;
 
     SLANG_ASSERT(nextLineIndex >= currentLineIndex);
-    
+
     if (nextLineIndex <= currentLineIndex)
     {
         return;
@@ -147,7 +152,7 @@ void SourceMap::advanceToLine(Index nextLineIndex)
 
     const auto lastEntryIndex = m_lineEntries.getCount();
 
-    // For all the new entries they will need to point to the end 
+    // For all the new entries they will need to point to the end
     m_lineStarts.growToCount(nextLineIndex + 1);
 
     Index* starts = m_lineStarts.getBuffer();

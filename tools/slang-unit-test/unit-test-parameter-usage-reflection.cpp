@@ -1,14 +1,13 @@
 // unit-test-parameter-usage-reflection.cpp
 
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
+#include "slang-com-ptr.h"
 #include "slang.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-#include "slang-com-ptr.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
 
 using namespace Slang;
 
@@ -40,16 +39,28 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflection)
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
-    auto module = session->loadModuleFromSourceString("m", "m.slang", userSourceBody, diagnosticBlob.writeRef());
+    auto module = session->loadModuleFromSourceString(
+        "m",
+        "m.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    module->findAndCheckEntryPoint("fragMain", SLANG_STAGE_FRAGMENT, entryPoint.writeRef(), diagnosticBlob.writeRef());
+    module->findAndCheckEntryPoint(
+        "fragMain",
+        SLANG_STAGE_FRAGMENT,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
     SLANG_CHECK(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
-    slang::IComponentType* components[] = { module, entryPoint.get() };
-    session->createCompositeComponentType(components, 2, compositeProgram.writeRef(), diagnosticBlob.writeRef());
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
     SLANG_CHECK(compositeProgram != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
@@ -65,4 +76,3 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflection)
     metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, isUsed);
     SLANG_CHECK(!isUsed);
 }
-

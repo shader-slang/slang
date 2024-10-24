@@ -1,11 +1,12 @@
 // slang-ir-single-return.cpp
 #include "slang-ir-single-return.h"
-#include "slang-ir.h"
+
 #include "slang-ir-clone.h"
-#include "slang-ir-insts.h"
-#include "slang-ir-inst-pass-base.h"
 #include "slang-ir-eliminate-multilevel-break.h"
+#include "slang-ir-inst-pass-base.h"
+#include "slang-ir-insts.h"
 #include "slang-ir-simplify-cfg.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -14,7 +15,8 @@ struct SingleReturnContext : public InstPassBase
 {
     SingleReturnContext(IRModule* inModule)
         : InstPassBase(inModule)
-    {}
+    {
+    }
     void processFunc(IRGlobalValueWithCode* func)
     {
         IRBuilder builder(module);
@@ -56,7 +58,10 @@ struct SingleReturnContext : public InstPassBase
         builder.emitLoop(originalStartBlock, breakBlock, originalStartBlock);
 
         // Now replace all return insts as break insts.
-        processChildInstsOfType<IRReturn>(kIROp_Return, func, [&](IRReturn* returnInst)
+        processChildInstsOfType<IRReturn>(
+            kIROp_Return,
+            func,
+            [&](IRReturn* returnInst)
             {
                 IRInst* retVal = nullptr;
                 if (returnInst->getOperandCount() == 0)
@@ -64,7 +69,7 @@ struct SingleReturnContext : public InstPassBase
                 else
                     retVal = returnInst->getVal();
                 builder.setInsertBefore(returnInst);
-                if (resultType->getOp()==kIROp_VoidType)
+                if (resultType->getOp() == kIROp_VoidType)
                 {
                     builder.emitBranch(breakBlock);
                 }

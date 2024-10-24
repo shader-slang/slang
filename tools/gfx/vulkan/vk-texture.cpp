@@ -10,9 +10,9 @@ namespace vk
 {
 
 TextureResourceImpl::TextureResourceImpl(const Desc& desc, DeviceImpl* device)
-    : Parent(desc)
-    , m_device(device)
-{}
+    : Parent(desc), m_device(device)
+{
+}
 
 TextureResourceImpl::~TextureResourceImpl()
 {

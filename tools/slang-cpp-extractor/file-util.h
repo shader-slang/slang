@@ -3,7 +3,8 @@
 
 #include "diagnostics.h"
 
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
 
 // A macro to define a single indent as a string
@@ -11,15 +12,23 @@ using namespace Slang;
 
 struct FileUtil
 {
-        /// Read text into outRead. Any failures written to sink (can be passed as nullptr, for no output)
-    static SlangResult readAllText(const Slang::String& fileName, DiagnosticSink* sink, String& outRead);
-        /// Write text to filename. Any failures written to sink. (can be passed as nullptr, for no output)
-    static SlangResult writeAllText(const Slang::String& fileName, DiagnosticSink* sink, const UnownedStringSlice& text);
+    /// Read text into outRead. Any failures written to sink (can be passed as nullptr, for no
+    /// output)
+    static SlangResult readAllText(
+        const Slang::String& fileName,
+        DiagnosticSink* sink,
+        String& outRead);
+    /// Write text to filename. Any failures written to sink. (can be passed as nullptr, for no
+    /// output)
+    static SlangResult writeAllText(
+        const Slang::String& fileName,
+        DiagnosticSink* sink,
+        const UnownedStringSlice& text);
 
-        /// Appends CPP_EXTRACT_INDENT_STRING indentCount number of times to out
+    /// Appends CPP_EXTRACT_INDENT_STRING indentCount number of times to out
     static void indent(Index indentCount, StringBuilder& out);
 };
 
-} // CppExtract
+} // namespace CppExtract
 
 #endif

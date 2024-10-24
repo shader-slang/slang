@@ -1,11 +1,12 @@
 // slang-intrinsic-expand.cpp
 #include "slang-intrinsic-expand.h"
 
+#include "../core/slang-char-util.h"
 #include "slang-emit-cuda.h"
 #include "slang-ir-util.h"
-#include "../core/slang-char-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
 void IntrinsicExpandContext::emit(
     IRCall* inst,
@@ -22,7 +23,7 @@ void IntrinsicExpandContext::emit(
 
     const auto returnType = inst->getDataType();
 
-    // If it returns void -> then we don't need parenthesis 
+    // If it returns void -> then we don't need parenthesis
     if (as<IRVoidType>(returnType) == nullptr)
     {
         m_writer->emit("(");
@@ -74,27 +75,29 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
 {
     switch (type)
     {
-        case SLANG_SCALAR_TYPE_INT32:       return BaseType::Int;
-        case SLANG_SCALAR_TYPE_UINT32:      return BaseType::UInt;
-        case SLANG_SCALAR_TYPE_INT16:       return BaseType::Int16;
-        case SLANG_SCALAR_TYPE_UINT16:      return BaseType::UInt16;
-        case SLANG_SCALAR_TYPE_INT64:       return BaseType::Int64;
-        case SLANG_SCALAR_TYPE_INTPTR:      return BaseType::IntPtr;
-        case SLANG_SCALAR_TYPE_UINT64:      return BaseType::UInt64;
-        case SLANG_SCALAR_TYPE_UINTPTR:     return BaseType::UIntPtr;
-        case SLANG_SCALAR_TYPE_INT8:        return BaseType::Int8;
-        case SLANG_SCALAR_TYPE_UINT8:       return BaseType::UInt8;
-        case SLANG_SCALAR_TYPE_FLOAT16:     return BaseType::Half;
-        case SLANG_SCALAR_TYPE_FLOAT32:     return BaseType::Float;
-        case SLANG_SCALAR_TYPE_FLOAT64:     return BaseType::Double;
-        case SLANG_SCALAR_TYPE_BOOL:        return BaseType::Bool;
-        default:                            return BaseType::Void;
+    case SLANG_SCALAR_TYPE_INT32:   return BaseType::Int;
+    case SLANG_SCALAR_TYPE_UINT32:  return BaseType::UInt;
+    case SLANG_SCALAR_TYPE_INT16:   return BaseType::Int16;
+    case SLANG_SCALAR_TYPE_UINT16:  return BaseType::UInt16;
+    case SLANG_SCALAR_TYPE_INT64:   return BaseType::Int64;
+    case SLANG_SCALAR_TYPE_INTPTR:  return BaseType::IntPtr;
+    case SLANG_SCALAR_TYPE_UINT64:  return BaseType::UInt64;
+    case SLANG_SCALAR_TYPE_UINTPTR: return BaseType::UIntPtr;
+    case SLANG_SCALAR_TYPE_INT8:    return BaseType::Int8;
+    case SLANG_SCALAR_TYPE_UINT8:   return BaseType::UInt8;
+    case SLANG_SCALAR_TYPE_FLOAT16: return BaseType::Half;
+    case SLANG_SCALAR_TYPE_FLOAT32: return BaseType::Float;
+    case SLANG_SCALAR_TYPE_FLOAT64: return BaseType::Double;
+    case SLANG_SCALAR_TYPE_BOOL:    return BaseType::Bool;
+    default:                        return BaseType::Void;
     }
 }
 
 // TODO(JS): There is an inherent problem here:
-// 
-// TimF: The big gotcha you'd have with trying to look up the IRVar or whatever from an intrinsic is that it is very easy for the user to "smuggle" a resource-type value through an intermediate function:
+//
+// TimF: The big gotcha you'd have with trying to look up the IRVar or whatever from an intrinsic is
+// that it is very easy for the user to "smuggle" a resource-type value through an intermediate
+// function:
 //
 // ```
 // Imagine this is user code...
@@ -104,14 +107,16 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
 // f(gTex);
 //
 // ```
-// 
-// So when emitting IR code for f, there is no way to trace t back to gTex and get at[attributeYouCareAbout(...)]
-// Structurally, you can get back to the IRParam for t and that's it.
-// And even if there was some magic way to trace back through the call site, you would run into the problem that some call sites
-// might call f(gTex) and other might call f(gSomeOtherTex) and there is no guarantee the attributes on those two textures would match.
 //
-// The VK back-end gets away with this kind of coincidentally, since the "legalization" we have to do for resources means that there wouldn't be a single f() function any more.
-// But for CUDA and C++ that's not the case or generally desirable.
+// So when emitting IR code for f, there is no way to trace t back to gTex and get
+// at[attributeYouCareAbout(...)] Structurally, you can get back to the IRParam for t and that's it.
+// And even if there was some magic way to trace back through the call site, you would run into the
+// problem that some call sites might call f(gTex) and other might call f(gSomeOtherTex) and there
+// is no guarantee the attributes on those two textures would match.
+//
+// The VK back-end gets away with this kind of coincidentally, since the "legalization" we have to
+// do for resources means that there wouldn't be a single f() function any more. But for CUDA and
+// C++ that's not the case or generally desirable.
 
 static IRFormatDecoration* _findImageFormatDecoration(IRInst* resourceInst)
 {
@@ -200,7 +205,7 @@ static size_t _calcBackingElementSizeInBytes(IRInst* resourceInst)
             }
 
             const auto& info = BaseTypeInfo::getInfo(baseType);
-            return info.sizeInBytes * numElems; 
+            return info.sizeInBytes * numElems;
         }
     }
 
@@ -238,8 +243,8 @@ static Index parseNumber(const char*& cursor, const char* end)
 
 const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 {
-    const char*const end = m_text.end();
-    
+    const char* const end = m_text.end();
+
     // Check we are at start of 'special' sequence
     SLANG_ASSERT(*cursor == '$');
     cursor++;
@@ -247,18 +252,23 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
     SLANG_RELEASE_ASSERT(cursor < end);
 
     char d = *cursor++;
-    auto parseNat = [&]() -> Index
-    {
-        return parseNumber(cursor, end);
-    };
+    auto parseNat = [&]() -> Index { return parseNumber(cursor, end); };
 
     // Takes the first character of the number, parses the rest and returns the
     // total value.
 
     switch (d)
     {
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
         {
             --cursor;
             Index argIndex = parseNat() + m_argIndexOffset;
@@ -270,12 +280,12 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        case 'G':
+    case 'G':
         {
             // Get the type/value at the index of the specialization of this generic
 
             Index argIndex = parseNat() + m_argIndexOffset;
-            
+
             IRSpecialize* specialize = as<IRSpecialize>(m_callInst->getCallee());
             SLANG_ASSERT(specialize);
 
@@ -298,8 +308,8 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        case 'T':
-            // Get the 'element' or `return` type for the type of the param at the index
+    case 'T':
+        // Get the 'element' or `return` type for the type of the param at the index
         {
             IRType* type = nullptr;
             if (*cursor == 'R')
@@ -324,8 +334,8 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        case 'S':
-            // Get the scalar type of a generic at specified index
+    case 'S':
+        // Get the scalar type of a generic at specified index
         {
             Index argIndex = parseNat() + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
@@ -355,7 +365,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             m_emitter->emitSimpleType(underlyingType);
         }
         break;
-        case 'p':
+    case 'p':
         {
             // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
             // then this form will pair up the t and s arguments as needed for a GLSL
@@ -363,7 +373,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
             auto textureArg = m_args[0].get();
-            
+
             if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
             {
                 if (baseTextureType->isCombined())
@@ -371,15 +381,15 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     // If the base object (first argument) has a combined texture-sampler type,
                     // then we can simply use that argument as-is.
                     //
-                        m_emitter->emitOperand(textureArg, getInfo(EmitOp::General));
+                    m_emitter->emitOperand(textureArg, getInfo(EmitOp::General));
 
-                        // HACK: Because the target intrinsic strings are using indices based on the
-                        // parameter list with the `SamplerState` parameter in place, seeing this opcode
-                        // and this type tells us that we are about to have an off-by-one sort of
-                        // situation. We quietly patch it up by offseting the index-based access for
-                        // all the other operands.
-                        //
-                        m_argIndexOffset -= 1;
+                    // HACK: Because the target intrinsic strings are using indices based on the
+                    // parameter list with the `SamplerState` parameter in place, seeing this opcode
+                    // and this type tells us that we are about to have an off-by-one sort of
+                    // situation. We quietly patch it up by offseting the index-based access for
+                    // all the other operands.
+                    //
+                    m_argIndexOffset -= 1;
                 }
                 else
                 {
@@ -389,8 +399,8 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     SLANG_RELEASE_ASSERT(m_argCount >= 2);
                     auto samplerArg = m_args[1].get();
 
-                    // We will emit GLSL code to construct the corresponding combined texture/sampler
-                    // type from the separate pieces.
+                    // We will emit GLSL code to construct the corresponding combined
+                    // texture/sampler type from the separate pieces.
                     //
                     m_emitter->emitTextureOrTextureSamplerType(baseTextureType, "sampler");
                     if (auto samplerType = as<IRSamplerStateTypeBase>(samplerArg->getDataType()))
@@ -415,12 +425,12 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        case 'C':
+    case 'C':
         {
-            // The $C intrinsic is a mechanism to change the name of an invocation depending on if there is a format
-            // conversion required between the type associated by the resource and the backing ImageFormat.
-            // Currently this is only implemented on CUDA, where there are specialized versions of the RWTexture
-            // writes that will do a format conversion.
+            // The $C intrinsic is a mechanism to change the name of an invocation depending on if
+            // there is a format conversion required between the type associated by the resource and
+            // the backing ImageFormat. Currently this is only implemented on CUDA, where there are
+            // specialized versions of the RWTexture writes that will do a format conversion.
             if (m_emitter->getTarget() == CodeGenTarget::CUDASource)
             {
                 IRInst* resourceInst = m_callInst->getArg(0);
@@ -437,35 +447,36 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                             // If the source format if half derived, then we need to enable half
                             switch (imageFormat)
                             {
-                                case ImageFormat::r16f:
-                                case ImageFormat::rg16f:
-                                case ImageFormat::rgba16f:
+                            case ImageFormat::r16f:
+                            case ImageFormat::rg16f:
+                            case ImageFormat::rgba16f:
                                 {
-                                    CUDAExtensionTracker* extensionTracker = as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
+                                    CUDAExtensionTracker* extensionTracker =
+                                        as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
                                     if (extensionTracker)
                                     {
                                         extensionTracker->requireBaseType(BaseType::Half);
                                     }
                                     break;
                                 }
-                                default: break;
+                            default: break;
                             }
                         }
 
-                        // Append _convert on the name to signify we need to use a code path, that will automatically
-                        // do the format conversion.
+                        // Append _convert on the name to signify we need to use a code path, that
+                        // will automatically do the format conversion.
                         m_writer->emit("_convert");
-                    }                    
+                    }
                 }
             }
             break;
         }
 
-        case 'E':
+    case 'E':
         {
-            /// Sometimes accesses need to be scaled. For example in CUDA the x coordinate for surface
-            /// access is byte addressed.
-            /// $E will return the byte size of the *backing element*.
+            /// Sometimes accesses need to be scaled. For example in CUDA the x coordinate for
+            /// surface access is byte addressed. $E will return the byte size of the *backing
+            /// element*.
 
             IRInst* resourceInst = m_callInst->getArg(0);
             size_t elemSizeInBytes = _calcBackingElementSizeInBytes(resourceInst);
@@ -486,13 +497,13 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             break;
         }
 
-        case 'c':
+    case 'c':
         {
             // When doing texture access in glsl the result may need to be cast.
-            // In particular if the underlying texture is 'half' based, glsl only accesses (read/write)
-            // as float. So we need to cast to a half type on output.
-            // When storing into a texture it is still the case the value written must be half - but
-            // we don't need to do any casting there as half is coerced to float without a problem.
+            // In particular if the underlying texture is 'half' based, glsl only accesses
+            // (read/write) as float. So we need to cast to a half type on output. When storing into
+            // a texture it is still the case the value written must be half - but we don't need to
+            // do any casting there as half is coerced to float without a problem.
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
             auto textureArg = m_args[0].get();
@@ -520,7 +531,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        case 'z':
+    case 'z':
         {
             // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
             // where `t` is a `Texture*<T>`, then this is the step where we try to
@@ -529,7 +540,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
             auto textureArg = m_args[0].get();
-            IRType* elementType  = nullptr;
+            IRType* elementType = nullptr;
             bool isShadowTexture = false;
 
             if (auto baseTextureType = as<IRTextureTypeBase>(textureArg->getDataType()))
@@ -566,7 +577,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
                 if (elementCount < 4)
                 {
-                    char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
+                    char const* swiz[] = {"", ".x", ".xy", ".xyz", ""};
                     m_writer->emit(swiz[elementCount]);
                 }
             }
@@ -582,7 +593,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        case 'N':
+    case 'N':
         {
             // Extract the element count from a vector argument so that
             // we can use it in the constructed expression.
@@ -603,7 +614,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        case 'V':
+    case 'V':
         {
             // Take an argument of some scalar/vector type and pad
             // it out to a 4-vector with the same element type
@@ -653,8 +664,8 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
         }
         break;
-        case 'P':
-            // Type-based prefix as used for CUDA and C++ targets
+    case 'P':
+        // Type-based prefix as used for CUDA and C++ targets
         {
             Index argIndex = 0;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
@@ -665,7 +676,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             switch (argType->getOp())
             {
 #define CASE(OP, STR) \
-                    case kIROp_##OP: str = #STR; break
+    case kIROp_##OP: str = #STR; break
 
                 CASE(Int8Type, I8);
                 CASE(Int16Type, I16);
@@ -681,15 +692,13 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
 #undef CASE
 
-                default:
-                    SLANG_UNEXPECTED("unexpected type in intrinsic definition");
-                    break;
+            default: SLANG_UNEXPECTED("unexpected type in intrinsic definition"); break;
             }
             m_writer->emit(str);
         }
         break;
 
-        case '*':
+    case '*':
         {
             // An escape like `$*3` indicates that all arguments
             // from index 3 (in this example) and up should be
@@ -711,7 +720,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-        case 'w':
+    case 'w':
         {
             // Emit a swizzle of the argument.
             Index argIndex = parseNat() + m_argIndexOffset;
@@ -720,7 +729,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             d = *cursor++;
             auto vectorType = as<IRVectorType>(arg.get()->getDataType());
             auto vectorSize = as<IRIntLit>(vectorType->getElementCount())->getValue();
-            const char swizzleNames[] = { 'x', 'y', 'z', 'w' };
+            const char swizzleNames[] = {'x', 'y', 'z', 'w'};
             if (d == 'b')
             {
                 // Emit the first half the vector up to the n-1'th element.
@@ -735,7 +744,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
             break;
         }
-        case '!':
+    case '!':
         {
             // Emit a literal directly without any prefix/postfix/casts.
             Index argIndex = parseNat() + m_argIndexOffset;
@@ -755,7 +764,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
             break;
         }
-        case '[':
+    case '[':
         {
             Index argIndex = parseNat();
             auto arg = m_intrinsicInst->getOperand((UInt)(1 + argIndex));
@@ -768,9 +777,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 switch (arg->getDataType()->getOp())
                 {
                 case kIROp_TypeKind:
-                case kIROp_TypeType:
-                    m_emitter->emitType((IRType*)arg);
-                    break;
+                case kIROp_TypeType: m_emitter->emitType((IRType*)arg); break;
                 default:
                     m_emitter->emitOperand(
                         m_intrinsicInst->getOperand((UInt)(1 + argIndex)),
@@ -782,9 +789,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             cursor++;
             break;
         }
-        default:
-            SLANG_UNEXPECTED("bad format in intrinsic definition");
-            break;
+    default: SLANG_UNEXPECTED("bad format in intrinsic definition"); break;
     }
 
     // Return the cursor position. Will be next character after characters processed

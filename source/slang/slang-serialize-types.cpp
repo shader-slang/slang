@@ -1,48 +1,57 @@
 // slang-serialize-types.cpp
 #include "slang-serialize-types.h"
 
-#include "../core/slang-text-io.h"
 #include "../core/slang-byte-encode-util.h"
-
 #include "../core/slang-math.h"
+#include "../core/slang-text-io.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // Needed for linkage with some compilers
 /* static */ const SerialStringData::StringIndex SerialStringData::kNullStringIndex;
 /* static */ const SerialStringData::StringIndex SerialStringData::kEmptyStringIndex;
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct ByteReader
 {
     Byte operator()() const { return Byte(*m_pos++); }
-    ByteReader(const char* pos) :m_pos(pos) {}
+    ByteReader(const char* pos)
+        : m_pos(pos)
+    {
+    }
     mutable const char* m_pos;
 };
 
-} // anonymous
+} // namespace
 
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialStringTableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-/* static */void SerialStringTableUtil::encodeStringTable(const StringSlicePool& pool, List<char>& stringTable)
+/* static */ void SerialStringTableUtil::encodeStringTable(
+    const StringSlicePool& pool,
+    List<char>& stringTable)
 {
     // Skip the default handles -> nothing is encoded via them
     return encodeStringTable(pool.getAdded(), stringTable);
 }
-    
-/* static */void SerialStringTableUtil::encodeStringTable(const ConstArrayView<UnownedStringSlice>& slices, List<char>& stringTable)
+
+/* static */ void SerialStringTableUtil::encodeStringTable(
+    const ConstArrayView<UnownedStringSlice>& slices,
+    List<char>& stringTable)
 {
     stringTable.clear();
     for (const auto& slice : slices)
     {
         // TODO(JS):
-        // This is a bit of a hack. We need to store the string length, along with the string contents. We don't want to write
-        // the size as (say) uint32, because most strings are short. So we just save off the length as a utf8 encoding.
-        // As it stands this *does* have an arguable problem because encoding isn't of the full 32 bits. 
+        // This is a bit of a hack. We need to store the string length, along with the string
+        // contents. We don't want to write the size as (say) uint32, because most strings are
+        // short. So we just save off the length as a utf8 encoding. As it stands this *does* have
+        // an arguable problem because encoding isn't of the full 32 bits.
         const int len = int(slice.getLength());
-        
+
         // We need to write into the the string array
         char prefixBytes[6];
         const int numPrefixBytes = encodeUnicodePointToUTF8(len, prefixBytes);
@@ -54,11 +63,14 @@ struct ByteReader
         char* dst = stringTable.begin() + baseIndex;
 
         memcpy(dst, prefixBytes, numPrefixBytes);
-        memcpy(dst + numPrefixBytes, slice.begin(), len);   
+        memcpy(dst + numPrefixBytes, slice.begin(), len);
     }
 }
 
-/* static */void SerialStringTableUtil::appendDecodedStringTable(const char* table, size_t tableSize, List<UnownedStringSlice>& slicesOut)
+/* static */ void SerialStringTableUtil::appendDecodedStringTable(
+    const char* table,
+    size_t tableSize,
+    List<UnownedStringSlice>& slicesOut)
 {
     const char* start = table;
     const char* cur = start;
@@ -73,7 +85,10 @@ struct ByteReader
     }
 }
 
-/* static */void SerialStringTableUtil::decodeStringTable(const char* table, size_t tableSize, List<UnownedStringSlice>& slicesOut)
+/* static */ void SerialStringTableUtil::decodeStringTable(
+    const char* table,
+    size_t tableSize,
+    List<UnownedStringSlice>& slicesOut)
 {
     slicesOut.setCount(2);
     slicesOut[0] = UnownedStringSlice(nullptr, size_t(0));
@@ -82,7 +97,10 @@ struct ByteReader
     appendDecodedStringTable(table, tableSize, slicesOut);
 }
 
-/* static */void SerialStringTableUtil::decodeStringTable(const char* table, size_t tableSize, StringSlicePool& outPool)
+/* static */ void SerialStringTableUtil::decodeStringTable(
+    const char* table,
+    size_t tableSize,
+    StringSlicePool& outPool)
 {
     outPool.clear();
 
@@ -99,10 +117,15 @@ struct ByteReader
     }
 }
 
-/* static */void SerialStringTableUtil::calcStringSlicePoolMap(const List<UnownedStringSlice>& slices, StringSlicePool& pool, List<StringSlicePool::Handle>& indexMapOut)
+/* static */ void SerialStringTableUtil::calcStringSlicePoolMap(
+    const List<UnownedStringSlice>& slices,
+    StringSlicePool& pool,
+    List<StringSlicePool::Handle>& indexMapOut)
 {
     SLANG_ASSERT(slices.getCount() >= StringSlicePool::kDefaultHandlesCount);
-    SLANG_ASSERT(slices[int(StringSlicePool::kNullHandle)] == "" && slices[int(StringSlicePool::kNullHandle)].begin() == nullptr);
+    SLANG_ASSERT(
+        slices[int(StringSlicePool::kNullHandle)] == "" &&
+        slices[int(StringSlicePool::kNullHandle)].begin() == nullptr);
     SLANG_ASSERT(slices[int(StringSlicePool::kEmptyHandle)] == "");
 
     indexMapOut.setCount(slices.getCount());
@@ -113,7 +136,7 @@ struct ByteReader
     }
 
     const Index numSlices = slices.getCount();
-    for (Index i = StringSlicePool::kDefaultHandlesCount; i < numSlices ; ++i)
+    for (Index i = StringSlicePool::kDefaultHandlesCount; i < numSlices; ++i)
     {
         indexMapOut[i] = pool.add(slices[i]);
     }
@@ -121,7 +144,13 @@ struct ByteReader
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialRiffUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-/* static */ Result SerialRiffUtil::writeArrayChunk(SerialCompressionType compressionType, FourCC chunkId, const void* data, size_t numEntries, size_t typeSize, RiffContainer* container)
+/* static */ Result SerialRiffUtil::writeArrayChunk(
+    SerialCompressionType compressionType,
+    FourCC chunkId,
+    const void* data,
+    size_t numEntries,
+    size_t typeSize,
+    RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -132,13 +161,15 @@ struct ByteReader
     }
 
     // Make compressed fourCC
-    chunkId = (compressionType != SerialCompressionType::None) ? SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId) : chunkId;
+    chunkId = (compressionType != SerialCompressionType::None)
+                  ? SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId)
+                  : chunkId;
 
     ScopeChunk scope(container, Chunk::Kind::Data, chunkId);
 
     switch (compressionType)
     {
-        case SerialCompressionType::None:
+    case SerialCompressionType::None:
         {
             SerialBinary::ArrayHeader header;
             header.numEntries = uint32_t(numEntries);
@@ -147,12 +178,15 @@ struct ByteReader
             container->write(data, typeSize * numEntries);
             break;
         }
-        case SerialCompressionType::VariableByteLite:
+    case SerialCompressionType::VariableByteLite:
         {
             List<uint8_t> compressedPayload;
 
             size_t numCompressedEntries = (numEntries * typeSize) / sizeof(uint32_t);
-            ByteEncodeUtil::encodeLiteUInt32((const uint32_t*)data, numCompressedEntries, compressedPayload);
+            ByteEncodeUtil::encodeLiteUInt32(
+                (const uint32_t*)data,
+                numCompressedEntries,
+                compressedPayload);
 
             SerialBinary::CompressedArrayHeader header;
             header.numEntries = uint32_t(numEntries);
@@ -162,7 +196,7 @@ struct ByteReader
             container->write(compressedPayload.getBuffer(), compressedPayload.getCount());
             break;
         }
-        default:
+    default:
         {
             return SLANG_FAIL;
         }
@@ -170,7 +204,10 @@ struct ByteReader
     return SLANG_OK;
 }
 
-/* static */Result SerialRiffUtil::readArrayChunk(SerialCompressionType compressionType, RiffContainer::DataChunk* dataChunk, ListResizer& listOut)
+/* static */ Result SerialRiffUtil::readArrayChunk(
+    SerialCompressionType compressionType,
+    RiffContainer::DataChunk* dataChunk,
+    ListResizer& listOut)
 {
     typedef SerialBinary Bin;
 
@@ -179,19 +216,24 @@ struct ByteReader
 
     switch (compressionType)
     {
-        case SerialCompressionType::VariableByteLite:
+    case SerialCompressionType::VariableByteLite:
         {
             Bin::CompressedArrayHeader header;
             SLANG_RETURN_ON_FAIL(read.read(header));
 
             void* dst = listOut.setSize(header.numEntries);
-            SLANG_ASSERT(header.numCompressedEntries == uint32_t((header.numEntries * typeSize) / sizeof(uint32_t)));
+            SLANG_ASSERT(
+                header.numCompressedEntries ==
+                uint32_t((header.numEntries * typeSize) / sizeof(uint32_t)));
 
             // Decode..
-            ByteEncodeUtil::decodeLiteUInt32(read.getData(), header.numCompressedEntries, (uint32_t*)dst);
+            ByteEncodeUtil::decodeLiteUInt32(
+                read.getData(),
+                header.numCompressedEntries,
+                (uint32_t*)dst);
             break;
         }
-        case SerialCompressionType::None:
+    case SerialCompressionType::None:
         {
             // Read uncompressed
             Bin::ArrayHeader header;
@@ -214,7 +256,9 @@ struct ByteReader
     x(VariableByteLite, lite)
 // clang-format on
 
-/* static */SlangResult SerialParseUtil::parseCompressionType(const UnownedStringSlice& text, SerialCompressionType& outType)
+/* static */ SlangResult SerialParseUtil::parseCompressionType(
+    const UnownedStringSlice& text,
+    SerialCompressionType& outType)
 {
     struct Pair
     {
@@ -222,15 +266,12 @@ struct ByteReader
         SerialCompressionType type;
     };
 
-// clang-format off
+    // clang-format off
 #define SLANG_SERIAL_BINARY_PAIR(type, name) \
     {UnownedStringSlice::fromLiteral(#name), SerialCompressionType::type},
-// clang-format on
+    // clang-format on
 
-    static const Pair s_pairs[] =
-    {
-        SLANG_SERIAL_BINARY_COMPRESSION_TYPE(SLANG_SERIAL_BINARY_PAIR)
-    };
+    static const Pair s_pairs[] = {SLANG_SERIAL_BINARY_COMPRESSION_TYPE(SLANG_SERIAL_BINARY_PAIR)};
 
     for (const auto& pair : s_pairs)
     {
@@ -243,13 +284,14 @@ struct ByteReader
     return SLANG_FAIL;
 }
 
-/* static */UnownedStringSlice SerialParseUtil::getText(SerialCompressionType type)
+/* static */ UnownedStringSlice SerialParseUtil::getText(SerialCompressionType type)
 {
-#define SLANG_SERIAL_BINARY_CASE(type, name) case SerialCompressionType::type: return UnownedStringSlice::fromLiteral(#name);
+#define SLANG_SERIAL_BINARY_CASE(type, name) \
+    case SerialCompressionType::type: return UnownedStringSlice::fromLiteral(#name);
     switch (type)
     {
         SLANG_SERIAL_BINARY_COMPRESSION_TYPE(SLANG_SERIAL_BINARY_CASE)
-        default: break;
+    default: break;
     }
     SLANG_ASSERT(!"Unknown compression type");
     return UnownedStringSlice::fromLiteral("unknown");

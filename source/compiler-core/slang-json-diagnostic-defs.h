@@ -14,7 +14,7 @@
 // for any arguments.
 
 #ifndef DIAGNOSTIC
-#error Need to #define DIAGNOSTIC(...) before including 
+#error Need to #define DIAGNOSTIC(...) before including
 #define DIAGNOSTIC(id, severity, name, messageFormat) /* */
 #endif
 
@@ -40,7 +40,11 @@ DIAGNOSTIC(20009, Error, unableToConvertField, "unable to convert field '$0' in 
 DIAGNOSTIC(20010, Error, fieldNotFound, "field '$0' not found in type '$1'")
 DIAGNOSTIC(20011, Error, fieldNotDefinedOnType, "field '$0' not defined on type '$1'")
 DIAGNOSTIC(20011, Error, fieldRequiredOnType, "field '$0' required on '$1'")
-DIAGNOSTIC(20012, Error, tooManyElementsForArray, "too many elements ($0) for array array. Max allowed is $1")
+DIAGNOSTIC(
+    20012,
+    Error,
+    tooManyElementsForArray,
+    "too many elements ($0) for array array. Max allowed is $1")
 
 //
 // 3xxxx JSON-RPC

@@ -3,12 +3,16 @@
 
 #include "core/slang-blob.h"
 
-namespace renderer_test {
+namespace renderer_test
+{
 
 struct PngSerializeUtil
 {
-    static Slang::Result write(const char* filename, ISlangBlob* pixels, uint32_t width, uint32_t height);
-
+    static Slang::Result write(
+        const char* filename,
+        ISlangBlob* pixels,
+        uint32_t width,
+        uint32_t height);
 };
 
-} // renderer_test
+} // namespace renderer_test

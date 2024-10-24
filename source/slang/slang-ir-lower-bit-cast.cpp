@@ -1,8 +1,9 @@
 #include "slang-ir-lower-bit-cast.h"
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
+
 #include "slang-ir-extract-value-from-type.h"
+#include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -32,11 +33,8 @@ struct BitCastLoweringContext
     {
         switch (inst->getOp())
         {
-        case kIROp_BitCast:
-            processBitCast(inst);
-            break;
-        default:
-            break;
+        case kIROp_BitCast: processBitCast(inst); break;
+        default:            break;
         }
     }
 
@@ -73,11 +71,12 @@ struct BitCastLoweringContext
                 {
                     IRIntegerValue fieldOffset = 0;
                     SLANG_RELEASE_ASSERT(
-                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) == SLANG_OK);
+                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) ==
+                        SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
                         readObject(builder, src, fieldType, (uint32_t)(fieldOffset + offset));
-                    fieldValues.add(fieldValue); 
+                    fieldValues.add(fieldValue);
                 }
                 return builder.emitMakeStruct(structType, fieldValues);
             }
@@ -91,7 +90,9 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout) == SLANG_OK);
+                        targetProgram->getOptionSet(),
+                        arrayType->getElementType(),
+                        &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -100,7 +101,10 @@ struct BitCastLoweringContext
                         arrayType->getElementType(),
                         (uint32_t)(offset + elementLayout.getStride() * i)));
                 }
-                return builder.emitMakeArray(arrayType, (UInt)arrayCount->value.intVal, elements.getBuffer());
+                return builder.emitMakeArray(
+                    arrayType,
+                    (UInt)arrayCount->value.intVal,
+                    elements.getBuffer());
             }
             break;
         case kIROp_VectorType:
@@ -112,7 +116,9 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(), vectorType->getElementType(), &elementLayout) == SLANG_OK);
+                        targetProgram->getOptionSet(),
+                        vectorType->getElementType(),
+                        &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -122,7 +128,9 @@ struct BitCastLoweringContext
                         (uint32_t)(offset + elementLayout.getStride() * i)));
                 }
                 return builder.emitMakeVector(
-                    vectorType, (UInt)elementCount->value.intVal, elements.getBuffer());
+                    vectorType,
+                    (UInt)elementCount->value.intVal,
+                    elements.getBuffer());
             }
             break;
         case kIROp_MatrixType:
@@ -130,14 +138,17 @@ struct BitCastLoweringContext
                 // Assuming row-major order
                 auto matrixType = as<IRMatrixType>(type);
                 auto elementCount = as<IRIntLit>(matrixType->getRowCount());
-                SLANG_RELEASE_ASSERT(
-                    elementCount && "bit_cast: vector size must be int literal.");
+                SLANG_RELEASE_ASSERT(elementCount && "bit_cast: vector size must be int literal.");
                 List<IRInst*> elements;
                 auto elementType = builder.getVectorType(
-                    matrixType->getElementType(), matrixType->getColumnCount());
+                    matrixType->getElementType(),
+                    matrixType->getColumnCount());
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
-                    getNaturalSizeAndAlignment(targetProgram->getOptionSet(), elementType, &elementLayout) == SLANG_OK);
+                    getNaturalSizeAndAlignment(
+                        targetProgram->getOptionSet(),
+                        elementType,
+                        &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -147,7 +158,9 @@ struct BitCastLoweringContext
                         (uint32_t)(offset + elementLayout.getStride() * i)));
                 }
                 return builder.emitMakeMatrix(
-                    matrixType, (UInt)elementCount->value.intVal, elements.getBuffer());
+                    matrixType,
+                    (UInt)elementCount->value.intVal,
+                    elements.getBuffer());
             }
             break;
         case kIROp_HalfType:
@@ -182,7 +195,8 @@ struct BitCastLoweringContext
             {
                 auto low = extractValueAtOffset(builder, targetProgram, src, offset, 4);
                 auto high = extractValueAtOffset(builder, targetProgram, src, offset + 4, 4);
-                auto combined = builder.emitAdd(builder.getUInt64Type(),
+                auto combined = builder.emitAdd(
+                    builder.getUInt64Type(),
                     low,
                     builder.emitShl(
                         builder.getUInt64Type(),
@@ -222,7 +236,13 @@ struct BitCastLoweringContext
         if (as<IRBasicType>(fromType) != nullptr && as<IRBasicType>(toType) != nullptr)
         {
             if (fromTypeSize.size != toTypeSize.size)
-                sink->diagnose(inst->sourceLoc, Diagnostics::notEqualBitCastSize, fromType, fromTypeSize.size, toType, toTypeSize.size);
+                sink->diagnose(
+                    inst->sourceLoc,
+                    Diagnostics::notEqualBitCastSize,
+                    fromType,
+                    fromTypeSize.size,
+                    toType,
+                    toTypeSize.size);
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
@@ -249,7 +269,13 @@ struct BitCastLoweringContext
         }
 
         if (fromTypeSize.size != toTypeSize.size)
-            sink->diagnose(inst->sourceLoc, Diagnostics::notEqualBitCastSize, fromType, fromTypeSize.size, toType, toTypeSize.size);
+            sink->diagnose(
+                inst->sourceLoc,
+                Diagnostics::notEqualBitCastSize,
+                fromType,
+                fromTypeSize.size,
+                toType,
+                toTypeSize.size);
 
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder(module);
@@ -269,4 +295,4 @@ void lowerBitCast(TargetProgram* targetProgram, IRModule* module, DiagnosticSink
     context.processModule();
 }
 
-}
+} // namespace Slang

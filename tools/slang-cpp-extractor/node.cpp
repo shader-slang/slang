@@ -1,15 +1,19 @@
 #include "node.h"
 
+#include "../../source/core/slang-string-escape-util.h"
+#include "../../source/core/slang-string-util.h"
 #include "file-util.h"
 
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-string-escape-util.h"
+namespace CppExtract
+{
 
-namespace CppExtract {
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Node Impl
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Node Impl !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out) { FileUtil::indent(indentCount, out); }
+SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out)
+{
+    FileUtil::indent(indentCount, out);
+}
 
 void Node::dumpMarkup(int indentCount, StringBuilder& out)
 {
@@ -93,7 +97,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     }
 }
 
-/* static */void Node::calcScopePath(Node* node, List<Node*>& outPath)
+/* static */ void Node::calcScopePath(Node* node, List<Node*>& outPath)
 {
     outPath.clear();
 
@@ -107,11 +111,11 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     outPath.reverse();
 }
 
-/* static */void Node::filterImpl(Filter inFilter, List<Node*>& ioNodes)
+/* static */ void Node::filterImpl(Filter inFilter, List<Node*>& ioNodes)
 {
     // Filter out all the unreflected nodes
     Index count = ioNodes.getCount();
-    for (Index j = 0; j < count; )
+    for (Index j = 0; j < count;)
     {
         Node* node = ioNodes[j];
 
@@ -127,7 +131,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     }
 }
 
-/* static */Node* Node::lookupNameInScope(ScopeNode* scope, const UnownedStringSlice& name)
+/* static */ Node* Node::lookupNameInScope(ScopeNode* scope, const UnownedStringSlice& name)
 {
     // TODO(JS): Doesn't handle 'using namespace'.
 
@@ -167,7 +171,10 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     return nullptr;
 }
 
-/* static */Node* Node::lookupFromScope(ScopeNode* scope, const UnownedStringSlice* parts, Index partsCount)
+/* static */ Node* Node::lookupFromScope(
+    ScopeNode* scope,
+    const UnownedStringSlice* parts,
+    Index partsCount)
 {
     SLANG_ASSERT(partsCount > 0);
     if (partsCount == 1)
@@ -202,7 +209,9 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     return nullptr;
 }
 
-/* static */void Node::splitPath(const UnownedStringSlice& inPath, List<UnownedStringSlice>& outParts)
+/* static */ void Node::splitPath(
+    const UnownedStringSlice& inPath,
+    List<UnownedStringSlice>& outParts)
 {
     if (inPath.indexOf(UnownedStringSlice::fromLiteral("::")) >= 0)
     {
@@ -220,7 +229,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     }
 }
 
-/* static */Node* Node::lookupFromScope(ScopeNode* scope, const UnownedStringSlice& inPath)
+/* static */ Node* Node::lookupFromScope(ScopeNode* scope, const UnownedStringSlice& inPath)
 {
     if (inPath.indexOf(UnownedStringSlice::fromLiteral("::")) >= 0)
     {
@@ -235,7 +244,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     }
 }
 
-/* static */Node* Node::lookup(ScopeNode* scope, const UnownedStringSlice& inPath)
+/* static */ Node* Node::lookup(ScopeNode* scope, const UnownedStringSlice& inPath)
 {
     if (inPath.indexOf(UnownedStringSlice::fromLiteral("::")) >= 0)
     {
@@ -341,11 +350,11 @@ void ScopeNode::dump(int indentCount, StringBuilder& out)
 
     switch (m_kind)
     {
-        case Kind::AnonymousNamespace:
+    case Kind::AnonymousNamespace:
         {
             out << "namespace {\n";
         }
-        case Kind::Namespace:
+    case Kind::Namespace:
         {
             if (m_name.hasContent())
             {
@@ -379,7 +388,7 @@ static bool _needsSpace(const Token& prevTok, const Token& tok)
     auto loc = tok.getLoc();
 
     auto prevContent = prevTok.getContent();
-    
+
     if (prevLoc + prevContent.getLength() == loc)
     {
         return false;
@@ -477,7 +486,7 @@ void EnumNode::dump(int indent, StringBuilder& out)
     }
 
     if (m_backingTokens.getCount() > 0)
-    { 
+    {
         out << " : ";
         _dumpTokens(m_backingTokens, out);
     }

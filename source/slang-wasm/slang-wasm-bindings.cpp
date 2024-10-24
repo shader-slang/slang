@@ -1,6 +1,7 @@
+#include "slang-wasm.h"
+
 #include <emscripten/bind.h>
 #include <slang-com-ptr.h>
-#include "slang-wasm.h"
 
 using namespace emscripten;
 
@@ -13,9 +14,7 @@ EMSCRIPTEN_BINDINGS(slang)
         &slang::wgsl::createGlobalSession,
         return_value_policy::take_ownership());
 
-    function(
-        "getLastError",
-        &slang::wgsl::getLastError);
+    function("getLastError", &slang::wgsl::getLastError);
 
     function(
         "getCompileTargets",
@@ -39,22 +38,11 @@ EMSCRIPTEN_BINDINGS(slang)
             return_value_policy::take_ownership());
 
     class_<slang::wgsl::ComponentType>("ComponentType")
-        .function(
-            "link",
-            &slang::wgsl::ComponentType::link,
-            return_value_policy::take_ownership())
-        .function(
-            "getEntryPointCode",
-            &slang::wgsl::ComponentType::getEntryPointCode)
-        .function(
-            "getEntryPointCodeBlob",
-            &slang::wgsl::ComponentType::getEntryPointCodeBlob)
-        .function(
-            "getTargetCodeBlob",
-            &slang::wgsl::ComponentType::getTargetCodeBlob)
-        .function(
-            "getTargetCode",
-            &slang::wgsl::ComponentType::getTargetCode);
+        .function("link", &slang::wgsl::ComponentType::link, return_value_policy::take_ownership())
+        .function("getEntryPointCode", &slang::wgsl::ComponentType::getEntryPointCode)
+        .function("getEntryPointCodeBlob", &slang::wgsl::ComponentType::getEntryPointCodeBlob)
+        .function("getTargetCodeBlob", &slang::wgsl::ComponentType::getTargetCodeBlob)
+        .function("getTargetCode", &slang::wgsl::ComponentType::getTargetCode);
 
     class_<slang::wgsl::Module, base<slang::wgsl::ComponentType>>("Module")
         .function(
@@ -69,9 +57,7 @@ EMSCRIPTEN_BINDINGS(slang)
             "getDefinedEntryPoint",
             &slang::wgsl::Module::getDefinedEntryPoint,
             return_value_policy::take_ownership())
-        .function(
-            "getDefinedEntryPointCount",
-            &slang::wgsl::Module::getDefinedEntryPointCount);
+        .function("getDefinedEntryPointCount", &slang::wgsl::Module::getDefinedEntryPointCount);
 
     value_object<slang::wgsl::Error>("Error")
         .field("type", &slang::wgsl::Error::type)
@@ -79,10 +65,7 @@ EMSCRIPTEN_BINDINGS(slang)
         .field("message", &slang::wgsl::Error::message);
 
     class_<slang::wgsl::EntryPoint, base<slang::wgsl::ComponentType>>("EntryPoint")
-        .function(
-            "getName",
-            &slang::wgsl::EntryPoint::getName,
-            allow_raw_pointers());
+        .function("getName", &slang::wgsl::EntryPoint::getName, allow_raw_pointers());
 
     class_<slang::wgsl::CompileTargets>("CompileTargets")
         .function(
@@ -98,7 +81,7 @@ EMSCRIPTEN_BINDINGS(slang)
     value_object<slang::wgsl::lsp::Position>("Position")
         .field("line", &slang::wgsl::lsp::Position::line)
         .field("character", &slang::wgsl::lsp::Position::character);
-    
+
     value_object<slang::wgsl::lsp::Range>("Range")
         .field("start", &slang::wgsl::lsp::Range::start)
         .field("end", &slang::wgsl::lsp::Range::end);
@@ -141,7 +124,7 @@ EMSCRIPTEN_BINDINGS(slang)
     value_object<slang::wgsl::lsp::CompletionContext>("CompletionContext")
         .field("triggerKind", &slang::wgsl::lsp::CompletionContext::triggerKind)
         .field("triggerCharacter", &slang::wgsl::lsp::CompletionContext::triggerCharacter);
-    
+
     value_array<std::array<uint32_t, 2>>("array_uint_2")
         .element(emscripten::index<0>())
         .element(emscripten::index<1>());
@@ -172,7 +155,7 @@ EMSCRIPTEN_BINDINGS(slang)
         .field("range", &slang::wgsl::lsp::DocumentSymbol::range)
         .field("selectionRange", &slang::wgsl::lsp::DocumentSymbol::selectionRange)
         .field("children", &slang::wgsl::lsp::DocumentSymbol::children);
-    
+
     register_vector<slang::wgsl::lsp::DocumentSymbol>("DocumentSymbolList");
     register_optional<std::vector<slang::wgsl::lsp::DocumentSymbol>>();
 
@@ -200,18 +183,12 @@ EMSCRIPTEN_BINDINGS(slang)
             "didChangeTextDocument",
             &slang::wgsl::lsp::LanguageServer::didChangeTextDocument,
             allow_raw_pointers())
-        .function(
-            "hover",
-            &slang::wgsl::lsp::LanguageServer::hover,
-            allow_raw_pointers())
+        .function("hover", &slang::wgsl::lsp::LanguageServer::hover, allow_raw_pointers())
         .function(
             "gotoDefinition",
             &slang::wgsl::lsp::LanguageServer::gotoDefinition,
             allow_raw_pointers())
-        .function(
-            "completion",
-            &slang::wgsl::lsp::LanguageServer::completion,
-            allow_raw_pointers())
+        .function("completion", &slang::wgsl::lsp::LanguageServer::completion, allow_raw_pointers())
         .function(
             "completionResolve",
             &slang::wgsl::lsp::LanguageServer::completionResolve,
@@ -232,7 +209,7 @@ EMSCRIPTEN_BINDINGS(slang)
             "getDiagnostics",
             &slang::wgsl::lsp::LanguageServer::getDiagnostics,
             allow_raw_pointers());
-    
+
     function(
         "createLanguageServer",
         &slang::wgsl::lsp::createLanguageServer,

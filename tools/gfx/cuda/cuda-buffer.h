@@ -16,7 +16,8 @@ class BufferResourceImpl : public BufferResource
 public:
     BufferResourceImpl(const Desc& _desc)
         : BufferResource(_desc)
-    {}
+    {
+    }
 
     ~BufferResourceImpl();
 
@@ -28,9 +29,10 @@ public:
     RefPtr<CUDAContext> m_cudaContext;
 
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        map(MemoryRange* rangeToRead, void** outPointer) override;
+    getNativeResourceHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    map(MemoryRange* rangeToRead, void** outPointer) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override;
 };
 

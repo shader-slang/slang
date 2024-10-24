@@ -6,7 +6,9 @@
 
 namespace Slang
 {
-class MetalExtensionTracker : public ExtensionTracker {};
+class MetalExtensionTracker : public ExtensionTracker
+{
+};
 
 class MetalSourceEmitter : public CLikeSourceEmitter
 {
@@ -14,42 +16,54 @@ public:
     typedef CLikeSourceEmitter Super;
 
     MetalSourceEmitter(const Desc& desc)
-        : Super(desc)
-        , m_extensionTracker(new MetalExtensionTracker())
-    {}
+        : Super(desc), m_extensionTracker(new MetalExtensionTracker())
+    {
+    }
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
+
 protected:
     RefPtr<MetalExtensionTracker> m_extensionTracker;
 
     void ensurePrelude(const char* preludeText);
 
     void emitMemoryOrderOperand(IRInst* inst);
-    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
-    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
-    
+    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+        SLANG_OVERRIDE;
+    virtual void emitEntryPointAttributesImpl(
+        IRFunc* irFunc,
+        IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
+
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
 
-    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace) SLANG_OVERRIDE;
+    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
+        SLANG_OVERRIDE;
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsets) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
     virtual void emitPostDeclarationAttributesForType(IRInst* type) SLANG_OVERRIDE;
 
-    virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) SLANG_OVERRIDE;
-    virtual void emitPackOffsetModifier(IRInst* varInst, IRType* valueType, IRPackOffsetDecoration* decoration) SLANG_OVERRIDE;
+    virtual void emitInterpolationModifiersImpl(
+        IRInst* varInst,
+        IRType* valueType,
+        IRVarLayout* layout) SLANG_OVERRIDE;
+    virtual void emitPackOffsetModifier(
+        IRInst* varInst,
+        IRType* valueType,
+        IRPackOffsetDecoration* decoration) SLANG_OVERRIDE;
 
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
-    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
+    virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
+        SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
     virtual void emitMatrixLayoutModifiersImpl(IRType* varType) SLANG_OVERRIDE;
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
-    
+
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
@@ -59,7 +73,7 @@ protected:
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) SLANG_OVERRIDE;
 
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
-    
+
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual bool doesTargetSupportPtrTypes() SLANG_OVERRIDE { return true; }
 
@@ -72,7 +86,7 @@ protected:
     void _emitHLSLTextureType(IRTextureTypeBase* texType);
 
     void _emitHLSLSubpassInputType(IRSubpassInputType* subpassType);
-    
+
     void _emitHLSLDecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val);
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
 
@@ -86,5 +100,5 @@ protected:
     void emitAtomicSemanticOperand(IRInst* inst);
 };
 
-}
+} // namespace Slang
 #endif

@@ -4,11 +4,12 @@
 
 #include "slang-ast-base.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // Syntax class definitions for statements.
 
-class ScopeStmt : public Stmt 
+class ScopeStmt : public Stmt
 {
     SLANG_ABSTRACT_AST_CLASS(ScopeStmt)
 
@@ -16,7 +17,7 @@ class ScopeStmt : public Stmt
 };
 
 // A sequence of statements, treated as a single statement
-class SeqStmt : public Stmt 
+class SeqStmt : public Stmt
 {
     SLANG_AST_CLASS(SeqStmt)
 
@@ -33,19 +34,19 @@ class LabelStmt : public Stmt
 };
 
 // The simplest kind of scope statement: just a `{...}` block
-class BlockStmt : public ScopeStmt 
+class BlockStmt : public ScopeStmt
 {
     SLANG_AST_CLASS(BlockStmt)
 
-        /// TODO(JS): Having ranges of sourcelocs might be a good addition to AST nodes in general.
-    SourceLoc closingSourceLoc;         ///< The source location of the closing brace
+    /// TODO(JS): Having ranges of sourcelocs might be a good addition to AST nodes in general.
+    SourceLoc closingSourceLoc; ///< The source location of the closing brace
 
     Stmt* body = nullptr;
 };
 
 // A statement that we aren't going to parse or check, because
 // we want to let a downstream compiler handle any issues
-class UnparsedStmt : public Stmt 
+class UnparsedStmt : public Stmt
 {
     SLANG_AST_CLASS(UnparsedStmt)
 
@@ -53,24 +54,24 @@ class UnparsedStmt : public Stmt
     List<Token> tokens;
 };
 
-class EmptyStmt : public Stmt 
+class EmptyStmt : public Stmt
 {
     SLANG_AST_CLASS(EmptyStmt)
 };
 
-class DiscardStmt : public Stmt 
+class DiscardStmt : public Stmt
 {
     SLANG_AST_CLASS(DiscardStmt)
 };
 
-class DeclStmt : public Stmt 
+class DeclStmt : public Stmt
 {
     SLANG_AST_CLASS(DeclStmt)
 
     DeclBase* decl = nullptr;
 };
 
-class IfStmt : public Stmt 
+class IfStmt : public Stmt
 {
     SLANG_AST_CLASS(IfStmt)
 
@@ -80,13 +81,12 @@ class IfStmt : public Stmt
 };
 
 // A statement that can be escaped with a `break`
-class BreakableStmt : public ScopeStmt 
+class BreakableStmt : public ScopeStmt
 {
     SLANG_ABSTRACT_AST_CLASS(BreakableStmt)
-
 };
 
-class SwitchStmt : public BreakableStmt 
+class SwitchStmt : public BreakableStmt
 {
     SLANG_AST_CLASS(SwitchStmt)
 
@@ -121,7 +121,7 @@ class IntrinsicAsmStmt : public Stmt
 // A statement that is expected to appear lexically nested inside
 // some other construct, and thus needs to keep track of the
 // outer statement that it is associated with...
-class ChildStmt : public Stmt 
+class ChildStmt : public Stmt
 {
     SLANG_ABSTRACT_AST_CLASS(ChildStmt)
 
@@ -133,14 +133,13 @@ class ChildStmt : public Stmt
 // Note(tfoley): A correct AST for a C-like language would treat
 // these as a labelled statement, and so they would contain a
 // sub-statement. I'm leaving that out for now for simplicity.
-class CaseStmtBase : public ChildStmt 
+class CaseStmtBase : public ChildStmt
 {
     SLANG_ABSTRACT_AST_CLASS(CaseStmtBase)
-
 };
 
 // a `case` statement inside a `switch`
-class CaseStmt : public CaseStmtBase 
+class CaseStmt : public CaseStmtBase
 {
     SLANG_AST_CLASS(CaseStmt)
 
@@ -150,13 +149,13 @@ class CaseStmt : public CaseStmtBase
 };
 
 // a `default` statement inside a `switch`
-class DefaultStmt : public CaseStmtBase 
+class DefaultStmt : public CaseStmtBase
 {
     SLANG_AST_CLASS(DefaultStmt)
 };
 
 // a `default` statement inside a `switch`
-class GpuForeachStmt : public ScopeStmt 
+class GpuForeachStmt : public ScopeStmt
 {
     SLANG_AST_CLASS(GpuForeachStmt)
 
@@ -167,14 +166,13 @@ class GpuForeachStmt : public ScopeStmt
 };
 
 // A statement that represents a loop, and can thus be escaped with a `continue`
-class LoopStmt : public BreakableStmt 
+class LoopStmt : public BreakableStmt
 {
     SLANG_ABSTRACT_AST_CLASS(LoopStmt)
-
 };
 
 // A `for` statement
-class ForStmt : public LoopStmt 
+class ForStmt : public LoopStmt
 {
     SLANG_AST_CLASS(ForStmt)
 
@@ -186,13 +184,12 @@ class ForStmt : public LoopStmt
 
 // A `for` statement in a language that doesn't restrict the scope
 // of the loop variable to the body.
-class UnscopedForStmt : public ForStmt 
+class UnscopedForStmt : public ForStmt
 {
-    SLANG_AST_CLASS(UnscopedForStmt)
-;
+    SLANG_AST_CLASS(UnscopedForStmt);
 };
 
-class WhileStmt : public LoopStmt 
+class WhileStmt : public LoopStmt
 {
     SLANG_AST_CLASS(WhileStmt)
 
@@ -200,7 +197,7 @@ class WhileStmt : public LoopStmt
     Stmt* statement = nullptr;
 };
 
-class DoWhileStmt : public LoopStmt 
+class DoWhileStmt : public LoopStmt
 {
     SLANG_AST_CLASS(DoWhileStmt)
 
@@ -209,7 +206,7 @@ class DoWhileStmt : public LoopStmt
 };
 
 // A compile-time, range-based `for` loop, which will not appear in the output code
-class CompileTimeForStmt : public ScopeStmt 
+class CompileTimeForStmt : public ScopeStmt
 {
     SLANG_AST_CLASS(CompileTimeForStmt)
 
@@ -223,31 +220,31 @@ class CompileTimeForStmt : public ScopeStmt
 
 // The case of child statements that do control flow relative
 // to their parent statement.
-class JumpStmt : public ChildStmt 
+class JumpStmt : public ChildStmt
 {
     SLANG_ABSTRACT_AST_CLASS(JumpStmt)
 };
 
-class BreakStmt : public JumpStmt 
+class BreakStmt : public JumpStmt
 {
     SLANG_AST_CLASS(BreakStmt)
 
     Token targetLabel;
 };
 
-class ContinueStmt : public JumpStmt 
+class ContinueStmt : public JumpStmt
 {
     SLANG_AST_CLASS(ContinueStmt)
 };
 
-class ReturnStmt : public Stmt 
+class ReturnStmt : public Stmt
 {
     SLANG_AST_CLASS(ReturnStmt)
 
     Expr* expression = nullptr;
 };
 
-class ExpressionStmt : public Stmt 
+class ExpressionStmt : public Stmt
 {
     SLANG_AST_CLASS(ExpressionStmt)
 

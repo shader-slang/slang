@@ -12,7 +12,10 @@ using namespace Slang;
 namespace d3d11
 {
 
-Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& swapchainDesc, WindowHandle window)
+Result SwapchainImpl::init(
+    DeviceImpl* renderer,
+    const ISwapchain::Desc& swapchainDesc,
+    WindowHandle window)
 {
     m_renderer = renderer;
     m_device = renderer->m_device;

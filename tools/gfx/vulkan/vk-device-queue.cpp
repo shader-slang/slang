@@ -1,11 +1,12 @@
 // vk-device-queue.cpp
 #include "vk-device-queue.h"
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-namespace gfx {
+namespace gfx
+{
 using namespace Slang;
 
 VulkanDeviceQueue::~VulkanDeviceQueue()
@@ -24,7 +25,8 @@ void VulkanDeviceQueue::destroy()
 
         for (int i = 0; i < m_numCommandBuffers; i++)
         {
-            m_api->vkFreeCommandBuffers(m_api->m_device, m_commandPools[i], 1, &m_commandBuffers[i]);
+            m_api
+                ->vkFreeCommandBuffers(m_api->m_device, m_commandPools[i], 1, &m_commandBuffers[i]);
             m_api->vkDestroyFence(m_api->m_device, m_fences[i].fence, nullptr);
             m_api->vkDestroyCommandPool(m_api->m_device, m_commandPools[i], nullptr);
         }
@@ -35,7 +37,7 @@ void VulkanDeviceQueue::destroy()
 SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int queueIndex)
 {
     assert(m_api == nullptr);
-    
+
     for (int i = 0; i < int(EventType::CountOf); ++i)
     {
         m_semaphores[i] = VK_NULL_HANDLE;
@@ -135,7 +137,7 @@ void VulkanDeviceQueue::flushStepA()
     makeCompleted(EventType::EndFrame);
 }
 
-void VulkanDeviceQueue::_updateFenceAtIndex( int fenceIndex, bool blocking)
+void VulkanDeviceQueue::_updateFenceAtIndex(int fenceIndex, bool blocking)
 {
     Fence& fence = m_fences[fenceIndex];
 
@@ -143,7 +145,8 @@ void VulkanDeviceQueue::_updateFenceAtIndex( int fenceIndex, bool blocking)
     {
         uint64_t timeout = blocking ? ~uint64_t(0) : 0;
 
-        if (VK_SUCCESS == m_api->vkWaitForFences(m_api->m_device, 1, &fence.fence, VK_TRUE, timeout))
+        if (VK_SUCCESS ==
+            m_api->vkWaitForFences(m_api->m_device, 1, &fence.fence, VK_TRUE, timeout))
         {
             m_api->vkResetFences(m_api->m_device, 1, &fence.fence);
 
@@ -211,4 +214,4 @@ void VulkanDeviceQueue::makeCompleted(EventType eventType)
     m_currentSemaphores[int(eventType)] = VK_NULL_HANDLE;
 }
 
-} // renderer_test
+} // namespace gfx

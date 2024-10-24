@@ -1,13 +1,14 @@
 #pragma once
-#include <chrono>
-#include "slang.h"
-#include "../core/slang-range.h"
-#include "../compiler-core/slang-json-rpc.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
-#include "slang-workspace-version.h"
-#include "slang-language-server-completion.h"
+#include "../compiler-core/slang-json-rpc.h"
+#include "../core/slang-range.h"
 #include "slang-language-server-auto-format.h"
+#include "slang-language-server-completion.h"
 #include "slang-language-server-inlay-hints.h"
+#include "slang-workspace-version.h"
+#include "slang.h"
+
+#include <chrono>
 
 namespace Slang
 {
@@ -18,7 +19,8 @@ struct Command
     PersistentJSONValue id;
     String method;
 
-    template <typename T> struct Optional
+    template<typename T>
+    struct Optional
     {
     public:
         T* value = nullptr;
@@ -103,7 +105,8 @@ public:
 
     LanguageServerCore(LanguageServerStartupOptions options)
         : m_options(options)
-    {}
+    {
+    }
 
     SlangResult init(const LanguageServerProtocol::InitializeParams& args);
     SlangResult didOpenTextDocument(const LanguageServerProtocol::DidOpenTextDocumentParams& args);
@@ -111,14 +114,16 @@ public:
         const LanguageServerProtocol::DidCloseTextDocumentParams& args);
     SlangResult didChangeTextDocument(
         const LanguageServerProtocol::DidChangeTextDocumentParams& args);
-    LanguageServerResult<LanguageServerProtocol::Hover> hover(const LanguageServerProtocol::HoverParams& args);
+    LanguageServerResult<LanguageServerProtocol::Hover> hover(
+        const LanguageServerProtocol::HoverParams& args);
     LanguageServerResult<List<LanguageServerProtocol::Location>> gotoDefinition(
         const LanguageServerProtocol::DefinitionParams& args);
-    
+
     LanguageServerResult<CompletionResult> completion(
         const LanguageServerProtocol::CompletionParams& args);
     LanguageServerResult<LanguageServerProtocol::CompletionItem> completionResolve(
-        const LanguageServerProtocol::CompletionItem& args, const LanguageServerProtocol::TextEditCompletionItem& editItem);
+        const LanguageServerProtocol::CompletionItem& args,
+        const LanguageServerProtocol::TextEditCompletionItem& editItem);
     LanguageServerResult<LanguageServerProtocol::SemanticTokens> semanticTokens(
         const LanguageServerProtocol::SemanticTokensParams& args);
     LanguageServerResult<LanguageServerProtocol::SignatureHelp> signatureHelp(
@@ -133,8 +138,15 @@ public:
         const LanguageServerProtocol::DocumentRangeFormattingParams& args);
     LanguageServerResult<List<LanguageServerProtocol::TextEdit>> onTypeFormatting(
         const LanguageServerProtocol::DocumentOnTypeFormattingParams& args);
-    String getExprDeclSignature(Expr* expr, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges);
-    String getDeclRefSignature(DeclRef<Decl> declRef, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges);
+    String getExprDeclSignature(
+        Expr* expr,
+        String* outDocumentation,
+        List<Slang::Range<Index>>* outParamRanges);
+    String getDeclRefSignature(
+        DeclRef<Decl> declRef,
+        String* outDocumentation,
+        List<Slang::Range<Index>>* outParamRanges);
+
 private:
     slang::IGlobalSession* getOrCreateGlobalSession();
 
@@ -155,11 +167,11 @@ private:
         Index line);
 };
 
-class LanguageServer 
+class LanguageServer
 {
 private:
     static const int kConfigResponseId = 0x1213;
-    
+
 public:
     enum class TraceOptions
     {
@@ -167,7 +179,7 @@ public:
         Messages,
         Verbose
     };
-    
+
     bool m_quit = false;
     LanguageServerCore m_core;
     RefPtr<JSONRPCConnection> m_connection;
@@ -179,7 +191,8 @@ public:
 
     LanguageServer(LanguageServerStartupOptions options)
         : m_core(options)
-    {}
+    {
+    }
 
     SlangResult init(const LanguageServerProtocol::InitializeParams& args);
     SlangResult execute();
@@ -194,25 +207,37 @@ public:
         const LanguageServerProtocol::DidChangeConfigurationParams& args);
     SlangResult hover(const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId);
     SlangResult gotoDefinition(
-        const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DefinitionParams& args,
+        const JSONValue& responseId);
     SlangResult completion(
-        const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::CompletionParams& args,
+        const JSONValue& responseId);
     SlangResult completionResolve(
-        const LanguageServerProtocol::CompletionItem& args, const LanguageServerProtocol::TextEditCompletionItem& editItem, const JSONValue& responseId);
+        const LanguageServerProtocol::CompletionItem& args,
+        const LanguageServerProtocol::TextEditCompletionItem& editItem,
+        const JSONValue& responseId);
     SlangResult semanticTokens(
-        const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::SemanticTokensParams& args,
+        const JSONValue& responseId);
     SlangResult signatureHelp(
-        const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::SignatureHelpParams& args,
+        const JSONValue& responseId);
     SlangResult documentSymbol(
-        const LanguageServerProtocol::DocumentSymbolParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DocumentSymbolParams& args,
+        const JSONValue& responseId);
     SlangResult inlayHint(
-        const LanguageServerProtocol::InlayHintParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::InlayHintParams& args,
+        const JSONValue& responseId);
     SlangResult formatting(
-        const LanguageServerProtocol::DocumentFormattingParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DocumentFormattingParams& args,
+        const JSONValue& responseId);
     SlangResult rangeFormatting(
-        const LanguageServerProtocol::DocumentRangeFormattingParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DocumentRangeFormattingParams& args,
+        const JSONValue& responseId);
     SlangResult onTypeFormatting(
-        const LanguageServerProtocol::DocumentOnTypeFormattingParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DocumentOnTypeFormattingParams& args,
+        const JSONValue& responseId);
+
 private:
     SlangResult parseNextMessage();
     void resetDiagnosticUpdateTime();
@@ -221,7 +246,12 @@ private:
     void updateSearchPaths(const JSONValue& value);
     void updateSearchInWorkspace(const JSONValue& value);
     void updateCommitCharacters(const JSONValue& value);
-    void updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle, const JSONValue& clangFormatFallbackStyle, const JSONValue& allowLineBreakOnType, const JSONValue& allowLineBreakInRange);
+    void updateFormattingOptions(
+        const JSONValue& clangFormatLoc,
+        const JSONValue& clangFormatStyle,
+        const JSONValue& clangFormatFallbackStyle,
+        const JSONValue& allowLineBreakOnType,
+        const JSONValue& allowLineBreakInRange);
     void updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames);
     void updateTraceOptions(const JSONValue& value);
 

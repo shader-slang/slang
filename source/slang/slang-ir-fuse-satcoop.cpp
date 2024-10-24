@@ -16,9 +16,9 @@ namespace Slang
 
 static bool uses(IRInst* used, IRInst* user)
 {
-    for(auto use = used->firstUse; use; use = use->nextUse)
+    for (auto use = used->firstUse; use; use = use->nextUse)
     {
-        if(use->getUser() == user)
+        if (use->getUser() == user)
             return true;
     }
     return false;
@@ -26,7 +26,7 @@ static bool uses(IRInst* used, IRInst* user)
 
 // given: `f; x; g`
 // reorder instructions such that f and g are adjacent, in the form:
-// `p; f; g; q`, 
+// `p; f; g; q`,
 //
 // p is the set of instructions upon which g depends and q is the
 // set of instructions which depend on f. If these sets are not disjoint then
@@ -38,26 +38,28 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
 {
     List<IRInst*> ps, qs;
 
-    auto usesF = [&](IRInst* i){
-        if(uses(f, i))
+    auto usesF = [&](IRInst* i)
+    {
+        if (uses(f, i))
             return true;
-        for(auto q : qs)
-            if(uses(q, i))
+        for (auto q : qs)
+            if (uses(q, i))
                 return true;
         return false;
     };
-    auto usedByG = [&](IRInst* i){
-        if(uses(i, g))
+    auto usedByG = [&](IRInst* i)
+    {
+        if (uses(i, g))
             return true;
-        for(auto p : ps)
-            if(uses(i, p))
+        for (auto p : ps)
+            if (uses(i, p))
                 return true;
         return false;
     };
 
     // Scan backwards to find which instructions g depends on, known as p
     auto i = g->prev;
-    while(i != f)
+    while (i != f)
     {
         SLANG_ASSERT(i);
 
@@ -66,23 +68,23 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
         // For a slight optimization: This is actually stricter than we need:
         // if `x = p;q` and f and g are movable, then we can safely move f and
         // g in and maintain the ordering of p and q
-        if(!isMovableInst(i))
+        if (!isMovableInst(i))
             return nullptr;
-            
-        if(usedByG(i))
+
+        if (usedByG(i))
             ps.add(i);
         i = i->prev;
     }
 
     // Scan forwards to compute instructions which depend on f, the instructions in q
     i = f->next;
-    while(i != g)
+    while (i != g)
     {
-        if(usesF(i))
+        if (usesF(i))
         {
             // If this happens then ps and qs are not disjoint, and we will not
             // be able to float f and g together
-            if(ps.contains(i))
+            if (ps.contains(i))
                 return nullptr;
             qs.add(i);
         }
@@ -93,7 +95,7 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
     // Now we can safely reorder things by moving p;f;g before everything else
     // Remember, we constructed ps in reverse, so we must insert these
     // backwards too
-    for(Index j = ps.getCount()-1; j >= 0; --j)
+    for (Index j = ps.getCount() - 1; j >= 0; --j)
     {
         auto p = ps[j];
         p->removeFromParent();
@@ -111,7 +113,12 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
 // instead of split in a tuple.
 //
 // The outputs are returned in a 2-tuple
-static IRFunc* makeBiFanout(IRBuilder& builder, IRFunc* f, IRFunc* g, bool shareFirst, bool shareSecond)
+static IRFunc* makeBiFanout(
+    IRBuilder& builder,
+    IRFunc* f,
+    IRFunc* g,
+    bool shareFirst,
+    bool shareSecond)
 {
     SLANG_ASSERT(f->getParamCount() == 2);
     SLANG_ASSERT(g->getParamCount() == f->getParamCount());
@@ -129,12 +136,11 @@ static IRFunc* makeBiFanout(IRBuilder& builder, IRFunc* f, IRFunc* g, bool share
 
     // The return type is the tuple of f and g's return types
     auto resType = builder.getTupleType(f->getResultType(), g->getResultType());
-    auto firstInputType = shareFirst
-        ? f->getParamType(0)
-        : builder.getTupleType(f->getParamType(0), g->getParamType(0));
+    auto firstInputType = shareFirst ? f->getParamType(0)
+                                     : builder.getTupleType(f->getParamType(0), g->getParamType(0));
     auto secondInputType = shareSecond
-        ? f->getParamType(1)
-        : builder.getTupleType(f->getParamType(1), g->getParamType(1));
+                               ? f->getParamType(1)
+                               : builder.getTupleType(f->getParamType(1), g->getParamType(1));
 
     // Set up our function
     // func myFunc(s : S, u : (U1,U2)) -> (R1, R2)
@@ -164,7 +170,12 @@ static IRFunc* makeBiFanout(IRBuilder& builder, IRFunc* f, IRFunc* g, bool share
 
 // Given f : a -> uint4, g : b -> uint4, return z : (a, b) -> uint4 using
 // bitwise and to combine the outputs
-static IRFunc* makeWaveMatchBoth(IRBuilder& builder, IRType* inputTypeF, IRType* inputTypeG, IRInst* f, IRInst* g)
+static IRFunc* makeWaveMatchBoth(
+    IRBuilder& builder,
+    IRType* inputTypeF,
+    IRType* inputTypeG,
+    IRInst* f,
+    IRInst* g)
 {
     // SLANG_ASSERT(f->getParamCount() == 1);
     // SLANG_ASSERT(g->getParamCount() == f->getParamCount());
@@ -204,7 +215,12 @@ static IRFunc* makeWaveMatchBoth(IRBuilder& builder, IRType* inputTypeF, IRType*
 }
 
 // Similar to above
-static IRFunc* makeBroadcastBoth(IRBuilder& builder, IRType* inputTypeF, IRType* inputTypeG, IRInst* f, IRInst* g)
+static IRFunc* makeBroadcastBoth(
+    IRBuilder& builder,
+    IRType* inputTypeF,
+    IRType* inputTypeG,
+    IRInst* f,
+    IRInst* g)
 {
     // SLANG_ASSERT(f->getParamCount() == 2);
     // SLANG_ASSERT(g->getParamCount() == f->getParamCount());
@@ -250,7 +266,7 @@ struct SatCoopCall
     // The definition in hlsl.slang
     IRGeneric* generic;
 
-    // The specialization of that call 
+    // The specialization of that call
     IRSpecialize* specialize;
 
     // Called 'A' in the definition
@@ -281,7 +297,7 @@ static SatCoopCall getSatCoopCall(IRCall* f)
 
     // Since this is a call to saturated_cooperation, it must have at least
     // three specialization arguments for the type parameters A, B, C. We allow
-    // more here for any dictionaries or witnesses. 
+    // more here for any dictionaries or witnesses.
     SLANG_ASSERT(ret.specialize && ret.specialize->getArgCount() >= 3);
     ret.generic = as<IRGeneric>(ret.specialize->getBase());
     SLANG_ASSERT(ret.generic);
@@ -291,7 +307,7 @@ static SatCoopCall getSatCoopCall(IRCall* f)
     SLANG_ASSERT(ret.sharedInputType);
     SLANG_ASSERT(ret.distinctInputType);
     SLANG_ASSERT(ret.retType);
-    
+
     SLANG_ASSERT(f->getArgCount() == 6);
     ret.cooperate = as<IRFunc>(f->getArg(0));
     ret.fallback = as<IRFunc>(f->getArg(1));
@@ -321,8 +337,8 @@ static SatCoopCall getSatCoopCall(IRCall* f)
 //     q;
 //
 // Removes the first two calls, and returns the second one if creation was
-// successful. 
-// 
+// successful.
+//
 // This can fail if:
 //
 // p has side effects which c1 or f1 may depend on
@@ -344,13 +360,13 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
     SLANG_ASSERT(callF.generic == callG.generic);
 
     // If g uses the result of f, we can't fuse them with this logic (we could
-    // however with a replacement for 'fanout') 
-    if(uses(f, g))
+    // however with a replacement for 'fanout')
+    if (uses(f, g))
         return nullptr;
 
     // If there is no safe way to float these together, then fail
     const auto q = floatTogether(f, g);
-    if(!q)
+    if (!q)
         return nullptr;
     builder.setInsertBefore(q);
 
@@ -362,21 +378,21 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
     // Similarly for the shared input: if these use the same shared input then
     // the fusing is simpler (no need to make a product of s1 and s2)
     // TODO: if there is an injection from s1 to s2, then we can avoid the WaveMatch on s2
-    const bool usesSameSharedInput =
-        callF.sharedInput == callG.sharedInput &&
-        callF.waveMatch == callG.waveMatch &&
-        callF.broadcast == callG.broadcast;
+    const bool usesSameSharedInput = callF.sharedInput == callG.sharedInput &&
+                                     callF.waveMatch == callG.waveMatch &&
+                                     callF.broadcast == callG.broadcast;
     SLANG_ASSERT(!usesSameSharedInput || callF.sharedInputType == callG.sharedInputType);
 
     // Generate a new specialization of our saturated_cooperation_using function,
-    // reflecting the new input and output types. 
+    // reflecting the new input and output types.
     const auto newRetType = builder.getTupleType(callF.retType, callG.retType);
-    const auto sharedInputType = usesSameSharedInput
-        ? callF.sharedInputType
-        : builder.getTupleType(callF.sharedInputType, callG.sharedInputType);
-    const auto distinctInputType = usesSameDistinctInput 
-        ? callF.distinctInputType 
-        : builder.getTupleType(callF.distinctInputType, callG.distinctInputType);
+    const auto sharedInputType =
+        usesSameSharedInput ? callF.sharedInputType
+                            : builder.getTupleType(callF.sharedInputType, callG.sharedInputType);
+    const auto distinctInputType =
+        usesSameDistinctInput
+            ? callF.distinctInputType
+            : builder.getTupleType(callF.distinctInputType, callG.distinctInputType);
 
     // Make sure there are no other generic parameters which are are failing to
     // take care of here.
@@ -390,20 +406,38 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
         {sharedInputType, distinctInputType, newRetType});
 
     // Make our new functions, and joined inputs
-    const auto newCooperate = makeBiFanout(builder, callF.cooperate, callG.cooperate, usesSameSharedInput, usesSameDistinctInput);
-    const auto newFallback = makeBiFanout(builder, callF.fallback, callG.fallback, usesSameSharedInput, usesSameDistinctInput);
-    const auto newWaveMatch = usesSameSharedInput
-        ? callF.waveMatch
-        : makeWaveMatchBoth(builder, callF.sharedInputType, callG.sharedInputType, callF.waveMatch, callG.waveMatch);
-    const auto newBroadcast = usesSameSharedInput
-        ? callF.broadcast
-        : makeBroadcastBoth(builder, callF.sharedInputType, callG.sharedInputType, callF.broadcast, callG.broadcast);
+    const auto newCooperate = makeBiFanout(
+        builder,
+        callF.cooperate,
+        callG.cooperate,
+        usesSameSharedInput,
+        usesSameDistinctInput);
+    const auto newFallback = makeBiFanout(
+        builder,
+        callF.fallback,
+        callG.fallback,
+        usesSameSharedInput,
+        usesSameDistinctInput);
+    const auto newWaveMatch = usesSameSharedInput ? callF.waveMatch
+                                                  : makeWaveMatchBoth(
+                                                        builder,
+                                                        callF.sharedInputType,
+                                                        callG.sharedInputType,
+                                                        callF.waveMatch,
+                                                        callG.waveMatch);
+    const auto newBroadcast = usesSameSharedInput ? callF.broadcast
+                                                  : makeBroadcastBoth(
+                                                        builder,
+                                                        callF.sharedInputType,
+                                                        callG.sharedInputType,
+                                                        callF.broadcast,
+                                                        callG.broadcast);
     const auto newSharedInput = usesSameSharedInput
-        ? callF.sharedInput
-        : builder.emitMakeTuple(callF.sharedInput, callG.sharedInput);
-    const auto newDistinctInput = usesSameDistinctInput 
-        ? callF.distinctInput 
-        : builder.emitMakeTuple(callF.distinctInput, callG.distinctInput);
+                                    ? callF.sharedInput
+                                    : builder.emitMakeTuple(callF.sharedInput, callG.sharedInput);
+    const auto newDistinctInput =
+        usesSameDistinctInput ? callF.distinctInput
+                              : builder.emitMakeTuple(callF.distinctInput, callG.distinctInput);
 
     // Call it and extract the results from f and g
     const auto res = builder.emitCallInst(
@@ -426,22 +460,22 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
 IRCall* isKnownFunction(const char* n, IRInst* i)
 {
     auto call = as<IRCall>(i);
-    if(!call)
+    if (!call)
         return nullptr;
     // saturated_cooperation is a generic function, so look for specializations thereof
     auto spec = as<IRSpecialize>(call->getCallee());
-    if(!spec)
+    if (!spec)
         return nullptr;
     auto generic = findSpecializedGeneric(spec);
-    if(!generic)
+    if (!generic)
         return nullptr;
 
     auto inner = findGenericReturnVal(generic);
-    if(!inner)
+    if (!inner)
         return nullptr;
 
     auto h = inner->findDecoration<IRKnownBuiltinDecoration>();
-    if(!h || h->getName() != n)
+    if (!h || h->getName() != n)
         return nullptr;
     return call;
 }
@@ -486,10 +520,10 @@ static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
     List<IRCall*> toInline;
     for (auto inst : block->getChildren())
     {
-        if(auto sat_coop = isKnownFunction("saturated_cooperation", inst))
+        if (auto sat_coop = isKnownFunction("saturated_cooperation", inst))
             toInline.add(sat_coop);
     }
-    for(auto c : toInline)
+    for (auto c : toInline)
         inlineCall(c);
 
     // Walk over the instructions in this block
@@ -499,14 +533,15 @@ static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
     // then we remove the first call and replace the second with a fused
     // call.
     IRCall* lastCall = nullptr;
-    for(auto inst = block->getFirstInst(); inst != block->getTerminator(); inst = inst->getNextInst())
+    for (auto inst = block->getFirstInst(); inst != block->getTerminator();
+         inst = inst->getNextInst())
     {
-        if(auto call = isKnownFunction("saturated_cooperation_using", inst))
+        if (auto call = isKnownFunction("saturated_cooperation_using", inst))
         {
-            if(lastCall)
+            if (lastCall)
             {
                 auto fused = tryFuseCalls(builder, lastCall, call);
-                if(fused)
+                if (fused)
                 {
                     inst = fused;
                     lastCall = fused;
@@ -527,7 +562,7 @@ static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
 void fuseCallsToSaturatedCooperation(IRModule* module)
 {
     IRBuilder builder(module);
-    overAllBlocks(module, [&](auto b){fuseCallsInBlock(builder, b);});
+    overAllBlocks(module, [&](auto b) { fuseCallsInBlock(builder, b); });
 }
 
 } // namespace Slang

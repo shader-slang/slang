@@ -1,16 +1,16 @@
 // slang-ir-glsl-legalize.cpp
 #include "slang-ir-glsl-legalize.h"
 
-#include <functional>
-
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
+#include "slang-glsl-extension-tracker.h"
+#include "slang-ir-clone.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-single-return.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
-#include "slang-ir-clone.h"
-#include "slang-ir-single-return.h"
-#include "slang-glsl-extension-tracker.h"
+#include "slang-ir.h"
+
+#include <functional>
 
 #ifdef SLANG_USE_SYSTEM_SPIRV_HEADER
 #include <spirv/unified1/spirv.h>
@@ -20,36 +20,30 @@
 
 namespace Slang
 {
-    //
+//
 // Legalization of entry points for GLSL:
 //
 
-IRGlobalParam* addGlobalParam(
-    IRModule*   module,
-    IRType*     valueType)
+IRGlobalParam* addGlobalParam(IRModule* module, IRType* valueType)
 {
     IRBuilder builder(module);
 
     return builder.createGlobalParam(valueType);
 }
 
-void moveValueBefore(
-    IRInst*  valueToMove,
-    IRInst*  placeBefore)
+void moveValueBefore(IRInst* valueToMove, IRInst* placeBefore)
 {
     valueToMove->removeFromParent();
     valueToMove->insertBefore(placeBefore);
 }
 
-IRType* getFieldType(
-    IRType*         baseType,
-    IRStructKey*    fieldKey)
+IRType* getFieldType(IRType* baseType, IRStructKey* fieldKey)
 {
-    if(auto structType = as<IRStructType>(baseType))
+    if (auto structType = as<IRStructType>(baseType))
     {
-        for(auto ff : structType->getFields())
+        for (auto ff : structType->getFields())
         {
-            if(ff->getKey() == fieldKey)
+            if (ff->getKey() == fieldKey)
                 return ff->getFieldType();
         }
         SLANG_UNEXPECTED("no such field");
@@ -58,7 +52,6 @@ IRType* getFieldType(
     SLANG_UNEXPECTED("not a struct");
     UNREACHABLE_RETURN(nullptr);
 }
-
 
 
 // When scalarizing shader inputs/outputs for GLSL, we need a way
@@ -70,7 +63,8 @@ IRType* getFieldType(
 // The `ScalarizedVal` type deals with the "tuple or single value?"
 // question, and also the "l-value or r-value?" question.
 struct ScalarizedValImpl : RefObject
-{};
+{
+};
 struct ScalarizedTupleValImpl;
 struct ScalarizedTypeAdapterValImpl;
 
@@ -100,7 +94,8 @@ struct ScalarizedVal
         // or write.
         typeAdapter,
 
-        // Array index to the irValue. The actual index is stored in impl as ScalarizedArrayIndexValImpl
+        // Array index to the irValue. The actual index is stored in impl as
+        // ScalarizedArrayIndexValImpl
         arrayIndex,
     };
 
@@ -151,35 +146,33 @@ struct ScalarizedVal
 
     List<IRInst*> leafAddresses();
 
-    Flavor                      flavor = Flavor::none;
-    IRInst*                     irValue = nullptr;
-    RefPtr<ScalarizedValImpl>   impl;
+    Flavor flavor = Flavor::none;
+    IRInst* irValue = nullptr;
+    RefPtr<ScalarizedValImpl> impl;
 };
 
-IRInst* materializeValue(
-    IRBuilder* builder,
-    ScalarizedVal const& val);
+IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
 
 // This is the case for a value that is a "tuple" of other values
 struct ScalarizedTupleValImpl : ScalarizedValImpl
 {
     struct Element
     {
-        IRStructKey*    key;
-        ScalarizedVal   val;
+        IRStructKey* key;
+        ScalarizedVal val;
     };
 
-    IRType*         type;
-    List<Element>   elements;
+    IRType* type;
+    List<Element> elements;
 };
 
 // This is the case for a value that is stored with one type,
 // but needs to present itself as having a different type
 struct ScalarizedTypeAdapterValImpl : ScalarizedValImpl
 {
-    ScalarizedVal   val;
-    IRType*         actualType;   // the actual type of `val`
-    IRType*         pretendType;     // the type this value pretends to have
+    ScalarizedVal val;
+    IRType* actualType;  // the actual type of `val`
+    IRType* pretendType; // the type this value pretends to have
 };
 
 struct GlobalVaryingDeclarator
@@ -192,9 +185,9 @@ struct GlobalVaryingDeclarator
         meshOutputPrimitives,
     };
 
-    Flavor                      flavor;
-    IRInst*                     elementCount;
-    GlobalVaryingDeclarator*    next;
+    Flavor flavor;
+    IRInst* elementCount;
+    GlobalVaryingDeclarator* next;
 };
 
 enum GLSLSystemValueKind
@@ -211,10 +204,10 @@ struct GLSLSystemValueInfo
 
     // The name of an outer array that wraps
     // the variable, in the case of a GS input
-    char const*     outerArrayName;
+    char const* outerArrayName;
 
     // The required type of the built-in variable
-    IRType*     requiredType;
+    IRType* requiredType;
 
     // If the built in GLSL variable is an array, holds the index into the array.
     // If < 0, then there is no array indexing
@@ -226,32 +219,31 @@ struct GLSLSystemValueInfo
 
 static void leafAddressesImpl(List<IRInst*>& ret, const ScalarizedVal& v)
 {
-    switch(v.flavor)
+    switch (v.flavor)
     {
     case ScalarizedVal::Flavor::none:
-    case ScalarizedVal::Flavor::value:
-    break;
+    case ScalarizedVal::Flavor::value: break;
 
     case ScalarizedVal::Flavor::address:
-    {
-        ret.add(v.irValue);
-    }
-    break;
-    case ScalarizedVal::Flavor::tuple:
-    {
-        auto tupleVal = as<ScalarizedTupleValImpl>(v.impl);
-        for(auto e : tupleVal->elements)
         {
-            leafAddressesImpl(ret, e.val);
+            ret.add(v.irValue);
         }
-    }
-    break;
+        break;
+    case ScalarizedVal::Flavor::tuple:
+        {
+            auto tupleVal = as<ScalarizedTupleValImpl>(v.impl);
+            for (auto e : tupleVal->elements)
+            {
+                leafAddressesImpl(ret, e.val);
+            }
+        }
+        break;
     case ScalarizedVal::Flavor::typeAdapter:
-    {
-        auto typeAdapterVal = as<ScalarizedTypeAdapterValImpl>(v.impl);
-        leafAddressesImpl(ret, typeAdapterVal->val);
-    }
-    break;
+        {
+            auto typeAdapterVal = as<ScalarizedTypeAdapterValImpl>(v.impl);
+            leafAddressesImpl(ret, typeAdapterVal->val);
+        }
+        break;
     }
 }
 
@@ -264,12 +256,12 @@ List<IRInst*> ScalarizedVal::leafAddresses()
 
 struct GLSLLegalizationContext
 {
-    Session*                   session;
-    GLSLExtensionTracker*      glslExtensionTracker;
-    DiagnosticSink*            sink;
-    Stage                      stage;
-    IRFunc*                    entryPointFunc;
-    
+    Session* session;
+    GLSLExtensionTracker* glslExtensionTracker;
+    DiagnosticSink* sink;
+    Stage stage;
+    IRFunc* entryPointFunc;
+
     /// This dictionary stores all bindings of 'VaryingIn/VaryingOut'. We assume 'space' is 0.
     Dictionary<LayoutResourceKind, UIntSet> usedBindingIndex;
 
@@ -281,10 +273,7 @@ struct GLSLLegalizationContext
 
     struct SystemSemanticGlobal
     {
-        void addIndex(Index index)
-        {
-            maxIndex = (index > maxIndex) ? index : maxIndex;
-        }
+        void addIndex(Index index) { maxIndex = (index > maxIndex) ? index : maxIndex; }
 
         IRGlobalParam* globalParam;
         Count maxIndex;
@@ -312,15 +301,9 @@ struct GLSLLegalizationContext
         glslExtensionTracker->requireVersion(version);
     }
 
-    Stage getStage()
-    {
-        return stage;
-    }
+    Stage getStage() { return stage; }
 
-    DiagnosticSink* getSink()
-    {
-        return sink;
-    }
+    DiagnosticSink* getSink() { return sink; }
 
     IRBuilder* builder;
     IRBuilder* getBuilder() { return builder; }
@@ -329,23 +312,23 @@ struct GLSLLegalizationContext
 // This examines the passed type and determines the GLSL mesh shader indices
 // builtin name and type
 GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
-    GLSLLegalizationContext*    context,
-    LayoutResourceKind          kind,
-    Stage                       stage,
-    IRType*                     type,
-    GlobalVaryingDeclarator*    declarator,
-    GLSLSystemValueInfo*        inStorage)
+    GLSLLegalizationContext* context,
+    LayoutResourceKind kind,
+    Stage stage,
+    IRType* type,
+    GlobalVaryingDeclarator* declarator,
+    GLSLSystemValueInfo* inStorage)
 {
     IRBuilder* builder = context->builder;
-    if(stage != Stage::Mesh)
+    if (stage != Stage::Mesh)
     {
         return nullptr;
     }
-    if(kind != LayoutResourceKind::VaryingOutput)
+    if (kind != LayoutResourceKind::VaryingOutput)
     {
         return nullptr;
     }
-    if(!declarator || declarator->flavor != GlobalVaryingDeclarator::Flavor::meshOutputIndices)
+    if (!declarator || declarator->flavor != GlobalVaryingDeclarator::Flavor::meshOutputIndices)
     {
         return nullptr;
     }
@@ -354,7 +337,7 @@ GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
     inStorage->outerArrayName = nullptr;
 
     // Points
-    if(isIntegralType(type))
+    if (isIntegralType(type))
     {
         inStorage->name = "gl_PrimitivePointIndicesEXT";
         inStorage->requiredType = builder->getUIntType();
@@ -365,24 +348,22 @@ GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
     auto elemType = composeGetters<IRType>(type, &IRVectorType::getElementType);
 
     // Lines
-    if(vectorCount->getValue() == 2 && isIntegralType(elemType))
+    if (vectorCount->getValue() == 2 && isIntegralType(elemType))
     {
         inStorage->name = "gl_PrimitiveLineIndicesEXT";
-        inStorage->requiredType =
-            builder->getVectorType(
-                builder->getUIntType(),
-                builder->getIntValue(builder->getIntType(), 2));
+        inStorage->requiredType = builder->getVectorType(
+            builder->getUIntType(),
+            builder->getIntValue(builder->getIntType(), 2));
         return inStorage;
     }
 
     // Triangles
-    if(vectorCount->getValue() == 3 && isIntegralType(elemType))
+    if (vectorCount->getValue() == 3 && isIntegralType(elemType))
     {
         inStorage->name = "gl_PrimitiveTriangleIndicesEXT";
-        inStorage->requiredType =
-            builder->getVectorType(
-                builder->getUIntType(),
-                builder->getIntValue(builder->getIntType(), 3));
+        inStorage->requiredType = builder->getVectorType(
+            builder->getUIntType(),
+            builder->getIntValue(builder->getIntType(), 3));
         return inStorage;
     }
 
@@ -390,24 +371,19 @@ GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
 }
 
 GLSLSystemValueInfo* getGLSLSystemValueInfo(
-    GLSLLegalizationContext*    context,
-    CodeGenContext*             codeGenContext,
-    IRVarLayout*                varLayout,
-    LayoutResourceKind          kind,
-    Stage                       stage,
-    IRType*                     type,
-    GlobalVaryingDeclarator*    declarator,
-    GLSLSystemValueInfo*        inStorage)
+    GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
+    IRVarLayout* varLayout,
+    LayoutResourceKind kind,
+    Stage stage,
+    IRType* type,
+    GlobalVaryingDeclarator* declarator,
+    GLSLSystemValueInfo* inStorage)
 {
     SLANG_UNUSED(codeGenContext);
 
-    if(auto indicesSemantic = getMeshOutputIndicesSystemValueInfo(
-            context,
-            kind,
-            stage,
-            type,
-            declarator,
-            inStorage))
+    if (auto indicesSemantic =
+            getMeshOutputIndicesSystemValueInfo(context, kind, stage, type, declarator, inStorage))
     {
         return indicesSemantic;
     }
@@ -418,7 +394,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     GLSLSystemValueKind systemValueKind = GLSLSystemValueKind::General;
 
     auto semanticInst = varLayout->findSystemValueSemanticAttr();
-    if(!semanticInst)
+    if (!semanticInst)
         return nullptr;
 
     String semanticNameSpelling = semanticInst->getName();
@@ -426,13 +402,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
     // HLSL semantic types can be found here
     // https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/dx-graphics-hlsl-semantics
-    /// NOTE! While there might be an "official" type for most of these in HLSL, in practice the user is allowed to declare almost anything
-    /// that the HLSL compiler can implicitly convert to/from the correct type
+    /// NOTE! While there might be an "official" type for most of these in HLSL, in practice the
+    /// user is allowed to declare almost anything that the HLSL compiler can implicitly convert
+    /// to/from the correct type
 
     auto builder = context->getBuilder();
     IRType* requiredType = nullptr;
 
-    if(semanticName == "sv_position")
+    if (semanticName == "sv_position")
     {
         // float4 in hlsl & glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_FragCoord.xhtml
@@ -446,14 +423,12 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // because a user might have a VS output `SV_Position`,
         // and then pass it along to a GS that reads it as input.
         //
-        if( stage == Stage::Fragment
-            && kind == LayoutResourceKind::VaryingInput )
+        if (stage == Stage::Fragment && kind == LayoutResourceKind::VaryingInput)
         {
             name = "gl_FragCoord";
             systemValueKind = GLSLSystemValueKind::PositionInput;
         }
-        else if( stage == Stage::Geometry
-            && kind == LayoutResourceKind::VaryingInput )
+        else if (stage == Stage::Geometry && kind == LayoutResourceKind::VaryingInput)
         {
             // As a GS input, the correct syntax is `gl_in[...].gl_Position`,
             // but that is not compatible with picking the array dimension later,
@@ -470,9 +445,11 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             }
         }
 
-        requiredType = builder->getVectorType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 4));
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 4));
     }
-    else if(semanticName == "sv_target")
+    else if (semanticName == "sv_target")
     {
         // Note: we do *not* need to generate some kind of `gl_`
         // builtin for fragment-shader outputs: they are just
@@ -480,13 +457,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // as far as GLSL is concerned.
         return nullptr;
     }
-    else if(semanticName == "sv_clipdistance")
+    else if (semanticName == "sv_clipdistance")
     {
         // TODO: type conversion is required here.
 
         // float in hlsl & glsl.
-        // "Clip distance data. SV_ClipDistance values are each assumed to be a float32 signed distance to a plane."
-        // In glsl clipping value meaning is probably different
+        // "Clip distance data. SV_ClipDistance values are each assumed to be a float32 signed
+        // distance to a plane." In glsl clipping value meaning is probably different
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_ClipDistance.xhtml
 
         name = "gl_ClipDistance";
@@ -494,7 +471,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         arrayIndex = int(semanticInst->getIndex());
     }
-    else if(semanticName == "sv_culldistance")
+    else if (semanticName == "sv_culldistance")
     {
         // float in hlsl & glsl.
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_CullDistance.xhtml
@@ -505,7 +482,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_CullDistance";
         requiredType = builder->getBasicType(BaseType::Float);
     }
-    else if(semanticName == "sv_coverage")
+    else if (semanticName == "sv_coverage")
     {
         // uint in hlsl, int in glsl
         // https://www.opengl.org/sdk/docs/manglsl/docbook4/xhtml/gl_SampleMask.xml
@@ -517,7 +494,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // on allows for a 32 bits worth of coverage, we will
         // only use the first array element in the generated GLSL.
 
-        if( kind == LayoutResourceKind::VaryingInput )
+        if (kind == LayoutResourceKind::VaryingInput)
         {
             name = "gl_SampleMaskIn";
         }
@@ -527,78 +504,87 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         }
         arrayIndex = 0;
     }
-    else if(semanticName == "sv_innercoverage")
+    else if (semanticName == "sv_innercoverage")
     {
         // uint in hlsl, bool in glsl
         // https://www.khronos.org/registry/OpenGL/extensions/NV/NV_conservative_raster_underestimation.txt
 
-        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_conservative_raster_underestimation"));
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_NV_conservative_raster_underestimation"));
 
         name = "gl_FragFullyCoveredNV";
         requiredType = builder->getBasicType(BaseType::Bool);
     }
-    else if(semanticName == "sv_depth")
+    else if (semanticName == "sv_depth")
     {
         // Float in hlsl & glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_FragDepth.xhtml
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
     }
-    else if(semanticName == "sv_depthgreaterequal")
+    else if (semanticName == "sv_depthgreaterequal")
     {
         // TODO: layout(depth_greater) out float gl_FragDepth;
 
-        // Type is 'unknown' in hlsl 
+        // Type is 'unknown' in hlsl
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
     }
-    else if(semanticName == "sv_depthlessequal")
+    else if (semanticName == "sv_depthlessequal")
     {
         // TODO: layout(depth_greater) out float gl_FragDepth;
 
-        // 'unknown' in hlsl, float in glsl 
+        // 'unknown' in hlsl, float in glsl
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
     }
-    else if(semanticName == "sv_dispatchthreadid")
+    else if (semanticName == "sv_dispatchthreadid")
     {
         // uint3 in hlsl, uvec3 in glsl
         // https://www.opengl.org/sdk/docs/manglsl/docbook4/xhtml/gl_GlobalInvocationID.xml
         name = "gl_GlobalInvocationID";
 
-        requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::UInt),
+            builder->getIntValue(builder->getIntType(), 3));
     }
-    else if(semanticName == "sv_domainlocation")
+    else if (semanticName == "sv_domainlocation")
     {
         // float2|3 in hlsl, vec3 in glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_TessCoord.xhtml
 
-        requiredType = builder->getVectorType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 3));
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 3));
 
         name = "gl_TessCoord";
     }
-    else if(semanticName == "sv_groupid")
+    else if (semanticName == "sv_groupid")
     {
         // uint3 in hlsl, uvec3 in glsl
         // https://www.opengl.org/sdk/docs/manglsl/docbook4/xhtml/gl_WorkGroupID.xml
         name = "gl_WorkGroupID";
 
-        requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::UInt),
+            builder->getIntValue(builder->getIntType(), 3));
     }
-    else if(semanticName == "sv_groupindex")
+    else if (semanticName == "sv_groupindex")
     {
         // uint in hlsl & in glsl
         name = "gl_LocalInvocationIndex";
         requiredType = builder->getBasicType(BaseType::UInt);
     }
-    else if(semanticName == "sv_groupthreadid")
+    else if (semanticName == "sv_groupthreadid")
     {
         // uint3 in hlsl, uvec3 in glsl
         name = "gl_LocalInvocationID";
 
-        requiredType = builder->getVectorType(builder->getBasicType(BaseType::UInt), builder->getIntValue(builder->getIntType(), 3));
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::UInt),
+            builder->getIntValue(builder->getIntType(), 3));
     }
-    else if(semanticName == "sv_gsinstanceid")
+    else if (semanticName == "sv_gsinstanceid")
     {
         // uint in hlsl, int in glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_InvocationID.xhtml
@@ -606,22 +592,22 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_InvocationID";
     }
-    else if(semanticName == "sv_instanceid")
+    else if (semanticName == "sv_instanceid")
     {
         // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/d3d10-graphics-programming-guide-input-assembler-stage-using#instanceid
-        // uint in hlsl, int in glsl 
+        // uint in hlsl, int in glsl
 
         requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_InstanceIndex";
     }
-    else if(semanticName == "sv_isfrontface")
+    else if (semanticName == "sv_isfrontface")
     {
         // bool in hlsl & glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_FrontFacing.xhtml
         name = "gl_FrontFacing";
         requiredType = builder->getBasicType(BaseType::Bool);
     }
-    else if(semanticName == "sv_outputcontrolpointid")
+    else if (semanticName == "sv_outputcontrolpointid")
     {
         // uint in hlsl, int in glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_InvocationID.xhtml
@@ -636,17 +622,15 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_PointSize";
         requiredType = builder->getBasicType(BaseType::Float);
     }
-    else if(semanticName == "sv_primitiveid")
+    else if (semanticName == "sv_primitiveid")
     {
         // uint in hlsl, int in glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_PrimitiveID.xhtml
         requiredType = builder->getBasicType(BaseType::Int);
 
-        switch( context->getStage() )
+        switch (context->getStage())
         {
-        default:
-            name = "gl_PrimitiveID";
-            break;
+        default: name = "gl_PrimitiveID"; break;
 
         case Stage::Geometry:
             // GLSL makes a confusing design choice here.
@@ -660,7 +644,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             // other stages access with `gl_PrimitiveID`), the
             // programmer must write `gl_PrimitiveIDIn`.
             //
-            if( kind == LayoutResourceKind::VaryingInput )
+            if (kind == LayoutResourceKind::VaryingInput)
             {
                 name = "gl_PrimitiveIDIn";
             }
@@ -678,18 +662,15 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         switch (context->getStage())
         {
-        case Stage::Geometry:
-            context->requireGLSLVersion(ProfileVersion::GLSL_150);
-            break;
+        case Stage::Geometry: context->requireGLSLVersion(ProfileVersion::GLSL_150); break;
 
-        case Stage::Fragment:
-            context->requireGLSLVersion(ProfileVersion::GLSL_430);
-            break;
+        case Stage::Fragment: context->requireGLSLVersion(ProfileVersion::GLSL_430); break;
 
         default:
             context->requireGLSLVersion(ProfileVersion::GLSL_450);
             context->requireSPIRVVersion(SemanticVersion(1, 5, 0));
-            context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_shader_viewport_layer_array"));
+            context->requireGLSLExtension(
+                UnownedStringSlice::fromLiteral("GL_ARB_shader_viewport_layer_array"));
             break;
         }
 
@@ -716,13 +697,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_tessfactor")
     {
-        // TODO(JS): Adjust type does *not* handle the conversion correctly. More specifically a float array hlsl
-        // parameter goes through code to make SOA in createGLSLGlobalVaryingsImpl.  
-        // 
+        // TODO(JS): Adjust type does *not* handle the conversion correctly. More specifically a
+        // float array hlsl parameter goes through code to make SOA in createGLSLGlobalVaryingsImpl.
+        //
         // Can be input and output.
-        // 
+        //
         // https://docs.microsoft.com/en-us/windows/desktop/direct3dhlsl/sv-tessfactor
-        // "Tessellation factors must be declared as an array; they cannot be packed into a single vector."
+        // "Tessellation factors must be declared as an array; they cannot be packed into a single
+        // vector."
         //
         // float[2|3|4] in hlsl, float[4] on glsl (ie both are arrays but might be different size)
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_TessLevelOuter.xhtml
@@ -730,14 +712,18 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_TessLevelOuter";
 
         // float[4] on glsl
-        requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 4));
+        requiredType = builder->getArrayType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 4));
     }
     else if (semanticName == "sv_insidetessfactor")
     {
         name = "gl_TessLevelInner";
 
         // float[2] on glsl
-        requiredType = builder->getArrayType(builder->getBasicType(BaseType::Float), builder->getIntValue(builder->getIntType(), 2));
+        requiredType = builder->getArrayType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 2));
     }
     else if (semanticName == "sv_vertexid")
     {
@@ -764,7 +750,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "nv_x_right")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NVX_multiview_per_view_attributes"));
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_NVX_multiview_per_view_attributes"));
 
         // The actual output in GLSL is:
         //
@@ -784,31 +771,33 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_PositionPerViewNV[1]";
         arrayIndex = 1;
 
-//            shared->requiresCopyGLPositionToPositionPerView = true;
+        //            shared->requiresCopyGLPositionToPositionPerView = true;
     }
     else if (semanticName == "nv_viewport_mask")
     {
         // TODO: This doesn't seem to work correctly on it's own between hlsl/glsl
 
-        // Indeed on slang issue 109 claims this remains a problem  
+        // Indeed on slang issue 109 claims this remains a problem
         // https://github.com/shader-slang/slang/issues/109
 
-        // On hlsl it's UINT related. "higher 16 bits for the right view, lower 16 bits for the left view."
-        // There is use in hlsl shader code as uint4 - not clear if that varies 
+        // On hlsl it's UINT related. "higher 16 bits for the right view, lower 16 bits for the left
+        // view." There is use in hlsl shader code as uint4 - not clear if that varies
         // https://github.com/KhronosGroup/GLSL/blob/master/extensions/nvx/GL_NVX_multiview_per_view_attributes.txt
         // On glsl its highp int gl_ViewportMaskPerViewNV[];
 
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NVX_multiview_per_view_attributes"));
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_NVX_multiview_per_view_attributes"));
 
         name = "gl_ViewportMaskPerViewNV";
-//            globalVarExpr = createGLSLBuiltinRef("gl_ViewportMaskPerViewNV",
-//                getUnsizedArrayType(getIntType()));
+        //            globalVarExpr = createGLSLBuiltinRef("gl_ViewportMaskPerViewNV",
+        //                getUnsizedArrayType(getIntType()));
     }
     else if (semanticName == "sv_barycentrics")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
         name = "gl_BaryCoordEXT";
 
         // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
@@ -831,7 +820,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         }
     }
 
-    if( name )
+    if (name)
     {
         inStorage->name = name;
         inStorage->outerArrayName = outerArrayName;
@@ -841,7 +830,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         return inStorage;
     }
 
-    context->getSink()->diagnose(varLayout->sourceLoc, Diagnostics::unknownSystemValueSemantic, semanticNameSpelling);
+    context->getSink()->diagnose(
+        varLayout->sourceLoc,
+        Diagnostics::unknownSystemValueSemantic,
+        semanticNameSpelling);
     return nullptr;
 }
 
@@ -898,7 +890,8 @@ void createVarLayoutForLegalizedGlobalParam(
         auto decorParent = paramInfo;
         if (auto field = as<IRStructField>(decorParent))
             decorParent = field->getKey();
-        if (auto interpolationModeDecor = decorParent->findDecoration<IRInterpolationModeDecoration>())
+        if (auto interpolationModeDecor =
+                decorParent->findDecoration<IRInterpolationModeDecoration>())
         {
             builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
             break;
@@ -912,11 +905,15 @@ void createVarLayoutForLegalizedGlobalParam(
 
     if (systemValueInfo)
     {
-        builder->addImportDecoration(globalParam, UnownedTerminatedStringSlice(systemValueInfo->name));
+        builder->addImportDecoration(
+            globalParam,
+            UnownedTerminatedStringSlice(systemValueInfo->name));
 
         if (auto outerArrayName = systemValueInfo->outerArrayName)
         {
-            builder->addGLSLOuterArrayDecoration(globalParam, UnownedTerminatedStringSlice(outerArrayName));
+            builder->addGLSLOuterArrayDecoration(
+                globalParam,
+                UnownedTerminatedStringSlice(outerArrayName));
         }
 
         switch (systemValueInfo->kind)
@@ -927,13 +924,14 @@ void createVarLayoutForLegalizedGlobalParam(
         case GLSLSystemValueKind::PositionInput:
             builder->addGLPositionInputDecoration(globalParam);
             break;
-        default:
-            break;
+        default: break;
         }
     }
 }
 
-IRInst* getOrCreateBuiltinParamForHullShader(GLSLLegalizationContext* context, UnownedStringSlice builtinSemantic)
+IRInst* getOrCreateBuiltinParamForHullShader(
+    GLSLLegalizationContext* context,
+    UnownedStringSlice builtinSemantic)
 {
     IRInst* outputControlPointIdParam = nullptr;
     if (context->stage == Stage::Hull)
@@ -956,7 +954,8 @@ IRInst* getOrCreateBuiltinParamForHullShader(GLSLLegalizationContext* context, U
         {
             IRBuilder builder(context->entryPointFunc);
             auto paramType = builder.getIntType();
-            builder.setInsertBefore(context->entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+            builder.setInsertBefore(
+                context->entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
             outputControlPointIdParam = builder.emitParam(paramType);
             IRStructTypeLayout::Builder typeBuilder(&builder);
             auto typeLayout = typeBuilder.build();
@@ -970,7 +969,10 @@ IRInst* getOrCreateBuiltinParamForHullShader(GLSLLegalizationContext* context, U
     return outputControlPointIdParam;
 }
 
-IRTypeLayout* createPatchConstantFuncResultTypeLayout(GLSLLegalizationContext* context, IRBuilder& irBuilder, IRType* type)
+IRTypeLayout* createPatchConstantFuncResultTypeLayout(
+    GLSLLegalizationContext* context,
+    IRBuilder& irBuilder,
+    IRType* type)
 {
     if (auto structType = as<IRStructType>(type))
     {
@@ -978,7 +980,8 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(GLSLLegalizationContext* c
         for (auto field : structType->getFields())
         {
             auto fieldType = field->getFieldType();
-            IRTypeLayout* fieldTypeLayout = createPatchConstantFuncResultTypeLayout(context, irBuilder, fieldType);
+            IRTypeLayout* fieldTypeLayout =
+                createPatchConstantFuncResultTypeLayout(context, irBuilder, fieldType);
             IRVarLayout::Builder fieldVarLayoutBuilder(&irBuilder, fieldTypeLayout);
             auto decoration = field->getKey()->findDecoration<IRSemanticDecoration>();
             if (decoration)
@@ -988,12 +991,14 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(GLSLLegalizationContext* c
             }
             else
             {
-                auto varLayoutForKind = fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
-                
+                auto varLayoutForKind =
+                    fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+
                 UInt space = 0;
                 varLayoutForKind->space = space;
 
-                auto unusedBinding = context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
+                auto unusedBinding =
+                    context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
                 varLayoutForKind->offset = unusedBinding;
                 context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
             }
@@ -1004,7 +1009,10 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(GLSLLegalizationContext* c
     }
     else if (auto arrayType = as<IRArrayTypeBase>(type))
     {
-        auto elementTypeLayout = createPatchConstantFuncResultTypeLayout(context, irBuilder, arrayType->getElementType());
+        auto elementTypeLayout = createPatchConstantFuncResultTypeLayout(
+            context,
+            irBuilder,
+            arrayType->getElementType());
         IRArrayTypeLayout::Builder builder(&irBuilder, elementTypeLayout);
         return builder.build();
     }
@@ -1023,7 +1031,10 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     IRFunc* func,
     IRVarLayout* resultLayout);
 
-void invokePathConstantFuncInHullShader(GLSLLegalizationContext* context, CodeGenContext* codeGenContext, ScalarizedVal outputPatchVal)
+void invokePathConstantFuncInHullShader(
+    GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
+    ScalarizedVal outputPatchVal)
 {
     auto entryPoint = context->entryPointFunc;
     auto patchConstantFuncDecor = entryPoint->findDecoration<IRPatchConstantFuncDecoration>();
@@ -1064,7 +1075,10 @@ void invokePathConstantFuncInHullShader(GLSLLegalizationContext* context, CodeGe
         {
             if (!outputPatchArg)
             {
-                context->getSink()->diagnose(param->sourceLoc, Diagnostics::unknownPatchConstantParameter, param);
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
             param->setFullType(outputPatchArg->getDataType());
@@ -1074,10 +1088,15 @@ void invokePathConstantFuncInHullShader(GLSLLegalizationContext* context, CodeGe
         {
             if (!inputPatchArg)
             {
-                context->getSink()->diagnose(param->sourceLoc, Diagnostics::unknownPatchConstantParameter, param);
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
-            auto arrayType = builder.getArrayType(inputPatchType->getElementType(), inputPatchType->getElementCount());
+            auto arrayType = builder.getArrayType(
+                inputPatchType->getElementType(),
+                inputPatchType->getElementCount());
             param->setFullType(arrayType);
             args.add(inputPatchArg);
         }
@@ -1086,18 +1105,26 @@ void invokePathConstantFuncInHullShader(GLSLLegalizationContext* context, CodeGe
             auto layout = findVarLayout(param);
             if (!layout)
             {
-                context->getSink()->diagnose(param->sourceLoc, Diagnostics::unknownPatchConstantParameter, param);
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
             auto sysAttr = layout->findSystemValueSemanticAttr();
             if (!sysAttr)
             {
-                context->getSink()->diagnose(param->sourceLoc, Diagnostics::unknownPatchConstantParameter, param);
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
             if (sysAttr->getName().caseInsensitiveEquals(toSlice("SV_OutputControlPointID")))
             {
-                args.add(getOrCreateBuiltinParamForHullShader(context, toSlice("SV_OutputControlPointID")));
+                args.add(getOrCreateBuiltinParamForHullShader(
+                    context,
+                    toSlice("SV_OutputControlPointID")));
             }
             else if (sysAttr->getName().caseInsensitiveEquals(toSlice("SV_PrimitiveID")))
             {
@@ -1105,7 +1132,10 @@ void invokePathConstantFuncInHullShader(GLSLLegalizationContext* context, CodeGe
             }
             else
             {
-                context->getSink()->diagnose(param->sourceLoc, Diagnostics::unknownPatchConstantParameter, param);
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
         }
@@ -1127,16 +1157,22 @@ void invokePathConstantFuncInHullShader(GLSLLegalizationContext* context, CodeGe
         noSideEffectDecor->removeAndDeallocate();
 
     builder.setInsertBefore(constantFunc->getFirstBlock()->getFirstOrdinaryInst());
-    
+
     auto constantOutputType = constantFunc->getResultType();
-    IRTypeLayout* constantOutputLayout = createPatchConstantFuncResultTypeLayout(context, builder, constantOutputType);
+    IRTypeLayout* constantOutputLayout =
+        createPatchConstantFuncResultTypeLayout(context, builder, constantOutputType);
     IRVarLayout::Builder resultVarLayoutBuilder(&builder, constantOutputLayout);
     if (auto semanticDecor = constantFunc->findDecoration<IRSemanticDecoration>())
         resultVarLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
 
     context->entryPointFunc = constantFunc;
     context->stage = Stage::Unknown;
-    legalizeEntryPointReturnValueForGLSL(context, codeGenContext, builder, constantFunc, resultVarLayoutBuilder.build());
+    legalizeEntryPointReturnValueForGLSL(
+        context,
+        codeGenContext,
+        builder,
+        constantFunc,
+        resultVarLayoutBuilder.build());
     context->entryPointFunc = entryPoint;
     context->stage = Stage::Hull;
 
@@ -1144,19 +1180,19 @@ void invokePathConstantFuncInHullShader(GLSLLegalizationContext* context, CodeGe
 }
 
 ScalarizedVal createSimpleGLSLGlobalVarying(
-    GLSLLegalizationContext*    context,
-    CodeGenContext*             codeGenContext,
-    IRBuilder*                  builder,
-    IRType*                     inType,
-    IRVarLayout*                inVarLayout,
-    IRTypeLayout*               inTypeLayout,
-    LayoutResourceKind          kind,
-    Stage                       stage,
-    UInt                        bindingIndex,
-    UInt                        bindingSpace,
-    GlobalVaryingDeclarator*    declarator,
-    OuterParamInfoLink*         outerParamInfo,
-    StringBuilder&              nameHintSB)
+    GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
+    IRBuilder* builder,
+    IRType* inType,
+    IRVarLayout* inVarLayout,
+    IRTypeLayout* inTypeLayout,
+    LayoutResourceKind kind,
+    Stage stage,
+    UInt bindingIndex,
+    UInt bindingSpace,
+    GlobalVaryingDeclarator* declarator,
+    OuterParamInfoLink* outerParamInfo,
+    StringBuilder& nameHintSB)
 {
     // Check if we have a system value on our hands.
     GLSLSystemValueInfo systemValueInfoStorage;
@@ -1173,9 +1209,13 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     {
 
         auto systemSemantic = inVarLayout->findAttr<IRSystemValueSemanticAttr>();
-        // Validate the system value, convert to a regular parameter if this is not a valid system value for a given target.
-        if (systemSemantic && isSPIRV(codeGenContext->getTargetFormat()) && systemSemantic->getName().caseInsensitiveEquals(UnownedStringSlice("sv_instanceid"))
-            && ((stage == Stage::Fragment) || (stage == Stage::Vertex && inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
+        // Validate the system value, convert to a regular parameter if this is not a valid system
+        // value for a given target.
+        if (systemSemantic && isSPIRV(codeGenContext->getTargetFormat()) &&
+            systemSemantic->getName().caseInsensitiveEquals(UnownedStringSlice("sv_instanceid")) &&
+            ((stage == Stage::Fragment) ||
+             (stage == Stage::Vertex &&
+              inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
         {
             ShortList<IRInst*> newOperands;
             auto opCount = inVarLayout->getOperandCount();
@@ -1195,7 +1235,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                 newOperands.getArrayView().getBuffer());
 
             newVarLayout->sourceLoc = inVarLayout->sourceLoc;
-            
+
             inVarLayout->replaceUsesWith(newVarLayout);
         }
     }
@@ -1206,7 +1246,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     bool peeledRequiredArrayLevelMatchesUserDeclaredType = false;
     // A system-value semantic might end up needing to override the type
     // that the user specified.
-    if( systemValueInfo && systemValueInfo->requiredType )
+    if (systemValueInfo && systemValueInfo->requiredType)
     {
         type = systemValueInfo->requiredType;
         peeledRequiredType = type;
@@ -1235,7 +1275,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     }
 
     // If we have a declarator, we just use the normal logic, as that seems to work correctly
-    // 
+    //
     if (systemValueInfo && systemValueInfo->arrayIndex >= 0 && declarator == nullptr)
     {
         // If declarator is set we have a problem, because we can't have an array of arrays
@@ -1247,7 +1287,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
         // Let's see if it has been already created
 
-        // Note! Assumes that the memory backing the name stays in scope! Does if the memory is string constants
+        // Note! Assumes that the memory backing the name stays in scope! Does if the memory is
+        // string constants
         UnownedTerminatedStringSlice systemValueName(systemValueInfo->name);
 
         auto semanticGlobal = context->systemNameToGlobalMap.tryGetValue(systemValueName);
@@ -1258,49 +1299,61 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             GLSLLegalizationContext::SystemSemanticGlobal semanticGlobalTmp;
 
             // We need to create the global. For now we *don't* know how many indices will be used.
-            // So we will 
+            // So we will
 
-            // Create the array type, but *don't* set the array size, because at this point we don't know.
-            // We can at the end replace any accesses to this variable with the correctly sized global
+            // Create the array type, but *don't* set the array size, because at this point we don't
+            // know. We can at the end replace any accesses to this variable with the correctly
+            // sized global
 
             semanticGlobalTmp.maxIndex = Count(systemValueInfo->arrayIndex);
 
-            // Set the array size to 0, to mean it is unsized 
-            auto arrayType = builder->getArrayType(
-                type,
-                0);
+            // Set the array size to 0, to mean it is unsized
+            auto arrayType = builder->getArrayType(type, 0);
 
             IRType* paramType = kind == LayoutResourceKind::VaryingOutput
-                ? (IRType*)builder->getOutType(arrayType)
-                : arrayType;
+                                    ? (IRType*)builder->getOutType(arrayType)
+                                    : arrayType;
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
-            
+
             builder->addImportDecoration(globalParam, systemValueName);
 
             createVarLayoutForLegalizedGlobalParam(
-                context, globalParam, builder, inVarLayout, inTypeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
+                context,
+                globalParam,
+                builder,
+                inVarLayout,
+                inTypeLayout,
+                kind,
+                bindingIndex,
+                bindingSpace,
+                declarator,
+                outerParamInfo,
+                systemValueInfo);
 
             semanticGlobalTmp.globalParam = globalParam;
 
-            semanticGlobal = &context->systemNameToGlobalMap.getOrAddValue(systemValueName, semanticGlobalTmp); 
+            semanticGlobal =
+                &context->systemNameToGlobalMap.getOrAddValue(systemValueName, semanticGlobalTmp);
         }
 
         // Update the max
         semanticGlobal->addIndex(systemValueInfo->arrayIndex);
 
         // Make it an array index
-        ScalarizedVal val = ScalarizedVal::scalarizedArrayIndex(semanticGlobal->globalParam, systemValueInfo->arrayIndex);
-        
+        ScalarizedVal val = ScalarizedVal::scalarizedArrayIndex(
+            semanticGlobal->globalParam,
+            systemValueInfo->arrayIndex);
+
         // We need to make this access, an array access to the global
-        if( auto fromType = systemValueInfo->requiredType )
+        if (auto fromType = systemValueInfo->requiredType)
         {
             // We may need to adapt from the declared type to/from
             // the actual type of the GLSL global.
             auto toType = inType;
 
-            if( !isTypeEqual(fromType, toType ))
+            if (!isTypeEqual(fromType, toType))
             {
                 RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
                 typeAdapter->actualType = systemValueInfo->requiredType;
@@ -1318,62 +1371,60 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     //
     IRTypeLayout* typeLayout = inTypeLayout;
     Index requiredArraySizeIndex = peeledRequiredArraySizes.getCount() - 1;
-    for( auto dd = declarator; dd; dd = dd->next )
+    for (auto dd = declarator; dd; dd = dd->next)
     {
-        switch(dd->flavor)
+        switch (dd->flavor)
         {
         case GlobalVaryingDeclarator::Flavor::array:
-        {
-            auto elementCount = peeledRequiredArrayLevelMatchesUserDeclaredType
-                ? peeledRequiredArraySizes[requiredArraySizeIndex] : dd->elementCount;
-
-            auto arrayType = builder->getArrayType(
-                type,
-                elementCount);
-            requiredArraySizeIndex--;
-
-            IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
-            if( auto resInfo = inTypeLayout->findSizeAttr(kind) )
             {
-                // TODO: it is kind of gross to be re-running some
-                // of the type layout logic here.
+                auto elementCount = peeledRequiredArrayLevelMatchesUserDeclaredType
+                                        ? peeledRequiredArraySizes[requiredArraySizeIndex]
+                                        : dd->elementCount;
 
-                arrayTypeLayoutBuilder.addResourceUsage(
-                    kind,
-                    resInfo->getSize() * getIntVal(elementCount));
+                auto arrayType = builder->getArrayType(type, elementCount);
+                requiredArraySizeIndex--;
+
+                IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
+                if (auto resInfo = inTypeLayout->findSizeAttr(kind))
+                {
+                    // TODO: it is kind of gross to be re-running some
+                    // of the type layout logic here.
+
+                    arrayTypeLayoutBuilder.addResourceUsage(
+                        kind,
+                        resInfo->getSize() * getIntVal(elementCount));
+                }
+                auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
+
+                type = arrayType;
+                typeLayout = arrayTypeLayout;
             }
-            auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
-
-            type = arrayType;
-            typeLayout = arrayTypeLayout;
-        }
-        break;
+            break;
         case GlobalVaryingDeclarator::Flavor::meshOutputVertices:
         case GlobalVaryingDeclarator::Flavor::meshOutputIndices:
         case GlobalVaryingDeclarator::Flavor::meshOutputPrimitives:
-        {
-            // It's legal to declare these as unsized arrays, but by sizing
-            // them by the (max) max size GLSL allows us to index into them
-            // with variable index.
-            SLANG_ASSERT(dd->elementCount && "Mesh output declarator didn't specify element count");
-            auto arrayType = builder->getArrayType(type, dd->elementCount);
-
-            IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
-            if( auto resInfo = inTypeLayout->findSizeAttr(kind) )
             {
-                // Although these are arrays, they consume slots as though
-                // they're scalar parameters, so don't multiply the usage by the
-                // (runtime) array size.
-                arrayTypeLayoutBuilder.addResourceUsage(
-                    kind,
-                    resInfo->getSize());
-            }
-            auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
+                // It's legal to declare these as unsized arrays, but by sizing
+                // them by the (max) max size GLSL allows us to index into them
+                // with variable index.
+                SLANG_ASSERT(
+                    dd->elementCount && "Mesh output declarator didn't specify element count");
+                auto arrayType = builder->getArrayType(type, dd->elementCount);
 
-            type = arrayType;
-            typeLayout = arrayTypeLayout;
-        }
-        break;
+                IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, typeLayout);
+                if (auto resInfo = inTypeLayout->findSizeAttr(kind))
+                {
+                    // Although these are arrays, they consume slots as though
+                    // they're scalar parameters, so don't multiply the usage by the
+                    // (runtime) array size.
+                    arrayTypeLayoutBuilder.addResourceUsage(kind, resInfo->getSize());
+                }
+                auto arrayTypeLayout = arrayTypeLayoutBuilder.build();
+
+                type = arrayType;
+                typeLayout = arrayTypeLayout;
+            }
+            break;
         }
     }
 
@@ -1392,7 +1443,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
 
-    ScalarizedVal val = isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
+    ScalarizedVal val =
+        isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
 
     if (systemValueInfo)
     {
@@ -1420,53 +1472,93 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     }
 
     createVarLayoutForLegalizedGlobalParam(
-        context, globalParam, builder, inVarLayout, typeLayout, kind, bindingIndex, bindingSpace, declarator, outerParamInfo, systemValueInfo);
+        context,
+        globalParam,
+        builder,
+        inVarLayout,
+        typeLayout,
+        kind,
+        bindingIndex,
+        bindingSpace,
+        declarator,
+        outerParamInfo,
+        systemValueInfo);
     return val;
 }
 
 ScalarizedVal createGLSLGlobalVaryingsImpl(
-    GLSLLegalizationContext*    context,
-    CodeGenContext*             codeGenContext,
-    IRBuilder*                  builder,
-    IRType*                     type,
-    IRVarLayout*                varLayout,
-    IRTypeLayout*               typeLayout,
-    LayoutResourceKind          kind,
-    Stage                       stage,
-    UInt                        bindingIndex,
-    UInt                        bindingSpace,
-    GlobalVaryingDeclarator*    declarator,
-    OuterParamInfoLink*         outerParamInfo,
-    IRInst*                     leafVar,
-    StringBuilder&              nameHintSB)
+    GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
+    IRBuilder* builder,
+    IRType* type,
+    IRVarLayout* varLayout,
+    IRTypeLayout* typeLayout,
+    LayoutResourceKind kind,
+    Stage stage,
+    UInt bindingIndex,
+    UInt bindingSpace,
+    GlobalVaryingDeclarator* declarator,
+    OuterParamInfoLink* outerParamInfo,
+    IRInst* leafVar,
+    StringBuilder& nameHintSB)
 {
     if (as<IRVoidType>(type))
     {
         return ScalarizedVal();
     }
-    else if( as<IRBasicType>(type) )
+    else if (as<IRBasicType>(type))
     {
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
+            builder,
+            type,
+            varLayout,
+            typeLayout,
+            kind,
+            stage,
+            bindingIndex,
+            bindingSpace,
+            declarator,
+            outerParamInfo,
+            nameHintSB);
     }
-    else if( as<IRVectorType>(type) )
+    else if (as<IRVectorType>(type))
     {
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
+            builder,
+            type,
+            varLayout,
+            typeLayout,
+            kind,
+            stage,
+            bindingIndex,
+            bindingSpace,
+            declarator,
+            outerParamInfo,
+            nameHintSB);
     }
-    else if( as<IRMatrixType>(type) )
+    else if (as<IRMatrixType>(type))
     {
         // TODO: a matrix-type varying should probably be handled like an array of rows
         return createSimpleGLSLGlobalVarying(
             context,
             codeGenContext,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
+            builder,
+            type,
+            varLayout,
+            typeLayout,
+            kind,
+            stage,
+            bindingIndex,
+            bindingSpace,
+            declarator,
+            outerParamInfo,
+            nameHintSB);
     }
-    else if( auto arrayType = as<IRArrayType>(type) )
+    else if (auto arrayType = as<IRArrayType>(type))
     {
         // We will need to SOA-ize any nested types.
 
@@ -1497,7 +1589,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             leafVar,
             nameHintSB);
     }
-    else if( auto meshOutputType = as<IRMeshOutputType>(type))
+    else if (auto meshOutputType = as<IRMeshOutputType>(type))
     {
         // We will need to SOA-ize any nested types.
         // TODO: Ellie, deduplicate with the above case?
@@ -1508,20 +1600,13 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         auto elementTypeLayout = arrayLayout->getElementTypeLayout();
 
         GlobalVaryingDeclarator arrayDeclarator;
-        switch(type->getOp())
+        switch (type->getOp())
         {
             using F = GlobalVaryingDeclarator::Flavor;
-            case kIROp_VerticesType:
-                arrayDeclarator.flavor = F::meshOutputVertices;
-                break;
-            case kIROp_IndicesType:
-                arrayDeclarator.flavor = F::meshOutputIndices;
-                break;
-            case kIROp_PrimitivesType:
-                arrayDeclarator.flavor = F::meshOutputPrimitives;
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled mesh output type");
+        case kIROp_VerticesType:   arrayDeclarator.flavor = F::meshOutputVertices; break;
+        case kIROp_IndicesType:    arrayDeclarator.flavor = F::meshOutputIndices; break;
+        case kIROp_PrimitivesType: arrayDeclarator.flavor = F::meshOutputPrimitives; break;
+        default:                   SLANG_UNEXPECTED("Unhandled mesh output type");
         }
         arrayDeclarator.elementCount = meshOutputType->getMaxElementCount();
         arrayDeclarator.next = declarator;
@@ -1542,7 +1627,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             leafVar,
             nameHintSB);
     }
-    else if( auto streamType = as<IRHLSLStreamOutputType>(type))
+    else if (auto streamType = as<IRHLSLStreamOutputType>(type))
     {
         auto elementType = streamType->getElementType();
         auto streamLayout = as<IRStreamOutputTypeLayout>(typeLayout);
@@ -1565,7 +1650,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             leafVar,
             nameHintSB);
     }
-    else if(auto structType = as<IRStructType>(type))
+    else if (auto structType = as<IRStructType>(type))
     {
         // We need to recurse down into the individual fields,
         // and generate a variable for each of them.
@@ -1582,20 +1667,18 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
         // Construct the actual type for the tuple (including any outer arrays)
         IRType* fullType = type;
-        for( auto dd = declarator; dd; dd = dd->next )
+        for (auto dd = declarator; dd; dd = dd->next)
         {
-            switch(dd->flavor)
+            switch (dd->flavor)
             {
             case GlobalVaryingDeclarator::Flavor::meshOutputVertices:
             case GlobalVaryingDeclarator::Flavor::meshOutputIndices:
             case GlobalVaryingDeclarator::Flavor::meshOutputPrimitives:
             case GlobalVaryingDeclarator::Flavor::array:
-            {
-                fullType = builder->getArrayType(
-                    fullType,
-                    dd->elementCount);
-            }
-            break;
+                {
+                    fullType = builder->getArrayType(fullType, dd->elementCount);
+                }
+                break;
             }
         }
 
@@ -1606,7 +1689,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         UInt fieldCounter = 0;
         auto nameSBLength = nameHintSB.getLength();
 
-        for(auto field : structType->getFields())
+        for (auto field : structType->getFields())
         {
             UInt fieldIndex = fieldCounter++;
 
@@ -1614,7 +1697,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
             UInt fieldBindingIndex = bindingIndex;
             UInt fieldBindingSpace = bindingSpace;
-            if( auto fieldResInfo = fieldLayout->findOffsetAttr(kind) )
+            if (auto fieldResInfo = fieldLayout->findOffsetAttr(kind))
             {
                 fieldBindingIndex += fieldResInfo->getOffset();
                 fieldBindingSpace += fieldResInfo->getSpace();
@@ -1659,22 +1742,32 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     return createSimpleGLSLGlobalVarying(
         context,
         codeGenContext,
-        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, outerParamInfo, nameHintSB);
+        builder,
+        type,
+        varLayout,
+        typeLayout,
+        kind,
+        stage,
+        bindingIndex,
+        bindingSpace,
+        declarator,
+        outerParamInfo,
+        nameHintSB);
 }
 
 ScalarizedVal createGLSLGlobalVaryings(
-    GLSLLegalizationContext*    context,
-    CodeGenContext*             codeGenContext,
-    IRBuilder*                  builder,
-    IRType*                     type,
-    IRVarLayout*                layout,
-    LayoutResourceKind          kind,
-    Stage                       stage,
-    IRInst*                     leafVar)
+    GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
+    IRBuilder* builder,
+    IRType* type,
+    IRVarLayout* layout,
+    LayoutResourceKind kind,
+    Stage stage,
+    IRInst* leafVar)
 {
     UInt bindingIndex = 0;
     UInt bindingSpace = 0;
-    if( auto rr = layout->findOffsetAttr(kind) )
+    if (auto rr = layout->findOffsetAttr(kind))
     {
         bindingIndex = rr->getOffset();
         bindingSpace = rr->getSpace();
@@ -1695,7 +1788,8 @@ ScalarizedVal createGLSLGlobalVaryings(
     if (stage == Stage::Hull && kind == LayoutResourceKind::VaryingOutput)
     {
         // Hull shader's output should be materialized into an array.
-        auto outputControlPointsDecor = context->entryPointFunc->findDecoration<IROutputControlPointsDecoration>();
+        auto outputControlPointsDecor =
+            context->entryPointFunc->findDecoration<IROutputControlPointsDecoration>();
         if (outputControlPointsDecor)
         {
             arrayDeclarator.flavor = GlobalVaryingDeclarator::Flavor::array;
@@ -1708,24 +1802,34 @@ ScalarizedVal createGLSLGlobalVaryings(
     return createGLSLGlobalVaryingsImpl(
         context,
         codeGenContext,
-        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, declarator, &outerParamInfo, leafVar, namehintSB);
+        builder,
+        type,
+        layout,
+        layout->getTypeLayout(),
+        kind,
+        stage,
+        bindingIndex,
+        bindingSpace,
+        declarator,
+        &outerParamInfo,
+        leafVar,
+        namehintSB);
 }
 
 ScalarizedVal extractField(
-    IRBuilder*              builder,
-    ScalarizedVal const&    val,
+    IRBuilder* builder,
+    ScalarizedVal const& val,
     // Pass ~0 in to search for the index via the key
-    UInt                    fieldIndex,
-    IRStructKey*            fieldKey)
+    UInt fieldIndex,
+    IRStructKey* fieldKey)
 {
-    switch( val.flavor )
+    switch (val.flavor)
     {
     case ScalarizedVal::Flavor::value:
-        return ScalarizedVal::value(
-            builder->emitFieldExtract(
-                getFieldType(val.irValue->getDataType(), fieldKey),
-                val.irValue,
-                fieldKey));
+        return ScalarizedVal::value(builder->emitFieldExtract(
+            getFieldType(val.irValue->getDataType(), fieldKey),
+            val.irValue,
+            fieldKey));
 
     case ScalarizedVal::Flavor::address:
         {
@@ -1734,26 +1838,23 @@ ScalarizedVal extractField(
             auto fieldType = getFieldType(valType, fieldKey);
             auto fieldPtrType = builder->getPtrType(ptrType->getOp(), fieldType);
             return ScalarizedVal::address(
-                builder->emitFieldAddress(
-                    fieldPtrType,
-                    val.irValue,
-                    fieldKey));
+                builder->emitFieldAddress(fieldPtrType, val.irValue, fieldKey));
         }
 
     case ScalarizedVal::Flavor::tuple:
         {
             auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
             const auto& es = tupleVal->elements;
-            if(fieldIndex == kMaxUInt)
+            if (fieldIndex == kMaxUInt)
             {
-                for(fieldIndex = 0; fieldIndex < (UInt)es.getCount(); ++fieldIndex)
+                for (fieldIndex = 0; fieldIndex < (UInt)es.getCount(); ++fieldIndex)
                 {
-                    if(es[fieldIndex].key == fieldKey)
+                    if (es[fieldIndex].key == fieldKey)
                     {
                         break;
                     }
                 }
-                if(fieldIndex >= (UInt)es.getCount())
+                if (fieldIndex >= (UInt)es.getCount())
                 {
                     SLANG_UNEXPECTED("Unable to find field index from struct key");
                 }
@@ -1761,18 +1862,11 @@ ScalarizedVal extractField(
             return es[fieldIndex].val;
         }
 
-    default:
-        SLANG_UNEXPECTED("unimplemented");
-        UNREACHABLE_RETURN(ScalarizedVal());
+    default: SLANG_UNEXPECTED("unimplemented"); UNREACHABLE_RETURN(ScalarizedVal());
     }
-
 }
 
-ScalarizedVal adaptType(
-    IRBuilder*              builder,
-    IRInst*                 val,
-    IRType*                 toType,
-    IRType*                 fromType)
+ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType* fromType)
 {
     if (auto fromVector = as<IRVectorType>(fromType))
     {
@@ -1780,7 +1874,9 @@ ScalarizedVal adaptType(
         {
             if (fromVector->getElementCount() != toVector->getElementCount())
             {
-                fromType = builder->getVectorType(fromVector->getElementType(), toVector->getElementCount());
+                fromType = builder->getVectorType(
+                    fromVector->getElementType(),
+                    toVector->getElementCount());
                 val = builder->emitVectorReshape(fromType, val);
             }
         }
@@ -1794,22 +1890,23 @@ ScalarizedVal adaptType(
     {
         if (as<IRBasicType>(toType))
         {
-            val = builder->emitElementExtract(fromArray->getElementType(), val, builder->getIntValue(builder->getIntType(), 0));
+            val = builder->emitElementExtract(
+                fromArray->getElementType(),
+                val,
+                builder->getIntValue(builder->getIntType(), 0));
         }
     }
     // TODO: actually consider what needs to go on here...
-    return ScalarizedVal::value(builder->emitCast(
-        toType,
-        val));
+    return ScalarizedVal::value(builder->emitCast(toType, val));
 }
 
 ScalarizedVal adaptType(
-    IRBuilder*              builder,
-    ScalarizedVal const&    val,
-    IRType*                 toType,
-    IRType*                 fromType)
+    IRBuilder* builder,
+    ScalarizedVal const& val,
+    IRType* toType,
+    IRType* fromType)
 {
-    switch( val.flavor )
+    switch (val.flavor)
     {
     case ScalarizedVal::Flavor::value:
         return adaptType(builder, val.irValue, toType, fromType);
@@ -1823,30 +1920,28 @@ ScalarizedVal adaptType(
         break;
     case ScalarizedVal::Flavor::arrayIndex:
         {
-            auto element = builder->emitElementExtract(val.irValue, as<ScalarizedArrayIndexValImpl>(val.impl)->index);
+            auto element = builder->emitElementExtract(
+                val.irValue,
+                as<ScalarizedArrayIndexValImpl>(val.impl)->index);
             return adaptType(builder, element, toType, fromType);
         }
         break;
-    default:
-        SLANG_UNEXPECTED("unimplemented");
-        UNREACHABLE_RETURN(ScalarizedVal());
+    default: SLANG_UNEXPECTED("unimplemented"); UNREACHABLE_RETURN(ScalarizedVal());
     }
 }
 
-IRInst* materializeValue(
-    IRBuilder*              builder,
-    ScalarizedVal const&    val);
+IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
 
 void assign(
-    IRBuilder*              builder,
-    ScalarizedVal const&    left,
-    ScalarizedVal const&    right,
+    IRBuilder* builder,
+    ScalarizedVal const& left,
+    ScalarizedVal const& right,
     // Pass nullptr for an unindexed write (for everything but mesh shaders)
-    IRInst*                 index = nullptr)
+    IRInst* index = nullptr)
 {
-    switch( left.flavor )
+    switch (left.flavor)
     {
-        case ScalarizedVal::Flavor::arrayIndex:
+    case ScalarizedVal::Flavor::arrayIndex:
         {
             // Get the rhs value
             auto rhs = materializeValue(builder, right);
@@ -1866,14 +1961,14 @@ void assign(
 
             break;
         }
-        case ScalarizedVal::Flavor::address:
+    case ScalarizedVal::Flavor::address:
         {
-            switch( right.flavor )
+            switch (right.flavor)
             {
-                case ScalarizedVal::Flavor::value:
+            case ScalarizedVal::Flavor::value:
                 {
                     auto address = left.irValue;
-                    if(index)
+                    if (index)
                     {
                         address = builder->emitElementAddress(
                             builder->getPtrType(right.irValue->getFullType()),
@@ -1883,13 +1978,13 @@ void assign(
                     builder->emitStore(address, right.irValue);
                     break;
                 }
-                case ScalarizedVal::Flavor::address:
+            case ScalarizedVal::Flavor::address:
                 {
                     auto val = builder->emitLoad(right.irValue);
                     builder->emitStore(left.irValue, val);
                     break;
                 }
-                case ScalarizedVal::Flavor::tuple:
+            case ScalarizedVal::Flavor::tuple:
                 {
                     // We are assigning from a tuple to a destination
                     // that is not a tuple. We will perform assignment
@@ -1897,44 +1992,35 @@ void assign(
                     auto rightTupleVal = as<ScalarizedTupleValImpl>(right.impl);
                     Index elementCount = rightTupleVal->elements.getCount();
 
-                    for( Index ee = 0; ee < elementCount; ++ee )
+                    for (Index ee = 0; ee < elementCount; ++ee)
                     {
                         auto rightElement = rightTupleVal->elements[ee];
-                        auto leftElementVal = extractField(
-                            builder,
-                            left,
-                            ee,
-                            rightElement.key);
+                        auto leftElementVal = extractField(builder, left, ee, rightElement.key);
                         assign(builder, leftElementVal, rightElement.val, index);
                     }
                     break;
                 }
 
-                default:
-                    SLANG_UNEXPECTED("unimplemented");
-                    break;
+            default: SLANG_UNEXPECTED("unimplemented"); break;
             }
             break;
         }
-        case ScalarizedVal::Flavor::tuple:
+    case ScalarizedVal::Flavor::tuple:
         {
             // We have a tuple, so we are going to need to try and assign
             // to each of its constituent fields.
             auto leftTupleVal = as<ScalarizedTupleValImpl>(left.impl);
             Index elementCount = leftTupleVal->elements.getCount();
 
-            for( Index ee = 0; ee < elementCount; ++ee )
+            for (Index ee = 0; ee < elementCount; ++ee)
             {
-                auto rightElementVal = extractField(
-                    builder,
-                    right,
-                    ee,
-                    leftTupleVal->elements[ee].key);
+                auto rightElementVal =
+                    extractField(builder, right, ee, leftTupleVal->elements[ee].key);
                 assign(builder, leftTupleVal->elements[ee].val, rightElementVal, index);
             }
             break;
         }
-        case ScalarizedVal::Flavor::typeAdapter:
+    case ScalarizedVal::Flavor::typeAdapter:
         {
             // We are trying to assign to something that had its type adjusted,
             // so we will need to adjust the type of the right-hand side first.
@@ -1942,11 +2028,12 @@ void assign(
             // In this case we are converting to the actual type of the GLSL variable,
             // from the "pretend" type that it had in the IR before.
             auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(left.impl);
-            auto adaptedRight = adaptType(builder, right, typeAdapter->actualType, typeAdapter->pretendType);
+            auto adaptedRight =
+                adaptType(builder, right, typeAdapter->actualType, typeAdapter->pretendType);
             assign(builder, typeAdapter->val, adaptedRight, index);
             break;
         }
-        default:
+    default:
         {
             SLANG_UNEXPECTED("unimplemented");
             break;
@@ -1955,26 +2042,20 @@ void assign(
 }
 
 ScalarizedVal getSubscriptVal(
-    IRBuilder*      builder,
-    IRType*         elementType,
-    ScalarizedVal   val,
-    IRInst*         indexVal)
+    IRBuilder* builder,
+    IRType* elementType,
+    ScalarizedVal val,
+    IRInst* indexVal)
 {
-    switch( val.flavor )
+    switch (val.flavor)
     {
     case ScalarizedVal::Flavor::value:
         return ScalarizedVal::value(
-            builder->emitElementExtract(
-                elementType,
-                val.irValue,
-                indexVal));
+            builder->emitElementExtract(elementType, val.irValue, indexVal));
 
     case ScalarizedVal::Flavor::address:
         return ScalarizedVal::address(
-            builder->emitElementAddress(
-                builder->getPtrType(elementType),
-                val.irValue,
-                indexVal));
+            builder->emitElementAddress(builder->getPtrType(elementType), val.irValue, indexVal));
 
     case ScalarizedVal::Flavor::tuple:
         {
@@ -1987,7 +2068,7 @@ ScalarizedVal getSubscriptVal(
             Index elementCounter = 0;
 
             auto structType = as<IRStructType>(elementType);
-            for(auto field : structType->getFields())
+            for (auto field : structType->getFields())
             {
                 auto tupleElementType = field->getFieldType();
 
@@ -1998,11 +2079,8 @@ ScalarizedVal getSubscriptVal(
 
                 ScalarizedTupleValImpl::Element resultElement;
                 resultElement.key = inputElement.key;
-                resultElement.val = getSubscriptVal(
-                    builder,
-                    tupleElementType,
-                    inputElement.val,
-                    indexVal);
+                resultElement.val =
+                    getSubscriptVal(builder, tupleElementType, inputElement.val, indexVal);
 
                 resultTuple->elements.add(resultElement);
             }
@@ -2018,42 +2096,31 @@ ScalarizedVal getSubscriptVal(
             resultAdapter->pretendType = inputAdapter->pretendType;
             resultAdapter->actualType = inputAdapter->actualType;
 
-            resultAdapter->val = getSubscriptVal(
-                builder,
-                inputAdapter->actualType,
-                inputAdapter->val,
-                indexVal);
+            resultAdapter->val =
+                getSubscriptVal(builder, inputAdapter->actualType, inputAdapter->val, indexVal);
             return ScalarizedVal::typeAdapter(resultAdapter);
         }
 
-    default:
-        SLANG_UNEXPECTED("unimplemented");
-        UNREACHABLE_RETURN(ScalarizedVal());
+    default: SLANG_UNEXPECTED("unimplemented"); UNREACHABLE_RETURN(ScalarizedVal());
     }
 }
 
 ScalarizedVal getSubscriptVal(
-    IRBuilder*      builder,
-    IRType*         elementType,
-    ScalarizedVal   val,
-    UInt            index)
+    IRBuilder* builder,
+    IRType* elementType,
+    ScalarizedVal val,
+    UInt index)
 {
     return getSubscriptVal(
         builder,
         elementType,
         val,
-        builder->getIntValue(
-            builder->getIntType(),
-            index));
+        builder->getIntValue(builder->getIntType(), index));
 }
 
-IRInst* materializeValue(
-    IRBuilder*              builder,
-    ScalarizedVal const&    val);
+IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
 
-IRInst* materializeTupleValue(
-    IRBuilder*      builder,
-    ScalarizedVal   val)
+IRInst* materializeTupleValue(IRBuilder* builder, ScalarizedVal val)
 {
     auto tupleVal = val.impl.as<ScalarizedTupleValImpl>();
     SLANG_ASSERT(tupleVal);
@@ -2061,7 +2128,7 @@ IRInst* materializeTupleValue(
     Index elementCount = tupleVal->elements.getCount();
     auto type = tupleVal->type;
 
-    if( auto arrayType = as<IRArrayType>(type))
+    if (auto arrayType = as<IRArrayType>(type))
     {
         // The tuple represent an array, which means that the
         // individual elements are expected to yield arrays as well.
@@ -2070,19 +2137,14 @@ IRInst* materializeTupleValue(
         // then use these to construct our result.
 
         List<IRInst*> arrayElementVals;
-        UInt arrayElementCount = (UInt) getIntVal(arrayType->getElementCount());
+        UInt arrayElementCount = (UInt)getIntVal(arrayType->getElementCount());
 
-        for( UInt ii = 0; ii < arrayElementCount; ++ii )
+        for (UInt ii = 0; ii < arrayElementCount; ++ii)
         {
-            auto arrayElementPseudoVal = getSubscriptVal(
-                builder,
-                arrayType->getElementType(),
-                val,
-                ii);
+            auto arrayElementPseudoVal =
+                getSubscriptVal(builder, arrayType->getElementType(), val, ii);
 
-            auto arrayElementVal = materializeValue(
-                builder,
-                arrayElementPseudoVal);
+            auto arrayElementVal = materializeValue(builder, arrayElementPseudoVal);
 
             arrayElementVals.add(arrayElementVal);
         }
@@ -2101,7 +2163,7 @@ IRInst* materializeTupleValue(
         SLANG_RELEASE_ASSERT(as<IRStructType>(type));
 
         List<IRInst*> elementVals;
-        for( Index ee = 0; ee < elementCount; ++ee )
+        for (Index ee = 0; ee < elementCount; ++ee)
         {
             auto elementVal = materializeValue(builder, tupleVal->elements[ee].val);
             elementVals.add(elementVal);
@@ -2114,14 +2176,11 @@ IRInst* materializeTupleValue(
     }
 }
 
-IRInst* materializeValue(
-    IRBuilder*              builder,
-    ScalarizedVal const&    val)
+IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
 {
-    switch( val.flavor )
+    switch (val.flavor)
     {
-    case ScalarizedVal::Flavor::value:
-        return val.irValue;
+    case ScalarizedVal::Flavor::value: return val.irValue;
 
     case ScalarizedVal::Flavor::address:
         {
@@ -2132,12 +2191,14 @@ IRInst* materializeValue(
 
     case ScalarizedVal::Flavor::arrayIndex:
         {
-            auto element = builder->emitElementExtract(val.irValue, as<ScalarizedArrayIndexValImpl>(val.impl)->index);
+            auto element = builder->emitElementExtract(
+                val.irValue,
+                as<ScalarizedArrayIndexValImpl>(val.impl)->index);
             return element;
         }
     case ScalarizedVal::Flavor::tuple:
         {
-            //auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
+            // auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
             return materializeTupleValue(builder, val);
         }
         break;
@@ -2149,22 +2210,24 @@ IRInst* materializeValue(
             // work we need to adapt the type from its actual type over
             // to its pretend type.
             auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(val.impl);
-            auto adapted = adaptType(builder, typeAdapter->val, typeAdapter->pretendType, typeAdapter->actualType);
+            auto adapted = adaptType(
+                builder,
+                typeAdapter->val,
+                typeAdapter->pretendType,
+                typeAdapter->actualType);
             return materializeValue(builder, adapted);
         }
         break;
 
-    default:
-        SLANG_UNEXPECTED("unimplemented");
-        break;
+    default: SLANG_UNEXPECTED("unimplemented"); break;
     }
 }
 
 void legalizeRayTracingEntryPointParameterForGLSL(
-    GLSLLegalizationContext*    context,
-    IRFunc*                     func,
-    IRParam*                    pp,
-    IRVarLayout*                paramLayout)
+    GLSLLegalizationContext* context,
+    IRFunc* func,
+    IRParam* pp,
+    IRVarLayout* paramLayout)
 {
     auto builder = context->getBuilder();
     auto paramType = pp->getDataType();
@@ -2214,27 +2277,26 @@ void legalizeRayTracingEntryPointParameterForGLSL(
 
 static void legalizeMeshPayloadInputParam(
     GLSLLegalizationContext* context,
-    CodeGenContext*          codeGenContext,
-    IRParam*                 pp)
+    CodeGenContext* codeGenContext,
+    IRParam* pp)
 {
     auto builder = context->getBuilder();
     auto stage = context->getStage();
-    SLANG_ASSERT(stage == Stage::Mesh && "legalizing mesh payload input, but we're not a mesh shader");
+    SLANG_ASSERT(
+        stage == Stage::Mesh && "legalizing mesh payload input, but we're not a mesh shader");
     IRBuilderInsertLocScope locScope{builder};
     builder->setInsertInto(builder->getModule());
 
     const auto ptrType = cast<IRPtrTypeBase>(pp->getDataType());
-    const auto g = builder->createGlobalVar(ptrType->getValueType(), AddressSpace::TaskPayloadWorkgroup);
+    const auto g =
+        builder->createGlobalVar(ptrType->getValueType(), AddressSpace::TaskPayloadWorkgroup);
     g->setFullType(builder->getRateQualifiedType(builder->getGroupSharedRate(), g->getFullType()));
     // moveValueBefore(g, builder->getFunc());
     builder->addNameHintDecoration(g, pp->findDecoration<IRNameHintDecoration>()->getName());
     pp->replaceUsesWith(g);
     struct MeshPayloadInputSpecializationCondition : FunctionCallSpecializeCondition
     {
-        bool doesParamWantSpecialization(IRParam*, IRInst* arg)
-        {
-            return arg == g;
-        }
+        bool doesParamWantSpecialization(IRParam*, IRInst* arg) { return arg == g; }
         IRInst* g;
     } condition;
     condition.g = g;
@@ -2272,11 +2334,11 @@ static void legalizePatchParam(
 
 static void legalizeMeshOutputParam(
     GLSLLegalizationContext* context,
-    CodeGenContext*          codeGenContext,
-    IRFunc*                  func,
-    IRParam*                 pp,
-    IRVarLayout*             paramLayout,
-    IRMeshOutputType*        meshOutputType)
+    CodeGenContext* codeGenContext,
+    IRFunc* func,
+    IRParam* pp,
+    IRVarLayout* paramLayout,
+    IRMeshOutputType* meshOutputType)
 {
     auto builder = context->getBuilder();
     auto stage = context->getStage();
@@ -2294,28 +2356,23 @@ static void legalizeMeshOutputParam(
         stage,
         pp);
 
-    switch ( globalOutputVal.flavor )
+    switch (globalOutputVal.flavor)
     {
     case ScalarizedVal::Flavor::tuple:
         {
             auto v = as<ScalarizedTupleValImpl>(globalOutputVal.impl);
 
             Index elementCount = v->elements.getCount();
-            for( Index ee = 0; ee < elementCount; ++ee )
+            for (Index ee = 0; ee < elementCount; ++ee)
             {
                 auto e = v->elements[ee];
-                auto leftElementVal = extractField(
-                    builder,
-                    globalOutputVal,
-                    ee,
-                    e.key);
+                auto leftElementVal = extractField(builder, globalOutputVal, ee, e.key);
             }
         }
         break;
     case ScalarizedVal::Flavor::value:
     case ScalarizedVal::Flavor::address:
-    case ScalarizedVal::Flavor::typeAdapter:
-        break;
+    case ScalarizedVal::Flavor::typeAdapter: break;
     }
 
     //
@@ -2338,10 +2395,7 @@ static void legalizeMeshOutputParam(
     // pp is only removed later on, so sadly we have to keep it around for now
     struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
     {
-        bool doesParamWantSpecialization(IRParam*, IRInst* arg)
-        {
-            return arg == g;
-        }
+        bool doesParamWantSpecialization(IRParam*, IRInst* arg) { return arg == g; }
         IRInst* g;
     } condition;
     condition.g = g;
@@ -2355,14 +2409,13 @@ static void legalizeMeshOutputParam(
     // the writes may only be writing to parts of the output struct, or may not
     // be writes at all (i.e. being passed as an out paramter).
     //
-    std::function<void(ScalarizedVal&, IRInst*)> assignUses =
-        [&](ScalarizedVal& d, IRInst* a)
+    std::function<void(ScalarizedVal&, IRInst*)> assignUses = [&](ScalarizedVal& d, IRInst* a)
     {
         // If we're just writing to an address, we can seamlessly
         // replace it with the address to the SOA representation.
         // GLSL's `out` function parameters have copy-out semantics, so
         // this is all above board.
-        if(d.flavor == ScalarizedVal::Flavor::address)
+        if (d.flavor == ScalarizedVal::Flavor::address)
         {
             IRBuilderInsertLocScope locScope{builder};
             builder->setInsertBefore(a);
@@ -2371,96 +2424,94 @@ static void legalizeMeshOutputParam(
             return;
         }
         // Otherwise, go through the uses one by one and see what we can do
-        traverseUsers(a, [&](IRInst* s)
-        {
-            IRBuilderInsertLocScope locScope{builder};
-            builder->setInsertBefore(s);
-            if(auto m = as<IRFieldAddress>(s))
+        traverseUsers(
+            a,
+            [&](IRInst* s)
             {
-                auto key = as<IRStructKey>(m->getField());
-                SLANG_ASSERT(key && "Result of getField wasn't a struct key");
-
-                auto d_ = extractField(builder, d, kMaxUInt, key);
-                assignUses(d_, m);
-            }
-            else if(auto ref = as<IRMeshOutputRef>(s))
-            {
-                auto elemType = composeGetters<IRType>(
-                    ref,
-                    &IRInst::getFullType,
-                    &IRPtrTypeBase::getValueType);
-                auto d_ = getSubscriptVal(builder, elemType, d, ref->getIndex());
-                assignUses(d_, ref);
-            }
-            else if(auto set = as<IRMeshOutputSet>(s))
-            {
-                auto elemType = composeGetters<IRType>(
-                    set->getElementValue(),
-                    &IRInst::getFullType);
-                auto d_ = getSubscriptVal(builder, elemType, d, set->getIndex());
-                assign(builder, d_, ScalarizedVal::value(set->getElementValue()));
-                set->removeAndDeallocate();
-            }
-            else if(auto g = as<IRGetElementPtr>(s))
-            {
-                // Writing to something like `struct Vertex{ Foo foo[10]; }`
-                // This case is also what's taken in the initial
-                // traversal, as every mesh output is an array.
-                auto elemType = composeGetters<IRType>(
-                    g,
-                    &IRInst::getFullType,
-                    &IRPtrTypeBase::getValueType);
-                auto d_ = getSubscriptVal(builder, elemType, d, g->getIndex());
-                assignUses(d_, g);
-            }
-            else if(auto store = as<IRStore>(s))
-            {
-                // Store using the SOA representation
-
-                assign(
-                    builder,
-                    d,
-                    ScalarizedVal::value(store->getVal()));
-
-                // Stores aren't used, safe to remove here without checking
-                store->removeAndDeallocate();
-            }
-            else if(auto c = as<IRCall>(s))
-            {
-                // Translate
-                //   foo(vertices[n])
-                // to
-                //   tmp
-                //   foo(tmp)
-                //   vertices[n] = tmp;
-                //
-                // This has copy-out semantics, which is really the
-                // best we can hope for without going and
-                // specializing foo.
-                auto ptr = as<IRPtrTypeBase>(a->getFullType());
-                SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
-                auto t = ptr->getValueType();
-                auto tmp = builder->emitVar(t);
-                for(UInt i = 0; i < c->getOperandCount(); i++)
+                IRBuilderInsertLocScope locScope{builder};
+                builder->setInsertBefore(s);
+                if (auto m = as<IRFieldAddress>(s))
                 {
-                    if(c->getOperand(i) == a)
-                    {
-                        c->setOperand(i, tmp);
-                    }
+                    auto key = as<IRStructKey>(m->getField());
+                    SLANG_ASSERT(key && "Result of getField wasn't a struct key");
+
+                    auto d_ = extractField(builder, d, kMaxUInt, key);
+                    assignUses(d_, m);
                 }
-                builder->setInsertAfter(c);
-                assign(builder, d,
-                        ScalarizedVal::value(builder->emitLoad(tmp)));
-            }
-            else if(const auto swiz = as<IRSwizzledStore>(s))
-            {
-                SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
-            }
-            else
-            {
-                SLANG_UNEXPECTED("Unhandled use of mesh output parameter during GLSL legalization");
-            }
-        });
+                else if (auto ref = as<IRMeshOutputRef>(s))
+                {
+                    auto elemType = composeGetters<IRType>(
+                        ref,
+                        &IRInst::getFullType,
+                        &IRPtrTypeBase::getValueType);
+                    auto d_ = getSubscriptVal(builder, elemType, d, ref->getIndex());
+                    assignUses(d_, ref);
+                }
+                else if (auto set = as<IRMeshOutputSet>(s))
+                {
+                    auto elemType =
+                        composeGetters<IRType>(set->getElementValue(), &IRInst::getFullType);
+                    auto d_ = getSubscriptVal(builder, elemType, d, set->getIndex());
+                    assign(builder, d_, ScalarizedVal::value(set->getElementValue()));
+                    set->removeAndDeallocate();
+                }
+                else if (auto g = as<IRGetElementPtr>(s))
+                {
+                    // Writing to something like `struct Vertex{ Foo foo[10]; }`
+                    // This case is also what's taken in the initial
+                    // traversal, as every mesh output is an array.
+                    auto elemType = composeGetters<IRType>(
+                        g,
+                        &IRInst::getFullType,
+                        &IRPtrTypeBase::getValueType);
+                    auto d_ = getSubscriptVal(builder, elemType, d, g->getIndex());
+                    assignUses(d_, g);
+                }
+                else if (auto store = as<IRStore>(s))
+                {
+                    // Store using the SOA representation
+
+                    assign(builder, d, ScalarizedVal::value(store->getVal()));
+
+                    // Stores aren't used, safe to remove here without checking
+                    store->removeAndDeallocate();
+                }
+                else if (auto c = as<IRCall>(s))
+                {
+                    // Translate
+                    //   foo(vertices[n])
+                    // to
+                    //   tmp
+                    //   foo(tmp)
+                    //   vertices[n] = tmp;
+                    //
+                    // This has copy-out semantics, which is really the
+                    // best we can hope for without going and
+                    // specializing foo.
+                    auto ptr = as<IRPtrTypeBase>(a->getFullType());
+                    SLANG_ASSERT(ptr && "Mesh output parameter was passed by value");
+                    auto t = ptr->getValueType();
+                    auto tmp = builder->emitVar(t);
+                    for (UInt i = 0; i < c->getOperandCount(); i++)
+                    {
+                        if (c->getOperand(i) == a)
+                        {
+                            c->setOperand(i, tmp);
+                        }
+                    }
+                    builder->setInsertAfter(c);
+                    assign(builder, d, ScalarizedVal::value(builder->emitLoad(tmp)));
+                }
+                else if (const auto swiz = as<IRSwizzledStore>(s))
+                {
+                    SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
+                }
+                else
+                {
+                    SLANG_UNEXPECTED(
+                        "Unhandled use of mesh output parameter during GLSL legalization");
+                }
+            });
 
         SLANG_ASSERT(!a->hasUses());
         a->removeAndDeallocate();
@@ -2502,25 +2553,19 @@ static void legalizeMeshOutputParam(
     //
 
     // First, collect the subset of outputs being used
-    if(!isSPIRV(codeGenContext->getTargetFormat()))
+    if (!isSPIRV(codeGenContext->getTargetFormat()))
     {
         auto isMeshOutputBuiltin = [](IRInst* g)
         {
-            if(const auto s = composeGetters<IRStringLit>(
-                g,
-                &IRInst::findDecoration<IRImportDecoration>,
-                &IRImportDecoration::getMangledNameOperand
-                ))
+            if (const auto s = composeGetters<IRStringLit>(
+                    g,
+                    &IRInst::findDecoration<IRImportDecoration>,
+                    &IRImportDecoration::getMangledNameOperand))
             {
                 const auto n = s->getStringSlice();
-                if (n == "gl_Position" ||
-                    n == "gl_PointSize" ||
-                    n == "gl_ClipDistance" ||
-                    n == "gl_CullDistance" ||
-                    n == "gl_PrimitiveID" ||
-                    n == "gl_Layer" ||
-                    n == "gl_ViewportIndex" ||
-                    n == "gl_CullPrimitiveEXT" ||
+                if (n == "gl_Position" || n == "gl_PointSize" || n == "gl_ClipDistance" ||
+                    n == "gl_CullDistance" || n == "gl_PrimitiveID" || n == "gl_Layer" ||
+                    n == "gl_ViewportIndex" || n == "gl_CullPrimitiveEXT" ||
                     n == "gl_PrimitiveShadingRateEXT")
                 {
                     return s;
@@ -2537,14 +2582,14 @@ static void legalizeMeshOutputParam(
             IRStructKey* key;
         };
         List<BuiltinOutputInfo> builtins;
-        for(auto leaf : leaves)
+        for (auto leaf : leaves)
         {
-            if(auto decoration = isMeshOutputBuiltin(leaf))
+            if (auto decoration = isMeshOutputBuiltin(leaf))
             {
                 builtins.add({leaf, decoration, nullptr, nullptr});
             }
         }
-        if(builtins.getCount() == 0)
+        if (builtins.getCount() == 0)
         {
             return;
         }
@@ -2554,7 +2599,7 @@ static void legalizeMeshOutputParam(
         {
             const auto _locScope2 = IRBuilderInsertLocScope{builder};
             builder->setInsertInto(meshOutputBlockType);
-            for(auto& builtin : builtins)
+            for (auto& builtin : builtins)
             {
                 auto t = composeGetters<IRType>(
                     builtin.param,
@@ -2587,7 +2632,7 @@ static void legalizeMeshOutputParam(
             CapabilitySet(CapabilityName::glsl),
             UnownedStringSlice(typeName));
         builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
-        if(isPerPrimitive)
+        if (isPerPrimitive)
         {
             builder->addDecoration(blockParam, kIROp_GLSLPrimitivesRateDecoration);
         }
@@ -2602,23 +2647,31 @@ static void legalizeMeshOutputParam(
         // varLayoutBuilder.setStage(Stage::Mesh);
         // builder->addLayoutDecoration(blockParam, varLayoutBuilder.build());
 
-        for(auto builtin : builtins)
+        for (auto builtin : builtins)
         {
-            traverseUsers(builtin.param, [&](IRInst* u)
-            {
-                IRBuilderInsertLocScope locScope{builder};
-                builder->setInsertBefore(u);
-                IRInst* index;
-                if(const auto p = as<IRGetElementPtr>(u))
-                    index = p->getIndex();
-                else if(const auto m = as<IRMeshOutputRef>(u))
-                    index = m->getIndex();
-                else
-                    SLANG_UNEXPECTED("Illegal use of mesh output parameter");
-                auto e = builder->emitElementAddress(builder->getPtrType(meshOutputBlockType), blockParam, index);
-                auto a = builder->emitFieldAddress(builder->getPtrType(builtin.type), e, builtin.key);
-                u->replaceUsesWith(a);
-            });
+            traverseUsers(
+                builtin.param,
+                [&](IRInst* u)
+                {
+                    IRBuilderInsertLocScope locScope{builder};
+                    builder->setInsertBefore(u);
+                    IRInst* index;
+                    if (const auto p = as<IRGetElementPtr>(u))
+                        index = p->getIndex();
+                    else if (const auto m = as<IRMeshOutputRef>(u))
+                        index = m->getIndex();
+                    else
+                        SLANG_UNEXPECTED("Illegal use of mesh output parameter");
+                    auto e = builder->emitElementAddress(
+                        builder->getPtrType(meshOutputBlockType),
+                        blockParam,
+                        index);
+                    auto a = builder->emitFieldAddress(
+                        builder->getPtrType(builtin.type),
+                        e,
+                        builtin.key);
+                    u->replaceUsesWith(a);
+                });
         }
     }
 
@@ -2626,16 +2679,16 @@ static void legalizeMeshOutputParam(
     g->removeAndDeallocate();
 }
 
-IRInst* getOrCreatePerVertexInputArray(
-    GLSLLegalizationContext* context,
-    IRInst* inputVertexAttr)
+IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst* inputVertexAttr)
 {
     IRInst* arrayInst = nullptr;
     if (context->mapVertexInputToPerVertexArray.tryGetValue(inputVertexAttr, arrayInst))
         return arrayInst;
     IRBuilder builder(inputVertexAttr);
     builder.setInsertBefore(inputVertexAttr);
-    auto arrayType = builder.getArrayType(inputVertexAttr->getDataType(), builder.getIntValue(builder.getIntType(), 3));
+    auto arrayType = builder.getArrayType(
+        inputVertexAttr->getDataType(),
+        builder.getIntValue(builder.getIntType(), 3));
     arrayInst = builder.createGlobalParam(arrayType);
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
@@ -2645,11 +2698,8 @@ IRInst* getOrCreatePerVertexInputArray(
     {
         switch (decoration->getOp())
         {
-        case kIROp_InterpolationModeDecoration:
-            continue;
-        default:
-            cloneDecoration(decoration, arrayInst);
-            break;
+        case kIROp_InterpolationModeDecoration: continue;
+        default:                                cloneDecoration(decoration, arrayInst); break;
         }
     }
     return arrayInst;
@@ -2664,67 +2714,72 @@ void tryReplaceUsesOfStageInput(
     {
     case ScalarizedVal::Flavor::value:
         {
-            traverseUses(originalVal, [&](IRUse* use)
-            {
-                auto user = use->getUser();
-                if (user->getOp() == kIROp_GetPerVertexInputArray)
+            traverseUses(
+                originalVal,
+                [&](IRUse* use)
                 {
-                    auto arrayInst = getOrCreatePerVertexInputArray(context, val.irValue);
-                    user->replaceUsesWith(arrayInst);
-                    user->removeAndDeallocate();
-                }
-                else
-                {
-                    IRBuilder builder(user);
-                    builder.setInsertBefore(user);
-                    builder.replaceOperand(use, val.irValue);
-                }
-            });
+                    auto user = use->getUser();
+                    if (user->getOp() == kIROp_GetPerVertexInputArray)
+                    {
+                        auto arrayInst = getOrCreatePerVertexInputArray(context, val.irValue);
+                        user->replaceUsesWith(arrayInst);
+                        user->removeAndDeallocate();
+                    }
+                    else
+                    {
+                        IRBuilder builder(user);
+                        builder.setInsertBefore(user);
+                        builder.replaceOperand(use, val.irValue);
+                    }
+                });
         }
         break;
     case ScalarizedVal::Flavor::tuple:
         {
             auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
-            traverseUses(originalVal, [&](IRUse* use)
-            {
-                auto user = use->getUser();
-                if (auto fieldExtract = as<IRFieldExtract>(user))
+            traverseUses(
+                originalVal,
+                [&](IRUse* use)
                 {
-                    auto fieldKey = fieldExtract->getField();
-                    ScalarizedVal fieldVal;
-                    for (auto element : tupleVal->elements)
+                    auto user = use->getUser();
+                    if (auto fieldExtract = as<IRFieldExtract>(user))
                     {
-                        if (element.key == fieldKey)
+                        auto fieldKey = fieldExtract->getField();
+                        ScalarizedVal fieldVal;
+                        for (auto element : tupleVal->elements)
                         {
-                            fieldVal = element.val;
-                            break;
+                            if (element.key == fieldKey)
+                            {
+                                fieldVal = element.val;
+                                break;
+                            }
+                        }
+                        if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                        {
+                            tryReplaceUsesOfStageInput(context, fieldVal, user);
                         }
                     }
-                    if (fieldVal.flavor != ScalarizedVal::Flavor::none)
-                    {
-                        tryReplaceUsesOfStageInput(context, fieldVal, user);
-                    }
-                }
-            });
+                });
         }
         break;
     }
 }
 
 void legalizeEntryPointParameterForGLSL(
-    GLSLLegalizationContext*    context,
-    CodeGenContext*             codeGenContext,
-    IRFunc*                     func,
-    IRParam*                    pp,
-    IRVarLayout*                paramLayout)
+    GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
+    IRFunc* func,
+    IRParam* pp,
+    IRVarLayout* paramLayout)
 {
     auto builder = context->getBuilder();
     auto stage = context->getStage();
 
     // (JS): In the legalization process parameters are moved from the entry point.
-    // So when we get to emit we have a problem in that we can't use parameters to find important decorations
-    // And in the future we will not have front end 'Layout' available. To work around this, we take the
-    // decorations that need special handling from parameters and put them on the IRFunc.
+    // So when we get to emit we have a problem in that we can't use parameters to find important
+    // decorations And in the future we will not have front end 'Layout' available. To work around
+    // this, we take the decorations that need special handling from parameters and put them on the
+    // IRFunc.
     //
     // This is only appropriate of course if there is only one of each for all parameters...
     // which is what current emit code assumes, but may not be more generally applicable.
@@ -2736,7 +2791,8 @@ void legalizeEntryPointParameterForGLSL(
         }
         else
         {
-            SLANG_UNEXPECTED("Only expected a single parameter to have IRGeometryInputPrimitiveTypeDecoration decoration");
+            SLANG_UNEXPECTED("Only expected a single parameter to have "
+                             "IRGeometryInputPrimitiveTypeDecoration decoration");
         }
     }
 
@@ -2753,7 +2809,7 @@ void legalizeEntryPointParameterForGLSL(
     // There *can* be multiple streamout parameters, to an entry point (points if nothing else)
     {
         IRType* type = pp->getFullType();
-        // Strip out type 
+        // Strip out type
         if (auto outType = as<IROutTypeBase>(type))
         {
             type = outType->getValueType();
@@ -2763,7 +2819,8 @@ void legalizeEntryPointParameterForGLSL(
         {
             if ([[maybe_unused]] auto decor = func->findDecoration<IRStreamOutputTypeDecoration>())
             {
-                // If it has the same stream out type, we *may* be ok (might not work for all types of streams)
+                // If it has the same stream out type, we *may* be ok (might not work for all types
+                // of streams)
                 SLANG_ASSERT(decor->getStreamType()->getOp() == streamType->getOp());
             }
             else
@@ -2811,7 +2868,7 @@ void legalizeEntryPointParameterForGLSL(
     {
         valueType = paramPtrType->getValueType();
     }
-    if( const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType) )
+    if (const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType))
     {
         // An output stream type like `TriangleStream<Foo>` should
         // more or less translate into `out Foo` (plus scalarization).
@@ -2851,7 +2908,8 @@ void legalizeEntryPointParameterForGLSL(
                     if (callee->getOp() != kIROp_Func)
                         continue;
 
-                    if (getBuiltinFuncName(callee) != UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                    if (getBuiltinFuncName(callee) !=
+                        UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
                     {
                         // If we are calling a function that takes a output stream as a parameter,
                         // we need to add it to the work list to be processed.
@@ -2898,15 +2956,21 @@ void legalizeEntryPointParameterForGLSL(
 
         return;
     }
-    if( auto meshOutputType = as<IRMeshOutputType>(valueType) )
+    if (auto meshOutputType = as<IRMeshOutputType>(valueType))
     {
-        return legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
+        return legalizeMeshOutputParam(
+            context,
+            codeGenContext,
+            func,
+            pp,
+            paramLayout,
+            meshOutputType);
     }
     if (auto patchType = as<IRHLSLPatchType>(valueType))
     {
         return legalizePatchParam(context, codeGenContext, func, pp, paramLayout, patchType);
     }
-    if(pp->findDecoration<IRHLSLMeshPayloadDecoration>())
+    if (pp->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         return legalizeMeshPayloadInputParam(context, codeGenContext, pp);
     }
@@ -2926,10 +2990,9 @@ void legalizeEntryPointParameterForGLSL(
     // to a single variable, and we can lower reads/writes of it
     // directly, rather than introduce an intermediate temporary.
     //
-    switch( stage )
+    switch (stage)
     {
-    default:
-        break;
+    default: break;
 
     case Stage::AnyHit:
     case Stage::Callable:
@@ -2944,7 +3007,7 @@ void legalizeEntryPointParameterForGLSL(
     // Is the parameter type a special pointer type
     // that indicates the parameter is used for `out`
     // or `inout` access?
-    if( as<IROutTypeBase>(paramType) )
+    if (as<IROutTypeBase>(paramType))
     {
         // Okay, we have the more interesting case here,
         // where the parameter was being passed by reference.
@@ -2955,7 +3018,7 @@ void legalizeEntryPointParameterForGLSL(
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
-        if( const auto inOutType = as<IRInOutType>(paramType) )
+        if (const auto inOutType = as<IRInOutType>(paramType))
         {
             // In the `in out` case we need to declare two
             // sets of global variables: one for the `in`
@@ -2963,7 +3026,12 @@ void legalizeEntryPointParameterForGLSL(
             auto globalInputVal = createGLSLGlobalVaryings(
                 context,
                 codeGenContext,
-                builder, valueType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
+                builder,
+                valueType,
+                paramLayout,
+                LayoutResourceKind::VaryingInput,
+                stage,
+                pp);
 
             assign(builder, localVal, globalInputVal);
         }
@@ -2977,25 +3045,28 @@ void legalizeEntryPointParameterForGLSL(
         // We also need one or more global variables to write the output to
         // when the function is done. We create them here.
         auto globalOutputVal = createGLSLGlobalVaryings(
-                context,
-                codeGenContext,
-                builder, valueType, paramLayout, LayoutResourceKind::VaryingOutput, stage, pp);
+            context,
+            codeGenContext,
+            builder,
+            valueType,
+            paramLayout,
+            LayoutResourceKind::VaryingOutput,
+            stage,
+            pp);
 
         // Now we need to iterate over all the blocks in the function looking
         // for any `return*` instructions, so that we can write to the output variable
-        for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
+        for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
         {
             auto terminatorInst = bb->getLastInst();
-            if(!terminatorInst)
+            if (!terminatorInst)
                 continue;
 
-            switch( terminatorInst->getOp() )
+            switch (terminatorInst->getOp())
             {
-            default:
-                continue;
+            default: continue;
 
-            case kIROp_Return:
-                break;
+            case kIROp_Return: break;
             }
 
             // We dont' re-use `builder` here because we don't want to
@@ -3021,20 +3092,25 @@ void legalizeEntryPointParameterForGLSL(
         auto globalValue = createGLSLGlobalVaryings(
             context,
             codeGenContext,
-            builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
+            builder,
+            paramType,
+            paramLayout,
+            LayoutResourceKind::VaryingInput,
+            stage,
+            pp);
 
         tryReplaceUsesOfStageInput(context, globalValue, pp);
 
         // we have a simple struct which represents all materialized GlobalParams, this
-        // struct will replace the no longer needed global variable which proxied as a 
+        // struct will replace the no longer needed global variable which proxied as a
         // GlobalParam.
         IRInst* materialized = materializeValue(builder, globalValue);
 
         // We next need to replace all uses of the proxy variable with the actual GlobalParam
         pp->replaceUsesWith(materialized);
 
-        // GlobalParams use use a OpStore to copy its data into a global 
-        // variable intermediary. We will follow the uses of this intermediary 
+        // GlobalParams use use a OpStore to copy its data into a global
+        // variable intermediary. We will follow the uses of this intermediary
         // and replace all some of the uses (function calls and SPIRV Operands)
         Dictionary<IRBlock*, IRInst*> blockToMaterialized;
         IRBuilder replaceBuilder(materialized);
@@ -3046,10 +3122,11 @@ void legalizeEntryPointParameterForGLSL(
             auto globalVarType = cast<IRPtrTypeBase>(globalVar->getDataType())->getValueType();
             auto key = dec->getOperand(1);
 
-            // we will be replacing uses of `globalVarToReplace`. We need globalVarToReplaceNextUse 
+            // we will be replacing uses of `globalVarToReplace`. We need globalVarToReplaceNextUse
             // to catch the next use before it is removed from the list of uses.
             IRUse* globalVarToReplaceNextUse;
-            for (auto globalVarUse = globalVar->firstUse; globalVarUse; globalVarUse = globalVarToReplaceNextUse)
+            for (auto globalVarUse = globalVar->firstUse; globalVarUse;
+                 globalVarUse = globalVarToReplaceNextUse)
             {
                 globalVarToReplaceNextUse = globalVarUse->nextUse;
                 auto user = globalVarUse->getUser();
@@ -3057,35 +3134,36 @@ void legalizeEntryPointParameterForGLSL(
                 {
                 case kIROp_SPIRVAsmOperandInst:
                 case kIROp_Call:
-                {
-                    for (Slang::UInt operandIndex = 0; operandIndex < user->getOperandCount();
-                        operandIndex++)
                     {
-                        auto operand = user->getOperand(operandIndex);
-                        auto operandUse = user->getOperands() + operandIndex;
-                        if (operand != globalVar)
-                            continue;
-
-                        // a GlobalParam may be used across functions/blocks, we need to 
-                        // materialize at a minimum 1 struct per block.
-                        auto callingBlock = getBlock(user);
-                        bool found = blockToMaterialized.tryGetValue(callingBlock, materialized);
-                        if (!found)
+                        for (Slang::UInt operandIndex = 0; operandIndex < user->getOperandCount();
+                             operandIndex++)
                         {
-                            replaceBuilder.setInsertBefore(callingBlock->getFirstInst());
-                            materialized = materializeValue(&replaceBuilder, globalValue);
-                            blockToMaterialized.set(callingBlock, materialized);
-                        }
+                            auto operand = user->getOperand(operandIndex);
+                            auto operandUse = user->getOperands() + operandIndex;
+                            if (operand != globalVar)
+                                continue;
 
-                        replaceBuilder.setInsertBefore(user);
-                        auto field = replaceBuilder.emitFieldExtract(globalVarType, materialized, key);
-                        replaceBuilder.replaceOperand(operandUse, field);
+                            // a GlobalParam may be used across functions/blocks, we need to
+                            // materialize at a minimum 1 struct per block.
+                            auto callingBlock = getBlock(user);
+                            bool found =
+                                blockToMaterialized.tryGetValue(callingBlock, materialized);
+                            if (!found)
+                            {
+                                replaceBuilder.setInsertBefore(callingBlock->getFirstInst());
+                                materialized = materializeValue(&replaceBuilder, globalValue);
+                                blockToMaterialized.set(callingBlock, materialized);
+                            }
+
+                            replaceBuilder.setInsertBefore(user);
+                            auto field =
+                                replaceBuilder.emitFieldExtract(globalVarType, materialized, key);
+                            replaceBuilder.replaceOperand(operandUse, field);
+                            break;
+                        }
                         break;
                     }
-                    break;
-                }
-                default:
-                    break;
+                default: break;
                 }
                 continue;
             }
@@ -3116,7 +3194,8 @@ void getAllNullLocationRayObjectsAndUsedLocations(
     {
         auto instOp = inst->getOp();
         IRIntegerValue intLitVal = 0;
-        if (instOp != kIROp_GlobalParam && instOp != kIROp_GlobalVar) continue;
+        if (instOp != kIROp_GlobalParam && instOp != kIROp_GlobalVar)
+            continue;
         for (auto decor : inst->getDecorations())
         {
             switch (decor->getOp())
@@ -3124,22 +3203,34 @@ void getAllNullLocationRayObjectsAndUsedLocations(
             case kIROp_VulkanRayPayloadDecoration:
             case kIROp_VulkanRayPayloadInDecoration:
                 intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
-                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                if (intLitVal == -1)
+                {
+                    nullRayObjects->add(inst);
+                    goto getAllNullLocationRayObjectsAndUsedLocations_end;
+                }
                 rayPayload->add(intLitVal);
                 goto getAllNullLocationRayObjectsAndUsedLocations_end;
             case kIROp_VulkanCallablePayloadDecoration:
             case kIROp_VulkanCallablePayloadInDecoration:
                 intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
-                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                if (intLitVal == -1)
+                {
+                    nullRayObjects->add(inst);
+                    goto getAllNullLocationRayObjectsAndUsedLocations_end;
+                }
                 callablePayload->add(intLitVal);
                 goto getAllNullLocationRayObjectsAndUsedLocations_end;
             case kIROp_VulkanHitObjectAttributesDecoration:
                 intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
-                if (intLitVal == -1) { nullRayObjects->add(inst); goto getAllNullLocationRayObjectsAndUsedLocations_end; }
+                if (intLitVal == -1)
+                {
+                    nullRayObjects->add(inst);
+                    goto getAllNullLocationRayObjectsAndUsedLocations_end;
+                }
                 hitObjectAttribute->add(intLitVal);
                 goto getAllNullLocationRayObjectsAndUsedLocations_end;
             }
-        }    
+        }
     getAllNullLocationRayObjectsAndUsedLocations_end:;
     }
 }
@@ -3149,7 +3240,12 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
     HashSet<IRIntegerValue> rayPayloadLocations;
     HashSet<IRIntegerValue> callablePayloadLocations;
     HashSet<IRIntegerValue> hitObjectAttributeLocations;
-    getAllNullLocationRayObjectsAndUsedLocations(module, &nullRayObjects, &rayPayloadLocations, &callablePayloadLocations, &hitObjectAttributeLocations);
+    getAllNullLocationRayObjectsAndUsedLocations(
+        module,
+        &nullRayObjects,
+        &rayPayloadLocations,
+        &callablePayloadLocations,
+        &hitObjectAttributeLocations);
 
     IRIntegerValue rayPayloadCounter = 0;
     IRIntegerValue callablePayloadCounter = 0;
@@ -3167,8 +3263,9 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
             case kIROp_VulkanRayPayloadDecoration:
             case kIROp_VulkanRayPayloadInDecoration:
                 intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
-                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
-                while(rayPayloadLocations.contains(rayPayloadCounter))
+                if (intLitVal >= 0)
+                    goto assignRayPayloadHitObjectAttributeLocations_end;
+                while (rayPayloadLocations.contains(rayPayloadCounter))
                 {
                     rayPayloadCounter++;
                 }
@@ -3180,7 +3277,8 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
             case kIROp_VulkanCallablePayloadDecoration:
             case kIROp_VulkanCallablePayloadInDecoration:
                 intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
-                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
+                if (intLitVal >= 0)
+                    goto assignRayPayloadHitObjectAttributeLocations_end;
                 while (callablePayloadLocations.contains(callablePayloadCounter))
                 {
                     callablePayloadCounter++;
@@ -3192,7 +3290,8 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
                 goto assignRayPayloadHitObjectAttributeLocations_end;
             case kIROp_VulkanHitObjectAttributesDecoration:
                 intLitVal = as<IRIntLit>(decor->getOperand(0))->getValue();
-                if (intLitVal >= 0) goto assignRayPayloadHitObjectAttributeLocations_end;
+                if (intLitVal >= 0)
+                    goto assignRayPayloadHitObjectAttributeLocations_end;
                 while (hitObjectAttributeLocations.contains(hitObjectAttributeCounter))
                 {
                     hitObjectAttributeCounter++;
@@ -3202,8 +3301,7 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
                 decor->setOperand(0, location);
                 hitObjectAttributeCounter++;
                 goto assignRayPayloadHitObjectAttributeLocations_end;
-            default:
-                break;
+            default: break;
             }
         }
     assignRayPayloadHitObjectAttributeLocations_end:;
@@ -3286,22 +3384,23 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
             if (entryPointDecor->getProfile().getStage() == Stage::Hull)
             {
                 builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
-                auto index = getOrCreateBuiltinParamForHullShader(context, toSlice("SV_OutputControlPointID"));
+                auto index = getOrCreateBuiltinParamForHullShader(
+                    context,
+                    toSlice("SV_OutputControlPointID"));
                 resultGlobal = getSubscriptVal(&builder, resultType, resultGlobal, index);
             }
         }
         rewriteReturnToOutputStore(builder, func, resultGlobal);
-        
     }
     return result;
 }
 
 void legalizeEntryPointForGLSL(
-    Session*                session,
-    IRModule*               module,
-    IRFunc*                 func,
-    CodeGenContext*         codeGenContext,
-    GLSLExtensionTracker*   glslExtensionTracker)
+    Session* session,
+    IRModule* module,
+    IRFunc* func,
+    CodeGenContext* codeGenContext,
+    GLSLExtensionTracker* glslExtensionTracker)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
@@ -3313,7 +3412,6 @@ void legalizeEntryPointForGLSL(
 
     auto entryPointLayout = as<IREntryPointLayout>(layoutDecoration->getLayout());
     SLANG_ASSERT(entryPointLayout);
-
 
 
     GLSLLegalizationContext context;
@@ -3383,7 +3481,11 @@ void legalizeEntryPointForGLSL(
     // a `void` return type, because there is no work
     // to be done on its return value in that case.
     auto scalarizedGlobalOutput = legalizeEntryPointReturnValueForGLSL(
-        &context, codeGenContext, builder, func, entryPointLayout->getResultLayout());
+        &context,
+        codeGenContext,
+        builder,
+        func,
+        entryPointLayout->getResultLayout());
 
     // For hull shaders, insert the invocation of the patch constant function
     // at the end of the entrypoint now.
@@ -3394,13 +3496,13 @@ void legalizeEntryPointForGLSL(
 
     // Next we will walk through any parameters of the entry-point function,
     // and turn them into global variables.
-    if( auto firstBlock = func->getFirstBlock() )
+    if (auto firstBlock = func->getFirstBlock())
     {
         // Any initialization code we insert for parameters needs
         // to be at the start of the "ordinary" instructions in the block:
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
 
-        for( auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam() )
+        for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
         {
             // We assume that the entry-point parameters will all have
             // layout information attached to them, which is kept up-to-date
@@ -3411,12 +3513,7 @@ void legalizeEntryPointForGLSL(
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
 
-            legalizeEntryPointParameterForGLSL(
-                &context,
-                codeGenContext,
-                func,
-                pp,
-                paramLayout);
+            legalizeEntryPointParameterForGLSL(&context, codeGenContext, func, pp, paramLayout);
         }
 
         // At this point we should have eliminated all uses of the
@@ -3429,7 +3526,7 @@ void legalizeEntryPointForGLSL(
         // We can safely go through and destroy the parameters
         // themselves, and then clear out the parameter list.
 
-        for( auto pp = firstBlock->getFirstParam(); pp; )
+        for (auto pp = firstBlock->getFirstParam(); pp;)
         {
             auto next = pp->getNextParam();
             pp->removeAndDeallocate();
@@ -3440,10 +3537,7 @@ void legalizeEntryPointForGLSL(
     // Finally, we need to patch up the type of the entry point,
     // because it is no longer accurate.
 
-    IRFuncType* voidFuncType = builder.getFuncType(
-        0,
-        nullptr,
-        builder.getVoidType());
+    IRFuncType* voidFuncType = builder.getFuncType(0, nullptr, builder.getVoidType());
     func->setFullType(voidFuncType);
 
     // TODO: we should technically be constructing
@@ -3494,18 +3588,18 @@ void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersi
     CapabilityName atom = CapabilityName::_spirv_1_0;
     switch (spirvVersion.m_major)
     {
-        case 1:
+    case 1:
         {
             switch (spirvVersion.m_minor)
             {
-                case 0: atom = CapabilityName::_spirv_1_0; break;
-                case 1: atom = CapabilityName::_spirv_1_1; break;
-                case 2: atom = CapabilityName::_spirv_1_2; break;
-                case 3: atom = CapabilityName::_spirv_1_3; break;
-                case 4: atom = CapabilityName::_spirv_1_4; break;
-                case 5: atom = CapabilityName::_spirv_1_5; break;
-                case 6: atom = CapabilityName::_spirv_1_6; break;
-                default: SLANG_UNEXPECTED("Unknown SPIRV version");
+            case 0:  atom = CapabilityName::_spirv_1_0; break;
+            case 1:  atom = CapabilityName::_spirv_1_1; break;
+            case 2:  atom = CapabilityName::_spirv_1_2; break;
+            case 3:  atom = CapabilityName::_spirv_1_3; break;
+            case 4:  atom = CapabilityName::_spirv_1_4; break;
+            case 5:  atom = CapabilityName::_spirv_1_5; break;
+            case 6:  atom = CapabilityName::_spirv_1_6; break;
+            default: SLANG_UNEXPECTED("Unknown SPIRV version");
             }
             break;
         }
@@ -3515,11 +3609,11 @@ void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersi
 }
 
 void legalizeEntryPointsForGLSL(
-    Session*                session,
-    IRModule*               module,
-    const List<IRFunc*>&    funcs,
-    CodeGenContext*         context,
-    GLSLExtensionTracker*   glslExtensionTracker)
+    Session* session,
+    IRModule* module,
+    const List<IRFunc*>& funcs,
+    CodeGenContext* context,
+    GLSLExtensionTracker* glslExtensionTracker)
 {
     for (auto func : funcs)
     {
@@ -3549,22 +3643,31 @@ void legalizeConstantBufferLoadForGLSL(IRModule* module)
                 {
                     auto load = as<IRLoad>(inst);
                     inst = inst->next;
-                    if (!load) continue;
+                    if (!load)
+                        continue;
                     auto bufferType = load->getPtr()->getDataType();
-                    if (as<IRConstantBufferType>(bufferType) || as<IRParameterBlockType>(bufferType))
+                    if (as<IRConstantBufferType>(bufferType) ||
+                        as<IRParameterBlockType>(bufferType))
                     {
                         auto parameterGroupType = as<IRUniformParameterGroupType>(bufferType);
                         auto elementType = as<IRStructType>(parameterGroupType->getElementType());
-                        if (!elementType) continue;
+                        if (!elementType)
+                            continue;
                         List<IRInst*> elements;
                         builder.setInsertBefore(load);
                         for (auto field : elementType->getFields())
                         {
-                            auto fieldAddr = builder.emitFieldAddress(builder.getPtrType(field->getFieldType()), load->getPtr(), field->getKey());
+                            auto fieldAddr = builder.emitFieldAddress(
+                                builder.getPtrType(field->getFieldType()),
+                                load->getPtr(),
+                                field->getKey());
                             auto fieldValue = builder.emitLoad(field->getFieldType(), fieldAddr);
                             elements.add(fieldValue);
                         }
-                        auto makeStruct = builder.emitMakeStruct(elementType, elements.getCount(), elements.getBuffer());
+                        auto makeStruct = builder.emitMakeStruct(
+                            elementType,
+                            elements.getCount(),
+                            elements.getBuffer());
                         load->replaceUsesWith(makeStruct);
                         load->removeAndDeallocate();
                     }
@@ -3579,13 +3682,13 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
 {
     // Find out DispatchMesh function
     IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
-    for(const auto globalInst : module->getGlobalInsts())
+    for (const auto globalInst : module->getGlobalInsts())
     {
-        if(const auto func = as<IRGlobalValueWithCode>(globalInst))
+        if (const auto func = as<IRGlobalValueWithCode>(globalInst))
         {
-            if(const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+            if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
             {
-                if(dec->getName() == "DispatchMesh")
+                if (dec->getName() == "DispatchMesh")
                 {
                     SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
                     dispatchMeshFunc = func;
@@ -3594,70 +3697,71 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
         }
     }
 
-    if(!dispatchMeshFunc)
+    if (!dispatchMeshFunc)
         return;
 
     IRBuilder builder{module};
     builder.setInsertBefore(dispatchMeshFunc);
 
     // We'll rewrite the calls to call EmitMeshTasksEXT
-    traverseUses(dispatchMeshFunc, [&](const IRUse* use){
-        if(const auto call = as<IRCall>(use->getUser()))
+    traverseUses(
+        dispatchMeshFunc,
+        [&](const IRUse* use)
         {
-            SLANG_ASSERT(call->getArgCount() == 4);
-            const auto payload = call->getArg(3);
-
-            const auto payloadPtrType = composeGetters<IRPtrTypeBase>(
-                payload,
-                &IRInst::getDataType
-            );
-            SLANG_ASSERT(payloadPtrType);
-            const auto payloadType = payloadPtrType->getValueType();
-            SLANG_ASSERT(payloadType);
-
-            const bool isGroupsharedGlobal =
-                payload->getParent() == module->getModuleInst() &&
-                composeGetters<IRGroupSharedRate>(payload, &IRInst::getRate);
-            if(isGroupsharedGlobal)
+            if (const auto call = as<IRCall>(use->getUser()))
             {
-                // If it's a groupshared global, then we put it in the address
-                // space we know to emit as taskPayloadSharedEXT instead (or
-                // naturally fall through correctly for SPIR-V emit)
-                //
-                // Keep it as a groupshared rate qualified type so we don't
-                // miss out on any further legalization requirement or
-                // optimization opportunities.
-                const auto payloadSharedPtrType =
-                    builder.getRateQualifiedType(
+                SLANG_ASSERT(call->getArgCount() == 4);
+                const auto payload = call->getArg(3);
+
+                const auto payloadPtrType =
+                    composeGetters<IRPtrTypeBase>(payload, &IRInst::getDataType);
+                SLANG_ASSERT(payloadPtrType);
+                const auto payloadType = payloadPtrType->getValueType();
+                SLANG_ASSERT(payloadType);
+
+                const bool isGroupsharedGlobal =
+                    payload->getParent() == module->getModuleInst() &&
+                    composeGetters<IRGroupSharedRate>(payload, &IRInst::getRate);
+                if (isGroupsharedGlobal)
+                {
+                    // If it's a groupshared global, then we put it in the address
+                    // space we know to emit as taskPayloadSharedEXT instead (or
+                    // naturally fall through correctly for SPIR-V emit)
+                    //
+                    // Keep it as a groupshared rate qualified type so we don't
+                    // miss out on any further legalization requirement or
+                    // optimization opportunities.
+                    const auto payloadSharedPtrType = builder.getRateQualifiedType(
                         builder.getGroupSharedRate(),
                         builder.getPtrType(
                             payloadPtrType->getOp(),
                             payloadPtrType->getValueType(),
-                            AddressSpace::TaskPayloadWorkgroup
-                        )
-                    );
-                payload->setFullType(payloadSharedPtrType);
-            }
-            else
-            {
-                // ...
-                // If it's not a groupshared global, then create such a
-                // parameter and store into the value being passed to this
-                // call.
-                builder.setInsertInto(module->getModuleInst());
-                const auto v = builder.createGlobalVar(payloadType, AddressSpace::TaskPayloadWorkgroup);
-                v->setFullType(builder.getRateQualifiedType(builder.getGroupSharedRate(), v->getFullType()));
-                builder.setInsertBefore(call);
-                builder.emitStore(v, builder.emitLoad(payload));
+                            AddressSpace::TaskPayloadWorkgroup));
+                    payload->setFullType(payloadSharedPtrType);
+                }
+                else
+                {
+                    // ...
+                    // If it's not a groupshared global, then create such a
+                    // parameter and store into the value being passed to this
+                    // call.
+                    builder.setInsertInto(module->getModuleInst());
+                    const auto v =
+                        builder.createGlobalVar(payloadType, AddressSpace::TaskPayloadWorkgroup);
+                    v->setFullType(builder.getRateQualifiedType(
+                        builder.getGroupSharedRate(),
+                        v->getFullType()));
+                    builder.setInsertBefore(call);
+                    builder.emitStore(v, builder.emitLoad(payload));
 
-                // Then, make sure that it's this new global which is being
-                // passed into the call to DispatchMesh, this is unimportant
-                // for GLSL which ignores such a parameter, but the SPIR-V
-                // backend depends on it being the global
-                call->getArgs()[3].set(v);
+                    // Then, make sure that it's this new global which is being
+                    // passed into the call to DispatchMesh, this is unimportant
+                    // for GLSL which ignores such a parameter, but the SPIR-V
+                    // backend depends on it being the global
+                    call->getArgs()[3].set(v);
+                }
             }
-        }
-    });
+        });
 }
 
 void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
@@ -3699,44 +3803,48 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
 
         // Try to rewrite all uses leading to `CastDynamicResource`.
         // Later, we will diagnose an error if the parameter still has uses.
-        traverseUsers(param, [&](IRInst* user)
-        {
-            if (user->getOp() == kIROp_CastDynamicResource && !arrayType)
+        traverseUsers(
+            param,
+            [&](IRInst* user)
             {
-                builder.setInsertBefore(user);
-
-                user->replaceUsesWith(getAliasedParam(user->getDataType()));
-                user->removeAndDeallocate();
-            }
-            else if (user->getOp() == kIROp_GetElement && arrayType)
-            {
-                traverseUsers(user, [&](IRInst* elementUser)
+                if (user->getOp() == kIROp_CastDynamicResource && !arrayType)
                 {
-                    if (elementUser->getOp() == kIROp_CastDynamicResource)
-                    {
-                        builder.setInsertBefore(elementUser);
+                    builder.setInsertBefore(user);
 
-                        auto paramType = builder.getArrayTypeBase(
-                            arrayType->getOp(),
-                            elementUser->getDataType(),
-                            arrayType->getElementCount());
-
-                        auto newAccess = builder.emitElementExtract(
-                            paramType->getElementType(),
-                            getAliasedParam(paramType),
-                            user->getOperand(1));
-
-                        elementUser->replaceUsesWith(newAccess);
-                        elementUser->removeAndDeallocate();
-                    }
-                });
-
-                if (!user->hasUses())
-                {
+                    user->replaceUsesWith(getAliasedParam(user->getDataType()));
                     user->removeAndDeallocate();
                 }
-            }
-        });
+                else if (user->getOp() == kIROp_GetElement && arrayType)
+                {
+                    traverseUsers(
+                        user,
+                        [&](IRInst* elementUser)
+                        {
+                            if (elementUser->getOp() == kIROp_CastDynamicResource)
+                            {
+                                builder.setInsertBefore(elementUser);
+
+                                auto paramType = builder.getArrayTypeBase(
+                                    arrayType->getOp(),
+                                    elementUser->getDataType(),
+                                    arrayType->getElementCount());
+
+                                auto newAccess = builder.emitElementExtract(
+                                    paramType->getElementType(),
+                                    getAliasedParam(paramType),
+                                    user->getOperand(1));
+
+                                elementUser->replaceUsesWith(newAccess);
+                                elementUser->removeAndDeallocate();
+                            }
+                        });
+
+                    if (!user->hasUses())
+                    {
+                        user->removeAndDeallocate();
+                    }
+                }
+            });
         toRemove.add(param);
     }
 
@@ -3749,7 +3857,10 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
         }
         else
         {
-            context->getSink()->diagnose(param->firstUse->getUser(), Diagnostics::ambiguousReference, param);
+            context->getSink()->diagnose(
+                param->firstUse->getUser(),
+                Diagnostics::ambiguousReference,
+                param);
         }
     }
 }

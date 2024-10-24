@@ -1,11 +1,10 @@
 // slang-ir-autodiff-propagate.h
 #pragma once
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
 #include "slang-compiler.h"
-
 #include "slang-ir-autodiff.h"
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -27,23 +26,21 @@ inline bool isMixedDifferentialInst(IRInst* inst)
 
 struct DiffPropagationPass : InstPassBase
 {
-    AutoDiffSharedContext*                  autodiffContext;
+    AutoDiffSharedContext* autodiffContext;
 
-    DiffPropagationPass(AutoDiffSharedContext* autodiffContext) : 
-        autodiffContext(autodiffContext),
-        InstPassBase(autodiffContext->moduleInst->getModule())
+    DiffPropagationPass(AutoDiffSharedContext* autodiffContext)
+        : autodiffContext(autodiffContext), InstPassBase(autodiffContext->moduleInst->getModule())
     {
-
     }
 
 
     bool shouldInstBeMarkedDifferential(IRInst* inst)
     {
-        for (UIndex ii = 0; ii < inst->getOperandCount(); ii ++)
+        for (UIndex ii = 0; ii < inst->getOperandCount(); ii++)
         {
             if (isDifferentialInst(inst->getOperand(ii)))
             {
-                return true;   
+                return true;
             }
         }
 
@@ -69,8 +66,8 @@ struct DiffPropagationPass : InstPassBase
         List<IRInst*> initialList;
         // Mark 'GetDifferential' insts as differential.
         processChildInstsOfType<IRDifferentialPairGetDifferential>(
-            kIROp_DifferentialPairGetDifferential, 
-            instWithChildren, 
+            kIROp_DifferentialPairGetDifferential,
+            instWithChildren,
             [&](IRDifferentialPairGetDifferential* getDifferentialInst)
             {
                 builder->markInstAsDifferential(getDifferentialInst);
@@ -109,4 +106,4 @@ struct DiffPropagationPass : InstPassBase
     }
 };
 
-}
+} // namespace Slang

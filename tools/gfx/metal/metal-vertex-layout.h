@@ -18,7 +18,8 @@ public:
     List<VertexStreamDesc> m_vertexStreams;
 
     Result init(const IInputLayout::Desc& desc);
-    NS::SharedPtr<MTL::VertexDescriptor> createVertexDescriptor(NS::UInteger vertexBufferIndexOffset);
+    NS::SharedPtr<MTL::VertexDescriptor> createVertexDescriptor(
+        NS::UInteger vertexBufferIndexOffset);
 };
 
 } // namespace metal

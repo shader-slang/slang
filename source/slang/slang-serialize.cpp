@@ -5,11 +5,12 @@
 #include "slang-ast-builder.h"
 #include "slang-check-impl.h"
 
-namespace Slang {
+namespace Slang
+{
 
 const SerialClass* SerialClasses::add(const SerialClass* cls)
 {
-    List<const SerialClass*>& classes = m_classesByTypeKind[Index(cls->typeKind)]; 
+    List<const SerialClass*>& classes = m_classesByTypeKind[Index(cls->typeKind)];
 
     if (cls->subType >= classes.getCount())
     {
@@ -30,12 +31,17 @@ const SerialClass* SerialClasses::add(const SerialClass* cls)
     return copy;
 }
 
-const SerialClass* SerialClasses::add(SerialTypeKind kind, SerialSubType subType, const SerialField* fields, Index fieldsCount, const SerialClass* superCls)
+const SerialClass* SerialClasses::add(
+    SerialTypeKind kind,
+    SerialSubType subType,
+    const SerialField* fields,
+    Index fieldsCount,
+    const SerialClass* superCls)
 {
     SerialClass cls;
     cls.typeKind = kind;
     cls.subType = subType;
-        
+
     cls.fields = fields;
     cls.fieldsCount = fieldsCount;
 
@@ -195,8 +201,7 @@ bool SerialClasses::isOk() const
 
                     // Add the fields of the parent
                     curCls = curCls->super;
-                }
-                while (curCls);
+                } while (curCls);
             }
         }
     }
@@ -205,18 +210,15 @@ bool SerialClasses::isOk() const
 }
 
 
-SerialClasses::SerialClasses():
-    m_arena(2097152)
+SerialClasses::SerialClasses()
+    : m_arena(2097152)
 {
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags flags)
-    : m_arena(2097152)
-    , m_classes(classes)
-    , m_filter(filter)
-    , m_flags(flags)
+    : m_arena(2097152), m_classes(classes), m_filter(filter), m_flags(flags)
 {
     // 0 is always the null pointer
     m_entries.add(nullptr);
@@ -256,7 +258,6 @@ struct SkipFunctionBodyRAII
                 funcDecl->body = nullptr;
             }
         }
-
     }
     ~SkipFunctionBodyRAII()
     {
@@ -289,7 +290,9 @@ SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* 
 
     typedef SerialInfo::ObjectEntry ObjectEntry;
 
-    ObjectEntry* nodeEntry = (ObjectEntry*)m_arena.allocateAligned(sizeof(ObjectEntry) + serialCls->size, SerialInfo::MAX_ALIGNMENT);
+    ObjectEntry* nodeEntry = (ObjectEntry*)m_arena.allocateAligned(
+        sizeof(ObjectEntry) + serialCls->size,
+        SerialInfo::MAX_ALIGNMENT);
 
     nodeEntry->typeKind = serialCls->typeKind;
     nodeEntry->subType = serialCls->subType;
@@ -330,7 +333,8 @@ SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* 
 
 SerialIndex SerialWriter::writeObject(const NodeBase* node)
 {
-    const SerialClass* serialClass = m_classes->getSerialClass(SerialTypeKind::NodeBase, SerialSubType(node->astNodeType));
+    const SerialClass* serialClass =
+        m_classes->getSerialClass(SerialTypeKind::NodeBase, SerialSubType(node->astNodeType));
     return writeObject(serialClass, (const void*)node);
 }
 
@@ -339,7 +343,8 @@ SerialIndex SerialWriter::writeValObject(const Val* node)
     typedef SerialInfo::ValEntry ValEntry;
 
     size_t size = node->getOperandCount() * sizeof(SerialInfo::SerialValOperand);
-    ValEntry* nodeEntry = (ValEntry*)m_arena.allocateAligned(sizeof(ValEntry) + size, SerialInfo::MAX_ALIGNMENT);
+    ValEntry* nodeEntry =
+        (ValEntry*)m_arena.allocateAligned(sizeof(ValEntry) + size, SerialInfo::MAX_ALIGNMENT);
 
     nodeEntry->typeKind = SerialTypeKind::NodeBase;
     nodeEntry->subType = (SerialSubType)node->astNodeType;
@@ -356,9 +361,7 @@ SerialIndex SerialWriter::writeValObject(const Val* node)
         auto operand = node->m_operands[i];
         switch (operand.kind)
         {
-        case ValNodeOperandKind::ConstantValue:
-            serializedOperands.add((SerialIndex)0);
-            break;
+        case ValNodeOperandKind::ConstantValue: serializedOperands.add((SerialIndex)0); break;
         case ValNodeOperandKind::ValNode:
         case ValNodeOperandKind::ASTNode:
             serializedOperands.add(addPointer(operand.values.nodeOperand));
@@ -402,7 +405,8 @@ SerialIndex SerialWriter::writeObject(const RefObject* obj)
     const ReflectClassInfo* classInfo = serialObj->getClassInfo();
     SLANG_ASSERT(classInfo);
 
-    const SerialClass* serialClass = m_classes->getSerialClass(SerialTypeKind::RefObject, SerialSubType(classInfo->m_classId));
+    const SerialClass* serialClass =
+        m_classes->getSerialClass(SerialTypeKind::RefObject, SerialSubType(classInfo->m_classId));
     return writeObject(serialClass, (const void*)obj);
 }
 
@@ -479,7 +483,10 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
     }
 }
 
-SerialIndex SerialWriter::_addStringSlice(SerialTypeKind typeKind, SliceMap& sliceMap, const UnownedStringSlice& slice)
+SerialIndex SerialWriter::_addStringSlice(
+    SerialTypeKind typeKind,
+    SliceMap& sliceMap,
+    const UnownedStringSlice& slice)
 {
     typedef ByteEncodeUtil Util;
     typedef SerialInfo::StringEntry StringEntry;
@@ -500,7 +507,8 @@ SerialIndex SerialWriter::_addStringSlice(SerialTypeKind typeKind, SliceMap& sli
     uint8_t encodeBuf[Util::kMaxLiteEncodeUInt32];
     const int encodeCount = Util::encodeLiteUInt32(uint32_t(slice.getLength()), encodeBuf);
 
-    StringEntry* entry = (StringEntry*)m_arena.allocateUnaligned(SLANG_OFFSET_OF(StringEntry, sizeAndChars) + encodeCount + slice.getLength());
+    StringEntry* entry = (StringEntry*)m_arena.allocateUnaligned(
+        SLANG_OFFSET_OF(StringEntry, sizeAndChars) + encodeCount + slice.getLength());
     entry->info = SerialInfo::EntryInfo::Alignment1;
     entry->typeKind = typeKind;
 
@@ -547,7 +555,11 @@ SerialIndex SerialWriter::addName(const Name* name)
     return index;
 }
 
-SerialIndex SerialWriter::addSerialArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount)
+SerialIndex SerialWriter::addSerialArray(
+    size_t elementSize,
+    size_t alignment,
+    const void* elements,
+    Index elementCount)
 {
     typedef SerialInfo::ArrayEntry Entry;
 
@@ -576,13 +588,15 @@ SerialIndex SerialWriter::addSerialArray(size_t elementSize, size_t alignment, c
     return SerialIndex(m_entries.getCount() - 1);
 }
 
-static const uint8_t s_fixBuffer[SerialInfo::MAX_ALIGNMENT]{ 0, };
+static const uint8_t s_fixBuffer[SerialInfo::MAX_ALIGNMENT]{
+    0,
+};
 
 SlangResult SerialWriter::write(Stream* stream)
 {
     const Int entriesCount = m_entries.getCount();
 
-    // Add a sentinal so we don't need special handling for 
+    // Add a sentinal so we don't need special handling for
     SerialInfo::Entry sentinal;
     sentinal.typeKind = SerialTypeKind::String;
     sentinal.info = SerialInfo::EntryInfo::Alignment1;
@@ -592,7 +606,8 @@ SlangResult SerialWriter::write(Stream* stream)
 
     SerialInfo::Entry** entries = m_entries.getBuffer();
     // Note strictly required in our impl of List. But by writing this and
-    // knowing that removeLast cannot release memory, means the sentinal must be at the last position.
+    // knowing that removeLast cannot release memory, means the sentinal must be at the last
+    // position.
     entries[entriesCount] = &sentinal;
 
     {
@@ -624,17 +639,18 @@ SlangResult SerialWriter::write(Stream* stream)
 
             size_t alignmentFixSize = nextOffset - (offset + entrySize);
 
-            // The fix must be less than max alignment. We require it to be less because we aligned each Entry to 
-            // MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can write
-            SLANG_ASSERT( alignmentFixSize < SerialInfo::MAX_ALIGNMENT);
-            
+            // The fix must be less than max alignment. We require it to be less because we aligned
+            // each Entry to MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can
+            // write
+            SLANG_ASSERT(alignmentFixSize < SerialInfo::MAX_ALIGNMENT);
+
             SLANG_RETURN_ON_FAIL(stream->write(entry, entrySize));
             // If we needed to fix so that subsequent alignment is right, write out extra bytes here
             if (alignmentFixSize)
             {
                 SLANG_RETURN_ON_FAIL(stream->write(s_fixBuffer, alignmentFixSize));
             }
-            
+
             // Onto next
             offset = nextOffset;
             entry = next;
@@ -665,11 +681,12 @@ SlangResult SerialWriter::writeIntoContainer(FourCC fourCc, RiffContainer* conta
                 m_entries.add(&sentinal);
                 m_entries.removeLast();
                 // Note strictly required in our impl of List. But by writing this and
-                // knowing that removeLast cannot release memory, means the sentinal must be at the last position.
+                // knowing that removeLast cannot release memory, means the sentinal must be at the
+                // last position.
                 m_entries.getBuffer()[entriesCount] = &sentinal;
             }
 
-            SerialInfo::Entry*const* entries = m_entries.getBuffer();
+            SerialInfo::Entry* const* entries = m_entries.getBuffer();
 
             SerialInfo::Entry* entry = entries[1];
             // We start on 1, because 0 is nullptr and not used for anything
@@ -697,8 +714,9 @@ SlangResult SerialWriter::writeIntoContainer(FourCC fourCc, RiffContainer* conta
 
                 size_t alignmentFixSize = nextOffset - (offset + entrySize);
 
-                // The fix must be less than max alignment. We require it to be less because we aligned each Entry to 
-                // MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can write
+                // The fix must be less than max alignment. We require it to be less because we
+                // aligned each Entry to MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra
+                // bytes we can write
                 SLANG_ASSERT(alignmentFixSize < SerialInfo::MAX_ALIGNMENT);
 
                 container->write(entry, entrySize);
@@ -723,8 +741,8 @@ size_t SerialInfo::Entry::calcSize(SerialClasses* serialClasses) const
 {
     switch (typeKind)
     {
-        case SerialTypeKind::ImportSymbol: 
-        case SerialTypeKind::String:
+    case SerialTypeKind::ImportSymbol:
+    case SerialTypeKind::String:
         {
             auto entry = static_cast<const StringEntry*>(this);
             const uint8_t* cur = (const uint8_t*)entry->sizeAndChars;
@@ -732,30 +750,31 @@ size_t SerialInfo::Entry::calcSize(SerialClasses* serialClasses) const
             int sizeSize = ByteEncodeUtil::decodeLiteUInt32(cur, &charsSize);
             return SLANG_OFFSET_OF(StringEntry, sizeAndChars) + sizeSize + charsSize;
         }
-        case SerialTypeKind::Array:
+    case SerialTypeKind::Array:
         {
             auto entry = static_cast<const ArrayEntry*>(this);
             return sizeof(ArrayEntry) + entry->elementSize * entry->elementCount;
         }
-        case SerialTypeKind::RefObject:
-        case SerialTypeKind::NodeBase:
+    case SerialTypeKind::RefObject:
+    case SerialTypeKind::NodeBase:
         {
             auto entry = static_cast<const ObjectEntry*>(this);
 
             auto serialClass = serialClasses->getSerialClass(typeKind, entry->subType);
 
             if (ReflectClassInfo::isSubClassOf(entry->subType, Val::kReflectClassInfo))
-                return sizeof(ValEntry) + static_cast<const ValEntry*>(this)->operandCount * sizeof(SerialValOperand);
+                return sizeof(ValEntry) +
+                       static_cast<const ValEntry*>(this)->operandCount * sizeof(SerialValOperand);
 
-            // Align by the alignment of the entry 
+            // Align by the alignment of the entry
             size_t alignment = getAlignment(entry->info);
             size_t size = sizeof(ObjectEntry) + serialClass->size;
 
             size = size + (alignment - 1) & ~(alignment - 1);
             return size;
         }
-        
-        default: break;
+
+    default: break;
     }
 
     SLANG_ASSERT(!"Unknown type");
@@ -785,13 +804,13 @@ const void* SerialReader::getArray(SerialIndex index, Index& outCount)
 
     switch (entry->typeKind)
     {
-        case SerialTypeKind::Array:
+    case SerialTypeKind::Array:
         {
             auto arrayEntry = static_cast<const SerialInfo::ArrayEntry*>(entry);
             outCount = Index(arrayEntry->elementCount);
             return (arrayEntry + 1);
         }
-        default: break;
+    default: break;
     }
 
     SLANG_ASSERT(!"Not an array");
@@ -813,13 +832,13 @@ SerialPointer SerialReader::getPointer(SerialIndex index)
 
     switch (entry->typeKind)
     {
-        case SerialTypeKind::String:
+    case SerialTypeKind::String:
         {
             // Hmm. Tricky -> we don't know if will be cast as Name or String. Lets assume string.
             String string = getString(index);
             return SerialPointer(string.getStringRepresentation());
         }
-        case SerialTypeKind::ImportSymbol:
+    case SerialTypeKind::ImportSymbol:
         {
             if (ptr.m_kind == SerialTypeKind::Unknown)
             {
@@ -830,7 +849,7 @@ SerialPointer SerialReader::getPointer(SerialIndex index)
             }
             break;
         }
-        default: break;
+    default: break;
     }
 
     return ptr;
@@ -865,10 +884,12 @@ SerialPointer SerialReader::getValPointer(SerialIndex index)
             operand.values.intOperand = serialOperand.payload;
             break;
         case ValNodeOperandKind::ASTNode:
-            operand.values.nodeOperand = (NodeBase*)getPointer((SerialIndex)serialOperand.payload).m_ptr;
+            operand.values.nodeOperand =
+                (NodeBase*)getPointer((SerialIndex)serialOperand.payload).m_ptr;
             break;
         case ValNodeOperandKind::ValNode:
-            operand.values.nodeOperand = (Val*)getValPointer((SerialIndex)serialOperand.payload).m_ptr;
+            operand.values.nodeOperand =
+                (Val*)getValPointer((SerialIndex)serialOperand.payload).m_ptr;
             break;
         }
         desc.operands.add(operand);
@@ -998,15 +1019,20 @@ UnownedStringSlice SerialReader::getStringSlice(SerialIndex index)
     return UnownedStringSlice();
 }
 
-/* static */SlangResult SerialReader::loadEntries(const uint8_t* data, size_t dataCount, SerialClasses* serialClasses, List<const Entry*>& outEntries)
+/* static */ SlangResult SerialReader::loadEntries(
+    const uint8_t* data,
+    size_t dataCount,
+    SerialClasses* serialClasses,
+    List<const Entry*>& outEntries)
 {
-    // Check the input data is at least aligned to the max alignment (otherwise everything cannot be aligned correctly)
+    // Check the input data is at least aligned to the max alignment (otherwise everything cannot be
+    // aligned correctly)
     SLANG_ASSERT((size_t(data) & (SerialInfo::MAX_ALIGNMENT - 1)) == 0);
 
     outEntries.setCount(1);
     outEntries[0] = nullptr;
 
-    const uint8_t*const end = data + dataCount;
+    const uint8_t* const end = data + dataCount;
 
     const uint8_t* cur = data;
     while (cur < end)
@@ -1042,21 +1068,21 @@ SlangResult SerialReader::constructObjects(NamePool* namePool)
 
         switch (entry->typeKind)
         {
-            case SerialTypeKind::ImportSymbol:
+        case SerialTypeKind::ImportSymbol:
             {
                 // We don't construct any object for an imported symbol.
-                // It will be the responsibility of external code to interpet the symbols and *set* the appopriate
-                // objects prior to a call to `deserializeObjects`
+                // It will be the responsibility of external code to interpet the symbols and *set*
+                // the appopriate objects prior to a call to `deserializeObjects`
                 break;
             }
-            case SerialTypeKind::String:
+        case SerialTypeKind::String:
             {
-                // Don't need to construct an object. This is probably a StringRepresentation, or a Name
-                // Will evaluate lazily.
+                // Don't need to construct an object. This is probably a StringRepresentation, or a
+                // Name Will evaluate lazily.
                 break;
             }
-            case SerialTypeKind::RefObject:
-            case SerialTypeKind::NodeBase:
+        case SerialTypeKind::RefObject:
+        case SerialTypeKind::NodeBase:
             {
                 auto objectEntry = static_cast<const SerialInfo::ObjectEntry*>(entry);
 
@@ -1073,9 +1099,10 @@ SlangResult SerialReader::constructObjects(NamePool* namePool)
                 m_objects[i].set(entry->typeKind, obj);
                 break;
             }
-            case SerialTypeKind::Array:
+        case SerialTypeKind::Array:
             {
-                // Don't need to construct an object, as will be accessed and interpreted by the object that holds it
+                // Don't need to construct an object, as will be accessed and interpreted by the
+                // object that holds it
                 break;
             }
         }
@@ -1098,11 +1125,12 @@ SlangResult SerialReader::deserializeObjects()
         }
         switch (entry->typeKind)
         {
-            case SerialTypeKind::NodeBase:
-            case SerialTypeKind::RefObject:
+        case SerialTypeKind::NodeBase:
+        case SerialTypeKind::RefObject:
             {
                 auto objectEntry = static_cast<const SerialInfo::ObjectEntry*>(entry);
-                auto serialClass = m_classes->getSerialClass(objectEntry->typeKind, objectEntry->subType);
+                auto serialClass =
+                    m_classes->getSerialClass(objectEntry->typeKind, objectEntry->subType);
                 if (!serialClass)
                 {
                     return SLANG_FAIL;
@@ -1122,7 +1150,10 @@ SlangResult SerialReader::deserializeObjects()
                     {
                         auto field = serialClass->fields[j];
                         auto fieldType = field.type;
-                        fieldType->toNativeFunc(this, src + field.serialOffset, dst + field.nativeOffset);
+                        fieldType->toNativeFunc(
+                            this,
+                            src + field.serialOffset,
+                            dst + field.nativeOffset);
                     }
 
                     // Get the super class
@@ -1131,7 +1162,7 @@ SlangResult SerialReader::deserializeObjects()
 
                 break;
             }
-            default: break;
+        default: break;
         }
     }
 

@@ -1,22 +1,24 @@
 #include "node-tree.h"
 
-#include "options.h"
-#include "identifier-lookup.h"
-
 #include "../../source/compiler-core/slang-name-convention-util.h"
-
 #include "../../source/core/slang-io.h"
+#include "identifier-lookup.h"
+#include "options.h"
 
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! NodeTree !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-NodeTree::NodeTree(StringSlicePool* typePool, NamePool* namePool, IdentifierLookup* identifierLookup):
-    m_typePool(typePool),
-    m_namePool(namePool),
-    m_identifierLookup(identifierLookup),
-    m_typeSetPool(StringSlicePool::Style::Empty)
+NodeTree::NodeTree(
+    StringSlicePool* typePool,
+    NamePool* namePool,
+    IdentifierLookup* identifierLookup)
+    : m_typePool(typePool)
+    , m_namePool(namePool)
+    , m_identifierLookup(identifierLookup)
+    , m_typeSetPool(StringSlicePool::Style::Empty)
 {
     m_rootNode = new ScopeNode(Node::Kind::Namespace);
     m_rootNode->m_reflectionType = ReflectionType::Reflected;
@@ -52,7 +54,7 @@ TypeSet* NodeTree::getOrAddTypeSet(const UnownedStringSlice& slice)
 
 SourceOrigin* NodeTree::addSourceOrigin(SourceFile* sourceFile, const Options& options)
 {
-    // Calculate from the path, a 'macro origin' name. 
+    // Calculate from the path, a 'macro origin' name.
     const String macroOrigin = calcMacroOrigin(sourceFile->getPathInfo().foundPath, options);
 
     SourceOrigin* origin = new SourceOrigin(sourceFile, macroOrigin);
@@ -60,7 +62,7 @@ SourceOrigin* NodeTree::addSourceOrigin(SourceFile* sourceFile, const Options& o
     return origin;
 }
 
-/* static */String NodeTree::calcMacroOrigin(const String& filePath, const Options& options)
+/* static */ String NodeTree::calcMacroOrigin(const String& filePath, const Options& options)
 {
     // Get the filename without extension
     String fileName = Path::getFileNameWithoutExt(filePath);
@@ -69,7 +71,8 @@ SourceOrigin* NodeTree::addSourceOrigin(SourceFile* sourceFile, const Options& o
     UnownedStringSlice slice = fileName.getUnownedSlice();
 
     // Filename prefix
-    if (options.m_stripFilePrefix.getLength() && slice.startsWith(options.m_stripFilePrefix.getUnownedSlice()))
+    if (options.m_stripFilePrefix.getLength() &&
+        slice.startsWith(options.m_stripFilePrefix.getUnownedSlice()))
     {
         const Index len = options.m_stripFilePrefix.getLength();
         slice = UnownedStringSlice(slice.begin() + len, slice.end());
@@ -94,7 +97,9 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
             ScopeNode* parentScope = classLikeNode->m_parentScope;
             if (parentScope == nullptr)
             {
-                sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Can't lookup in scope if there is none!"));
+                sink->diagnoseRaw(
+                    Severity::Error,
+                    UnownedStringSlice::fromLiteral("Can't lookup in scope if there is none!"));
                 return SLANG_FAIL;
             }
 
@@ -104,7 +109,10 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
             {
                 if (classLikeNode->isReflected())
                 {
-                    sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotFound, classLikeNode->getAbsoluteName());
+                    sink->diagnose(
+                        classLikeNode->m_name,
+                        CPPDiagnostics::superTypeNotFound,
+                        classLikeNode->getAbsoluteName());
                     return SLANG_FAIL;
                 }
             }
@@ -114,17 +122,26 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
 
                 if (!superType)
                 {
-                    sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotAType, classLikeNode->getAbsoluteName());
+                    sink->diagnose(
+                        classLikeNode->m_name,
+                        CPPDiagnostics::superTypeNotAType,
+                        classLikeNode->getAbsoluteName());
                     return SLANG_FAIL;
                 }
 
                 if (superType->m_typeSet != classLikeNode->m_typeSet)
                 {
-                    sink->diagnose(classLikeNode->m_name, CPPDiagnostics::typeInDifferentTypeSet, classLikeNode->m_name.getContent(), classLikeNode->m_typeSet->m_macroName, superType->m_typeSet->m_macroName);
+                    sink->diagnose(
+                        classLikeNode->m_name,
+                        CPPDiagnostics::typeInDifferentTypeSet,
+                        classLikeNode->m_name.getContent(),
+                        classLikeNode->m_typeSet->m_macroName,
+                        superType->m_typeSet->m_macroName);
                     return SLANG_FAIL;
                 }
 
-                // The base class must be defined in same scope (as we didn't allow different scopes for base classes)
+                // The base class must be defined in same scope (as we didn't allow different scopes
+                // for base classes)
                 superType->addDerived(classLikeNode);
             }
         }

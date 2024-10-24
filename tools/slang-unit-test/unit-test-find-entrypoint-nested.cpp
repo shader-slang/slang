@@ -1,14 +1,13 @@
 // unit-test-find-entrypoint-nested.cpp
 
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
+#include "slang-com-ptr.h"
 #include "slang.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-#include "slang-com-ptr.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
 
 using namespace Slang;
 
@@ -52,16 +51,28 @@ SLANG_UNIT_TEST(findEntryPointNested)
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
-    auto module = session->loadModuleFromSourceString("m", "m.slang", userSourceBody, diagnosticBlob.writeRef());
+    auto module = session->loadModuleFromSourceString(
+        "m",
+        "m.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    module->findAndCheckEntryPoint("outer", SLANG_STAGE_RAY_GENERATION, entryPoint.writeRef(), diagnosticBlob.writeRef());
+    module->findAndCheckEntryPoint(
+        "outer",
+        SLANG_STAGE_RAY_GENERATION,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
     SLANG_CHECK(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
-    slang::IComponentType* components[] = { module, entryPoint.get() };
-    session->createCompositeComponentType(components, 2, compositeProgram.writeRef(), diagnosticBlob.writeRef());
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
     SLANG_CHECK(compositeProgram != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
@@ -73,4 +84,3 @@ SLANG_UNIT_TEST(findEntryPointNested)
     SLANG_CHECK(code != nullptr);
     SLANG_CHECK(code->getBufferSize() != 0);
 }
-

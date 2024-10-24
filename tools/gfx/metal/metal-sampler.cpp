@@ -1,5 +1,6 @@
 // metal-sampler.cpp
 #include "metal-sampler.h"
+
 #include "metal-util.h"
 
 namespace gfx
@@ -10,15 +11,14 @@ using namespace Slang;
 namespace metal
 {
 
-SamplerStateImpl::~SamplerStateImpl()
-{
-}
+SamplerStateImpl::~SamplerStateImpl() {}
 
 Result SamplerStateImpl::init(DeviceImpl* device, const ISamplerState::Desc& desc)
 {
     m_device = device;
 
-    NS::SharedPtr<MTL::SamplerDescriptor> samplerDesc = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
+    NS::SharedPtr<MTL::SamplerDescriptor> samplerDesc =
+        NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
 
     samplerDesc->setMinFilter(MetalUtil::translateSamplerMinMagFilter(desc.minFilter));
     samplerDesc->setMagFilter(MetalUtil::translateSamplerMinMagFilter(desc.magFilter));
@@ -45,7 +45,7 @@ Result SamplerStateImpl::init(DeviceImpl* device, const ISamplerState::Desc& des
     // TODO: no support for reduction op
 
     m_samplerState = NS::TransferPtr(m_device->m_device->newSamplerState(samplerDesc.get()));
-    
+
     return m_samplerState ? SLANG_OK : SLANG_FAIL;
 }
 

@@ -1,5 +1,6 @@
 // slang-ir-eliminate-phis.cpp
 #include "slang-ir-eliminate-phis.h"
+
 #include "slang-ir-ssa-register-allocate.h"
 #include "slang-ir-util.h"
 
@@ -51,11 +52,12 @@
 //
 // With that out of the way, let's dive into the pass itself.
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 
-namespace Slang {
+namespace Slang
+{
 
 struct PhiEliminationContext
 {
@@ -72,18 +74,17 @@ struct PhiEliminationContext
     PhiEliminationOptions m_options;
 
     PhiEliminationContext(LivenessMode livenessMode, IRModule* module)
-        : m_module(module)
-        , m_builder(module)
-        , m_livenessMode(livenessMode)
-        , m_options()
-    {}
+        : m_module(module), m_builder(module), m_livenessMode(livenessMode), m_options()
+    {
+    }
 
-     PhiEliminationContext(LivenessMode livenessMode, IRModule* module, PhiEliminationOptions options)
-        : m_module(module)
-        , m_builder(module)
-        , m_livenessMode(livenessMode)
-        , m_options(options)
-    {}
+    PhiEliminationContext(
+        LivenessMode livenessMode,
+        IRModule* module,
+        PhiEliminationOptions options)
+        : m_module(module), m_builder(module), m_livenessMode(livenessMode), m_options(options)
+    {
+    }
 
     // We start with the top-down logic of the pass, which is to process
     // the functions in the module one at a time.
@@ -98,12 +99,10 @@ struct PhiEliminationContext
         {
             switch (inst->getOp())
             {
-            default:
-                continue;
+            default: continue;
 
             case kIROp_Func:
-            case kIROp_GlobalVar:
-                break;
+            case kIROp_GlobalVar: break;
             }
 
             auto code = (IRGlobalValueWithCode*)inst;
@@ -158,14 +157,15 @@ struct PhiEliminationContext
 
             switch (inst->getOp())
             {
-            case kIROp_Param:
-                continue;
+            case kIROp_Param: continue;
             case kIROp_UpdateElement:
                 {
                     auto updateInst = as<IRUpdateElement>(inst);
                     builder.setInsertBefore(updateInst);
                     RefPtr<RegisterInfo> oldReg;
-                    m_registerAllocation.mapInstToRegister.tryGetValue(updateInst->getOldValue(), oldReg);
+                    m_registerAllocation.mapInstToRegister.tryGetValue(
+                        updateInst->getOldValue(),
+                        oldReg);
                     // If the original value is not assigned to the same register as this inst,
                     // we need to insert a copy.
                     if (reg != oldReg)
@@ -173,12 +173,13 @@ struct PhiEliminationContext
                         builder.emitStore(registerVar, updateInst->getOldValue());
                     }
                     // Perform update on the register var.
-                    auto elementAddr = builder.emitElementAddress(registerVar, updateInst->getAccessChain().getArrayView());
+                    auto elementAddr = builder.emitElementAddress(
+                        registerVar,
+                        updateInst->getAccessChain().getArrayView());
                     builder.emitStore(elementAddr, updateInst->getElementValue());
                 }
                 break;
-            default:
-                break;
+            default: break;
             }
         }
     }
@@ -223,7 +224,10 @@ struct PhiEliminationContext
 
         if (m_options.useRegisterAllocation)
         {
-            m_registerAllocation = allocateRegistersForFunc(func, m_dominatorTree, m_options.eliminateCompositeTypedPhiOnly);
+            m_registerAllocation = allocateRegistersForFunc(
+                func,
+                m_dominatorTree,
+                m_options.eliminateCompositeTypedPhiOnly);
             m_mapRegToTempVar = createTempVarForInsts(func);
         }
     }
@@ -271,7 +275,8 @@ struct PhiEliminationContext
                     if (dom == thisDom)
                     {
                         bool isInsertionPointBeforeCurrentInst = false;
-                        for (auto current = insertionPoint; current; current = current->getNextInst())
+                        for (auto current = insertionPoint; current;
+                             current = current->getNextInst())
                         {
                             if (current == thisInsertionPoint)
                             {
@@ -326,7 +331,7 @@ struct PhiEliminationContext
         // We start by checking if the block has any parameters.
         // If it doesn't then there is nothing to eliminate.
         //
-        if( !block->getFirstParam() )
+        if (!block->getFirstParam())
         {
             return;
         }
@@ -436,7 +441,7 @@ struct PhiEliminationContext
         {
             Index paramIndex = paramCounter++;
             mapParamToIndex.add(param, paramIndex);
-            
+
             IRInst* temp = nullptr;
 
             // Have we already allocated a register for this inst?
@@ -446,7 +451,8 @@ struct PhiEliminationContext
                 m_mapRegToTempVar.tryGetValue(registerInfo->get(), temp);
             }
 
-            bool shouldAllocTemp = !m_options.eliminateCompositeTypedPhiOnly || isCompositeType(param->getFullType());
+            bool shouldAllocTemp =
+                !m_options.eliminateCompositeTypedPhiOnly || isCompositeType(param->getFullType());
 
             if (!temp && shouldAllocTemp)
             {
@@ -514,12 +520,12 @@ struct PhiEliminationContext
     //
     void replaceParamUsesWithTemps()
     {
-        for(auto& phiInfo : phiInfos)
+        for (auto& phiInfo : phiInfos)
         {
             auto& paramInfo = phiInfo.param;
             auto param = paramInfo.param;
             auto temp = paramInfo.temp;
-            
+
             if (!temp)
                 continue;
 
@@ -641,7 +647,10 @@ struct PhiEliminationContext
         //
         IRInst** currentValPtr = nullptr;
     };
-    enum { kInvalidIndex = -1 };
+    enum
+    {
+        kInvalidIndex = -1
+    };
 
     // A lot of the logic in this pass is concerned with the process of
     // emitting *assignments* from branch arguments to block parameters.
@@ -657,7 +666,7 @@ struct PhiEliminationContext
     // * _done_ (`-1`): any instructions needed for the assignment have been emitted
     //
     // * _ready_ (`0`): the assignment can be emitted without causing any problems
-    // 
+    //
     // * _blocked_ (`N > 0`): the assignment cannot be emitted yet, because there
     // are `N` other not-yet-done assignments that need to read the value of the
     // parameter that this assignment wants to write. The reads need to be able
@@ -958,10 +967,8 @@ struct PhiEliminationContext
         switch (addr->getOp())
         {
         case kIROp_Var:
-        case kIROp_Param:
-            break;
-        default:
-            return false;
+        case kIROp_Param: break;
+        default:          return false;
         }
         for (auto inst = load; inst; inst = inst->getNextInst())
         {
@@ -1021,10 +1028,11 @@ struct PhiEliminationContext
             if (isEnabled(m_livenessMode))
             {
                 // A store could (perhaps?) consist of multiple instructions
-                // If we make liveness *after* the store, then it implies anything stored 
+                // If we make liveness *after* the store, then it implies anything stored
                 // into the location might be lost.
                 //
-                // Therefore is seems appropriate to say the variable is *live* *before* the store instruction.
+                // Therefore is seems appropriate to say the variable is *live* *before* the store
+                // instruction.
                 m_builder.emitLiveRangeStart(dstParam.temp);
             }
 
@@ -1114,7 +1122,7 @@ struct PhiEliminationContext
         // other assignments, we will unblock it by making a copy.
         //
         auto& assignment = phiInfos[assignmentIndex];
-        if(assignment.state > 0)
+        if (assignment.state > 0)
         {
             auto& dstParam = assignment.param;
 
@@ -1158,4 +1166,4 @@ void eliminatePhisInFunc(
     context.eliminatePhisInFunc(func);
 }
 
-}
+} // namespace Slang

@@ -1,16 +1,17 @@
 // slang-json-lexer.cpp
 #include "slang-json-lexer.h"
 
-#include "slang-json-diagnostics.h"
 #include "../core/slang-char-util.h"
+#include "slang-json-diagnostics.h"
 
 /*
 https://www.json.org/json-en.html
 */
 
-namespace Slang {
+namespace Slang
+{
 
-/* static */UnownedStringSlice JSONLexer::calcLexemeLocation(const UnownedStringSlice& text)
+/* static */ UnownedStringSlice JSONLexer::calcLexemeLocation(const UnownedStringSlice& text)
 {
     SourceManager sourceManager;
     sourceManager.initialize(nullptr, nullptr);
@@ -18,7 +19,8 @@ namespace Slang {
     sink.init(&sourceManager, nullptr);
 
     String contents(text);
-    SourceFile* sourceFile = sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceFile* sourceFile =
+        sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
     SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
 
     JSONLexer lexer;
@@ -38,7 +40,7 @@ namespace Slang {
     }
 }
 
-SlangResult JSONLexer::init(SourceView* sourceView, DiagnosticSink* sink) 
+SlangResult JSONLexer::init(SourceView* sourceView, DiagnosticSink* sink)
 {
     m_sourceView = sourceView;
     m_sink = sink;
@@ -77,7 +79,11 @@ SlangResult JSONLexer::expect(JSONTokenType type)
 {
     if (type != peekType())
     {
-        m_sink->diagnose(m_token.loc, JSONDiagnostics::unexpectedTokenExpectedTokenType, getJSONTokenAsText(peekType()), getJSONTokenAsText(type));
+        m_sink->diagnose(
+            m_token.loc,
+            JSONDiagnostics::unexpectedTokenExpectedTokenType,
+            getJSONTokenAsText(peekType()),
+            getJSONTokenAsText(type));
         return SLANG_FAIL;
     }
 
@@ -89,7 +95,11 @@ SlangResult JSONLexer::expect(JSONTokenType type, JSONToken& out)
 {
     if (type != peekType())
     {
-        m_sink->diagnose(m_token.loc, JSONDiagnostics::unexpectedTokenExpectedTokenType, getJSONTokenAsText(peekType()), getJSONTokenAsText(type));
+        m_sink->diagnose(
+            m_token.loc,
+            JSONDiagnostics::unexpectedTokenExpectedTokenType,
+            getJSONTokenAsText(peekType()),
+            getJSONTokenAsText(type));
         return SLANG_FAIL;
     }
 
@@ -137,8 +147,8 @@ JSONTokenType JSONLexer::advance()
 
         switch (c)
         {
-            case 0:     return _setToken(JSONTokenType::EndOfFile, cursor - 1);
-            case '"':
+        case 0: return _setToken(JSONTokenType::EndOfFile, cursor - 1);
+        case '"':
             {
                 cursor = _lexString(cursor);
                 if (cursor == nullptr)
@@ -147,7 +157,7 @@ JSONTokenType JSONLexer::advance()
                 }
                 return _setToken(JSONTokenType::StringLiteral, cursor);
             }
-            case '/':
+        case '/':
             {
                 // We allow comments
                 const char nextChar = *m_cursor;
@@ -160,7 +170,7 @@ JSONTokenType JSONLexer::advance()
                 else if (nextChar == '*')
                 {
                     cursor = _lexBlockComment(cursor);
-                    // Can fail... 
+                    // Can fail...
                     if (cursor == nullptr)
                     {
                         return _setInvalidToken();
@@ -172,32 +182,32 @@ JSONTokenType JSONLexer::advance()
                 }
                 break;
             }
-            case ' ':
-            case '\t':
-            case '\n':
-            case '\r':
+        case ' ':
+        case '\t':
+        case '\n':
+        case '\r':
             {
                 cursor = _lexWhitespace(cursor);
                 break;
             }
-            case ':':           return _setToken(JSONTokenType::Colon, cursor);
-            case ',':           return _setToken(JSONTokenType::Comma, cursor);
-            case '[':           return _setToken(JSONTokenType::LBracket, cursor);
-            case ']':           return _setToken(JSONTokenType::RBracket, cursor);
-            case '{':           return _setToken(JSONTokenType::LBrace, cursor);
-            case '}':           return _setToken(JSONTokenType::RBrace, cursor);
+        case ':': return _setToken(JSONTokenType::Colon, cursor);
+        case ',': return _setToken(JSONTokenType::Comma, cursor);
+        case '[': return _setToken(JSONTokenType::LBracket, cursor);
+        case ']': return _setToken(JSONTokenType::RBracket, cursor);
+        case '{': return _setToken(JSONTokenType::LBrace, cursor);
+        case '}': return _setToken(JSONTokenType::RBrace, cursor);
 
-            case '-':
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
+        case '-':
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
             {
                 LexResult res = _lexNumber(cursor - 1);
                 if (res.cursor == nullptr)
@@ -206,7 +216,7 @@ JSONTokenType JSONLexer::advance()
                 }
                 return _setToken(res.type, res.cursor);
             }
-            case 't':
+        case 't':
             {
                 if (cursor[0] == 'r' && cursor[1] == 'u' && cursor[2] == 'e')
                 {
@@ -215,7 +225,7 @@ JSONTokenType JSONLexer::advance()
                 m_sink->diagnose(_getLoc(m_lexemeStart), JSONDiagnostics::expectingValueName);
                 return _setInvalidToken();
             }
-            case 'f':
+        case 'f':
             {
                 if (cursor[0] == 'a' && cursor[1] == 'l' && cursor[2] == 's' && cursor[3] == 'e')
                 {
@@ -224,7 +234,7 @@ JSONTokenType JSONLexer::advance()
                 m_sink->diagnose(_getLoc(m_lexemeStart), JSONDiagnostics::expectingValueName);
                 return _setInvalidToken();
             }
-            case 'n':
+        case 'n':
             {
                 if (cursor[0] == 'u' && cursor[1] == 'l' && cursor[2] == 'l')
                 {
@@ -233,7 +243,7 @@ JSONTokenType JSONLexer::advance()
                 m_sink->diagnose(_getLoc(m_lexemeStart), JSONDiagnostics::expectingValueName);
                 return _setInvalidToken();
             }
-            default:
+        default:
             {
                 StringBuilder buf;
                 if (c <= ' ' || c >= 0x7e)
@@ -241,7 +251,7 @@ JSONTokenType JSONLexer::advance()
                     static const char s_hex[] = "0123456789abcdef";
 
                     char hexBuf[5] = "0x";
-      
+
                     uint32_t value = c;
                     hexBuf[2] = s_hex[((value >> 4) & 0xf)];
                     hexBuf[3] = s_hex[(value & 0xf)];
@@ -294,12 +304,13 @@ JSONLexer::LexResult JSONLexer::_lexNumber(const char* cursor)
         if (!CharUtil::isDigit(*cursor))
         {
             m_sink->diagnose(_getLoc(cursor), JSONDiagnostics::expectingADigit);
-            return LexResult{ JSONTokenType::Invalid, nullptr };
+            return LexResult{JSONTokenType::Invalid, nullptr};
         }
         // Skip the digit
         cursor++;
         // Skip any more digits
-        while (CharUtil::isDigit(*cursor)) cursor++;
+        while (CharUtil::isDigit(*cursor))
+            cursor++;
     }
 
     // Theres an exponent
@@ -320,13 +331,14 @@ JSONLexer::LexResult JSONLexer::_lexNumber(const char* cursor)
         if (!CharUtil::isDigit(*cursor))
         {
             m_sink->diagnose(_getLoc(cursor), JSONDiagnostics::expectingADigit);
-            return LexResult{ JSONTokenType::Invalid, nullptr };
+            return LexResult{JSONTokenType::Invalid, nullptr};
         }
 
         // Skip the digit
         cursor++;
         // Skip any more digits
-        while (CharUtil::isDigit(*cursor)) cursor++;
+        while (CharUtil::isDigit(*cursor))
+            cursor++;
     }
 
     return LexResult{tokenType, cursor};
@@ -341,40 +353,42 @@ const char* JSONLexer::_lexString(const char* cursor)
 
         switch (c)
         {
-            case 0:
+        case 0:
             {
                 m_sink->diagnose(_getLoc(cursor - 1), JSONDiagnostics::endOfFileInLiteral);
                 return nullptr;
             }
-            case '"':
+        case '"':
             {
                 return cursor;
             }
-            case '\\':
+        case '\\':
             {
                 const char nextC = *cursor;
                 switch (nextC)
                 {
-                    case '"':
-                    case '\\':
-                    case '/':
-                    case 'b':
-                    case 'f':
-                    case 'n':
-                    case 'r':
-                    case 't':
+                case '"':
+                case '\\':
+                case '/':
+                case 'b':
+                case 'f':
+                case 'n':
+                case 'r':
+                case 't':
                     {
                         ++cursor;
                         break;
                     }
-                    case 'u':
+                case 'u':
                     {
                         cursor++;
                         for (Index i = 0; i < 4; ++i)
                         {
                             if (!CharUtil::isHexDigit(cursor[i]))
                             {
-                                m_sink->diagnose(_getLoc(cursor), JSONDiagnostics::expectingAHexDigit);
+                                m_sink->diagnose(
+                                    _getLoc(cursor),
+                                    JSONDiagnostics::expectingAHexDigit);
                                 return nullptr;
                             }
                         }
@@ -382,10 +396,9 @@ const char* JSONLexer::_lexString(const char* cursor)
                         break;
                     }
                 }
-
             }
-            // Somewhat surprisingly it appears it's valid to have \r\n inside of quotes.
-            default: break;
+        // Somewhat surprisingly it appears it's valid to have \r\n inside of quotes.
+        default: break;
         }
     }
 }
@@ -398,13 +411,13 @@ const char* JSONLexer::_lexLineComment(const char* cursor)
 
         switch (c)
         {
-            case '\n':
-            case '\r':
+        case '\n':
+        case '\r':
             {
                 // We need to skip to the next line
                 return _handleEndOfLine(c, cursor);
             }
-            case 0:
+        case 0:
             {
                 return cursor - 1;
             }
@@ -419,12 +432,12 @@ const char* JSONLexer::_lexBlockComment(const char* cursor)
         const char c = *cursor++;
         switch (c)
         {
-            case 0:
+        case 0:
             {
                 m_sink->diagnose(_getLoc(cursor), JSONDiagnostics::endOfFileInComment);
                 return nullptr;
             }
-            case '*':
+        case '*':
             {
                 if (*cursor == '/')
                 {
@@ -432,7 +445,7 @@ const char* JSONLexer::_lexBlockComment(const char* cursor)
                 }
                 break;
             }
-            default: break;
+        default: break;
         }
     }
 }
@@ -447,21 +460,20 @@ const char* JSONLexer::_lexWhitespace(const char* cursor)
 
         switch (c)
         {
-            case ' ':
-            case '\n':
-            case '\r':
-            case '\t':
+        case ' ':
+        case '\n':
+        case '\r':
+        case '\t':
             {
                 cursor++;
                 break;
             }
-            default:
+        default:
             {
                 // Hit non white space
                 return cursor;
             }
         }
-
     }
 }
 
@@ -469,21 +481,21 @@ UnownedStringSlice getJSONTokenAsText(JSONTokenType type)
 {
     switch (type)
     {
-        case JSONTokenType::Invalid:        return UnownedStringSlice::fromLiteral("invalid");
-        case JSONTokenType::IntegerLiteral: return UnownedStringSlice::fromLiteral("integer literal");
-        case JSONTokenType::FloatLiteral:   return UnownedStringSlice::fromLiteral("float literal");
-        case JSONTokenType::StringLiteral:  return UnownedStringSlice::fromLiteral("string literal");
-        case JSONTokenType::LBracket:       return UnownedStringSlice::fromLiteral("[");
-        case JSONTokenType::RBracket:       return UnownedStringSlice::fromLiteral("]");
-        case JSONTokenType::LBrace:         return UnownedStringSlice::fromLiteral("{");
-        case JSONTokenType::RBrace:         return UnownedStringSlice::fromLiteral("}");
-        case JSONTokenType::Comma:          return UnownedStringSlice::fromLiteral(",");
-        case JSONTokenType::Colon:          return UnownedStringSlice::fromLiteral(":");
-        case JSONTokenType::True:           return UnownedStringSlice::fromLiteral("true");
-        case JSONTokenType::False:          return UnownedStringSlice::fromLiteral("false");
-        case JSONTokenType::Null:           return UnownedStringSlice::fromLiteral("null");
-        case JSONTokenType::EndOfFile:      return UnownedStringSlice::fromLiteral("end of file");
-        default: break;
+    case JSONTokenType::Invalid:        return UnownedStringSlice::fromLiteral("invalid");
+    case JSONTokenType::IntegerLiteral: return UnownedStringSlice::fromLiteral("integer literal");
+    case JSONTokenType::FloatLiteral:   return UnownedStringSlice::fromLiteral("float literal");
+    case JSONTokenType::StringLiteral:  return UnownedStringSlice::fromLiteral("string literal");
+    case JSONTokenType::LBracket:       return UnownedStringSlice::fromLiteral("[");
+    case JSONTokenType::RBracket:       return UnownedStringSlice::fromLiteral("]");
+    case JSONTokenType::LBrace:         return UnownedStringSlice::fromLiteral("{");
+    case JSONTokenType::RBrace:         return UnownedStringSlice::fromLiteral("}");
+    case JSONTokenType::Comma:          return UnownedStringSlice::fromLiteral(",");
+    case JSONTokenType::Colon:          return UnownedStringSlice::fromLiteral(":");
+    case JSONTokenType::True:           return UnownedStringSlice::fromLiteral("true");
+    case JSONTokenType::False:          return UnownedStringSlice::fromLiteral("false");
+    case JSONTokenType::Null:           return UnownedStringSlice::fromLiteral("null");
+    case JSONTokenType::EndOfFile:      return UnownedStringSlice::fromLiteral("end of file");
+    default:                            break;
     }
     SLANG_UNEXPECTED("JSONTokenType not known");
 }

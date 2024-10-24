@@ -17,7 +17,7 @@ public:
 public:
     ISamplerState* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeHandle(InteropHandle* outNativeHandle) override;
+    getNativeHandle(InteropHandle* outNativeHandle) override;
 };
 
 } // namespace debug

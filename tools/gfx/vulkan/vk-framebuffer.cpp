@@ -2,9 +2,8 @@
 #include "vk-framebuffer.h"
 
 #include "vk-device.h"
-#include "vk-resource-views.h"
-
 #include "vk-helper-functions.h"
+#include "vk-resource-views.h"
 
 namespace gfx
 {
@@ -106,7 +105,10 @@ Result FramebufferLayoutImpl::init(DeviceImpl* renderer, const IFramebufferLayou
     renderPassCreateInfo.subpassCount = 1;
     renderPassCreateInfo.pSubpasses = &subpassDesc;
     SLANG_VK_RETURN_ON_FAIL(m_renderer->m_api.vkCreateRenderPass(
-        m_renderer->m_api.m_device, &renderPassCreateInfo, nullptr, &m_renderPass));
+        m_renderer->m_api.m_device,
+        &renderPassCreateInfo,
+        nullptr,
+        &m_renderPass));
     return SLANG_OK;
 }
 
@@ -142,7 +144,9 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
         auto size = resourceDesc->size;
         m_width = getMipLevelSize(viewDesc->subresourceRange.mipLevel, size.width);
         m_height = getMipLevelSize(viewDesc->subresourceRange.mipLevel, size.height);
-        layerCount = (resourceDesc->type == IResource::Type::Texture3D) ? size.depth : viewDesc->subresourceRange.layerCount;
+        layerCount = (resourceDesc->type == IResource::Type::Texture3D)
+                         ? size.depth
+                         : viewDesc->subresourceRange.layerCount;
     }
     else
     {
@@ -200,7 +204,10 @@ Result FramebufferImpl::init(DeviceImpl* renderer, const IFramebuffer::Desc& des
     framebufferInfo.layers = layerCount;
 
     SLANG_VK_RETURN_ON_FAIL(m_renderer->m_api.vkCreateFramebuffer(
-        m_renderer->m_api.m_device, &framebufferInfo, nullptr, &m_handle));
+        m_renderer->m_api.m_device,
+        &framebufferInfo,
+        nullptr,
+        &m_handle));
     return SLANG_OK;
 }
 

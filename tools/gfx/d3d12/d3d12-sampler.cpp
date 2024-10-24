@@ -8,7 +8,10 @@ namespace d3d12
 
 using namespace Slang;
 
-SamplerStateImpl::~SamplerStateImpl() { m_allocator->free(m_descriptor); }
+SamplerStateImpl::~SamplerStateImpl()
+{
+    m_allocator->free(m_descriptor);
+}
 
 Result SamplerStateImpl::getNativeHandle(InteropHandle* outHandle)
 {

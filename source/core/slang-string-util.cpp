@@ -1,15 +1,18 @@
 #include "slang-string-util.h"
 
 #include "slang-blob.h"
-
 #include "slang-char-util.h"
 #include "slang-text-io.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-/* static */bool StringUtil::areAllEqual(const List<UnownedStringSlice>& a, const List<UnownedStringSlice>& b, EqualFn equalFn)
+/* static */ bool StringUtil::areAllEqual(
+    const List<UnownedStringSlice>& a,
+    const List<UnownedStringSlice>& b,
+    EqualFn equalFn)
 {
     if (a.getCount() != b.getCount())
     {
@@ -27,7 +30,11 @@ namespace Slang {
     return true;
 }
 
-/* static */bool StringUtil::areAllEqualWithSplit(const UnownedStringSlice& a, const UnownedStringSlice& b, char splitChar, EqualFn equalFn)
+/* static */ bool StringUtil::areAllEqualWithSplit(
+    const UnownedStringSlice& a,
+    const UnownedStringSlice& b,
+    char splitChar,
+    EqualFn equalFn)
 {
     List<UnownedStringSlice> slicesA, slicesB;
     StringUtil::split(a, splitChar, slicesA);
@@ -35,14 +42,17 @@ namespace Slang {
     return areAllEqual(slicesA, slicesB, equalFn);
 }
 
-/* static */void StringUtil::appendSplitOnWhitespace(const UnownedStringSlice& in, List<UnownedStringSlice>& outSlices)
+/* static */ void StringUtil::appendSplitOnWhitespace(
+    const UnownedStringSlice& in,
+    List<UnownedStringSlice>& outSlices)
 {
     const char* start = in.begin();
     const char* end = in.end();
 
     // Skip any at the start
-    while (start < end && CharUtil::isWhitespace(*start)) start++;
-    
+    while (start < end && CharUtil::isWhitespace(*start))
+        start++;
+
     while (start < end)
     {
         // Find all the non white space in a run
@@ -59,11 +69,15 @@ namespace Slang {
         start = cur + 1;
 
         // Skip the split
-        while (start < end && CharUtil::isWhitespace(*start)) start++;
+        while (start < end && CharUtil::isWhitespace(*start))
+            start++;
     }
 }
 
-/* static */void StringUtil::appendSplit(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& outSlices)
+/* static */ void StringUtil::appendSplit(
+    const UnownedStringSlice& in,
+    char splitChar,
+    List<UnownedStringSlice>& outSlices)
 {
     const char* start = in.begin();
     const char* end = in.end();
@@ -85,7 +99,10 @@ namespace Slang {
     }
 }
 
-/* static */void StringUtil::appendSplit(const UnownedStringSlice& in, const UnownedStringSlice& splitSlice, List<UnownedStringSlice>& outSlices)
+/* static */ void StringUtil::appendSplit(
+    const UnownedStringSlice& in,
+    const UnownedStringSlice& splitSlice,
+    List<UnownedStringSlice>& outSlices)
 {
     const Index splitLen = splitSlice.getLength();
 
@@ -129,25 +146,37 @@ namespace Slang {
     }
 }
 
-/* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& outSlices)
+/* static */ void StringUtil::split(
+    const UnownedStringSlice& in,
+    char splitChar,
+    List<UnownedStringSlice>& outSlices)
 {
     outSlices.clear();
     appendSplit(in, splitChar, outSlices);
 }
 
-/* static */void StringUtil::split(const UnownedStringSlice& in, const UnownedStringSlice& splitSlice, List<UnownedStringSlice>& outSlices)
+/* static */ void StringUtil::split(
+    const UnownedStringSlice& in,
+    const UnownedStringSlice& splitSlice,
+    List<UnownedStringSlice>& outSlices)
 {
     outSlices.clear();
     appendSplit(in, splitSlice, outSlices);
 }
 
-/* static */void StringUtil::splitOnWhitespace(const UnownedStringSlice& in, List<UnownedStringSlice>& outSlices)
+/* static */ void StringUtil::splitOnWhitespace(
+    const UnownedStringSlice& in,
+    List<UnownedStringSlice>& outSlices)
 {
     outSlices.clear();
     appendSplitOnWhitespace(in, outSlices);
 }
 
-/* static */Index StringUtil::split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices)
+/* static */ Index StringUtil::split(
+    const UnownedStringSlice& in,
+    char splitChar,
+    Index maxSlices,
+    UnownedStringSlice* outSlices)
 {
     Index index = 0;
 
@@ -173,7 +202,12 @@ namespace Slang {
     return index;
 }
 
-/* static */SlangResult StringUtil::split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices, Index& outSlicesCount)
+/* static */ SlangResult StringUtil::split(
+    const UnownedStringSlice& in,
+    char splitChar,
+    Index maxSlices,
+    UnownedStringSlice* outSlices,
+    Index& outSlicesCount)
 {
     const Index sliceCount = split(in, splitChar, maxSlices, outSlices);
     if (sliceCount == maxSlices && sliceCount > 0)
@@ -188,12 +222,15 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */void StringUtil::join(const List<String>& values, char separator, StringBuilder& out)
+/* static */ void StringUtil::join(const List<String>& values, char separator, StringBuilder& out)
 {
     join(values, UnownedStringSlice(&separator, 1), out);
 }
 
-/* static */void StringUtil::join(const List<String>& values, const UnownedStringSlice& separator, StringBuilder& out)
+/* static */ void StringUtil::join(
+    const List<String>& values,
+    const UnownedStringSlice& separator,
+    StringBuilder& out)
 {
     const Index count = values.getCount();
     if (count <= 0)
@@ -208,12 +245,20 @@ namespace Slang {
     }
 }
 
-/* static */void StringUtil::join(const UnownedStringSlice* values, Index valueCount, char separator, StringBuilder& out)
+/* static */ void StringUtil::join(
+    const UnownedStringSlice* values,
+    Index valueCount,
+    char separator,
+    StringBuilder& out)
 {
     join(values, valueCount, UnownedStringSlice(&separator, 1), out);
 }
 
-/* static */void StringUtil::join(const UnownedStringSlice* values, Index valueCount, const UnownedStringSlice& separator, StringBuilder& out)
+/* static */ void StringUtil::join(
+    const UnownedStringSlice* values,
+    Index valueCount,
+    const UnownedStringSlice& separator,
+    StringBuilder& out)
 {
     if (valueCount <= 0)
     {
@@ -227,7 +272,10 @@ namespace Slang {
     }
 }
 
-/* static */Index StringUtil::indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find)
+/* static */ Index StringUtil::indexOfInSplit(
+    const UnownedStringSlice& in,
+    char splitChar,
+    const UnownedStringSlice& find)
 {
     const char* start = in.begin();
     const char* end = in.end();
@@ -253,7 +301,10 @@ namespace Slang {
     return -1;
 }
 
-UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char splitChar, Index index)
+UnownedStringSlice StringUtil::getAtInSplit(
+    const UnownedStringSlice& in,
+    char splitChar,
+    Index index)
 {
     const char* start = in.begin();
     const char* end = in.end();
@@ -279,16 +330,20 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
     return UnownedStringSlice();
 }
 
-/* static */size_t StringUtil::calcFormattedSize(const char* format, va_list args)
+/* static */ size_t StringUtil::calcFormattedSize(const char* format, va_list args)
 {
 #if SLANG_WINDOWS_FAMILY
     return _vscprintf(format, args);
 #else
-     return vsnprintf(nullptr, 0, format, args);
+    return vsnprintf(nullptr, 0, format, args);
 #endif
 }
 
-/* static */void StringUtil::calcFormatted(const char* format, va_list args, size_t numChars, char* dst)
+/* static */ void StringUtil::calcFormatted(
+    const char* format,
+    va_list args,
+    size_t numChars,
+    char* dst)
 {
 #if SLANG_WINDOWS_FAMILY
     vsnprintf_s(dst, numChars + 1, _TRUNCATE, format, args);
@@ -297,7 +352,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
 #endif
 }
 
-/* static */void StringUtil::append(const char* format, va_list args, StringBuilder& buf)
+/* static */ void StringUtil::append(const char* format, va_list args, StringBuilder& buf)
 {
     // Calculate the size required (not including terminating 0)
     size_t numChars;
@@ -315,7 +370,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
     buf.appendInPlace(dst, numChars);
 }
 
-/* static */void StringUtil::appendFormat(StringBuilder& buf, const char* format, ...)
+/* static */ void StringUtil::appendFormat(StringBuilder& buf, const char* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -323,7 +378,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
     va_end(args);
 }
 
-/* static */String StringUtil::makeStringWithFormat(const char* format, ...)
+/* static */ String StringUtil::makeStringWithFormat(const char* format, ...)
 {
     StringBuilder builder;
 
@@ -335,7 +390,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
     return builder;
 }
 
-/* static */UnownedStringSlice StringUtil::getSlice(ISlangBlob* blob)
+/* static */ UnownedStringSlice StringUtil::getSlice(ISlangBlob* blob)
 {
     if (blob)
     {
@@ -343,7 +398,8 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
         if (size > 0)
         {
             const char* contents = (const char*)blob->getBufferPointer();
-            // Check it has terminating 0, if it has we skip it, because slices do not need zero termination 
+            // Check it has terminating 0, if it has we skip it, because slices do not need zero
+            // termination
             if (contents[size - 1] == 0)
             {
                 size--;
@@ -354,7 +410,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
     return UnownedStringSlice();
 }
 
-/* static */String StringUtil::getString(ISlangBlob* blob)
+/* static */ String StringUtil::getString(ISlangBlob* blob)
 {
     return getSlice(blob);
 }
@@ -364,7 +420,10 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return StringBlob::create(string);
 }
 
-/* static */String StringUtil::calcCharReplaced(const UnownedStringSlice& slice, char fromChar, char toChar)
+/* static */ String StringUtil::calcCharReplaced(
+    const UnownedStringSlice& slice,
+    char fromChar,
+    char toChar)
 {
     if (fromChar == toChar)
     {
@@ -387,12 +446,17 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return builder;
 }
 
-/* static */String StringUtil::calcCharReplaced(const String& string, char fromChar, char toChar)
+/* static */ String StringUtil::calcCharReplaced(const String& string, char fromChar, char toChar)
 {
-    return (fromChar == toChar || string.indexOf(fromChar) == Index(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
+    return (fromChar == toChar || string.indexOf(fromChar) == Index(-1))
+               ? string
+               : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
 }
 
-String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr, UnownedStringSlice replacement)
+String StringUtil::replaceAll(
+    UnownedStringSlice text,
+    UnownedStringSlice subStr,
+    UnownedStringSlice replacement)
 {
     StringBuilder builder;
     for (Index i = 0; i < text.getLength();)
@@ -417,7 +481,9 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
 }
 
 
-/* static */void StringUtil::appendStandardLines(const UnownedStringSlice& text, StringBuilder& out)
+/* static */ void StringUtil::appendStandardLines(
+    const UnownedStringSlice& text,
+    StringBuilder& out)
 {
     const char* cur = text.begin();
     const char* start = cur;
@@ -428,25 +494,25 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
         const char c = *cur;
         switch (c)
         {
-            case '\n':
+        case '\n':
             {
                 ++cur;
                 if (cur < end && *cur == '\r')
                 {
                     // If we have following \r, we should append with \n
-                    // Append (including \n) 
+                    // Append (including \n)
                     out.append(start, cur);
                     // Skip the \r
                     start = ++cur;
                 }
                 else
                 {
-                    // If not, we don't need to append because just \n is 'standard', and everything remaining
-                    // is appended at the end
+                    // If not, we don't need to append because just \n is 'standard', and everything
+                    // remaining is appended at the end
                 }
                 break;
             }
-            case '\r':
+        case '\r':
             {
                 out.append(start, cur);
                 out.appendChar('\n');
@@ -457,7 +523,7 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
                 start = cur;
                 break;
             }
-            default:
+        default:
             {
                 cur++;
                 break;
@@ -471,10 +537,10 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
     }
 }
 
-/* static */bool StringUtil::extractLine(UnownedStringSlice& ioText, UnownedStringSlice& outLine)
+/* static */ bool StringUtil::extractLine(UnownedStringSlice& ioText, UnownedStringSlice& outLine)
 {
-    char const*const begin = ioText.begin();
-    char const*const end = ioText.end();
+    char const* const begin = ioText.begin();
+    char const* const end = ioText.end();
 
     // If we have hit the end then return the 'special' terminator
     if (begin == nullptr)
@@ -489,10 +555,11 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
         int c = *cursor++;
         switch (c)
         {
-            case '\r': case '\n':
+        case '\r':
+        case '\n':
             {
                 // Remember the end of the line
-                const char*const lineEnd = cursor - 1;
+                const char* const lineEnd = cursor - 1;
 
                 // When we see a line-break character we need
                 // to record the line break, but we also need
@@ -510,8 +577,7 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
                 outLine = UnownedStringSlice(begin, lineEnd);
                 return true;
             }
-            default:
-                break;
+        default: break;
         }
     }
 
@@ -525,7 +591,9 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
     return true;
 }
 
-/* static */void StringUtil::calcLines(const UnownedStringSlice& textIn, List<UnownedStringSlice>& outLines)
+/* static */ void StringUtil::calcLines(
+    const UnownedStringSlice& textIn,
+    List<UnownedStringSlice>& outLines)
 {
     outLines.clear();
     UnownedStringSlice text(textIn), line;
@@ -535,7 +603,7 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
     }
 }
 
-/* static */UnownedStringSlice StringUtil::trimEndOfLine(const UnownedStringSlice& line)
+/* static */ UnownedStringSlice StringUtil::trimEndOfLine(const UnownedStringSlice& line)
 {
     // Strip CR/LF from end of line if present
 
@@ -557,10 +625,12 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
     return line.head(Index(end - begin));
 }
 
-/* static */bool StringUtil::areLinesEqual(const UnownedStringSlice& inA, const UnownedStringSlice& inB)
+/* static */ bool StringUtil::areLinesEqual(
+    const UnownedStringSlice& inA,
+    const UnownedStringSlice& inB)
 {
     UnownedStringSlice a(inA), b(inB), lineA, lineB;
-    
+
     while (true)
     {
         const auto hasLineA = extractLine(a, lineA);
@@ -579,7 +649,7 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
     }
 }
 
-/* static */SlangResult StringUtil::parseDouble(const UnownedStringSlice& text, double& out)
+/* static */ SlangResult StringUtil::parseDouble(const UnownedStringSlice& text, double& out)
 {
     const Index bufSize = 32;
 
@@ -606,7 +676,7 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
     return SLANG_OK;
 }
 
-/* static */SlangResult StringUtil::parseInt(const UnownedStringSlice& in, Int& outValue)
+/* static */ SlangResult StringUtil::parseInt(const UnownedStringSlice& in, Int& outValue)
 {
     const char* cur = in.begin();
     const char* end = in.end();
@@ -620,7 +690,7 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
 
     int radix = 10;
     auto getDigit = CharUtil::getDecimalDigitValue;
-    if (cur+1 < end && *cur == '0' && (*(cur+1) == 'x' || *(cur+1) == 'X'))
+    if (cur + 1 < end && *cur == '0' && (*(cur + 1) == 'x' || *(cur + 1) == 'X'))
     {
         radix = 16;
         getDigit = CharUtil::getHexDigitValue;
@@ -632,7 +702,7 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
     {
         return SLANG_FAIL;
     }
-    
+
     Int value = 0;
     // Do the digits
     for (; cur < end; ++cur)
@@ -649,7 +719,7 @@ String StringUtil::replaceAll(UnownedStringSlice text, UnownedStringSlice subStr
     return SLANG_OK;
 }
 
-/* static */SlangResult StringUtil::parseInt64(const UnownedStringSlice& text, int64_t& out)
+/* static */ SlangResult StringUtil::parseInt64(const UnownedStringSlice& text, int64_t& out)
 {
     bool negate = false;
 

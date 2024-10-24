@@ -34,7 +34,7 @@ public:
 
 public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
+    createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
 };
 

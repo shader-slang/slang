@@ -1,7 +1,8 @@
 
 #include "slang-random-generator.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! RandomGenerator !!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -20,8 +21,8 @@ bool RandomGenerator::nextBool()
     bits = ((bits & 0x44444444) >> 2) ^ (bits & 0x11111111);
     bits = ((bits & 0x10101010) >> 4) ^ (bits & 0x01010101);
 
-    // In effect is the xor of all the bits of the original last byte 
-    return ( bits & 1) != 0;
+    // In effect is the xor of all the bits of the original last byte
+    return (bits & 1) != 0;
 }
 
 int64_t RandomGenerator::nextInt64()
@@ -34,7 +35,7 @@ int64_t RandomGenerator::nextInt64()
 
 uint32_t RandomGenerator::nextUInt32InRange(uint32_t min, uint32_t max)
 {
-    // Make sure max is at least in 
+    // Make sure max is at least in
     max = (max >= min) ? max : min;
 
     // Make 64 bit so can be lazier than having to take care of 32 bit overflow/underflow issues
@@ -49,7 +50,7 @@ uint32_t RandomGenerator::nextUInt32InRange(uint32_t min, uint32_t max)
 
 int32_t RandomGenerator::nextInt32InRange(int32_t min, int32_t max)
 {
-    // Make sure max is at least in 
+    // Make sure max is at least in
     max = (max >= min) ? max : min;
 
     // Make 64 bit so can be lazier than having to take care of 32 bit overflow/underflow issues
@@ -90,7 +91,7 @@ static uint8_t* _nextData(RandomGenerator* rand, uint8_t* out, size_t size)
 void RandomGenerator::nextData(void* out, size_t size)
 {
     uint8_t* dst = (uint8_t*)out;
-    uint8_t*const end = dst + size;
+    uint8_t* const end = dst + size;
 
     // For short runs just output
     if (size <= 4)
@@ -98,7 +99,7 @@ void RandomGenerator::nextData(void* out, size_t size)
         _nextData(this, dst, size);
         return;
     }
-    
+
     {
         const size_t preAlign = size_t(((size_t(dst) + 3) & ~size_t(3)) - size_t(dst));
         dst = _nextData(this, dst, preAlign);
@@ -122,7 +123,7 @@ void RandomGenerator::nextData(void* out, size_t size)
     _nextData(this, dst, size_t(end - dst));
 }
 
-/* static */RandomGenerator* RandomGenerator::create(int32_t seed)
+/* static */ RandomGenerator* RandomGenerator::create(int32_t seed)
 {
     return new DefaultRandomGenerator(seed);
 }
@@ -149,7 +150,7 @@ void Mt19937RandomGenerator::_generate()
     const uint32_t xorValue = 2567483615u;
     for (int i = 0; i < kNumEntries - 1; ++i)
     {
-        const uint32_t y = (m_mt[i] & 0x80000000) + (m_mt[i + 1] & 0x7fffffff);    
+        const uint32_t y = (m_mt[i] & 0x80000000) + (m_mt[i + 1] & 0x7fffffff);
 
         // o = (i + 397) % kNumEntries
         int32_t o = i + 397;
@@ -200,7 +201,7 @@ int32_t Mt19937RandomGenerator::nextInt32()
     uint32_t y = m_mt[m_index++];
     y = y ^ (y >> 11);
     y = y ^ ((y << 7) & uint32_t(0x9d2c5680u));
-    y = y ^ ((y << 15) & uint32_t(0xefc6000u)); 
+    y = y ^ ((y << 15) & uint32_t(0xefc6000u));
     y = y ^ (y >> 18);
 
     return int32_t(y);

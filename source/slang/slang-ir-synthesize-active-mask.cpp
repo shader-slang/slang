@@ -150,7 +150,7 @@ struct SynthesizeActiveMaskForModuleContext
     //
     void markFuncUsingActiveMask(IRFunc* func)
     {
-        if(m_funcsUsingActiveMaskSet.contains(func))
+        if (m_funcsUsingActiveMaskSet.contains(func))
             return;
 
         m_funcsUsingActiveMask.add(func);
@@ -175,7 +175,7 @@ struct SynthesizeActiveMaskForModuleContext
         // in the `IRModule`).
         //
         auto parent = inst->getParent();
-        if( auto block = as<IRBlock>(parent) )
+        if (auto block = as<IRBlock>(parent))
         {
             parent = block->getParent();
         }
@@ -185,7 +185,7 @@ struct SynthesizeActiveMaskForModuleContext
         // the block could be nested in an IR generic,
         // or a global variable with an initializer, etc.).
         //
-        if( auto func = as<IRFunc>(parent) )
+        if (auto func = as<IRFunc>(parent))
         {
             markFuncUsingActiveMask(func);
         }
@@ -220,7 +220,7 @@ struct SynthesizeActiveMaskForModuleContext
         // of the loop, rather than querying it once and using a
         // variable (or using a range-based `for` loop).
         //
-        for( Index i = 0; i < m_funcsUsingActiveMask.getCount(); ++i )
+        for (Index i = 0; i < m_funcsUsingActiveMask.getCount(); ++i)
         {
             markAndModifyFuncsIndirectlyUsingActiveMask(m_funcsUsingActiveMask[i]);
         }
@@ -257,12 +257,12 @@ struct SynthesizeActiveMaskForModuleContext
         // instructions. When we find one we mark the function
         // that contains it.
 
-        if( inst->getOp() == kIROp_WaveGetActiveMask )
+        if (inst->getOp() == kIROp_WaveGetActiveMask)
         {
             markInstUsingActiveMask(inst);
         }
 
-        for( auto child : inst->getChildren() )
+        for (auto child : inst->getChildren())
         {
             markFuncsDirectlyUsingActiveMaskRec(child);
         }
@@ -283,7 +283,7 @@ struct SynthesizeActiveMaskForModuleContext
         // in this function.
 
         List<IRCall*> calls;
-        for( IRUse* use = callee->firstUse; use; use = use->nextUse )
+        for (IRUse* use = callee->firstUse; use; use = use->nextUse)
         {
             // We are looking for instructions that use `callee`,
             // where the instruction is a call, and `callee` is used
@@ -291,9 +291,9 @@ struct SynthesizeActiveMaskForModuleContext
             //
             IRInst* user = use->getUser();
             IRCall* call = as<IRCall>(user);
-            if(!call)
+            if (!call)
                 continue;
-            if(call->getCallee() != callee)
+            if (call->getCallee() != callee)
                 continue;
 
             // Once we have found a call site to `callee`,
@@ -313,7 +313,7 @@ struct SynthesizeActiveMaskForModuleContext
         // changing the use/def list of `callee` while also
         // walking it would be dangerous)
         //
-        for(auto call : calls)
+        for (auto call : calls)
         {
             // The basic situation here is that we have a call of the form:
             //
@@ -334,7 +334,11 @@ struct SynthesizeActiveMaskForModuleContext
             // the function containing `call` is now a function
             // that directly uses the active mask.
             //
-            auto mask = builder.emitIntrinsicInst(builder.getBasicType(BaseType::UInt), kIROp_WaveGetActiveMask, 0, nullptr);
+            auto mask = builder.emitIntrinsicInst(
+                builder.getBasicType(BaseType::UInt),
+                kIROp_WaveGetActiveMask,
+                0,
+                nullptr);
 
             // Next we synthesize the new argument list for the
             // call, which consists of the original arguments,
@@ -342,7 +346,7 @@ struct SynthesizeActiveMaskForModuleContext
             //
             List<IRInst*> newArgs;
             Int originalArgCount = call->getArgCount();
-            for(Int a = 0; a < originalArgCount; ++a)
+            for (Int a = 0; a < originalArgCount; ++a)
             {
                 newArgs.add(call->getArg(a));
             }
@@ -369,7 +373,7 @@ struct SynthesizeActiveMaskForModuleContext
         // been modified), we can transform each of the marked
         // functions one by one.
         //
-        for( auto func : m_funcsUsingActiveMask )
+        for (auto func : m_funcsUsingActiveMask)
         {
             transformFuncUsingActiveMask(func);
         }
@@ -513,7 +517,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 // We want to collect the edges that are critical
                 // or psuedo-critical.
                 //
-                if( edge.isCritical() || isPseudoCriticalEdge(edge) )
+                if (edge.isCritical() || isPseudoCriticalEdge(edge))
                 {
                     edgesToBreak.add(edge);
                 }
@@ -523,7 +527,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // Once we've identified the edges we want to break,
         // we do so by inserting an edge along them.
         //
-        for( auto& edge : edgesToBreak )
+        for (auto& edge : edgesToBreak)
         {
             IRBuilder::insertBlockAlongEdge(m_module, edge);
         }
@@ -543,13 +547,13 @@ struct SynthesizeActiveMaskForFunctionContext
         // The condition on the predecessor is easy
         // enough to check.
         //
-        if(pred->getSuccessors().getCount() <= 1)
+        if (pred->getSuccessors().getCount() <= 1)
             return false;
 
         // To check if the successor is used as a merge
         // point, we must iterate over its uses.
         //
-        for( auto use = succ->firstUse; use; use = use->nextUse )
+        for (auto use = succ->firstUse; use; use = use->nextUse)
         {
             // For each use, we need to consider if
             // the user represents a structured control-flow
@@ -557,24 +561,24 @@ struct SynthesizeActiveMaskForFunctionContext
             // is being used as a merge point in that construct.
             //
             auto user = use->getUser();
-            if(auto ifElseInst = as<IRIfElse>(user))
+            if (auto ifElseInst = as<IRIfElse>(user))
             {
                 // The merge point for an `if` or `if`/`else`
                 // if the block *after* the statement.
                 //
-                if(ifElseInst->getAfterBlock() == succ)
+                if (ifElseInst->getAfterBlock() == succ)
                     return true;
             }
-            else if( auto switchInst = as<IRSwitch>(user) )
+            else if (auto switchInst = as<IRSwitch>(user))
             {
                 // The merge point for a `switch` is the block
                 // after the statement, which is also the label
                 // where control flow goes on a `break`.
                 //
-                if(switchInst->getBreakLabel() == succ)
+                if (switchInst->getBreakLabel() == succ)
                     return true;
             }
-            else if( auto loopInst = as<IRLoop>(user) )
+            else if (auto loopInst = as<IRLoop>(user))
             {
                 // A loop construct can actually have two
                 // merge points.
@@ -583,7 +587,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 // is the block after the loop, which is also
                 // where control flow goes on a `break`.
                 //
-                if(loopInst->getBreakBlock() == succ)
+                if (loopInst->getBreakBlock() == succ)
                     return true;
                 //
                 // Second, for a given iteration of the loop,
@@ -591,7 +595,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 // is a merge point, and is where control flow
                 // goes on a `continue`.
                 //
-                if(loopInst->getContinueBlock() == succ)
+                if (loopInst->getContinueBlock() == succ)
                     return true;
             }
         }
@@ -627,11 +631,11 @@ struct SynthesizeActiveMaskForFunctionContext
         // discovered this way, even in functions that did not
         // initially contain direct uses of `waveGetActiveMask`.
         //
-        for( auto block : m_func->getBlocks() )
+        for (auto block : m_func->getBlocks())
         {
-            for( auto inst : block->getOrdinaryInsts() )
+            for (auto inst : block->getOrdinaryInsts())
             {
-                if( inst->getOp() == kIROp_WaveGetActiveMask )
+                if (inst->getOp() == kIROp_WaveGetActiveMask)
                 {
                     m_blocksNeedingActiveMask.add(block);
                     break;
@@ -654,7 +658,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // know we have converged.
             //
             bool change = true;
-            while( change )
+            while (change)
             {
                 change = false;
 
@@ -663,14 +667,14 @@ struct SynthesizeActiveMaskForFunctionContext
                 // order to minimize the number of iterations required
                 // in the common case.
                 //
-                for(auto block = m_func->getLastBlock(); block; block = block->getPrevBlock())
+                for (auto block = m_func->getLastBlock(); block; block = block->getPrevBlock())
                 {
-                    if(m_blocksNeedingActiveMask.contains(block))
+                    if (m_blocksNeedingActiveMask.contains(block))
                         continue;
 
-                    for( auto successor : block->getSuccessors() )
+                    for (auto successor : block->getSuccessors())
                     {
-                        if( !m_blocksNeedingActiveMask.contains(successor) )
+                        if (!m_blocksNeedingActiveMask.contains(successor))
                             continue;
 
                         // If we get here then `block` has *not* been marked
@@ -742,7 +746,8 @@ struct SynthesizeActiveMaskForFunctionContext
             //
             //      initialActiveMask = waveMaskBallot(allOnesMask, true);
             //
-            auto initialActiveMask = builder.emitWaveMaskBallot(m_maskType, allLanesMask, builder.getBoolValue(true));
+            auto initialActiveMask =
+                builder.emitWaveMaskBallot(m_maskType, allLanesMask, builder.getBoolValue(true));
             //
             // Note: an important detail here is that we are invoking `waveMaskBallot`
             // with the all-ones mask and *assuming* that a target will properly ignore
@@ -764,14 +769,14 @@ struct SynthesizeActiveMaskForFunctionContext
         // recieve their input active mask as a block parameter
         // (an SSA phi operation in more traditional representations).
         //
-        for( auto block : m_func->getBlocks() )
+        for (auto block : m_func->getBlocks())
         {
             // We only care about blocks that want the active mask,
             // and that have multiple predecessors.
             //
-            if(!doesBlockNeedActiveMask(block))
+            if (!doesBlockNeedActiveMask(block))
                 continue;
-            if(block->getPredecessors().getCount() <= 1)
+            if (block->getPredecessors().getCount() <= 1)
                 continue;
 
             // What is more, we only care about blocks with multiple
@@ -791,15 +796,15 @@ struct SynthesizeActiveMaskForFunctionContext
             // with <= 1 predecessor already).
             //
             IRBlock* firstPred = *block->getPredecessors().begin();
-            for(auto pred : block->getPredecessors())
+            for (auto pred : block->getPredecessors())
             {
-                if(pred != firstPred)
+                if (pred != firstPred)
                 {
                     allPredsTheSame = false;
                     break;
                 }
             }
-            if(allPredsTheSame)
+            if (allPredsTheSame)
                 continue;
 
             // If we have identified a block with multiple distinct
@@ -866,8 +871,7 @@ struct SynthesizeActiveMaskForFunctionContext
     //
     bool dominatesOrIsUnreachable(IRBlock* dominator, IRBlock* dominated)
     {
-        return m_dominatorTree->isUnreachable(dominated)
-            || dominates(dominator, dominated);
+        return m_dominatorTree->isUnreachable(dominated) || dominates(dominator, dominated);
     }
 
     // With the definition of dominance in hand, we are now ready
@@ -924,7 +928,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // Thus, any block not dominated by the entry block
         // is outside the region.
         //
-        if(!m_dominatorTree->dominates(region->entryBlock, block))
+        if (!m_dominatorTree->dominates(region->entryBlock, block))
             return false;
 
         // In addition, if `block` is dominated by the merge
@@ -940,14 +944,14 @@ struct SynthesizeActiveMaskForFunctionContext
         // block would suffice. We need to double-check that
         // nothing would be changed before removing that logic...
         //
-        for( auto r = region; r; r = r->parentRegion )
+        for (auto r = region; r; r = r->parentRegion)
         {
             // Note: It is possible for the merge block of a region to
             // be null (specifically for the entry block of a function,
             // where the logical merge point is after the function
             // returns).
             //
-            if(r->mergeBlock && dominates(r->mergeBlock, block))
+            if (r->mergeBlock && dominates(r->mergeBlock, block))
                 return false;
         }
 
@@ -1011,11 +1015,11 @@ struct SynthesizeActiveMaskForFunctionContext
         // the way.
         //
         IRInst* nextInst = nullptr;
-        for( IRInst* inst = regionEntry->getFirstInst(); inst; inst = nextInst )
+        for (IRInst* inst = regionEntry->getFirstInst(); inst; inst = nextInst)
         {
             nextInst = inst->getNextInst();
 
-            if( inst->getOp() == kIROp_WaveGetActiveMask )
+            if (inst->getOp() == kIROp_WaveGetActiveMask)
             {
                 inst->replaceUsesWith(activeMaskOnRegionEntry);
                 inst->removeAndDeallocate();
@@ -1030,7 +1034,7 @@ struct SynthesizeActiveMaskForFunctionContext
         //
         auto terminator = regionEntry->getTerminator();
         SLANG_ASSERT(terminator);
-        switch( terminator->getOp() )
+        switch (terminator->getOp())
         {
             // There are some cases of terminator instructions that
             // we explicit do not or cannot handle.
@@ -1060,8 +1064,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // so we can elect to simply do nothing.
             //
         case kIROp_MissingReturn:
-        case kIROp_Unreachable:
-            break;
+        case kIROp_Unreachable:   break;
 
         case kIROp_unconditionalBranch:
             {
@@ -1085,7 +1088,11 @@ struct SynthesizeActiveMaskForFunctionContext
                 // a subroutine, so we just invoke it here and leave the explanation
                 // to later.
                 //
-                transformUnconditionalEdge(region, terminator, branch->getTargetBlock(), activeMaskOnRegionEntry);
+                transformUnconditionalEdge(
+                    region,
+                    terminator,
+                    branch->getTargetBlock(),
+                    activeMaskOnRegionEntry);
 
                 // Once we've handled the control-flow edge at the end of the entry
                 // block of our region, we need to process any child regions that
@@ -1176,7 +1183,7 @@ struct SynthesizeActiveMaskForFunctionContext
 
                 // Because we broke all critical edges as a pre-process, we
                 // can be certain that the entry block for `region` dominates
-                // the blocks for the `true` and `false` cases (it should 
+                // the blocks for the `true` and `false` cases (it should
                 // be their only predecessor, and thus the immediate
                 // dominator).
                 //
@@ -1205,7 +1212,8 @@ struct SynthesizeActiveMaskForFunctionContext
                 // parent region and computed a `condition` value of `true`.
                 //
                 builder.setInsertBefore(ifElse);
-                auto trueMask = builder.emitWaveMaskBallot(m_maskType, activeMaskOnRegionEntry, condition);
+                auto trueMask =
+                    builder.emitWaveMaskBallot(m_maskType, activeMaskOnRegionEntry, condition);
 
                 // To establish the mask value for `falseBlock`, we will
                 // insert code into the false block that computes an inverted mask as:
@@ -1327,7 +1335,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 // `loop` instruction and one or more for back edges that
                 // continue execution of the loop.
                 //
-                if( loopHeader->getPredecessors().getCount() > 1 )
+                if (loopHeader->getPredecessors().getCount() > 1)
                 {
                     iterEntryMask = loopHeader->getLastParam();
                     SLANG_ASSERT(iterEntryMask);
@@ -1375,7 +1383,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 // `continue`.
                 //
                 // The nested region thus begins at the loop header,
-                // and ends at the `continue` label. Note that it 
+                // and ends at the `continue` label. Note that it
                 // is possible for this region to be empty, in the
                 // case where `loopHeader == continueBlock` (which
                 // will happen for any non-`for` loop).
@@ -1437,7 +1445,8 @@ struct SynthesizeActiveMaskForFunctionContext
                 // This value will yield a mask for each thread that consists of
                 // the threads who had exactly the same value for `condition`.
                 //
-                auto matchingMask = builder.emitWaveMaskMatch(m_maskType, activeMaskOnRegionEntry, condition);
+                auto matchingMask =
+                    builder.emitWaveMaskMatch(m_maskType, activeMaskOnRegionEntry, condition);
                 //
                 // TODO: this mask computation yields a surprising value in cases where
                 // multiple values go to the same code:
@@ -1544,13 +1553,13 @@ struct SynthesizeActiveMaskForFunctionContext
                 //
                 // * If the cases with label A can fall through to the cases with label B, then
                 //   the A cases immediately precede the B cases in the list of cases.
-                // 
+                //
                 // We can thus simply track the label of the last case we processed,
                 // and detect duplicates by comparing to it (and the `default` label).
                 //
                 IRBlock* prevLabel = nullptr;
                 UInt caseCount = switchInst->getCaseCount();
-                for( UInt ii = 0; ii < caseCount; ++ii )
+                for (UInt ii = 0; ii < caseCount; ++ii)
                 {
                     auto caseLabel = switchInst->getCaseLabel(ii);
 
@@ -1558,7 +1567,7 @@ struct SynthesizeActiveMaskForFunctionContext
                     // a given label, since all of the edges will pass  along the
                     // same mask.
                     //
-                    if(caseLabel == prevLabel)
+                    if (caseLabel == prevLabel)
                         continue;
                     prevLabel = caseLabel;
 
@@ -1566,7 +1575,7 @@ struct SynthesizeActiveMaskForFunctionContext
                     // as a `default`, since the `default` label was already
                     // processed above.
                     //
-                    if(caseLabel == defaultLabel)
+                    if (caseLabel == defaultLabel)
                         continue;
 
                     transformConditionalEdge(&switchRegion, terminator, caseLabel, matchingMask);
@@ -1621,7 +1630,6 @@ struct SynthesizeActiveMaskForFunctionContext
                 transformChildRegions(&switchRegion, region);
             }
             break;
-
         }
     }
 
@@ -1631,7 +1639,11 @@ struct SynthesizeActiveMaskForFunctionContext
     //
     // The case of conditional edges is the easiest.
     //
-    void transformConditionalEdge(RegionInfo* fromRegion, IRTerminatorInst* terminator, IRBlock* toBlock, IRInst* fromActiveMask)
+    void transformConditionalEdge(
+        RegionInfo* fromRegion,
+        IRTerminatorInst* terminator,
+        IRBlock* toBlock,
+        IRInst* fromActiveMask)
     {
         SLANG_UNUSED(fromRegion);
         SLANG_UNUSED(terminator);
@@ -1657,7 +1669,11 @@ struct SynthesizeActiveMaskForFunctionContext
     // edges, because they may branch out of a control-flow
     // region and/or branch to a block with multiple predecessors.
     //
-    void transformUnconditionalEdge(RegionInfo* fromRegion, IRTerminatorInst* terminator, IRBlock* toBlock, IRInst* fromActiveMask)
+    void transformUnconditionalEdge(
+        RegionInfo* fromRegion,
+        IRTerminatorInst* terminator,
+        IRBlock* toBlock,
+        IRInst* fromActiveMask)
     {
         IRBuilder builder(m_module);
         builder.setInsertBefore(terminator);
@@ -1688,7 +1704,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // to the outer-most and check if we are exiting each
         // region in turn.
         //
-        for( RegionInfo* r = fromRegion; r; r = r->parentRegion )
+        for (RegionInfo* r = fromRegion; r; r = r->parentRegion)
         {
             // To know if we are exiting the region `r`, we
             // need to look at its merge block.
@@ -1714,7 +1730,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // so that code like this doesn't need the ad hoc check.
             //
             auto parentRegion = r->parentRegion;
-            if(parentRegion && parentRegion->mergeBlock == mergeBlock)
+            if (parentRegion && parentRegion->mergeBlock == mergeBlock)
                 continue;
 
             // We need to know if the branch exits the region `r`
@@ -1725,7 +1741,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // (which can only be the case for a non-null target
             // block), then we clearly aren't exiting region `r`.
             //
-            if(toBlock && isBlockInRegion(toBlock, r))
+            if (toBlock && isBlockInRegion(toBlock, r))
             {
                 // Furthermore, if we aren't exiting region `r`,
                 // then we must not be exiting any of its parent
@@ -1742,7 +1758,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // it is any case where the destination of the branch is
             // the merge block for the region.
             //
-            else if( toBlock == mergeBlock )
+            else if (toBlock == mergeBlock)
             {
                 // In this case we are jumping to the dedicated
                 // merge point of region `r`, which means we need
@@ -1754,7 +1770,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 // it representing the merge point upon return from
                 // the function, so we guard against that case.
                 //
-                if( mergeBlock )
+                if (mergeBlock)
                 {
                     // Otherwise, if we are branching to a non-null
                     // merge point, then we emit a ballot operation
@@ -1813,7 +1829,8 @@ struct SynthesizeActiveMaskForFunctionContext
                 // the ballot operation, since it will only represent
                 // the active mask for threads that wanted to re-converge.
                 //
-                builder.emitWaveMaskBallot(m_maskType,
+                builder.emitWaveMaskBallot(
+                    m_maskType,
                     r->activeMaskOnEntry,
                     builder.getBoolValue(false));
             }
@@ -1827,14 +1844,14 @@ struct SynthesizeActiveMaskForFunctionContext
         // The way that we pass things along to the target
         // block will vary a lot based on its form.
         //
-        if( !toBlock )
+        if (!toBlock)
         {
             // First, if the target block is null, then
             // the branch is exiting the current function
             // completely, so we don't need to wire up an
             // active mask at all.
         }
-        else if( toBlock->getPredecessors().getCount() > 1 )
+        else if (toBlock->getPredecessors().getCount() > 1)
         {
             if (doesBlockNeedActiveMask(toBlock))
             {
@@ -1855,7 +1872,7 @@ struct SynthesizeActiveMaskForFunctionContext
                 //
                 List<IRInst*> newOperands;
                 UInt oldOperandCount = terminator->getOperandCount();
-                for( UInt i = 0; i < oldOperandCount; ++i )
+                for (UInt i = 0; i < oldOperandCount; ++i)
                 {
                     newOperands.add(terminator->getOperand(i));
                 }
@@ -1926,14 +1943,14 @@ struct SynthesizeActiveMaskForFunctionContext
         // our overall range of regions.
         //
         IRBlock* entryBlock = outerRegion->entryBlock;
-        for( auto childBlock : m_dominatorTree->getImmediatelyDominatedBlocks(entryBlock) )
+        for (auto childBlock : m_dominatorTree->getImmediatelyDominatedBlocks(entryBlock))
         {
             // We don't want to consider blocks that are outside of
             // the inner region here (they could be, e.g., the merge
             // point of the region, or just blocks inside some
             // nested control-flow construct).
             //
-            if(!isBlockInRegion(childBlock, innerRegion))
+            if (!isBlockInRegion(childBlock, innerRegion))
                 continue;
 
             // If we do find a child region, then we want to process it as
@@ -1950,7 +1967,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // We will walk the regions in our range from the inner-most
         // to the outer-most and look at their merge blocks.
         //
-        for( auto mergeRegion = innerRegion; mergeRegion; mergeRegion = mergeRegion->parentRegion )
+        for (auto mergeRegion = innerRegion; mergeRegion; mergeRegion = mergeRegion->parentRegion)
         {
             // The merge point of a region forms the start of a
             // sibling region that shares the same parent region.
@@ -1962,7 +1979,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // the same merge point, then  the merge region can't
             // actually be one of its children.
             //
-            if( parentRegion && parentRegion->mergeBlock == mergeRegion->mergeBlock)
+            if (parentRegion && parentRegion->mergeBlock == mergeRegion->mergeBlock)
             {
                 // In the case where the parent region has the same
                 // merge point, we choose not to process it here
@@ -1988,7 +2005,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // condition because we need to make sure that we process
             // at least one region in the case where `innerRegion == outerRegion`.
             //
-            if(mergeRegion == outerRegion)
+            if (mergeRegion == outerRegion)
                 break;
         }
     }
@@ -2004,14 +2021,14 @@ struct SynthesizeActiveMaskForFunctionContext
         // merge point for the entire function body, which is a null
         // region. There is nothing that needs to be done in that case.
         //
-        if(!regionEntry)
+        if (!regionEntry)
             return;
 
         // Similarly, we don't need to do anything for regions that don't
         // need or use the active mask (even to pass along to their
         // successors).
         //
-        if(!doesBlockNeedActiveMask(regionEntry))
+        if (!doesBlockNeedActiveMask(regionEntry))
             return;
 
         // An important invariant of our approach is that before a child
@@ -2029,7 +2046,7 @@ struct SynthesizeActiveMaskForFunctionContext
         //   to each of its successors.
         //
         IRInst* activeMaskOnRegionEntry = nullptr;
-        if( !m_activeMaskForBlock.tryGetValue(regionEntry, activeMaskOnRegionEntry) )
+        if (!m_activeMaskForBlock.tryGetValue(regionEntry, activeMaskOnRegionEntry))
         {
             SLANG_UNEXPECTED("no active mask registered for block");
         }
@@ -2064,9 +2081,7 @@ void SynthesizeActiveMaskForModuleContext::transformFuncUsingActiveMask(IRFunc* 
 // The public entry point for this pass is just a wrapper around
 // the context type for the module-level pass.
 //
-void synthesizeActiveMask(
-    IRModule*       module,
-    DiagnosticSink* sink)
+void synthesizeActiveMask(IRModule* module, DiagnosticSink* sink)
 {
     SynthesizeActiveMaskForModuleContext context;
     context.m_module = module;

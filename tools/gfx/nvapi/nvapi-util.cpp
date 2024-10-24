@@ -2,11 +2,12 @@
 
 #include "nvapi-include.h"
 
-namespace gfx {
+namespace gfx
+{
 
 static SlangResult g_initStatus = SLANG_E_UNINITIALIZED;
 
-/* static */SlangResult NVAPIUtil::initialize()
+/* static */ SlangResult NVAPIUtil::initialize()
 {
 #ifdef GFX_NVAPI
     if (g_initStatus == SLANG_E_UNINITIALIZED)
@@ -22,9 +23,9 @@ static SlangResult g_initStatus = SLANG_E_UNINITIALIZED;
     return g_initStatus;
 }
 
-/* static */bool NVAPIUtil::isAvailable()
+/* static */ bool NVAPIUtil::isAvailable()
 {
     return SLANG_SUCCEEDED(g_initStatus);
 }
 
-} // gfx
+} // namespace gfx

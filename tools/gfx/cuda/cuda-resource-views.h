@@ -1,7 +1,6 @@
 // cuda-resource-views.h
 #pragma once
 #include "cuda-base.h"
-
 #include "cuda-buffer.h"
 #include "cuda-texture.h"
 

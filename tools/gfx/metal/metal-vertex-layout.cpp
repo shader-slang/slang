@@ -1,5 +1,6 @@
 // metal-vertex-layout.cpp
 #include "metal-vertex-layout.h"
+
 #include "metal-util.h"
 
 namespace gfx
@@ -14,7 +15,8 @@ Result InputLayoutImpl::init(const IInputLayout::Desc& desc)
 {
     for (Index i = 0; i < desc.inputElementCount; i++)
     {
-        if (MetalUtil::translateVertexFormat(desc.inputElements[i].format) == MTL::VertexFormatInvalid)
+        if (MetalUtil::translateVertexFormat(desc.inputElements[i].format) ==
+            MTL::VertexFormatInvalid)
         {
             return SLANG_E_INVALID_ARG;
         }
@@ -27,9 +29,11 @@ Result InputLayoutImpl::init(const IInputLayout::Desc& desc)
     return SLANG_OK;
 }
 
-NS::SharedPtr<MTL::VertexDescriptor> InputLayoutImpl::createVertexDescriptor(NS::UInteger vertexBufferIndexOffset)
+NS::SharedPtr<MTL::VertexDescriptor> InputLayoutImpl::createVertexDescriptor(
+    NS::UInteger vertexBufferIndexOffset)
 {
-    NS::SharedPtr<MTL::VertexDescriptor> vertexDescriptor = NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
+    NS::SharedPtr<MTL::VertexDescriptor> vertexDescriptor =
+        NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
 
     for (Index i = 0; i < m_inputElements.getCount(); i++)
     {
@@ -44,9 +48,13 @@ NS::SharedPtr<MTL::VertexDescriptor> InputLayoutImpl::createVertexDescriptor(NS:
     for (Index i = 0; i < m_vertexStreams.getCount(); i++)
     {
         const auto& vertexStream = m_vertexStreams[i];
-        MTL::VertexBufferLayoutDescriptor* desc = vertexDescriptor->layouts()->object(i + vertexBufferIndexOffset);
+        MTL::VertexBufferLayoutDescriptor* desc =
+            vertexDescriptor->layouts()->object(i + vertexBufferIndexOffset);
         desc->setStepFunction(MetalUtil::translateVertexStepFunction(vertexStream.slotClass));
-        desc->setStepRate(vertexStream.slotClass == InputSlotClass::PerVertex ? 1 : vertexStream.instanceDataStepRate);
+        desc->setStepRate(
+            vertexStream.slotClass == InputSlotClass::PerVertex
+                ? 1
+                : vertexStream.instanceDataStepRate);
         desc->setStride(vertexStream.stride);
     }
 

@@ -1,8 +1,8 @@
 #ifndef SLANG_CONTAINER_POOL_H
 #define SLANG_CONTAINER_POOL_H
 
-#include "../core/slang-list.h"
 #include "../core/slang-dictionary.h"
+#include "../core/slang-list.h"
 #include "../core/slang-virtual-object-pool.h"
 
 // A pool to allow reuse of common types of containers to avoid
@@ -46,8 +46,11 @@ struct ContainerPool
     ObjectPool<HashSet<void*>> m_hashSetPool;
 
     ContainerPool()
-        :m_listPool(kContainerPoolSize), m_dictionaryPool(kContainerPoolSize), m_hashSetPool(kContainerPoolSize)
-    {}
+        : m_listPool(kContainerPoolSize)
+        , m_dictionaryPool(kContainerPoolSize)
+        , m_hashSetPool(kContainerPoolSize)
+    {
+    }
 
     template<typename T>
     List<T*>* getList()
@@ -88,6 +91,6 @@ struct ContainerPool
         m_hashSetPool.freeObject((HashSet<void*>*)set);
     }
 };
-}
+} // namespace Slang
 
 #endif

@@ -2,24 +2,22 @@
 
 #include "options.h"
 
+#include "../../source/core/slang-list.h"
+#include "../../source/core/slang-render-api-util.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-writer.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "../../source/core/slang-writer.h"
-#include "../../source/core/slang-render-api-util.h"
-
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-string-util.h"
-//#include "../../source/core/slang-downstream-compiler.h"
-
-#include "../../source/core/slang-type-text-util.h"
+// #include "../../source/core/slang-downstream-compiler.h"
 
 #include "../../source/compiler-core/slang-command-line-args.h"
-
+#include "../../source/core/slang-type-text-util.h"
 #include "diagnostics.h"
 
-namespace renderer_test {
+namespace renderer_test
+{
 using namespace Slang;
 
 static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
@@ -34,12 +32,15 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     case RenderApiType::CPU:    return rhi::DeviceType::CPU;
     case RenderApiType::CUDA:   return rhi::DeviceType::CUDA;
     case RenderApiType::WebGPU: return rhi::DeviceType::WGPU;
-    default:
-        return rhi::DeviceType::Default;
+    default:                    return rhi::DeviceType::Default;
     }
 }
 
-/* static */SlangResult Options::parse(int argc, const char*const* argv, Slang::WriterHelper stdError, Options& outOptions)
+/* static */ SlangResult Options::parse(
+    int argc,
+    const char* const* argv,
+    Slang::WriterHelper stdError,
+    Options& outOptions)
 {
     using namespace Slang;
 
@@ -48,7 +49,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     DiagnosticSink sink(cmdLineContext->getSourceManager(), nullptr);
     sink.writer = stdError.getWriter();
     sink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
-    
+
     outOptions = Options();
 
     CommandLineArgs args(cmdLineContext);
@@ -78,7 +79,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         CommandLineArg arg = reader.getArgAndAdvance();
         const auto& argValue = arg.value;
 
-        if(!argValue.startsWith("-"))
+        if (!argValue.startsWith("-"))
         {
             positionalArgs.add(arg);
             continue;
@@ -92,7 +93,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
             }
             break;
         }
-        else if(argValue == "-o")
+        else if (argValue == "-o")
         {
             SLANG_RETURN_ON_FAIL(reader.expectArg(outOptions.outputPath));
         }
@@ -113,7 +114,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
                 outOptions.renderFeatures.add(value);
             }
         }
-        else if( argValue == "-xslang" || argValue == "-compile-arg")
+        else if (argValue == "-xslang" || argValue == "-compile-arg")
         {
             // This is legacy support, should use -Xslang now
             // This is an option that we want to pass along to Slang
@@ -121,14 +122,14 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
             SLANG_RETURN_ON_FAIL(reader.expectArg(slangArg));
             outOptions.downstreamArgs.getArgsByName("slang").add(slangArg);
         }
-		else if (argValue == "-compute")
-		{
-			outOptions.shaderType = ShaderProgramType::Compute;
-		}
-		else if (argValue == "-graphics")
-		{
-			outOptions.shaderType = ShaderProgramType::Graphics;
-		}
+        else if (argValue == "-compute")
+        {
+            outOptions.shaderType = ShaderProgramType::Compute;
+        }
+        else if (argValue == "-graphics")
+        {
+            outOptions.shaderType = ShaderProgramType::Graphics;
+        }
         else if (argValue == "-gcompute")
         {
             outOptions.shaderType = ShaderProgramType::GraphicsCompute;
@@ -145,17 +146,17 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.shaderType = ShaderProgramType::GraphicsTaskMeshCompute;
         }
-        else if(argValue == "-use-dxil")
+        else if (argValue == "-use-dxil")
         {
             outOptions.useDXIL = true;
         }
         else if (argValue == "-emit-spirv-directly")
         {
-            outOptions.generateSPIRVDirectly= true;
+            outOptions.generateSPIRVDirectly = true;
         }
         else if (argValue == "-emit-spirv-via-glsl")
         {
-            outOptions.generateSPIRVDirectly= false;
+            outOptions.generateSPIRVDirectly = false;
         }
         else if (argValue == "-only-startup")
         {
@@ -178,10 +179,12 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
             StringUtil::split(dispatchSize.value.getUnownedSlice(), ',', slices);
             if (slices.getCount() != 3)
             {
-                sink.diagnose(dispatchSize.loc, RenderTestDiagnostics::expectingCommaComputeDispatch);
+                sink.diagnose(
+                    dispatchSize.loc,
+                    RenderTestDiagnostics::expectingCommaComputeDispatch);
                 return SLANG_FAIL;
             }
-           
+
             String string;
             for (Index i = 0; i < 3; ++i)
             {
@@ -189,7 +192,9 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
                 int v = stringToInt(string);
                 if (v < 1)
                 {
-                    sink.diagnose(dispatchSize.loc, RenderTestDiagnostics::expectingPositiveComputeDispatch);
+                    sink.diagnose(
+                        dispatchSize.loc,
+                        RenderTestDiagnostics::expectingPositiveComputeDispatch);
                     return SLANG_FAIL;
                 }
                 outOptions.computeDispatchSize[i] = v;
@@ -199,8 +204,9 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             CommandLineArg sourceLanguageName;
             SLANG_RETURN_ON_FAIL(reader.expectArg(sourceLanguageName));
-            
-            const SlangSourceLanguage sourceLanguage = TypeTextUtil::findSourceLanguage(sourceLanguageName.value.getUnownedSlice());
+
+            const SlangSourceLanguage sourceLanguage =
+                TypeTextUtil::findSourceLanguage(sourceLanguageName.value.getUnownedSlice());
             if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
             {
                 sink.diagnose(sourceLanguageName.loc, RenderTestDiagnostics::unknownSourceLanguage);
@@ -209,7 +215,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
 
             outOptions.sourceLanguage = sourceLanguage;
         }
-        else if(argValue == "-no-default-entry-point")
+        else if (argValue == "-no-default-entry-point")
         {
             outOptions.dontAddDefaultEntryPoints = true;
         }
@@ -252,12 +258,17 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
                 }
 
                 // Lookup the target language type
-                DeviceType targetLanguageDeviceType = _toRenderType(RenderApiUtil::findImplicitLanguageRenderApiType(argName));
-                    
+                DeviceType targetLanguageDeviceType =
+                    _toRenderType(RenderApiUtil::findImplicitLanguageRenderApiType(argName));
+
                 if (targetLanguageDeviceType != DeviceType::Default || argName == "glsl")
                 {
                     outOptions.targetLanguageDeviceType = targetLanguageDeviceType;
-                    outOptions.inputLanguageID = (argName == "hlsl" || argName == "glsl" || argName == "cpp" || argName == "cxx" || argName == "c") ?  InputLanguageID::Native : InputLanguageID::Slang;
+                    outOptions.inputLanguageID =
+                        (argName == "hlsl" || argName == "glsl" || argName == "cpp" ||
+                         argName == "cxx" || argName == "c")
+                            ? InputLanguageID::Native
+                            : InputLanguageID::Slang;
                     continue;
                 }
             }
@@ -266,26 +277,26 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         }
     }
 
-    // If a render option isn't set use defaultRenderType 
+    // If a render option isn't set use defaultRenderType
     outOptions.deviceType = (outOptions.deviceType == DeviceType::Default)
                                 ? outOptions.targetLanguageDeviceType
                                 : outOptions.deviceType;
 
     // first positional argument is source shader path
-    if(positionalArgs.getCount())
+    if (positionalArgs.getCount())
     {
         outOptions.sourcePath = positionalArgs[0].value;
         positionalArgs.removeAt(0);
     }
 
     // any remaining arguments represent an error
-    if(positionalArgs.getCount() != 0)
+    if (positionalArgs.getCount() != 0)
     {
         sink.diagnose(positionalArgs[0].loc, RenderTestDiagnostics::unexpectedPositionalArg);
         return SLANG_FAIL;
     }
 
-	return SLANG_OK;
+    return SLANG_OK;
 }
 
-} // renderer_test
+} // namespace renderer_test
