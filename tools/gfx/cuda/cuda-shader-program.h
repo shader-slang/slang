@@ -1,7 +1,6 @@
 // cuda-shader-program.h
 #pragma once
 #include "cuda-base.h"
-
 #include "cuda-context.h"
 #include "cuda-shader-object-layout.h"
 

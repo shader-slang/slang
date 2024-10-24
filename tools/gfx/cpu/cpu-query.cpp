@@ -14,8 +14,8 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc)
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL QueryPoolImpl::getResult(
-    GfxIndex queryIndex, GfxCount count, uint64_t* data)
+SLANG_NO_THROW Result SLANG_MCALL
+QueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data)
 {
     for (GfxCount i = 0; i < count; i++)
     {

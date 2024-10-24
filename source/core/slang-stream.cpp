@@ -1,10 +1,11 @@
 #include "slang-stream.h"
 #ifdef _WIN32
-#include <share.h>
+    #include <share.h>
 #endif
-#include <thread>
 #include "slang-io.h"
 #include "slang-process.h"
+
+#include <thread>
 
 namespace Slang
 {
@@ -20,10 +21,8 @@ SlangResult Stream::readExactly(void* buffer, size_t length)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-FileStream::FileStream() :
-    m_handle(nullptr),
-    m_fileAccess(FileAccess::None),
-    m_endReached(false)
+FileStream::FileStream()
+    : m_handle(nullptr), m_fileAccess(FileAccess::None), m_endReached(false)
 {
 }
 
@@ -33,7 +32,8 @@ SlangResult FileStream::init(const String& fileName, FileMode fileMode)
     return _init(fileName, fileMode, access, FileShare::None);
 }
 
-SlangResult FileStream::init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
+SlangResult
+FileStream::init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
 {
     return _init(fileName, fileMode, access, share);
 }
@@ -43,7 +43,8 @@ SlangResult FileStream::_init(
     FileMode fileMode,
     FileAccess access,
     // Only used on Windows
-    [[maybe_unused]] FileShare share)
+    [[maybe_unused]] FileShare share
+)
 {
     // Make sure it's closed to start with
     close();
@@ -57,109 +58,98 @@ SlangResult FileStream::_init(
     const char* mode = "rt";
     switch (fileMode)
     {
-    case FileMode::Create:
-        if (access == FileAccess::Read)
-        {
-            SLANG_ASSERT(!"Read-only access is incompatible with Create mode.");
-            return SLANG_E_INVALID_ARG;
-        }
-        else if (access == FileAccess::ReadWrite)
-        {
-            mode = "w+b";
-        }
-        else
-        {
-            mode = "wb";
-        }
-        break;
-    case FileMode::Open:
-        if (access == FileAccess::Read)
-        {
-            mode = "rb";
-        }
-        else if (access == FileAccess::ReadWrite)
-        {
-            mode = "r+b";
-        }
-        else
-        {
-            mode = "wb";
-        }
-        break;
-    case FileMode::CreateNew:
-        if (File::exists(fileName))
-        {
-            return SLANG_E_CANNOT_OPEN;
-        }
-        if (access == FileAccess::Read)
-        {
-            SLANG_ASSERT(!"Read-only access is incompatible with Create mode.");
-            return SLANG_E_INVALID_ARG;
-        }
-        else if (access == FileAccess::ReadWrite)
-        {
-            mode = "w+b";
-        }
-        else
-        {
-            mode = "wb";
-        }
-        break;
-    case FileMode::Append:
-        if (access == FileAccess::Read)
-        {
-            SLANG_ASSERT(!"Read-only access is incompatible with Append mode.");
-            return SLANG_E_INVALID_ARG;
-        }
-        else if (access == FileAccess::ReadWrite)
-        {
-            mode = "a+b";
-        }
-        else
-        {
-            mode = "ab";
-        }
-        break;
-    default:
-        break;
+        case FileMode::Create:
+            if (access == FileAccess::Read)
+            {
+                SLANG_ASSERT(!"Read-only access is incompatible with Create mode.");
+                return SLANG_E_INVALID_ARG;
+            }
+            else if (access == FileAccess::ReadWrite)
+            {
+                mode = "w+b";
+            }
+            else
+            {
+                mode = "wb";
+            }
+            break;
+        case FileMode::Open:
+            if (access == FileAccess::Read)
+            {
+                mode = "rb";
+            }
+            else if (access == FileAccess::ReadWrite)
+            {
+                mode = "r+b";
+            }
+            else
+            {
+                mode = "wb";
+            }
+            break;
+        case FileMode::CreateNew:
+            if (File::exists(fileName))
+            {
+                return SLANG_E_CANNOT_OPEN;
+            }
+            if (access == FileAccess::Read)
+            {
+                SLANG_ASSERT(!"Read-only access is incompatible with Create mode.");
+                return SLANG_E_INVALID_ARG;
+            }
+            else if (access == FileAccess::ReadWrite)
+            {
+                mode = "w+b";
+            }
+            else
+            {
+                mode = "wb";
+            }
+            break;
+        case FileMode::Append:
+            if (access == FileAccess::Read)
+            {
+                SLANG_ASSERT(!"Read-only access is incompatible with Append mode.");
+                return SLANG_E_INVALID_ARG;
+            }
+            else if (access == FileAccess::ReadWrite)
+            {
+                mode = "a+b";
+            }
+            else
+            {
+                mode = "ab";
+            }
+            break;
+        default: break;
     }
 #ifdef _WIN32
 
     // NOTE! This works because we know all the characters in the mode
     // are encoded directly as the same value in a wchar_t.
-    // 
+    //
     // Work out the length *including* terminating 0
     const Index modeLength = Index(::strlen(mode)) + 1;
     wchar_t wideMode[8];
     SLANG_ASSERT(modeLength <= SLANG_COUNT_OF(wideMode));
 
-    // Copy to wchar_t 
-    for (Index i = 0; i < modeLength ; ++i)
+    // Copy to wchar_t
+    for (Index i = 0; i < modeLength; ++i)
     {
         wideMode[i] = wchar_t(mode[i]);
     }
-   
+
     int shFlag = _SH_DENYRW;
     switch (share)
     {
-    case FileShare::None:
-        shFlag = _SH_DENYRW;
-        break;
-    case FileShare::ReadOnly:
-        shFlag = _SH_DENYWR;
-        break;
-    case FileShare::WriteOnly:
-        shFlag = _SH_DENYRD;
-        break;
-    case FileShare::ReadWrite:
-        shFlag = _SH_DENYNO;
-        break;
-    default:
-        SLANG_ASSERT(!"Invalid file share mode.");
-        return SLANG_FAIL;
+        case FileShare::None:      shFlag = _SH_DENYRW; break;
+        case FileShare::ReadOnly:  shFlag = _SH_DENYWR; break;
+        case FileShare::WriteOnly: shFlag = _SH_DENYRD; break;
+        case FileShare::ReadWrite: shFlag = _SH_DENYNO; break;
+        default:                   SLANG_ASSERT(!"Invalid file share mode."); return SLANG_FAIL;
     }
     if (share == FileShare::None)
-#pragma warning(suppress:4996)
+    #pragma warning(suppress : 4996)
         m_handle = _wfopen(fileName.toWString(), wideMode);
     else
         m_handle = _wfsopen(fileName.toWString(), wideMode, shFlag);
@@ -189,7 +179,7 @@ Int64 FileStream::getPosition()
     return pos;
 #elif defined(__APPLE__)
     return ftell(m_handle);
-#else 
+#else
     fpos64_t pos;
     fgetpos64(m_handle, &pos);
     return *(Int64*)(&pos);
@@ -201,18 +191,10 @@ SlangResult FileStream::seek(SeekOrigin seekOrigin, Int64 offset)
     int fseekOrigin;
     switch (seekOrigin)
     {
-    case SeekOrigin::Start:
-        fseekOrigin = SEEK_SET;
-        break;
-    case SeekOrigin::End:
-        fseekOrigin = SEEK_END;
-        break;
-    case SeekOrigin::Current:
-        fseekOrigin = SEEK_CUR;
-        break;
-    default:
-        SLANG_ASSERT(!"Unsupported seek origin.");
-        return SLANG_FAIL;
+        case SeekOrigin::Start:   fseekOrigin = SEEK_SET; break;
+        case SeekOrigin::End:     fseekOrigin = SEEK_END; break;
+        case SeekOrigin::Current: fseekOrigin = SEEK_CUR; break;
+        default:                  SLANG_ASSERT(!"Unsupported seek origin."); return SLANG_FAIL;
     }
 
     // If endReached is intended to be like feof - then doing a seek will reset it
@@ -301,18 +283,10 @@ SlangResult MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
     Int64 pos = 0;
     switch (origin)
     {
-        case SeekOrigin::Start:
-            pos = offset;
-            break;
-        case SeekOrigin::End:
-            pos = Int64(m_contentsSize) + offset;
-            break;
-        case SeekOrigin::Current:
-            pos = Int64(m_position) + offset;
-            break;
-        default:
-            SLANG_ASSERT(!"Unsupported seek origin.");
-            return SLANG_E_NOT_IMPLEMENTED;
+        case SeekOrigin::Start:   pos = offset; break;
+        case SeekOrigin::End:     pos = Int64(m_contentsSize) + offset; break;
+        case SeekOrigin::Current: pos = Int64(m_position) + offset; break;
+        default:                  SLANG_ASSERT(!"Unsupported seek origin."); return SLANG_E_NOT_IMPLEMENTED;
     }
 
     m_atEnd = false;
@@ -338,7 +312,7 @@ SlangResult MemoryStreamBase::read(void* buffer, size_t length, size_t& outReadB
     if (maxRead == 0 && length > 0)
     {
         // At end of stream
-        m_atEnd = true;        
+        m_atEnd = true;
         return SLANG_OK;
     }
 
@@ -353,7 +327,7 @@ SlangResult MemoryStreamBase::read(void* buffer, size_t length, size_t& outReadB
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! OwnedMemoryStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult OwnedMemoryStream::write(const void * buffer, size_t length)
+SlangResult OwnedMemoryStream::write(const void* buffer, size_t length)
 {
     if (!canWrite())
     {
@@ -406,7 +380,8 @@ SlangResult BufferedReadStream::seek(SeekOrigin origin, Int64 offset)
     // So we could seek backwards up to -m_startIndex.
     // We don't worry about this here, for simplicity sake.
 
-    if (origin == SeekOrigin::End || origin == SeekOrigin::Start || offset < 0 || offset >= Int64(getCount()))
+    if (origin == SeekOrigin::End || origin == SeekOrigin::Start || offset < 0 ||
+        offset >= Int64(getCount()))
     {
         // Empty the buffer
         _resetBuffer();
@@ -420,8 +395,9 @@ SlangResult BufferedReadStream::seek(SeekOrigin origin, Int64 offset)
 }
 
 SlangResult BufferedReadStream::read(void* inBuffer, size_t length, size_t& outReadBytes)
-{    
-    // If the buffer has no data and the read size is larger than the default read size - may as well just read directly into the output buffer
+{
+    // If the buffer has no data and the read size is larger than the default read size - may as
+    // well just read directly into the output buffer
     if (getCount() == 0 && length > m_defaultReadSize)
     {
         return m_stream->read(inBuffer, length, outReadBytes);
@@ -542,20 +518,21 @@ SlangResult BufferedReadStream::update()
         }
         else
         {
-            // Make sure we have the space 
+            // Make sure we have the space
             const Index prevCount = m_buffer.getCount();
             m_buffer.setCount(prevCount + m_defaultReadSize);
             m_buffer.setCount(prevCount);
         }
     }
-    
+
     {
         const Index prevCount = m_buffer.getCount();
         m_buffer.setCount(prevCount + m_defaultReadSize);
 
         size_t readBytes = 0;
 
-        const SlangResult res = m_stream->read(m_buffer.getBuffer() + prevCount, m_defaultReadSize, readBytes);
+        const SlangResult res =
+            m_stream->read(m_buffer.getBuffer() + prevCount, m_defaultReadSize, readBytes);
 
         m_buffer.setCount(prevCount + Index(readBytes));
 
@@ -591,41 +568,39 @@ SlangResult BufferedReadStream::readUntilContains(size_t size)
 SlangResult StreamUtil::readAndWrite(
     Stream* writeStream,
     ArrayView<Byte> bytesToWrite,
-    Stream* readStream, List<Byte>& outReadBytes,
+    Stream* readStream,
+    List<Byte>& outReadBytes,
     Stream* errStream,
-    List<Byte>& outErrBytes)
+    List<Byte>& outErrBytes
+)
 {
-    std::thread writeThread([&]()
+    std::thread writeThread(
+        [&]()
         {
             writeStream->write(bytesToWrite.getBuffer(), (size_t)bytesToWrite.getCount());
             writeStream->close();
-        });
+        }
+    );
     SlangResult readResult = SLANG_OK;
-    std::thread readThread([&]()
-        {
-            readResult = readAll(readStream, 1024, outReadBytes);
-        });
-    std::thread readErrThread([&]()
-        {
-            readAll(errStream, 1024, outErrBytes);
-        });
+    std::thread readThread([&]() { readResult = readAll(readStream, 1024, outReadBytes); });
+    std::thread readErrThread([&]() { readAll(errStream, 1024, outErrBytes); });
     writeThread.join();
     readThread.join();
     readErrThread.join();
     return readResult;
 }
 
-/* static */SlangResult StreamUtil::readAll(Stream* stream, size_t readSize, List<Byte>& ioBytes)
+/* static */ SlangResult StreamUtil::readAll(Stream* stream, size_t readSize, List<Byte>& ioBytes)
 {
     while (!stream->isEnd())
     {
         SLANG_RETURN_ON_FAIL(read(stream, readSize, ioBytes));
     }
-    
+
     return SLANG_OK;
 }
 
-/* static */SlangResult StreamUtil::read(Stream* stream, size_t readSize, List<Byte>& ioBytes)
+/* static */ SlangResult StreamUtil::read(Stream* stream, size_t readSize, List<Byte>& ioBytes)
 {
     readSize = (readSize <= 0) ? 1024 : readSize;
 
@@ -635,7 +610,8 @@ SlangResult StreamUtil::readAndWrite(
         ioBytes.setCount(prevCount + readSize);
 
         size_t readBytesCount;
-        SLANG_RETURN_ON_FAIL(stream->read(ioBytes.getBuffer() + prevCount, readSize, readBytesCount));
+        SLANG_RETURN_ON_FAIL(stream->read(ioBytes.getBuffer() + prevCount, readSize, readBytesCount)
+        );
         ioBytes.setCount(prevCount + Index(readBytesCount));
 
         if (readBytesCount == 0)
@@ -645,7 +621,7 @@ SlangResult StreamUtil::readAndWrite(
     }
 }
 
-/* static */SlangResult StreamUtil::discard(Stream* stream)
+/* static */ SlangResult StreamUtil::discard(Stream* stream)
 {
     Byte buf[1024];
     const Index bufSize = SLANG_COUNT_OF(buf);
@@ -654,7 +630,7 @@ SlangResult StreamUtil::readAndWrite(
     {
         size_t readBytesCount;
         SLANG_RETURN_ON_FAIL(stream->read(buf, bufSize, readBytesCount));
-        
+
         if (readBytesCount == 0)
         {
             return SLANG_OK;
@@ -662,7 +638,7 @@ SlangResult StreamUtil::readAndWrite(
     }
 }
 
-/* static */SlangResult StreamUtil::discardAll(Stream* stream)
+/* static */ SlangResult StreamUtil::discardAll(Stream* stream)
 {
     while (!stream->isEnd())
     {
@@ -672,7 +648,8 @@ SlangResult StreamUtil::readAndWrite(
 }
 
 
-/* static */SlangResult StreamUtil::readOrDiscard(Stream* stream, size_t readSize, List<Byte>* ioBytes)
+/* static */ SlangResult
+StreamUtil::readOrDiscard(Stream* stream, size_t readSize, List<Byte>* ioBytes)
 {
     if (ioBytes)
     {
@@ -684,7 +661,8 @@ SlangResult StreamUtil::readAndWrite(
     }
 }
 
-/* static */SlangResult StreamUtil::readOrDiscardAll(Stream* stream, size_t readSize, List<Byte>* ioBytes)
+/* static */ SlangResult
+StreamUtil::readOrDiscardAll(Stream* stream, size_t readSize, List<Byte>* ioBytes)
 {
     if (ioBytes)
     {
@@ -701,9 +679,9 @@ static FILE* _getFileFromStdStreamType(StdStreamType stdStream)
     switch (stdStream)
     {
         case StdStreamType::ErrorOut: return stderr;
-        case StdStreamType::Out:   return stdout;
-        case StdStreamType::In:    return stdin;
-        default: return nullptr;
+        case StdStreamType::Out:      return stdout;
+        case StdStreamType::In:       return stdin;
+        default:                      return nullptr;
     }
 }
 
@@ -711,14 +689,15 @@ static int _getBufferOptions(StreamBufferStyle style)
 {
     switch (style)
     {
-        case StreamBufferStyle::None:       return _IONBF;
-        case StreamBufferStyle::Line:       return _IOLBF;
+        case StreamBufferStyle::None: return _IONBF;
+        case StreamBufferStyle::Line: return _IOLBF;
         default:
-        case StreamBufferStyle::Full:       return _IOFBF;
+        case StreamBufferStyle::Full: return _IOFBF;
     }
 }
 
-/* static */SlangResult StreamUtil::setStreamBufferStyle(StdStreamType stdStream, StreamBufferStyle style)
+/* static */ SlangResult
+StreamUtil::setStreamBufferStyle(StdStreamType stdStream, StreamBufferStyle style)
 {
     FILE* file = _getFileFromStdStreamType(stdStream);
 

@@ -9,14 +9,17 @@ namespace d3d12
 using namespace Slang;
 
 Result ShaderProgramImpl::createShaderModule(
-    slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode)
+    slang::EntryPointReflection* entryPointInfo,
+    ComPtr<ISlangBlob> kernelCode
+)
 {
     ShaderBinary shaderBin;
     shaderBin.stage = entryPointInfo->getStage();
     shaderBin.entryPointInfo = entryPointInfo;
     shaderBin.code.addRange(
         reinterpret_cast<const uint8_t*>(kernelCode->getBufferPointer()),
-        (Index)kernelCode->getBufferSize());
+        (Index)kernelCode->getBufferSize()
+    );
     m_shaders.add(_Move(shaderBin));
     return SLANG_OK;
 }

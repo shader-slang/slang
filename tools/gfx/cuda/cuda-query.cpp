@@ -30,8 +30,8 @@ QueryPoolImpl::~QueryPoolImpl()
     cuEventDestroy(m_startEvent);
 }
 
-SLANG_NO_THROW Result SLANG_MCALL QueryPoolImpl::getResult(
-    GfxIndex queryIndex, GfxCount count, uint64_t* data)
+SLANG_NO_THROW Result SLANG_MCALL
+QueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data)
 {
     for (GfxIndex i = 0; i < count; i++)
     {

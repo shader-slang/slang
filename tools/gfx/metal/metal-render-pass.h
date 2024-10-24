@@ -12,9 +12,7 @@ using namespace Slang;
 namespace metal
 {
 
-class RenderPassLayoutImpl
-    : public IRenderPassLayout
-    , public ComObject
+class RenderPassLayoutImpl : public IRenderPassLayout, public ComObject
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL

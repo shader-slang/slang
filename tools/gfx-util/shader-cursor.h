@@ -87,14 +87,15 @@ struct ShaderCursor
         : m_baseObject(object)
         , m_typeLayout(object->getElementTypeLayout())
         , m_containerType(object->getContainerType())
-    {}
+    {
+    }
 
     SlangResult setData(void const* data, Size size) const
     {
         return m_baseObject->setData(m_offset, data, size);
     }
 
-    template <typename T>
+    template<typename T>
     SlangResult setData(T const& data) const
     {
         return setData(&data, sizeof(data));
@@ -125,17 +126,14 @@ struct ShaderCursor
         return m_baseObject->setCombinedTextureSampler(m_offset, textureView, sampler);
     }
 
-        /// Produce a cursor to the field with the given `name`.
-        ///
-        /// This is a convenience wrapper around `getField()`.
-    ShaderCursor operator[](const char* name) const
-    {
-        return getField(name);
-    }
+    /// Produce a cursor to the field with the given `name`.
+    ///
+    /// This is a convenience wrapper around `getField()`.
+    ShaderCursor operator[](const char* name) const { return getField(name); }
 
-        /// Produce a cursor to the element or field with the given `index`.
-        ///
-        /// This is a convenience wrapper around `getElement()`.
+    /// Produce a cursor to the element or field with the given `index`.
+    ///
+    /// This is a convenience wrapper around `getElement()`.
     ShaderCursor operator[](int64_t index) const { return getElement((GfxIndex)index); }
     ShaderCursor operator[](uint64_t index) const { return getElement((GfxIndex)index); }
     ShaderCursor operator[](int32_t index) const { return getElement((GfxIndex)index); }
@@ -145,4 +143,4 @@ struct ShaderCursor
     ShaderCursor operator[](int8_t index) const { return getElement((GfxIndex)index); }
     ShaderCursor operator[](uint8_t index) const { return getElement((GfxIndex)index); }
 };
-}
+} // namespace gfx

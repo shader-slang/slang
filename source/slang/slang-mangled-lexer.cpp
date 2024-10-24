@@ -3,7 +3,8 @@
 
 #include <assert.h>
 
-namespace Slang {
+namespace Slang
+{
 
 UInt MangledLexer::readCount()
 {
@@ -34,19 +35,15 @@ void MangledLexer::readGenericParam()
 {
     switch (peekChar())
     {
-    case 'T':
-    case 'C':
-        nextChar();
-        break;
+        case 'T':
+        case 'C': nextChar(); break;
 
-    case 'v':
-        nextChar();
-        readType();
-        break;
+        case 'v':
+            nextChar();
+            readType();
+            break;
 
-    default:
-        SLANG_UNEXPECTED("bad name mangling");
-        break;
+        default: SLANG_UNEXPECTED("bad name mangling"); break;
     }
 }
 
@@ -65,26 +62,22 @@ void MangledLexer::readType()
     int c = peekChar();
     switch (c)
     {
-    case 'V':
-    case 'b':
-    case 'i':
-    case 'u':
-    case 'U':
-    case 'h':
-    case 'f':
-    case 'd':
-        nextChar();
-        break;
+        case 'V':
+        case 'b':
+        case 'i':
+        case 'u':
+        case 'U':
+        case 'h':
+        case 'f':
+        case 'd': nextChar(); break;
 
-    case 'v':
-        nextChar();
-        readSimpleIntVal();
-        readType();
-        break;
+        case 'v':
+            nextChar();
+            readSimpleIntVal();
+            readType();
+            break;
 
-    default:
-        readNamedType();
-        break;
+        default: readNamedType(); break;
     }
 }
 
@@ -92,21 +85,18 @@ void MangledLexer::readVal()
 {
     switch (peekChar())
     {
-    case 'k':
-        nextChar();
-        readCount();
-        break;
+        case 'k':
+            nextChar();
+            readCount();
+            break;
 
-    case 'K':
-        nextChar();
-        readRawStringSegment();
-        break;
+        case 'K':
+            nextChar();
+            readRawStringSegment();
+            break;
 
-    default:
-        readType();
-        break;
+        default: readType(); break;
     }
-
 }
 
 void MangledLexer::readGenericArgs()
@@ -232,20 +222,21 @@ UInt MangledLexer::readParamCount()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MangledNameParser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */SlangResult MangledNameParser::parseModuleName(const UnownedStringSlice& in, String& outModuleName)
+/* static */ SlangResult
+MangledNameParser::parseModuleName(const UnownedStringSlice& in, String& outModuleName)
 {
     MangledLexer lexer(in);
     {
         switch (lexer.peekChar())
         {
-        case 'T':
-        case 'G':
-        case 'V':
-        {
-            lexer.nextChar();
-            break;
-        }
-        default: break;
+            case 'T':
+            case 'G':
+            case 'V':
+            {
+                lexer.nextChar();
+                break;
+            }
+            default: break;
         }
     }
 

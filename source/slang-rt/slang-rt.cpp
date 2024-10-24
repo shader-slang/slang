@@ -1,9 +1,10 @@
 #include "slang-rt.h"
+
 #include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
 
 #if SLANG_WINDOWS_FAMILY
-#    include <windows.h>
+    #include <windows.h>
 #endif
 
 using namespace Slang;
@@ -25,8 +26,8 @@ extern "C"
         ComPtr<ISlangSharedLibrary> lib;
         if (!slangRT_loadedLibraries.tryGetValue(modulePath, lib))
         {
-            if (DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(
-                    modulePath.getBuffer(), lib.writeRef()) != SLANG_OK)
+            if (DefaultSharedLibraryLoader::getSingleton()
+                    ->loadSharedLibrary(modulePath.getBuffer(), lib.writeRef()) != SLANG_OK)
             {
                 _slang_rt_abort("Failed to load DLL \"" + modulePath + "\"");
             }
@@ -36,7 +37,7 @@ extern "C"
     }
 
     SLANG_RT_API void* SLANG_MCALL
-        _slang_rt_load_dll_func(void* moduleHandle, Slang::String funcName, uint32_t argSize)
+    _slang_rt_load_dll_func(void* moduleHandle, Slang::String funcName, uint32_t argSize)
     {
         if (moduleHandle == nullptr)
         {

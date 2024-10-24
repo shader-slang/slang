@@ -3,10 +3,8 @@
 
 namespace Slang
 {
-    class DiagnosticSink;
-    struct IRModule;
+class DiagnosticSink;
+struct IRModule;
 
-    void checkForUsingUninitializedValues(
-        IRModule*       module,
-        DiagnosticSink* sink);
-}
+void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink);
+} // namespace Slang

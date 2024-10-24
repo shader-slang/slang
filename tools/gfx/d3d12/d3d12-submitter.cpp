@@ -11,7 +11,9 @@ namespace d3d12
 using namespace Slang;
 
 void GraphicsSubmitter::setRootConstantBufferView(
-    int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation)
+    int index,
+    D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation
+)
 {
     m_commandList->SetGraphicsRootConstantBufferView(index, gpuBufferLocation);
 }
@@ -27,7 +29,9 @@ void GraphicsSubmitter::setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBuffe
 }
 
 void GraphicsSubmitter::setRootDescriptorTable(
-    int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor)
+    int index,
+    D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor
+)
 {
     m_commandList->SetGraphicsRootDescriptorTable(index, baseDescriptor);
 }
@@ -41,10 +45,15 @@ void GraphicsSubmitter::setRootConstants(
     Index rootParamIndex,
     Index dstOffsetIn32BitValues,
     Index countOf32BitValues,
-    void const* srcData)
+    void const* srcData
+)
 {
     m_commandList->SetGraphicsRoot32BitConstants(
-        UINT(rootParamIndex), UINT(countOf32BitValues), srcData, UINT(dstOffsetIn32BitValues));
+        UINT(rootParamIndex),
+        UINT(countOf32BitValues),
+        srcData,
+        UINT(dstOffsetIn32BitValues)
+    );
 }
 
 void GraphicsSubmitter::setPipelineState(PipelineStateBase* pipeline)
@@ -54,7 +63,9 @@ void GraphicsSubmitter::setPipelineState(PipelineStateBase* pipeline)
 }
 
 void ComputeSubmitter::setRootConstantBufferView(
-    int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation)
+    int index,
+    D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation
+)
 {
     m_commandList->SetComputeRootConstantBufferView(index, gpuBufferLocation);
 }
@@ -69,8 +80,7 @@ void ComputeSubmitter::setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBuffer
     m_commandList->SetComputeRootShaderResourceView(index, gpuBufferLocation);
 }
 
-void ComputeSubmitter::setRootDescriptorTable(
-    int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor)
+void ComputeSubmitter::setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor)
 {
     m_commandList->SetComputeRootDescriptorTable(index, baseDescriptor);
 }
@@ -84,10 +94,15 @@ void ComputeSubmitter::setRootConstants(
     Index rootParamIndex,
     Index dstOffsetIn32BitValues,
     Index countOf32BitValues,
-    void const* srcData)
+    void const* srcData
+)
 {
     m_commandList->SetComputeRoot32BitConstants(
-        UINT(rootParamIndex), UINT(countOf32BitValues), srcData, UINT(dstOffsetIn32BitValues));
+        UINT(rootParamIndex),
+        UINT(countOf32BitValues),
+        srcData,
+        UINT(dstOffsetIn32BitValues)
+    );
 }
 
 void ComputeSubmitter::setPipelineState(PipelineStateBase* pipeline)

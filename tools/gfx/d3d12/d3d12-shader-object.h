@@ -87,8 +87,8 @@ class ShaderObjectImpl
         Super;
 
 public:
-    static Result create(
-        DeviceImpl* device, ShaderObjectLayoutImpl* layout, ShaderObjectImpl** outShaderObject);
+    static Result
+    create(DeviceImpl* device, ShaderObjectLayoutImpl* layout, ShaderObjectImpl** outShaderObject);
 
     ~ShaderObjectImpl();
 
@@ -97,7 +97,7 @@ public:
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
 
@@ -105,25 +105,29 @@ public:
 
     // TODO: What to do with size_t?
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& inOffset, void const* data, size_t inSize) override;
+    setData(ShaderOffset const& inOffset, void const* data, size_t inSize) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setObject(ShaderOffset const& offset, IShaderObject* object) override;
+    setObject(ShaderOffset const& offset, IShaderObject* object) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setResource(ShaderOffset const& offset, IResourceView* resourceView) override;
+    setResource(ShaderOffset const& offset, IResourceView* resourceView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
+    setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
-        ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) override;
+        ShaderOffset const& offset,
+        IResourceView* textureView,
+        ISamplerState* sampler
+    ) override;
 
 protected:
     Result init(
         DeviceImpl* device,
         ShaderObjectLayoutImpl* layout,
         DescriptorHeapReference viewHeap,
-        DescriptorHeapReference samplerHeap);
+        DescriptorHeapReference samplerHeap
+    );
 
     /// Write the uniform/ordinary data of this object into the given `dest` buffer at the given
     /// `offset`
@@ -132,13 +136,16 @@ protected:
         BufferResourceImpl* buffer,
         Offset offset,
         Size destSize,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     bool shouldAllocateConstantBuffer(TransientResourceHeapImpl* transientHeap);
 
     /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
     Result _ensureOrdinaryDataBufferCreatedIfNeeded(
-        PipelineCommandEncoder* encoder, ShaderObjectLayoutImpl* specializedLayout);
+        PipelineCommandEncoder* encoder,
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
 public:
     void updateSubObjectsRecursive();
@@ -158,7 +165,8 @@ public:
         BindingContext* context,
         BindingOffset& ioOffset,
         ShaderObjectLayoutImpl* specializedLayout,
-        DescriptorSet& outDescriptorSet);
+        DescriptorSet& outDescriptorSet
+    );
 
     bool checkIfCachedDescriptorSetIsValidRecursive(BindingContext* context);
 
@@ -166,28 +174,32 @@ public:
     Result bindAsParameterBlock(
         BindingContext* context,
         BindingOffset const& offset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     /// Bind this object as a `ConstantBuffer<X>`
     Result bindAsConstantBuffer(
         BindingContext* context,
         DescriptorSet const& descriptorSet,
         BindingOffset const& offset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     /// Bind this object as a value (for an interface-type parameter)
     Result bindAsValue(
         BindingContext* context,
         DescriptorSet const& descriptorSet,
         BindingOffset const& offset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     /// Shared logic for `bindAsConstantBuffer()` and `bindAsValue()`
     Result _bindImpl(
         BindingContext* context,
         DescriptorSet const& descriptorSet,
         BindingOffset const& offset,
-        ShaderObjectLayoutImpl* specializedLayout);
+        ShaderObjectLayoutImpl* specializedLayout
+    );
 
     Result bindRootArguments(BindingContext* context, uint32_t& index);
     /// A CPU-memory descriptor set holding any descriptors used to represent the
@@ -255,10 +267,10 @@ public:
 
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
     virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
+    copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
 
 public:
     Result bindAsRoot(BindingContext* context, RootShaderObjectLayoutImpl* specializedLayout);
@@ -271,10 +283,11 @@ public:
         RootShaderObjectLayoutImpl* layout,
         DescriptorHeapReference viewHeap,
         DescriptorHeapReference samplerHeap,
-        bool isMutable);
+        bool isMutable
+    );
 
-    Result reset(
-        DeviceImpl* device, RootShaderObjectLayoutImpl* layout, TransientResourceHeapImpl* heap);
+    Result
+    reset(DeviceImpl* device, RootShaderObjectLayoutImpl* layout, TransientResourceHeapImpl* heap);
 
 protected:
     virtual Result _createSpecializedLayout(ShaderObjectLayoutImpl** outLayout) override;

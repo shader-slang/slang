@@ -1,8 +1,8 @@
 // slang-ir-strip-witness-tables.cpp
 #include "slang-ir-strip-witness-tables.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -20,10 +20,10 @@ void stripWitnessTables(IRModule* module)
     // (since the key-value associations are stored as
     // children of each table).
 
-    for( auto inst : module->getGlobalInsts() )
+    for (auto inst : module->getGlobalInsts())
     {
         auto witnessTable = as<IRWitnessTable>(inst);
-        if(!witnessTable)
+        if (!witnessTable)
             continue;
         auto conformanceType = witnessTable->getConformanceType();
         if (conformanceType && conformanceType->findDecoration<IRComInterfaceDecoration>())
@@ -50,4 +50,4 @@ void unpinWitnessTables(IRModule* module)
     }
 }
 
-}
+} // namespace Slang

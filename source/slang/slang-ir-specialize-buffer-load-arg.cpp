@@ -1,9 +1,9 @@
 // slang-ir-specialize-buffer-load-arg.cpp
 #include "slang-ir-specialize-buffer-load-arg.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -32,7 +32,7 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
         // by value).
         //
         auto paramType = param->getDataType();
-        if(!as<IRStructType>(paramType))
+        if (!as<IRStructType>(paramType))
             return false;
 
         // We also only want to specialize for arguments that are a load
@@ -84,12 +84,10 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
     }
 };
 
-void specializeFuncsForBufferLoadArgs(
-    CodeGenContext*         codegenContext,
-    IRModule*               module)
+void specializeFuncsForBufferLoadArgs(CodeGenContext* codegenContext, IRModule* module)
 {
     FuncBufferLoadSpecializationCondition condition;
     specializeFunctionCalls(codegenContext, module, &condition);
 }
 
-}
+} // namespace Slang

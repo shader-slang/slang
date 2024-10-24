@@ -136,7 +136,8 @@ public:
     public:
         Builder(DeviceImpl* renderer, slang::ISession* session)
             : m_renderer(renderer), m_session(session)
-        {}
+        {
+        }
 
         DeviceImpl* m_renderer;
         slang::ISession* m_session;
@@ -180,7 +181,9 @@ public:
         /// Add any descriptor ranges implied by this object containing a leaf
         /// sub-object described by `typeLayout`, at the given `offset`.
         void _addDescriptorRangesAsValue(
-            slang::TypeLayoutReflection* typeLayout, BindingOffset const& offset);
+            slang::TypeLayoutReflection* typeLayout,
+            BindingOffset const& offset
+        );
 
         /// Add the descriptor ranges implied by a `ConstantBuffer<X>` where `X` is
         /// described by `elementTypeLayout`.
@@ -191,7 +194,8 @@ public:
         void _addDescriptorRangesAsConstantBuffer(
             slang::TypeLayoutReflection* elementTypeLayout,
             BindingOffset const& containerOffset,
-            BindingOffset const& elementOffset);
+            BindingOffset const& elementOffset
+        );
 
         /// Add the descriptor ranges implied by a `PushConstantBuffer<X>` where `X` is
         /// described by `elementTypeLayout`.
@@ -202,7 +206,8 @@ public:
         void _addDescriptorRangesAsPushConstantBuffer(
             slang::TypeLayoutReflection* elementTypeLayout,
             BindingOffset const& containerOffset,
-            BindingOffset const& elementOffset);
+            BindingOffset const& elementOffset
+        );
 
         /// Add binding ranges to this shader object layout, as implied by the given
         /// `typeLayout`
@@ -217,7 +222,8 @@ public:
         DeviceImpl* renderer,
         slang::ISession* session,
         slang::TypeLayoutReflection* elementType,
-        ShaderObjectLayoutImpl** outLayout);
+        ShaderObjectLayoutImpl** outLayout
+    );
 
     ~ShaderObjectLayoutImpl();
 
@@ -325,7 +331,8 @@ public:
     {
         Builder(DeviceImpl* device, slang::ISession* session)
             : Super::Builder(device, session)
-        {}
+        {
+        }
 
         Result build(EntryPointLayout** outLayout);
 
@@ -368,11 +375,13 @@ public:
         Builder(
             DeviceImpl* renderer,
             slang::IComponentType* program,
-            slang::ProgramLayout* programLayout)
+            slang::ProgramLayout* programLayout
+        )
             : Super::Builder(renderer, program->getSession())
             , m_program(program)
             , m_programLayout(programLayout)
-        {}
+        {
+        }
 
         Result build(RootShaderObjectLayout** outLayout);
 
@@ -398,7 +407,8 @@ public:
         DeviceImpl* renderer,
         slang::IComponentType* program,
         slang::ProgramLayout* programLayout,
-        RootShaderObjectLayout** outLayout);
+        RootShaderObjectLayout** outLayout
+    );
 
     SimpleBindingOffset const& getPendingDataOffset() const { return m_pendingDataOffset; }
 

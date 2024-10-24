@@ -36,7 +36,11 @@ CommandQueueImpl::~CommandQueueImpl()
 }
 
 SLANG_NO_THROW void SLANG_MCALL CommandQueueImpl::executeCommandBuffers(
-    GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
+    GfxCount count,
+    ICommandBuffer* const* commandBuffers,
+    IFence* fence,
+    uint64_t valueToSignal
+)
 {
     SLANG_UNUSED(valueToSignal);
     // TODO: implement fence.
@@ -55,7 +59,10 @@ SLANG_NO_THROW void SLANG_MCALL CommandQueueImpl::waitOnHost()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL CommandQueueImpl::waitForFenceValuesOnDevice(
-    GfxCount fenceCount, IFence** fences, uint64_t* waitValues)
+    GfxCount fenceCount,
+    IFence** fences,
+    uint64_t* waitValues
+)
 {
     return SLANG_FAIL;
 }
@@ -101,22 +108,23 @@ void CommandQueueImpl::dispatchCompute(int x, int y, int z)
             &globalParamsSymbol,
             &globalParamsSymbolSize,
             currentPipeline->shaderProgram->cudaModule,
-            "SLANG_globalParams");
+            "SLANG_globalParams"
+        );
 
         CUdeviceptr globalParamsCUDAData = (CUdeviceptr)currentRootObject->getBuffer();
         cuMemcpyAsync(
             (CUdeviceptr)globalParamsSymbol,
             (CUdeviceptr)globalParamsCUDAData,
             globalParamsSymbolSize,
-            0);
+            0
+        );
     }
     //
     // The argument data for the entry-point parameters are already
     // stored in host memory in a CUDAEntryPointShaderObject, as expected by cuLaunchKernel.
     //
     auto entryPointBuffer = currentRootObject->entryPointObjects[kernelId]->getBuffer();
-    auto entryPointDataSize =
-        currentRootObject->entryPointObjects[kernelId]->getBufferSize();
+    auto entryPointDataSize = currentRootObject->entryPointObjects[kernelId]->getBufferSize();
 
     void* extraOptions[] = {
         CU_LAUNCH_PARAM_BUFFER_POINTER,
@@ -140,7 +148,8 @@ void CommandQueueImpl::dispatchCompute(int x, int y, int z)
         0,
         stream,
         nullptr,
-        extraOptions);
+        extraOptions
+    );
 
     SLANG_ASSERT(cudaLaunchResult == CUDA_SUCCESS);
 }
@@ -150,23 +159,27 @@ void CommandQueueImpl::copyBuffer(
     size_t dstOffset,
     IBufferResource* src,
     size_t srcOffset,
-    size_t size)
+    size_t size
+)
 {
     auto dstImpl = static_cast<BufferResourceImpl*>(dst);
     auto srcImpl = static_cast<BufferResourceImpl*>(src);
     cuMemcpy(
         (CUdeviceptr)((uint8_t*)dstImpl->m_cudaMemory + dstOffset),
         (CUdeviceptr)((uint8_t*)srcImpl->m_cudaMemory + srcOffset),
-        size);
+        size
+    );
 }
 
-void CommandQueueImpl::uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data)
+void CommandQueueImpl::uploadBufferData(
+    IBufferResource* dst,
+    size_t offset,
+    size_t size,
+    void* data
+)
 {
     auto dstImpl = static_cast<BufferResourceImpl*>(dst);
-    cuMemcpy(
-        (CUdeviceptr)((uint8_t*)dstImpl->m_cudaMemory + offset),
-        (CUdeviceptr)data,
-        size);
+    cuMemcpy((CUdeviceptr)((uint8_t*)dstImpl->m_cudaMemory + offset), (CUdeviceptr)data, size);
 }
 
 void CommandQueueImpl::writeTimestamp(IQueryPool* pool, SlangInt index)
@@ -181,36 +194,37 @@ void CommandQueueImpl::execute(CommandBufferImpl* commandBuffer)
     {
         switch (cmd.name)
         {
-        case CommandName::SetPipelineState:
-            setPipelineState(commandBuffer->getObject<PipelineStateBase>(cmd.operands[0]));
-            break;
-        case CommandName::BindRootShaderObject:
-            bindRootShaderObject(
-                commandBuffer->getObject<ShaderObjectBase>(cmd.operands[0]));
-            break;
-        case CommandName::DispatchCompute:
-            dispatchCompute(
-                int(cmd.operands[0]), int(cmd.operands[1]), int(cmd.operands[2]));
-            break;
-        case CommandName::CopyBuffer:
-            copyBuffer(
-                commandBuffer->getObject<BufferResource>(cmd.operands[0]),
-                cmd.operands[1],
-                commandBuffer->getObject<BufferResource>(cmd.operands[2]),
-                cmd.operands[3],
-                cmd.operands[4]);
-            break;
-        case CommandName::UploadBufferData:
-            uploadBufferData(
-                commandBuffer->getObject<BufferResource>(cmd.operands[0]),
-                cmd.operands[1],
-                cmd.operands[2],
-                commandBuffer->getData<uint8_t>(cmd.operands[3]));
-            break;
-        case CommandName::WriteTimestamp:
-            writeTimestamp(
-                commandBuffer->getObject<QueryPoolBase>(cmd.operands[0]),
-                (SlangInt)cmd.operands[1]);
+            case CommandName::SetPipelineState:
+                setPipelineState(commandBuffer->getObject<PipelineStateBase>(cmd.operands[0]));
+                break;
+            case CommandName::BindRootShaderObject:
+                bindRootShaderObject(commandBuffer->getObject<ShaderObjectBase>(cmd.operands[0]));
+                break;
+            case CommandName::DispatchCompute:
+                dispatchCompute(int(cmd.operands[0]), int(cmd.operands[1]), int(cmd.operands[2]));
+                break;
+            case CommandName::CopyBuffer:
+                copyBuffer(
+                    commandBuffer->getObject<BufferResource>(cmd.operands[0]),
+                    cmd.operands[1],
+                    commandBuffer->getObject<BufferResource>(cmd.operands[2]),
+                    cmd.operands[3],
+                    cmd.operands[4]
+                );
+                break;
+            case CommandName::UploadBufferData:
+                uploadBufferData(
+                    commandBuffer->getObject<BufferResource>(cmd.operands[0]),
+                    cmd.operands[1],
+                    cmd.operands[2],
+                    commandBuffer->getData<uint8_t>(cmd.operands[3])
+                );
+                break;
+            case CommandName::WriteTimestamp:
+                writeTimestamp(
+                    commandBuffer->getObject<QueryPoolBase>(cmd.operands[0]),
+                    (SlangInt)cmd.operands[1]
+                );
         }
     }
 }

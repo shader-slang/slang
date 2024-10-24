@@ -1,9 +1,10 @@
 // slang-ir-spirv-snippet.cpp
 
 #include "slang-ir-spirv-snippet.h"
-#include "slang-lookup-spirv.h"
-#include "../core/slang-token-reader.h"
+
 #include "../compiler-core/slang-spirv-core-grammar.h"
+#include "../core/slang-token-reader.h"
+#include "slang-lookup-spirv.h"
 
 namespace Slang
 {
@@ -53,42 +54,42 @@ SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
     SpvWord ret = 0;
     do
     {
-        switch(reader.NextToken().Type)
+        switch (reader.NextToken().Type)
         {
-            case Slang::Misc::TokenType::IntLiteral:
-                ret = reader.ReadUInt();
-                break;
+            case Slang::Misc::TokenType::IntLiteral: ret = reader.ReadUInt(); break;
             case Slang::Misc::TokenType::Identifier:
-                {
-                    const auto i = reader.ReadWord();
-#define GO(x) if(i == #x) ret |= Spv ## x
-                         GO(ScopeWorkgroup);
-                    else GO(ScopeDevice);
-                    else GO(MemorySemanticsMaskNone);
-                    else GO(MemorySemanticsAcquireReleaseMask);
-                    else GO(MemorySemanticsUniformMemoryMask);
-                    else GO(MemorySemanticsImageMemoryMask);
-                    else GO(MemorySemanticsAtomicCounterMemoryMask);
-                    else GO(MemorySemanticsWorkgroupMemoryMask);
+            {
+                const auto i = reader.ReadWord();
+#define GO(x)    \
+    if (i == #x) \
+    ret |= Spv##x
+                GO(ScopeWorkgroup);
+                else GO(ScopeDevice);
+                else GO(MemorySemanticsMaskNone);
+                else GO(MemorySemanticsAcquireReleaseMask);
+                else GO(MemorySemanticsUniformMemoryMask);
+                else GO(MemorySemanticsImageMemoryMask);
+                else GO(MemorySemanticsAtomicCounterMemoryMask);
+                else GO(MemorySemanticsWorkgroupMemoryMask);
 #undef GO
-                    else
-                    {
-                        reader.Back(1);
-                        throw Misc::TextFormatException(
-                            "Text parsing error: Unrecognized SPIR-V enum: " + i);
-                    }
+                else
+                {
+                    reader.Back(1);
+                    throw Misc::TextFormatException(
+                        "Text parsing error: Unrecognized SPIR-V enum: " + i
+                    );
                 }
-                break;
+            }
+            break;
             default:
                 throw Misc::TextFormatException("Text parsing error: Expected int or SPIR-V enum");
         }
-    } while(reader.AdvanceIf(Misc::TokenType::OpBitOr));
+    } while (reader.AdvanceIf(Misc::TokenType::OpBitOr));
     return ret;
 }
 
-RefPtr<SpvSnippet> SpvSnippet::parse(
-    const SPIRVCoreGrammarInfo& spirvGrammar,
-    UnownedStringSlice definition)
+RefPtr<SpvSnippet>
+SpvSnippet::parse(const SPIRVCoreGrammarInfo& spirvGrammar, UnownedStringSlice definition)
 {
     RefPtr<SpvSnippet> snippet = new SpvSnippet();
     try
@@ -101,7 +102,6 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
         {
             auto storageToken = tokenReader.ReadWord();
             snippet->resultStorageClass = translateStorageClass(storageToken);
-            
         }
         while (!tokenReader.IsEnd())
         {
@@ -115,24 +115,25 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             SpvOp opCode;
             switch (tokenReader.NextToken().Type)
             {
-            case Slang::Misc::TokenType::IntLiteral:
-                opCode = (SpvOp)tokenReader.ReadInt();
-                break;
-            case Slang::Misc::TokenType::Identifier:
-            {
-                auto opName = tokenReader.ReadWord();
-                const auto opCodeMaybe = spirvGrammar.opcodes.lookup(opName.getUnownedSlice());
-                if(!opCodeMaybe)
+                case Slang::Misc::TokenType::IntLiteral:
+                    opCode = (SpvOp)tokenReader.ReadInt();
+                    break;
+                case Slang::Misc::TokenType::Identifier:
                 {
-                    throw Misc::TextFormatException(
-                        "Text parsing error: Unrecognized SPIR-V opcode: " + opName);
+                    auto opName = tokenReader.ReadWord();
+                    const auto opCodeMaybe = spirvGrammar.opcodes.lookup(opName.getUnownedSlice());
+                    if (!opCodeMaybe)
+                    {
+                        throw Misc::TextFormatException(
+                            "Text parsing error: Unrecognized SPIR-V opcode: " + opName
+                        );
+                    }
+                    opCode = *opCodeMaybe;
+                    break;
                 }
-                opCode = *opCodeMaybe;
-                break;
-            }
-            default:
-                throw Misc::TextFormatException(
-                    "Text parsing error: SPIR-V intrinsics must begin with an integer or opcode name");
+                default:
+                    throw Misc::TextFormatException("Text parsing error: SPIR-V intrinsics must "
+                                                    "begin with an integer or opcode name");
             }
             inst.opCode = opCode;
             bool insideOperandList = true;
@@ -142,27 +143,30 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             {
                 switch (tokenReader.NextToken().Type)
                 {
-                case Slang::Misc::TokenType::IntLiteral:
-                    return (SpvWord)tokenReader.ReadInt();
-                    break;
-                case Slang::Misc::TokenType::Identifier:
-                {
-                    if(isGLSLstd450OpcodeAllowed)
+                    case Slang::Misc::TokenType::IntLiteral:
+                        return (SpvWord)tokenReader.ReadInt();
+                        break;
+                    case Slang::Misc::TokenType::Identifier:
                     {
-                        auto opName = tokenReader.ReadWord();
-                        GLSLstd450 glslOpcode;
-                        if(!lookupGLSLstd450(opName.getUnownedSlice(), glslOpcode))
+                        if (isGLSLstd450OpcodeAllowed)
                         {
-                            throw Misc::TextFormatException(
-                                "Text parsing error: Unrecognized SPIR-V GLSLstd450 opcode: " + opName);
+                            auto opName = tokenReader.ReadWord();
+                            GLSLstd450 glslOpcode;
+                            if (!lookupGLSLstd450(opName.getUnownedSlice(), glslOpcode))
+                            {
+                                throw Misc::TextFormatException(
+                                    "Text parsing error: Unrecognized SPIR-V GLSLstd450 opcode: " +
+                                    opName
+                                );
+                            }
+                            return (SpvWord)glslOpcode;
                         }
-                        return (SpvWord)glslOpcode;
                     }
-                }
-                // fallthrough
-                default:
-                    throw Misc::TextFormatException(
-                        "Text parsing error: Failed to read SPIR-V ExtInst Opcode");
+                    // fallthrough
+                    default:
+                        throw Misc::TextFormatException(
+                            "Text parsing error: Failed to read SPIR-V ExtInst Opcode"
+                        );
                 }
             };
             while (insideOperandList)
@@ -170,16 +174,16 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                 ASMOperand operand = {ASMOperandType::SpvWord, 0, 0, 0};
                 switch (tokenReader.NextToken().Type)
                 {
-                case Slang::Misc::TokenType::Semicolon:
-                    insideOperandList = false;
-                    tokenReader.ReadToken();
-                    break;
-                case Slang::Misc::TokenType::IntLiteral:
-                    operand.type = SpvSnippet::ASMOperandType::SpvWord;
-                    operand.content = tokenReader.ReadInt();
-                    inst.operands.add(operand);
-                    break;
-                case Slang::Misc::TokenType::OpMod:
+                    case Slang::Misc::TokenType::Semicolon:
+                        insideOperandList = false;
+                        tokenReader.ReadToken();
+                        break;
+                    case Slang::Misc::TokenType::IntLiteral:
+                        operand.type = SpvSnippet::ASMOperandType::SpvWord;
+                        operand.content = tokenReader.ReadInt();
+                        inst.operands.add(operand);
+                        break;
+                    case Slang::Misc::TokenType::OpMod:
                     {
                         tokenReader.ReadToken();
                         operand.type = SpvSnippet::ASMOperandType::InstReference;
@@ -191,7 +195,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         inst.operands.add(operand);
                     }
                     break;
-                case Slang::Misc::TokenType::Identifier:
+                    case Slang::Misc::TokenType::Identifier:
                     {
                         auto identifier = tokenReader.ReadToken().Content;
                         if (identifier == "resultType")
@@ -255,8 +259,8 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         else if (identifier.startsWith("_"))
                         {
                             operand.type = SpvSnippet::ASMOperandType::ObjectReference;
-                            operand.content = (SpvWord)stringToInt(
-                                identifier.subString(1, identifier.getLength() - 1));
+                            operand.content = (SpvWord
+                            )stringToInt(identifier.subString(1, identifier.getLength() - 1));
                             inst.operands.add(operand);
                         }
                         else if (identifier == "const")
@@ -271,17 +275,17 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                             {
                                 switch (constant.type)
                                 {
-                                case ASMType::Float:
-                                case ASMType::Float2:
-                                case ASMType::FloatOrDouble:
-                                    constant.floatValues[i] = tokenReader.ReadFloat();
-                                    ++i;
-                                    break;
-                                    
-                                default:
-                                    constant.intValues[i] = readWordOrWordLiteral(tokenReader);
-                                    ++i;
-                                    break;
+                                    case ASMType::Float:
+                                    case ASMType::Float2:
+                                    case ASMType::FloatOrDouble:
+                                        constant.floatValues[i] = tokenReader.ReadFloat();
+                                        ++i;
+                                        break;
+
+                                    default:
+                                        constant.intValues[i] = readWordOrWordLiteral(tokenReader);
+                                        ++i;
+                                        break;
                                 }
                             }
                             tokenReader.Read(")");
@@ -289,7 +293,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                             operand.content = (SpvWord)(snippet->constants.getCount() - 1);
                             inst.operands.add(operand);
                         }
-                        else if(isGLSLstd450OpcodeAllowed)
+                        else if (isGLSLstd450OpcodeAllowed)
                         {
                             GLSLstd450 glslstd450Opcode;
                             lookupGLSLstd450(identifier.getUnownedSlice(), glslstd450Opcode);
@@ -299,13 +303,13 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         }
                         else
                         {
-                            SLANG_UNEXPECTED(("Invalid SPV ASM operand: \"" + identifier + "\"").getBuffer());
+                            SLANG_UNEXPECTED(
+                                ("Invalid SPV ASM operand: \"" + identifier + "\"").getBuffer()
+                            );
                         }
                     }
                     break;
-                default:
-                    insideOperandList = false;
-                    break;
+                    default: insideOperandList = false; break;
                 }
             }
             snippet->instructions.add(inst);
@@ -319,4 +323,4 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
 }
 
 
-}
+} // namespace Slang

@@ -25,39 +25,29 @@ Index ShaderObjectLayoutImpl::Builder::findOrAddDescriptorSet(Index space)
     return index;
 }
 
-VkDescriptorType ShaderObjectLayoutImpl::Builder::_mapDescriptorType(
-    slang::BindingType slangBindingType)
+VkDescriptorType
+ShaderObjectLayoutImpl::Builder::_mapDescriptorType(slang::BindingType slangBindingType)
 {
     switch (slangBindingType)
     {
-    case slang::BindingType::PushConstant:
-    default:
-        SLANG_ASSERT("unsupported binding type");
-        return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+        case slang::BindingType::PushConstant:
+        default:                               SLANG_ASSERT("unsupported binding type"); return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 
-    case slang::BindingType::Sampler:
-        return VK_DESCRIPTOR_TYPE_SAMPLER;
-    case slang::BindingType::CombinedTextureSampler:
-        return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    case slang::BindingType::Texture:
-        return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    case slang::BindingType::MutableTexture:
-        return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    case slang::BindingType::TypedBuffer:
-        return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-    case slang::BindingType::MutableTypedBuffer:
-        return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-    case slang::BindingType::RawBuffer:
-    case slang::BindingType::MutableRawBuffer:
-        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    case slang::BindingType::InputRenderTarget:
-        return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    case slang::BindingType::InlineUniformData:
-        return VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT;
-    case slang::BindingType::RayTracingAccelerationStructure:
-        return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-    case slang::BindingType::ConstantBuffer:
-        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        case slang::BindingType::Sampler: return VK_DESCRIPTOR_TYPE_SAMPLER;
+        case slang::BindingType::CombinedTextureSampler:
+            return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        case slang::BindingType::Texture:            return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        case slang::BindingType::MutableTexture:     return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        case slang::BindingType::TypedBuffer:        return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+        case slang::BindingType::MutableTypedBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+        case slang::BindingType::RawBuffer:
+        case slang::BindingType::MutableRawBuffer:   return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        case slang::BindingType::InputRenderTarget:  return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+        case slang::BindingType::InlineUniformData:
+            return VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT;
+        case slang::BindingType::RayTracingAccelerationStructure:
+            return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+        case slang::BindingType::ConstantBuffer: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     }
 }
 
@@ -65,7 +55,9 @@ VkDescriptorType ShaderObjectLayoutImpl::Builder::_mapDescriptorType(
 /// sub-object described by `typeLayout`, at the given `offset`.
 
 void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
-    slang::TypeLayoutReflection* typeLayout, BindingOffset const& offset)
+    slang::TypeLayoutReflection* typeLayout,
+    BindingOffset const& offset
+)
 {
     // First we will scan through all the descriptor sets that the Slang reflection
     // information believes go into making up the given type.
@@ -94,17 +86,15 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
         auto bindingRangeType = typeLayout->getBindingRangeType(bindingRangeIndex);
         switch (bindingRangeType)
         {
-        default:
-            break;
+            default: break;
 
-        // We will skip over ranges that represent sub-objects for now, and handle
-        // them in a separate pass.
-        //
-        case slang::BindingType::ParameterBlock:
-        case slang::BindingType::ConstantBuffer:
-        case slang::BindingType::ExistentialValue:
-        case slang::BindingType::PushConstant:
-            continue;
+            // We will skip over ranges that represent sub-objects for now, and handle
+            // them in a separate pass.
+            //
+            case slang::BindingType::ParameterBlock:
+            case slang::BindingType::ConstantBuffer:
+            case slang::BindingType::ExistentialValue:
+            case slang::BindingType::PushConstant:     continue;
         }
 
         // Given a binding range we are interested in, we will then enumerate
@@ -117,7 +107,8 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
         auto slangDescriptorSetIndex =
             typeLayout->getBindingRangeDescriptorSetIndex(bindingRangeIndex);
         auto descriptorSetIndex = findOrAddDescriptorSet(
-            offset.bindingSet + typeLayout->getDescriptorSetSpaceOffset(slangDescriptorSetIndex));
+            offset.bindingSet + typeLayout->getDescriptorSetSpaceOffset(slangDescriptorSetIndex)
+        );
         auto& descriptorSetInfo = m_descriptorSetBuildInfos[descriptorSetIndex];
 
         Index firstDescriptorRangeIndex =
@@ -126,29 +117,33 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
         {
             Index descriptorRangeIndex = firstDescriptorRangeIndex + j;
             auto slangDescriptorType = typeLayout->getDescriptorSetDescriptorRangeType(
-                slangDescriptorSetIndex, descriptorRangeIndex);
+                slangDescriptorSetIndex,
+                descriptorRangeIndex
+            );
 
             // Certain kinds of descriptor ranges reflected by Slang do not
             // manifest as descriptors at the Vulkan level, so we will skip those.
             //
             switch (slangDescriptorType)
             {
-            case slang::BindingType::ExistentialValue:
-            case slang::BindingType::InlineUniformData:
-            case slang::BindingType::PushConstant:
-                continue;
-            default:
-                break;
+                case slang::BindingType::ExistentialValue:
+                case slang::BindingType::InlineUniformData:
+                case slang::BindingType::PushConstant:      continue;
+                default:                                    break;
             }
 
             auto vkDescriptorType = _mapDescriptorType(slangDescriptorType);
             VkDescriptorSetLayoutBinding vkBindingRangeDesc = {};
             vkBindingRangeDesc.binding =
                 offset.binding + (uint32_t)typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
-                                     slangDescriptorSetIndex, descriptorRangeIndex);
+                                     slangDescriptorSetIndex,
+                                     descriptorRangeIndex
+                                 );
             vkBindingRangeDesc.descriptorCount =
                 (uint32_t)typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(
-                    slangDescriptorSetIndex, descriptorRangeIndex);
+                    slangDescriptorSetIndex,
+                    descriptorRangeIndex
+                );
             vkBindingRangeDesc.descriptorType = vkDescriptorType;
             vkBindingRangeDesc.stageFlags = VK_SHADER_STAGE_ALL;
 
@@ -177,27 +172,26 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
 
         switch (bindingType)
         {
-        // A `ParameterBlock<X>` never contributes descripto ranges to the
-        // decriptor sets of a parent object.
-        //
-        case slang::BindingType::ParameterBlock:
-        default:
-            break;
-
-        case slang::BindingType::ExistentialValue:
-            // An interest/existential-typed sub-object range will only contribute
-            // descriptor ranges to a parent object in the case where it has been
-            // specialied, which is precisely the case where the Slang reflection
-            // information will tell us about its "pending" layout.
+            // A `ParameterBlock<X>` never contributes descripto ranges to the
+            // decriptor sets of a parent object.
             //
-            if (auto pendingTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout())
-            {
-                BindingOffset pendingOffset = BindingOffset(subObjectRangeOffset.pending);
-                _addDescriptorRangesAsValue(pendingTypeLayout, pendingOffset);
-            }
-            break;
+            case slang::BindingType::ParameterBlock:
+            default:                                 break;
 
-        case slang::BindingType::ConstantBuffer:
+            case slang::BindingType::ExistentialValue:
+                // An interest/existential-typed sub-object range will only contribute
+                // descriptor ranges to a parent object in the case where it has been
+                // specialied, which is precisely the case where the Slang reflection
+                // information will tell us about its "pending" layout.
+                //
+                if (auto pendingTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout())
+                {
+                    BindingOffset pendingOffset = BindingOffset(subObjectRangeOffset.pending);
+                    _addDescriptorRangesAsValue(pendingTypeLayout, pendingOffset);
+                }
+                break;
+
+            case slang::BindingType::ConstantBuffer:
             {
                 // A `ConstantBuffer<X>` range will contribute any nested descriptor
                 // ranges in `X`, along with a leading descriptor range for a
@@ -221,11 +215,14 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
                 elementOffset += BindingOffset(elementVarLayout);
 
                 _addDescriptorRangesAsConstantBuffer(
-                    elementTypeLayout, containerOffset, elementOffset);
+                    elementTypeLayout,
+                    containerOffset,
+                    elementOffset
+                );
             }
             break;
 
-        case slang::BindingType::PushConstant:
+            case slang::BindingType::PushConstant:
             {
                 // This case indicates a `ConstantBuffer<X>` that was marked as being
                 // used for push constants.
@@ -252,7 +249,10 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
                 elementOffset += BindingOffset(elementVarLayout);
 
                 _addDescriptorRangesAsPushConstantBuffer(
-                    elementTypeLayout, containerOffset, elementOffset);
+                    elementTypeLayout,
+                    containerOffset,
+                    elementOffset
+                );
             }
             break;
         }
@@ -269,7 +269,8 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
 void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsConstantBuffer(
     slang::TypeLayoutReflection* elementTypeLayout,
     BindingOffset const& containerOffset,
-    BindingOffset const& elementOffset)
+    BindingOffset const& elementOffset
+)
 {
     // If the type has ordinary uniform data fields, we need to make sure to create
     // a descriptor set with a constant buffer binding in the case that the shader
@@ -299,7 +300,8 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsConstantBuffer(
 void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsPushConstantBuffer(
     slang::TypeLayoutReflection* elementTypeLayout,
     BindingOffset const& containerOffset,
-    BindingOffset const& elementOffset)
+    BindingOffset const& elementOffset
+)
 {
     // If the type has ordinary uniform data fields, we need to make sure to create
     // a descriptor set with a constant buffer binding in the case that the shader
@@ -342,51 +344,51 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
         Index subObjectIndex = 0;
         switch (slangBindingType)
         {
-        case slang::BindingType::ConstantBuffer:
-        case slang::BindingType::ParameterBlock:
-        case slang::BindingType::ExistentialValue:
-            baseIndex = m_subObjectCount;
-            subObjectIndex = baseIndex;
-            m_subObjectCount += count;
-            break;
-        case slang::BindingType::RawBuffer:
-        case slang::BindingType::MutableRawBuffer:
-            if (slangLeafTypeLayout->getType()->getElementType() != nullptr)
-            {
-                // A structured buffer occupies both a resource slot and
-                // a sub-object slot.
-                subObjectIndex = m_subObjectCount;
+            case slang::BindingType::ConstantBuffer:
+            case slang::BindingType::ParameterBlock:
+            case slang::BindingType::ExistentialValue:
+                baseIndex = m_subObjectCount;
+                subObjectIndex = baseIndex;
                 m_subObjectCount += count;
-            }
-            baseIndex = m_resourceViewCount;
-            m_resourceViewCount += count;
-            break;
-        case slang::BindingType::Sampler:
-            baseIndex = m_samplerCount;
-            m_samplerCount += count;
-            m_totalBindingCount += 1;
-            break;
+                break;
+            case slang::BindingType::RawBuffer:
+            case slang::BindingType::MutableRawBuffer:
+                if (slangLeafTypeLayout->getType()->getElementType() != nullptr)
+                {
+                    // A structured buffer occupies both a resource slot and
+                    // a sub-object slot.
+                    subObjectIndex = m_subObjectCount;
+                    m_subObjectCount += count;
+                }
+                baseIndex = m_resourceViewCount;
+                m_resourceViewCount += count;
+                break;
+            case slang::BindingType::Sampler:
+                baseIndex = m_samplerCount;
+                m_samplerCount += count;
+                m_totalBindingCount += 1;
+                break;
 
-        case slang::BindingType::CombinedTextureSampler:
-            baseIndex = m_combinedTextureSamplerCount;
-            m_combinedTextureSamplerCount += count;
-            m_totalBindingCount += 1;
-            break;
+            case slang::BindingType::CombinedTextureSampler:
+                baseIndex = m_combinedTextureSamplerCount;
+                m_combinedTextureSamplerCount += count;
+                m_totalBindingCount += 1;
+                break;
 
-        case slang::BindingType::VaryingInput:
-            baseIndex = m_varyingInputCount;
-            m_varyingInputCount += count;
-            break;
+            case slang::BindingType::VaryingInput:
+                baseIndex = m_varyingInputCount;
+                m_varyingInputCount += count;
+                break;
 
-        case slang::BindingType::VaryingOutput:
-            baseIndex = m_varyingOutputCount;
-            m_varyingOutputCount += count;
-            break;
-        default:
-            baseIndex = m_resourceViewCount;
-            m_resourceViewCount += count;
-            m_totalBindingCount += 1;
-            break;
+            case slang::BindingType::VaryingOutput:
+                baseIndex = m_varyingOutputCount;
+                m_varyingOutputCount += count;
+                break;
+            default:
+                baseIndex = m_resourceViewCount;
+                m_resourceViewCount += count;
+                m_totalBindingCount += 1;
+                break;
         }
 
         BindingRangeInfo bindingRangeInfo;
@@ -416,7 +418,9 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
 
             auto set = typeLayout->getDescriptorSetSpaceOffset(descriptorSetIndex);
             auto bindingOffset = typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
-                descriptorSetIndex, descriptorRangeIndex);
+                descriptorSetIndex,
+                descriptorRangeIndex
+            );
 
             bindingRangeInfo.setOffset = uint32_t(set);
             bindingRangeInfo.bindingOffset = uint32_t(bindingOffset);
@@ -444,22 +448,30 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
         RefPtr<ShaderObjectLayoutImpl> subObjectLayout;
         switch (slangBindingType)
         {
-        default:
+            default:
             {
                 auto varLayout = slangLeafTypeLayout->getElementVarLayout();
                 auto subTypeLayout = varLayout->getTypeLayout();
                 ShaderObjectLayoutImpl::createForElementType(
-                    m_renderer, m_session, subTypeLayout, subObjectLayout.writeRef());
+                    m_renderer,
+                    m_session,
+                    subTypeLayout,
+                    subObjectLayout.writeRef()
+                );
             }
             break;
 
-        case slang::BindingType::ExistentialValue:
-            if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
-            {
-                ShaderObjectLayoutImpl::createForElementType(
-                    m_renderer, m_session, pendingTypeLayout, subObjectLayout.writeRef());
-            }
-            break;
+            case slang::BindingType::ExistentialValue:
+                if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
+                {
+                    ShaderObjectLayoutImpl::createForElementType(
+                        m_renderer,
+                        m_session,
+                        pendingTypeLayout,
+                        subObjectLayout.writeRef()
+                    );
+                }
+                break;
         }
 
         SubObjectRangeInfo subObjectRange;
@@ -476,49 +488,49 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
 
         switch (slangBindingType)
         {
-        case slang::BindingType::ParameterBlock:
-            m_childDescriptorSetCount += subObjectLayout->getTotalDescriptorSetCount();
-            m_childPushConstantRangeCount += subObjectLayout->getTotalPushConstantRangeCount();
-            break;
+            case slang::BindingType::ParameterBlock:
+                m_childDescriptorSetCount += subObjectLayout->getTotalDescriptorSetCount();
+                m_childPushConstantRangeCount += subObjectLayout->getTotalPushConstantRangeCount();
+                break;
 
-        case slang::BindingType::ConstantBuffer:
-            m_childDescriptorSetCount += subObjectLayout->getChildDescriptorSetCount();
-            m_totalBindingCount += subObjectLayout->getTotalBindingCount();
-            m_childPushConstantRangeCount += subObjectLayout->getTotalPushConstantRangeCount();
-            break;
-
-        case slang::BindingType::ExistentialValue:
-            if (subObjectLayout)
-            {
+            case slang::BindingType::ConstantBuffer:
                 m_childDescriptorSetCount += subObjectLayout->getChildDescriptorSetCount();
                 m_totalBindingCount += subObjectLayout->getTotalBindingCount();
                 m_childPushConstantRangeCount += subObjectLayout->getTotalPushConstantRangeCount();
+                break;
 
-                // An interface-type range that includes ordinary data can
-                // increase the size of the ordinary data buffer we need to
-                // allocate for the parent object.
-                //
-                uint32_t ordinaryDataEnd =
-                    subObjectRange.offset.pendingOrdinaryData +
-                    (uint32_t)bindingRange.count * subObjectRange.stride.pendingOrdinaryData;
-
-                if (ordinaryDataEnd > m_totalOrdinaryDataSize)
+            case slang::BindingType::ExistentialValue:
+                if (subObjectLayout)
                 {
-                    m_totalOrdinaryDataSize = ordinaryDataEnd;
-                }
-            }
-            break;
+                    m_childDescriptorSetCount += subObjectLayout->getChildDescriptorSetCount();
+                    m_totalBindingCount += subObjectLayout->getTotalBindingCount();
+                    m_childPushConstantRangeCount +=
+                        subObjectLayout->getTotalPushConstantRangeCount();
 
-        default:
-            break;
+                    // An interface-type range that includes ordinary data can
+                    // increase the size of the ordinary data buffer we need to
+                    // allocate for the parent object.
+                    //
+                    uint32_t ordinaryDataEnd =
+                        subObjectRange.offset.pendingOrdinaryData +
+                        (uint32_t)bindingRange.count * subObjectRange.stride.pendingOrdinaryData;
+
+                    if (ordinaryDataEnd > m_totalOrdinaryDataSize)
+                    {
+                        m_totalOrdinaryDataSize = ordinaryDataEnd;
+                    }
+                }
+                break;
+
+            default: break;
         }
 
         m_subObjectRanges.add(subObjectRange);
     }
 }
 
-Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
-    slang::TypeLayoutReflection* typeLayout)
+Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(slang::TypeLayoutReflection* typeLayout
+)
 {
     typeLayout = _unwrapParameterGroups(typeLayout, m_containerType);
     m_elementTypeLayout = typeLayout;
@@ -553,7 +565,8 @@ Result ShaderObjectLayoutImpl::createForElementType(
     DeviceImpl* renderer,
     slang::ISession* session,
     slang::TypeLayoutReflection* elementType,
-    ShaderObjectLayoutImpl** outLayout)
+    ShaderObjectLayoutImpl** outLayout
+)
 {
     Builder builder(renderer, session);
     builder.setElementTypeLayout(elementType);
@@ -593,8 +606,9 @@ Result ShaderObjectLayoutImpl::createForElementType(
     // part of the "primary" (unspecialized) data.
     //
     uint32_t primaryDescriptorCount =
-        ordinaryDataBufferCount + (uint32_t)builder.m_elementTypeLayout->getSize(
-                                      SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+        ordinaryDataBufferCount +
+        (uint32_t
+        )builder.m_elementTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
     elementOffset.pending.binding = primaryDescriptorCount;
 
     // Once we've computed the offset information, we simply add the
@@ -602,7 +616,10 @@ Result ShaderObjectLayoutImpl::createForElementType(
     // since that is how things will be laid out inside the parameter block.
     //
     builder._addDescriptorRangesAsConstantBuffer(
-        builder.m_elementTypeLayout, containerOffset, elementOffset);
+        builder.m_elementTypeLayout,
+        containerOffset,
+        elementOffset
+    );
     return builder.build(outLayout);
 }
 
@@ -611,7 +628,10 @@ ShaderObjectLayoutImpl::~ShaderObjectLayoutImpl()
     for (auto& descSetInfo : m_descriptorSetInfos)
     {
         getDevice()->m_api.vkDestroyDescriptorSetLayout(
-            getDevice()->m_api.m_device, descSetInfo.descriptorSetLayout, nullptr);
+            getDevice()->m_api.m_device,
+            descSetInfo.descriptorSetLayout,
+            nullptr
+        );
     }
 }
 
@@ -645,7 +665,11 @@ Result ShaderObjectLayoutImpl::_init(Builder const* builder)
         createInfo.bindingCount = (uint32_t)descriptorSetInfo.vkBindings.getCount();
         VkDescriptorSetLayout vkDescSetLayout;
         SLANG_RETURN_ON_FAIL(renderer->m_api.vkCreateDescriptorSetLayout(
-            renderer->m_api.m_device, &createInfo, nullptr, &vkDescSetLayout));
+            renderer->m_api.m_device,
+            &createInfo,
+            nullptr,
+            &vkDescSetLayout
+        ));
         descriptorSetInfo.descriptorSetLayout = vkDescSetLayout;
     }
     return SLANG_OK;
@@ -692,8 +716,8 @@ RootShaderObjectLayout::~RootShaderObjectLayout()
 {
     if (m_pipelineLayout)
     {
-        m_renderer->m_api.vkDestroyPipelineLayout(
-            m_renderer->m_api.m_device, m_pipelineLayout, nullptr);
+        m_renderer->m_api
+            .vkDestroyPipelineLayout(m_renderer->m_api.m_device, m_pipelineLayout, nullptr);
     }
 }
 
@@ -713,7 +737,8 @@ Result RootShaderObjectLayout::create(
     DeviceImpl* renderer,
     slang::IComponentType* program,
     slang::ProgramLayout* programLayout,
-    RootShaderObjectLayout** outLayout)
+    RootShaderObjectLayout** outLayout
+)
 {
     RootShaderObjectLayout::Builder builder(renderer, program, programLayout);
     builder.addGlobalParams(programLayout->getGlobalParamsVarLayout());
@@ -790,7 +815,11 @@ Result RootShaderObjectLayout::_init(Builder const* builder)
         pipelineLayoutCreateInfo.pPushConstantRanges = m_allPushConstantRanges.getBuffer();
     }
     SLANG_RETURN_ON_FAIL(m_renderer->m_api.vkCreatePipelineLayout(
-        m_renderer->m_api.m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout));
+        m_renderer->m_api.m_device,
+        &pipelineLayoutCreateInfo,
+        nullptr,
+        &m_pipelineLayout
+    ));
     return SLANG_OK;
 }
 
@@ -842,16 +871,16 @@ Result RootShaderObjectLayout::addChildDescriptorSetsRec(ShaderObjectLayoutImpl*
         auto bindingRange = layout->getBindingRange(subObject.bindingRangeIndex);
         switch (bindingRange.bindingType)
         {
-        case slang::BindingType::ParameterBlock:
-            SLANG_RETURN_ON_FAIL(addAllDescriptorSetsRec(subObject.layout));
-            break;
+            case slang::BindingType::ParameterBlock:
+                SLANG_RETURN_ON_FAIL(addAllDescriptorSetsRec(subObject.layout));
+                break;
 
-        default:
-            if (auto subObjectLayout = subObject.layout)
-            {
-                SLANG_RETURN_ON_FAIL(addChildDescriptorSetsRec(subObject.layout));
-            }
-            break;
+            default:
+                if (auto subObjectLayout = subObject.layout)
+                {
+                    SLANG_RETURN_ON_FAIL(addChildDescriptorSetsRec(subObject.layout));
+                }
+                break;
         }
     }
 
@@ -915,8 +944,8 @@ Result RootShaderObjectLayout::Builder::build(RootShaderObjectLayout** outLayout
     return SLANG_OK;
 }
 
-void RootShaderObjectLayout::Builder::addGlobalParams(
-    slang::VariableLayoutReflection* globalsLayout)
+void RootShaderObjectLayout::Builder::addGlobalParams(slang::VariableLayoutReflection* globalsLayout
+)
 {
     setElementTypeLayout(globalsLayout->getTypeLayout());
 

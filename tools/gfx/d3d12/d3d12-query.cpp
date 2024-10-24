@@ -2,7 +2,6 @@
 #include "d3d12-query.h"
 
 #include "d3d12-command-queue.h"
-
 #include "d3d12-helper-functions.h"
 
 namespace gfx
@@ -22,18 +21,17 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
     heapDesc.NodeMask = 1;
     switch (desc.type)
     {
-    case QueryType::Timestamp:
-        heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
-        m_queryType = D3D12_QUERY_TYPE_TIMESTAMP;
-        break;
-    default:
-        return SLANG_E_INVALID_ARG;
+        case QueryType::Timestamp:
+            heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+            m_queryType = D3D12_QUERY_TYPE_TIMESTAMP;
+            break;
+        default: return SLANG_E_INVALID_ARG;
     }
 
     // Create query heap.
     auto d3dDevice = device->m_device;
-    SLANG_RETURN_ON_FAIL(
-        d3dDevice->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(m_queryHeap.writeRef())));
+    SLANG_RETURN_ON_FAIL(d3dDevice->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(m_queryHeap.writeRef()))
+    );
 
     // Create readback buffer.
     D3D12_HEAP_PROPERTIES heapProps;
@@ -50,11 +48,14 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
         D3D12_HEAP_FLAG_NONE,
         resourceDesc,
         D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr));
+        nullptr
+    ));
 
     // Create command allocator.
     SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
-        D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
+        D3D12_COMMAND_LIST_TYPE_DIRECT,
+        IID_PPV_ARGS(m_commandAllocator.writeRef())
+    ));
 
     // Create command list.
     SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandList(
@@ -62,12 +63,14 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
         D3D12_COMMAND_LIST_TYPE_DIRECT,
         m_commandAllocator,
         nullptr,
-        IID_PPV_ARGS(m_commandList.writeRef())));
+        IID_PPV_ARGS(m_commandList.writeRef())
+    ));
     m_commandList->Close();
 
     // Create fence.
     SLANG_RETURN_ON_FAIL(
-        d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef())));
+        d3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef()))
+    );
 
     // Get command queue from device.
     m_commandQueue = device->m_resourceCommandQueue->m_d3dQueue;
@@ -87,7 +90,8 @@ Result QueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount count, uint64_t* d
         (UINT)queryIndex,
         (UINT)count,
         m_readBackBuffer,
-        sizeof(uint64_t) * queryIndex);
+        sizeof(uint64_t) * queryIndex
+    );
     m_commandList->Close();
     ID3D12CommandList* cmdList = m_commandList;
     m_commandQueue->ExecuteCommandLists(1, &cmdList);
@@ -99,7 +103,9 @@ Result QueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount count, uint64_t* d
 
     int8_t* mappedData = nullptr;
     D3D12_RANGE readRange = {
-        sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * (queryIndex + count) };
+        sizeof(uint64_t) * queryIndex,
+        sizeof(uint64_t) * (queryIndex + count)
+    };
     m_readBackBuffer.getResource()->Map(0, &readRange, (void**)&mappedData);
     memcpy(data, mappedData + sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * count);
     m_readBackBuffer.getResource()->Unmap(0, nullptr);
@@ -119,7 +125,10 @@ IQueryPool* PlainBufferProxyQueryPoolImpl::getInterface(const Guid& guid)
 }
 
 Result PlainBufferProxyQueryPoolImpl::init(
-    const IQueryPool::Desc& desc, DeviceImpl* device, uint32_t stride)
+    const IQueryPool::Desc& desc,
+    DeviceImpl* device,
+    uint32_t stride
+)
 {
     ComPtr<IBufferResource> bufferResource;
     IBufferResource::Desc bufferDesc = {};
@@ -130,7 +139,8 @@ Result PlainBufferProxyQueryPoolImpl::init(
     bufferDesc.format = Format::Unknown;
     bufferDesc.allowedStates.add(ResourceState::UnorderedAccess);
     SLANG_RETURN_ON_FAIL(
-        device->createBufferResource(bufferDesc, nullptr, bufferResource.writeRef()));
+        device->createBufferResource(bufferDesc, nullptr, bufferResource.writeRef())
+    );
     m_bufferResource = static_cast<BufferResourceImpl*>(bufferResource.get());
     m_queryType = desc.type;
     m_device = device;
@@ -185,10 +195,11 @@ Result PlainBufferProxyQueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount co
             D3D12_HEAP_FLAG_NONE,
             stagingDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr));
+            nullptr
+        ));
 
-        encodeInfo.d3dCommandList->CopyBufferRegion(
-            stageBuf, 0, m_bufferResource->m_resource.getResource(), 0, size);
+        encodeInfo.d3dCommandList
+            ->CopyBufferRegion(stageBuf, 0, m_bufferResource->m_resource.getResource(), 0, size);
         m_device->submitResourceCommandsAndWait(encodeInfo);
         void* ptr = nullptr;
         stageBuf.getResource()->Map(0, nullptr, &ptr);

@@ -1,18 +1,17 @@
 // unit-test-translation-unit-import.cpp
 
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
+#include "slang-com-ptr.h"
 #include "slang.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "tools/unit-test/slang-unit-test.h"
-#include "slang-com-ptr.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
-
 using namespace Slang;
 
-// Test that the IModule::findAndCheckEntryPoint API supports discovering 
+// Test that the IModule::findAndCheckEntryPoint API supports discovering
 // entrypoints without a [shader] attribute.
 
 SLANG_UNIT_TEST(genericInterfaceConformance)
@@ -56,37 +55,54 @@ SLANG_UNIT_TEST(genericInterfaceConformance)
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
     sessionDesc.allowGLSLSyntax = true;
-    
+
     ComPtr<slang::ISession> session;
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
-    auto module = session->loadModuleFromSourceString("m", "m.slang", userSourceBody, diagnosticBlob.writeRef());
+    auto module =
+        session
+            ->loadModuleFromSourceString("m", "m.slang", userSourceBody, diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    module->findAndCheckEntryPoint("computeMain", SLANG_STAGE_COMPUTE, entryPoint.writeRef(), diagnosticBlob.writeRef());
+    module->findAndCheckEntryPoint(
+        "computeMain",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef()
+    );
     SLANG_CHECK(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
-    slang::IComponentType* components[] = { module, entryPoint.get() };
-    session->createCompositeComponentType(components, 2, compositeProgram.writeRef(), diagnosticBlob.writeRef());
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef()
+    );
     SLANG_CHECK(compositeProgram != nullptr);
 
     ComPtr<slang::ITypeConformance> typeConformance;
-    auto result =  session->createTypeConformanceComponentType(
-        compositeProgram->getLayout()->findTypeByName("TestInterfaceImpl<float>"), 
+    auto result = session->createTypeConformanceComponentType(
+        compositeProgram->getLayout()->findTypeByName("TestInterfaceImpl<float>"),
         compositeProgram->getLayout()->findTypeByName("ITestInterface<float>"),
         typeConformance.writeRef(),
         3,
-        diagnosticBlob.writeRef());
+        diagnosticBlob.writeRef()
+    );
     SLANG_CHECK(result == SLANG_OK);
     SLANG_CHECK(typeConformance != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram2;
-    slang::IComponentType* components2[] = { compositeProgram.get(), typeConformance.get() };
+    slang::IComponentType* components2[] = {compositeProgram.get(), typeConformance.get()};
     session->createCompositeComponentType(
-        components2, 2, compositeProgram2.writeRef(), diagnosticBlob.writeRef());
+        components2,
+        2,
+        compositeProgram2.writeRef(),
+        diagnosticBlob.writeRef()
+    );
 
     ComPtr<slang::IComponentType> linkedProgram;
     compositeProgram2->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
@@ -99,4 +115,3 @@ SLANG_UNIT_TEST(genericInterfaceConformance)
     auto codeSrc = UnownedStringSlice((const char*)code->getBufferPointer());
     SLANG_CHECK(codeSrc.indexOf(toSlice("computeMain")) != -1);
 }
-

@@ -1,8 +1,9 @@
 #include "slang-char-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
-/* static */CharUtil::CharFlagMap CharUtil::makeCharFlagMap()
+/* static */ CharUtil::CharFlagMap CharUtil::makeCharFlagMap()
 {
     CharUtil::CharFlagMap map;
     memset(&map, 0, sizeof(map));
@@ -46,11 +47,11 @@ namespace Slang {
     return map;
 }
 
-/* static */int CharUtil::_ensureLink()
+/* static */ int CharUtil::_ensureLink()
 {
     return makeCharFlagMap().flags[0];
 }
 
-/* static */const CharUtil::CharFlagMap CharUtil::g_charFlagMap = makeCharFlagMap();
+/* static */ const CharUtil::CharFlagMap CharUtil::g_charFlagMap = makeCharFlagMap();
 
 } // namespace Slang

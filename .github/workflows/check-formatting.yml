@@ -1,0 +1,22 @@
+name: Check Formatting
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+jobs:
+  check-formatting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip3 install gersemi
+      - name: install clang-format
+        run: |
+          tmpdir=$(mktemp -d)
+          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o "$tmpdir/clang-format" \
+            https://github.com/shader-slang/slang-binaries/raw/4e88845ec51641b4c92e68027e359090bdb219e0/clang-format/x86_64-linux/bin/clang-format
+          chmod +x "$tmpdir/clang-format"
+          echo "$tmpdir" >> $GITHUB_PATH
+      - run: ./extras/formatting.sh --check-only

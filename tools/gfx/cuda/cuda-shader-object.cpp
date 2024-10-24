@@ -1,10 +1,9 @@
 // cuda-shader-object.cpp
 #include "cuda-shader-object.h"
 
-#include "cuda-shader-object-layout.h"
-#include "cuda-resource-views.h"
-
 #include "cuda-helper-functions.h"
+#include "cuda-resource-views.h"
+#include "cuda-shader-object-layout.h"
 
 namespace gfx
 {
@@ -37,7 +36,9 @@ Result ShaderObjectData::setCount(Index count)
         m_bufferResource = new BufferResourceImpl(desc);
         if (count)
         {
-            SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc((CUdeviceptr*)&m_bufferResource->m_cudaMemory, (size_t)count));
+            SLANG_CUDA_RETURN_ON_FAIL(
+                cuMemAlloc((CUdeviceptr*)&m_bufferResource->m_cudaMemory, (size_t)count)
+            );
         }
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
@@ -58,7 +59,8 @@ Result ShaderObjectData::setCount(Index count)
             SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy(
                 (CUdeviceptr)newMemory,
                 (CUdeviceptr)m_bufferResource->m_cudaMemory,
-                Math::Min((size_t)count, oldSize)));
+                Math::Min((size_t)count, oldSize)
+            ));
         }
         cuMemFree((CUdeviceptr)m_bufferResource->m_cudaMemory);
         m_bufferResource->m_cudaMemory = newMemory;
@@ -91,7 +93,8 @@ void* ShaderObjectData::getBuffer()
 ResourceViewBase* ShaderObjectData::getResourceView(
     RendererBase* device,
     slang::TypeLayoutReflection* elementLayout,
-    slang::BindingType bindingType)
+    slang::BindingType bindingType
+)
 {
     SLANG_UNUSED(device);
     m_bufferResource->getDesc()->elementSize = (int)elementLayout->getSize();
@@ -167,7 +170,7 @@ SLANG_NO_THROW GfxCount SLANG_MCALL ShaderObjectImpl::getEntryPointCount()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
+ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     *outEntryPoint = nullptr;
     return SLANG_OK;
@@ -184,19 +187,20 @@ SLANG_NO_THROW Size SLANG_MCALL ShaderObjectImpl::getSize()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setData(ShaderOffset const& offset, void const* data, Size size)
+ShaderObjectImpl::setData(ShaderOffset const& offset, void const* data, Size size)
 {
     Size temp = m_data.getCount() - (Size)offset.uniformOffset;
     size = Math::Min(size, temp);
     SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy(
         (CUdeviceptr)((uint8_t*)m_data.getBuffer() + offset.uniformOffset),
         (CUdeviceptr)data,
-        size));
+        size
+    ));
     return SLANG_OK;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourceView)
+ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourceView)
 {
     if (!resourceView)
         return SLANG_OK;
@@ -255,7 +259,7 @@ SLANG_NO_THROW Result SLANG_MCALL
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setObject(ShaderOffset const& offset, IShaderObject* object)
+ShaderObjectImpl::setObject(ShaderOffset const& offset, IShaderObject* object)
 {
     SLANG_RETURN_ON_FAIL(Super::setObject(offset, object));
 
@@ -265,22 +269,21 @@ SLANG_NO_THROW Result SLANG_MCALL
     ShaderObjectImpl* subObject = static_cast<ShaderObjectImpl*>(object);
     switch (bindingRange.bindingType)
     {
-    default:
-    {
-        void* subObjectDataBuffer = subObject->getBuffer();
-        SLANG_RETURN_ON_FAIL(setData(offset, &subObjectDataBuffer, sizeof(void*)));
-    }
-    break;
-    case slang::BindingType::ExistentialValue:
-    case slang::BindingType::RawBuffer:
-    case slang::BindingType::MutableRawBuffer:
+        default:
+        {
+            void* subObjectDataBuffer = subObject->getBuffer();
+            SLANG_RETURN_ON_FAIL(setData(offset, &subObjectDataBuffer, sizeof(void*)));
+        }
         break;
+        case slang::BindingType::ExistentialValue:
+        case slang::BindingType::RawBuffer:
+        case slang::BindingType::MutableRawBuffer: break;
     }
     return SLANG_OK;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
+ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
 {
     SLANG_UNUSED(sampler);
     SLANG_UNUSED(offset);
@@ -288,7 +291,10 @@ SLANG_NO_THROW Result SLANG_MCALL
 }
 
 SLANG_NO_THROW Result SLANG_MCALL ShaderObjectImpl::setCombinedTextureSampler(
-    ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler)
+    ShaderOffset const& offset,
+    IResourceView* textureView,
+    ISamplerState* sampler
+)
 {
     SLANG_UNUSED(sampler);
     setResource(offset, textureView);
@@ -329,7 +335,7 @@ SLANG_NO_THROW GfxCount SLANG_MCALL RootShaderObjectImpl::getEntryPointCount()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
+RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     returnComPtr(outEntryPoint, entryPointObjects[index]);
     return SLANG_OK;

@@ -3,10 +3,9 @@
 #define SLANG_EMIT_BASE_H
 
 #include "../core/slang-basic.h"
-
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -27,5 +26,5 @@ public:
     static BaseType extractBaseType(IRType* inType);
 };
 
-}
+} // namespace Slang
 #endif

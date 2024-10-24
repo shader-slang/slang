@@ -20,11 +20,17 @@ Result CommandQueueImpl::init(DeviceImpl* device, uint32_t queueIndex)
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     SLANG_RETURN_ON_FAIL(
-        m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_d3dQueue.writeRef())));
+        m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_d3dQueue.writeRef()))
+    );
     SLANG_RETURN_ON_FAIL(
-        m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef())));
+        m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef()))
+    );
     globalWaitHandle = CreateEventEx(
-        nullptr, nullptr, CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+        nullptr,
+        nullptr,
+        CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET,
+        EVENT_ALL_ACCESS
+    );
     return SLANG_OK;
 }
 
@@ -36,7 +42,11 @@ CommandQueueImpl::~CommandQueueImpl()
 }
 
 void CommandQueueImpl::executeCommandBuffers(
-    GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
+    GfxCount count,
+    ICommandBuffer* const* commandBuffers,
+    IFence* fence,
+    uint64_t valueToSignal
+)
 {
     ShortList<ID3D12CommandList*> commandLists;
     for (GfxCount i = 0; i < count; i++)
@@ -80,7 +90,10 @@ void CommandQueueImpl::waitOnHost()
 }
 
 Result CommandQueueImpl::waitForFenceValuesOnDevice(
-    GfxCount fenceCount, IFence** fences, uint64_t* waitValues)
+    GfxCount fenceCount,
+    IFence** fences,
+    uint64_t* waitValues
+)
 {
     for (GfxCount i = 0; i < fenceCount; ++i)
     {
@@ -90,7 +103,10 @@ Result CommandQueueImpl::waitForFenceValuesOnDevice(
     return SLANG_OK;
 }
 
-const CommandQueueImpl::Desc& CommandQueueImpl::getDesc() { return m_desc; }
+const CommandQueueImpl::Desc& CommandQueueImpl::getDesc()
+{
+    return m_desc;
+}
 
 ICommandQueue* CommandQueueImpl::getInterface(const Guid& guid)
 {

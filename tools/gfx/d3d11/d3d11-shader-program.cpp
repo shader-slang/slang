@@ -12,6 +12,5 @@ namespace d3d11
 {
 
 
-
 } // namespace d3d11
 } // namespace gfx

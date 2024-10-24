@@ -3,9 +3,9 @@
 
 namespace Slang
 {
-    struct IRModule;
-    void invertYOfPositionOutput(IRModule* module);
-    void rcpWOfPositionInput(IRModule* module);
-}
+struct IRModule;
+void invertYOfPositionOutput(IRModule* module);
+void rcpWOfPositionInput(IRModule* module);
+} // namespace Slang
 
 #endif

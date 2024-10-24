@@ -4,7 +4,6 @@
 
 #include "../core/slang-basic.h"
 #include "../core/slang-char-util.h"
-
 #include "slang-compiler.h"
 
 namespace Slang
@@ -15,7 +14,7 @@ Expects names to be correctly constructed - any errors will cause asserts/failur
 class MangledLexer
 {
 public:
-        /// Reads a count at current position 
+    /// Reads a count at current position
     UInt readCount();
 
     void readGenericParam();
@@ -42,18 +41,17 @@ public:
 
     UInt readParamCount();
 
-        /// Returns the character at the current position
+    /// Returns the character at the current position
     char peekChar() { return *m_cursor; }
-        // Returns the current character and moves to next character.
+    // Returns the current character and moves to next character.
     char nextChar() { return *m_cursor++; }
 
     static String unescapeString(UnownedStringSlice str);
 
-        /// Ctor
+    /// Ctor
     SLANG_FORCE_INLINE MangledLexer(const UnownedStringSlice& slice);
 
 private:
-
     // Call at the beginning of a mangled name,
     // to strip off the main prefix
     void _start() { _expect("_S"); }
@@ -73,9 +71,7 @@ private:
 
 // -------------------------------------------------------------------------- -
 SLANG_FORCE_INLINE MangledLexer::MangledLexer(const UnownedStringSlice& slice)
-    : m_cursor(slice.begin())
-    , m_begin(slice.begin())
-    , m_end(slice.end())
+    : m_cursor(slice.begin()), m_begin(slice.begin()), m_end(slice.end())
 {
     _start();
 }
@@ -126,9 +122,9 @@ SLANG_INLINE void MangledLexer::_expect(char c)
 
 struct MangledNameParser
 {
-        /// Tries to extract the module name from this mangled name. 
+    /// Tries to extract the module name from this mangled name.
     static SlangResult parseModuleName(const UnownedStringSlice& in, String& outModuleName);
 };
 
-}
+} // namespace Slang
 #endif

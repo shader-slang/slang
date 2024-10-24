@@ -1,7 +1,6 @@
 // cpu-device.h
 #pragma once
 #include "cpu-base.h"
-
 #include "cpu-pipeline-state.h"
 #include "cpu-shader-object.h"
 
@@ -22,54 +21,63 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
-        ITextureResource** outResource) override;
+        ITextureResource** outResource
+    ) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& descIn,
         const void* initData,
-        IBufferResource** outResource) override;
+        IBufferResource** outResource
+    ) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
-        ITextureResource* inTexture, IResourceView::Desc const& desc, IResourceView** outView) override;
+        ITextureResource* inTexture,
+        IResourceView::Desc const& desc,
+        IResourceView** outView
+    ) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
         IBufferResource* inBuffer,
         IBufferResource* counterBuffer,
         IResourceView::Desc const& desc,
-        IResourceView** outView) override;
+        IResourceView** outView
+    ) override;
 
     virtual Result createShaderObjectLayout(
         slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
-        ShaderObjectLayoutBase** outLayout) override;
+        ShaderObjectLayoutBase** outLayout
+    ) override;
 
-    virtual Result createShaderObject(
-        ShaderObjectLayoutBase* layout,
-        IShaderObject** outObject) override;
+    virtual Result
+    createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
 
-    virtual Result createMutableShaderObject(
-        ShaderObjectLayoutBase* layout,
-        IShaderObject** outObject) override;
+    virtual Result
+    createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
 
-    virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject) override;
+    virtual Result
+    createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
         const IShaderProgram::Desc& desc,
         IShaderProgram** outProgram,
-        ISlangBlob** outDiagnosticBlob) override;
+        ISlangBlob** outDiagnosticBlob
+    ) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
-        const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
+        const ComputePipelineStateDesc& desc,
+        IPipelineState** outState
+    ) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
-        const IQueryPool::Desc& desc, IQueryPool** outPool) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outPool) override;
 
     virtual void writeTimestamp(IQueryPool* pool, GfxIndex index) override;
 
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
+    createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
 
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
@@ -92,7 +100,8 @@ private:
         size_t dstOffset,
         IBufferResource* src,
         size_t srcOffset,
-        size_t size) override;
+        size_t size
+    ) override;
 };
 
 } // namespace cpu

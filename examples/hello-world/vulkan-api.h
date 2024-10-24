@@ -7,6 +7,7 @@
 // the Vulkan API.
 
 // The Vulkan function pointers we will use in this example.
+// clang-format off
 #define VK_API_GLOBAL_PROCS(x) \
     x(vkGetInstanceProcAddr) \
     x(vkCreateInstance) \
@@ -87,6 +88,7 @@
     /* */
 
 #define VK_API_DECLARE_PROC(NAME) PFN_##NAME NAME = nullptr;
+// clang-format on
 
 struct VulkanAPI
 {
@@ -119,12 +121,12 @@ struct VulkanAPI
 };
 
 #define RETURN_ON_FAIL(x) \
-    {                           \
-        auto _res = x;          \
-        if (_res != 0)          \
-        {                       \
-            return -1;          \
-        }                       \
+    {                     \
+        auto _res = x;    \
+        if (_res != 0)    \
+        {                 \
+            return -1;    \
+        }                 \
     }
 
 // Loads Vulkan library and creates a VkDevice.

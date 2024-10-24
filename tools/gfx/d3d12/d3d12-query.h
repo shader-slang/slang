@@ -2,8 +2,8 @@
 #pragma once
 
 #include "d3d12-base.h"
-#include "d3d12-device.h"
 #include "d3d12-buffer.h"
+#include "d3d12-device.h"
 
 namespace gfx
 {
@@ -18,7 +18,7 @@ public:
     Result init(const IQueryPool::Desc& desc, DeviceImpl* device);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data) override;
+    getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data) override;
 
     void writeTimestamp(ID3D12GraphicsCommandList* cmdList, GfxIndex index);
 
@@ -41,14 +41,14 @@ class PlainBufferProxyQueryPoolImpl : public QueryPoolBase
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IQueryPool* getInterface(const Guid& guid);
+    IQueryPool* getInterface(const Guid& guid);
 
 public:
     Result init(const IQueryPool::Desc& desc, DeviceImpl* device, uint32_t stride);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL reset() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data) override;
+    getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data) override;
 
 public:
     QueryType m_queryType;

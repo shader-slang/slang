@@ -1,25 +1,26 @@
 // model.h
 #pragma once
 
+#include "platform-api.h"
+#include "slang-com-ptr.h"
 #include "slang-gfx.h"
 #include "vector-math.h"
-#include "slang-com-ptr.h"
-#include <vector>
+
 #include <string>
+#include <vector>
 
-#include "platform-api.h"
-
-namespace platform {
+namespace platform
+{
 
 struct ModelLoader
 {
     struct MaterialData
     {
-        glm::vec3                   diffuseColor;
-        glm::vec3                   specularColor;
-        float                       specularity;
+        glm::vec3 diffuseColor;
+        glm::vec3 specularColor;
+        float specularity;
 
-        Slang::ComPtr<gfx::ITextureResource>     diffuseMap;
+        Slang::ComPtr<gfx::ITextureResource> diffuseMap;
     };
 
     struct Vertex
@@ -36,18 +37,18 @@ struct ModelLoader
         int firstIndex;
         int indexCount;
 
-        void*   material;
+        void* material;
     };
 
     struct ModelData
     {
         Slang::ComPtr<gfx::IBufferResource> vertexBuffer;
         Slang::ComPtr<gfx::IBufferResource> indexBuffer;
-        gfx::PrimitiveTopology       primitiveTopology;
-        int                     vertexCount;
-        int                     indexCount;
-        int                     meshCount;
-        void* const*            meshes;
+        gfx::PrimitiveTopology primitiveTopology;
+        int vertexCount;
+        int indexCount;
+        int meshCount;
+        void* const* meshes;
     };
 
     struct ICallbacks
@@ -76,4 +77,4 @@ struct ModelLoader
 };
 
 
-} // gfx
+} // namespace platform

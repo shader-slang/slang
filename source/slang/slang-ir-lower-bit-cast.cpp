@@ -1,8 +1,9 @@
 #include "slang-ir-lower-bit-cast.h"
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
+
 #include "slang-ir-extract-value-from-type.h"
+#include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -32,11 +33,8 @@ struct BitCastLoweringContext
     {
         switch (inst->getOp())
         {
-        case kIROp_BitCast:
-            processBitCast(inst);
-            break;
-        default:
-            break;
+            case kIROp_BitCast: processBitCast(inst); break;
+            default:            break;
         }
     }
 
@@ -65,7 +63,7 @@ struct BitCastLoweringContext
     {
         switch (type->getOp())
         {
-        case kIROp_StructType:
+            case kIROp_StructType:
             {
                 auto structType = as<IRStructType>(type);
                 List<IRInst*> fieldValues;
@@ -73,16 +71,18 @@ struct BitCastLoweringContext
                 {
                     IRIntegerValue fieldOffset = 0;
                     SLANG_RELEASE_ASSERT(
-                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) == SLANG_OK);
+                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) ==
+                        SLANG_OK
+                    );
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
                         readObject(builder, src, fieldType, (uint32_t)(fieldOffset + offset));
-                    fieldValues.add(fieldValue); 
+                    fieldValues.add(fieldValue);
                 }
                 return builder.emitMakeStruct(structType, fieldValues);
             }
             break;
-        case kIROp_ArrayType:
+            case kIROp_ArrayType:
             {
                 auto arrayType = as<IRArrayType>(type);
                 auto arrayCount = as<IRIntLit>(arrayType->getElementCount());
@@ -91,19 +91,25 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(), arrayType->getElementType(), &elementLayout) == SLANG_OK);
+                        targetProgram->getOptionSet(),
+                        arrayType->getElementType(),
+                        &elementLayout
+                    ) == SLANG_OK
+                );
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
                 {
                     elements.add(readObject(
                         builder,
                         src,
                         arrayType->getElementType(),
-                        (uint32_t)(offset + elementLayout.getStride() * i)));
+                        (uint32_t)(offset + elementLayout.getStride() * i)
+                    ));
                 }
-                return builder.emitMakeArray(arrayType, (UInt)arrayCount->value.intVal, elements.getBuffer());
+                return builder
+                    .emitMakeArray(arrayType, (UInt)arrayCount->value.intVal, elements.getBuffer());
             }
             break;
-        case kIROp_VectorType:
+            case kIROp_VectorType:
             {
                 auto vectorType = as<IRVectorType>(type);
                 auto elementCount = as<IRIntLit>(vectorType->getElementCount());
@@ -112,95 +118,116 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(), vectorType->getElementType(), &elementLayout) == SLANG_OK);
+                        targetProgram->getOptionSet(),
+                        vectorType->getElementType(),
+                        &elementLayout
+                    ) == SLANG_OK
+                );
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(
                         builder,
                         src,
                         vectorType->getElementType(),
-                        (uint32_t)(offset + elementLayout.getStride() * i)));
+                        (uint32_t)(offset + elementLayout.getStride() * i)
+                    ));
                 }
                 return builder.emitMakeVector(
-                    vectorType, (UInt)elementCount->value.intVal, elements.getBuffer());
+                    vectorType,
+                    (UInt)elementCount->value.intVal,
+                    elements.getBuffer()
+                );
             }
             break;
-        case kIROp_MatrixType:
+            case kIROp_MatrixType:
             {
                 // Assuming row-major order
                 auto matrixType = as<IRMatrixType>(type);
                 auto elementCount = as<IRIntLit>(matrixType->getRowCount());
-                SLANG_RELEASE_ASSERT(
-                    elementCount && "bit_cast: vector size must be int literal.");
+                SLANG_RELEASE_ASSERT(elementCount && "bit_cast: vector size must be int literal.");
                 List<IRInst*> elements;
                 auto elementType = builder.getVectorType(
-                    matrixType->getElementType(), matrixType->getColumnCount());
+                    matrixType->getElementType(),
+                    matrixType->getColumnCount()
+                );
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
-                    getNaturalSizeAndAlignment(targetProgram->getOptionSet(), elementType, &elementLayout) == SLANG_OK);
+                    getNaturalSizeAndAlignment(
+                        targetProgram->getOptionSet(),
+                        elementType,
+                        &elementLayout
+                    ) == SLANG_OK
+                );
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(
                         builder,
                         src,
                         elementType,
-                        (uint32_t)(offset + elementLayout.getStride() * i)));
+                        (uint32_t)(offset + elementLayout.getStride() * i)
+                    ));
                 }
                 return builder.emitMakeMatrix(
-                    matrixType, (UInt)elementCount->value.intVal, elements.getBuffer());
+                    matrixType,
+                    (UInt)elementCount->value.intVal,
+                    elements.getBuffer()
+                );
             }
             break;
-        case kIROp_HalfType:
-        case kIROp_Int16Type:
-        case kIROp_UInt16Type:
+            case kIROp_HalfType:
+            case kIROp_Int16Type:
+            case kIROp_UInt16Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 2);
                 return builder.emitBitCast(type, object);
             }
             break;
-        case kIROp_IntType:
-        case kIROp_UIntType:
-        case kIROp_FloatType:
-        case kIROp_BoolType:
+            case kIROp_IntType:
+            case kIROp_UIntType:
+            case kIROp_FloatType:
+            case kIROp_BoolType:
 #if SLANG_PTR_IS_32
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
+            case kIROp_IntPtrType:
+            case kIROp_UIntPtrType:
 #endif
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 4);
                 return builder.emitBitCast(type, object);
             }
             break;
-        case kIROp_DoubleType:
-        case kIROp_Int64Type:
-        case kIROp_UInt64Type:
+            case kIROp_DoubleType:
+            case kIROp_Int64Type:
+            case kIROp_UInt64Type:
 #if SLANG_PTR_IS_64
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
+            case kIROp_IntPtrType:
+            case kIROp_UIntPtrType:
 #endif
-        case kIROp_RawPointerType:
+            case kIROp_RawPointerType:
             {
                 auto low = extractValueAtOffset(builder, targetProgram, src, offset, 4);
                 auto high = extractValueAtOffset(builder, targetProgram, src, offset + 4, 4);
-                auto combined = builder.emitAdd(builder.getUInt64Type(),
+                auto combined = builder.emitAdd(
+                    builder.getUInt64Type(),
                     low,
                     builder.emitShl(
                         builder.getUInt64Type(),
                         high,
-                        builder.getIntValue(builder.getUIntType(), 32)));
+                        builder.getIntValue(builder.getUIntType(), 32)
+                    )
+                );
                 if (type->getOp() == kIROp_UInt64Type)
                     return combined;
                 return builder.emitBitCast(type, combined);
             }
             break;
-        case kIROp_UInt8Type:
-        case kIROp_Int8Type:
+            case kIROp_UInt8Type:
+            case kIROp_Int8Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 1);
                 return builder.emitBitCast(type, object);
             }
             break;
-        default:
+            default:
             {
                 SLANG_UNEXPECTED("Unable to generate bit_cast code for the given type");
             }
@@ -222,7 +249,14 @@ struct BitCastLoweringContext
         if (as<IRBasicType>(fromType) != nullptr && as<IRBasicType>(toType) != nullptr)
         {
             if (fromTypeSize.size != toTypeSize.size)
-                sink->diagnose(inst->sourceLoc, Diagnostics::notEqualBitCastSize, fromType, fromTypeSize.size, toType, toTypeSize.size);
+                sink->diagnose(
+                    inst->sourceLoc,
+                    Diagnostics::notEqualBitCastSize,
+                    fromType,
+                    fromTypeSize.size,
+                    toType,
+                    toTypeSize.size
+                );
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
@@ -249,7 +283,14 @@ struct BitCastLoweringContext
         }
 
         if (fromTypeSize.size != toTypeSize.size)
-            sink->diagnose(inst->sourceLoc, Diagnostics::notEqualBitCastSize, fromType, fromTypeSize.size, toType, toTypeSize.size);
+            sink->diagnose(
+                inst->sourceLoc,
+                Diagnostics::notEqualBitCastSize,
+                fromType,
+                fromTypeSize.size,
+                toType,
+                toTypeSize.size
+            );
 
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder(module);
@@ -269,4 +310,4 @@ void lowerBitCast(TargetProgram* targetProgram, IRModule* module, DiagnosticSink
     context.processModule();
 }
 
-}
+} // namespace Slang

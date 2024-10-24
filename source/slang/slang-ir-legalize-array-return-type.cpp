@@ -1,7 +1,8 @@
 #include "slang-ir-legalize-array-return-type.h"
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
+
 #include "slang-ir-clone.h"
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -75,7 +76,6 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
         call->replaceUsesWith(load);
         call->removeAndDeallocate();
     }
-
 }
 
 void legalizeArrayReturnType(IRModule* module)
@@ -93,4 +93,4 @@ void legalizeArrayReturnType(IRModule* module)
         }
     }
 }
-}
+} // namespace Slang

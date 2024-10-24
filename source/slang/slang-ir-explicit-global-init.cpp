@@ -61,8 +61,8 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     //
     struct GlobalVarInfo
     {
-        IRGlobalVar*    globalVar   = nullptr;
-        IRFunc*         initFunc    = nullptr;
+        IRGlobalVar* globalVar = nullptr;
+        IRFunc* initFunc = nullptr;
     };
     List<GlobalVarInfo> m_globalVarsWithInit;
 
@@ -76,10 +76,10 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // initialization) and function (to compute the
         // initial value).
         //
-        for( auto inst : m_module->getGlobalInsts() )
+        for (auto inst : m_module->getGlobalInsts())
         {
             auto globalVar = as<IRGlobalVar>(inst);
-            if(!globalVar)
+            if (!globalVar)
                 continue;
 
             // If it's an `Actual Global` we don't want to move initialization
@@ -87,9 +87,9 @@ struct MoveGlobalVarInitializationToEntryPointsPass
             {
                 continue;
             }
-        
+
             auto firstBlock = globalVar->getFirstBlock();
-            if(!firstBlock)
+            if (!firstBlock)
                 continue;
 
             processGlobalVarWithInit(globalVar, firstBlock);
@@ -100,13 +100,13 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // all the global variables that were identified
         // and processed in the first pass.
         //
-        for( auto inst : m_module->getGlobalInsts() )
+        for (auto inst : m_module->getGlobalInsts())
         {
             auto func = as<IRFunc>(inst);
-            if(!func)
+            if (!func)
                 continue;
 
-            if(!func->findDecoration<IREntryPointDecoration>())
+            if (!func->findDecoration<IREntryPointDecoration>())
                 continue;
 
             processEntryPoint(func);
@@ -140,7 +140,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // needed to guarantee.
         //
         IRBlock* nextBlock = nullptr;
-        for( IRBlock* block = firstBlock; block; block = nextBlock )
+        for (IRBlock* block = firstBlock; block; block = nextBlock)
         {
             nextBlock = block->getNextBlock();
 
@@ -163,7 +163,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // We can only process entry point definitions, not declarations.
         //
         auto firstBlock = entryPointFunc->getFirstBlock();
-        if(!firstBlock)
+        if (!firstBlock)
             return;
 
         // We are going to insert initiailization logic at the start
@@ -172,7 +172,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         IRBuilder builder(m_module);
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
 
-        for( auto globalVarInfo : m_globalVarsWithInit )
+        for (auto globalVarInfo : m_globalVarsWithInit)
         {
             // The earlier step split each global variable into
             // a variable with no initialization logic, plus a function
@@ -195,7 +195,8 @@ struct MoveGlobalVarInitializationToEntryPointsPass
             {
                 if (auto returnInst = as<IRReturn>(initFirstBlock->getTerminator()))
                 {
-                    if (returnInst->getVal() && returnInst->getVal()->getParent() == m_module->getModuleInst())
+                    if (returnInst->getVal() &&
+                        returnInst->getVal()->getParent() == m_module->getModuleInst())
                     {
                         initVal = returnInst->getVal();
                     }
@@ -214,12 +215,11 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     }
 };
 
-    /// Move initialization logic off of global variables and onto each entry point
-void moveGlobalVarInitializationToEntryPoints(
-    IRModule* module)
+/// Move initialization logic off of global variables and onto each entry point
+void moveGlobalVarInitializationToEntryPoints(IRModule* module)
 {
     MoveGlobalVarInitializationToEntryPointsPass pass;
     pass.processModule(module);
 }
 
-}
+} // namespace Slang

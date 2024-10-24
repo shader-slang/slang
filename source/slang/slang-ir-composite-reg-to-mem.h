@@ -3,11 +3,11 @@
 
 namespace Slang
 {
-    struct IRModule;
-    struct IRCall;
-    struct IRInst;
-    struct IRFunc;
+struct IRModule;
+struct IRCall;
+struct IRInst;
+struct IRFunc;
 
-        /// Convert parameters of composite type into pointers and modify the callsites accordingly.
-    void convertCompositeTypeParametersToPointers(IRModule* module);
-}
+/// Convert parameters of composite type into pointers and modify the callsites accordingly.
+void convertCompositeTypeParametersToPointers(IRModule* module);
+} // namespace Slang

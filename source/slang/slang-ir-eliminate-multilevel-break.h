@@ -3,10 +3,10 @@
 
 namespace Slang
 {
-    struct IRModule;
-    struct IRGlobalValueWithCode;
+struct IRModule;
+struct IRGlobalValueWithCode;
 
-    void eliminateMultiLevelBreak(IRModule* module);
-    void eliminateMultiLevelBreakForFunc(IRModule* module, IRGlobalValueWithCode* func);
+void eliminateMultiLevelBreak(IRModule* module);
+void eliminateMultiLevelBreakForFunc(IRModule* module, IRGlobalValueWithCode* func);
 
-}
+} // namespace Slang

@@ -6,7 +6,8 @@
 namespace Slang
 {
 
-template <typename TResult, typename... Arguments> class FuncPtr : public RefObject
+template<typename TResult, typename... Arguments>
+class FuncPtr : public RefObject
 {
 public:
     virtual TResult operator()(Arguments...) const = 0;
@@ -15,7 +16,7 @@ public:
     virtual ~FuncPtr() {}
 };
 
-template <typename TResult, typename... Arguments>
+template<typename TResult, typename... Arguments>
 class CdeclFuncPtr : public FuncPtr<TResult, Arguments...>
 {
 public:
@@ -27,7 +28,8 @@ private:
 public:
     CdeclFuncPtr(FuncType func)
         : funcPtr(func)
-    {}
+    {
+    }
     virtual FuncPtr<TResult, Arguments...>* clone() override
     {
         auto rs = new CdeclFuncPtr<TResult, Arguments...>(funcPtr);
@@ -46,7 +48,7 @@ public:
     }
 };
 
-template <typename Class, typename TResult, typename... Arguments>
+template<typename Class, typename TResult, typename... Arguments>
 class MemberFuncPtr : public FuncPtr<TResult, Arguments...>
 {
 public:
@@ -58,9 +60,9 @@ private:
 
 public:
     MemberFuncPtr(Class* obj, FuncType func)
-        : funcPtr(func)
-        , object(obj)
-    {}
+        : funcPtr(func), object(obj)
+    {
+    }
     virtual FuncPtr<TResult, Arguments...>* clone() override
     {
         auto rs = new MemberFuncPtr<Class, TResult, Arguments...>(object, funcPtr);
@@ -81,7 +83,7 @@ public:
     }
 };
 
-template <typename F, typename TResult, typename... Arguments>
+template<typename F, typename TResult, typename... Arguments>
 class LambdaFuncPtr : public FuncPtr<TResult, Arguments...>
 {
 private:
@@ -90,7 +92,8 @@ private:
 public:
     LambdaFuncPtr(const F& _func)
         : func(_func)
-    {}
+    {
+    }
     virtual TResult operator()(Arguments... params) const override { return func(params...); }
     virtual FuncPtr<TResult, Arguments...>* clone() override
     {
@@ -103,7 +106,8 @@ public:
     }
 };
 
-template <typename TResult, typename... Arguments> class Func
+template<typename TResult, typename... Arguments>
+class Func
 {
 private:
     RefPtr<FuncPtr<TResult, Arguments...>> funcPtr;
@@ -114,12 +118,13 @@ public:
     {
         funcPtr = new CdeclFuncPtr<TResult, Arguments...>(func);
     }
-    template <typename Class>
+    template<typename Class>
     Func(Class* object, typename MemberFuncPtr<Class, TResult, Arguments...>::FuncType func)
     {
         funcPtr = new MemberFuncPtr<Class, TResult, Arguments...>(object, func);
     }
-    template <typename TFuncObj> Func(const TFuncObj& func)
+    template<typename TFuncObj>
+    Func(const TFuncObj& func)
     {
         funcPtr = new LambdaFuncPtr<TFuncObj, TResult, Arguments...>(func);
     }
@@ -128,13 +133,14 @@ public:
         funcPtr = new CdeclFuncPtr<TResult, Arguments...>(func);
         return *this;
     }
-    template <typename Class>
+    template<typename Class>
     Func& operator=(const MemberFuncPtr<Class, TResult, Arguments...>& func)
     {
         funcPtr = new MemberFuncPtr<Class, TResult, Arguments...>(func);
         return *this;
     }
-    template <typename TFuncObj> Func& operator=(const TFuncObj& func)
+    template<typename TFuncObj>
+    Func& operator=(const TFuncObj& func)
     {
         funcPtr = new LambdaFuncPtr<TFuncObj, TResult, Arguments...>(func);
         return *this;
@@ -147,7 +153,8 @@ public:
 // template<typename... Arguments>
 // using Action = Func<void, Arguments...>;
 
-template <typename... Arguments> class Action : public Func<void, Arguments...>
+template<typename... Arguments>
+class Action : public Func<void, Arguments...>
 {
 private:
     RefPtr<FuncPtr<void, Arguments...>> funcPtr;
@@ -159,12 +166,13 @@ public:
     {
         funcPtr = new CdeclFuncPtr<void, Arguments...>(func);
     }
-    template <typename Class>
+    template<typename Class>
     Action(Class* object, typename MemberFuncPtr<Class, void, Arguments...>::FuncType func)
     {
         funcPtr = new MemberFuncPtr<Class, void, Arguments...>(object, func);
     }
-    template <typename TFuncObj> Action(const TFuncObj& func)
+    template<typename TFuncObj>
+    Action(const TFuncObj& func)
     {
         funcPtr = new LambdaFuncPtr<TFuncObj, void, Arguments...>(func);
     }
@@ -173,13 +181,14 @@ public:
         funcPtr = new CdeclFuncPtr<void, Arguments...>(func);
         return *this;
     }
-    template <typename Class>
+    template<typename Class>
     Action& operator=(const MemberFuncPtr<Class, void, Arguments...>& func)
     {
         funcPtr = new MemberFuncPtr<Class, void, Arguments...>(func);
         return *this;
     }
-    template <typename TFuncObj> Action& operator=(const TFuncObj& func)
+    template<typename TFuncObj>
+    Action& operator=(const TFuncObj& func)
     {
         funcPtr = new LambdaFuncPtr<TFuncObj, void, Arguments...>(func);
         return *this;

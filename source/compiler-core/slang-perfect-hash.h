@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../core/slang-string.h"
 #include "../core/slang-list.h"
+#include "../core/slang-string.h"
 
 namespace Slang
 {
@@ -12,7 +12,8 @@ struct HashParams
     List<String> destTable;
 };
 
-enum class HashFindResult {
+enum class HashFindResult
+{
     Success,
     NonUniqueKeys,
     UnavoidableHashCollision,
@@ -25,6 +26,7 @@ String perfectHashToEmbeddableCpp(
     const HashParams& hashParams,
     const UnownedStringSlice& valueType,
     const UnownedStringSlice& funcName,
-    const List<String>& values);
+    const List<String>& values
+);
 
-}
+} // namespace Slang

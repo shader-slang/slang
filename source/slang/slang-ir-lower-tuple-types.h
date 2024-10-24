@@ -5,12 +5,10 @@
 
 namespace Slang
 {
-    struct IRModule;
-    class DiagnosticSink;
+struct IRModule;
+class DiagnosticSink;
 
-    /// Lower tuple types to ordinary `struct`s.
-    void lowerTuples(
-        IRModule* module,
-        DiagnosticSink* sink);
+/// Lower tuple types to ordinary `struct`s.
+void lowerTuples(IRModule* module, DiagnosticSink* sink);
 
-}
+} // namespace Slang

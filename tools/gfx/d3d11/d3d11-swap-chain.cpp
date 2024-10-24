@@ -12,7 +12,11 @@ using namespace Slang;
 namespace d3d11
 {
 
-Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& swapchainDesc, WindowHandle window)
+Result SwapchainImpl::init(
+    DeviceImpl* renderer,
+    const ISwapchain::Desc& swapchainDesc,
+    WindowHandle window
+)
 {
     m_renderer = renderer;
     m_device = renderer->m_device;
@@ -39,7 +43,8 @@ void SwapchainImpl::createSwapchainBufferImages()
     imageDesc.allowedStates = ResourceStateSet(
         ResourceState::Present,
         ResourceState::CopyDestination,
-        ResourceState::RenderTarget);
+        ResourceState::RenderTarget
+    );
     RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc);
     image->m_resource = d3dResource;
     for (GfxIndex i = 0; i < m_desc.imageCount; i++)

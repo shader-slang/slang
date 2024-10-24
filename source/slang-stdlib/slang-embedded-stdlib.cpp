@@ -1,12 +1,11 @@
-#include "../core/slang-basic.h"
 #include "../core/slang-array-view.h"
+#include "../core/slang-basic.h"
 #include "../core/slang-blob.h"
 
 #ifdef SLANG_EMBED_STDLIB
 
-static const uint8_t g_stdLib[] =
-{
-#   include "slang-stdlib-generated.h"
+static const uint8_t g_stdLib[] = {
+    #include "slang-stdlib-generated.h"
 };
 
 static Slang::StaticBlob g_stdLibBlob((const void*)g_stdLib, sizeof(g_stdLib));

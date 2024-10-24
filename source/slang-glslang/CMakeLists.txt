@@ -12,5 +12,9 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     )
     # Our only interface is through what we define in source/slang-glslang, in the
     # interests of hygiene, hide anything else we link in.
-    add_supported_cxx_linker_flags(slang-glslang PRIVATE "-Wl,--exclude-libs,ALL")
+    add_supported_cxx_linker_flags(
+        slang-glslang
+        PRIVATE
+        "-Wl,--exclude-libs,ALL"
+    )
 endif()

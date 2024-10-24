@@ -50,7 +50,9 @@ public:
     RayTracingPipelineStateImpl(DeviceImpl* device);
 
     uint32_t findEntryPointIndexByName(
-        const Dictionary<String, Index>& entryPointNameToIndex, const char* name);
+        const Dictionary<String, Index>& entryPointNameToIndex,
+        const char* name
+    );
 
     Result createVKRayTracingPipelineState();
 

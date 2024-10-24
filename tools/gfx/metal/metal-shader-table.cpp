@@ -14,7 +14,8 @@ namespace metal
 RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     PipelineStateBase* pipeline,
     TransientResourceHeapBase* transientHeap,
-    IResourceCommandEncoder* encoder)
+    IResourceCommandEncoder* encoder
+)
 {
     return RefPtr<BufferResource>(0);
 }

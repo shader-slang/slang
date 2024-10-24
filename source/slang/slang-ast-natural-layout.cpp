@@ -25,15 +25,15 @@ NaturalSize NaturalSize::operator*(Count count) const
         // If the count is 0, in effect the result doesn't take up any space
         return makeEmpty();
     }
-    else 
+    else
     {
-        // We don't want to produce an aligned size, as we allow the last element to not 
+        // We don't want to produce an aligned size, as we allow the last element to not
         // take up a whole stride (only up to size)
         return make(size + (getStride() * (count - 1)), alignment);
     }
 }
 
-/* static */NaturalSize NaturalSize::makeFromBaseType(BaseType baseType)
+/* static */ NaturalSize NaturalSize::makeFromBaseType(BaseType baseType)
 {
     // Special case void
     if (baseType == BaseType::Void)
@@ -49,7 +49,7 @@ NaturalSize NaturalSize::operator*(Count count) const
     }
 }
 
-/* static */NaturalSize NaturalSize::calcUnion(NaturalSize a, NaturalSize b)
+/* static */ NaturalSize NaturalSize::calcUnion(NaturalSize a, NaturalSize b)
 {
     const auto alignment = maxAlignment(a.alignment, b.alignment);
     Count size = (alignment == kInvalidAlignment) ? 0 : Math::Max(a.size, b.size);
@@ -58,9 +58,8 @@ NaturalSize NaturalSize::operator*(Count count) const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTNaturalLayoutContext !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-ASTNaturalLayoutContext::ASTNaturalLayoutContext(ASTBuilder* astBuilder, DiagnosticSink* sink):
-    m_astBuilder(astBuilder),
-    m_sink(sink)
+ASTNaturalLayoutContext::ASTNaturalLayoutContext(ASTBuilder* astBuilder, DiagnosticSink* sink)
+    : m_astBuilder(astBuilder), m_sink(sink)
 {
     // A null type always maps to invalid
     m_typeToSize.add(nullptr, NaturalSize::makeInvalid());
@@ -94,10 +93,12 @@ NaturalSize ASTNaturalLayoutContext::calcSize(Type* type)
     // Calc the size
     const NaturalSize size = _calcSizeImpl(type);
 
-    // We want to add to the cache, but we need to special case 
-    // in case there is an aggregate type that `poisoned` the cache entry, to stop infinite recursion.
-    // 
-    // A requirement is that when the agg type completes it must set the cache entry, and return the same result.
+    // We want to add to the cache, but we need to special case
+    // in case there is an aggregate type that `poisoned` the cache entry, to stop infinite
+    // recursion.
+    //
+    // A requirement is that when the agg type completes it must set the cache entry, and return the
+    // same result.
     if (auto foundSize = m_typeToSize.tryGetValueOrAdd(type, size))
     {
         // If there is a found size, it must match. If not we update the state as invalid.
@@ -116,17 +117,16 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     if (VectorExpressionType* vecType = as<VectorExpressionType>(type))
     {
         const Count elementCount = _getCount(vecType->getElementCount());
-        return (elementCount > 0) ? 
-            calcSize(vecType->getElementType()) * elementCount : 
-            NaturalSize::makeInvalid();
+        return (elementCount > 0) ? calcSize(vecType->getElementType()) * elementCount
+                                  : NaturalSize::makeInvalid();
     }
     else if (auto matType = as<MatrixExpressionType>(type))
     {
         const Count colCount = _getCount(matType->getColumnCount());
         const Count rowCount = _getCount(matType->getRowCount());
-        return (colCount > 0 && rowCount > 0) ? 
-            calcSize(matType->getElementType()) * (colCount * rowCount) : 
-            NaturalSize::makeInvalid();
+        return (colCount > 0 && rowCount > 0)
+                   ? calcSize(matType->getElementType()) * (colCount * rowCount)
+                   : NaturalSize::makeInvalid();
     }
     else if (auto basicType = as<BasicExpressionType>(type))
     {
@@ -140,9 +140,8 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {
         const Count elementCount = _getCount(arrayType->getElementCount());
-        return (elementCount > 0) ? 
-            calcSize(arrayType->getElementType()) * elementCount : 
-            NaturalSize::makeInvalid();
+        return (elementCount > 0) ? calcSize(arrayType->getElementType()) * elementCount
+                                  : NaturalSize::makeInvalid();
     }
     else if (auto namedType = as<NamedExpressionType>(type))
     {
@@ -166,14 +165,14 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
 
         return size;
     }
-    else if( auto declRefType = as<DeclRefType>(type) )
+    else if (auto declRefType = as<DeclRefType>(type))
     {
         if (const auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
         {
             Type* tagType = getTagType(m_astBuilder, enumDeclRef);
             return calcSize(tagType);
         }
-        else if(const auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
+        else if (const auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
         {
             // Poison the cache whilst we construct
             m_typeToSize.add(type, NaturalSize::makeInvalid());
@@ -213,7 +212,7 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
             // Set the cached result to the size.
             m_typeToSize.set(type, size);
 
-            return size; 
+            return size;
         }
         else if (const auto typeDef = declRefType->getDeclRef().as<TypeDefDecl>())
         {

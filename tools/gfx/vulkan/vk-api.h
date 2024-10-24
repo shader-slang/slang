@@ -3,8 +3,10 @@
 
 #include "vk-module.h"
 
-namespace gfx {
+namespace gfx
+{
 
+// clang-format off
 #define VK_API_GLOBAL_PROCS(x) \
     x(vkGetInstanceProcAddr) \
     x(vkCreateInstance) \
@@ -235,7 +237,7 @@ namespace gfx {
     /* */
 
 #define VK_API_DECLARE_PROC(NAME) PFN_##NAME NAME = nullptr;
-
+// clang-format on
 
 struct VulkanExtendedFeatureProperties
 {
@@ -292,7 +294,7 @@ struct VulkanExtendedFeatureProperties
     };
 
     // Clock features
-    VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures = { 
+    VkPhysicalDeviceShaderClockFeaturesKHR clockFeatures = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR
     };
 
@@ -303,12 +305,12 @@ struct VulkanExtendedFeatureProperties
 
     // Multiview features
     VkPhysicalDeviceMultiviewFeaturesKHR multiviewFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR 
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES_KHR
     };
 
     // Fragment shading rate features
     VkPhysicalDeviceFragmentShadingRateFeaturesKHR fragmentShadingRateFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR 
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR
     };
 
     // Vulkan 1.2 features.
@@ -320,7 +322,6 @@ struct VulkanExtendedFeatureProperties
     VkPhysicalDeviceRayTracingValidationFeaturesNV rayTracingValidationFeatures = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV
     };
-
 };
 
 struct VulkanApi
@@ -334,38 +335,38 @@ struct VulkanApi
         Device,
     };
 
-        /// Returns true if all the functions in the class are defined
+    /// Returns true if all the functions in the class are defined
     bool areDefined(ProcType type) const;
 
-        /// Sets up global parameters
+    /// Sets up global parameters
     Slang::Result initGlobalProcs(const VulkanModule& module);
-        /// Initialize the instance functions
+    /// Initialize the instance functions
     Slang::Result initInstanceProcs(VkInstance instance);
 
-        /// Called before initDevice
+    /// Called before initDevice
     Slang::Result initPhysicalDevice(VkPhysicalDevice physicalDevice);
 
-        /// Initialize the device functions
+    /// Initialize the device functions
     Slang::Result initDeviceProcs(VkDevice device);
 
-        /// Type bits control which indices are tested against bit 0 for testing at index 0
-        /// properties - a memory type must have all the bits set as passed in
-        /// Returns -1 if couldn't find an appropriate memory type index
+    /// Type bits control which indices are tested against bit 0 for testing at index 0
+    /// properties - a memory type must have all the bits set as passed in
+    /// Returns -1 if couldn't find an appropriate memory type index
     int findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 
-        /// Given queue required flags, finds a queue
+    /// Given queue required flags, finds a queue
     int findQueue(VkQueueFlags reqFlags) const;
 
-    const VulkanModule* m_module = nullptr;               ///< Module this was all loaded from
+    const VulkanModule* m_module = nullptr; ///< Module this was all loaded from
     VkInstance m_instance = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 
-    VkPhysicalDeviceProperties                              m_deviceProperties;
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR         m_rtProperties;
-    VkPhysicalDeviceFeatures                                m_deviceFeatures;
-    VkPhysicalDeviceMemoryProperties                        m_deviceMemoryProperties;
-    VulkanExtendedFeatureProperties                         m_extendedFeatures;
+    VkPhysicalDeviceProperties m_deviceProperties;
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_rtProperties;
+    VkPhysicalDeviceFeatures m_deviceFeatures;
+    VkPhysicalDeviceMemoryProperties m_deviceMemoryProperties;
+    VulkanExtendedFeatureProperties m_extendedFeatures;
 };
 
-} // renderer_test
+} // namespace gfx

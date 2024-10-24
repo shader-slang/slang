@@ -11,10 +11,7 @@ typedef std::chrono::high_resolution_clock::duration Duration;
 class PerformanceCounter
 {
 public:
-    static inline TimePoint now()
-    {
-        return std::chrono::high_resolution_clock::now();
-    }
+    static inline TimePoint now() { return std::chrono::high_resolution_clock::now(); }
     static inline Duration getElapsedTime(TimePoint counter) { return now() - counter; }
     static inline float getElapsedTimeInSeconds(TimePoint counter)
     {

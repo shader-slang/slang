@@ -1,13 +1,13 @@
 #include "slang-blob.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BlobBase !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 ISlangUnknown* BlobBase::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() || 
-        guid == ISlangBlob::getTypeGuid())
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangBlob::getTypeGuid())
     {
         return static_cast<ISlangBlob*>(this);
     }
@@ -41,12 +41,11 @@ void StringBlob::_setUniqueRep(StringRepresentation* uniqueRep)
 
     m_uniqueRep = uniqueRep;
 
-    m_slice = uniqueRep ? 
-        UnownedTerminatedStringSlice(uniqueRep->getData(), uniqueRep->getLength()) :
-        UnownedTerminatedStringSlice();
+    m_slice = uniqueRep ? UnownedTerminatedStringSlice(uniqueRep->getData(), uniqueRep->getLength())
+                        : UnownedTerminatedStringSlice();
 }
 
-/* static */StringRepresentation* StringBlob::_createUniqueCopy(StringRepresentation* rep)
+/* static */ StringRepresentation* StringBlob::_createUniqueCopy(StringRepresentation* rep)
 {
     if (rep)
     {
@@ -75,7 +74,7 @@ void StringBlob::_setWithMove(StringRepresentation* rep)
     if (rep && !rep->isUniquelyReferenced())
     {
         _setUniqueRep(_createUniqueCopy(rep));
-        // We need to release a ref as rep is passed in with the 'current' ref count 
+        // We need to release a ref as rep is passed in with the 'current' ref count
         rep->releaseReference();
     }
     else
@@ -84,7 +83,7 @@ void StringBlob::_setWithMove(StringRepresentation* rep)
     }
 }
 
-/* static */ComPtr<ISlangBlob> StringBlob::create(const UnownedStringSlice& slice)
+/* static */ ComPtr<ISlangBlob> StringBlob::create(const UnownedStringSlice& slice)
 {
     StringRepresentation* rep = nullptr;
     if (slice.getLength())
@@ -93,27 +92,27 @@ void StringBlob::_setWithMove(StringRepresentation* rep)
     }
 
     auto blob = new StringBlob;
-    
+
     // rep must be unique at this point
     blob->_setUniqueRep(rep);
     return ComPtr<ISlangBlob>(blob);
 }
 
-/* static */ComPtr<ISlangBlob> StringBlob::create(const String& in)
+/* static */ ComPtr<ISlangBlob> StringBlob::create(const String& in)
 {
     auto blob = new StringBlob;
     blob->_setWithCopy(in.getStringRepresentation());
     return ComPtr<ISlangBlob>(blob);
 }
 
-/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
+/* static */ ComPtr<ISlangBlob> StringBlob::moveCreate(String& in)
 {
     auto blob = new StringBlob;
     blob->_setWithMove(in.detachStringRepresentation());
     return ComPtr<ISlangBlob>(blob);
 }
 
-/* static */ComPtr<ISlangBlob> StringBlob::moveCreate(String&& in)
+/* static */ ComPtr<ISlangBlob> StringBlob::moveCreate(String&& in)
 {
     auto blob = new StringBlob;
     blob->_setWithMove(in.detachStringRepresentation());
@@ -167,7 +166,7 @@ void* RawBlob::getObject(const Guid& guid)
     // If the data has 0 termination, we can return the pointer
     if (guid == SlangTerminatedChars::getTypeGuid() && m_data.isTerminated())
     {
-        return (char*)m_data.getData(); 
+        return (char*)m_data.getData();
     }
     return nullptr;
 }
@@ -185,7 +184,7 @@ void* ScopeBlob::castAs(const SlangUUID& guid)
         return obj;
     }
 
-    // If the contained thing is castable, ask it 
+    // If the contained thing is castable, ask it
     if (m_castable)
     {
         return m_castable->castAs(guid);
@@ -225,7 +224,7 @@ void* ListBlob::getObject(const Guid& guid)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StaticBlob !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-SlangResult StaticBlob::queryInterface(SlangUUID const& guid, void** outObject) 
+SlangResult StaticBlob::queryInterface(SlangUUID const& guid, void** outObject)
 {
     if (auto intf = getInterface(guid))
     {
@@ -246,8 +245,7 @@ void* StaticBlob::castAs(const SlangUUID& guid)
 
 ISlangUnknown* StaticBlob::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ISlangBlob::getTypeGuid())
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangBlob::getTypeGuid())
     {
         return static_cast<ISlangBlob*>(this);
     }

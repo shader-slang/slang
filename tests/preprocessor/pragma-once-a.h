@@ -3,4 +3,7 @@
 
 // Used by the `pragma-once.slang` test
 
-float foo(float x) { return x; }
+float foo(float x)
+{
+    return x;
+}

@@ -1,18 +1,19 @@
 // slang-json-diagnostics.cpp
 #include "slang-json-diagnostics.h"
 
-namespace Slang {
+namespace Slang
+{
 
 namespace JSONDiagnostics
 {
-#define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, #name, messageFormat };
+#define DIAGNOSTIC(id, severity, name, messageFormat) \
+    const DiagnosticInfo name = {id, Severity::severity, #name, messageFormat};
 #include "slang-json-diagnostic-defs.h"
 #undef DIAGNOSTIC
-}
+} // namespace JSONDiagnostics
 
-static const DiagnosticInfo* const kJSONDiagnostics[] =
-{
-#define DIAGNOSTIC(id, severity, name, messageFormat) &JSONDiagnostics::name, 
+static const DiagnosticInfo* const kJSONDiagnostics[] = {
+#define DIAGNOSTIC(id, severity, name, messageFormat) &JSONDiagnostics::name,
 #include "slang-json-diagnostic-defs.h"
 #undef DIAGNOSTIC
 };

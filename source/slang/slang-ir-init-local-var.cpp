@@ -1,7 +1,8 @@
 // slang-ir-init-local-var.cpp
 #include "slang-ir-init-local-var.h"
-#include "slang-ir.h"
+
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -26,20 +27,19 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                 {
                     switch (nextInst->getOp())
                     {
-                    case kIROp_Store:
-                        if (nextInst->getOperand(0) == inst)
-                            initialized = true;
-                        break;
-                    case kIROp_GetElementPtr:
-                    case kIROp_FieldAddress:
-                        continue;
-                    default:
-                        if (userSet.contains(nextInst))
-                        {
-                            // We encountered a user of the variable before it was initialized.
-                            // Break out of the loop and insert the initialization code.
-                            goto breakLabel;
-                        }
+                        case kIROp_Store:
+                            if (nextInst->getOperand(0) == inst)
+                                initialized = true;
+                            break;
+                        case kIROp_GetElementPtr:
+                        case kIROp_FieldAddress:  continue;
+                        default:
+                            if (userSet.contains(nextInst))
+                            {
+                                // We encountered a user of the variable before it was initialized.
+                                // Break out of the loop and insert the initialization code.
+                                goto breakLabel;
+                            }
                     }
                     if (initialized)
                         break;
@@ -49,12 +49,14 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                     continue;
 
                 IRBuilderSourceLocRAII sourceLocationScope(&builder, inst->sourceLoc);
-                
+
                 builder.setInsertAfter(inst);
                 builder.emitStore(
                     inst,
                     builder.emitDefaultConstruct(
-                        as<IRPtrTypeBase>(inst->getFullType())->getValueType()));
+                        as<IRPtrTypeBase>(inst->getFullType())->getValueType()
+                    )
+                );
             }
         }
     }

@@ -3,9 +3,9 @@
 
 namespace Slang
 {
-    struct IRModule;
-    struct IRCall;
+struct IRModule;
+struct IRCall;
 
-        /// Removes specialization dictionaries from module.
-    void stripCachedDictionaries(IRModule* module);
-}
+/// Removes specialization dictionaries from module.
+void stripCachedDictionaries(IRModule* module);
+} // namespace Slang

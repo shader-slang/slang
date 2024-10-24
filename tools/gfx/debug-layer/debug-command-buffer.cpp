@@ -2,9 +2,8 @@
 #include "debug-command-buffer.h"
 
 #include "debug-framebuffer.h"
-#include "debug-render-pass.h"
-
 #include "debug-helper-functions.h"
+#include "debug-render-pass.h"
 
 namespace gfx
 {
@@ -34,7 +33,8 @@ ICommandBuffer* DebugCommandBuffer::getInterface(const Slang::Guid& guid)
 void DebugCommandBuffer::encodeRenderCommands(
     IRenderPassLayout* renderPass,
     IFramebuffer* framebuffer,
-    IRenderCommandEncoder** outEncoder)
+    IRenderCommandEncoder** outEncoder
+)
 {
     SLANG_GFX_API_FUNC;
     checkCommandBufferOpenWhenCreatingEncoder();
@@ -43,7 +43,10 @@ void DebugCommandBuffer::encodeRenderCommands(
     auto innerFramebuffer = getInnerObj(framebuffer);
     m_renderCommandEncoder.isOpen = true;
     baseObject->encodeRenderCommands(
-        innerRenderPass, innerFramebuffer, &m_renderCommandEncoder.baseObject);
+        innerRenderPass,
+        innerFramebuffer,
+        &m_renderCommandEncoder.baseObject
+    );
     if (m_renderCommandEncoder.baseObject)
         *outEncoder = &m_renderCommandEncoder;
     else
@@ -112,19 +115,22 @@ void DebugCommandBuffer::close()
     {
         GFX_DIAGNOSE_ERROR(
             "A render command encoder on this command buffer is still open. "
-            "IRenderCommandEncoder::endEncoding() must be called before closing a command buffer.");
+            "IRenderCommandEncoder::endEncoding() must be called before closing a command buffer."
+        );
     }
     if (m_computeCommandEncoder.isOpen)
     {
         GFX_DIAGNOSE_ERROR(
             "A compute command encoder on this command buffer is still open. "
-            "IComputeCommandEncoder::endEncoding() must be called before closing a command buffer.");
+            "IComputeCommandEncoder::endEncoding() must be called before closing a command buffer."
+        );
     }
     if (m_resourceCommandEncoder.isOpen)
     {
         GFX_DIAGNOSE_ERROR(
             "A resource command encoder on this command buffer is still open. "
-            "IResourceCommandEncoder::endEncoding() must be called before closing a command buffer.");
+            "IResourceCommandEncoder::endEncoding() must be called before closing a command buffer."
+        );
     }
     isOpen = false;
     baseObject->close();
@@ -140,9 +146,13 @@ void DebugCommandBuffer::invalidateDescriptorHeapBinding()
 {
     SLANG_GFX_API_FUNC;
     ComPtr<ICommandBufferD3D12> cmdBuf;
-    if (SLANG_FAILED(baseObject->queryInterface(SlangUUID SLANG_UUID_ICommandBufferD3D12, (void**)cmdBuf.writeRef())))
+    if (SLANG_FAILED(baseObject->queryInterface(
+            SlangUUID SLANG_UUID_ICommandBufferD3D12,
+            (void**)cmdBuf.writeRef()
+        )))
     {
-        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide ICommandBufferD3D12 interface.");
+        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide "
+                           "ICommandBufferD3D12 interface.");
         return;
     }
     return cmdBuf->invalidateDescriptorHeapBinding();
@@ -152,9 +162,13 @@ void DebugCommandBuffer::ensureInternalDescriptorHeapsBound()
 {
     SLANG_GFX_API_FUNC;
     ComPtr<ICommandBufferD3D12> cmdBuf;
-    if (SLANG_FAILED(baseObject->queryInterface(SlangUUID SLANG_UUID_ICommandBufferD3D12, (void**)cmdBuf.writeRef())))
+    if (SLANG_FAILED(baseObject->queryInterface(
+            SlangUUID SLANG_UUID_ICommandBufferD3D12,
+            (void**)cmdBuf.writeRef()
+        )))
     {
-        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide ICommandBufferD3D12 interface.");
+        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide "
+                           "ICommandBufferD3D12 interface.");
         return;
     }
     return cmdBuf->ensureInternalDescriptorHeapsBound();
@@ -167,7 +181,8 @@ void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()
     {
         GFX_DIAGNOSE_ERROR(
             "A previouse command encoder created on this command buffer is still open. "
-            "endEncoding() must be called on the encoder before creating an encoder.");
+            "endEncoding() must be called on the encoder before creating an encoder."
+        );
     }
 }
 

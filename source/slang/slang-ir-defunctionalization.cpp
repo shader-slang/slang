@@ -19,9 +19,7 @@ struct FunctionParameterSpecializationCondition : FunctionCallSpecializeConditio
     }
 };
 
-bool specializeHigherOrderParameters(
-    CodeGenContext* codeGenContext,
-    IRModule*       module)
+bool specializeHigherOrderParameters(CodeGenContext* codeGenContext, IRModule* module)
 {
     bool result = false;
     FunctionParameterSpecializationCondition condition;

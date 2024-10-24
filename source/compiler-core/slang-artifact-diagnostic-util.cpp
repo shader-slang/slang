@@ -4,11 +4,12 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-string-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */UnownedStringSlice ArtifactDiagnosticUtil::getSeverityText(Severity severity)
+/* static */ UnownedStringSlice ArtifactDiagnosticUtil::getSeverityText(Severity severity)
 {
     switch (severity)
     {
@@ -19,7 +20,11 @@ namespace Slang {
     }
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::splitPathLocation(SliceAllocator& allocator, const UnownedStringSlice& pathLocation, ArtifactDiagnostic& outDiagnostic)
+/* static */ SlangResult ArtifactDiagnosticUtil::splitPathLocation(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& pathLocation,
+    ArtifactDiagnostic& outDiagnostic
+)
 {
     const Index lineStartIndex = pathLocation.lastIndexOf('(');
     if (lineStartIndex >= 0)
@@ -37,8 +42,8 @@ namespace Slang {
             UnownedStringSlice slices[2];
             const Index numSlices = StringUtil::split(locationSlice, ',', 2, slices);
 
-            // NOTE! FXC actually outputs a range of columns in the form of START-END in the column position
-            // We don't need to parse here, because we only care about the line number
+            // NOTE! FXC actually outputs a range of columns in the form of START-END in the column
+            // position We don't need to parse here, because we only care about the line number
 
             Int lineNumber = 0;
             if (numSlices > 0)
@@ -57,7 +62,11 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::splitColonDelimitedLine(const UnownedStringSlice& line, Int pathIndex, List<UnownedStringSlice>& outSlices)
+/* static */ SlangResult ArtifactDiagnosticUtil::splitColonDelimitedLine(
+    const UnownedStringSlice& line,
+    Int pathIndex,
+    List<UnownedStringSlice>& outSlices
+)
 {
     StringUtil::split(line, ':', outSlices);
 
@@ -69,7 +78,8 @@ namespace Slang {
         if (pathStart.getLength() == 1 && CharUtil::isAlpha(pathStart[0]))
         {
             // Splice back together
-            outSlices[pathIndex] = UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
+            outSlices[pathIndex] =
+                UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
             outSlices.removeAt(pathIndex + 1);
         }
     }
@@ -77,7 +87,13 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(SliceAllocator& allocator, const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, IArtifactDiagnostics* diagnostics)
+/* static */ SlangResult ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& inText,
+    Int pathIndex,
+    LineParser lineParser,
+    IArtifactDiagnostics* diagnostics
+)
 {
     List<UnownedStringSlice> splitLine;
 
@@ -106,7 +122,10 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */void ArtifactDiagnosticUtil::maybeAddNote(const UnownedStringSlice& in, IArtifactDiagnostics* diagnostics)
+/* static */ void ArtifactDiagnosticUtil::maybeAddNote(
+    const UnownedStringSlice& in,
+    IArtifactDiagnostics* diagnostics
+)
 {
     // Don't bother adding an empty line
     if (in.trim().getLength() == 0)

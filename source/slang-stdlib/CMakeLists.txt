@@ -29,26 +29,28 @@ set(stdlib_common_args
     .
     OBJECT
     EXCLUDE_FROM_ALL
-    EXPORT_MACRO_PREFIX SLANG
-    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
-    FOLDER generated
-    LINK_WITH_PRIVATE core
+    EXPORT_MACRO_PREFIX
+    SLANG
+    EXPORT_TYPE_AS
+    ${SLANG_LIB_TYPE}
+    FOLDER
+    generated
+    LINK_WITH_PRIVATE
+    core
     USE_EXTRA_WARNINGS
-    EXPLICIT_SOURCE ./slang-embedded-stdlib.cpp 
+    EXPLICIT_SOURCE
+    ./slang-embedded-stdlib.cpp
 )
 
 slang_add_target(
     ${stdlib_common_args}
     TARGET_NAME slang-embedded-stdlib
-    EXPLICIT_SOURCE  ${stdlib_generated_header}
+    EXPLICIT_SOURCE ${stdlib_generated_header}
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_STDLIB
     INCLUDE_DIRECTORIES_PRIVATE ${stdlib_generated_header_dir}
 )
 
-slang_add_target(
-    ${stdlib_common_args}
-    TARGET_NAME slang-no-embedded-stdlib
-)
+slang_add_target(${stdlib_common_args} TARGET_NAME slang-no-embedded-stdlib)
 
 #
 # Compiling the meta.slang files
@@ -87,7 +89,10 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(generate-stdlib-headers DEPENDS ${stdlib_meta_generated_headers})
+add_custom_target(
+    generate-stdlib-headers
+    DEPENDS ${stdlib_meta_generated_headers}
+)
 set_target_properties(generate-stdlib-headers PROPERTIES FOLDER generated)
 
 #
@@ -99,22 +104,28 @@ set(stdlib_source_common_args
     OBJECT
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE 
-        core 
-        slang-capability-defs 
-        slang-reflect-headers 
-        SPIRV-Headers 
-    INCLUDE_DIRECTORIES_PRIVATE ../slang
-    FOLDER generated
-    EXPLICIT_SOURCE 
-      ./slang-embedded-stdlib-source.cpp
-      ${stdlib_meta_generated_headers}
-    REQUIRES generate-stdlib-headers
-    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_STDLIB_SOURCE
-    INCLUDE_DIRECTORIES_PRIVATE 
-      ${stdlib_meta_output_dir}
-    EXPORT_MACRO_PREFIX SLANG
-    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
+    LINK_WITH_PRIVATE
+    core
+    slang-capability-defs
+    slang-reflect-headers
+    SPIRV-Headers
+    INCLUDE_DIRECTORIES_PRIVATE
+    ../slang
+    FOLDER
+    generated
+    EXPLICIT_SOURCE
+    ./slang-embedded-stdlib-source.cpp
+    ${stdlib_meta_generated_headers}
+    REQUIRES
+    generate-stdlib-headers
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    SLANG_EMBED_STDLIB_SOURCE
+    INCLUDE_DIRECTORIES_PRIVATE
+    ${stdlib_meta_output_dir}
+    EXPORT_MACRO_PREFIX
+    SLANG
+    EXPORT_TYPE_AS
+    ${SLANG_LIB_TYPE}
 )
 
 slang_add_target(

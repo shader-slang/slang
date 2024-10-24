@@ -2,11 +2,10 @@
 #include "vk-pipeline-state.h"
 
 #include "vk-device.h"
-#include "vk-shader-program.h"
-#include "vk-shader-object-layout.h"
-#include "vk-vertex-layout.h"
-
 #include "vk-helper-functions.h"
+#include "vk-shader-object-layout.h"
+#include "vk-shader-program.h"
+#include "vk-vertex-layout.h"
 
 namespace gfx
 {
@@ -35,9 +34,15 @@ PipelineStateImpl::~PipelineStateImpl()
     }
 }
 
-void PipelineStateImpl::establishStrongDeviceReference() { m_device.establishStrongReference(); }
+void PipelineStateImpl::establishStrongDeviceReference()
+{
+    m_device.establishStrongReference();
+}
 
-void PipelineStateImpl::comFree() { m_device.breakStrongReference(); }
+void PipelineStateImpl::comFree()
+{
+    m_device.breakStrongReference();
+}
 
 void PipelineStateImpl::init(const GraphicsPipelineStateDesc& inDesc)
 {
@@ -71,7 +76,8 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
 
     // VertexBuffer/s
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+    };
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 0;
     vertexInputInfo.vertexAttributeDescriptionCount = 0;
@@ -159,8 +165,9 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     multisampling.alphaToCoverageEnable = blendDesc.alphaToCoverageEnable;
     multisampling.alphaToOneEnable = VK_FALSE;
 
-    auto targetCount =
-        GfxCount(Math::Min(framebufferLayoutImpl->m_renderTargetCount, (uint32_t)blendDesc.targetCount));
+    auto targetCount = GfxCount(
+        Math::Min(framebufferLayoutImpl->m_renderTargetCount, (uint32_t)blendDesc.targetCount)
+    );
     List<VkPipelineColorBlendAttachmentState> colorBlendTargets;
 
     // Regardless of whether blending is enabled, Vulkan always applies the color write mask
@@ -222,7 +229,8 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
     dynamicStates.add(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
     // It's not valid to specify VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT when
     // the pipeline contains a mesh shader.
-    if (!m_program->isMeshShaderProgram() && m_device->m_api.m_extendedFeatures.extendedDynamicStateFeatures.extendedDynamicState)
+    if (!m_program->isMeshShaderProgram() &&
+        m_device->m_api.m_extendedFeatures.extendedDynamicStateFeatures.extendedDynamicState)
 
     {
         dynamicStates.add(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT);
@@ -275,17 +283,23 @@ Result PipelineStateImpl::createVKGraphicsPipelineState()
 
     if (m_device->m_pipelineCreationAPIDispatcher)
     {
-        SLANG_RETURN_ON_FAIL(
-            m_device->m_pipelineCreationAPIDispatcher->createGraphicsPipelineState(
-                m_device,
-                programImpl->linkedProgram.get(),
-                &pipelineInfo,
-                (void**)&m_pipeline));
+        SLANG_RETURN_ON_FAIL(m_device->m_pipelineCreationAPIDispatcher->createGraphicsPipelineState(
+            m_device,
+            programImpl->linkedProgram.get(),
+            &pipelineInfo,
+            (void**)&m_pipeline
+        ));
     }
     else
     {
         SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateGraphicsPipelines(
-            m_device->m_device, pipelineCache, 1, &pipelineInfo, nullptr, &m_pipeline));
+            m_device->m_device,
+            pipelineCache,
+            1,
+            &pipelineInfo,
+            nullptr,
+            &m_pipeline
+        ));
     }
 
     return SLANG_OK;
@@ -300,24 +314,31 @@ Result PipelineStateImpl::createVKComputePipelineState()
     }
 
     VkComputePipelineCreateInfo computePipelineInfo = {
-            VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+        VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO
+    };
     computePipelineInfo.stage = programImpl->m_stageCreateInfos[0];
     computePipelineInfo.layout = programImpl->m_rootObjectLayout->m_pipelineLayout;
 
     if (m_device->m_pipelineCreationAPIDispatcher)
     {
-        SLANG_RETURN_ON_FAIL(
-            m_device->m_pipelineCreationAPIDispatcher->createComputePipelineState(
-                m_device,
-                programImpl->linkedProgram.get(),
-                &computePipelineInfo,
-                (void**)&m_pipeline));
+        SLANG_RETURN_ON_FAIL(m_device->m_pipelineCreationAPIDispatcher->createComputePipelineState(
+            m_device,
+            programImpl->linkedProgram.get(),
+            &computePipelineInfo,
+            (void**)&m_pipeline
+        ));
     }
     else
     {
         VkPipelineCache pipelineCache = VK_NULL_HANDLE;
         SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateComputePipelines(
-            m_device->m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &m_pipeline));
+            m_device->m_device,
+            pipelineCache,
+            1,
+            &computePipelineInfo,
+            nullptr,
+            &m_pipeline
+        ));
     }
     return SLANG_OK;
 }
@@ -329,13 +350,9 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 
     switch (desc.type)
     {
-    case PipelineType::Compute:
-        return createVKComputePipelineState();
-    case PipelineType::Graphics:
-        return createVKGraphicsPipelineState();
-    default:
-        SLANG_UNREACHABLE("Unknown pipeline type.");
-        return SLANG_FAIL;
+        case PipelineType::Compute:  return createVKComputePipelineState();
+        case PipelineType::Graphics: return createVKGraphicsPipelineState();
+        default:                     SLANG_UNREACHABLE("Unknown pipeline type."); return SLANG_FAIL;
     }
 }
 SLANG_NO_THROW Result SLANG_MCALL PipelineStateImpl::getNativeHandle(InteropHandle* outHandle)
@@ -349,9 +366,12 @@ SLANG_NO_THROW Result SLANG_MCALL PipelineStateImpl::getNativeHandle(InteropHand
 
 RayTracingPipelineStateImpl::RayTracingPipelineStateImpl(DeviceImpl* device)
     : PipelineStateImpl(device)
-{}
+{
+}
 uint32_t RayTracingPipelineStateImpl::findEntryPointIndexByName(
-    const Dictionary<String, Index>& entryPointNameToIndex, const char* name)
+    const Dictionary<String, Index>& entryPointNameToIndex,
+    const char* name
+)
 {
     if (!name)
         return VK_SHADER_UNUSED_KHR;
@@ -371,7 +391,8 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
     }
 
     VkRayTracingPipelineCreateInfoKHR raytracingPipelineInfo = {
-        VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR};
+        VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR
+    };
     raytracingPipelineInfo.pNext = nullptr;
     raytracingPipelineInfo.flags = translateRayTracingPipelineFlags(desc.rayTracing.flags);
 
@@ -394,7 +415,8 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
             continue;
 
         VkRayTracingShaderGroupCreateInfoKHR shaderGroupInfo = {
-            VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR};
+            VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR
+        };
         shaderGroupInfo.pNext = nullptr;
         shaderGroupInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
         shaderGroupInfo.generalShader = i;
@@ -413,7 +435,8 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
     for (int32_t i = 0; i < desc.rayTracing.hitGroupDescs.getCount(); ++i)
     {
         VkRayTracingShaderGroupCreateInfoKHR shaderGroupInfo = {
-            VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR};
+            VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR
+        };
         auto& groupDesc = desc.rayTracing.hitGroupDescs[i];
 
         shaderGroupInfo.pNext = nullptr;
@@ -451,7 +474,9 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
     if (m_device->m_pipelineCreationAPIDispatcher)
     {
         m_device->m_pipelineCreationAPIDispatcher->beforeCreateRayTracingState(
-            m_device, programImpl->linkedProgram.get());
+            m_device,
+            programImpl->linkedProgram.get()
+        );
     }
 
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
@@ -462,13 +487,16 @@ Result RayTracingPipelineStateImpl::createVKRayTracingPipelineState()
         1,
         &raytracingPipelineInfo,
         nullptr,
-        &m_pipeline));
+        &m_pipeline
+    ));
     shaderGroupCount = shaderGroupInfos.getCount();
 
     if (m_device->m_pipelineCreationAPIDispatcher)
     {
         m_device->m_pipelineCreationAPIDispatcher->afterCreateRayTracingState(
-            m_device, programImpl->linkedProgram.get());
+            m_device,
+            programImpl->linkedProgram.get()
+        );
     }
     return SLANG_OK;
 }
@@ -479,11 +507,8 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
 
     switch (desc.type)
     {
-    case PipelineType::RayTracing:
-        return createVKRayTracingPipelineState();
-    default:
-        SLANG_UNREACHABLE("Unknown pipeline type.");
-        return SLANG_FAIL;
+        case PipelineType::RayTracing: return createVKRayTracingPipelineState();
+        default:                       SLANG_UNREACHABLE("Unknown pipeline type."); return SLANG_FAIL;
     }
 }
 Result RayTracingPipelineStateImpl::getNativeHandle(InteropHandle* outHandle)

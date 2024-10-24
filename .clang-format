@@ -1,0 +1,39 @@
+BasedOnStyle: Microsoft
+ColumnLimit: 100
+
+# Preprocessor
+IndentPPDirectives: BeforeHash
+AlignEscapedNewlines: Left
+IncludeBlocks: Regroup
+
+# Functions
+AllowAllArgumentsOnNextLine: false
+BinPackArguments: false
+BinPackParameters: false
+AllowAllParametersOfDeclarationOnNextLine: false
+PenaltyReturnTypeOnItsOwnLine: 100
+AllowShortFunctionsOnASingleLine: Inline
+
+# Brackets and braces
+AlignAfterOpenBracket: BlockIndent
+BreakBeforeBraces: Allman
+
+# Pointers
+PointerAlignment: Left
+
+# Classes
+PackConstructorInitializers: NextLineOnly
+BreakConstructorInitializers: BeforeComma
+AccessModifierOffset: -4
+
+# Switch statements
+IndentCaseLabels: true
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+
+# Misc
+SortUsingDeclarations: false
+SpaceAfterTemplateKeyword: false
+AlwaysBreakTemplateDeclarations: true
+MaxEmptyLinesToKeep: 2

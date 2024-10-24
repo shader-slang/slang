@@ -1,10 +1,9 @@
 // debug-shader-object.cpp
 #include "debug-shader-object.h"
 
+#include "debug-helper-functions.h"
 #include "debug-resource-views.h"
 #include "debug-sampler-state.h"
-
-#include "debug-helper-functions.h"
 
 namespace gfx
 {
@@ -32,7 +31,8 @@ void DebugShaderObject::checkCompleteness()
                 GFX_DIAGNOSE_ERROR_FORMAT(
                     "shader parameter '%s' is not initialized in the shader object of type '%s'.",
                     var->getName(),
-                    m_slangType->getName());
+                    m_slangType->getName()
+                );
             }
         }
     }
@@ -58,8 +58,8 @@ Result DebugShaderObject::getEntryPoint(GfxIndex index, IShaderObject** entryPoi
         for (GfxIndex i = 0; i < getEntryPointCount(); i++)
         {
             RefPtr<DebugShaderObject> entryPointObj = new DebugShaderObject();
-            SLANG_RETURN_ON_FAIL(
-                baseObject->getEntryPoint(i, entryPointObj->baseObject.writeRef()));
+            SLANG_RETURN_ON_FAIL(baseObject->getEntryPoint(i, entryPointObj->baseObject.writeRef())
+            );
             m_entryPoints.add(entryPointObj);
         }
     }
@@ -133,7 +133,8 @@ Result DebugShaderObject::setSampler(ShaderOffset const& offset, ISamplerState* 
 Result DebugShaderObject::setCombinedTextureSampler(
     ShaderOffset const& offset,
     IResourceView* textureView,
-    ISamplerState* sampler)
+    ISamplerState* sampler
+)
 {
     SLANG_GFX_API_FUNC;
     auto samplerImpl = getDebugObj(sampler);
@@ -141,25 +142,30 @@ Result DebugShaderObject::setCombinedTextureSampler(
     auto viewImpl = getDebugObj(textureView);
     m_resources[ShaderOffsetKey{offset}] = viewImpl;
     m_initializedBindingRanges.add(offset.bindingRangeIndex);
-    return baseObject->setCombinedTextureSampler(
-        offset, getInnerObj(viewImpl), getInnerObj(sampler));
+    return baseObject
+        ->setCombinedTextureSampler(offset, getInnerObj(viewImpl), getInnerObj(sampler));
 }
 
 Result DebugShaderObject::setSpecializationArgs(
     ShaderOffset const& offset,
     const slang::SpecializationArg* args,
-    GfxCount count)
+    GfxCount count
+)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->setSpecializationArgs(offset, args, count);
 }
 
 Result DebugShaderObject::getCurrentVersion(
-    ITransientResourceHeap* transientHeap, IShaderObject** outObject)
+    ITransientResourceHeap* transientHeap,
+    IShaderObject** outObject
+)
 {
     SLANG_GFX_API_FUNC;
     ComPtr<IShaderObject> innerObject;
-    SLANG_RETURN_ON_FAIL(baseObject->getCurrentVersion(getInnerObj(transientHeap), innerObject.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        baseObject->getCurrentVersion(getInnerObj(transientHeap), innerObject.writeRef())
+    );
     RefPtr<DebugShaderObject> debugShaderObject = new DebugShaderObject();
     debugShaderObject->baseObject = innerObject;
     debugShaderObject->m_typeName = innerObject->getElementTypeLayout()->getName();
@@ -188,7 +194,8 @@ Result DebugShaderObject::setConstantBufferOverride(IBufferResource* constantBuf
 Result DebugRootShaderObject::setSpecializationArgs(
     ShaderOffset const& offset,
     const slang::SpecializationArg* args,
-    GfxCount count)
+    GfxCount count
+)
 {
     SLANG_GFX_API_FUNC;
 

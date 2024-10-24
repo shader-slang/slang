@@ -11,23 +11,29 @@ class DownstreamCompilerSet : public RefObject
 public:
     typedef RefObject Super;
 
-        /// Find all the available compilers
+    /// Find all the available compilers
     void getCompilerDescs(List<IDownstreamCompiler::Desc>& outCompilerDescs) const;
-        /// Returns list of all compilers
+    /// Returns list of all compilers
     void getCompilers(List<IDownstreamCompiler*>& outCompilers) const;
 
-        /// Get a compiler
+    /// Get a compiler
     IDownstreamCompiler* getCompiler(const DownstreamCompilerDesc& compilerDesc) const;
-  
-        /// Will replace if there is one with same desc
+
+    /// Will replace if there is one with same desc
     void addCompiler(IDownstreamCompiler* compiler);
 
-        /// Get a default compiler
-    IDownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage) const { return m_defaultCompilers[int(sourceLanguage)];  }
-        /// Set the default compiler
-    void setDefaultCompiler(SlangSourceLanguage sourceLanguage, IDownstreamCompiler* compiler) { m_defaultCompilers[int(sourceLanguage)] = compiler;  }
+    /// Get a default compiler
+    IDownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage) const
+    {
+        return m_defaultCompilers[int(sourceLanguage)];
+    }
+    /// Set the default compiler
+    void setDefaultCompiler(SlangSourceLanguage sourceLanguage, IDownstreamCompiler* compiler)
+    {
+        m_defaultCompilers[int(sourceLanguage)] = compiler;
+    }
 
-        /// True if has a compiler of the specified type
+    /// True if has a compiler of the specified type
     bool hasCompiler(SlangPassThrough compilerType) const;
 
     void remove(SlangPassThrough compilerType);
@@ -51,7 +57,6 @@ public:
     }
 
 protected:
-
     Index _findIndex(const DownstreamCompilerDesc& desc) const;
 
 
@@ -63,6 +68,6 @@ protected:
     List<ComPtr<ISlangSharedLibrary>> m_sharedLibraries;
 };
 
-}
+} // namespace Slang
 
 #endif

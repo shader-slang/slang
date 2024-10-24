@@ -23,7 +23,8 @@ public:
     virtual RefPtr<BufferResource> createDeviceBuffer(
         PipelineStateBase* pipeline,
         TransientResourceHeapBase* transientHeap,
-        IResourceCommandEncoder* encoder) override;
+        IResourceCommandEncoder* encoder
+    ) override;
 };
 
 } // namespace d3d12

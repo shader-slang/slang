@@ -1,6 +1,7 @@
 #include "slang-ir-extract-value-from-type.h"
-#include "slang-ir-layout.h"
+
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #define CHECK(x) SLANG_RELEASE_ASSERT((x) == SLANG_OK)
 
 namespace Slang
@@ -11,8 +12,9 @@ namespace Slang
 struct FindLeafValueResult
 {
     IRInst* leafValue = nullptr; // The leaf-level value.
-    uint32_t valueSize = 0; // The size of the leaf-level value.
-    uint32_t offsetInValue = 0; // The offset in bytes within `leafValue` that contains the requested value.
+    uint32_t valueSize = 0;      // The size of the leaf-level value.
+    uint32_t offsetInValue =
+        0; // The offset in bytes within `leafValue` that contains the requested value.
 };
 
 FindLeafValueResult findLeafValueAtOffset(
@@ -21,7 +23,8 @@ FindLeafValueResult findLeafValueAtOffset(
     IRType* dataType,
     IRSizeAndAlignment& layout,
     IRInst* src,
-    uint32_t offset)
+    uint32_t offset
+)
 {
     FindLeafValueResult result;
     if (offset >= layout.size && offset < layout.getStride())
@@ -35,14 +38,18 @@ FindLeafValueResult findLeafValueAtOffset(
     }
     switch (dataType->getOp())
     {
-    case kIROp_StructType:
+        case kIROp_StructType:
         {
             auto structType = as<IRStructType>(dataType);
             for (auto field : structType->getFields())
             {
                 IRIntegerValue fieldOffset = 0;
                 IRSizeAndAlignment fieldLayout;
-                CHECK(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), field->getFieldType(), &fieldLayout));
+                CHECK(getNaturalSizeAndAlignment(
+                    targetProgram->getOptionSet(),
+                    field->getFieldType(),
+                    &fieldLayout
+                ));
                 CHECK(getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset));
                 if (fieldOffset + fieldLayout.size > offset)
                 {
@@ -67,7 +74,8 @@ FindLeafValueResult findLeafValueAtOffset(
                         field->getFieldType(),
                         fieldLayout,
                         fieldValue,
-                        (uint32_t)(offset - fieldOffset));
+                        (uint32_t)(offset - fieldOffset)
+                    );
                 }
             }
             result.leafValue = builder.getIntValue(builder.getUIntType(), 0);
@@ -76,12 +84,16 @@ FindLeafValueResult findLeafValueAtOffset(
             return result;
         }
         break;
-    case kIROp_ArrayType:
+        case kIROp_ArrayType:
         {
             auto arrayType = as<IRArrayType>(dataType);
             auto elementType = arrayType->getElementType();
             IRSizeAndAlignment elementLayout;
-            CHECK(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), elementType, &elementLayout));
+            CHECK(getNaturalSizeAndAlignment(
+                targetProgram->getOptionSet(),
+                elementType,
+                &elementLayout
+            ));
             if (elementLayout.getStride() == 0)
             {
                 result.leafValue = builder.getIntValue(builder.getUIntType(), 0);
@@ -91,36 +103,48 @@ FindLeafValueResult findLeafValueAtOffset(
             }
             uint32_t index = offset / (uint32_t)elementLayout.getStride();
             auto elementValue = builder.emitElementExtract(
-                elementType, src, builder.getIntValue(builder.getUIntType(), index));
+                elementType,
+                src,
+                builder.getIntValue(builder.getUIntType(), index)
+            );
             return findLeafValueAtOffset(
                 targetProgram,
                 builder,
                 elementType,
                 elementLayout,
                 elementValue,
-                (uint32_t)(offset - elementLayout.getStride() * index));
+                (uint32_t)(offset - elementLayout.getStride() * index)
+            );
         }
         break;
-    case kIROp_VectorType:
+        case kIROp_VectorType:
         {
             auto vectorType = as<IRVectorType>(dataType);
             auto elementType = vectorType->getElementType();
             IRSizeAndAlignment elementLayout;
-            CHECK(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), elementType, &elementLayout));
+            CHECK(getNaturalSizeAndAlignment(
+                targetProgram->getOptionSet(),
+                elementType,
+                &elementLayout
+            ));
             uint32_t index =
                 elementLayout.getStride() == 0 ? 0 : (uint32_t)(offset / elementLayout.getStride());
             auto elementValue = builder.emitElementExtract(
-                elementType, src, builder.getIntValue(builder.getUIntType(), index));
+                elementType,
+                src,
+                builder.getIntValue(builder.getUIntType(), index)
+            );
             return findLeafValueAtOffset(
                 targetProgram,
                 builder,
                 elementType,
                 elementLayout,
                 elementValue,
-                (uint32_t)(offset - elementLayout.getStride() * index));
+                (uint32_t)(offset - elementLayout.getStride() * index)
+            );
         }
         break;
-    case kIROp_MatrixType:
+        case kIROp_MatrixType:
         {
             // Note: this code is assuming row major odering.
             auto matrixType = as<IRMatrixType>(dataType);
@@ -134,17 +158,21 @@ FindLeafValueResult findLeafValueAtOffset(
                                     ? 0
                                     : (uint32_t)(offset / (columnCount * rowLayout.getStride()));
             auto rowValue = builder.emitElementExtract(
-                rowType, src, builder.getIntValue(builder.getUIntType(), rowIndex));
+                rowType,
+                src,
+                builder.getIntValue(builder.getUIntType(), rowIndex)
+            );
             return findLeafValueAtOffset(
                 targetProgram,
                 builder,
                 rowType,
                 rowLayout,
                 rowValue,
-                (uint32_t)(offset - rowLayout.getStride() * rowIndex));
+                (uint32_t)(offset - rowLayout.getStride() * rowIndex)
+            );
         }
         break;
-    default:
+        default:
         {
             result.leafValue = src;
             result.offsetInValue = offset;
@@ -161,7 +189,8 @@ IRInst* extractByteAtOffset(
     IRType* dataType,
     IRSizeAndAlignment& layout,
     IRInst* src,
-    uint32_t offset)
+    uint32_t offset
+)
 {
     auto leaf = findLeafValueAtOffset(targetProgram, builder, dataType, layout, src, offset);
     IRType* uintType = nullptr;
@@ -181,7 +210,9 @@ IRInst* extractByteAtOffset(
 
         resultValue = builder.emitBitAnd(
             builder.getUIntType(),
-            resultValue, builder.getIntValue(builder.getUIntType(), 0xFF));
+            resultValue,
+            builder.getIntValue(builder.getUIntType(), 0xFF)
+        );
     }
     return resultValue;
 }
@@ -193,7 +224,8 @@ IRInst* extractMultiByteValueAtOffset(
     IRSizeAndAlignment& layout,
     IRInst* src,
     uint32_t size,
-    uint32_t offset)
+    uint32_t offset
+)
 {
     if (size == 1)
         return extractByteAtOffset(builder, targetProgram, dataType, layout, src, offset);
@@ -215,24 +247,16 @@ IRInst* extractMultiByteValueAtOffset(
         // We can proceed to extract the requested bits from the element.
         uint32_t shift = leaf.offsetInValue * 8;
         if (shift > 0)
-            resultValue = builder.emitShr(uintType, resultValue, builder.getIntValue(uintType, shift));
+            resultValue =
+                builder.emitShr(uintType, resultValue, builder.getIntValue(uintType, shift));
         uint32_t bitMask = 0;
         switch (size)
         {
-        case 1:
-            bitMask = 0xFF;
-            break;
-        case 2:
-            bitMask = 0xFFFFF;
-            break;
-        case 3:
-            bitMask = 0xFFFFFF;
-            break;
-        case 4:
-            bitMask = 0xFFFFFFFF;
-            break;
-        default:
-            break;
+            case 1:  bitMask = 0xFF; break;
+            case 2:  bitMask = 0xFFFFF; break;
+            case 3:  bitMask = 0xFFFFFF; break;
+            case 4:  bitMask = 0xFFFFFFFF; break;
+            default: break;
         }
         if (leaf.valueSize != size)
         {
@@ -246,9 +270,23 @@ IRInst* extractMultiByteValueAtOffset(
         // The requested value crosses the boundaries of different fields.
         // We need to extract first and second half separately, and combine them together.
         auto firstHalf = extractMultiByteValueAtOffset(
-            builder, targetProgram, dataType, layout, src, size / 2, offset);
+            builder,
+            targetProgram,
+            dataType,
+            layout,
+            src,
+            size / 2,
+            offset
+        );
         auto secondHalf = extractMultiByteValueAtOffset(
-            builder, targetProgram, dataType, layout, src, size / 2, offset + size / 2);
+            builder,
+            targetProgram,
+            dataType,
+            layout,
+            src,
+            size / 2,
+            offset + size / 2
+        );
         uint32_t shift = (size / 2) * 8;
         resultValue = builder.emitAdd(
             builder.getUIntType(),
@@ -256,23 +294,39 @@ IRInst* extractMultiByteValueAtOffset(
             builder.emitShl(
                 builder.getUIntType(),
                 secondHalf,
-                builder.getIntValue(builder.getUIntType(), shift)));
+                builder.getIntValue(builder.getUIntType(), shift)
+            )
+        );
         return resultValue;
     }
 }
 
 IRInst* extractValueAtOffset(
-    IRBuilder& builder, TargetProgram* targetProgram, IRInst* src, uint32_t offset, uint32_t size)
+    IRBuilder& builder,
+    TargetProgram* targetProgram,
+    IRInst* src,
+    uint32_t offset,
+    uint32_t size
+)
 {
     auto dataType = src->getDataType();
     IRSizeAndAlignment typeLayout;
-    SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), dataType, &typeLayout));
+    SLANG_RETURN_NULL_ON_FAIL(
+        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), dataType, &typeLayout)
+    );
     if (offset + size > typeLayout.size)
     {
         return builder.getIntValue(builder.getIntType(), 0);
     }
     return extractMultiByteValueAtOffset(
-        builder, targetProgram, dataType, typeLayout, src, size, offset);
+        builder,
+        targetProgram,
+        dataType,
+        typeLayout,
+        src,
+        size,
+        offset
+    );
 }
 
 } // namespace Slang

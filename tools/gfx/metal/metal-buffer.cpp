@@ -1,5 +1,6 @@
 // metal-buffer.cpp
 #include "metal-buffer.h"
+
 #include "metal-util.h"
 
 namespace gfx
@@ -11,14 +12,11 @@ namespace metal
 {
 
 BufferResourceImpl::BufferResourceImpl(const IBufferResource::Desc& desc, DeviceImpl* device)
-    : Parent(desc)
-    , m_device(device)
+    : Parent(desc), m_device(device)
 {
 }
 
-BufferResourceImpl::~BufferResourceImpl()
-{
-}
+BufferResourceImpl::~BufferResourceImpl() {}
 
 DeviceAddress BufferResourceImpl::getDeviceAddress()
 {
