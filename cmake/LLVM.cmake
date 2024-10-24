@@ -109,6 +109,7 @@ function(fetch_or_build_slang_llvm)
                     ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}/D3D12
                 VERBATIM
             )
+            set_target_properties(copy-prebuilt-binaries PROPERTIES FOLDER external)
         endif()
     endif()
 endfunction()
