@@ -64,7 +64,7 @@ struct TestToolUtil
         /// Sets the default preludes on the session based on the executable path
     static SlangResult setSessionDefaultPreludeFromExePath(const char* exePath, slang::IGlobalSession* session);
 
-        /// Returns true if the core module should not be initialized immediately (eg when doing a -load-standard-modules).
+        /// Returns true if the core module should not be initialized immediately (eg when doing a -load-core-module).
     static bool hasDeferredCoreModule(Index numArgs, const char*const* args);
 
     static SlangResult getDllDirectoryPath(const char* exePath, String& outDllDirectoryPath);

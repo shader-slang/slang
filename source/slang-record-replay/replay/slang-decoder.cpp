@@ -94,11 +94,11 @@ namespace SlangRecord
         case ApiCallId::IGlobalSession_compileCoreModule:
             IGlobalSession_compileCoreModule(objectId, parameterBlock);
             break;
-        case ApiCallId::IGlobalSession_loadStandardModules:
-            IGlobalSession_loadStandardModules(objectId, parameterBlock);
+        case ApiCallId::IGlobalSession_loadCoreModule:
+            IGlobalSession_loadCoreModule(objectId, parameterBlock);
             break;
-        case ApiCallId::IGlobalSession_saveStandardModules:
-            IGlobalSession_saveStandardModules(objectId, parameterBlock);
+        case ApiCallId::IGlobalSession_saveCoreModule:
+            IGlobalSession_saveCoreModule(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_findCapability:
             IGlobalSession_findCapability(objectId, parameterBlock);
@@ -621,7 +621,7 @@ namespace SlangRecord
 
     void SlangDecoder::IGlobalSession_compileCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-        slang::CompileStandardModulesFlags flags {};
+        slang::CompileCoreModuleFlags flags {};
         ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, flags);
 
         for (auto consumer: m_consumers)
@@ -630,18 +630,18 @@ namespace SlangRecord
         }
     }
 
-    void SlangDecoder::IGlobalSession_loadStandardModules(ObjectID objectId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_loadCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-        PointerDecoder<void*> standardModules;
-        ParameterDecoder::decodePointer(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, standardModules);
+        PointerDecoder<void*> coreModule;
+        ParameterDecoder::decodePointer(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, coreModule);
 
         for (auto consumer: m_consumers)
         {
-            consumer->IGlobalSession_loadStandardModules(objectId, standardModules.getPointer(), standardModules.getDataSize());
+            consumer->IGlobalSession_loadCoreModule(objectId, coreModule.getPointer(), coreModule.getDataSize());
         }
     }
 
-    void SlangDecoder::IGlobalSession_saveStandardModules(ObjectID objectId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_saveCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         SlangArchiveType archiveType {};
         ObjectID outBlobId = 0;
@@ -650,7 +650,7 @@ namespace SlangRecord
 
         for (auto consumer: m_consumers)
         {
-            consumer->IGlobalSession_saveStandardModules(objectId, archiveType, outBlobId);
+            consumer->IGlobalSession_saveCoreModule(objectId, archiveType, outBlobId);
         }
     }
 

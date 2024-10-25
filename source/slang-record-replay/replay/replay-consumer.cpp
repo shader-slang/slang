@@ -466,7 +466,7 @@ namespace SlangRecord
     }
 
 
-    void ReplayConsumer::IGlobalSession_compileCoreModule(ObjectID objectId, slang::CompileStandardModulesFlags flags)
+    void ReplayConsumer::IGlobalSession_compileCoreModule(ObjectID objectId, slang::CompileCoreModuleFlags flags)
     {
         InputObjectSanityCheck(objectId);
 
@@ -480,28 +480,28 @@ namespace SlangRecord
     }
 
 
-    void ReplayConsumer::IGlobalSession_loadStandardModules(ObjectID objectId, const void* standardModules, size_t standardModulesSizeInBytes)
+    void ReplayConsumer::IGlobalSession_loadCoreModule(ObjectID objectId, const void* coreModule, size_t coreModuleSizeInBytes)
     {
         InputObjectSanityCheck(objectId);
 
         slang::IGlobalSession* globalSession = getObjectPointer<slang::IGlobalSession>(objectId);
-        SlangResult res = globalSession->loadStandardModules(standardModules, standardModulesSizeInBytes);
+        SlangResult res = globalSession->loadCoreModule(coreModule, coreModuleSizeInBytes);
 
         if (SLANG_FAILED(res))
         {
-            slangRecordLog(LogLevel::Error, "IGlobalSession::loadStandardModules fails, ret: 0x%X, this: 0x%X\n", res, objectId);
+            slangRecordLog(LogLevel::Error, "IGlobalSession::loadCoreModule fails, ret: 0x%X, this: 0x%X\n", res, objectId);
         }
     }
 
 
-    void ReplayConsumer::IGlobalSession_saveStandardModules(ObjectID objectId, SlangArchiveType archiveType, ObjectID outBlobId)
+    void ReplayConsumer::IGlobalSession_saveCoreModule(ObjectID objectId, SlangArchiveType archiveType, ObjectID outBlobId)
     {
         InputObjectSanityCheck(objectId);
         OutputObjectSanityCheck(outBlobId);
 
         slang::IGlobalSession* globalSession = getObjectPointer<slang::IGlobalSession>(objectId);
         ISlangBlob* outBlob {};
-        SlangResult res = globalSession->saveStandardModules(archiveType, &outBlob);
+        SlangResult res = globalSession->saveCoreModule(archiveType, &outBlob);
 
         if (outBlob && SLANG_SUCCEEDED(res))
         {
@@ -509,7 +509,7 @@ namespace SlangRecord
         }
         else
         {
-            slangRecordLog(LogLevel::Error, "IGlobalSession::saveStandardModules fails, ret: 0x%X, this: 0x%X\n", res, objectId);
+            slangRecordLog(LogLevel::Error, "IGlobalSession::saveCoreModule fails, ret: 0x%X, this: 0x%X\n", res, objectId);
         }
     }
 

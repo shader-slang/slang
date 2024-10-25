@@ -51,7 +51,7 @@ SlangResult tryLoadStdLibFromCache(
     auto cacheTimestamp = *(uint64_t*)(cacheData.getData());
     if (cacheTimestamp != currentLibTimestamp)
         return SLANG_FAIL;
-    SLANG_RETURN_ON_FAIL(globalSession->loadStandardModules(
+    SLANG_RETURN_ON_FAIL(globalSession->loadCoreModule(
         (uint8_t*)cacheData.getData() + sizeof(uint64_t),
         cacheData.getSizeInBytes() - sizeof(uint64_t)));
     return SLANG_OK;
@@ -66,7 +66,7 @@ SlangResult trySaveStdLibToCache(
     {
         Slang::ComPtr<ISlangBlob> stdLibBlobPtr;
         SLANG_RETURN_ON_FAIL(
-            globalSession->saveStandardModules(SLANG_ARCHIVE_TYPE_RIFF_LZ4, stdLibBlobPtr.writeRef()));
+            globalSession->saveCoreModule(SLANG_ARCHIVE_TYPE_RIFF_LZ4, stdLibBlobPtr.writeRef()));
 
         Slang::FileStream fileStream;
         SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
@@ -95,7 +95,7 @@ SLANG_API SlangResult slang_createGlobalSession(
     ISlangBlob* stdLibBlob = slang_getEmbeddedCoreModule();
     if (stdLibBlob)
     {
-        SLANG_RETURN_ON_FAIL(globalSession->loadStandardModules(stdLibBlob->getBufferPointer(), stdLibBlob->getBufferSize()));
+        SLANG_RETURN_ON_FAIL(globalSession->loadCoreModule(stdLibBlob->getBufferPointer(), stdLibBlob->getBufferSize()));
     }
     else
     {
