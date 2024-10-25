@@ -119,6 +119,7 @@ which you want raw access, that is, a buffer that you can conveniently access th
 four 32-bit typeless address values.
  @remarks
 This type is supported natively when targeting HLSL.
+For all other targets, this type maps to a buffer of 32bit unsigned integers.
  @category buffer_types
 */
 __magic_type(HLSLByteAddressBufferType)
@@ -158,6 +159,7 @@ struct ByteAddressBuffer
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
@@ -196,6 +198,7 @@ struct ByteAddressBuffer
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
@@ -234,7 +237,7 @@ struct ByteAddressBuffer
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint2`.
+    /// of `uint2`, which is 4.
     ///@param location The input address in bytes, which must be a multiple of alignment of 4.
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
@@ -263,6 +266,7 @@ struct ByteAddressBuffer
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
@@ -301,7 +305,7 @@ struct ByteAddressBuffer
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint3`.
+    /// of `uint3`, which is 4.
     ///@param location The input address in bytes which must be a multiple of alignment of 4.
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__readNone]
@@ -368,7 +372,7 @@ struct ByteAddressBuffer
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`.
+    /// of `uint4`, which is 4.
     ///@param location The input address in bytes which must be a multiple of alignment of 4.
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__readNone]
@@ -4170,8 +4174,9 @@ __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
 [require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
 struct ConsumeStructuredBuffer
 {
-    /// Removes an element  from the end of the buffer.
-    ///@return The element removed from the buffer, it can be a structure.
+    /// Reading the element at the end of the buffer indicated by the associated atomic counter
+    /// and decrement the builtin atomic counter by 1.
+    ///@return The element read from the buffer, it can be a structure.
     __intrinsic_op($(kIROp_StructuredBufferConsume))
     T Consume();
 
@@ -4300,6 +4305,7 @@ struct $(item.name)
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
@@ -4338,6 +4344,7 @@ struct $(item.name)
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4365,7 +4372,7 @@ struct $(item.name)
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint2`.
+    /// of `uint2`, which is 4.
     ///@param location The input address in bytes, which must be a multiple of alignment of 4.
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
@@ -4405,6 +4412,7 @@ struct $(item.name)
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4432,7 +4440,7 @@ struct $(item.name)
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint3`.
+    /// of `uint3`, which is 4.
     ///@param location The input address in bytes which must be a multiple of alignment of 4.
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
@@ -4499,7 +4507,7 @@ struct $(item.name)
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`.
+    /// of `uint4`, which is 4.
     ///@param location The input address in bytes which must be a multiple of alignment of 4.
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
@@ -5095,7 +5103,7 @@ ${{{{
     }
 
     /// Set two values to the buffer at the specified location, the address will be aligned
-    /// to the size of `uint2`.
+    /// to the alignment of  `uint2`, which is 4.
     ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param value Two input values.
     [ForceInline]
@@ -5139,7 +5147,7 @@ ${{{{
     }
 
     /// Set three values to the buffer at the specified location, the address will be aligned
-    /// to the size of `uint3`.
+    /// to the alignment of `uint3`, which is 4.
     ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param value Three input values.
     [ForceInline]
@@ -5184,7 +5192,7 @@ ${{{{
     }
 
     /// Set four values to the buffer at the specified location, the address will be aligned
-    /// to the size of `uint4`.
+    /// to the alignment of `uint4`, which is 4.
     ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param value Four input values.
     [ForceInline]
@@ -5212,7 +5220,7 @@ ${{{{
     }
 
     /// Set four values to the buffer at the specified location, the address will be aligned
-    /// to the size of `T`.
+    /// to the alignment of `T`.
     ///@param T The type of the input value.
     ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param value The input value.
@@ -5261,6 +5269,8 @@ struct $(item.name)
 {
     /// Decrements the object's hidden counter.
     /// @return The post-decremented counter value.
+    /// @remarks
+    /// This function is not implemented when targeting non-HLSL.
     uint DecrementCounter();
 
     /// Get the dimensions of the buffer.
@@ -5285,6 +5295,8 @@ struct $(item.name)
 
     /// Increment the object's hidden counter.
     /// @return The pre-incremented counter value.
+    /// @remarks
+    /// This function is not implemented when targeting non-HLSL.
     uint IncrementCounter();
 
     /// Load a element from the buffer at the specified location.
@@ -5299,6 +5311,7 @@ struct $(item.name)
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoad))
     T Load<TIndex : __BuiltinIntegerType>(TIndex location);
