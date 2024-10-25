@@ -1068,14 +1068,6 @@ void applyCheckpointSet(
             // primal logic may have already updated the param with a new value, and instead we
             // want the original value.
             builder.setInsertBefore(recomputeInsertBeforeInst);    
-            /*if (auto load = as<IRLoad>(child))
-            {
-                if (load->getPtr()->getOp() == kIROp_Param &&
-                    load->getPtr()->getParent() == func->getFirstBlock())
-                {
-                    builder.setInsertBefore(getParamPreludeBlock(func)->getTerminator());
-                }
-            }*/
             applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, blockIndexInfo, child);
         }
     }
@@ -1191,45 +1183,6 @@ IRInst* emitIndexedLoadAddressForVar(
             // An exception is if the stored inst is in a loop header block where 
             // we use counter directly (since that block runs N+1 times)
             // 
-            
-            /*auto dc = index.diffCountParam;
-            auto dcParent = as<IRBlock>(dc->getParent());
-
-            IRBlock* loopBlock = nullptr;
-            for (auto block : dcParent->getPredecessors())
-            {
-                // Look for loop entry block.
-                if (as<IRLoop>(block->getTerminator()))
-                {
-                    loopBlock = block;
-                    break;
-                }
-            }
-
-            // DC index.
-            UInt dcIndex = 0;
-            for (auto param : dcParent->getParams())
-            {
-                if (param == dc)
-                    break;
-                dcIndex++;
-            }
-
-            // Find the appropriate input parameter..
-            IRLoop* loop = as<IRLoop>(loopBlock->getTerminator());
-            auto primalCounterInitVal = loop->getArg(dcIndex);
-
-            auto primalCounterLastValue = (index.loopHeaderBlock == defBlock) ? 
-                builder->emitAdd(
-                    primalCounterInitVal->getDataType(),
-                    primalCounterInitVal,
-                    builder->getIntValue(builder->getIntType(), 1)) : 
-                primalCounterInitVal;
-            
-            loadAddr = builder->emitElementAddress(
-                loadAddr, 
-                primalCounterLastValue);*/
-
             auto primalCounterCurrValue = index.primalCountParam;
             auto primalCounterLastValue = (index.loopHeaderBlock == defBlock) ? primalCounterCurrValue : 
                 builder->emitSub(
