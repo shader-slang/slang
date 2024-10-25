@@ -787,17 +787,17 @@ namespace SlangRecord
     }
 
 
-    void JsonConsumer::IGlobalSession_compileStdLib(ObjectID objectId, slang::CompileStdLibFlags flags)
+    void JsonConsumer::IGlobalSession_compileCoreModule(ObjectID objectId, slang::CompileCoreModuleFlags flags)
     {
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
 
         {
-            ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::compileStdLib");
+            ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::compileCoreModule");
             {
                 _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%llX", objectId));
-                _writePairNoComma(builder, indent, "flags", CompileStdLibFlagsToString(flags));
+                _writePairNoComma(builder, indent, "flags", CompileCoreModuleFlagsToString(flags));
             }
         }
 
@@ -806,19 +806,19 @@ namespace SlangRecord
     }
 
 
-    void JsonConsumer::IGlobalSession_loadStdLib(ObjectID objectId, const void* stdLib, size_t stdLibSizeInBytes)
+    void JsonConsumer::IGlobalSession_loadCoreModule(ObjectID objectId, const void* coreModule, size_t coreModuleSizeInBytes)
     {
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
-        _writeString(builder, indent, "IGlobalSession::loadStdLib: {\n");
+        _writeString(builder, indent, "IGlobalSession::loadCoreModule: {\n");
 
         {
-            ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::loadStdLib");
+            ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::loadCoreModule");
             {
                 _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%llX", objectId));
-                _writePair(builder, indent, "stdLib-Ignore-Data", Slang::StringUtil::makeStringWithFormat("0x%llX", objectId));
-                _writePairNoComma(builder, indent, "stdLibSizeInBytes", (uint32_t)stdLibSizeInBytes);
+                _writePair(builder, indent, "coreModule-Ignore-Data", Slang::StringUtil::makeStringWithFormat("0x%llX", objectId));
+                _writePairNoComma(builder, indent, "coreModuleSizeInBytes", (uint32_t)coreModuleSizeInBytes);
             }
         }
 
@@ -826,14 +826,14 @@ namespace SlangRecord
         m_fileStream.flush();
     }
 
-    void JsonConsumer::IGlobalSession_saveStdLib(ObjectID objectId, SlangArchiveType archiveType, ObjectID outBlobId)
+    void JsonConsumer::IGlobalSession_saveCoreModule(ObjectID objectId, SlangArchiveType archiveType, ObjectID outBlobId)
     {
         SANITY_CHECK();
         Slang::StringBuilder builder;
         int indent = 0;
 
         {
-            ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::saveStdLib");
+            ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::saveCoreModule");
             {
                 _writePair(builder, indent, "this", Slang::StringUtil::makeStringWithFormat("0x%llX", objectId));
                 _writePair(builder, indent, "archiveType", SlangArchiveTypeToString(archiveType));

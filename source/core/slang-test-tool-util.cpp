@@ -37,12 +37,12 @@ namespace Slang
     }
 }
 
-/* static */bool TestToolUtil::hasDeferredStdLib(Index argc, const char*const* argv)
+/* static */bool TestToolUtil::hasDeferredCoreModule(Index argc, const char*const* argv)
 {
     for (Index i = 0; i < argc; ++i)
     {
         UnownedStringSlice option(argv[i]);
-        if (option == "-load-stdlib" || option == "-compile-stdlib")
+        if (option == "-load-core-module" || option == "-compile-core-module")
         {
             return true;
         }

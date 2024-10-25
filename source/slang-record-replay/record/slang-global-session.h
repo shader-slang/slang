@@ -42,9 +42,9 @@ namespace SlangRecord
             SLANG_NO_THROW SlangResult SLANG_MCALL checkCompileTargetSupport(SlangCompileTarget target) override;
             SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(SlangPassThrough passThrough) override;
 
-            SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib(slang::CompileStdLibFlags flags) override;
-            SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) override;
-            SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
+            SLANG_NO_THROW SlangResult SLANG_MCALL compileCoreModule(slang::CompileCoreModuleFlags flags) override;
+            SLANG_NO_THROW SlangResult SLANG_MCALL loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes) override;
+            SLANG_NO_THROW SlangResult SLANG_MCALL saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
 
             SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 

@@ -91,14 +91,14 @@ namespace SlangRecord
         case ApiCallId::IGlobalSession_checkPassThroughSupport:
             IGlobalSession_checkPassThroughSupport(objectId, parameterBlock);
             break;
-        case ApiCallId::IGlobalSession_compileStdLib:
-            IGlobalSession_compileStdLib(objectId, parameterBlock);
+        case ApiCallId::IGlobalSession_compileCoreModule:
+            IGlobalSession_compileCoreModule(objectId, parameterBlock);
             break;
-        case ApiCallId::IGlobalSession_loadStdLib:
-            IGlobalSession_loadStdLib(objectId, parameterBlock);
+        case ApiCallId::IGlobalSession_loadCoreModule:
+            IGlobalSession_loadCoreModule(objectId, parameterBlock);
             break;
-        case ApiCallId::IGlobalSession_saveStdLib:
-            IGlobalSession_saveStdLib(objectId, parameterBlock);
+        case ApiCallId::IGlobalSession_saveCoreModule:
+            IGlobalSession_saveCoreModule(objectId, parameterBlock);
             break;
         case ApiCallId::IGlobalSession_findCapability:
             IGlobalSession_findCapability(objectId, parameterBlock);
@@ -619,29 +619,29 @@ namespace SlangRecord
         slangRecordLog(LogLevel::Debug, "%s should not be called, it'a not recordd\n", __PRETTY_FUNCTION__);
     }
 
-    void SlangDecoder::IGlobalSession_compileStdLib(ObjectID objectId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_compileCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-        slang::CompileStdLibFlags flags {};
+        slang::CompileCoreModuleFlags flags {};
         ParameterDecoder::decodeEnumValue(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, flags);
 
         for (auto consumer: m_consumers)
         {
-            consumer->IGlobalSession_compileStdLib(objectId, flags);
+            consumer->IGlobalSession_compileCoreModule(objectId, flags);
         }
     }
 
-    void SlangDecoder::IGlobalSession_loadStdLib(ObjectID objectId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_loadCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
-        PointerDecoder<void*> stdLib;
-        ParameterDecoder::decodePointer(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, stdLib);
+        PointerDecoder<void*> coreModule;
+        ParameterDecoder::decodePointer(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize, coreModule);
 
         for (auto consumer: m_consumers)
         {
-            consumer->IGlobalSession_loadStdLib(objectId, stdLib.getPointer(), stdLib.getDataSize());
+            consumer->IGlobalSession_loadCoreModule(objectId, coreModule.getPointer(), coreModule.getDataSize());
         }
     }
 
-    void SlangDecoder::IGlobalSession_saveStdLib(ObjectID objectId, ParameterBlock const& parameterBlock)
+    void SlangDecoder::IGlobalSession_saveCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock)
     {
         SlangArchiveType archiveType {};
         ObjectID outBlobId = 0;
@@ -650,7 +650,7 @@ namespace SlangRecord
 
         for (auto consumer: m_consumers)
         {
-            consumer->IGlobalSession_saveStdLib(objectId, archiveType, outBlobId);
+            consumer->IGlobalSession_saveCoreModule(objectId, archiveType, outBlobId);
         }
     }
 
