@@ -19,7 +19,7 @@ rm -rf ./global-decls
 rm -rf ./attributes
 
 # generate updated pages
-slangc -compile-stdlib -doc
+slangc -compile-core-module -doc
 
 # optional: move generated toc.html to `_includes`
 mv toc.html ./_includes/stdlib-reference-toc.html
@@ -96,7 +96,7 @@ as with `@remarks`.
 - Include examples if needed in the examples section.
 - Provide a see also section with links to related declarations.
 
-After updating comments, build `slangc`, and run `slangc -compile-stdlib -doc` in `stdlib-reference` diretory to update the markdown files for preview.
+After updating comments, build `slangc`, and run `slangc -compile-core-module -doc` in `stdlib-reference` diretory to update the markdown files for preview.
 Your PR only needs to include changes to *.meta.slang files. Once your PR is merged, slang CI will run `slangc` and push the updated markdown files to
 the `stdlib-reference` repo.
 

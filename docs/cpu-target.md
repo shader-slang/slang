@@ -616,7 +616,7 @@ Vector<float, 3> defValue = {};         // Zero initialize such that read access
 values.at(3).x = 10;
 ```
 
-Note that '[] 'would be turned into the `at` function, which takes the default value as a paramter provided by the caller. If this is then written to then only the defValue is corrupted.  Even this mechanism not be quite right, because if we write and then read again from the out of bounds reference in HLSL we may expect that 0 is returned, whereas here we get the value that was last written.
+Note that '[] 'would be turned into the `at` function, which takes the default value as a parameter provided by the caller. If this is then written to then only the defValue is corrupted.  Even this mechanism not be quite right, because if we write and then read again from the out of bounds reference in HLSL we may expect that 0 is returned, whereas here we get the value that was last written.
 
 ## <a id="zero-index"/>Zero index bound checking
 

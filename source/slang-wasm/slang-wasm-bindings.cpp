@@ -17,6 +17,11 @@ EMSCRIPTEN_BINDINGS(slang)
         "getLastError",
         &slang::wgsl::getLastError);
 
+    function(
+        "getCompileTargets",
+        &slang::wgsl::getCompileTargets,
+        return_value_policy::take_ownership());
+
     class_<slang::wgsl::GlobalSession>("GlobalSession")
         .function(
             "createSession",
@@ -40,7 +45,10 @@ EMSCRIPTEN_BINDINGS(slang)
             return_value_policy::take_ownership())
         .function(
             "getEntryPointCode",
-            &slang::wgsl::ComponentType::getEntryPointCode);
+            &slang::wgsl::ComponentType::getEntryPointCode)
+        .function(
+            "getEntryPointCodeSpirv",
+            &slang::wgsl::ComponentType::getEntryPointCodeSpirv);
 
     class_<slang::wgsl::Module, base<slang::wgsl::ComponentType>>("Module")
         .function(
@@ -58,6 +66,12 @@ EMSCRIPTEN_BINDINGS(slang)
         .field("message", &slang::wgsl::Error::message);
 
     class_<slang::wgsl::EntryPoint, base<slang::wgsl::ComponentType>>("EntryPoint");
+
+    class_<slang::wgsl::CompileTargets>("CompileTargets")
+        .function(
+            "findCompileTarget",
+            &slang::wgsl::CompileTargets::findCompileTarget,
+            return_value_policy::take_ownership());
 
     register_vector<slang::wgsl::ComponentType*>("ComponentTypeList");
 }

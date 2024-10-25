@@ -342,7 +342,7 @@ void Session::writeStdlibDoc(String config)
     }
 }
 
-SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
+SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlags)
 {
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
@@ -369,7 +369,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     auto stdLibSrcBlob = StringBlob::moveCreate(stdLibSrcBuilder.produceString());
     addBuiltinSource(coreLanguageScope, "core", stdLibSrcBlob);
 
-    if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
+    if (compileFlags & slang::CompileCoreModuleFlag::WriteDocumentation)
     {
         // Load config file first.
         String configText;
@@ -393,7 +393,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     return SLANG_OK;
 }
 
-SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
+SlangResult Session::loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes)
 {
     SLANG_PROFILE;
 
@@ -407,7 +407,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
     // Make a file system to read it from
     ComPtr<ISlangFileSystemExt> fileSystem;
-    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(coreModule, coreModuleSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
@@ -416,7 +416,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     return SLANG_OK;
 }
 
-SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob)
+SlangResult Session::saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.getCount() == 0)
     {
@@ -757,13 +757,11 @@ SLANG_NO_THROW void SLANG_MCALL Session::getLanguagePrelude(
     ISlangBlob** outPrelude)
 {
     SourceLanguage sourceLanguage = SourceLanguage(inSourceLanguage);
-    SLANG_ASSERT(int(sourceLanguage) > int(SourceLanguage::Unknown) && int(sourceLanguage) < int(SourceLanguage::CountOf));
-
-    SLANG_ASSERT(sourceLanguage != SourceLanguage::Unknown);
 
     *outPrelude = nullptr;
     if (sourceLanguage != SourceLanguage::Unknown)
     {
+        SLANG_ASSERT(int(sourceLanguage) > int(SourceLanguage::Unknown) && int(sourceLanguage) < int(SourceLanguage::CountOf));
         *outPrelude = Slang::StringUtil::createStringBlob(m_languagePreludes[int(sourceLanguage)]).detach();
     }
 }
@@ -1369,14 +1367,66 @@ DeclRef<GenericDecl> getGenericParentDeclRef(
     // Create substituted parent decl ref.
     auto decl = declRef.getDecl();
 
-    while (!as<GenericDecl>(decl))
+    while (decl && !as<GenericDecl>(decl))
     {
         decl = decl->parentDecl;
+    }
+
+    if (!decl)
+    {
+        // No generic parent
+        return DeclRef<GenericDecl>();
     }
 
     auto genericDecl = as<GenericDecl>(decl);
     auto genericDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, DeclRef(genericDecl)).as<GenericDecl>();
     return substituteDeclRef(SubstitutionSet(declRef), astBuilder, genericDeclRef).as<GenericDecl>();
+}
+
+bool Linkage::isSpecialized(DeclRef<Decl> declRef)
+{
+    // For now, we only support two 'states': fully applied or not at all.
+    // If we add support for partial specialization, we will need to update this logic.
+    // 
+    // If it's not specialized, then declRef will be the one with default substitutions.
+    //
+    SemanticsVisitor visitor(getSemanticsForReflection());
+
+    auto decl = declRef.getDecl();
+    while (decl && !as<GenericDecl>(decl))
+    {
+        decl = decl->parentDecl;
+    }
+
+    if(!decl)
+        return true; // no generics => always specialized
+    
+    auto defaultArgs = getDefaultSubstitutionArgs(getASTBuilder(), &visitor, as<GenericDecl>(decl));
+    auto currentArgs = SubstitutionSet(declRef).findGenericAppDeclRef(as<GenericDecl>(decl))->getArgs();
+    
+    if (defaultArgs.getCount() != currentArgs.getCount()) // should really never happen.
+        return true;
+
+    for (Index i = 0; i < defaultArgs.getCount(); ++i)
+    {
+        if (defaultArgs[i] != currentArgs[i])
+            return true;
+    }
+
+    return false;
+}
+
+bool isFuncGeneric(DeclRef<Decl> declRef)
+{
+    if (auto funcDecl = as<FuncDecl>(declRef.getDecl()))
+    {
+        if (funcDecl->parentDecl && as<GenericDecl>(funcDecl->parentDecl))
+        {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 DeclRef<Decl> Linkage::specializeWithArgTypes(
@@ -1387,16 +1437,22 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     SemanticsVisitor visitor(getSemanticsForReflection());
     visitor = visitor.withSink(sink);
 
-    ASTBuilder* astBuilder = getASTBuilder();
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
     
     if (auto declRefFuncExpr = as<DeclRefExpr>(funcExpr))
     {
-        auto genericDeclRefExpr = astBuilder->create<DeclRefExpr>();
-        genericDeclRefExpr->declRef = getGenericParentDeclRef(
-            getASTBuilder(),
-            &visitor,
-            declRefFuncExpr->declRef);
-        funcExpr = genericDeclRefExpr;
+        if (isFuncGeneric(declRefFuncExpr->declRef) && !isSpecialized(declRefFuncExpr->declRef))
+        {
+            if (auto genericDeclRef = getGenericParentDeclRef(
+                getCurrentASTBuilder(),
+                &visitor,
+                declRefFuncExpr->declRef))
+            {
+                auto genericDeclRefExpr = getCurrentASTBuilder()->create<DeclRefExpr>();
+                genericDeclRefExpr->declRef = genericDeclRef;
+                funcExpr = genericDeclRefExpr;
+            }
+        }
     }
 
     List<Expr*> argExprs;
@@ -1407,17 +1463,19 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
         // Create an 'empty' expr with the given type. Ideally, the expression itself should not matter
         // only its checked type.
         //
-        auto argExpr = astBuilder->create<VarExpr>();
+        auto argExpr = getCurrentASTBuilder()->create<VarExpr>();
         argExpr->type = argType;
+        argExpr->type.isLeftValue = true;
         argExprs.add(argExpr);
     }
 
     // Construct invoke expr.
-    auto invokeExpr = astBuilder->create<InvokeExpr>();
+    auto invokeExpr = getCurrentASTBuilder()->create<InvokeExpr>();
     invokeExpr->functionExpr = funcExpr;
     invokeExpr->arguments = argExprs;
 
     auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
+
     return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
 }
 

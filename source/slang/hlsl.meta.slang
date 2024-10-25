@@ -7,6 +7,8 @@ __intrinsic_op($(kIROp_RequireGLSLExtension))
 void __requireGLSLExtension(String extensionName);
 
 //@public:
+/// Represents an interface for buffer data layout.
+/// This interface is used as a base for defining specific data layouts for buffers.
 [sealed]
 interface IBufferDataLayout
 {
@@ -6960,6 +6962,10 @@ vector<T,N> cospi(vector<T,N> x)
 
 
 /// Population count.
+/// Counts the number of set bits in the binary representation of a value.
+/// @param value The value to count bits in.
+/// @return The number of bits in the binary representation of `value` that are set to one.
+/// @remarks For SPIR-V, this function maps to `OpBitCount`.
 /// @category bitops
 [__readNone]
 [ForceInline]
@@ -8034,6 +8040,14 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 }
 
 /// Find first set bit starting at high bit and working down.
+/// @param value The value to find set bits in.
+/// @return The bit index number of the most significant bit,
+///         or returns -1 if `value` is either 0 if `value is
+///         a signed type and equal to -1.
+/// @remarks If `value` is unsigned, or signed with positive value, the bit index returned is the highest 1-bit.
+///          If `value` is signed with negative value, the bit index returned is the highest 0-bit.
+///          For SPIR-V, this function maps to GLSL extended instruction `FindSMsb` if `value` is signed,
+///          or `FindUMsb` if `value` is unsigned.
 /// @category bitops Bit operation functions
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -8110,6 +8124,10 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
 }
 
 /// Find first set bit starting at low bit and working up.
+/// @param value The value to find set bits in.
+/// @return The bit index number of the least significant set bit,
+///         or all ones (-1 when interpretted as signed) if `value` is 0.
+/// @remarks For SPIR-V, this function maps to GLSL extended instruction `FindILsb`.
 /// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -11096,6 +11114,9 @@ T refract(T i, T n, T eta)
 }
 
 /// Reverse order of bits.
+/// @param value The value to reverse bits of.
+/// @return The bits of `value`, reversed such that bit n of the result is equal to bit (width - 1 - n) of `value`.
+/// @remarks For SPIR-V, this function maps to `OpBitReverse`.
 /// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]

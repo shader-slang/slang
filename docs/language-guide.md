@@ -26,7 +26,7 @@ New Features
 
 ### Import Declarations
 
-In order to support better software modularity, and also to deal with the issue of how to integrate shader libraries written in Slang into other langauges, Slang introduces an `import` declaration construct.
+In order to support better software modularity, and also to deal with the issue of how to integrate shader libraries written in Slang into other languages, Slang introduces an `import` declaration construct.
 
 The basic idea is that if you write a file `foo.slang` like this:
 

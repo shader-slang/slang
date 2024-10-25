@@ -19,7 +19,7 @@ set(stdlib_generated_header
 add_custom_command(
     OUTPUT ${stdlib_generated_header}
     COMMAND
-        slang-bootstrap -archive-type riff-lz4 -save-stdlib-bin-source
+        slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
         ${stdlib_generated_header}
     DEPENDS slang-bootstrap
     VERBATIM
@@ -87,7 +87,8 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(generate_stdlib_headers DEPENDS ${stdlib_meta_generated_headers})
+add_custom_target(generate-stdlib-headers DEPENDS ${stdlib_meta_generated_headers})
+set_target_properties(generate-stdlib-headers PROPERTIES FOLDER generated)
 
 #
 # Generate embedded stdlib source
@@ -108,7 +109,7 @@ set(stdlib_source_common_args
     EXPLICIT_SOURCE 
       ./slang-embedded-stdlib-source.cpp
       ${stdlib_meta_generated_headers}
-    REQUIRES generate_stdlib_headers
+    REQUIRES generate-stdlib-headers
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_STDLIB_SOURCE
     INCLUDE_DIRECTORIES_PRIVATE 
       ${stdlib_meta_output_dir}

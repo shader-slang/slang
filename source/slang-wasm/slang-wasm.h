@@ -1,6 +1,8 @@
 #pragma once
 
 #include <slang.h>
+#include <unordered_map>
+#include <emscripten/val.h>
 
 namespace slang
 {
@@ -20,6 +22,17 @@ public:
 
 Error getLastError();
 
+class CompileTargets
+{
+public:
+    CompileTargets();
+    int findCompileTarget(const std::string& name);
+private:
+    std::unordered_map<std::string, SlangCompileTarget> m_compileTargetMap;
+};
+
+CompileTargets* getCompileTargets();
+
 class ComponentType
 {
 public:
@@ -30,6 +43,7 @@ public:
     ComponentType* link();
 
     std::string getEntryPointCode(int entryPointIndex, int targetIndex);
+    emscripten::val getEntryPointCodeSpirv(int entryPointIndex, int targetIndex);
 
     slang::IComponentType* interface() const {return m_interface;}
 
@@ -93,7 +107,7 @@ public:
     GlobalSession(slang::IGlobalSession* interface)
         : m_interface(interface) {}
 
-    Session* createSession();
+    Session* createSession(int compileTarget);
 
     slang::IGlobalSession* interface() const {return m_interface;}
 
