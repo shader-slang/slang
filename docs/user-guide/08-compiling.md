@@ -266,19 +266,19 @@ The `slangc` compiler provides a few conveniences for command-line compilation:
 You can compile a `.slang` file into a binary IR module. For example, given the following source:
 
 ```hlsl
-// library.slang
+// my_library.slang
 float myLibFunc() { return 5.0; }
 ```
 
-You can compile it into `library.slang-module` with the following slangc command line:
+You can compile it into `my_library.slang-module` with the following slangc command line:
 
 ```bat
-slangc library.slang -o library.slang-module
+slangc my_library.slang -o my_library.slang-module
 ```
 
-This allows you to deploy just the `library.slang-module` file to users of the library, and it can be consumed in the user code with the same `import` syntax:
+This allows you to deploy just the `my_library.slang-module` file to users of the module, and it can be consumed in the user code with the same `import` syntax:
 ```hlsl
-import library;
+import my_library;
 ```
 
 ### More Options
@@ -329,8 +329,8 @@ Slang::ComPtr<IGlobalSession> globalSession;
 createGlobalSession(globalSession.writeRef());
 ```
 
-When a global session is created, the Slang system will load its internal representation of the _standard library_ that the compiler provides to user code.
-The standard library can take a significant amount of time to load, so applications are advised to use a single global session if possible, rather than creating and then disposing of one for each compile.
+When a global session is created, the Slang system will load its internal representation of the _core module_ that the compiler provides to user code.
+The core module can take a significant amount of time to load, so applications are advised to use a single global session if possible, rather than creating and then disposing of one for each compile.
 
 > #### Note ####
 > Currently, the global session type is *not* thread-safe.

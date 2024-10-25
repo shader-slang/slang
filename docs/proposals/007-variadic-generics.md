@@ -29,8 +29,8 @@ Background
 ----------
 
 We have several cases that will benefit from variadic generics. One simplest example is the `printf` function is currently
-defined to have different overloads for each number of arguments. The downside of duplicating overloads is the bloating standard
-library size and a predefined upper limit of argument count. If users are to build their own functions that wraps the `printf`
+defined to have different overloads for each number of arguments. The downside of duplicating overloads is the bloating the core
+module size and a predefined upper limit of argument count. If users are to build their own functions that wraps the `printf`
 function, they will have to define a set of overloads for each number of arguments too, further bloating code size.
 
 Some of our users would like to implement the functor idiom in their shader code with interfaces. This is almost possible

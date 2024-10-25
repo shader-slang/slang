@@ -84,7 +84,7 @@ Proposed Approach
 We propose a modest starting point for error handling in Slang that can be extended over time.
 The model borrows heavily from Swift, but also focuses on strongly-typed errors.
 
-The standard library will provide a built-in interface for errors, initially empty:
+The core module will provide a built-in interface for errors, initially empty:
 
 ```
 interface IError {}
