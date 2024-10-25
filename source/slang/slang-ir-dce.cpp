@@ -402,6 +402,9 @@ bool removeStoresIntoField(IRStructField* field)
 
 bool trimMakeStructOperands(IRStructField* field)
 {
+    // TODO: This can be sped up by considering the full set of fields instead
+    // of one at a time.
+
     bool changed = false;
     auto structType = cast<IRStructType>(field->getParent());
 
@@ -445,6 +448,11 @@ bool trimMakeStructOperands(IRStructField* field)
         builder.setInsertAfter(makeStruct);
         auto newMakeStruct = builder.emitMakeStruct(makeStruct->getFullType(), newOperands);
         makeStruct->replaceUsesWith(newMakeStruct);
+    }
+
+    for (auto makeStruct : workList)
+    {
+        makeStruct->removeAndDeallocate();
     }
 
     return changed;
