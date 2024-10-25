@@ -56,7 +56,7 @@ generator(
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE 
         prelude 
-        slang-without-embedded-stdlib 
+        slang-without-embedded-core-module 
         slang-capability-lookup 
         slang-lookup-tables 
         Threads::Threads

@@ -1,7 +1,7 @@
-#include "slang-stdlib-textures.h"
+#include "slang-core-module-textures.h"
 #include <spirv/unified1/spirv.h>
 
-#define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"slang-stdlib-textures.cpp\"\n"
+#define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"slang-core-module-textures.cpp\"\n"
 
 namespace Slang
 {
