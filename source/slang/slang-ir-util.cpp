@@ -971,6 +971,24 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
     }
 }
 
+IRInst* tryFindBasePtr(IRInst* inst, IRInst* parentFunc)
+{
+    // Keep going up the tree until we find a variable.
+    switch (inst->getOp())
+    {
+    case kIROp_Var:
+        return getParentFunc(inst) == parentFunc ? inst : nullptr;
+    case kIROp_Param:
+        return getParentFunc(inst) == parentFunc ? inst : nullptr;
+    case kIROp_GetElementPtr:
+        return tryFindBasePtr(as<IRGetElementPtr>(inst)->getBase(), parentFunc);
+    case kIROp_FieldAddress:
+        return tryFindBasePtr(as<IRFieldAddress>(inst)->getBase(), parentFunc);
+    default:
+        return nullptr;
+    }
+}
+
 bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions options)
 {
     // If the function has no side effect and is not writing to any outputs,
@@ -995,7 +1013,13 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
         if (!module)
             return false;
 
-        if (arg->getOp() == kIROp_Var && getParentFunc(arg) == parentFunc)
+        auto basePtr = tryFindBasePtr(arg, parentFunc);
+        
+        // If its a write into a function parameter, we can't treat it as side effect free.
+        if (as<IRParam>(basePtr))
+            return false; 
+
+        if (auto var = as<IRVar>(basePtr))
         {
             IRDominatorTree* dom = nullptr;
             if (isBitSet(options, SideEffectAnalysisOptions::UseDominanceTree))
@@ -1010,7 +1034,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
             // 
             // A more aggresive test can check all other address uses reachable from the call site
             // and see if any of them are aliasing with the argument.
-            for (auto use = arg->firstUse; use; use = use->nextUse)
+            for (auto use = var->firstUse; use; use = use->nextUse)
             {
                 if (as<IRDecoration>(use->getUser()))
                     continue;
@@ -1046,7 +1070,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
                         // If we have dominator tree available, use it to check if the call is inside a loop.
                         auto callBlock = as<IRBlock>(call->getParent());
                         if (!callBlock) return false;
-                        auto varBlock = as<IRBlock>(arg->getParent());
+                        auto varBlock = as<IRBlock>(var->getParent());
                         if (!varBlock) return false;
                         auto idom = callBlock;
                         while (idom != varBlock)
