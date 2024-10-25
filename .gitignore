@@ -68,7 +68,7 @@ prelude/*.h.cpp
 /docs/Gemfile.lock
 /docs/Gemfile
 /docs/stdlib-reference
-/source/slang/slang-stdlib-generated.h
+/source/slang/slang-core-module-generated.h
 
 /examples/heterogeneous-hello-world/shader.cpp
 /multiple-definitions.hlsl
