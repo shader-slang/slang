@@ -611,8 +611,8 @@ The only functions which are currently thread safe are
 ```C++
 SlangSession* spCreateSession(const char* deprecated);
 SlangResult slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
-SlangResult slang_createGlobalSessionWithoutStdLib(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
-ISlangBlob* slang_getEmbeddedStdLib();
+SlangResult slang_createGlobalSessionWithoutCoreModule(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
+ISlangBlob* slang_getEmbeddedCoreModule();
 SlangResult slang::createGlobalSession(slang::IGlobalSession** outGlobalSession);
 const char* spGetBuildTagString();
 ```
