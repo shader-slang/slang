@@ -138,6 +138,14 @@ SpvInst* emitOpDebugValue(SpvInstParent* parent, IRInst* inst, const T& idResult
 }
 
 template<typename T, typename Ts>
+SpvInst* emitOpDebugDeclare(SpvInstParent* parent, IRInst* inst, const T& idResultType, SpvInst* set, SpvInst* debugLocalVar, IRInst* actualLocalVar, SpvInst* expression, const Ts& indices)
+{
+    static_assert(isSingular<T>);
+    static_assert(isPlural<Ts>);
+
+    return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(28), debugLocalVar, actualLocalVar, expression, indices);
+}
+template<typename T, typename Ts>
 SpvInst* emitOpDebugExpression(SpvInstParent* parent, IRInst* inst, const T& idResultType, SpvInst* set, const Ts& operations)
 {
     static_assert(isSingular<T>);

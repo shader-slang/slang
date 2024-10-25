@@ -3325,21 +3325,20 @@ namespace Slang
         if (argIndex)
         {
             IRInst* args[] = { source, line, col, argIndex };
-            return emitIntrinsicInst(type, kIROp_DebugVar, 4, args);
+            return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
         }
         else
         {
             IRInst* args[] = { source, line, col };
-            return emitIntrinsicInst(type, kIROp_DebugVar, 3, args);
+            return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 3, args);
         }
     }
 
-    IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue, ArrayView<IRInst*> accessChain)
+    IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
     {
         List<IRInst*> args;
         args.add(debugVar);
         args.add(debugValue);
-        args.addRange(accessChain);
         return emitIntrinsicInst(getVoidType(), kIROp_DebugValue, (UInt)args.getCount(), args.getBuffer());
     }
 
