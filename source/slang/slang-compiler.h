@@ -3274,7 +3274,7 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL checkCompileTargetSupport(SlangCompileTarget target) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(SlangPassThrough passThrough) override;
 
-        void writeStdlibDoc(String config);
+        void writeCoreModuleDoc(String config);
         SLANG_NO_THROW SlangResult SLANG_MCALL compileCoreModule(slang::CompileCoreModuleFlags flags) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
@@ -3312,7 +3312,7 @@ namespace Slang
         Scope* autodiffLanguageScope = nullptr;
 
         ModuleDecl* baseModuleDecl = nullptr;
-        List<RefPtr<Module>> stdlibModules;
+        List<RefPtr<Module>> coreModules;
 
         SourceManager   builtinSourceManager;
 
@@ -3336,8 +3336,8 @@ namespace Slang
 
         RefPtr<ASTBuilder> globalAstBuilder;
 
-        // Generated code for stdlib, etc.
-        String stdlibPath;
+        // Generated code for core module, etc.
+        String coreModulePath;
 
         ComPtr<ISlangBlob> coreLibraryCode;
         //ComPtr<ISlangBlob> slangLibraryCode;
@@ -3345,7 +3345,7 @@ namespace Slang
         ComPtr<ISlangBlob> glslLibraryCode;
         ComPtr<ISlangBlob> autodiffLibraryCode;
 
-        String  getStdlibPath();
+        String  getCoreModulePath();
 
         ComPtr<ISlangBlob> getCoreLibraryCode();
         ComPtr<ISlangBlob> getHLSLLibraryCode();
@@ -3375,7 +3375,7 @@ namespace Slang
             /// Get the prelude associated with the language
         const String& getPreludeForLanguage(SourceLanguage language) { return m_languagePreludes[int(language)]; }
 
-            /// Get the built in linkage -> handy to get the stdlibs from
+            /// Get the built in linkage -> handy to get the core module from
         Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
         Name* getCompletionRequestTokenName() const { return m_completionTokenName; }
@@ -3412,7 +3412,7 @@ namespace Slang
 
         SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
 
-            /// Linkage used for all built-in (stdlib) code.
+            /// Linkage used for all built-in (core module) code.
         RefPtr<Linkage> m_builtinLinkage;
 
         String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];         ///< Paths for each pass through

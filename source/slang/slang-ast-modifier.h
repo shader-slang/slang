@@ -24,7 +24,7 @@ class ParamModifier : public Modifier { SLANG_AST_CLASS(ParamModifier)};
 class ExternModifier : public Modifier { SLANG_AST_CLASS(ExternModifier)};
 class HLSLExportModifier : public Modifier { SLANG_AST_CLASS(HLSLExportModifier) };
 class TransparentModifier : public Modifier { SLANG_AST_CLASS(TransparentModifier)};
-class FromStdLibModifier : public Modifier { SLANG_AST_CLASS(FromStdLibModifier)};
+class FromCoreModuleModifier : public Modifier { SLANG_AST_CLASS(FromCoreModuleModifier)};
 class PrefixModifier : public Modifier { SLANG_AST_CLASS(PrefixModifier)};
 class PostfixModifier : public Modifier { SLANG_AST_CLASS(PostfixModifier)};
 class ExportedModifier : public Modifier { SLANG_AST_CLASS(ExportedModifier)};
@@ -1194,7 +1194,7 @@ class AnyValueSizeAttribute : public Attribute
     int32_t size;
 };
 
-    /// This is a stop-gap solution to break overload ambiguity in stdlib.
+    /// This is a stop-gap solution to break overload ambiguity in the core module.
     /// When there is a function overload ambiguity, the compiler will pick the one with higher rank
     /// specified by this attribute. An overload without this attribute will have a rank of 0.
     /// In the future, we should enhance our type system to take into account the "specialized"-ness

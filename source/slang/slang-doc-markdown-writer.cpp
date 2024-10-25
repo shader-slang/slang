@@ -1104,7 +1104,7 @@ void DocMarkdownWriter::_appendRequirements(const Requirement& requirement)
 
         // TODO: We should probably print the capabilities for each stage set if the requirements differ between
         // different stages, but for now we'll just print the first one, assuming the rest are the same.
-        // This is currently true for most if not all of our stdlib decls.
+        // This is currently true for most if not all of our core module decls.
         //
         if (targetSet.second.shaderStageSets.getCount() > 0 &&
             targetSet.second.shaderStageSets.begin()->second.atomSet.has_value())

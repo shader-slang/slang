@@ -113,7 +113,7 @@ struct SynthesizeActiveMaskForModuleContext
         // generate here since it matches the current
         // definition of `WaveMask` in the standard library.
         //
-        // TODO: If/when the `WaveMask` type in the stdlib is
+        // TODO: If/when the `WaveMask` type in the core module is
         // made opaque, this should use the opaque type instead,
         // so that the pass is compatible with all targets that
         // support  a wave mask.

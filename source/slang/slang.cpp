@@ -185,7 +185,7 @@ void Session::init()
     // Create scopes for various language builtins.
     //
     // TODO: load these on-demand to avoid parsing
-    // stdlib code for languages the user won't use.
+    // the core module code for languages the user won't use.
 
     baseLanguageScope = builtinAstBuilder->create<Scope>();
 
@@ -312,7 +312,7 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
     return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
 }
 
-void Session::writeStdlibDoc(String config)
+void Session::writeCoreModuleDoc(String config)
 {
     ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();
     SourceManager* sourceManager = getBuiltinSourceManager();
@@ -322,10 +322,10 @@ void Session::writeStdlibDoc(String config)
     List<String> docStrings;
 
     // For all the modules add their doc output to docStrings
-    for (Module* stdlibModule : stdlibModules)
+    for (Module* m : coreModules)
     {
         RefPtr<ASTMarkup> markup(new ASTMarkup);
-        ASTMarkupUtil::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
+        ASTMarkupUtil::extract(m->getModuleDecl(), sourceManager, &sink, markup);
 
         DocMarkdownWriter writer(markup, astBuilder, &sink);
         auto rootPage = writer.writeAll(config.getUnownedSlice());
@@ -348,26 +348,26 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
 
     if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
-        // Already have a StdLib loaded
+        // Already have a core module loaded
         return SLANG_FAIL;
     }
 
 #ifdef _DEBUG
-    // Print a message in debug builds to notice the user that compiling the stdlib
+    // Print a message in debug builds to notice the user that compiling the core module
     // can take a while.
     time_t beginTime;
     time(&beginTime);
-    fprintf(stderr, "Compiling stdlib on debug build, this can take a while.\n");
+    fprintf(stderr, "Compiling core module on debug build, this can take a while.\n");
 #endif
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
-    StringBuilder stdLibSrcBuilder;
-    stdLibSrcBuilder
+    StringBuilder coreModuleSrcBuilder;
+    coreModuleSrcBuilder
         << (const char*)getCoreLibraryCode()->getBufferPointer()
         << (const char*)getHLSLLibraryCode()->getBufferPointer()
         << (const char*)getAutodiffLibraryCode()->getBufferPointer();
-    auto stdLibSrcBlob = StringBlob::moveCreate(stdLibSrcBuilder.produceString());
-    addBuiltinSource(coreLanguageScope, "core", stdLibSrcBlob);
+    auto coreModuleSrcBlob = StringBlob::moveCreate(coreModuleSrcBuilder.produceString());
+    addBuiltinSource(coreLanguageScope, "core", coreModuleSrcBlob);
 
     if (compileFlags & slang::CompileCoreModuleFlag::WriteDocumentation)
     {
@@ -379,7 +379,7 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
         }
         else
         {
-            writeStdlibDoc(configText);
+            writeCoreModuleDoc(configText);
         }
     }
 
@@ -388,7 +388,7 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
 #ifdef _DEBUG
     time_t endTime;
     time(&endTime);
-    fprintf(stderr, "Compiling stdlib took %.2f seconds.\n", difftime(endTime, beginTime));
+    fprintf(stderr, "Compiling core module took %.2f seconds.\n", difftime(endTime, beginTime));
 #endif
     return SLANG_OK;
 }
@@ -399,7 +399,7 @@ SlangResult Session::loadCoreModule(const void* coreModule, size_t coreModuleSiz
 
     if (m_builtinLinkage->mapNameToLoadedModules.getCount())
     {
-        // Already have a StdLib loaded
+        // Already have a core module loaded
         return SLANG_FAIL;
     }
 
@@ -521,7 +521,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
 
         if (moduleDecl)
         {
-            if (isFromStdLib(moduleDecl))
+            if (isFromCoreModule(moduleDecl))
             {
                 registerBuiltinDecls(this, moduleDecl);
             }
@@ -551,7 +551,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
 
         // We need to retain this AST so that we can use it in other code
         // (Note that the `Scope` type does not retain the AST it points to)
-        stdlibModules.add(module);
+        coreModules.add(module);
     }
 
     return SLANG_OK;
@@ -2951,7 +2951,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
     //
     if( m_isStandardLibraryCode )
     {
-        translationUnitSyntax->modifiers.first = astBuilder->create<FromStdLibModifier>();
+        translationUnitSyntax->modifiers.first = astBuilder->create<FromCoreModuleModifier>();
     }
 
     // We use a custom handler for preprocessor callbacks, to
@@ -5925,7 +5925,7 @@ void Session::addBuiltinSource(
         SLANG_UNEXPECTED("error in Slang standard library");
     }
     
-    // Compiling stdlib should not yield any warnings.
+    // Compiling the core module should not yield any warnings.
     SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
 
     // Extract the AST for the code we just parsed
@@ -5957,7 +5957,7 @@ void Session::addBuiltinSource(
 
     // We need to retain this AST so that we can use it in other code
     // (Note that the `Scope` type does not retain the AST it points to)
-    stdlibModules.add(module);
+    coreModules.add(module);
 }
 
 Session::~Session()
@@ -5970,7 +5970,7 @@ Session::~Session()
     globalAstBuilder.setNull();
 
     // destroy modules next
-    stdlibModules = decltype(stdlibModules)();
+    coreModules = decltype(coreModules)();
 }
 
 }

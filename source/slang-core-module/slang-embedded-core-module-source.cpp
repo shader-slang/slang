@@ -288,7 +288,7 @@ namespace Slang
         if (!coreLibraryCode)
         {
             StringBuilder sb;
-            const String path = getStdlibPath();
+            const String path = getCoreModulePath();
             #include "core.meta.slang.h"
             coreLibraryCode = StringBlob::moveCreate(sb);
         }
@@ -301,7 +301,7 @@ namespace Slang
 #if SLANG_EMBED_CORE_MODULE_SOURCE
         if (!hlslLibraryCode)
         {
-            const String path = getStdlibPath();
+            const String path = getCoreModulePath();
             StringBuilder sb;
             #include "hlsl.meta.slang.h"
             hlslLibraryCode = StringBlob::moveCreate(sb);
@@ -315,7 +315,7 @@ namespace Slang
 #if SLANG_EMBED_CORE_MODULE_SOURCE
         if (!autodiffLibraryCode)
         {
-            const String path = getStdlibPath();
+            const String path = getCoreModulePath();
             StringBuilder sb;
             #include "diff.meta.slang.h"
             autodiffLibraryCode = StringBlob::moveCreate(sb);
@@ -328,7 +328,7 @@ namespace Slang
     {
         if (!glslLibraryCode)
         {
-            const String path = getStdlibPath();
+            const String path = getCoreModulePath();
             StringBuilder sb;
             #include "glsl.meta.slang.h"
             glslLibraryCode = StringBlob::moveCreate(sb);

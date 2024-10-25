@@ -655,11 +655,11 @@ ModuleDecl* findModuleDecl(Decl* decl)
     return nullptr;
 }
 
-bool isFromStdLib(Decl* decl)
+bool isFromCoreModule(Decl* decl)
 {
     for (auto dd = decl; dd; dd = dd->parentDecl)
     {
-        if (dd->hasModifier<FromStdLibModifier>())
+        if (dd->hasModifier<FromCoreModuleModifier>())
             return true;
     }
     return false;
@@ -707,7 +707,7 @@ bool isEffectivelyStatic(
     Decl*           decl,
     ContainerDecl*  parentDecl);
 
-bool isStdLibMemberFuncDecl(
+bool isCoreModuleMemberFuncDecl(
     Decl*   decl);
 
 // Ensure that a version of the given declaration has been emitted to the IR
@@ -1442,10 +1442,10 @@ static void addLinkageDecoration(
 
     // Obfuscate the mangled names if necessary.
     // 
-    // Care is needed around stdlib as it is only compiled once and *without* obfuscation, 
-    // so any linkage name to stdlib *shouldn't* have obfuscation applied to it.
+    // Care is needed around the core module as it is only compiled once and *without* obfuscation, 
+    // so any linkage name to the core module *shouldn't* have obfuscation applied to it.
     if (context->shared->m_obfuscateCode && 
-        !isFromStdLib(decl))
+        !isFromCoreModule(decl))
     {
         const auto obfuscatedName = getHashedName(mangledName.getUnownedSlice());
     
@@ -9549,7 +9549,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                if( isStdLibMemberFuncDecl(decl) )
+                if( isCoreModuleMemberFuncDecl(decl) )
                 {
                     // We will mark member functions by appending a `.` to the
                     // start of their name.
@@ -9623,8 +9623,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
-        /// Is `decl` a member function (or effectively a member function) when considered as a stdlib declaration?
-    bool isStdLibMemberFuncDecl(
+        /// Is `decl` a member function (or effectively a member function) when considered as a core module declaration?
+    bool isCoreModuleMemberFuncDecl(
         Decl*   inDecl)
     {
         auto decl = as<CallableDecl>(inDecl);
@@ -9670,7 +9670,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return false;
     }
 
-        /// Add a "catch-all" decoration for a stdlib function if it would be needed
+        /// Add a "catch-all" decoration for a core module function if it would be needed
     void addCatchAllIntrinsicDecorationIfNeeded(
         IRInst*             irInst,
         FunctionDeclBase*   decl)
@@ -9686,7 +9686,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // for marking things as target intrinsics if they want to go down
         // that (unsupported) route.
         //
-        if(!isFromStdLib(decl))
+        if(!isFromCoreModule(decl))
             return;
 
         // No need to worry about functions that lower to intrinsic IR opcodes
@@ -9719,7 +9719,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // (the assumption is that a catch-all definition of a member function
         // is itself implemented as a member function).
         //
-        if( isStdLibMemberFuncDecl(decl) )
+        if( isCoreModuleMemberFuncDecl(decl) )
         {
             // We will mark member functions by appending a `.` to the
             // start of their name.

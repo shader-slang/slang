@@ -266,7 +266,7 @@ namespace Slang
             return;
 
         // At this point, we should no longer need to care any `WrapExistential` insts,
-        // although they could still exist in the IR in order to call generic stdlib functions,
+        // although they could still exist in the IR in order to call generic core module functions,
         // e.g. RWStucturedBuffer.Load(WrapExistential(sbuffer, type), index).
         // We should remove them now.
         stripWrapExistential(module);
@@ -289,7 +289,7 @@ namespace Slang
             return;
 
         // At this point, we should no longer need to care any `WrapExistential` insts,
-        // although they could still exist in the IR in order to call generic stdlib functions,
+        // although they could still exist in the IR in order to call generic core module functions,
         // e.g. RWStucturedBuffer.Load(WrapExistential(sbuffer, type), index).
         // We should remove them now.
         stripWrapExistential(module);

@@ -3039,7 +3039,7 @@ namespace Slang
         // seemingly add overhead to checking things other than
         // the standard library.
         //
-        if(isFromStdLib(moduleDecl))
+        if(isFromCoreModule(moduleDecl))
         {
             _registerBuiltinDeclsRec(getSession(), moduleDecl);
         }
@@ -4924,7 +4924,7 @@ namespace Slang
         // code to dispatch to the special-case logic used when doing
         // semantic checking for member expressions.
         //
-        // Note: an alternative would be to change the stdlib declarations
+        // Note: an alternative would be to change the core module declarations
         // of vectors/matrices so that all the swizzles are defined as
         // `property` declarations. There are some C++ math libraries (like GLM)
         // that implement swizzle syntax by a similar approach of statically
@@ -5127,7 +5127,7 @@ namespace Slang
             else
             {
                 // While there are other kinds of accessors than `get` and `set`,
-                // those are currently only reserved for stdlib-internal use.
+                // those are currently only reserved for the internal use in the core module.
                 // We will not bother with synthesis for those cases.
                 //
                 return false;
@@ -5408,7 +5408,7 @@ namespace Slang
             else
             {
                 // While there are other kinds of accessors than `get` and `set`,
-                // those are currently only reserved for stdlib-internal use.
+                // those are currently only reserved for the internal use in the core module.
                 // We will not bother with synthesis for those cases.
                 //
                 return false;
@@ -6997,7 +6997,7 @@ namespace Slang
                 continue;
             }
 
-            if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) && !isFromStdLib(decl))
+            if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) && !isFromCoreModule(decl))
             {
                 // Force add IDefaultInitializable to any struct missing (transitively) `IDefaultInitializable`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
@@ -9850,7 +9850,7 @@ namespace Slang
             // as part of our standard-library modules are always visible,
             // even if they are not explicit `import`ed into user code.
             //
-            for( auto module : getSession()->stdlibModules )
+            for( auto module : getSession()->coreModules )
             {
                 _addCandidateExtensionsFromModule(module->getModuleDecl());
             }
@@ -10101,7 +10101,7 @@ namespace Slang
         {
             m_associatedDeclListsBuilt = true;
 
-            for (auto module : getSession()->stdlibModules)
+            for (auto module : getSession()->coreModules)
             {
                 _addDeclAssociationsFromModule(module->getModuleDecl());
             }

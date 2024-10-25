@@ -19,7 +19,7 @@ namespace Slang
     class TranslationUnitRequest;
 
     bool isGlobalShaderParameter(VarDeclBase* decl);
-    bool isFromStdLib(Decl* decl);
+    bool isFromCoreModule(Decl* decl);
 
     void registerBuiltinDecls(Session* session, Decl* decl);
 

@@ -72,7 +72,7 @@ Val* Val::resolve()
 #ifdef _DEBUG
     if (m_resolvedVal->_debugUID > 0 && this->_debugUID < 0)
     {
-        SLANG_ASSERT_FAILURE("should not be modifying stdlib vals outside of stdlib checking.");
+        SLANG_ASSERT_FAILURE("should not be modifying the core module vals outside of the core module checking.");
     }
 #endif
     return m_resolvedVal;

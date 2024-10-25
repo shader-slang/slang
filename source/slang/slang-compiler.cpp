@@ -1749,7 +1749,7 @@ namespace Slang
             // The user requested no output
             return SLANG_OK;
 
-            // Note(tfoley): We currently hit this case when compiling the stdlib
+            // Note(tfoley): We currently hit this case when compiling the core module
         case CodeGenTarget::Unknown:
             return SLANG_OK;
 
