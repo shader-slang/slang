@@ -84,7 +84,10 @@ runs:
     - name: Build LLVM
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
-      run: ./external/build-llvm.sh --install-prefix "${{ github.workspace }}/build/llvm-project-install"
+      run: |
+        ./external/build-llvm.sh \
+          --install-prefix "${{github.workspace}}/build/llvm-project-install" \
+          --repo "https://${{github.token}}@github.com/llvm/llvm-project"
     - uses: actions/cache/save@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
