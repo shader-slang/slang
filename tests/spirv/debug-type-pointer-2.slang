@@ -18,7 +18,7 @@ uniform Problem probs;
 
 RWStructuredBuffer<float4> outputBuffer;
 [shader("compute")]
-float4 main()
+void main()
 {
     outputBuffer[0] = float(probs.getVal());
 }
