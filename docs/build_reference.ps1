@@ -33,7 +33,7 @@ Remove-Item -Path ".\stdlib-reference\attributes" -Recurse -Force
 git describe --tags | Out-File -FilePath ".\stdlib-reference\_includes\version.inc" -Encoding ASCII
 
 cd stdlib-reference
-& ../../build/Release/bin/slangc -compile-stdlib -doc
+& ../../build/Release/bin/slangc -compile-core-module -doc
 Move-Item -Path ".\toc.html" -Destination ".\_includes\stdlib-reference-toc.html" -Force
 git config user.email "bot@shader-slang.com"
 git config user.name "Stdlib Reference Bot"
