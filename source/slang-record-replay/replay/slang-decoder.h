@@ -58,8 +58,8 @@ namespace SlangRecord
 		void IGlobalSession_checkCompileTargetSupport(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_checkPassThroughSupport(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_compileCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock);
-		void IGlobalSession_loadStandardModules(ObjectID objectId, ParameterBlock const& parameterBlock);
-		void IGlobalSession_saveStandardModules(ObjectID objectId, ParameterBlock const& parameterBlock);
+		void IGlobalSession_loadCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock);
+		void IGlobalSession_saveCoreModule(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_findCapability(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_setDownstreamCompilerForTransition(ObjectID objectId, ParameterBlock const& parameterBlock);
 		void IGlobalSession_getDownstreamCompilerForTransition(ObjectID objectId, ParameterBlock const& parameterBlock);

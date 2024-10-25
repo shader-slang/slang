@@ -306,7 +306,7 @@ namespace SlangRecord
         return res;
     }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::compileCoreModule(slang::CompileStandardModulesFlags flags)
+    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::compileCoreModule(slang::CompileCoreModuleFlags flags)
     {
         slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
 
@@ -321,33 +321,33 @@ namespace SlangRecord
         return res;
     }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::loadStandardModules(const void* standardModules, size_t standardModulesSizeInBytes)
+    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes)
     {
         slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
 
         ParameterRecorder* recorder {};
         {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_loadStandardModules, m_globalSessionHandle);
-            recorder->recordPointer(standardModules, false, standardModulesSizeInBytes);
+            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_loadCoreModule, m_globalSessionHandle);
+            recorder->recordPointer(coreModule, false, coreModuleSizeInBytes);
             m_recordManager->endMethodRecord();
         }
 
-        SlangResult res = m_actualGlobalSession->loadStandardModules(standardModules, standardModulesSizeInBytes);
+        SlangResult res = m_actualGlobalSession->loadCoreModule(coreModule, coreModuleSizeInBytes);
         return res;
     }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::saveStandardModules(SlangArchiveType archiveType, ISlangBlob** outBlob)
+    SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob)
     {
         slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
 
         ParameterRecorder* recorder {};
         {
-            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_saveStandardModules, m_globalSessionHandle);
+            recorder = m_recordManager->beginMethodRecord(ApiCallId::IGlobalSession_saveCoreModule, m_globalSessionHandle);
             recorder->recordEnumValue(archiveType);
             recorder = m_recordManager->endMethodRecord();
         }
 
-        SlangResult res = m_actualGlobalSession->saveStandardModules(archiveType, outBlob);
+        SlangResult res = m_actualGlobalSession->saveCoreModule(archiveType, outBlob);
 
         {
             recorder->recordAddress(*outBlob);

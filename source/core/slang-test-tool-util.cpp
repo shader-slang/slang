@@ -42,7 +42,7 @@ namespace Slang
     for (Index i = 0; i < argc; ++i)
     {
         UnownedStringSlice option(argv[i]);
-        if (option == "-load-standard-modules" || option == "-compile-core-module")
+        if (option == "-load-core-module" || option == "-compile-core-module")
         {
             return true;
         }

@@ -342,7 +342,7 @@ void Session::writeStdlibDoc(String config)
     }
 }
 
-SlangResult Session::compileCoreModule(slang::CompileStandardModulesFlags compileFlags)
+SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlags)
 {
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
@@ -369,7 +369,7 @@ SlangResult Session::compileCoreModule(slang::CompileStandardModulesFlags compil
     auto stdLibSrcBlob = StringBlob::moveCreate(stdLibSrcBuilder.produceString());
     addBuiltinSource(coreLanguageScope, "core", stdLibSrcBlob);
 
-    if (compileFlags & slang::CompileStandardModulesFlag::WriteDocumentation)
+    if (compileFlags & slang::CompileCoreModuleFlag::WriteDocumentation)
     {
         // Load config file first.
         String configText;
@@ -393,7 +393,7 @@ SlangResult Session::compileCoreModule(slang::CompileStandardModulesFlags compil
     return SLANG_OK;
 }
 
-SlangResult Session::loadStandardModules(const void* standardModules, size_t standardModulesSizeInBytes)
+SlangResult Session::loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes)
 {
     SLANG_PROFILE;
 
@@ -407,7 +407,7 @@ SlangResult Session::loadStandardModules(const void* standardModules, size_t sta
 
     // Make a file system to read it from
     ComPtr<ISlangFileSystemExt> fileSystem;
-    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(standardModules, standardModulesSizeInBytes, fileSystem));
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(coreModule, coreModuleSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
@@ -416,7 +416,7 @@ SlangResult Session::loadStandardModules(const void* standardModules, size_t sta
     return SLANG_OK;
 }
 
-SlangResult Session::saveStandardModules(SlangArchiveType archiveType, ISlangBlob** outBlob)
+SlangResult Session::saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.getCount() == 0)
     {

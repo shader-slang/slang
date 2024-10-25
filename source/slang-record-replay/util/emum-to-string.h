@@ -218,10 +218,10 @@ namespace SlangRecord
         CASE(CompileCoreModule);
         CASE(Doc);
         CASE(IrCompression);
-        CASE(LoadStandardModules);
+        CASE(LoadCoreModule);
         CASE(ReferenceModule);
-        CASE(SaveStandardModules);
-        CASE(SaveStandardModulesBinSource);
+        CASE(SaveCoreModule);
+        CASE(SaveCoreModuleBinSource);
         CASE(TrackLiveness);
         CASE(LoopInversion);
         CASE(CountOfParsableOptions);
@@ -332,15 +332,15 @@ namespace SlangRecord
         }
     }
 
-    static Slang::String CompileStandardModulesFlagsToString(const slang::CompileStandardModulesFlags flags)
+    static Slang::String CompileCoreModuleFlagsToString(const slang::CompileCoreModuleFlags flags)
     {
         using namespace slang;
         switch(flags)
         {
-        case CompileStandardModulesFlag::WriteDocumentation: return "WriteDocumentation";
+        case CompileCoreModuleFlag::WriteDocumentation: return "WriteDocumentation";
         default:
             Slang::StringBuilder str;
-            str << "Unknown CompileStandardModulesFlags: " << static_cast<uint32_t>(flags);
+            str << "Unknown CompileCoreModuleFlags: " << static_cast<uint32_t>(flags);
             return str.toString();
         }
     }

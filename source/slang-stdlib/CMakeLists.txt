@@ -19,7 +19,7 @@ set(stdlib_generated_header
 add_custom_command(
     OUTPUT ${stdlib_generated_header}
     COMMAND
-        slang-bootstrap -archive-type riff-lz4 -save-standard-modules-bin-source
+        slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
         ${stdlib_generated_header}
     DEPENDS slang-bootstrap
     VERBATIM

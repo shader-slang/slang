@@ -950,10 +950,10 @@ extern "C"
             CompileCoreModule,
             Doc,
             IrCompression,
-            LoadStandardModules,
+            LoadCoreModule,
             ReferenceModule,
-            SaveStandardModules,
-            SaveStandardModulesBinSource,
+            SaveCoreModule,
+            SaveCoreModuleBinSource,
             TrackLiveness,
             LoopInversion,              // bool, enable loop inversion optimization
 
@@ -3307,10 +3307,10 @@ namespace slang
 
     };
 
-    typedef uint32_t CompileStandardModulesFlags;
-    struct CompileStandardModulesFlag
+    typedef uint32_t CompileCoreModuleFlags;
+    struct CompileCoreModuleFlag
     {
-        enum Enum : CompileStandardModulesFlags
+        enum Enum : CompileCoreModuleFlags
         {
             WriteDocumentation = 0x1,
         };
@@ -3487,22 +3487,22 @@ namespace slang
             NOTE! API is experimental and not ready for production code
             @param flags to control compilation
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileCoreModule(CompileStandardModulesFlags flags) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileCoreModule(CompileCoreModuleFlags flags) = 0;
 
-            /** Load the standard modules. Currently loads modules from the file system. 
-            @param standardModules Start address of the serialized standard modules
-            @param standardModulesSizeInBytes The size in bytes of the serialized standard modules
+            /** Load the core module. Currently loads modules from the file system. 
+            @param coreModule Start address of the serialized core module
+            @param coreModuleSizeInBytes The size in bytes of the serialized core module
 
             NOTE! API is experimental and not ready for production code
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadStandardModules(const void* standardModules, size_t standardModulesSizeInBytes) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes) = 0;
 
-            /** Save the standard modules to the file system
-            @param archiveType The type of archive used to hold the standard modules
-            @param outBlob The serialized blob containing the standard modules
+            /** Save the core module to the file system
+            @param archiveType The type of archive used to hold the core module
+            @param outBlob The serialized blob containing the core module
 
             NOTE! API is experimental and not ready for production code  */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveStandardModules(SlangArchiveType archiveType, ISlangBlob** outBlob) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) = 0;
 
             /** Look up the internal ID of a capability by its `name`.
 
@@ -4242,7 +4242,7 @@ SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSession(
     slang::IGlobalSession** outGlobalSession);
 
 /* Create a global session, but do not set up the core module. The core module can
-then be loaded via loadStandardModules or compileCoreModule
+then be loaded via loadCoreModule or compileCoreModule
 
 @param apiVersion Pass in SLANG_API_VERSION
 @param outGlobalSession (out)The created global session that doesn't have a core module setup.
