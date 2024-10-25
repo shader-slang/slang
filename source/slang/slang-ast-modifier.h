@@ -943,7 +943,7 @@ class EntryPointAttribute : public Attribute
 };
 
 // A `[__vulkanRayPayload(location)]` attribute, which is used in the
-// standard library implementation to indicate that a variable
+// core module implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass per-ray payload information.
 class VulkanRayPayloadAttribute : public Attribute 
@@ -960,7 +960,7 @@ class VulkanRayPayloadInAttribute : public Attribute
 };
 
 // A `[__vulkanCallablePayload(location)]` attribute, which is used in the
-// standard library implementation to indicate that a variable
+// core module implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass payload information to/from a callee.
 class VulkanCallablePayloadAttribute : public Attribute 
@@ -977,7 +977,7 @@ class VulkanCallablePayloadInAttribute : public Attribute
 };
 
 // A `[__vulkanHitAttributes]` attribute, which is used in the
-// standard library implementation to indicate that a variable
+// core module implementation to indicate that a variable
 // actually represents the output interface for a Vulkan
 // intersection shader to pass hit attribute information.
 class VulkanHitAttributesAttribute : public Attribute 
@@ -986,7 +986,7 @@ class VulkanHitAttributesAttribute : public Attribute
 };
 
 // A `[__vulkanHitObjectAttributes(location)]` attribute, which is used in the
-// standard library implementation to indicate that a variable
+// core module implementation to indicate that a variable
 // actually represents the attributes on a HitObject as part of
 // Shader ExecutionReordering
 class VulkanHitObjectAttributesAttribute : public Attribute

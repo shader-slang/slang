@@ -111,7 +111,7 @@ struct SynthesizeActiveMaskForModuleContext
     {
         // We use the plain 32-bit `uint` type masks we
         // generate here since it matches the current
-        // definition of `WaveMask` in the standard library.
+        // definition of `WaveMask` in the core module.
         //
         // TODO: If/when the `WaveMask` type in the core module is
         // made opaque, this should use the opaque type instead,

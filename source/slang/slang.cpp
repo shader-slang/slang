@@ -2937,19 +2937,19 @@ void FrontEndCompileRequest::parseTranslationUnit(
     module->setModuleDecl(translationUnitSyntax);
 
     // When compiling a module of code that belongs to the Slang
-    // standard library, we add a modifier to the module to act
+    // core module, we add a modifier to the module to act
     // as a marker, so that downstream code can detect declarations
-    // that came from the standard library (by walking up their
+    // that came from the core module (by walking up their
     // chain of ancestors and looking for the marker), and treat
     // them differently from user declarations.
     //
     // We are adding the marker here, before we even parse the
     // code in the module, in case the subsequent steps would
-    // like to treat the standard library differently. Alternatively
+    // like to treat the core module differently. Alternatively
     // we could pass down the `m_isStandardLibraryCode` flag to
     // these passes.
     //
-    if( m_isStandardLibraryCode )
+    if( m_isCoreModuleCode )
     {
         translationUnitSyntax->modifiers.first = astBuilder->create<FromCoreModuleModifier>();
     }
@@ -5898,7 +5898,7 @@ void Session::addBuiltinSource(
         m_builtinLinkage,
         nullptr,
         &sink);
-    compileRequest->m_isStandardLibraryCode = true;
+    compileRequest->m_isCoreModuleCode = true;
 
     // Set the source manager on the sink
     sink.setSourceManager(sourceManager);
@@ -5922,7 +5922,7 @@ void Session::addBuiltinSource(
 
         PlatformUtil::outputDebugMessage(diagnostics);
 
-        SLANG_UNEXPECTED("error in Slang standard library");
+        SLANG_UNEXPECTED("error in Slang core module");
     }
     
     // Compiling the core module should not yield any warnings.

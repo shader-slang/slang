@@ -9681,7 +9681,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if(decl->body)
             return;
 
-        // Only standard library declarations should get any kind of catch-all
+        // Only core module declarations should get any kind of catch-all
         // treatment by default. Declarations in user case are responsible
         // for marking things as target intrinsics if they want to go down
         // that (unsupported) route.

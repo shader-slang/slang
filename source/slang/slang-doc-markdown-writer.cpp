@@ -2616,7 +2616,7 @@ DocumentPage* DocMarkdownWriter::writeAll(UnownedStringSlice configStr)
             m_output[page->path] = page;
             return page.get();
         };
-    m_rootPage = addBuiltinPage(nullptr, toSlice("index.md"), m_config.title.getUnownedSlice(), toSlice("Standard Library Reference"));
+    m_rootPage = addBuiltinPage(nullptr, toSlice("index.md"), m_config.title.getUnownedSlice(), toSlice("Core Module Reference"));
     m_rootPage->skipWrite = true;
 
     m_interfacesPage = addBuiltinPage(m_rootPage.get(), toSlice("interfaces/index.md"), toSlice("Interfaces"), toSlice("Interfaces"));

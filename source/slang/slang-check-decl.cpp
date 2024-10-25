@@ -1796,7 +1796,7 @@ namespace Slang
         // global shader parameter to Slang, but we want to be able to
         // associate special behavior with it to make downstream compilation
         // work nicely (especially in the case where certain cross-platform
-        // operations in the Slang standard library need to use NVAPI).
+        // operations in the Slang core module need to use NVAPI).
         //
         // We will detect a global variable declaration that appears to
         // be declaring `g_NvidiaExt` from NVAPI, and mark it with a special
@@ -2957,7 +2957,7 @@ namespace Slang
 
         /// Recursively register any builtin declarations that need to be attached to the `session`.
         ///
-        /// This function should only be needed for declarations in the standard library.
+        /// This function should only be needed for declarations in the core module.
         ///
     static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
     {
@@ -3026,18 +3026,18 @@ namespace Slang
 
     void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     {
-        // When we are dealing with code from the standard library,
+        // When we are dealing with code from the core modules,
         // there is a potential problem where we might need to look
         // up built-in types like `Int` through the session (e.g.,
         // to determine the type for an integer literal), but those
         // types might not have been registered yet. We solve that
-        // by doing a pre-process on standard-library code to find
+        // by doing a pre-process on the core module code to find
         // and register any built-in declarations.
         //
         // TODO: This could be factored into another visitor pass
         // that fits the more standard checking below, but that would
         // seemingly add overhead to checking things other than
-        // the standard library.
+        // the core module.
         //
         if(isFromCoreModule(moduleDecl))
         {
@@ -9847,7 +9847,7 @@ namespace Slang
             m_candidateExtensionListsBuilt = true;
 
             // We need to make sure that all extensions that were declared
-            // as part of our standard-library modules are always visible,
+            // as parts of our core module are always visible,
             // even if they are not explicit `import`ed into user code.
             //
             for( auto module : getSession()->coreModules )

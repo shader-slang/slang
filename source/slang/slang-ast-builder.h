@@ -89,7 +89,7 @@ protected:
     Type* m_overloadedType = nullptr;
 
     // The following types are created lazily, such that part of their definition
-    // can be in the standard library
+    // can be in the core module.
     // 
     // Note(tfoley): These logically belong to `Type`,
     // but order-of-declaration stuff makes that tricky

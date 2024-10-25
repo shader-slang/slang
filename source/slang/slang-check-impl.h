@@ -2112,7 +2112,7 @@ namespace Slang
             Type*              elementType);
 
         // The way that we have designed out type system, pretyt much *every*
-        // type is a reference to some declaration in the standard library.
+        // type is a reference to some declaration in the core module.
         // That means that when we construct a new type on the fly, we need
         // to make sure that it is wired up to reference the appropriate
         // declaration, or else it won't compare as equal to other types

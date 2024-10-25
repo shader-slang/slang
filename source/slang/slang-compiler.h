@@ -2480,8 +2480,8 @@ namespace Slang
 
         List<RefPtr<ComponentType>> const& getUnspecializedEntryPoints() { return m_unspecializedEntryPoints; }
 
-            /// Does the code we are compiling represent part of the Slang standard library?
-        bool m_isStandardLibraryCode = false;
+            /// Does the code we are compiling represent part of the Slang core module?
+        bool m_isCoreModuleCode = false;
 
         Name* m_defaultModuleName = nullptr;
 
