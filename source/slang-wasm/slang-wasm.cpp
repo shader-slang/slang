@@ -14,12 +14,18 @@ namespace wgsl
 {
 
 Error g_error;
+CompileTargets g_compileTargets;
 
 Error getLastError()
 {
     Error currentError = g_error;
     g_error = {};
     return currentError;
+}
+
+CompileTargets* getCompileTargets()
+{
+    return &g_compileTargets;
 }
 
 GlobalSession* createGlobalSession()
@@ -38,7 +44,33 @@ GlobalSession* createGlobalSession()
     return new GlobalSession(globalSession);
 }
 
-Session* GlobalSession::createSession()
+CompileTargets::CompileTargets()
+{
+#define MAKE_PAIR(x) { #x, SLANG_##x }
+
+    m_compileTargetMap = {
+        MAKE_PAIR(GLSL),
+        MAKE_PAIR(HLSL),
+        MAKE_PAIR(WGSL),
+        MAKE_PAIR(SPIRV),
+        MAKE_PAIR(METAL),
+    };
+}
+
+int CompileTargets::findCompileTarget(const std::string& name)
+{
+    auto res = m_compileTargetMap.find(name);
+    if ( res != m_compileTargetMap.end())
+    {
+        return res->second;
+    }
+    else
+    {
+        return SLANG_TARGET_UNKNOWN;
+    }
+}
+
+Session* GlobalSession::createSession(int compileTarget)
 {
     ISession* session = nullptr;
     {
@@ -46,7 +78,7 @@ Session* GlobalSession::createSession()
         sessionDesc.structureSize = sizeof(sessionDesc);
         constexpr SlangInt targetCount = 1;
         TargetDesc target = {};
-        target.format = SLANG_WGSL;
+        target.format = (SlangCompileTarget)compileTarget;
         sessionDesc.targets = &target;
         sessionDesc.targetCount = targetCount;
         SlangResult result = m_interface->createSession(sessionDesc, &session);
@@ -200,6 +232,33 @@ std::string ComponentType::getEntryPointCode(int entryPointIndex, int targetInde
     }
 
     return {};
+}
+
+// Since spirv code is binary, we can't return it as a string, we will need to use emscripten::val
+// to wrap it and return it to the javascript side.
+emscripten::val ComponentType::getEntryPointCodeSpirv(int entryPointIndex, int targetIndex)
+{
+    Slang::ComPtr<IBlob> kernelBlob;
+    Slang::ComPtr<ISlangBlob> diagnosticBlob;
+    SlangResult result = interface()->getEntryPointCode(
+        entryPointIndex,
+        targetIndex,
+        kernelBlob.writeRef(),
+        diagnosticBlob.writeRef());
+    if (result != SLANG_OK)
+    {
+        g_error.type = std::string("USER");
+        g_error.result = result;
+        g_error.message = std::string(
+            (char*)diagnosticBlob->getBufferPointer(),
+            (char*)diagnosticBlob->getBufferPointer() +
+            diagnosticBlob->getBufferSize());
+        return {};
+    }
+
+    const uint8_t* ptr = (uint8_t*)kernelBlob->getBufferPointer();
+    return emscripten::val(emscripten::typed_memory_view(kernelBlob->getBufferSize(),
+            ptr));
 }
 
 } // namespace wgsl
