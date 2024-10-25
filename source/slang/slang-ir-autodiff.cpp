@@ -1512,6 +1512,7 @@ void stripTempDecorations(IRInst* inst)
         case kIROp_RecomputeBlockDecoration:
         case kIROp_AutoDiffOriginalValueDecoration:
         case kIROp_BackwardDerivativePrimalReturnDecoration:
+        case kIROp_BackwardDerivativePrimalContextDecoration:
         case kIROp_PrimalValueStructKeyDecoration:
         case kIROp_PrimalElementTypeDecoration:
             decor->removeAndDeallocate();
