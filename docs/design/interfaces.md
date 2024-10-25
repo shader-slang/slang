@@ -38,7 +38,7 @@ Depending on the scenario, we might be able to generate statically specialized c
     	// ...
     }
 
-Current shading langauges support neither higher-order functions nor templates/generics, so neither of these options is viable.
+Current shading languages support neither higher-order functions nor templates/generics, so neither of these options is viable.
 Instead practicioners typically use preprocessor techniques to either stich together the final code, or to substitute in different function/type definitions to make a definition like `integrateLighting` reusable.
 
 These ad hoc approaches actually work well in practice; we aren't proposing to replace them *just* to make code abstractly "cleaner."

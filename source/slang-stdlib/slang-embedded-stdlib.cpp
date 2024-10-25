@@ -4,21 +4,21 @@
 
 #ifdef SLANG_EMBED_STDLIB
 
-static const uint8_t g_stdLib[] =
+static const uint8_t g_coreModule[] =
 {
 #   include "slang-stdlib-generated.h"
 };
 
-static Slang::StaticBlob g_stdLibBlob((const void*)g_stdLib, sizeof(g_stdLib));
+static Slang::StaticBlob g_coreModuleBlob((const void*)g_coreModule, sizeof(g_coreModule));
 
-SLANG_API ISlangBlob* slang_getEmbeddedStdLib()
+SLANG_API ISlangBlob* slang_getEmbeddedCoreModule()
 {
-    return &g_stdLibBlob;
+    return &g_coreModuleBlob;
 }
 
 #else
 
-SLANG_API ISlangBlob* slang_getEmbeddedStdLib()
+SLANG_API ISlangBlob* slang_getEmbeddedCoreModule()
 {
     return nullptr;
 }

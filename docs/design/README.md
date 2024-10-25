@@ -2,7 +2,7 @@ Slang Design and Implementation Notes
 =====================================
 
 This directory contains documents that are primarily intended for developers working on the Slang implementation.
-They are not indended to be helpful to Slang users.
+They are not intended to be helpful to Slang users.
 
 These documents can only be trusted to reflect the state of the codebase or the plans of their authors at the time they were written. Changes to the implementation are not expected to always come with matching changes to these documents, so some amount of drift is to be expected.
 
@@ -21,3 +21,5 @@ The [Existential Types](existential-types.md) document goes into some detail abo
 The [Capabilities](capabilities.md) document explains the proposed model for how Slang will support general notions of profile- or capability-based overloading/dispatch.
 
 The [Casting](casting.md) document explains how casting works in the slang C++ compiler code base.
+
+The [Experimental API Interfaces](experimental.md) document explains how experimental Slang API changes are to be deployed.

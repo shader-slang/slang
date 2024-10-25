@@ -543,18 +543,18 @@ void initCommandOptions(CommandOptions& options)
 
     const Option internalOpts[] = 
     {
-        { OptionKind::ArchiveType, "-archive-type", "-archive-type <archive-type>", "Set the archive type for -save-stdlib. Default is zip." },
-        { OptionKind::CompileStdLib, "-compile-stdlib", nullptr, 
+        { OptionKind::ArchiveType, "-archive-type", "-archive-type <archive-type>", "Set the archive type for -save-core-module. Default is zip." },
+        { OptionKind::CompileCoreModule, "-compile-core-module", nullptr, 
         "Compile the StdLib from embedded sources. "
         "Will return a failure if there is already a StdLib available."},
-        { OptionKind::Doc, "-doc", nullptr, "Write documentation for -compile-stdlib" },
+        { OptionKind::Doc, "-doc", nullptr, "Write documentation for -compile-core-module" },
         { OptionKind::IrCompression,"-ir-compression", "-ir-compression <type>", 
         "Set compression for IR and AST outputs.\n"
         "Accepted compression types: none, lite"},
-        { OptionKind::LoadStdLib, "-load-stdlib", "-load-stdlib <filename>", "Load the StdLib from file." },
+        { OptionKind::LoadCoreModule, "-load-core-module", "-load-core-module <filename>", "Load the core module from file." },
         { OptionKind::ReferenceModule, "-r", "-r <name>", "reference module <name>" },
-        { OptionKind::SaveStdLib, "-save-stdlib", "-save-stdlib <filename>", "Save the StdLib modules to an archive file." },
-        { OptionKind::SaveStdLibBinSource, "-save-stdlib-bin-source","-save-stdlib-bin-source <filename>", "Same as -save-stdlib but output "
+        { OptionKind::SaveCoreModule, "-save-core-module", "-save-core-module <filename>", "Save the core module to an archive file." },
+        { OptionKind::SaveCoreModuleBinSource, "-save-core-module-bin-source","-save-core-module-bin-source <filename>", "Same as -save-core-module but output "
         "the data as a C array.\n"},
         { OptionKind::TrackLiveness, "-track-liveness", nullptr, "Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness." },
         { OptionKind::LoopInversion, "-loop-inversion", nullptr, "Enable loop inversion in the code-gen optimization. Default is off" },
@@ -798,7 +798,7 @@ struct OptionsParser
 
     bool m_hasLoadedRepro = false;
     bool m_compileStdLib = false;
-    slang::CompileStdLibFlags m_compileStdLibFlags;
+    slang::CompileCoreModuleFlags m_compileStdLibFlags;
 
     SlangArchiveType m_archiveType = SLANG_ARCHIVE_TYPE_RIFF_LZ4;
     
@@ -1747,7 +1747,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::NoCodeGen:
                 linkage->m_optionSet.set(OptionKind::SkipCodeGen, true); break;
                 break;
-            case OptionKind::LoadStdLib:
+            case OptionKind::LoadCoreModule:
             {
                 CommandLineArg fileName;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
@@ -1755,38 +1755,38 @@ SlangResult OptionsParser::_parse(
                 // Load the file
                 ScopedAllocation contents;
                 SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
-                SLANG_RETURN_ON_FAIL(m_session->loadStdLib(contents.getData(), contents.getSizeInBytes()));
+                SLANG_RETURN_ON_FAIL(m_session->loadCoreModule(contents.getData(), contents.getSizeInBytes()));
                 
                 // Ensure that the linkage's AST builder is up-to-date.
                 linkage->getASTBuilder()->m_cachedNodes = asInternal(m_session)->getGlobalASTBuilder()->m_cachedNodes;
 
                 break;
             }
-            case OptionKind::CompileStdLib: m_compileStdLib = true; break;
+            case OptionKind::CompileCoreModule: m_compileStdLib = true; break;
             case OptionKind::ArchiveType:
             {
                 SLANG_RETURN_ON_FAIL(_expectValue(m_archiveType));
                 break;
             }
-            case OptionKind::SaveStdLib:
+            case OptionKind::SaveCoreModule:
             {
                 CommandLineArg fileName;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
 
                 ComPtr<ISlangBlob> blob;
 
-                SLANG_RETURN_ON_FAIL(m_session->saveStdLib(m_archiveType, blob.writeRef()));
+                SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
                 SLANG_RETURN_ON_FAIL(File::writeAllBytes(fileName.value, blob->getBufferPointer(), blob->getBufferSize()));
                 break;
             }
-            case OptionKind::SaveStdLibBinSource:
+            case OptionKind::SaveCoreModuleBinSource:
             {
                 CommandLineArg fileName;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
 
                 ComPtr<ISlangBlob> blob;
 
-                SLANG_RETURN_ON_FAIL(m_session->saveStdLib(m_archiveType, blob.writeRef()));
+                SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
 
                 StringBuilder builder;
                 StringWriter writer(&builder, 0);
@@ -1811,7 +1811,7 @@ SlangResult OptionsParser::_parse(
             case OptionKind::Doc:
             {
                 // If compiling stdlib is enabled, will write out documentation
-                m_compileStdLibFlags |= slang::CompileStdLibFlag::WriteDocumentation;
+                m_compileStdLibFlags |= slang::CompileCoreModuleFlag::WriteDocumentation;
 
                 // Enable writing out documentation on the req
                 linkage->m_optionSet.set(CompilerOptionName::Doc, true);
@@ -2380,7 +2380,7 @@ SlangResult OptionsParser::_parse(
 
     if (m_compileStdLib)
     {
-        SLANG_RETURN_ON_FAIL(m_session->compileStdLib(m_compileStdLibFlags));
+        SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileStdLibFlags));
     }
 
     // TODO(JS): This is a restriction because of how setting of state works for load repro
