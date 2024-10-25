@@ -293,6 +293,32 @@ struct ExtractPrimalFuncContext
     }
 };
 
+bool isIntermediateContextType(IRInst* type)
+{
+    switch (type->getOp())
+    {
+        case kIROp_BackwardDiffIntermediateContextType:
+            return true;
+        case kIROp_AttributedType:
+            return isIntermediateContextType(as<IRAttributedType>(type)->getBaseType());
+        case kIROp_Specialize:
+            return isIntermediateContextType(as<IRSpecialize>(type)->getBase());
+        default:
+            if (as<IRPtrTypeBase>(type))
+                return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());
+            return false;
+    }
+}
+
+void markNonContextParamsAsSideEffectFree(IRBuilder* builder, IRFunc* func)
+{
+    for (auto param : func->getParams())
+    {
+        if (!isIntermediateContextType(param->getDataType()))
+            builder->addDecoration(param, kIROp_IgnoreSideEffectsDecoration);
+    }
+}
+
 static void copyPrimalValueStructKeyDecorations(IRInst* inst, IRCloneEnv& cloneEnv)
 {
     IRInst* newInst = nullptr;
@@ -379,6 +405,8 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
         auto primalName = String("s_primal_ctx_") + UnownedStringSlice(originalNameHint->getName());
         builder.addNameHintDecoration(primalFunc, builder.getStringValue(primalName.getUnownedSlice()));
         builder.addDecoration(primalFunc, kIROp_IgnoreSideEffectsDecoration);
+
+        markNonContextParamsAsSideEffectFree(&builder, primalFunc);
     }
 
     // Copy PrimalValueStructKey decorations from primal func.

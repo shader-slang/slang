@@ -993,8 +993,19 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
 {
     // If the function has no side effect and is not writing to any outputs,
     // we can safely treat the call as a normal inst.
+
     IRFunc* parentFunc = nullptr;
-    for (UInt i = 0; i < call->getArgCount(); i++)
+
+    IRParam* param = nullptr;
+    if (auto calleeFunc = getResolvedInstForDecorations(call->getCallee()))
+    {
+        if (auto block = calleeFunc->getFirstBlock())
+        {
+            param = block->getFirstParam();
+        }
+    }
+
+    for (UInt i = 0; i < call->getArgCount(); i++, (param = param ? param->getNextParam() : nullptr))
     {
         auto arg = call->getArg(i);
         if (isValueType(arg->getDataType()))
@@ -1013,13 +1024,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
         if (!module)
             return false;
 
-        auto basePtr = tryFindBasePtr(arg, parentFunc);
-        
-        // If its a write into a function parameter, we can't treat it as side effect free.
-        if (as<IRParam>(basePtr))
-            return false; 
-
-        if (auto var = as<IRVar>(basePtr))
+        if (arg->getOp() == kIROp_Var && getParentFunc(arg) == parentFunc)
         {
             IRDominatorTree* dom = nullptr;
             if (isBitSet(options, SideEffectAnalysisOptions::UseDominanceTree))
@@ -1034,7 +1039,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
             // 
             // A more aggresive test can check all other address uses reachable from the call site
             // and see if any of them are aliasing with the argument.
-            for (auto use = var->firstUse; use; use = use->nextUse)
+            for (auto use = arg->firstUse; use; use = use->nextUse)
             {
                 if (as<IRDecoration>(use->getUser()))
                     continue;
@@ -1070,7 +1075,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
                         // If we have dominator tree available, use it to check if the call is inside a loop.
                         auto callBlock = as<IRBlock>(call->getParent());
                         if (!callBlock) return false;
-                        auto varBlock = as<IRBlock>(var->getParent());
+                        auto varBlock = as<IRBlock>(arg->getParent());
                         if (!varBlock) return false;
                         auto idom = callBlock;
                         while (idom != varBlock)
@@ -1098,14 +1103,9 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
         }
         else
         {
-            // If our parameter is not a local variable or known value type, we can assume
-            // that we've hit a pointer-like local value. In some cases, we synthesize
-            // duplicate calls where we know that any side effects can be ignored. For such
-            // calls, we ignore the side effects of the call.
-            //
-            if (getResolvedInstForDecorations(call->getCallee())->findDecoration<IRIgnoreSideEffectsDecoration>())
+            if (param && param->findDecoration<IRIgnoreSideEffectsDecoration>())
                 continue;
-
+                
             return false;
         }
     }
@@ -1124,9 +1124,6 @@ bool isPureFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
 
 bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
 {
-    //if (getResolvedInstForDecorations(call->getCallee())->findDecoration<IRIgnoreSideEffectsDecoration>())
-    //    return true;
-
     if (!doesCalleeHaveSideEffect(call->getCallee()))
     {
         return areCallArgumentsSideEffectFree(call, options);
