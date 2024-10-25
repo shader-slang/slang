@@ -449,17 +449,17 @@ static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& l
     SlangResult resB = ParseDiagnosticUtil::parseDiagnostics(b, diagsB);
 
     /*
-        TODO(JS): In the past we needed special handling of the stdlib, when
-        in some builds the path contains the stdlib.
+        TODO(JS): In the past we needed special handling of the core module, when
+        in some builds the path contains the core module.
 
         For now we don't seem to need this, this is for future reference, if there
         is an issue with needing to specially handle this.
 
-       static const UnownedStringSlice stdLibNames[] =
+       static const UnownedStringSlice coreModuleNames[] =
         {
             UnownedStringSlice::fromLiteral("core.meta.slang"),
             UnownedStringSlice::fromLiteral("hlsl.meta.slang"),
-            UnownedStringSlice::fromLiteral("slang-stdlib.cpp"),
+            UnownedStringSlice::fromLiteral("slang-core-module.cpp"),
         };
         */
 
