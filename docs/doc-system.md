@@ -88,7 +88,7 @@ Currently the only documentation style supported is a single file 'markdown' out
 It is possible to generate documentation for Slangs internal `stdlib`. This can be achieved with `slangc` via
 
 ```
-slangc -doc -compile-stdlib
+slangc -doc -compile-core-module
 ```
 
 The documentation will be written to a file `stdlib-doc.md`.
