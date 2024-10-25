@@ -21,3 +21,5 @@ The [Existential Types](existential-types.md) document goes into some detail abo
 The [Capabilities](capabilities.md) document explains the proposed model for how Slang will support general notions of profile- or capability-based overloading/dispatch.
 
 The [Casting](casting.md) document explains how casting works in the slang C++ compiler code base.
+
+The [Experimental API Interfaces](experimental.md) document explains how experimental Slang API changes are to be deployed.

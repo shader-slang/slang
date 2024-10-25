@@ -314,6 +314,9 @@ Application code is expected to correctly maintain the reference counts of `ISla
 Many Slang API calls return `SlangResult` values; this type is equivalent to (and binary-compatible with) the standard COM `HRESULT` type.
 As a matter of convention, Slang API calls return a zero value (`SLANG_OK`) on success, and a negative value on errors.
 
+> #### Note ####
+> Slang API interfaces may be named with the suffix "_Experimental", indicating that the interface is not complete, may have known bugs, and may change or be removed between Slang API releases.
+
 ### Creating a Global Session
 
 A Slang _global session_ uses the interface `slang::IGlobalSession` and it represents a connection from an application to a particular implementation of the Slang API.
