@@ -6,12 +6,11 @@ jobs:
   slashCommandDispatch:
     runs-on: ubuntu-latest
     steps:
-
       - name: Slash Command Dispatch
         id: scd
         uses: peter-evans/slash-command-dispatch@v4
         with:
-          token: ${{ secrets.SLANGBOT_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           reaction-token: ${{ secrets.SLANGBOT_PAT }}
           config: >
             [
