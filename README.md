@@ -49,7 +49,7 @@ Documentation
 
 The Slang project provides a variety of different [documentation](docs/), but most users would be well served starting with the [User's Guide](https://shader-slang.github.io/slang/user-guide/).
 
-For developers writing Slang code, the [Slang Standard Library Reference](https://shader-slang.com/stdlib-reference/) provides detailed documentation on Slang's built-in types and functions.
+For developers writing Slang code, the [Slang Core Module Reference](https://shader-slang.com/stdlib-reference/) provides detailed documentation on Slang's built-in types and functions.
 
 We also provide a few [examples](examples/) of how to integrate Slang into a rendering application.
 

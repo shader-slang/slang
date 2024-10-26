@@ -267,7 +267,7 @@ There is broad support for [HLSL Wave intrinsics](https://docs.microsoft.com/en-
 
 Most Wave intrinsics will work with vector, matrix or scalar types of typical built in types - uint, int, float, double, uint64_t, int64_t.
 
-The support is provided via both the Slang stdlib as well as the Slang CUDA prelude found in 'prelude/slang-cuda-prelude.h'. Many Wave intrinsics are not directly applicable within CUDA which supplies a more low level mechanisms. The implementation of most Wave functions work most optimally if a 'Wave' where all lanes are used. If all lanes from index 0 to pow2(n) -1  are used (which is also true if all lanes are used) a binary reduction is typically applied. If this is not the case the implementation fallsback on a slow path which is linear in the number of active lanes, and so is typically significantly less performant.
+The support is provided via both the Slang core module as well as the Slang CUDA prelude found in 'prelude/slang-cuda-prelude.h'. Many Wave intrinsics are not directly applicable within CUDA which supplies a more low level mechanisms. The implementation of most Wave functions work most optimally if a 'Wave' where all lanes are used. If all lanes from index 0 to pow2(n) -1  are used (which is also true if all lanes are used) a binary reduction is typically applied. If this is not the case the implementation fallsback on a slow path which is linear in the number of active lanes, and so is typically significantly less performant.
 
 For more a more concrete example take
 
