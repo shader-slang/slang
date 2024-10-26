@@ -541,6 +541,29 @@ namespace lsp
         return result;
     }
 
+    std::optional<std::vector<lsp::Diagnostics>> LanguageServer::getDiagnostics(std::string uri)
+    {
+        std::vector<lsp::Diagnostics> result;
+        auto module = m_core->m_workspace->getCurrentVersion()->getOrLoadModule(
+            Slang::URI::fromString(Slang::UnownedStringSlice(uri.c_str())).getPath());
+        if (!module)
+            return std::nullopt;
+        for (auto& docDiag: m_core->m_workspace->getCurrentVersion()->diagnostics)
+        {
+            for (auto& message: docDiag.second.messages)
+            {
+                lsp::Diagnostics diag;
+                diag.code = Slang::String(message.code).getBuffer();
+                diag.range = translate(message.range);
+                diag.severity = (int)message.severity;
+                diag.message = message.message.getBuffer();
+                result.push_back(diag);
+            }
+        }
+        return result;
+    }
+
+
     LanguageServer* createLanguageServer()
     {
         return new LanguageServer();

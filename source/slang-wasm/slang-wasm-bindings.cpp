@@ -89,6 +89,8 @@ EMSCRIPTEN_BINDINGS(slang)
     value_object<slang::wgsl::lsp::Location>("Location")
         .field("uri", &slang::wgsl::lsp::Location::uri)
         .field("range", &slang::wgsl::lsp::Location::range);
+    register_vector<slang::wgsl::lsp::Location>("LocationList");
+    register_optional<std::vector<slang::wgsl::lsp::Location>>();
 
     value_object<slang::wgsl::lsp::TextEdit>("TextEdit")
         .field("range", &slang::wgsl::lsp::TextEdit::range)
@@ -157,6 +159,17 @@ EMSCRIPTEN_BINDINGS(slang)
     register_vector<slang::wgsl::lsp::DocumentSymbol>("DocumentSymbolList");
     register_optional<std::vector<slang::wgsl::lsp::DocumentSymbol>>();
 
+    value_object<slang::wgsl::lsp::Diagnostics>("Diagnostics")
+        .field("code", &slang::wgsl::lsp::Diagnostics::code)
+        .field("range", &slang::wgsl::lsp::Diagnostics::range)
+        .field("severity", &slang::wgsl::lsp::Diagnostics::severity)
+        .field("message", &slang::wgsl::lsp::Diagnostics::message);
+    register_vector<slang::wgsl::lsp::Diagnostics>("DiagnosticsList");
+    register_optional<std::vector<slang::wgsl::lsp::Diagnostics>>();
+
+    register_vector<uint32_t>("Uint32List");
+    register_optional<std::vector<uint32_t>>();
+
     class_<slang::wgsl::lsp::LanguageServer>("LanguageServer")
         .function(
             "didOpenTextDocument",
@@ -197,6 +210,10 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "documentSymbol",
             &slang::wgsl::lsp::LanguageServer::documentSymbol,
+            allow_raw_pointers())
+        .function(
+            "getDiagnostics",
+            &slang::wgsl::lsp::LanguageServer::getDiagnostics,
             allow_raw_pointers());
     
     function(

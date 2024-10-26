@@ -208,6 +208,14 @@ namespace lsp
         std::vector<DocumentSymbol> children;
     };
 
+    struct Diagnostics
+    {
+        std::string code;
+        Range range;
+        std::string message;
+        int severity;
+    };
+
     class LanguageServer
     {
     private:
@@ -227,6 +235,7 @@ namespace lsp
         std::optional<std::vector<uint32_t>> semanticTokens(std::string uri);
         std::optional<lsp::SignatureHelp> signatureHelp(std::string uri, lsp::Position position);
         std::optional<std::vector<lsp::DocumentSymbol>> documentSymbol(std::string uri);
+        std::optional<std::vector<lsp::Diagnostics>> getDiagnostics(std::string uri);
     };
 
     LanguageServer* createLanguageServer();
