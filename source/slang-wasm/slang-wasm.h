@@ -218,7 +218,7 @@ namespace lsp
         ~LanguageServer();
         void didOpenTextDocument(std::string uri, std::string text);
         void didCloseTextDocument(std::string uri);
-        void didChangeTextDocument(std::string uri, std::vector<lsp::TextEdit> changes);
+        void didChangeTextDocument(std::string uri, const std::vector<lsp::TextEdit>& changes);
         std::optional<lsp::Hover> hover(std::string uri, lsp::Position position);
         std::optional<std::vector<lsp::Location>> gotoDefinition(std::string uri, lsp::Position position);
         std::optional<std::vector<lsp::CompletionItem>> completion(

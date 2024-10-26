@@ -94,6 +94,8 @@ EMSCRIPTEN_BINDINGS(slang)
         .field("range", &slang::wgsl::lsp::TextEdit::range)
         .field("text", &slang::wgsl::lsp::TextEdit::text);
     register_optional<slang::wgsl::lsp::TextEdit>();
+    register_vector<slang::wgsl::lsp::TextEdit>("TextEditList");
+    register_optional<std::vector<slang::wgsl::lsp::TextEdit>>();
 
     value_object<slang::wgsl::lsp::MarkupContent>("MarkupContent")
         .field("kind", &slang::wgsl::lsp::MarkupContent::kind)
@@ -114,6 +116,8 @@ EMSCRIPTEN_BINDINGS(slang)
         .field("data", &slang::wgsl::lsp::CompletionItem::data)
         .field("commitCharacters", &slang::wgsl::lsp::CompletionItem::commitCharacters);
     register_optional<slang::wgsl::lsp::CompletionItem>();
+    register_vector<slang::wgsl::lsp::CompletionItem>("CompletionItemList");
+    register_optional<std::vector<slang::wgsl::lsp::CompletionItem>>();
 
     value_object<slang::wgsl::lsp::CompletionContext>("CompletionContext")
         .field("triggerKind", &slang::wgsl::lsp::CompletionContext::triggerKind)

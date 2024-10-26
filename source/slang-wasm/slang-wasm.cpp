@@ -322,6 +322,10 @@ namespace lsp
     void LanguageServer::init()
     {
         Slang::LanguageServerProtocol::InitializeParams args = {};
+        Slang::LanguageServerProtocol::WorkspaceFolder folder = {};
+        folder.uri = "file:///";
+        folder.name = "/";
+        args.workspaceFolders.add(folder);
         m_core->init(args);
     }
 
@@ -341,7 +345,7 @@ namespace lsp
         m_core->didCloseTextDocument(args);
     }
     
-    void LanguageServer::didChangeTextDocument(std::string uri, std::vector<lsp::TextEdit> changes)
+    void LanguageServer::didChangeTextDocument(std::string uri, const std::vector<lsp::TextEdit>& changes)
     {
         Slang::LanguageServerProtocol::DidChangeTextDocumentParams args = {};
         args.textDocument.uri = uri.c_str();
