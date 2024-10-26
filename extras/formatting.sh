@@ -2,8 +2,8 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-cd "$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)" || exit 1
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+source_dir="$(dirname "$script_dir")"
 
 check_only=0
 
@@ -11,6 +11,10 @@ while [[ "$#" -gt 0 ]]; do
   case $1 in
   -h | --help) help=1 ;;
   --check-only) check_only=1 ;;
+  --source)
+    source_dir="$2"
+    shift
+    ;;
   esac
   shift
 done
@@ -20,13 +24,16 @@ if [ "$help" ]; then
   cat <<EOF
 $me: Format or check formatting of files in this repo
 
-Usage: $me [--check-only]
+Usage: $me [--check-only] [--source <path>]
 
 Options:
     --check-only     Check formatting without modifying files
+    --source         Path to source directory to format (defaults to parent of script directory)
 EOF
   exit 0
 fi
+
+cd "$source_dir" || exit 1
 
 require_bin() {
   local name="$1"
@@ -47,11 +54,7 @@ require_bin() {
 }
 
 require_bin "git" "1.8"
-require_bin "gersemi" "0.16.2"
-
-if [ "${missing_bin:-}" = "1" ]; then
-  exit 1
-fi
+require_bin "gersemi" "0.17"
 
 if [ "$missing_bin" ]; then
   exit 1
