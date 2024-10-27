@@ -268,7 +268,7 @@ AST Serialization
 
 AST serialization uses the generalized serialization mechanism. 
 
-When serializing out an AST module it is typical to want to just serialize out the definitions within that module. Without this, the generalized serializer will crawl over the whole of the AST structure serializing every thing that can be reached - including the whole of the standard library.
+When serializing out an AST module it is typical to want to just serialize out the definitions within that module. Without this, the generalized serializer will crawl over the whole of the AST structure serializing every thing that can be reached - including the whole of the core module.
 
 The filter `ModuleSerialFilter` can be used when writing the AST module, it will replace any references to elements outside of the current module with a `ImportExternalDecl`. This contains a mangled name to the item being referenced in another module. 
 

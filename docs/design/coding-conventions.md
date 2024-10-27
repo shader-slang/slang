@@ -72,7 +72,7 @@ As a general rule, default to making the implementation of a type `public`, and 
 
 ### Slang
 
-The Slang project codebase also includes `.slang` files implementing the Slang standard library, as well as various test cases and examples.
+The Slang project codebase also includes `.slang` files implementing the Slang core module, as well as various test cases and examples.
 The conventions described here are thus the "official" recommendations for how users should format Slang code.
 
 To the extent possible, we will try to apply the same basic conventions to both C++ and Slang.
@@ -132,7 +132,7 @@ Namespaces
 Favor fewer namespaces when possible.
 Small programs may not need any.
 
-All library code that a Slang user might link against should go in the `Slang` namespace for now, to avoid any possibility of clashes in a static linking scenario.
+All standard module code that a Slang user might link against should go in the `Slang` namespace for now, to avoid any possibility of clashes in a static linking scenario.
 The public C API is obviously an exception to this.
 
 

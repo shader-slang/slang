@@ -9,7 +9,7 @@ Slang aims to be a portable language for shader programming, which introduces tw
 
 Item (2) is traditionally handled with preprocessor techniques (e.g., `#ifdef`ing the body of a function based on target platform), but that of course requires that the user invoke the Slang front end once for each target platform, and target-specific coding in a library will then "infect" code that uses that library, forcing them to invoke the front-end once per target as well.
 
-We are especially sensitive to this problem in the compiler itself, because we have to author and maintain the Slang standard library, which needs to (1) expose the capabilities of many platforms and (2) work across all those platforms. It would be very unfortunate if we had to build different copies of our standard library per-target.
+We are especially sensitive to this problem in the compiler itself, because we have to author and maintain the Slang standard modules, which needs to (1) expose the capabilities of many platforms and (2) work across all those platforms. It would be very unfortunate if we had to build different copies of our standard modules per-target.
 
 The intention in Slang is to solve both of these problems with a system of *capabilities*.
 
@@ -19,7 +19,7 @@ What is a capability?
 For our purposes a capability is a discrete feature that a compilation target either does or does not support.
 We could imagine defining a capability for the presence of texture sampling operations with implicit gradients; this capability would be supported when generating fragment shader kernel code, but not when generating code for other stages.
 
-Let's imagine a language syntax that the standard library could use to define some *atomic* capabilities:
+Let's imagine a language syntax that the standard modules could use to define some *atomic* capabilities:
 
 ```
 capability implicit_gradient_texture_fetches;
@@ -268,4 +268,4 @@ Conclusion
 ----------
 
 Overall, the hope is that in many cases developers will be able to use capability-based partitioning and overloading of APIs to build code that only has to pass through the Slang front-end once, but that can then go through back-end code generation for each target.
-In cases where this can't be achieved, the way that capability-based overloading is built into the Slang IR design means that we should be able to merge multiple target-specific definitions into one IR module, so that a library can employ target-specific specializations while still presenting a single API to consumers.
+In cases where this can't be achieved, the way that capability-based overloading is built into the Slang IR design means that we should be able to merge multiple target-specific definitions into one IR module, so that a module can employ target-specific specializations while still presenting a single API to consumers.

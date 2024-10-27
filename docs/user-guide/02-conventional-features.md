@@ -275,7 +275,7 @@ enum Channel
 
 ### Opaque Types
 
-The Slang standard library defines a large number of _opaque_ types which provide access to objects that are allocated via GPU APIs.
+The Slang core module defines a large number of _opaque_ types which provide access to objects that are allocated via GPU APIs.
 
 What all opaque types have in common is that they are not "first-class" types on most platforms.
 Opaque types (and structure or array types that contain them) may be limited in the following ways (depending on the platform):
