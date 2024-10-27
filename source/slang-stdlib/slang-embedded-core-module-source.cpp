@@ -1,7 +1,7 @@
 #include "slang-compiler.h"
 #include "slang-ir.h"
 #include "slang-ir-util.h"
-#include "slang-stdlib-textures.h"
+#include "slang-core-module-textures.h"
 
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
@@ -9,7 +9,7 @@
 
 namespace Slang
 {
-    // We are going to generate the stdlib source code from a more compact
+    // We are going to generate the core module source code from a more compact
     // description. For example, we need to generate all the `operator`
     // declarations for the basic unary and binary math operations on
     // builtin types. To do this, we will make a big array of all these
@@ -284,7 +284,7 @@ namespace Slang
 
     ComPtr<ISlangBlob> Session::getCoreLibraryCode()
     {
-#if SLANG_EMBED_STDLIB_SOURCE
+#if SLANG_EMBED_CORE_MODULE_SOURCE
         if (!coreLibraryCode)
         {
             StringBuilder sb;
@@ -298,7 +298,7 @@ namespace Slang
 
     ComPtr<ISlangBlob> Session::getHLSLLibraryCode()
     {
-#if SLANG_EMBED_STDLIB_SOURCE
+#if SLANG_EMBED_CORE_MODULE_SOURCE
         if (!hlslLibraryCode)
         {
             const String path = getStdlibPath();
@@ -312,7 +312,7 @@ namespace Slang
 
     ComPtr<ISlangBlob> Session::getAutodiffLibraryCode()
     {
-#if SLANG_EMBED_STDLIB_SOURCE
+#if SLANG_EMBED_CORE_MODULE_SOURCE
         if (!autodiffLibraryCode)
         {
             const String path = getStdlibPath();

@@ -28,7 +28,7 @@ to interop more directly with other parts of the user application written in oth
 Proposed Approach
 -----------------
 
-With variadic generics support, we can now easily define a Tuple type in stdlib as:
+With variadic generics support, we can now easily define a Tuple type in the core module as:
 ```
 __generic<each T>
 __magic_type(TupleType)
@@ -43,7 +43,7 @@ This will allow users to instantiate tuple types from their code with `Tuple<T0,
 
 ### Constructing Tuple Values
 
-To make it easy to construct tuples, we will define a `makeTuple` function in stdlib as:
+To make it easy to construct tuples, we will define a `makeTuple` function in the core module as:
 ```
 __intrinsic_op($(kIROp_MakeTuple))
 Tuple<expand each T> makeTuple(expand each T values);
@@ -73,7 +73,7 @@ let v = t._1_0;
 
 ### Concatenation
 
-We can define tuple concatenation operation in stdlib as:
+We can define tuple concatenation operation in the core module as:
 ```
 Tuple<expand each T, expand each U> concat<each T, each U>(Tuple<expand each T> first, Tuple<expand each U> second)
 {
@@ -103,7 +103,7 @@ int foo<each T>()
 ### Operator Overloads
 
 We should have builtin operator overloads for all comparison operators if every element type of a tuple conforms to `IComparable`.
-This can be supported by defining an overload for these operators in stdlib in the form of:
+This can be supported by defining an overload for these operators in the core module in the form of:
 ```
 bool assign(inout bool r, bool v) { r = v;  return v; }
 
@@ -137,4 +137,4 @@ Tuple<T, U> concat<each T, each U>(Tuple<T> t, each U values);
 ```
 However, this could lead to surprising behavior when the user writes `concat(t0, t1, t2)` where t1 and t2 are also tuples.
 Having this overload means the result would be `(t0_0, t0_1, ... t0_n, t1, t2)` where the user could be expecting `t1` and `t2`
-to be flattened into the resulting tuple. To avoid this surprising behavior, we decide to not include this overload in stdlib.
+to be flattened into the resulting tuple. To avoid this surprising behavior, we decide to not include this overload in the core module.
