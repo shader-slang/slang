@@ -1,17 +1,17 @@
-Stdlib Intrinsics
-=================
+Core Module Intrinsics
+======================
 
-The following document aims to cover a variety of systems used to add target specific features. They are most extensively used in the slang standard library (stdlib).
+The following document aims to cover a variety of systems used to add target specific features. They are most extensively used in the slang core module.
 
 **NOTE!** These features should *not* be considered stable! They can be used in regular slang code to add features, but they risk breaking with any Slang version change. Additionally the features implementation can be very particular to what is required for a specific feature set, so might not work as expected in all scenarios.
 
 As these features are in flux, it is quite possible this document is behind the current features available within the Slang code base.
 
-If you want to add support for a feature for a target to Slang, implementing it as part of the Slang standard library is typically a good way to progress. Depending on the extension/feature it may not be possible to add support exclusively via changes to the standard library alone. That said most support for target specific extensions and features involve at least some changes to the slang standard library, and typically using the mechanisms described here.
+If you want to add support for a feature for a target to Slang, implementing it as a part of the Slang standard modules is typically a good way to progress. Depending on the extension/feature it may not be possible to add support exclusively via changes to the standard module alone. That said most support for target specific extensions and features involve at least some changes to the slang standard modules including the core module, and typically using the mechanisms described here.
 
-## Standard Library
+## Core Module
 
-The main place these features are used are within the slang standard library (aka stdlib). This is implemented with a set of slang files within the slang project
+The main place these features are used are within the slang core module. This is implemented with a set of slang files within the slang project
 
 * core.meta.slang 
 * hlsl.meta.slang
@@ -146,7 +146,7 @@ Used before a type declaration. The clsName is the name of the class that is use
 
 Used to specify the IR opcode associated with a type. The IR opcode is listed as something like `$(kIROp_HLSLByteAddressBufferType)`, which will expand to the integer value of the opcode (because the opcode value is an enum value that is visible from C++). It is possible to just write the opcode number, but that is generally inadvisable as the ids for ops are not stable. If a code change in Slang C++ adds or removes an opcode the number is likely to be incorrect.
 
-As an example from stdlib
+As an example from the core module
 
 ```slang
 __magic_type(HLSLByteAddressBufferType)

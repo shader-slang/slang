@@ -1,7 +1,7 @@
 Basic Interfaces
 ================
 
-The Slang standard library is in need of basic interfaces that allow generic code to be written that abstracts over built-in types.
+The Slang core module is in need of basic interfaces that allow generic code to be written that abstracts over built-in types.
 This document sketches what the relevant interfaces and their operations might be.
 
 Status
@@ -49,7 +49,7 @@ T horizontalSum<T : __BuiltinFloatingPointType>( vector<T,4> v )
 }
 ```
 
-This alternative is much more palatable to users, but it results in them using a double-underscored interface (which we consider to mean "implementation details that are subject to change"). Users often get tripped up when they find out that certain operations that make sense to be available through `__BuiltinFloatingPointType` are not available (because those operations were not needed in the definition of the stdlib, which is what the `__` interfaces were created to support).
+This alternative is much more palatable to users, but it results in them using a double-underscored interface (which we consider to mean "implementation details that are subject to change"). Users often get tripped up when they find out that certain operations that make sense to be available through `__BuiltinFloatingPointType` are not available (because those operations were not needed in the definition of the core module, which is what the `__` interfaces were created to support).
 
 Related Work
 ------------
@@ -228,7 +228,7 @@ The main reason for the current `__Builtin` interfaces is that it allows us to d
 
 ### What should the naming convention be for `interface`s in Slang?
 
-These would be the first `interface`s officially exposed by the standard library.
+These would be the first `interface`s officially exposed by the core module.
 While most of our existing code written in Slang uses an `I` prefix as the naming convention for `interface`s (e.g., `IThing`), we have never really discussed that choice in detail.
 Whatever we decide to expose for this stuff is likely to become the de facto convention for Slang code.
 

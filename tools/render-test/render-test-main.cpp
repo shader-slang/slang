@@ -1397,12 +1397,12 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     // Assume we will used the shared session
     ComPtr<slang::IGlobalSession> session(sharedSession);
 
-    // The sharedSession always has a pre-loaded stdlib.
-    // This differed test checks if the command line has an option to setup the stdlib.
-    // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
-    if (TestToolUtil::hasDeferredStdLib(Index(inArgc - 1), inArgv + 1))
+    // The sharedSession always has a pre-loaded core module.
+    // This differed test checks if the command line has an option to setup the core module.
+    // If so we *don't* use the sharedSession, and create a new session without the core module just for this compilation. 
+    if (TestToolUtil::hasDeferredCoreModule(Index(inArgc - 1), inArgv + 1))
     {
-        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, session.writeRef()));
     }
 
     SlangResult res = SLANG_FAIL;
