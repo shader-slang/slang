@@ -7,38 +7,39 @@ Slang is a shading language that makes it easier to build and maintain large sha
 Slang is based on years of collaboration between researchers at NVIDIA, Carnegie Mellon University, Stanford, MIT, UCSD and the University of Washington.
 
 
-# Why Slang?
+Why Slang?
+---------------
 
 The Slang shading language is designed to enable real-time graphics developers to work with large-scale, high-performance shader code.
 
-## Write Shaders Once, Run Anywhere
+### Write Shaders Once, Run Anywhere
 
 The Slang compiler can generate code for a wide variety of targets: D3D12, Vulkan, Metal, D3D11, OpenGL, CUDA, and even generate code to run on a CPU. For textual targets, such as Metal Shading Language (MSL) and CUDA, Slang produces readable code that preserves original identifier names, as well as the type and call structure, making it easier to debug.
 
-## Access the Latest GPU Features
+### Access the Latest GPU Features
 
 Slang code is highly portable, but can still leverage unique platform capabilities, including the latest features in Direct3D and Vulkan. For example, developers can make full use of [pointers](https://shader-slang.com/slang/user-guide/convenience-features.html#pointers-limited) when generating SPIR-V.
 Slang's [capability system](https://shader-slang.com/slang/user-guide/capabilities.html) helps applications manage feature set differences across target platforms by ensuring code only uses available features during the type-checking step, before generating final code. Additionally, Slang provides [flexible interop](https://shader-slang.com/slang/user-guide/a1-04-interop.html) features to enable directly embedding target code or SPIR-V into generated shaders.
 
-## Leverage Neural Graphics with Automatic Differentiation
+### Leverage Neural Graphics with Automatic Differentiation
 
 Slang can [automatically generate both forward and backward derivative propagation code](https://shader-slang.com/slang/user-guide/autodiff.html) for complex functions that involve arbitrary control flow and dynamic dispatch. This allows existing rendering codebases to easily become differentiable, or for Slang to serve as the kernel language in a PyTorch-driven machine learning framework via [`slangtorch`](https://shader-slang.com/slang/user-guide/a1-02-slangpy.html).
 
-## Scalable Software Development with Modules
+### Scalable Software Development with Modules
 
 Slang provides a [module system](https://shader-slang.com/slang/user-guide/modules.html) that enables logical organization of code for separate compilation. Slang modules can be independently compiled offline to a custom IR (with optional obfuscation) and then linked at runtime to generate code in formats such as DXIL or SPIR-V.
 
-## Code Specialization that Works with Modules
+### Code Specialization that Works with Modules
 
 Slang supports [generics and interfaces](https://shader-slang.com/slang/user-guide/interfaces-generics.html) (a.k.a. type traits/protocols), allowing for clear expression of shader specialization without the need for preprocessor techniques or string-pasting. Unlike C++ templates, Slang's generics are pre-checked and don't produce cascading error messages that are difficult to diagnose. The same generic shader can be specialized for a variety of different types to produce specialized code ahead of time, or on the fly, entirely under application control.
 
-## Easy On-ramp for HLSL and GLSL Codebases
+### Easy On-ramp for HLSL and GLSL Codebases
 
 Slang's syntax is similar to HLSL, and most existing HLSL code can be compiled with the Slang compiler out-of-the-box, or with just minor modifications. This allows existing shader codebases to immediately benefit from Slang without requiring a complete rewrite or port.
 
 Slang provides a compatibility module that enables the use of most GLSL intrinsic functions and GLSL's parameter binding syntax.
 
-## Comprehensive Tooling Support
+### Comprehensive Tooling Support
 
 Slang comes with full support of IntelliSense editing features in Visual Studio Code and Visual Studio through the Language Server Protocol.
 Full debugging capabilities are also available through RenderDoc and SPIR-V based tools.
