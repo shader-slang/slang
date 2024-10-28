@@ -237,8 +237,9 @@ struct ByteAddressBuffer
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint2`, which is 4.
-    ///@param location The input address in bytes, which must be a multiple of alignment of 4.
+    /// of stride of `uint2`, which is 8.
+    ///@param location The input address in bytes, which must be a multiple of alignment of 8. Invalid
+    /// value of location will cause undefined behavior.
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -305,8 +306,8 @@ struct ByteAddressBuffer
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint3`, which is 4.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
+    /// of stride of `uint3`, which is 12.
+    ///@param location The input address in bytes which must be a multiple of alignment of 12.
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -372,8 +373,8 @@ struct ByteAddressBuffer
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`, which is 4.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
+    /// of `uint4`, which is 16.
+    ///@param location The input address in bytes which must be a multiple of alignment of 16.
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -403,8 +404,10 @@ struct ByteAddressBuffer
     }
 
     /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
+    ///@param location The input address in bytes which must be a multiply of size of `T`.
     ///@return T value with type `T` loaded from the buffer.
+    ///@remarks
+    ///Currently, this function only supports when `T` is scalar, vector or matrix type.
     [__readNone]
     [ForceInline]
     T LoadAligned<T>(int location)
@@ -4372,8 +4375,8 @@ struct $(item.name)
     }
 
     /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint2`, which is 4.
-    ///@param location The input address in bytes, which must be a multiple of alignment of 4.
+    /// of `uint2`, which is 8.
+    ///@param location The input address in bytes, which must be a multiple of alignment of 8.
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -4440,8 +4443,8 @@ struct $(item.name)
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint3`, which is 4.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
+    /// of `uint3`, which is 12.
+    ///@param location The input address in bytes which must be a multiple of alignment of 12.
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -4507,8 +4510,8 @@ struct $(item.name)
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`, which is 4.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
+    /// of `uint4`, which is 16.
+    ///@param location The input address in bytes which must be a multiple of alignment of 16.
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -4551,8 +4554,10 @@ struct $(item.name)
     }
 
     /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
+    ///@param location The input address in bytes which must be a multiple of size of `T`.
     ///@return T value with type `T` loaded from the buffer.
+    ///@remarks
+    ///Currently, this function only supports when `T` is scalar, vector, or matrix type.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -5103,8 +5108,8 @@ ${{{{
     }
 
     /// Set two values to the buffer at the specified location, the address will be aligned
-    /// to the alignment of  `uint2`, which is 4.
-    ///@param address The input address in bytes, which must be a multiple of 4.
+    /// to the alignment of  `uint2`, which is 8.
+    ///@param address The input address in bytes, which must be a multiple of 8.
     ///@param value Two input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -5147,8 +5152,8 @@ ${{{{
     }
 
     /// Set three values to the buffer at the specified location, the address will be aligned
-    /// to the alignment of `uint3`, which is 4.
-    ///@param address The input address in bytes, which must be a multiple of 4.
+    /// to the alignment of `uint3`, which is 12.
+    ///@param address The input address in bytes, which must be a multiple of 12.
     ///@param value Three input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
@@ -5192,8 +5197,8 @@ ${{{{
     }
 
     /// Set four values to the buffer at the specified location, the address will be aligned
-    /// to the alignment of `uint4`, which is 4.
-    ///@param address The input address in bytes, which must be a multiple of 4.
+    /// to the alignment of `uint4`, which is 16.
+    ///@param address The input address in bytes, which must be a multiple of 16.
     ///@param value Four input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -5222,7 +5227,7 @@ ${{{{
     /// Set four values to the buffer at the specified location, the address will be aligned
     /// to the alignment of `T`.
     ///@param T The type of the input value.
-    ///@param address The input address in bytes, which must be a multiple of 4.
+    ///@param address The input address in bytes, which must be a multiple of size of `T`.
     ///@param value The input value.
     [ForceInline]
     void StoreAligned<T>(uint address, T value)
