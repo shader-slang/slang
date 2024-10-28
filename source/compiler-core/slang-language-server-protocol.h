@@ -6,6 +6,7 @@
 
 #include "../../source/core/slang-rtti-info.h"
 #include "../../source/compiler-core/slang-json-value.h"
+#include <optional>
 
 namespace Slang
 {
@@ -1124,3 +1125,32 @@ struct DocumentFormattingParams
 
 } // namespace LanguageServerProtocol
 } // namespace Slang
+
+namespace Slang
+{
+    template<typename T>
+    struct LanguageServerResult
+    {
+        SlangResult returnCode;
+        bool isNull = true;
+        T result;
+        LanguageServerResult()
+        {
+            returnCode = SLANG_OK;
+        }
+        LanguageServerResult(std::nullopt_t)
+        {
+            returnCode = SLANG_OK;
+        }
+        LanguageServerResult(const T& value)
+        {
+            result = value;
+            isNull = false;
+            returnCode = SLANG_OK;
+        }
+        LanguageServerResult(SlangResult code)
+        {
+            returnCode = code;
+        }
+    };
+}

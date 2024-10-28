@@ -254,6 +254,10 @@ alias cpp_cuda = cpp | cuda;
 /// [Compound]
 alias cpp_cuda_spirv = cpp | cuda | spirv;
 
+/// CUDA and SPIRV code-gen targets
+/// [Compound]
+alias cuda_spirv = cuda | spirv;
+
 /// CPP, CUDA, GLSL and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
@@ -522,6 +526,10 @@ def spvAtomicFloat32AddEXT : SPV_EXT_shader_atomic_float_add;
 /// [EXT]
 def spvAtomicFloat16AddEXT : SPV_EXT_shader_atomic_float16_add;
 
+/// Represents the SPIR-V capability for atomic float 64 add operations.
+/// [EXT]
+def spvAtomicFloat64AddEXT : SPV_EXT_shader_atomic_float_add;
+
 /// Represents the SPIR-V capability for 64-bit integer atomics.
 /// [EXT]
 def spvInt64Atomics : _spirv_1_0;
@@ -533,6 +541,10 @@ def spvAtomicFloat32MinMaxEXT : SPV_EXT_shader_atomic_float_min_max;
 /// Represents the SPIR-V capability for atomic float 16 min/max operations.
 /// [EXT]
 def spvAtomicFloat16MinMaxEXT : SPV_EXT_shader_atomic_float_min_max;
+
+/// Represents the SPIR-V capability for atomic float 64 min/max operations.
+/// [EXT]
+def spvAtomicFloat64MinMaxEXT : SPV_EXT_shader_atomic_float_min_max;
 
 /// Represents the SPIR-V capability for 'derivative control' operations.
 /// [EXT]

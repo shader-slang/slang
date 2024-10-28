@@ -1,5 +1,3 @@
-// slang-stdlib.cpp
-
 #include "slang-compiler.h"
 #include "slang-ir.h"
 #include "../core/slang-string-util.h"

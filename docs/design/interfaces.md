@@ -163,7 +163,7 @@ That is intentional, because at the most basic level, interfaces are designed to
 
 ### Generic Declarations
 
-The Slang compiler currently has some ad hoc support for generic declarations that it uses to implement the HLSL standard library (which has a few generic types).
+The Slang compiler currently has some ad hoc support for generic declarations that it uses to implement the HLSL standard module (which has a few generic types).
 The syntax for those is currently very bad, and it makes sense to converge on the style for generic declarations used by C# and Swift:
 
     float myGenericFunc<T>(T someValue);
