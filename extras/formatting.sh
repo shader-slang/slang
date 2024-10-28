@@ -6,11 +6,13 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source_dir="$(dirname "$script_dir")"
 
 check_only=0
+no_version_check=0
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
   -h | --help) help=1 ;;
   --check-only) check_only=1 ;;
+  --no-version-check) no_version_check=1 ;;
   --source)
     source_dir="$2"
     shift
@@ -24,11 +26,12 @@ if [ "$help" ]; then
   cat <<EOF
 $me: Format or check formatting of files in this repo
 
-Usage: $me [--check-only] [--source <path>]
+Usage: $me [--check-only] [--no-version-check] [--source <path>]
 
 Options:
-    --check-only     Check formatting without modifying files
-    --source         Path to source directory to format (defaults to parent of script directory)
+    --check-only       Check formatting without modifying files
+    --no-version-check Skip version compatibility checks
+    --source           Path to source directory to format (defaults to parent of script directory)
 EOF
   exit 0
 fi
@@ -46,10 +49,12 @@ require_bin() {
     return
   fi
 
-  version=$("$name" --version | grep -oP "$name(?:\s+version)?\s+\K\d+\.\d+\.?\d*")
-  if ! printf '%s\n%s\n' "$required" "$version" | sort -V -C; then
-    echo "$name version $version is too old. Version $required or newer is required."
-    missing_bin=1
+  if [ "$no_version_check" -eq 0 ]; then
+    version=$("$name" --version | grep -oP "$name(?:\s+version)?\s+\K\d+\.\d+\.?\d*")
+    if ! printf '%s\n%s\n' "$required" "$version" | sort -V -C; then
+      echo "$name version $version is too old. Version $required or newer is required."
+      missing_bin=1
+    fi
   fi
 }
 
@@ -82,3 +87,4 @@ cmake_formatting() {
 cmake_formatting
 
 exit $exit_code
+
