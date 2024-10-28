@@ -947,13 +947,13 @@ extern "C"
             // Internal
 
             ArchiveType,
-            CompileStdLib,
+            CompileCoreModule,
             Doc,
             IrCompression,
-            LoadStdLib,
+            LoadCoreModule,
             ReferenceModule,
-            SaveStdLib,
-            SaveStdLibBinSource,
+            SaveCoreModule,
+            SaveCoreModuleBinSource,
             TrackLiveness,
             LoopInversion,              // bool, enable loop inversion optimization
 
@@ -3307,10 +3307,10 @@ namespace slang
 
     };
 
-    typedef uint32_t CompileStdLibFlags;
-    struct CompileStdLibFlag
+    typedef uint32_t CompileCoreModuleFlags;
+    struct CompileCoreModuleFlag
     {
-        enum Enum : CompileStdLibFlags
+        enum Enum : CompileCoreModuleFlags
         {
             WriteDocumentation = 0x1,
         };
@@ -3482,27 +3482,27 @@ namespace slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(
             SlangPassThrough    passThrough) = 0;
 
-            /** Compile from (embedded source) the StdLib on the session.
-            Will return a failure if there is already a StdLib available
+            /** Compile from (embedded source) the core module on the session.
+            Will return a failure if there is already a core module available
             NOTE! API is experimental and not ready for production code
             @param flags to control compilation
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib(CompileStdLibFlags flags) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileCoreModule(CompileCoreModuleFlags flags) = 0;
 
-            /** Load the StdLib. Currently loads modules from the file system. 
-            @param stdLib Start address of the serialized stdlib
-            @param stdLibSizeInBytes The size in bytes of the serialized stdlib
+            /** Load the core module. Currently loads modules from the file system. 
+            @param coreModule Start address of the serialized core module
+            @param coreModuleSizeInBytes The size in bytes of the serialized core module
 
             NOTE! API is experimental and not ready for production code
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes) = 0;
 
-            /** Save the StdLib modules to the file system
-            @param archiveType The type of archive used to hold the stdlib
-            @param outBlob The serialized blob containing the standard library
+            /** Save the core module to the file system
+            @param archiveType The type of archive used to hold the core module
+            @param outBlob The serialized blob containing the core module
 
             NOTE! API is experimental and not ready for production code  */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob) = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) = 0;
 
             /** Look up the internal ID of a capability by its `name`.
 
@@ -4232,7 +4232,7 @@ namespace slang
 // using. 
 #define SLANG_API_VERSION 0
 
-/* Create a global session, with built in StdLib.
+/* Create a global session, with the built-in core module.
 
 @param apiVersion Pass in SLANG_API_VERSION
 @param outGlobalSession (out)The created global session. 
@@ -4241,22 +4241,24 @@ SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSession(
     SlangInt                apiVersion,
     slang::IGlobalSession** outGlobalSession);
 
-/* Create a global session, but do not set up the stdlib. The stdlib can
-then be loaded via loadStdLib or compileStdLib
+/* Create a global session, but do not set up the core module. The core module can
+then be loaded via loadCoreModule or compileCoreModule
 
 @param apiVersion Pass in SLANG_API_VERSION
-@param outGlobalSession (out)The created global session that doesn't have a StdLib setup.
+@param outGlobalSession (out)The created global session that doesn't have a core module setup.
 
 NOTE! API is experimental and not ready for production code 
 */
-SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSessionWithoutStdLib(
+SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     SlangInt                apiVersion,
     slang::IGlobalSession** outGlobalSession);
 
-/* Returns a blob that contains the serialized stdlib.
-Returns nullptr if there isn't an embedded stdlib.
+/* Returns a blob that contains the serialized core module.
+Returns nullptr if there isn't an embedded core module.
+
+NOTE! API is experimental and not ready for production code
 */
-SLANG_API ISlangBlob* slang_getEmbeddedStdLib();
+SLANG_API ISlangBlob* slang_getEmbeddedCoreModule();
 
 
 /* Cleanup all global allocations used by Slang, to prevent memory leak detectors from

@@ -169,13 +169,13 @@ slangc module-source.slang -o module.zip -g -obfuscate
 
 This will compile "module-source.slang" into SlangIR module (aka `slang-module`) and places the `.slang-module` inside of the zip. As obfuscation is enabled the .zip will also contain the obfuscated source map for the module. 
 
-The `.zip` file can now be used and referenced as a library 
+The `.zip` file can now be used and referenced as a module 
 
 ```
 slangc source.slang -target dxil -stage compute -entry computeMain -obfuscate -r module.zip
 ```
 
-Notice here that the `-r` library reference is to the `.zip` file rather than the more usual `.slang-module` that is contained in the zip file. By referencing the library in this way Slang will automatically associate the contained obfuscated source map with the module. It will use that mapping for outputting diagnostics.
+Notice here that the `-r` module reference is to the `.zip` file rather than the more usual `.slang-module` that is contained in the zip file. By referencing the module in this way Slang will automatically associate the contained obfuscated source map with the module. It will use that mapping for outputting diagnostics.
 
 It is also worth noticing that in this second compilation, using `module.zip`, we need the `-obfuscate` flag set. If this isn't set linking will not work correctly.
 
@@ -256,7 +256,7 @@ Why you might not want to use an emit source map
 * The `#line` mechanism doesn't require any special handling, and the mapping back is embedded directly into the emitted source/output binary
 * There is more housekeeping in getting keeping and using source maps
 * Currently Slang doesn't directly expose a source map processing API directly  
-  * We do support source maps in library files, or produced as part of a compilation
+  * We do support source maps in module files, or produced as part of a compilation
   * A developer could use the slang `compiler-core` implementation
   * In the future the project could provide some API support 
 

@@ -71,7 +71,7 @@ This means that most of the language "keywords" in Slang aren't keywords at all,
 Syntax declarations are associated with a callback that is invoked to parse the construct they name.
 
 The design of treating syntax as ordinary declarations has a long-term motivation (we'd like to support a flexible macro system) but it also has short-term practical benefits.
-It is easy for us to add new modifier keywords to the language without touching the lexer or parser (just adding them to the standard library), and we also don't have to worry about any of Slang's extended construct (e.g., `import`) breaking existing HLSL code that just happens to use one of those new keywords as a local variable name.
+It is easy for us to add new modifier keywords to the language without touching the lexer or parser (just adding them to the core module), and we also don't have to worry about any of Slang's extended construct (e.g., `import`) breaking existing HLSL code that just happens to use one of those new keywords as a local variable name.
 
 What the parser produces is an abstract syntax tree (AST).
 The AST currently uses a strongly-typed C++ class hierarchy with a "visitor" API generated via some ugly macro magic.
@@ -186,7 +186,7 @@ We make a copy of things so that any optimization/transformation passes we do fo
 
 While copying IR code into the fresh module, we have cases where there might be multiple definitions of the same function or other entity.
 In those cases, we apply "target specialization" to pick the definition that is the best for the chosen target.
-This step is where we can select between, say, a built-in definition of the `saturate` function for D3D targets, vs. a hand-written one in the Slang standard library to use for GLSL-based targets.
+This step is where we can select between, say, a built-in definition of the `saturate` function for D3D targets, vs. a hand-written one in a Slang standard module to use for GLSL-based targets.
 
 ### API Legalization
 

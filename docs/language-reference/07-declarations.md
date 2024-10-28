@@ -642,7 +642,7 @@ float f = v.getLength();
 int n = MyVector.getDimensionality();
 ```
 
-An extension declaration need not be placed in the same module as the type being extended; it is possible to extend a type from third-party or standard-library code.
+An extension declaration need not be placed in the same module as the type being extended; it is possible to extend a type from third-party or standard module code.
 The members of an extension are only visible inside of modules that `import` the module declaring the extension;
 extension members are *not* automatically visible wherever the type being extended is visible.
 

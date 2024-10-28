@@ -268,7 +268,7 @@ struct MyRayDifferential : IDifferentiable
     float3 d_dir;
 }
 ```
-In this case, since all fields in `MyRayDifferential` are differentiable, and the `Differential` of each field is the same as the original type of each field (i.e. `float3.Differential == float3` as defined in built-in library), the compiler will automatically use the type itself as its own `Differential`, making `MyRayDifferential` suitable for use as `Differential` of `MyRay`.
+In this case, since all fields in `MyRayDifferential` are differentiable, and the `Differential` of each field is the same as the original type of each field (i.e. `float3.Differential == float3` as defined in the core module), the compiler will automatically use the type itself as its own `Differential`, making `MyRayDifferential` suitable for use as `Differential` of `MyRay`.
 
 We can also choose to manually implement `IDifferentiable` interface for `MyRayDifferential` as in the following code:
 
@@ -487,7 +487,7 @@ void back_prop(
 
 ## Builtin Differentiable Functions
 
-The following built-in functions are backward differentiable and both their forward-derivative and backward-propagation functions are already defined in the built-in library:
+The following built-in functions are backward differentiable and both their forward-derivative and backward-propagation functions are already defined in the core module:
 
 - Arithmetic functions: `abs`, `max`, `min`, `sqrt`, `rcp`, `rsqrt`, `fma`, `mad`, `fmod`, `frac`, `radians`, `degrees`
 - Interpolation and clamping functions: `lerp`, `smoothstep`, `clamp`, `saturate`

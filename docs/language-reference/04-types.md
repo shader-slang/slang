@@ -92,7 +92,7 @@ The alignment of a vector type may vary by target platforms.
 The alignment of `vector<T,N>` will be at least the alignment of `T` and may be at most `N` times the alignment of `T`.
 
 As a convenience, Slang defines built-in type aliases for vectors of the built-in scalar types.
-E.g., declarations equivalent to the following are provided by the Slang standard library:
+E.g., declarations equivalent to the following are provided by the Slang core module:
 
 ```hlsl
 typealias float4 = vector<float, 4>;
@@ -139,7 +139,7 @@ Under column-major layout, a matrix is laid out in memory equivalent to the row-
 This means it will be laid out equivalently to a `C`-element array of `vector<T,R>` elements.
 
 As a convenience, Slang defines built-in type aliases for matrices of the built-in scalar types.
-E.g., declarations equivalent to the following are provided by the Slang standard library:
+E.g., declarations equivalent to the following are provided by the Slang core module:
 
 ```hlsl
 typealias float3x4 = matrix<float, 3, 4>;
@@ -311,7 +311,7 @@ Opaque Types
 _Opaque_ types are built-in types that (depending on the target platform) may not have a well-defined size or representation in memory.
 Similar languages may refer to these as "resource types" or "object types."
 
-The full list of opaque types supported by Slang can be found in the standard library reference, but important examples are:
+The full list of opaque types supported by Slang can be found in the core module reference, but important examples are:
 
 * Texture types such as `Texture2D<T>`, `TextureCubeArray<T>`, and `RWTexture2DMS<T>`
 * Sampler state types: `SamplerState` and `SamplerComparisonState`

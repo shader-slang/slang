@@ -84,7 +84,7 @@ bool isDeclKeyword(const UnownedStringSlice& slice)
     return false;
 }
 
-SlangResult CompletionContext::tryCompleteHLSLSemantic()
+LanguageServerResult<CompletionResult> CompletionContext::tryCompleteHLSLSemantic()
 {
     if (version->linkage->contentAssistInfo.completionSuggestions.scopeKind !=
         CompletionSuggestions::ScopeKind::HLSLSemantics)
@@ -99,23 +99,20 @@ SlangResult CompletionContext::tryCompleteHLSLSemantic()
         item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
         items.add(item);
     }
-    server->m_connection->sendResult(&items, responseId);
-    return SLANG_OK;
+    return CompletionResult(_Move(items));
 }
 
-SlangResult CompletionContext::tryCompleteAttributes()
+LanguageServerResult<CompletionResult> CompletionContext::tryCompleteAttributes()
 {
     if (version->linkage->contentAssistInfo.completionSuggestions.scopeKind !=
         CompletionSuggestions::ScopeKind::Attribute)
     {
         return SLANG_FAIL;
     }
-    List<LanguageServerProtocol::CompletionItem> items = collectAttributes();
-    server->m_connection->sendResult(&items, responseId);
-    return SLANG_OK;
+    return collectAttributes();
 }
 
-List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFileAndModuleCompletionItems(
+CompletionResult CompletionContext::gatherFileAndModuleCompletionItems(
     const String& prefixPath,
     bool translateModuleName,
     bool isImportString,
@@ -299,10 +296,10 @@ List<LanguageServerProtocol::TextEditCompletionItem> CompletionContext::gatherFi
             }
         }
     }
-    return context.items;
+    return CompletionResult(_Move(context.items));
 }
 
-SlangResult CompletionContext::tryCompleteImport()
+LanguageServerResult<CompletionResult> CompletionContext::tryCompleteImport()
 {
     const char* prefixes[] = { "import ", "__include ", "implementing " };
     UnownedStringSlice lineContent;
@@ -358,13 +355,11 @@ validLine:;
             prefixSB.appendChar(ch);
     }
     auto prefix = prefixSB.produceString();
-    auto items = gatherFileAndModuleCompletionItems(
+    return gatherFileAndModuleCompletionItems(
         prefix, true, false, line - 1, fileNameEnd, lastPos + 1, sectionEnd, 0);
-    server->m_connection->sendResult(&items, responseId);
-    return SLANG_OK;
 }
 
-SlangResult CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineContent, Index pos, bool isImportString)
+LanguageServerResult<CompletionResult> CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineContent, Index pos, bool isImportString)
 {
     while (pos < lineContent.getLength() && (lineContent[pos] != '\"' && lineContent[pos] != '<'))
         pos++;
@@ -405,7 +400,7 @@ SlangResult CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineCon
             prefixSB.appendChar(ch);
     }
     auto prefix = prefixSB.produceString();
-    auto items = gatherFileAndModuleCompletionItems(
+    return gatherFileAndModuleCompletionItems(
         prefix,
         false,
         isImportString,
@@ -414,11 +409,9 @@ SlangResult CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineCon
         lastPos + 1,
         sectionEnd,
         closingChar);
-    server->m_connection->sendResult(&items, responseId);
-    return SLANG_OK;
 }
 
-SlangResult CompletionContext::tryCompleteInclude()
+LanguageServerResult<CompletionResult> CompletionContext::tryCompleteInclude()
 {
     auto lineContent = doc->getLine(line);
     if (!lineContent.startsWith("#"))
@@ -437,14 +430,12 @@ SlangResult CompletionContext::tryCompleteInclude()
     return tryCompleteRawFileName(lineContent, pos, false);
 }
 
-SlangResult CompletionContext::tryCompleteMemberAndSymbol()
+LanguageServerResult<CompletionResult> CompletionContext::tryCompleteMemberAndSymbol()
 {
-    List<LanguageServerProtocol::CompletionItem> items = collectMembersAndSymbols();
-    server->m_connection->sendResult(&items, responseId);
-    return SLANG_OK;
+    return collectMembersAndSymbols();
 }
 
-List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAndSymbols()
+CompletionResult CompletionContext::collectMembersAndSymbols()
 {
     auto linkage = version->linkage;
     if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
@@ -611,7 +602,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::collectMembersAn
     return result;
 }
 
-List<LanguageServerProtocol::CompletionItem> CompletionContext::createCapabilityCandidates()
+CompletionResult CompletionContext::createCapabilityCandidates()
 {
     List<LanguageServerProtocol::CompletionItem> result;
     List<UnownedStringSlice> names;
@@ -629,7 +620,7 @@ List<LanguageServerProtocol::CompletionItem> CompletionContext::createCapability
     return result;
 }
 
-List<LanguageServerProtocol::CompletionItem> CompletionContext::createSwizzleCandidates(
+CompletionResult CompletionContext::createSwizzleCandidates(
     Type* type, IntegerLiteralValue elementCount[2])
 {
     List<LanguageServerProtocol::CompletionItem> result;
@@ -738,7 +729,7 @@ LanguageServerProtocol::CompletionItem CompletionContext::generateGUIDCompletion
     return resultItem;
 }
 
-List<LanguageServerProtocol::CompletionItem> CompletionContext::collectAttributes()
+CompletionResult CompletionContext::collectAttributes()
 {
     List<LanguageServerProtocol::CompletionItem> result;
     for (auto& item : version->linkage->contentAssistInfo.completionSuggestions.candidateItems)

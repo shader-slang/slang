@@ -125,8 +125,8 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | Option                            | Default                    | Description                                                                                  |
 |-----------------------------------|----------------------------|----------------------------------------------------------------------------------------------|
 | `SLANG_VERSION`                   | Latest `v*` tag            | The project version, detected using git if available                                         |
-| `SLANG_EMBED_STDLIB`              | `FALSE`                    | Build slang with an embedded version of the stdlib                                           |
-| `SLANG_EMBED_STDLIB_SOURCE`       | `TRUE`                     | Embed stdlib source in the binary                                                            |
+| `SLANG_EMBED_CORE_MODULE`         | `FALSE`                    | Build slang with an embedded version of the core module                                      |
+| `SLANG_EMBED_CORE_MODULE_SOURCE`  | `TRUE`                     | Embed the core module source in the binary                                                   |
 | `SLANG_ENABLE_ASAN`               | `FALSE`                    | Enable ASAN (address sanitizer)                                                              |
 | `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`                    | Enable full IR validation (SLOW!)                                                            |
 | `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`                    | Enable IR BreakAlloc functionality for debugging.                                            |
