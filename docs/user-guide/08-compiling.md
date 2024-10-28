@@ -442,9 +442,8 @@ slangc targets.slang -entry vsMain -entry psMain -target spirv -o targets.spv
 ```
 
 #### Creating a standalone executable example
-How to compile a .slang file to standalone executable?
 
-This example compiles and runs a host-callable style Slang unit.
+This example compiles and runs a CPU host-callable style Slang unit.
 
 ```hlsl
 // cpu.slang
