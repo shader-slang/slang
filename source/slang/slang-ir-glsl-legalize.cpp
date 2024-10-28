@@ -2889,7 +2889,7 @@ void legalizeEntryPointParameterForGLSL(
         // TODO: This approach to generating geometry shader code
         // is not ideal, and we should strive to find a better
         // approach that involes coding the `EmitVertex` operation
-        // directly in the stdlib, similar to how ray-tracing
+        // directly in the core module, similar to how ray-tracing
         // operations like `TraceRay` are handled.
         //
         builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());

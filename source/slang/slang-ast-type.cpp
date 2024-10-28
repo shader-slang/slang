@@ -1025,7 +1025,7 @@ SlangResourceShape ResourceType::getShape()
 
 bool ResourceType::isArray()
 {
-    auto isArray = _getGenericTypeArg(this, kStdlibTextureIsArrayParameterIndex);
+    auto isArray = _getGenericTypeArg(this, kCoreModule_TextureIsArrayParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(isArray))
         return constIntVal->getValue() != 0;
     return false;
@@ -1033,7 +1033,7 @@ bool ResourceType::isArray()
 
 bool ResourceType::isMultisample()
 {
-    auto isMS = _getGenericTypeArg(this, kStdlibTextureIsMultisampleParameterIndex);
+    auto isMS = _getGenericTypeArg(this, kCoreModule_TextureIsMultisampleParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(isMS))
         return constIntVal->getValue() != 0;
     return false;
@@ -1041,7 +1041,7 @@ bool ResourceType::isMultisample()
 
 bool ResourceType::isShadow()
 {
-    auto isShadow = _getGenericTypeArg(this, kStdlibTextureIsShadowParameterIndex);
+    auto isShadow = _getGenericTypeArg(this, kCoreModule_TextureIsShadowParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(isShadow))
         return constIntVal->getValue() != 0;
     return false;
@@ -1049,15 +1049,15 @@ bool ResourceType::isShadow()
 
 bool ResourceType::isFeedback()
 {
-    auto access = _getGenericTypeArg(this, kStdlibTextureAccessParameterIndex);
+    auto access = _getGenericTypeArg(this, kCoreModule_TextureAccessParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(access))
-        return constIntVal->getValue() == kStdlibResourceAccessFeedback;
+        return constIntVal->getValue() == kCoreModule_ResourceAccessFeedback;
     return false;
 }
 
 bool ResourceType::isCombined()
 {
-    auto combined = _getGenericTypeArg(this, kStdlibTextureIsCombinedParameterIndex);
+    auto combined = _getGenericTypeArg(this, kCoreModule_TextureIsCombinedParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(combined))
         return constIntVal->getValue() != 0;
     return false;
@@ -1078,18 +1078,18 @@ bool SubpassInputType::isMultisample()
 
 SlangResourceAccess ResourceType::getAccess()
 {
-    auto access = _getGenericTypeArg(this, kStdlibTextureAccessParameterIndex);
+    auto access = _getGenericTypeArg(this, kCoreModule_TextureAccessParameterIndex);
     if (auto constIntVal = as<ConstantIntVal>(access))
     {
         switch (constIntVal->getValue())
         {
-        case kStdlibResourceAccessReadOnly:
+        case kCoreModule_ResourceAccessReadOnly:
             return SLANG_RESOURCE_ACCESS_READ;
-        case kStdlibResourceAccessReadWrite:
+        case kCoreModule_ResourceAccessReadWrite:
             return SLANG_RESOURCE_ACCESS_READ_WRITE;
-        case kStdlibResourceAccessRasterizerOrdered:
+        case kCoreModule_ResourceAccessRasterizerOrdered:
             return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-        case kStdlibResourceAccessFeedback:
+        case kCoreModule_ResourceAccessFeedback:
             return SLANG_RESOURCE_ACCESS_FEEDBACK;
         default:
             break;

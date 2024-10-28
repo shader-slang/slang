@@ -425,18 +425,18 @@ struct InliningPassBase
         // An assumption here is that [__unsafeForceInlineEarly] will not be in user code (when we have more
         // general inlining this will not follow).
         //
-        // Therefore we probably *don't* want to copy sourceLoc from the original definition in the stdlib because
+        // Therefore we probably *don't* want to copy sourceLoc from the original definition in the core module because
         //
-        // * That won't be much use to the user (they can't easily see stdlib code currently for example)
-        // * That the definitions in stdlib are currently 'mundane' and largely exist to flesh out language features - such that
-        //   their being in the stdlib would likely be surprising to users
+        // * That won't be much use to the user (they can't easily see the core module code currently for example)
+        // * That the definitions in the core module are currently 'mundane' and largely exist to flesh out language features - such that
+        //   their being in the core module would likely be surprising to users
         //
         // That being the case, we actually copy the call sites sourceLoc if it's defined, and only fall back
         // onto the originating loc, if that's not defined.
         //
-        // We *could* vary behavior if we knew if the function was defined in the stdlib. There doesn't appear 
+        // We *could* vary behavior if we knew if the function was defined in the core module. There doesn't appear 
         // to be a decoration for this.
-        // We could find out by looking at the source loc and checking if it's in the range of stdlib - this would actually be
+        // We could find out by looking at the source loc and checking if it's in the range of the core module - this would actually be
         // a fast and easy but to do properly this way you'd want a way to mark that source range that would also work across
         // serialization.
         // 

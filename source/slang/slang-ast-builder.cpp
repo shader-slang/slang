@@ -229,7 +229,7 @@ ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
 {
     SLANG_ASSERT(sharedASTBuilder);
     // Copy Val deduplication map over so we don't create duplicate Vals that are already
-    // existent in the stdlib.
+    // existent in the core module.
     m_cachedNodes = sharedASTBuilder->getInnerASTBuilder()->m_cachedNodes;
 }
 

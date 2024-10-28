@@ -24,7 +24,7 @@ class ParamModifier : public Modifier { SLANG_AST_CLASS(ParamModifier)};
 class ExternModifier : public Modifier { SLANG_AST_CLASS(ExternModifier)};
 class HLSLExportModifier : public Modifier { SLANG_AST_CLASS(HLSLExportModifier) };
 class TransparentModifier : public Modifier { SLANG_AST_CLASS(TransparentModifier)};
-class FromStdLibModifier : public Modifier { SLANG_AST_CLASS(FromStdLibModifier)};
+class FromCoreModuleModifier : public Modifier { SLANG_AST_CLASS(FromCoreModuleModifier)};
 class PrefixModifier : public Modifier { SLANG_AST_CLASS(PrefixModifier)};
 class PostfixModifier : public Modifier { SLANG_AST_CLASS(PostfixModifier)};
 class ExportedModifier : public Modifier { SLANG_AST_CLASS(ExportedModifier)};
@@ -943,7 +943,7 @@ class EntryPointAttribute : public Attribute
 };
 
 // A `[__vulkanRayPayload(location)]` attribute, which is used in the
-// standard library implementation to indicate that a variable
+// core module implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass per-ray payload information.
 class VulkanRayPayloadAttribute : public Attribute 
@@ -960,7 +960,7 @@ class VulkanRayPayloadInAttribute : public Attribute
 };
 
 // A `[__vulkanCallablePayload(location)]` attribute, which is used in the
-// standard library implementation to indicate that a variable
+// core module implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass payload information to/from a callee.
 class VulkanCallablePayloadAttribute : public Attribute 
@@ -977,7 +977,7 @@ class VulkanCallablePayloadInAttribute : public Attribute
 };
 
 // A `[__vulkanHitAttributes]` attribute, which is used in the
-// standard library implementation to indicate that a variable
+// core module implementation to indicate that a variable
 // actually represents the output interface for a Vulkan
 // intersection shader to pass hit attribute information.
 class VulkanHitAttributesAttribute : public Attribute 
@@ -986,7 +986,7 @@ class VulkanHitAttributesAttribute : public Attribute
 };
 
 // A `[__vulkanHitObjectAttributes(location)]` attribute, which is used in the
-// standard library implementation to indicate that a variable
+// core module implementation to indicate that a variable
 // actually represents the attributes on a HitObject as part of
 // Shader ExecutionReordering
 class VulkanHitObjectAttributesAttribute : public Attribute
@@ -1194,7 +1194,7 @@ class AnyValueSizeAttribute : public Attribute
     int32_t size;
 };
 
-    /// This is a stop-gap solution to break overload ambiguity in stdlib.
+    /// This is a stop-gap solution to break overload ambiguity in the core module.
     /// When there is a function overload ambiguity, the compiler will pick the one with higher rank
     /// specified by this attribute. An overload without this attribute will have a rank of 0.
     /// In the future, we should enhance our type system to take into account the "specialized"-ness

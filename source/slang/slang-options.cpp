@@ -545,8 +545,8 @@ void initCommandOptions(CommandOptions& options)
     {
         { OptionKind::ArchiveType, "-archive-type", "-archive-type <archive-type>", "Set the archive type for -save-core-module. Default is zip." },
         { OptionKind::CompileCoreModule, "-compile-core-module", nullptr, 
-        "Compile the StdLib from embedded sources. "
-        "Will return a failure if there is already a StdLib available."},
+        "Compile the core module from embedded sources. "
+        "Will return a failure if there is already a core module available."},
         { OptionKind::Doc, "-doc", nullptr, "Write documentation for -compile-core-module" },
         { OptionKind::IrCompression,"-ir-compression", "-ir-compression <type>", 
         "Set compression for IR and AST outputs.\n"
@@ -797,8 +797,8 @@ struct OptionsParser
     int m_currentTranslationUnitIndex = -1;
 
     bool m_hasLoadedRepro = false;
-    bool m_compileStdLib = false;
-    slang::CompileCoreModuleFlags m_compileStdLibFlags;
+    bool m_compileCoreModule = false;
+    slang::CompileCoreModuleFlags m_compileCoreModuleFlags;
 
     SlangArchiveType m_archiveType = SLANG_ARCHIVE_TYPE_RIFF_LZ4;
     
@@ -1762,7 +1762,7 @@ SlangResult OptionsParser::_parse(
 
                 break;
             }
-            case OptionKind::CompileCoreModule: m_compileStdLib = true; break;
+            case OptionKind::CompileCoreModule: m_compileCoreModule = true; break;
             case OptionKind::ArchiveType:
             {
                 SLANG_RETURN_ON_FAIL(_expectValue(m_archiveType));
@@ -1810,8 +1810,8 @@ SlangResult OptionsParser::_parse(
             }
             case OptionKind::Doc:
             {
-                // If compiling stdlib is enabled, will write out documentation
-                m_compileStdLibFlags |= slang::CompileCoreModuleFlag::WriteDocumentation;
+                // When compiling the core module, it will write out a documentation.
+                m_compileCoreModuleFlags |= slang::CompileCoreModuleFlag::WriteDocumentation;
 
                 // Enable writing out documentation on the req
                 linkage->m_optionSet.set(CompilerOptionName::Doc, true);
@@ -2378,9 +2378,9 @@ SlangResult OptionsParser::_parse(
         }
     }
 
-    if (m_compileStdLib)
+    if (m_compileCoreModule)
     {
-        SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileStdLibFlags));
+        SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileCoreModuleFlags));
     }
 
     // TODO(JS): This is a restriction because of how setting of state works for load repro

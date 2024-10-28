@@ -1757,9 +1757,9 @@ LinkedIR linkIR(
 
     List<IRModule*> irModules;
 
-    // Link stdlib modules.
-    auto& stdlibModules = static_cast<Session*>(linkage->getGlobalSession())->stdlibModules;
-    for (auto& m : stdlibModules)
+    // Link the core modules.
+    auto& coreModules = static_cast<Session*>(linkage->getGlobalSession())->coreModules;
+    for (auto& m : coreModules)
         irModules.add(m->getIRModule());
 
     // Link modules in the program.

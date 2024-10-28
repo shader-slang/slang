@@ -1796,7 +1796,7 @@ namespace Slang
         // global shader parameter to Slang, but we want to be able to
         // associate special behavior with it to make downstream compilation
         // work nicely (especially in the case where certain cross-platform
-        // operations in the Slang standard library need to use NVAPI).
+        // operations in the Slang core module need to use NVAPI).
         //
         // We will detect a global variable declaration that appears to
         // be declaring `g_NvidiaExt` from NVAPI, and mark it with a special
@@ -2957,7 +2957,7 @@ namespace Slang
 
         /// Recursively register any builtin declarations that need to be attached to the `session`.
         ///
-        /// This function should only be needed for declarations in the standard library.
+        /// This function should only be needed for declarations in the core module.
         ///
     static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
     {
@@ -3026,20 +3026,20 @@ namespace Slang
 
     void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     {
-        // When we are dealing with code from the standard library,
+        // When we are dealing with code from the core modules,
         // there is a potential problem where we might need to look
         // up built-in types like `Int` through the session (e.g.,
         // to determine the type for an integer literal), but those
         // types might not have been registered yet. We solve that
-        // by doing a pre-process on standard-library code to find
+        // by doing a pre-process on the core module code to find
         // and register any built-in declarations.
         //
         // TODO: This could be factored into another visitor pass
         // that fits the more standard checking below, but that would
         // seemingly add overhead to checking things other than
-        // the standard library.
+        // the core module.
         //
-        if(isFromStdLib(moduleDecl))
+        if(isFromCoreModule(moduleDecl))
         {
             _registerBuiltinDeclsRec(getSession(), moduleDecl);
         }
@@ -4924,7 +4924,7 @@ namespace Slang
         // code to dispatch to the special-case logic used when doing
         // semantic checking for member expressions.
         //
-        // Note: an alternative would be to change the stdlib declarations
+        // Note: an alternative would be to change the core module declarations
         // of vectors/matrices so that all the swizzles are defined as
         // `property` declarations. There are some C++ math libraries (like GLM)
         // that implement swizzle syntax by a similar approach of statically
@@ -5127,7 +5127,7 @@ namespace Slang
             else
             {
                 // While there are other kinds of accessors than `get` and `set`,
-                // those are currently only reserved for stdlib-internal use.
+                // those are currently only reserved for the internal use in the core module.
                 // We will not bother with synthesis for those cases.
                 //
                 return false;
@@ -5408,7 +5408,7 @@ namespace Slang
             else
             {
                 // While there are other kinds of accessors than `get` and `set`,
-                // those are currently only reserved for stdlib-internal use.
+                // those are currently only reserved for the internal use in the core module.
                 // We will not bother with synthesis for those cases.
                 //
                 return false;
@@ -6997,7 +6997,7 @@ namespace Slang
                 continue;
             }
 
-            if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) && !isFromStdLib(decl))
+            if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) && !isFromCoreModule(decl))
             {
                 // Force add IDefaultInitializable to any struct missing (transitively) `IDefaultInitializable`.
                 auto* defaultInitializableType = m_astBuilder->getDefaultInitializableType();
@@ -9847,10 +9847,10 @@ namespace Slang
             m_candidateExtensionListsBuilt = true;
 
             // We need to make sure that all extensions that were declared
-            // as part of our standard-library modules are always visible,
+            // as parts of our core module are always visible,
             // even if they are not explicit `import`ed into user code.
             //
-            for( auto module : getSession()->stdlibModules )
+            for( auto module : getSession()->coreModules )
             {
                 _addCandidateExtensionsFromModule(module->getModuleDecl());
             }
@@ -10101,7 +10101,7 @@ namespace Slang
         {
             m_associatedDeclListsBuilt = true;
 
-            for (auto module : getSession()->stdlibModules)
+            for (auto module : getSession()->coreModules)
             {
                 _addDeclAssociationsFromModule(module->getModuleDecl());
             }

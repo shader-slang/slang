@@ -1104,7 +1104,7 @@ void DocMarkdownWriter::_appendRequirements(const Requirement& requirement)
 
         // TODO: We should probably print the capabilities for each stage set if the requirements differ between
         // different stages, but for now we'll just print the first one, assuming the rest are the same.
-        // This is currently true for most if not all of our stdlib decls.
+        // This is currently true for most if not all of our core module decls.
         //
         if (targetSet.second.shaderStageSets.getCount() > 0 &&
             targetSet.second.shaderStageSets.begin()->second.atomSet.has_value())
@@ -2616,7 +2616,7 @@ DocumentPage* DocMarkdownWriter::writeAll(UnownedStringSlice configStr)
             m_output[page->path] = page;
             return page.get();
         };
-    m_rootPage = addBuiltinPage(nullptr, toSlice("index.md"), m_config.title.getUnownedSlice(), toSlice("Standard Library Reference"));
+    m_rootPage = addBuiltinPage(nullptr, toSlice("index.md"), m_config.title.getUnownedSlice(), toSlice("Core Module Reference"));
     m_rootPage->skipWrite = true;
 
     m_interfacesPage = addBuiltinPage(m_rootPage.get(), toSlice("interfaces/index.md"), toSlice("Interfaces"), toSlice("Interfaces"));

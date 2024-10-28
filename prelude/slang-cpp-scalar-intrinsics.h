@@ -431,7 +431,7 @@ SLANG_FORCE_INLINE uint64_t U64_abs(uint64_t f) { return f; }
 SLANG_FORCE_INLINE uint64_t U64_min(uint64_t a, uint64_t b) { return a < b ? a : b; }
 SLANG_FORCE_INLINE uint64_t U64_max(uint64_t a, uint64_t b) { return a > b ? a : b; }
 
-// TODO(JS): We don't define countbits for 64bit in stdlib currently.
+// TODO(JS): We don't define countbits for 64bit in the core module currently.
 // It's not clear from documentation if it should return 32 or 64 bits, if it exists. 
 // 32 bits can always hold the result, and will be implicitly promoted. 
 SLANG_FORCE_INLINE uint32_t U64_countbits(uint64_t v)
