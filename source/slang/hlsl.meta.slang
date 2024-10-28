@@ -93,8 +93,13 @@ __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
 struct AppendStructuredBuffer
 {
     __intrinsic_op($(kIROp_StructuredBufferAppend))
+    /// Appends a new element to the buffer.
+    ///@param value The element to be appended to the buffer.
     void Append(T value);
 
+    /// Get information about the number of elements and stride of the buffer.
+    ///@param numStructs The number of elements in the buffer.
+    ///@param stride The stride of the buffer.
     [ForceInline]
     void GetDimensions(
         out uint numStructs,
@@ -106,12 +111,24 @@ struct AppendStructuredBuffer
     }
 };
 
-/// @category buffer_types
+//@public:
+/**
+Represents an opaque handle to a read-only buffer allocated in global memory that is indexed in bytes.
+ByteAddressBuffer can be used when working with raw buffers. Raw buffer can be viewed as a bag of bits to
+which you want raw access, that is, a buffer that you can conveniently access through chunks of one to
+four 32-bit typeless address values.
+ @remarks
+This type is supported natively when targeting HLSL.
+For all other targets, this type maps to a buffer of 32bit unsigned integers.
+ @category buffer_types
+*/
 __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer)]
 struct ByteAddressBuffer
 {
+    /// Get the number of bytes in the buffer.
+    ///@param[out] dim The number of bytes in the buffer.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
@@ -129,6 +146,20 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load a 32-bit unsigned integer or value with type of `T` from the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return The value loaded from the buffer.
+    ///
+    ///@remarks
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
@@ -153,6 +184,21 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location
+    /// with additional alignment.
+    ///@param location The input address in bytes.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function only supports when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
@@ -181,6 +227,22 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    uint2 Load2(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load2";
+        }
+    }
+
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
+    /// of stride of `uint2`, which is 8.
+    ///@param location The input address in bytes, which must be a multiple of alignment of 8. Invalid
+    /// value of location will cause undefined behavior.
+    ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
+    [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
     uint2 Load2Aligned(int location)
     {
@@ -192,17 +254,20 @@ struct ByteAddressBuffer
         }
     }
 
-    [__readNone]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer)]
-    uint2 Load2(int location, out uint status)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm ".Load2";
-        }
-    }
-
+    /// Load three 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function only supports when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
@@ -231,6 +296,21 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    uint3 Load3(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load3";
+        }
+    }
+
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
+    /// of stride of `uint3`, which is 12.
+    ///@param location The input address in bytes which must be a multiple of alignment of 12.
+    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
     uint3 Load3Aligned(int location)
     {
@@ -242,17 +322,19 @@ struct ByteAddressBuffer
         }
     }
 
-    [__readNone]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer)]
-    uint3 Load3(int location, out uint status)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm ".Load3";
-        }
-    }
-
+    /// Load four 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes which must be a multiple of alignment of 4.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function only supports when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
@@ -281,6 +363,21 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    uint4 Load4(int location, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Load4";
+        }
+    }
+
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
+    /// of `uint4`, which is 16.
+    ///@param location The input address in bytes which must be a multiple of alignment of 16.
+    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
     uint4 Load4Aligned(int location)
     {
@@ -289,17 +386,6 @@ struct ByteAddressBuffer
         case hlsl: __intrinsic_asm ".Load4";
         default:
             return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
-        }
-    }
-
-    [__readNone]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer)]
-    uint4 Load4(int location, out uint status)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm ".Load4";
         }
     }
 
@@ -317,6 +403,11 @@ struct ByteAddressBuffer
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
+    /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
+    ///@param location The input address in bytes which must be a multiply of size of `T`.
+    ///@return T value with type `T` loaded from the buffer.
+    ///@remarks
+    ///Currently, this function only supports when `T` is scalar, vector or matrix type.
     [__readNone]
     [ForceInline]
     T LoadAligned<T>(int location)
@@ -4011,6 +4102,10 @@ __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct StructuredBuffer
 {
+
+    /// Get the dimensions of the buffer.
+    /// @param numStructs The number of structures in the buffer.
+    /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
     void GetDimensions(
@@ -4022,6 +4117,18 @@ struct StructuredBuffer
         stride = rs.y;
     }
 
+    /// Load a element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param location The index of buffer.
+    /// @param[out] status The status of the operation.
+    /// @return The element at the specified index.
+    ///
+    /// @remarks
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     __intrinsic_op($(kIROp_StructuredBufferLoad))
     [__readNone]
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
@@ -4031,6 +4138,10 @@ struct StructuredBuffer
     [require(hlsl, structuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
+    /// Load a element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param index The index of buffer.
+    /// @return The element at the specified index.
     __generic<TIndex : __BuiltinIntegerType>
     __subscript(TIndex index) -> T
     {
@@ -4066,8 +4177,15 @@ __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
 [require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
 struct ConsumeStructuredBuffer
 {
+    /// Reading the element at the end of the buffer indicated by the associated atomic counter
+    /// and decrement the builtin atomic counter by 1.
+    ///@return The element read from the buffer, it can be a structure.
     __intrinsic_op($(kIROp_StructuredBufferConsume))
     T Consume();
+
+    ///Gets the dimensions of the resource.
+    ///@param[out] numStructs The number of structures in the buffer.
+    ///@param[out] stride The stride, in bytes, of each element
 
     [ForceInline]
     void GetDimensions(
@@ -4143,7 +4261,16 @@ static const struct {
 for(auto item : kMutableByteAddressBufferCases) {
 }}}}
 
-/// @category buffer_types
+//@public:
+/**
+Represents an opaque handle to a read-write buffer allocated in global memory that is indexed in bytes.
+This type can be used when working with raw buffers. Raw buffer can be viewed as a bag of bits to
+which you want raw access, that is, a buffer that you can conveniently access through chunks of one to
+four 32-bit typeless address values.
+ @remarks
+This type is supported natively when targeting HLSL.
+ @category buffer_types
+*/
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 struct $(item.name)
@@ -4151,6 +4278,8 @@ struct $(item.name)
     // Note(tfoley): supports all operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
+    /// Get the number of bytes in the buffer.
+    ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
     void GetDimensions(out uint dim)
@@ -4166,6 +4295,20 @@ struct $(item.name)
         }
     }
 
+    /// Load a 32-bit unsigned integer or value with type of `T` from the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return The value loaded from the buffer.
+    ///
+    ///@remarks
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
@@ -4190,6 +4333,21 @@ struct $(item.name)
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location
+    /// with additional alignment.
+    ///@param location The input address in bytes.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function only supports when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4216,6 +4374,10 @@ struct $(item.name)
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
+    /// of `uint2`, which is 8.
+    ///@param location The input address in bytes, which must be a multiple of alignment of 8.
+    ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4240,6 +4402,20 @@ struct $(item.name)
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function only supports when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4266,6 +4442,10 @@ struct $(item.name)
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
+    /// of `uint3`, which is 12.
+    ///@param location The input address in bytes which must be a multiple of alignment of 12.
+    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4290,6 +4470,19 @@ struct $(item.name)
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes which must be a multiple of alignment of 4.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function only supports when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4316,6 +4509,10 @@ struct $(item.name)
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
+    /// of `uint4`, which is 16.
+    ///@param location The input address in bytes which must be a multiple of alignment of 16.
+    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4356,6 +4553,11 @@ struct $(item.name)
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
+    /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
+    ///@param location The input address in bytes which must be a multiple of size of `T`.
+    ///@return T value with type `T` loaded from the buffer.
+    ///@remarks
+    ///Currently, this function only supports when `T` is scalar, vector, or matrix type.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4442,9 +4644,12 @@ ${{{{
     }
     // FP16x2
 
-    /// @internal
+    ///@internal
     /// Maps to the `NvInterlockedAddFp16x2` NVAPI function.
-    ///
+    /// Perform 2 16-bit floating point atomic add operations at `byteAddress`.
+    /// @param byteAddress The address at which to perform the atomic add operation.
+    /// @param fp16x2Value Two 16-bit floating point values are packed into a 32-bit unsigned integer.
+    /// @return The 2 16-bit floating point values packed into a 32-bit unsigned integer.
     [__requiresNVAPI]
     [ForceInline]
     [require(cuda_hlsl_spirv)]
@@ -4463,7 +4668,7 @@ ${{{{
 
     /// Perform a 16-bit floating point atomic add operation at `byteAddress`.
     /// @param byteAddress The address at which to perform the atomic add operation.
-    /// @param valueToAdd The value to add to the value at `byteAddress`.
+    /// @param value The value to add to the value at `byteAddress`.
     /// @param originalValue The original value at `byteAddress` before the add operation.
     /// @remarks For SPIR-V, this function maps to `OpAtomicFAdd` and requires `SPV_EXT_shader_atomic_float16_add` extension.
     ///
@@ -4500,7 +4705,7 @@ ${{{{
 
     /// Perform a 16-bit floating point atomic add operation at `byteAddress` through emulation using `half2` atomics.
     /// @param byteAddress The address at which to perform the atomic add operation.
-    /// @param valueToAdd The value to add to the value at `byteAddress`.
+    /// @param value The value to add to the value at `byteAddress`.
     /// @param originalValue The original value at `byteAddress` before the add operation.
     /// @remarks For SPIR-V, this function maps to `OpAtomicFAdd` on a `half2` vector with the correct part set to `value`
     /// and the remaining part set to 0. This requires the `AtomicFloat16VectorNV` capability introduced by the `SPV_NV_shader_atomic_fp16_vector`
@@ -4594,7 +4799,7 @@ ${{{{
     /// @param byteAddress The address at which to perform the atomic compare-and-exchange operation.
     /// @param compareValue The value to compare to the value at `byteAddress`.
     /// @param value The value to store at `byteAddress` if the comparison is successful.
-    /// @param originalValue The original value at `byteAddress` before the add operation.
+    /// @param outOriginalValue The original value at `byteAddress` before the add operation.
     /// @remarks For SPIR-V, this function maps to `OpAtomicCompareExchange`. For HLSL, this function
     /// translates to `InterlockedCompareExchange64` and requires shader model 6.6.
     /// For CUDA, this function maps to `atomicCAS`.
@@ -4618,6 +4823,10 @@ ${{{{
 ${{{{
     for (auto op : bufferAtomicOps) {
 }}}}
+
+    /// Perform a 64-bit unsigned integer atomic $(op.internalName) operation at `byteAddress`.
+    /// @param byteAddress The address at which to perform the atomic $(op.internalName) operation.
+    /// @param value The operand for the $(op.internalName) operation.
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     uint64_t Interlocked$(op.name)U64(uint byteAddress, uint64_t value)
@@ -4638,7 +4847,7 @@ ${{{{
     /// Perform a 64-bit integer atomic $(op.internalName) operation at `byteAddress`.
     /// @param byteAddress The address at which to perform the atomic $(op.internalName) operation.
     /// @param value The operand for the $(op.internalName) operation.
-    /// @param originalValue The original value at `byteAddress` before the $(op.internalName) operation.
+    /// @param outOriginalValue The original value at `byteAddress` before the $(op.internalName) operation.
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void Interlocked$(op.name)64<T:__BuiltinInt64Type>(uint byteAddress, T value, out T outOriginalValue)
@@ -4679,6 +4888,14 @@ ${{{{
         }
     }
 
+    /// Perform a floating-point atomic bitwise compare-and-exchange operation at `byteAddress`.
+    /// @param byteAddress The address at which to perform the atomic exchange operation.
+    /// @param compareValue The value to compare to the value at `byteAddress`.
+    /// @param value The value to store at `byteAddress`.
+    /// @param [out] outOriginalValue The original value at `byteAddress` before the exchange operation.
+    /// @remarks For SPIR-V, this function maps to `OpAtomicCompareExchange`. For HLSL, this function
+    /// translates to `InterlockedCompareExchangeFloatBitwise` and requires shader model 6.6.
+    /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, atomic_glsl_hlsl_cuda9_int64)]
     void InterlockedCompareExchangeFloatBitwise(uint byteAddress, float compareValue, float value, out float outOriginalValue)
@@ -4858,7 +5075,11 @@ ${{{{
         }
     }
 
-
+    /// Set one value to the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param value The input value.
+    ///@param address The input address in bytes, which must be a multiple of 4.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store(uint address, uint value)
@@ -4872,6 +5093,10 @@ ${{{{
     }
 
 
+    /// Set two values to the buffer at the specified location.
+    ///@param address The input address in bytes, which must be a multiple of 4.
+    ///@param value Two input values.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store2(uint address, uint2 value)
@@ -4897,6 +5122,10 @@ ${{{{
         }
     }
 
+    /// Set two values to the buffer at the specified location, the address will be aligned
+    /// to the alignment of  `uint2`, which is 8.
+    ///@param address The input address in bytes, which must be a multiple of 8.
+    ///@param value Two input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store2Aligned(uint address, uint2 value)
@@ -4909,6 +5138,10 @@ ${{{{
         }
     }
 
+    /// Set three values to the buffer at the specified location.
+    ///@param address The input address in bytes, which must be a multiple of 4.
+    ///@param value Three input values.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store3(uint address, uint3 value)
@@ -4920,7 +5153,6 @@ ${{{{
             __byteAddressBufferStore(this, address, 0, value);
         }
     }
-
 
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
@@ -4934,6 +5166,10 @@ ${{{{
         }
     }
 
+    /// Set three values to the buffer at the specified location, the address will be aligned
+    /// to the alignment of `uint3`, which is 12.
+    ///@param address The input address in bytes, which must be a multiple of 12.
+    ///@param value Three input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void Store3Aligned(uint address, uint3 value)
@@ -4946,6 +5182,10 @@ ${{{{
         }
     }
 
+    /// Set four values to the buffer at the specified location.
+    ///@param address The input address in bytes, which must be a multiple of 4.
+    ///@param value Four input values.
+    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
     void Store4(uint address, uint4 value)
@@ -4971,6 +5211,10 @@ ${{{{
         }
     }
 
+    /// Set four values to the buffer at the specified location, the address will be aligned
+    /// to the alignment of `uint4`, which is 16.
+    ///@param address The input address in bytes, which must be a multiple of 16.
+    ///@param value Four input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
     void Store4Aligned(uint address, uint4 value)
@@ -4984,21 +5228,26 @@ ${{{{
     }
 
     [ForceInline]
-    void Store<T>(int offset, T value)
+    void Store<T>(uint address, T value)
     {
-        __byteAddressBufferStore(this, offset, 0, value);
+        __byteAddressBufferStore(this, address, 0, value);
     }
 
     [ForceInline]
-    void Store<T>(int offset, T value, uint alignment)
+    void Store<T>(uint address, T value, uint alignment)
     {
-        __byteAddressBufferStore(this, offset, alignment, value);
+        __byteAddressBufferStore(this, address, alignment, value);
     }
 
+    /// Set four values to the buffer at the specified location, the address will be aligned
+    /// to the alignment of `T`.
+    ///@param T The type of the input value.
+    ///@param address The input address in bytes, which must be a multiple of size of `T`.
+    ///@param value The input value.
     [ForceInline]
-    void StoreAligned<T>(int offset, T value)
+    void StoreAligned<T>(uint address, T value)
     {
-        __byteAddressBufferStore(this, offset, __naturalStrideOf<T>(), value);
+        __byteAddressBufferStore(this, address, __naturalStrideOf<T>(), value);
     }
 };
 
@@ -5038,8 +5287,15 @@ When generating code for other targets, this parameter is ignored and has no eff
 **/
 struct $(item.name)
 {
+    /// Decrements the object's hidden counter.
+    /// @return The post-decremented counter value.
+    /// @remarks
+    /// This function is not implemented when targeting non-HLSL.
     uint DecrementCounter();
 
+    /// Get the dimensions of the buffer.
+    /// @param numStructs The number of structures in the buffer.
+    /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
@@ -5057,8 +5313,25 @@ struct $(item.name)
         }
     }
 
+    /// Increment the object's hidden counter.
+    /// @return The pre-incremented counter value.
+    /// @remarks
+    /// This function is not implemented when targeting non-HLSL.
     uint IncrementCounter();
 
+    /// Load a element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param location The index of buffer.
+    /// @param[out] status The status of the operation.
+    /// @return The element at the specified index.
+    ///
+    /// @remarks
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoad))
     T Load<TIndex : __BuiltinIntegerType>(TIndex location);
@@ -5067,6 +5340,10 @@ struct $(item.name)
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
+    /// Load a element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param index The index of buffer.
+    /// @return The element at the specified index.
     __generic<TIndex : __BuiltinIntegerType>
     __subscript(TIndex index) -> T
     {
