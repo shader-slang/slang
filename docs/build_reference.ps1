@@ -1,4 +1,4 @@
-# This script uses `slangc` to generate stdlib reference documentation and push the updated
+# This script uses `slangc` to generate the core module reference documentation and push the updated
 # documents to shader-slang/stdlib-reference repository.
 # The stdlib-reference repository has github-pages setup so that the markdown files we generate
 # in this step will be rendered as html pages by Jekyll upon a commit to the repository.
@@ -38,7 +38,7 @@ Move-Item -Path ".\toc.html" -Destination ".\_includes\stdlib-reference-toc.html
 git config user.email "bot@shader-slang.com"
 git config user.name "Stdlib Reference Bot"
 git add .
-git commit -m "Update stdlib reference"
+git commit -m "Update the core module reference"
 git push
 cd ../
 
