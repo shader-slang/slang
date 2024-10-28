@@ -294,6 +294,237 @@ bool isFirstBlock(IRInst* inst)
     return block->getParent()->getFirstBlock() == block;
 }
 
+bool isPtrUsed(IRInst* ptrInst)
+{
+    for (auto use = ptrInst->firstUse; use; use = use->nextUse)
+    {
+        if (as<IRLoad>(use->getUser()))
+            return true;
+        else if (as<IRCall>(use->getUser())) // TODO: narrow this case to 'inout' parameters only.
+            return true;
+        else if (as<IRPtrTypeBase>(use->getUser()->getDataType()) &&
+            isPtrUsed(use->getUser()))
+            return true;
+    }
+
+    return false;
+}
+
+bool isFieldUsed(IRStructField* fieldInst)
+{
+    auto structKey = fieldInst->getKey();
+    for (auto use = structKey->firstUse; use; use = use->nextUse)
+    {
+        if (as<IRPtrTypeBase>(use->getUser()->getDataType()) && 
+            isPtrUsed(use->getUser()))
+            return true;
+
+        if (as<IRFieldExtract>(use->getUser()))
+            return true;
+    }
+
+    // Check fields that have this field as a sub-field.
+    auto parentType = cast<IRStructType>(fieldInst->getParent());
+    
+    if (as<IRModuleInst>(parentType->getParent()))
+    {
+        for (auto use = parentType->firstUse; use; use = use->nextUse)
+        {
+            auto useField = as<IRStructField>(use->getUser());
+            if (useField && isFieldUsed(useField))
+                return true;
+        }
+    }
+    else if (as<IRBlock>(parentType->getParent()))
+    {
+        if (auto genericParentType = as<IRGeneric>(parentType->getParent()))
+        {
+            List<IRSpecialize*> specInsts;
+            for (auto use = genericParentType->firstUse; use; use = use->nextUse)
+            {
+                if (auto specInst = as<IRSpecialize>(use->getUser()))
+                    specInsts.add(specInst);
+            }
+
+            for (auto specInst : specInsts)
+            {
+                for (auto use = specInst->firstUse; use; use = use->nextUse)
+                {
+                    auto useField = as<IRStructField>(use->getUser());
+                    if (useField && isFieldUsed(useField))
+                        return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+bool removeStoresIntoInst(IRInst* ptrInst)
+{
+    bool changed = false;
+
+    List<IRInst*> storesToRemove;
+    for (auto use = ptrInst->firstUse; use; use = use->nextUse)
+    {
+        // If this is a store, remove it.
+        if (auto store = as<IRStore>(use->getUser()))
+        {
+            if (store->getPtr() == ptrInst)
+                storesToRemove.add(store);
+        }
+
+        // If there are any stores into a 'sub-object' of the pointer,
+        // remove them.
+        //
+
+        if (auto subAddr = as<IRFieldAddress>(use->getUser()))
+            changed |= removeStoresIntoInst(subAddr);
+        
+        if (auto subIndex = as<IRGetElementPtr>(use->getUser()))
+            changed |= removeStoresIntoInst(subIndex);
+    }
+
+    for (auto store : storesToRemove)
+    {
+        changed = true;
+        store->removeAndDeallocate();
+    }
+
+    return changed;
+}
+
+bool removeStoresIntoField(IRStructField* field)
+{
+    return removeStoresIntoInst(field->getKey());
+}
+
+bool trimMakeStructOperands(IRStructField* field)
+{
+    // TODO: This can be sped up by considering the full set of fields instead
+    // of one at a time.
+
+    bool changed = false;
+    auto structType = cast<IRStructType>(field->getParent());
+
+    UIndex indexInStruct = 0;
+    for (auto _field : structType->getFields())
+    {
+        if (field == _field)
+            break;
+        indexInStruct++;
+    }
+
+    List<IRInst*> workList;
+    for (auto use = structType->firstUse; use; use = use->nextUse)
+    {
+        if (use->getUser()->getOp() == kIROp_MakeStruct)
+        {
+            workList.add(use->getUser());
+        }
+    }
+
+    IRBuilder builder(field->getModule());
+
+    for (auto makeStruct : workList)
+    {
+        // Make a replacement list of operands.
+        List<IRInst*> newOperands;
+        for (UInt index = 0; index < makeStruct->getOperandCount(); ++index)
+        {
+            if (index == indexInStruct)
+            {
+                // skip..
+                changed = true;
+                continue;
+            }
+            else
+            {
+                newOperands.add(makeStruct->getOperand(index));
+            }
+        }
+
+        builder.setInsertAfter(makeStruct);
+        auto newMakeStruct = builder.emitMakeStruct(makeStruct->getFullType(), newOperands);
+        makeStruct->replaceUsesWith(newMakeStruct);
+    }
+
+    for (auto makeStruct : workList)
+    {
+        makeStruct->removeAndDeallocate();
+    }
+
+    return changed;
+}
+
+bool isStructEmpty(IRType* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return false;
+    
+    UCount nonEmptyFieldCount = 0;
+    for (auto field : structType->getFields())
+    {
+        if (as<IRVoidType>(field->getFieldType()))
+            continue;
+        if (isStructEmpty(field->getFieldType()))
+            continue;
+        nonEmptyFieldCount++;
+    }
+
+    return nonEmptyFieldCount == 0;
+}
+
+bool trimOptimizableType(IRStructType* type)
+{
+    bool changed = false;
+    List<IRStructField*> fieldsToRemove;
+    for (auto field : type->getFields())
+    {
+        // We'll ignore void-type fields, since they're handled differently.
+        if (as<IRVoidType>(field->getFieldType()))
+            continue;
+        
+        // ... same for empty struct fields.
+        if(as<IRStructType>(field->getFieldType()) && isStructEmpty(field->getFieldType()))
+            continue;
+        
+        if (!isFieldUsed(field))
+            fieldsToRemove.add(field);
+    }
+
+    for (auto field : fieldsToRemove)
+    {
+        changed |= removeStoresIntoField(field);
+        changed |= trimMakeStructOperands(field);
+        field->removeFromParent();
+    }
+
+    for (auto field : fieldsToRemove)
+    {
+        changed = true;
+        field->removeAndDeallocate();
+    }
+
+    return changed;
+}
+
+bool trimOptimizableTypes(IRModule* module)
+{   
+    bool changed = false;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto type = as<IRStructType>(inst))
+        {
+            if (type->findDecoration<IROptimizableTypeDecoration>())
+                changed |= trimOptimizableType(type);
+        }
+    }
+    return changed;
+}
+
 bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options)
 {
     // The main source of confusion/complexity here is that

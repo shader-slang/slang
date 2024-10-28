@@ -359,135 +359,155 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     
     while (workList.getCount() > 0)
     {
-        auto use = workList.getLast();
-        workList.removeLast();
-
-        if (processedUses.contains(use))
-            continue;
-
-        processedUses.add(use);
-
-        HoistResult result = this->classify(use);
-
-        if (result.mode == HoistResult::Mode::Store)
+        while (workList.getCount() > 0)
         {
-            SLANG_ASSERT(!checkpointInfo->recomputeSet.contains(result.instToStore));
-            checkpointInfo->storeSet.add(result.instToStore);
-        }
-        else if (result.mode == HoistResult::Mode::Recompute)
-        {
-            SLANG_ASSERT(!checkpointInfo->storeSet.contains(result.instToRecompute));
-            checkpointInfo->recomputeSet.add(result.instToRecompute);
+            auto use = workList.getLast();
+            workList.removeLast();
 
-            if (isDifferentialInst(use.user) && use.irUse)
-                usesToReplace.add(use.irUse);
+            if (processedUses.contains(use))
+                continue;
 
-            if (auto param = as<IRParam>(result.instToRecompute))
+            processedUses.add(use);
+
+            HoistResult result = this->classify(use);
+
+            if (result.mode == HoistResult::Mode::Store)
             {
-                if (auto inductionInfo = inductionValueInsts.tryGetValue(param))
-                {
-                    checkpointInfo->loopInductionInfo.addIfNotExists(param, *inductionInfo);
-                    continue;
-                }
-
-                // Add in the branch-args of every predecessor block.
-                auto paramBlock = as<IRBlock>(param->getParent());
-                UIndex paramIndex = 0;
-                for (auto _param : paramBlock->getParams())
-                {
-                    if (_param == param) break;
-                    paramIndex ++;
-                }
-
-                for (auto predecessor : paramBlock->getPredecessors())
-                {
-                    // If we hit this, the checkpoint policy is trying to recompute 
-                    // values across a loop region boundary (we don't currently support this,
-                    // and in general this is quite inefficient in both compute & memory)
-                    // 
-                    SLANG_RELEASE_ASSERT(!domTree->dominates(paramBlock, predecessor));
-
-                    auto branchInst = as<IRUnconditionalBranch>(predecessor->getTerminator());
-                    SLANG_ASSERT(branchInst->getOperandCount() > paramIndex);
-
-                    workList.add(&branchInst->getArgs()[paramIndex]);
-                }
+                SLANG_ASSERT(!checkpointInfo->recomputeSet.contains(result.instToStore));
+                checkpointInfo->storeSet.add(result.instToStore);
             }
-            else
+            else if (result.mode == HoistResult::Mode::Recompute)
             {
-                if (auto var = as<IRVar>(result.instToRecompute))
+                SLANG_ASSERT(!checkpointInfo->storeSet.contains(result.instToRecompute));
+                checkpointInfo->recomputeSet.add(result.instToRecompute);
+
+                if (isDifferentialInst(use.user) && use.irUse)
+                    usesToReplace.add(use.irUse);
+
+                if (auto param = as<IRParam>(result.instToRecompute))
                 {
-                    for (auto varUse = var->firstUse; varUse; varUse = varUse->nextUse)
+                    if (auto inductionInfo = inductionValueInsts.tryGetValue(param))
                     {
-                        switch (varUse->getUser()->getOp())
-                        {
-                        case kIROp_Store:
-                        case kIROp_Call:
-                            // When we have a var and a store/call insts that writes to the var,
-                            // we treat as if there is a pseudo-use of the store/call to compute
-                            // the var inst, i.e. the var depends on the store/call, despite
-                            // the IR's def-use chain doesn't reflect this.
-                            workList.add(UseOrPseudoUse(var, varUse->getUser()));
-                            break;
-                        }
+                        checkpointInfo->loopInductionInfo.addIfNotExists(param, *inductionInfo);
+                        continue;
+                    }
+
+                    // Add in the branch-args of every predecessor block.
+                    auto paramBlock = as<IRBlock>(param->getParent());
+                    UIndex paramIndex = 0;
+                    for (auto _param : paramBlock->getParams())
+                    {
+                        if (_param == param) break;
+                        paramIndex ++;
+                    }
+
+                    for (auto predecessor : paramBlock->getPredecessors())
+                    {
+                        // If we hit this, the checkpoint policy is trying to recompute 
+                        // values across a loop region boundary (we don't currently support this,
+                        // and in general this is quite inefficient in both compute & memory)
+                        // 
+                        SLANG_RELEASE_ASSERT(!domTree->dominates(paramBlock, predecessor));
+
+                        auto branchInst = as<IRUnconditionalBranch>(predecessor->getTerminator());
+                        SLANG_ASSERT(branchInst->getOperandCount() > paramIndex);
+
+                        workList.add(&branchInst->getArgs()[paramIndex]);
                     }
                 }
                 else
                 {
-                    addPrimalOperandsToWorkList(result.instToRecompute);
+                    if (auto var = as<IRVar>(result.instToRecompute))
+                    {
+                        for (auto varUse = var->firstUse; varUse; varUse = varUse->nextUse)
+                        {
+                            switch (varUse->getUser()->getOp())
+                            {
+                            case kIROp_Store:
+                            case kIROp_Call:
+                                // When we have a var and a store/call insts that writes to the var,
+                                // we treat as if there is a pseudo-use of the store/call to compute
+                                // the var inst, i.e. the var depends on the store/call, despite
+                                // the IR's def-use chain doesn't reflect this.
+                                workList.add(UseOrPseudoUse(var, varUse->getUser()));
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        addPrimalOperandsToWorkList(result.instToRecompute);
+                    }
                 }
             }
         }
-    }
 
-    // If a var or call is in recomputeSet, move any var/calls associated with the same call to
-    // recomputeSet.
-    List<IRInst*> instWorkList;
-    HashSet<IRInst*> instWorkListSet;
-    for (auto inst : checkpointInfo->recomputeSet)
-    {
-        switch (inst->getOp())
+        // If a var or call is in recomputeSet, move any var/calls associated with the same call to
+        // recomputeSet.
+        // This is a bit of a 'retro-active' analysis where we go back on processed insts and
+        // correct them.
+        //
+        List<IRInst*> callVarWorkList;
+        HashSet<IRInst*> callVarWorkListSet;
+        for (auto inst : checkpointInfo->recomputeSet)
         {
-        case kIROp_Call:
-        case kIROp_Var:
-            instWorkList.add(inst);
-            instWorkListSet.add(inst);
-            break;
-        }
-    }
-    for (Index i = 0; i < instWorkList.getCount(); i++)
-    {
-        auto inst = instWorkList[i];
-        if (auto var = as<IRVar>(inst))
-        {
-            for (auto use = var->firstUse; use; use = use->nextUse)
+            switch (inst->getOp())
             {
-                if (auto callUser = as<IRCall>(use->getUser()))
-                {
-                    checkpointInfo->recomputeSet.add(callUser);
-                    checkpointInfo->storeSet.remove(callUser);
-                    if (instWorkListSet.add(callUser))
-                        instWorkList.add(callUser);
-                }
-                else if (auto storeUser = as<IRStore>(use->getUser()))
-                {
-                    checkpointInfo->recomputeSet.add(storeUser);
-                    checkpointInfo->storeSet.remove(storeUser);
-                    if (instWorkListSet.add(callUser))
-                        instWorkList.add(callUser);
-                }
+            case kIROp_Call:
+            case kIROp_Var:
+                callVarWorkList.add(inst);
+                callVarWorkListSet.add(inst);
+                break;
             }
         }
-        else if (auto call = as<IRCall>(inst))
+
+        for (Index i = 0; i < callVarWorkList.getCount(); i++)
         {
-            for (UInt j = 0; j < call->getArgCount(); j++)
+            auto inst = callVarWorkList[i];
+            if (auto var = as<IRVar>(inst))
             {
-                if (auto varArg = as<IRVar>(call->getArg(j)))
+                for (auto use = var->firstUse; use; use = use->nextUse)
                 {
-                    checkpointInfo->recomputeSet.add(varArg);
-                    checkpointInfo->storeSet.remove(varArg);
-                    if (instWorkListSet.add(varArg))
-                        instWorkList.add(varArg);
+                    if (auto callUser = as<IRCall>(use->getUser()))
+                    {
+                        checkpointInfo->recomputeSet.add(callUser);
+                        checkpointInfo->storeSet.remove(callUser);
+                        if (callVarWorkListSet.add(callUser))
+                            callVarWorkList.add(callUser);
+                    }
+                    else if (auto storeUser = as<IRStore>(use->getUser()))
+                    {
+                        checkpointInfo->recomputeSet.add(storeUser);
+                        checkpointInfo->storeSet.remove(storeUser);
+                        if (callVarWorkListSet.add(callUser))
+                            callVarWorkList.add(callUser);
+                    }
+                }
+            }
+            else if (auto call = as<IRCall>(inst))
+            {
+                for (UInt j = 0; j < call->getArgCount(); j++)
+                {
+                    if (auto varArg = as<IRVar>(call->getArg(j)))
+                    {
+                        checkpointInfo->recomputeSet.add(varArg);
+                        checkpointInfo->storeSet.remove(varArg);
+                        if (callVarWorkListSet.add(varArg))
+                            callVarWorkList.add(varArg);
+                    }
+                }
+
+                // This next few lines are a bit of a hack.. ideally we need to add the call to the main worklist
+                // for processing, so we don't have to repeat the recomputationn actions.
+                //
+                auto calleeUse = &call->getOperands()[0];
+                if (!as<IRModuleInst>(calleeUse->get()->getParent()) && !processedUses.contains(calleeUse))
+                    addPrimalOperandsToWorkList(call);
+                
+                for (auto use = call->firstUse; use; use = use->nextUse)
+                {
+                    if (isDifferentialInst(use->getUser()))
+                        usesToReplace.add(use);
                 }
             }
         }
@@ -1048,14 +1068,6 @@ void applyCheckpointSet(
             // primal logic may have already updated the param with a new value, and instead we
             // want the original value.
             builder.setInsertBefore(recomputeInsertBeforeInst);    
-            if (auto load = as<IRLoad>(child))
-            {
-                if (load->getPtr()->getOp() == kIROp_Param &&
-                    load->getPtr()->getParent() == func->getFirstBlock())
-                {
-                    builder.setInsertBefore(getParamPreludeBlock(func)->getTerminator());
-                }
-            }
             applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, blockIndexInfo, child);
         }
     }
@@ -1331,15 +1343,17 @@ struct UseChain
 
         IRBuilder chainBuilder(builder->getModule());
         setInsertAfterOrdinaryInst(&chainBuilder, inst);
-        
+
+        chain.reverse();
+
         // Clone the rest of the chain.
         for (auto& use : chain)
         {
-            lastInstInChain = cloneInst(&env, &chainBuilder, use->getUser());
+            lastInstInChain = cloneInst(&env, &chainBuilder, use->get());
         }
 
         // Replace the base use.
-        builder->replaceOperand(baseUse, lastInstInChain);
+        builder->replaceOperand(chain.getLast(), lastInstInChain);
         
         chain.clear();
     }
@@ -1347,7 +1361,7 @@ struct UseChain
     IRInst* getUser() const
     {
         SLANG_ASSERT(chain.getCount() > 0);
-        return chain.getLast()->getUser();
+        return chain.getFirst()->getUser();
     }
 };
 
@@ -1385,11 +1399,14 @@ static List<IndexTrackingInfo> maybeTrimIndices(
 
 bool canInstBeStored(IRInst* inst)
 {
-    // Cannot store insts whose value is a type or a witness table.
+    // Cannot store insts whose value is a type or a witness table, or a function.
     // These insts get lowered to target-specific logic, and cannot be 
     // stored into variables or context structs as normal values.
     // 
-    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()))
+    if (as<IRTypeType>(inst->getDataType()) || 
+        as<IRWitnessTableType>(inst->getDataType()) ||
+        as<IRTypeKind>(inst->getDataType()) || 
+        as<IRFuncType>(inst->getDataType()))
         return false;
     
     return true;
@@ -1499,18 +1516,15 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
             SLANG_RELEASE_ASSERT(defBlock);
 
-            List<UseChain> outOfScopeUses;
-            for (auto use = instToStore->firstUse; use;)
+            // Lambda to check if a use is relevant.
+            auto isRelevantUse = [&](IRUse* use)
             {
-                auto nextUse = use->nextUse;
-
-                // Lambda to check if a use is relevant.
-                auto isRelevantUse = [&](IRUse* use)
+                // Only consider uses in differential blocks. 
+                // This method is not responsible for other blocks.
+                //
+                IRBlock* userBlock = getBlock(use->getUser());
+                if (isRecomputeInst)
                 {
-                    // Only consider uses in differential blocks. 
-                    // This method is not responsible for other blocks.
-                    //
-                    IRBlock* userBlock = getBlock(use->getUser());
                     if (isDifferentialOrRecomputeBlock(userBlock))
                     {
                         if (!domTree->dominates(defBlock, userBlock))
@@ -1532,16 +1546,37 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                             return true;
                         }
                     }
-                    return false;
-                };
-
-                // Lambda to check if an inst is transparent. We lookup uses 'through' transparent
-                // insts recursively.
-                // 
-                auto isPassthroughInst = [&](IRInst* inst)
+                }
+                else
                 {
-                    return !canInstBeStored(inst);
-                };
+                    if (isDifferentialOrRecomputeBlock(userBlock))
+                        return true;
+                }
+                return false;
+            };
+
+            // Lambda to check if an inst is transparent. We lookup uses 'through' transparent
+            // insts recursively.
+            // 
+            auto isPassthroughInst = [&](IRInst* inst)
+            {
+                if (!canInstBeStored(inst))
+                    return true;
+                
+                switch (inst->getOp())
+                {
+                    case kIROp_GetSequentialID:
+                    case kIROp_ExtractExistentialValue:
+                        return true;
+                }
+
+                return false;
+            };
+
+            List<UseChain> outOfScopeUses;
+            for (auto use = instToStore->firstUse; use;)
+            {
+                auto nextUse = use->nextUse;
 
                 List<UseChain> useChains = UseChain::from(use, isRelevantUse, isPassthroughInst);
                 outOfScopeUses.addRange(useChains);
@@ -1622,7 +1657,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 if (!isRecomputeInst)
                     processedStoreSet.add(localVar);
             }
-            else if (!canInstBeStored(instToStore))
+            else if (isPassthroughInst(instToStore))
             {
                 // We won't actually process these insts here. Instead we'll
                 // simply make sure that their operands are either already present
@@ -1683,12 +1718,52 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 if (!isRecomputeInst)
                     processedStoreSet.add(localVar);
             }
-
+            
+            // Put the inst back on the worklist since there's a possibility that we created more uses 
+            // for it in the process.
+            //
+            //workList.add(instToStore);
             seenInstSet.add(instToStore);
         }
     };
 
+    // Pull any loop counter in the store set out to another list.
+    //
+    Dictionary<UIndex, OrderedHashSet<IRInst*>> loopCounters;
+    {
+        List<IRInst*> loopCounterInsts;
+        for (auto inst : hoistInfo->storeSet)
+        {
+            if (inst->findDecoration<IRLoopCounterDecoration>())
+            {
+                auto block = cast<IRBlock>(inst->getParent());
+                auto nestDepth = indexedBlockInfo.getValue(block).getCount() - 1;
+
+                if (!loopCounters.containsKey(nestDepth))
+                    loopCounters[nestDepth] = OrderedHashSet<IRInst*>();
+                
+                loopCounters[nestDepth].add(inst);
+                loopCounterInsts.add(inst);
+            }
+        }
+
+        for (auto inst : loopCounterInsts)
+            hoistInfo->storeSet.remove(inst);
+    }
+
+    // First handle all non-loop-counter insts.
     ensureInstAvailable(hoistInfo->storeSet, false);
+
+    // Then handle the loop counter insts in reverse-order of nest depth
+    // This ordering is important because loop counters at level N _may_ depend on 
+    // the counters at the previous levels.
+    // 
+    for (Index ii = (Index)loopCounters.getCount() - 1; ii >= 0; --ii)
+    {
+        ensureInstAvailable(loopCounters[(UIndex)ii], false);
+    }
+
+    // Next handle all recompute insts, from within 
     ensureInstAvailable(hoistInfo->recomputeSet, true);
 
     // Replace the old store set with the processed one.
@@ -2080,12 +2155,27 @@ static bool shouldStoreInst(IRInst* inst)
         return false;
 
     case kIROp_Call:
-        // If the callee prefers recompute policy, don't store.
+    {
+        // If the callee has a preference, we should follow it.
         if (getCheckpointPreference(inst->getOperand(0)) == CheckpointPreference::PreferRecompute)
         {
             return false;
         }
+        else if (getCheckpointPreference(inst->getOperand(0)) == CheckpointPreference::PreferCheckpoint)
+        {
+            return true;
+        }
+
+        // If not, we'll default to recomputing calls that don't have side effects & don't 
+        // load from non-local variables. A previous data-flow pass should have already tagged functions 
+        // with the appropriate decorations.
+        // 
+        auto callee = getResolvedInstForDecorations(inst->getOperand(0), true);
+        if (callee->findDecoration<IRReadNoneDecoration>())
+            return false;
+
         break;
+    }
     default:
         break;
     }
@@ -2123,8 +2213,8 @@ static bool shouldStoreVar(IRVar* var)
             // of the var will be the same as the decision for the call.
             return shouldStoreInst(callUser);
         }
-        // Default behavior is to store if we can.
-        return true;
+        // Default behavior is to recompute stuff.
+        return false;
     }
     // If the var has never been written to, don't store it.
     return false;
