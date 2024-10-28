@@ -161,6 +161,38 @@ EntryPoint* Module::findAndCheckEntryPoint(const std::string& name, int stage)
     return new EntryPoint(entryPoint);
 }
 
+int Module::getDefinedEntryPointCount()
+{
+    return moduleInterface()->getDefinedEntryPointCount();
+}
+
+EntryPoint* Module::getDefinedEntryPoint(int index)
+{
+    if (moduleInterface()->getDefinedEntryPointCount() <= index)
+        return nullptr;
+
+    Slang::ComPtr<IEntryPoint> entryPoint;
+    {
+        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        SlangResult result = moduleInterface()->getDefinedEntryPoint(index, entryPoint.writeRef());
+        if (!SLANG_SUCCEEDED(result))
+        {
+            g_error.type = std::string("USER");
+            g_error.result = result;
+
+            if (diagnosticsBlob->getBufferSize())
+            {
+                char* diagnostics = (char*)diagnosticsBlob->getBufferPointer();
+                g_error.message = std::string(diagnostics);
+            }
+            return nullptr;
+        }
+    }
+
+    return new EntryPoint(entryPoint);
+}
+
+
 ComponentType* Session::createCompositeComponentType(
     const std::vector<ComponentType*>& components)
 {
@@ -235,14 +267,68 @@ std::string ComponentType::getEntryPointCode(int entryPointIndex, int targetInde
     return {};
 }
 
-// Since spirv code is binary, we can't return it as a string, we will need to use emscripten::val
+// Since result code is binary, we can't return it as a string, we will need to use emscripten::val
 // to wrap it and return it to the javascript side.
-emscripten::val ComponentType::getEntryPointCodeSpirv(int entryPointIndex, int targetIndex)
+emscripten::val ComponentType::getEntryPointCodeBlob(int entryPointIndex, int targetIndex)
 {
     Slang::ComPtr<IBlob> kernelBlob;
     Slang::ComPtr<ISlangBlob> diagnosticBlob;
     SlangResult result = interface()->getEntryPointCode(
         entryPointIndex,
+        targetIndex,
+        kernelBlob.writeRef(),
+        diagnosticBlob.writeRef());
+    if (result != SLANG_OK)
+    {
+        g_error.type = std::string("USER");
+        g_error.result = result;
+        g_error.message = std::string(
+            (char*)diagnosticBlob->getBufferPointer(),
+            (char*)diagnosticBlob->getBufferPointer() +
+            diagnosticBlob->getBufferSize());
+        return {};
+    }
+
+    const uint8_t* ptr = (uint8_t*)kernelBlob->getBufferPointer();
+    return emscripten::val(emscripten::typed_memory_view(kernelBlob->getBufferSize(),
+            ptr));
+}
+
+std::string ComponentType::getTargetCode(int targetIndex)
+{
+    {
+        Slang::ComPtr<IBlob> kernelBlob;
+        Slang::ComPtr<ISlangBlob> diagnosticBlob;
+        SlangResult result = interface()->getTargetCode(
+            targetIndex,
+            kernelBlob.writeRef(),
+            diagnosticBlob.writeRef());
+        if (result != SLANG_OK)
+        {
+            g_error.type = std::string("USER");
+            g_error.result = result;
+            g_error.message = std::string(
+                (char*)diagnosticBlob->getBufferPointer(),
+                (char*)diagnosticBlob->getBufferPointer() +
+                diagnosticBlob->getBufferSize());
+            return "";
+        }
+        std::string targetCode = std::string(
+            (char*)kernelBlob->getBufferPointer(),
+            (char*)kernelBlob->getBufferPointer() + kernelBlob->getBufferSize());
+        return targetCode;
+    }
+
+    return {};
+}
+
+// Since result code is binary, we can't return it as a string, we will need to use emscripten::val
+// to wrap it and return it to the javascript side.
+emscripten::val ComponentType::getTargetCodeBlob(int targetIndex)
+{
+    Slang::ComPtr<IBlob> kernelBlob;
+    Slang::ComPtr<ISlangBlob> diagnosticBlob;
+    SlangResult result = interface()->getTargetCode(
         targetIndex,
         kernelBlob.writeRef(),
         diagnosticBlob.writeRef());
