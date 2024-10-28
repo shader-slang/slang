@@ -3289,8 +3289,6 @@ struct IRDebugValue : IRInst
     IR_LEAF_ISA(DebugValue)
     IRInst* getDebugVar() { return getOperand(0); }
     IRInst* getValue() { return getOperand(1); }
-    UInt getAccessChainCount() { return getOperandCount() - 2; }
-    IRInst* getAccessChain(UInt index) { return getOperand(2 + index); }
 };
 
 struct IRDebugLocationDecoration : IRDecoration
@@ -3798,7 +3796,7 @@ public:
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugLine(IRInst* source, IRIntegerValue lineStart, IRIntegerValue lineEnd, IRIntegerValue colStart, IRIntegerValue colEnd);
     IRInst* emitDebugVar(IRType* type, IRInst* source, IRInst* line, IRInst* col, IRInst* argIndex = nullptr);
-    IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue, ArrayView<IRInst*> accessChain);
+    IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
 
         /// Emit an LiveRangeStart instruction indicating the referenced item is live following this instruction
     IRLiveRangeStart* emitLiveRangeStart(IRInst* referenced);

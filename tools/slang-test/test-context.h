@@ -158,13 +158,13 @@ public:
 
     /// Timeout time for communication over connection.
     /// NOTE! If the timeout is hit, the connection will be destroyed, and then recreated.
-    /// For tests that compile the stdlib, if that takes this time, the stdlib will be
+    /// To test it, compile the core module, if it takes too much time, the core module will be
     /// repeatedly compiled and each time fail.
     /// NOTE! This timeout may be altered in the ctor for a specific target, the initializatoin
     /// value is just the default.
     ///
-    /// TODO(JS): We could split the stdlib compilation from other actions, and have timeout specific for
-    /// that. To do this we could have a 'compileStdLib' RPC method.
+    /// TODO(JS): We could split the core module compilation from other actions, and have timeout specific for
+    /// that. To do this we could have a 'compileCoreModule' RPC method.
     ///
     /// Current default is 60 seconds.
     Slang::Int connectionTimeOutInMs = 60 * 1000;

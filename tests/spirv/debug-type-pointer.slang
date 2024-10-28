@@ -32,7 +32,6 @@ struct LinkedNode
 
 float test(LinkedNode *pNode)
 {
-    //SPV: DebugValue %pNodeNext
     LinkedNode *pNodeNext = pNode->pNext;
     return *(pNode->pValue) + pNodeNext->value;
 }

@@ -4627,6 +4627,21 @@ ${{{{
         }
     }
 
+    [require(cuda, cuda_sm_6_0)]
+    [require(spirv, spvAtomicFloat64AddEXT)]
+    void InterlockedAddF64(uint byteAddress, double valueToAdd, out double originalValue)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<double>($1), $2))";
+        default:
+            {
+                let buf = __getEquivalentStructuredBuffer<double>(this);
+                originalValue = __atomic_add(buf[byteAddress / 8], valueToAdd);
+                return;
+            }
+        }
+    }
     // FP16x2
 
     ///@internal

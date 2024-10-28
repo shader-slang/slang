@@ -1642,6 +1642,17 @@ extension vector<T,N> : IInteger
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int64_t v) { this = vector<T,N>(T(v)); }
+
+    [OverloadRank(-1)]
+    __implicit_conversion($(kConversionCost_Default))
+    __intrinsic_op($(kIROp_CastFloatToInt))
+    __generic<U:__BuiltinFloatingPointType>
+    __init(vector<U, N> other);
+
+    [OverloadRank(-1)]
+    __intrinsic_op($(kIROp_IntCast))
+    __generic<U:__BuiltinIntegerType>
+    __init(vector<U, N> other);
 }
 
 __generic<T:__BuiltinFloatingPointType, let N : int>
@@ -1658,6 +1669,17 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Neg)) This neg();
     __intrinsic_op($(kIROp_Mul)) This scale<T1:__BuiltinFloatingPointType>(T1 s);
     [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+
+    [OverloadRank(-1)]
+    __implicit_conversion($(kConversionCost_Default))
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:__BuiltinFloatingPointType>
+    __init(vector<U, N> other);
+
+    [OverloadRank(-1)]
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __generic<U:__BuiltinIntegerType>
+    __init(vector<U, N> other);
 
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }

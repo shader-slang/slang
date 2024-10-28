@@ -18,8 +18,8 @@ Currently, deserialization of the AST or IR for a module is an all-or-nothing op
 Either the entire `Decl` hierarchy of the AST is deserialized and turned into in-memory C++ objects, or none of it is.
 Similarly, we can either construct the `IRInst` hierarchy for an entire module, or none of it.
 
-Releases of the Slang compiler typically included a serialized form of the standard library ("stdlib") module, and the runtime cost of deserializing this module has proven to be a problem for users of the compiler.
-Becuse parts of the Slang compiler are not fully thread-safe/reentrant, the stdlib must be deserialized for each "global session," so that deserialization cost is incurred per-thread in scenarios with thread pools.
+Releases of the Slang compiler typically included a serialized form of the core module, and the runtime cost of deserializing this module has proven to be a problem for users of the compiler.
+Becuse parts of the Slang compiler are not fully thread-safe/reentrant, the core module must be deserialized for each "global session," so that deserialization cost is incurred per-thread in scenarios with thread pools.
 Even in single-threaded scenarios, the deserialization step adds significantly to the startup time for the compiler, making single-file compiles less efficient than compiling large batches of files in a single process.
 
 Overview of Proposed Solution

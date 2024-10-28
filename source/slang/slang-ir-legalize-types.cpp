@@ -886,19 +886,13 @@ static LegalVal legalizeDebugVar(IRTypeLegalizationContext* context, LegalType t
 static LegalVal legalizeDebugValue(IRTypeLegalizationContext* context, LegalVal debugVar, LegalVal debugValue, IRDebugValue* originalInst)
 {
     // For now we just discard any special part and keep the ordinary part.
-    ShortList<IRInst*> accessChain;
-    for (UInt i = 0; i < originalInst->getAccessChainCount(); i++)
-    {
-        accessChain.add(originalInst->getAccessChain(i));
-    }
     switch (debugValue.flavor)
     {
     case LegalType::Flavor::simple:
         return LegalVal::simple(
             context->builder->emitDebugValue(
                 debugVar.getSimple(),
-                debugValue.getSimple(),
-                accessChain.getArrayView().arrayView));
+                debugValue.getSimple()));
     case LegalType::Flavor::none:
         return LegalVal();
     case LegalType::Flavor::pair:

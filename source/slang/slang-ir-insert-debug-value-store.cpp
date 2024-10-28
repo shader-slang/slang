@@ -136,8 +136,7 @@ namespace Slang
                     paramVal = builder.emitLoad(param);
                 if (paramVal)
                 {
-                    ArrayView<IRInst*> accessChain;
-                    builder.emitDebugValue(debugVar, paramVal, accessChain);
+                    builder.emitDebugValue(debugVar, paramVal);
                 }
                 paramIndex++;
             }
@@ -172,36 +171,11 @@ namespace Slang
 
             // Helper func to insert debugValue updates.
             auto setDebugValue = [&](
-                IRInst* debugVar, IRInst* rootVar, IRInst* newValue,
-                ArrayView<IRInst*> accessChain, ArrayView<IRInst*> types)
+                IRInst* debugVar, IRInst* newValue,
+                ArrayView<IRInst*> accessChain)
                 {
-                    // SPIRV does not allow dynamic indices in DebugValue,
-                    // so we need to stop the access chain at the first dynamic index.
-                    Index i = 0;
-                    for (; i < accessChain.getCount(); i++)
-                    {
-                        if (as<IRStructKey>(accessChain[i]))
-                        {
-                            continue;
-                        }
-                        if (as<IRIntLit>(accessChain[i]))
-                        {
-                            continue;
-                        }
-                        break;
-                    }
-                    // If everything is static on the access chain, we can simply emit a DebugValue.
-                    if (i == accessChain.getCount())
-                    {
-                        builder.emitDebugValue(debugVar, newValue, accessChain);
-                        return;
-                    }
-
-                    // Otherwise we need to load the entire composite value starting at the dynamic index access chain
-                    // and set it.
-                    auto compositePtr = builder.emitElementAddress(rootVar, accessChain.head(i), types.head(i));
-                    auto compositeVal = builder.emitLoad(compositePtr);
-                    builder.emitDebugValue(debugVar, compositeVal, accessChain.head(i));
+                    auto ptr = builder.emitElementAddress(debugVar, accessChain);
+                    builder.emitDebugValue(ptr, newValue);
                 };
             for (auto block : func->getBlocks())
             {
@@ -213,26 +187,24 @@ namespace Slang
                     if (auto storeInst = as<IRStore>(inst))
                     {
                         List<IRInst*> accessChain;
-                        List<IRInst*> types;
-                        auto varInst = getRootAddr(storeInst->getPtr(), accessChain, &types);
+                        auto varInst = getRootAddr(storeInst->getPtr(), accessChain);
                         IRInst* debugVar = nullptr;
                         if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                         {
                             builder.setInsertAfter(storeInst);
-                            setDebugValue(debugVar, varInst, storeInst->getVal(), accessChain.getArrayView(), types.getArrayView());
+                            setDebugValue(debugVar, storeInst->getVal(), accessChain.getArrayView());
                         }
                     }
                     else if (auto swizzledStore = as<IRSwizzledStore>(inst))
                     {
                         List<IRInst*> accessChain;
-                        List<IRInst*> types;
-                        auto varInst = getRootAddr(swizzledStore->getDest(), accessChain, &types);
+                        auto varInst = getRootAddr(swizzledStore->getDest(), accessChain);
                         IRInst* debugVar = nullptr;
                         if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                         {
                             builder.setInsertAfter(swizzledStore);
                             auto loadVal = builder.emitLoad(swizzledStore->getDest());
-                            setDebugValue(debugVar, varInst, loadVal, accessChain.getArrayView(), types.getArrayView());
+                            setDebugValue(debugVar, loadVal, accessChain.getArrayView());
                         }
                     }
                     else if (auto callInst = as<IRCall>(inst))
@@ -246,14 +218,13 @@ namespace Slang
                             if (!as<IRPtrTypeBase>(arg->getDataType()))
                                 continue;
                             List<IRInst*> accessChain;
-                            List<IRInst*> types;
-                            auto varInst = getRootAddr(arg, accessChain, &types);
+                            auto varInst = getRootAddr(arg, accessChain);
                             IRInst* debugVar = nullptr;
                             if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                             {
                                 builder.setInsertAfter(callInst);
                                 auto loadVal = builder.emitLoad(arg);
-                                setDebugValue(debugVar, varInst, loadVal, accessChain.getArrayView(), types.getArrayView());
+                                setDebugValue(debugVar, loadVal, accessChain.getArrayView());
                             }
                         }
                     }

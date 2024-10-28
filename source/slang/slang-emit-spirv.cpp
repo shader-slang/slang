@@ -1432,7 +1432,7 @@ struct SPIRVEmitContext
         return m_targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanEmitReflection);
     }
 
-    void requireVariablePointers()
+    void requirePhysicalStorageAddressing()
     {
         if (m_addressingMode == SpvAddressingModelPhysicalStorageBuffer64)
             return;
@@ -1511,7 +1511,7 @@ struct SPIRVEmitContext
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_storage_buffer_storage_class"));
                 if (storageClass == SpvStorageClassPhysicalStorageBuffer)
                 {
-                    requireVariablePointers();
+                    requirePhysicalStorageAddressing();
                 }
                 auto valueType = ptrType->getValueType();
                 // If we haven't emitted the inner type yet, we need to emit a forward declaration.
@@ -1688,7 +1688,7 @@ struct SPIRVEmitContext
             return emitOpTypeHitObject(inst);
 
         case kIROp_HLSLConstBufferPointerType:
-            requireVariablePointers();
+            requirePhysicalStorageAddressing();
             return emitOpTypePointer(inst, SpvStorageClassPhysicalStorageBuffer, inst->getOperand(0));
 
         case kIROp_FuncType:
@@ -2724,41 +2724,32 @@ struct SPIRVEmitContext
             auto spvBlock = emitOpLabel(spvFunc, irBlock);
             if (irBlock == irFunc->getFirstBlock())
             {
-                // OpVariable
+                // OpVariable and OpDebugVariable
                 // All variables used in the function must be declared before anything else.
                 for (auto block : irFunc->getBlocks())
                 {
                     for (auto inst : block->getChildren())
                     {
-                        if (as<IRVar>(inst))
+                        switch (inst->getOp())
+                        {
+                        case kIROp_Var:
                             emitLocalInst(spvBlock, inst);
+                            break;
+                        case kIROp_DebugVar:
+                            // Declare an ordinary local variable for debugDeclare association of a debug variable.
+                            // This variable is what we will actually write values to upon a `kIROp_DebugValue` inst.
+                            emitDebugVarBackingLocalVarDeclaration(spvBlock, as<IRDebugVar>(inst));
+                            break;
+                        }
                     }
                 }
                 // DebugInfo.
                 funcDebugScope = emitDebugFunction(spvBlock, spvFunc, irFunc);
             }
-
             if (funcDebugScope)
             {
-                if (auto entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>())
-                {
-                    if (auto debugScope = findDebugScope(irFunc->getModule()->getModuleInst()))
-                    {
-                        IRBuilder builder(irFunc);
-                        String cmdArgs = getDebugInfoCommandLineArgumentForEntryPoint(entryPointDecor);
-                        emitOpDebugEntryPoint(
-                            getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                            m_voidType,
-                            getNonSemanticDebugInfoExtInst(),
-                            funcDebugScope,
-                            debugScope,
-                            builder.getStringValue(toSlice("slangc")),
-                            builder.getStringValue(cmdArgs.getUnownedSlice()));
-                    }
-                }
                 emitOpDebugScope(spvBlock, nullptr, m_voidType, getNonSemanticDebugInfoExtInst(), funcDebugScope);
             }
-
             // In addition to normal basic blocks,
             // all loops gets a header block.
             for (auto irInst : irBlock->getChildren())
@@ -2766,6 +2757,26 @@ struct SPIRVEmitContext
                 if (irInst->getOp() == kIROp_loop)
                 {
                     emitOpLabel(spvFunc, irInst);
+                }
+            }
+        }
+
+        if (funcDebugScope)
+        {
+            if (auto entryPointDecor = irFunc->findDecoration<IREntryPointDecoration>())
+            {
+                if (auto debugScope = findDebugScope(irFunc->getModule()->getModuleInst()))
+                {
+                    IRBuilder builder(irFunc);
+                    String cmdArgs = getDebugInfoCommandLineArgumentForEntryPoint(entryPointDecor);
+                    emitOpDebugEntryPoint(
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                        m_voidType,
+                        getNonSemanticDebugInfoExtInst(),
+                        funcDebugScope,
+                        debugScope,
+                        builder.getStringValue(toSlice("slangc")),
+                        builder.getStringValue(cmdArgs.getUnownedSlice()));
                 }
             }
         }
@@ -2991,6 +3002,97 @@ struct SPIRVEmitContext
             requireSPIRVCapability(SpvCapabilityInt64Atomics);
             break;
         }
+    }
+
+    SpvInst* emitDebugVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
+    {
+        // For every DebugVar, we will declare:
+        // - An OpDebugLocalVariable `spvDebugLocalVar`
+        // - An OpVariable `actualHelperVar`
+        // - An OpDebugDeclare to associate `spvDebugLocalVar` with `actualHelperVar`
+        // The `actualHelperVar` is used to update the actual value of the variable
+        // at each kIROp_DebugValue instruction.
+        //
+        auto scope = findDebugScope(debugVar);
+        if (!scope)
+            return nullptr;
+
+        bool hasBackingVar = m_mapIRInstToSpvInst.containsKey(debugVar);
+
+        IRBuilder builder(debugVar);
+        builder.setInsertBefore(debugVar);
+
+        auto name = getName(debugVar);
+        auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
+        auto debugType = emitDebugType(varType);
+
+        auto spvDebugLocalVar = emitOpDebugLocalVariable(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            hasBackingVar ? nullptr : debugVar,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            name,
+            debugType,
+            debugVar->getSource(),
+            debugVar->getLine(),
+            debugVar->getCol(),
+            scope,
+            builder.getIntValue(builder.getUIntType(), 0),
+            debugVar->getArgIndex());
+
+        if (hasBackingVar)
+        {
+            emitOpDebugDeclare(parent, nullptr, m_voidType, getNonSemanticDebugInfoExtInst(),
+                spvDebugLocalVar, debugVar, getDwarfExpr(), List<SpvInst*>());
+        }
+
+        return spvDebugLocalVar;
+    }
+
+    bool isLegalType(IRInst* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_UnsizedArrayType:
+            return false;
+        case kIROp_ArrayType:
+            return isLegalType(as<IRArrayType>(type)->getElementType());
+        case kIROp_VectorType:
+        case kIROp_StructType:
+        case kIROp_MatrixType:
+            return true;
+        case kIROp_PtrType:
+            return as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::UserPointer;
+        default:
+            if (as<IRBasicType>(type))
+                return true;
+            return false;
+        }
+    }
+
+    SpvInst* emitDebugVarBackingLocalVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
+    {
+        auto scope = findDebugScope(debugVar);
+        if (!scope)
+            return nullptr;
+
+        IRBuilder builder(debugVar);
+        builder.setInsertBefore(debugVar);
+        auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
+
+        if (!isLegalType(varType))
+            return nullptr;
+
+        IRSizeAndAlignment sizeAlignment;
+        getNaturalSizeAndAlignment(this->m_targetRequest->getOptionSet(), varType, &sizeAlignment);
+        if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
+        {
+            auto debugVarPtrType = builder.getPtrType(varType, AddressSpace::Function);
+            auto actualHelperVar = emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
+            maybeEmitPointerDecoration(actualHelperVar, debugVar);
+            return actualHelperVar;
+        }
+        return nullptr;
     }
 
     // The instructions that appear inside the basic blocks of
@@ -3310,7 +3412,7 @@ struct SPIRVEmitContext
             result = emitDebugLine(parent, as<IRDebugLine>(inst));
             break;
         case kIROp_DebugVar:
-            result = emitDebugVar(parent, as<IRDebugVar>(inst));
+            result = emitDebugVarDeclaration(parent, as<IRDebugVar>(inst));
             break;
         case kIROp_DebugValue:
             result = emitDebugValue(parent, as<IRDebugValue>(inst));
@@ -4803,7 +4905,8 @@ struct SPIRVEmitContext
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_Var ? SpvDecorationAliasedPointer : SpvDecorationAliased)
+                    (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_Var || inst->getOp() == kIROp_DebugVar
+                        ? SpvDecorationAliasedPointer : SpvDecorationAliased)
                 );
             }
         }
@@ -6188,21 +6291,6 @@ struct SPIRVEmitContext
             debugLine->getColEnd());
     }
 
-    SpvInst* emitDebugVar(SpvInstParent* parent, IRDebugVar* debugVar)
-    {
-        SLANG_UNUSED(parent);
-        auto scope = findDebugScope(debugVar);
-        if (!scope)
-            return nullptr;
-        IRBuilder builder(debugVar);
-        auto name = getName(debugVar);
-        auto debugType = emitDebugType(debugVar->getDataType());
-        auto spvLocalVar = emitOpDebugLocalVariable(getSection(SpvLogicalSectionID::ConstantsAndTypes), debugVar, m_voidType, getNonSemanticDebugInfoExtInst(),
-            name, debugType, debugVar->getSource(), debugVar->getLine(), debugVar->getCol(), scope,
-            builder.getIntValue(builder.getUIntType(), 0), debugVar->getArgIndex());
-        return spvLocalVar;
-    }
-
     SpvInst* getDwarfExpr()
     {
         if (m_nullDwarfExpr)
@@ -6216,21 +6304,18 @@ struct SPIRVEmitContext
         return m_nullDwarfExpr;
     }
 
-    SpvInst* emitDebugValue(SpvInstParent* parent, IRDebugValue* debugValue)
+    bool translateIRAccessChain(IRBuilder& builder, IRInst* baseType, const List<IRInst*>& irAccessChain, List<SpvInst*>& spvAccessChain)
     {
-        IRBuilder builder(debugValue);
-
-        List<SpvInst*> accessChain;
-        auto type = unwrapAttributedType(debugValue->getDebugVar()->getDataType());
-        for (UInt i = 0; i < debugValue->getAccessChainCount(); i++)
+        auto type = baseType;
+        for (Index i = 0; i < irAccessChain.getCount(); i++)
         {
-            auto element = debugValue->getAccessChain(i);
+            auto element = irAccessChain[i];
             if (element->getOp() == kIROp_StructKey)
             {
                 auto key = as<IRStructKey>(element);
                 auto structType = as<IRStructType>(type);
                 if (!structType)
-                    return nullptr;
+                    return false;
                 UInt fieldIndex = 0;
                 for (auto field : structType->getFields())
                 {
@@ -6241,7 +6326,7 @@ struct SPIRVEmitContext
                     }
                     fieldIndex++;
                 }
-                accessChain.add(emitIntConstant(fieldIndex, builder.getIntType()));
+                spvAccessChain.add(emitIntConstant(fieldIndex, builder.getIntType()));
             }
             else
             {
@@ -6252,12 +6337,66 @@ struct SPIRVEmitContext
                 else if (auto matrixType = as<IRMatrixType>(type))
                     type = builder.getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
                 else
-                    return nullptr;
-                accessChain.add(ensureInst(element));
+                    return false;
+                spvAccessChain.add(ensureInst(element));
             }
         }
-        return emitOpDebugValue(parent, debugValue, m_voidType, getNonSemanticDebugInfoExtInst(),
-            debugValue->getDebugVar(), debugValue->getValue(),  getDwarfExpr(), accessChain);
+        return true;
+    }
+
+    SpvInst* emitDebugValue(SpvInstParent* parent, IRDebugValue* debugValue)
+    {
+        // We are asked to update the value for a debug variable.
+        // A debug variable is already emited as a OpDebugVariable + 
+        // OpVariable + OpDebugDeclare. We only need to store the new value
+        // into the associated OpVariable. The `debugValue->getDebugVar()` inst
+        // already maps to the `OpVariable` SpvInst, so we just need to emit
+        // code for a store into the subset of the OpVariable with the correct
+        // accesschain defined in the debug value inst.
+        //
+        IRBuilder builder(debugValue);
+        builder.setInsertBefore(debugValue);
+
+        // First we need to check if the debug variable has a backing ordinary
+        // variable. If it doesn't, we can't emit a store.
+        //
+        List<IRInst*> irAccessChain;
+        auto rootVar = getRootAddr(debugValue->getDebugVar(), irAccessChain);
+        SpvInst* spvDebugVar = nullptr;
+        if (!m_mapIRInstToSpvInst.tryGetValue(rootVar, spvDebugVar))
+            return nullptr;
+        if (!spvDebugVar)
+            return nullptr;
+        if (spvDebugVar->opcode != SpvOpVariable)
+        {
+            // If the root variable can't be represented by a normal variable,
+            // try to emit a DebugValue if possible. Usually this means that the variable
+            // represents a shader resource.
+            // 
+            // SPIR-V requires the access chain specified in a DebugValue operation to
+            // be fully static. We will skip emitting the debug inst if the access chain
+            // isn't static.
+            //
+            auto type = unwrapAttributedType(debugValue->getDebugVar()->getDataType());
+            List<SpvInst*> accessChain;
+            bool isConstAccessChain = translateIRAccessChain(builder, type, irAccessChain, accessChain);
+           
+            if (isConstAccessChain)
+            {
+                return emitOpDebugValue(
+                    parent, debugValue, m_voidType, getNonSemanticDebugInfoExtInst(),
+                    rootVar, debugValue->getValue(), getDwarfExpr(), accessChain);
+            }
+
+            // Fallback to not emit anything for now.
+            return nullptr;
+        }
+        
+        // The ordinary case is the debug variable has a backing ordinary variable.
+        // We can simply emit a store into the backing variable for the DebugValue operation.
+        //
+        builder.setInsertBefore(debugValue);
+        return emitOpStore(parent, debugValue, debugValue->getDebugVar(), debugValue->getValue());
     }
 
     IRInst* getName(IRInst* inst)

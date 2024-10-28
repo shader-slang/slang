@@ -342,7 +342,7 @@ void Session::writeStdlibDoc(String config)
     }
 }
 
-SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
+SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlags)
 {
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
@@ -369,7 +369,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     auto stdLibSrcBlob = StringBlob::moveCreate(stdLibSrcBuilder.produceString());
     addBuiltinSource(coreLanguageScope, "core", stdLibSrcBlob);
 
-    if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
+    if (compileFlags & slang::CompileCoreModuleFlag::WriteDocumentation)
     {
         // Load config file first.
         String configText;
@@ -393,7 +393,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     return SLANG_OK;
 }
 
-SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
+SlangResult Session::loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes)
 {
     SLANG_PROFILE;
 
@@ -407,7 +407,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
     // Make a file system to read it from
     ComPtr<ISlangFileSystemExt> fileSystem;
-    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(coreModule, coreModuleSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
@@ -416,7 +416,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     return SLANG_OK;
 }
 
-SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob)
+SlangResult Session::saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.getCount() == 0)
     {
@@ -757,13 +757,11 @@ SLANG_NO_THROW void SLANG_MCALL Session::getLanguagePrelude(
     ISlangBlob** outPrelude)
 {
     SourceLanguage sourceLanguage = SourceLanguage(inSourceLanguage);
-    SLANG_ASSERT(int(sourceLanguage) > int(SourceLanguage::Unknown) && int(sourceLanguage) < int(SourceLanguage::CountOf));
-
-    SLANG_ASSERT(sourceLanguage != SourceLanguage::Unknown);
 
     *outPrelude = nullptr;
     if (sourceLanguage != SourceLanguage::Unknown)
     {
+        SLANG_ASSERT(int(sourceLanguage) > int(SourceLanguage::Unknown) && int(sourceLanguage) < int(SourceLanguage::CountOf));
         *outPrelude = Slang::StringUtil::createStringBlob(m_languagePreludes[int(sourceLanguage)]).detach();
     }
 }
@@ -5042,13 +5040,21 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             });
         List<RefPtr<ComponentType>> components;
         components.add(this);
+        bool entryPointsDiscovered = false;
         for (auto module : modules)
         {
             for (auto entryPoint : module->getEntryPoints())
             {
                 components.add(entryPoint);
+                entryPointsDiscovered = true;
             }
         }
+        // If no entry points were discovered, then we should return nullptr.
+        if (!entryPointsDiscovered)
+        {
+            return nullptr;
+        }
+        
         RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
         ComPtr<IComponentType> linkedComponentType;
         SLANG_RETURN_NULL_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));

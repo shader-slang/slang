@@ -466,42 +466,42 @@ namespace SlangRecord
     }
 
 
-    void ReplayConsumer::IGlobalSession_compileStdLib(ObjectID objectId, slang::CompileStdLibFlags flags)
+    void ReplayConsumer::IGlobalSession_compileCoreModule(ObjectID objectId, slang::CompileCoreModuleFlags flags)
     {
         InputObjectSanityCheck(objectId);
 
         slang::IGlobalSession* globalSession = getObjectPointer<slang::IGlobalSession>(objectId);
-        SlangResult res = globalSession->compileStdLib(flags);
+        SlangResult res = globalSession->compileCoreModule(flags);
 
         if (SLANG_FAILED(res))
         {
-            slangRecordLog(LogLevel::Error, "IGlobalSession::compileStdLib fails, ret: 0x%X, this: 0x%X\n", res, objectId);
+            slangRecordLog(LogLevel::Error, "IGlobalSession::compileCoreModule fails, ret: 0x%X, this: 0x%X\n", res, objectId);
         }
     }
 
 
-    void ReplayConsumer::IGlobalSession_loadStdLib(ObjectID objectId, const void* stdLib, size_t stdLibSizeInBytes)
+    void ReplayConsumer::IGlobalSession_loadCoreModule(ObjectID objectId, const void* coreModule, size_t coreModuleSizeInBytes)
     {
         InputObjectSanityCheck(objectId);
 
         slang::IGlobalSession* globalSession = getObjectPointer<slang::IGlobalSession>(objectId);
-        SlangResult res = globalSession->loadStdLib(stdLib, stdLibSizeInBytes);
+        SlangResult res = globalSession->loadCoreModule(coreModule, coreModuleSizeInBytes);
 
         if (SLANG_FAILED(res))
         {
-            slangRecordLog(LogLevel::Error, "IGlobalSession::loadStdLib fails, ret: 0x%X, this: 0x%X\n", res, objectId);
+            slangRecordLog(LogLevel::Error, "IGlobalSession::loadCoreModule fails, ret: 0x%X, this: 0x%X\n", res, objectId);
         }
     }
 
 
-    void ReplayConsumer::IGlobalSession_saveStdLib(ObjectID objectId, SlangArchiveType archiveType, ObjectID outBlobId)
+    void ReplayConsumer::IGlobalSession_saveCoreModule(ObjectID objectId, SlangArchiveType archiveType, ObjectID outBlobId)
     {
         InputObjectSanityCheck(objectId);
         OutputObjectSanityCheck(outBlobId);
 
         slang::IGlobalSession* globalSession = getObjectPointer<slang::IGlobalSession>(objectId);
         ISlangBlob* outBlob {};
-        SlangResult res = globalSession->saveStdLib(archiveType, &outBlob);
+        SlangResult res = globalSession->saveCoreModule(archiveType, &outBlob);
 
         if (outBlob && SLANG_SUCCEEDED(res))
         {
@@ -509,7 +509,7 @@ namespace SlangRecord
         }
         else
         {
-            slangRecordLog(LogLevel::Error, "IGlobalSession::saveStdLib fails, ret: 0x%X, this: 0x%X\n", res, objectId);
+            slangRecordLog(LogLevel::Error, "IGlobalSession::saveCoreModule fails, ret: 0x%X, this: 0x%X\n", res, objectId);
         }
     }
 
