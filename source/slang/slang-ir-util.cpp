@@ -971,12 +971,41 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
     }
 }
 
+IRInst* tryFindBasePtr(IRInst* inst, IRInst* parentFunc)
+{
+    // Keep going up the tree until we find a variable.
+    switch (inst->getOp())
+    {
+    case kIROp_Var:
+        return getParentFunc(inst) == parentFunc ? inst : nullptr;
+    case kIROp_Param:
+        return getParentFunc(inst) == parentFunc ? inst : nullptr;
+    case kIROp_GetElementPtr:
+        return tryFindBasePtr(as<IRGetElementPtr>(inst)->getBase(), parentFunc);
+    case kIROp_FieldAddress:
+        return tryFindBasePtr(as<IRFieldAddress>(inst)->getBase(), parentFunc);
+    default:
+        return nullptr;
+    }
+}
+
 bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions options)
 {
     // If the function has no side effect and is not writing to any outputs,
     // we can safely treat the call as a normal inst.
+
     IRFunc* parentFunc = nullptr;
-    for (UInt i = 0; i < call->getArgCount(); i++)
+
+    IRParam* param = nullptr;
+    if (auto calleeFunc = getResolvedInstForDecorations(call->getCallee()))
+    {
+        if (auto block = calleeFunc->getFirstBlock())
+        {
+            param = block->getFirstParam();
+        }
+    }
+
+    for (UInt i = 0; i < call->getArgCount(); i++, (param = param ? param->getNextParam() : nullptr))
     {
         auto arg = call->getArg(i);
         if (isValueType(arg->getDataType()))
@@ -1074,6 +1103,9 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
         }
         else
         {
+            if (param && param->findDecoration<IRIgnoreSideEffectsDecoration>())
+                continue;
+                
             return false;
         }
     }
@@ -1107,6 +1139,7 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
         {
         case kIROp_NoSideEffectDecoration:
         case kIROp_ReadNoneDecoration:
+        case kIROp_IgnoreSideEffectsDecoration:
             return false;
         }
     }

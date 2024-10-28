@@ -6,6 +6,7 @@
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-inline.h"
 #include "../core/slang-performance-profiler.h"
 
 namespace Slang
@@ -1511,6 +1512,7 @@ void stripTempDecorations(IRInst* inst)
         case kIROp_RecomputeBlockDecoration:
         case kIROp_AutoDiffOriginalValueDecoration:
         case kIROp_BackwardDerivativePrimalReturnDecoration:
+        case kIROp_BackwardDerivativePrimalContextDecoration:
         case kIROp_PrimalValueStructKeyDecoration:
         case kIROp_PrimalElementTypeDecoration:
             decor->removeAndDeallocate();
@@ -2283,12 +2285,15 @@ struct AutoDiffPass : public InstPassBase
                 }
             }
 
-            // Get rid of block-level decorations that are used to keep track of 
-            // different block types. These don't work well with the IR simplification
-            // passes since they don't expect decorations in blocks.
-            // 
+            
             for (auto diffFunc : autodiffCleanupList)
+            {
+                // Get rid of block-level decorations that are used to keep track of 
+                // different block types. These don't work well with the IR simplification
+                // passes since they don't expect decorations in blocks.
+                // 
                 stripTempDecorations(diffFunc);
+            }
 
             autodiffCleanupList.clear();
 
@@ -2300,9 +2305,7 @@ struct AutoDiffPass : public InstPassBase
                 break;
 
             if (lowerIntermediateContextType(builder))
-            {
                 hasChanges = true;
-            }
 
             // We have done transcribing the functions, now it is time to demote all DifferentialPair types
             // and their operations down to DifferentialPairUserCodeType and *UserCode operations so they
@@ -2312,7 +2315,6 @@ struct AutoDiffPass : public InstPassBase
 
             hasChanges |= changed;
         }
-
         return hasChanges;
     }
 
