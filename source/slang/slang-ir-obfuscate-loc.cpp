@@ -48,8 +48,8 @@ static void _findInstsRec(IRInst* inst, List<InstWithLoc>& out)
     }
 }
 
-// We assume the root source manager is the stdlibs
-static SourceLoc _getStdLibLastLoc(SourceManager* sourceManager)
+// We assume the root source manager is the core module
+static SourceLoc _getCoreModuleLastLoc(SourceManager* sourceManager)
 {
     auto rootManager = sourceManager;
     while (rootManager->getParent())
@@ -95,7 +95,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
     {
         SourceView* sourceView = nullptr;
 
-        const SourceLoc endStdLibLoc = _getStdLibLastLoc(sourceManager);
+        const SourceLoc endCoreModuleLoc = _getCoreModuleLastLoc(sourceManager);
 
         SourceLoc curLoc;
         for (const auto& instWithLoc : instWithLocs)
@@ -109,8 +109,8 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 // This is the current loc
                 curLoc = instWithLoc.loc;
             
-                // Ignore any stdlib locs in the hash
-                if (instWithLoc.loc.getRaw() < endStdLibLoc.getRaw())
+                // Ignore any core module locs in the hash
+                if (instWithLoc.loc.getRaw() < endCoreModuleLoc.getRaw())
                 {
                     continue;
                 }

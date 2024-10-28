@@ -1398,14 +1398,14 @@ SIMPLE_IR_TYPE(BasicBlockType, Type)
 
 struct IRResourceTypeBase : IRType
 {
-    IRInst* getShapeInst() { return getOperand(kStdlibTextureShapeParameterIndex); }
-    IRInst* getIsArrayInst() { return getOperand(kStdlibTextureIsArrayParameterIndex); }
-    IRInst* getIsMultisampleInst() { return getOperand(kStdlibTextureIsMultisampleParameterIndex); }
-    IRInst* getSampleCountInst() { return getOperand(kStdlibTextureSampleCountParameterIndex); }
-    IRInst* getAccessInst() { return getOperand(kStdlibTextureAccessParameterIndex); }
-    IRInst* getIsShadowInst() { return getOperand(kStdlibTextureIsShadowParameterIndex); }
-    IRInst* getIsCombinedInst() { return getOperand(kStdlibTextureIsCombinedParameterIndex); }
-    IRInst* getFormatInst() { return getOperand(kStdlibTextureFormatParameterIndex); }
+    IRInst* getShapeInst() { return getOperand(kCoreModule_TextureShapeParameterIndex); }
+    IRInst* getIsArrayInst() { return getOperand(kCoreModule_TextureIsArrayParameterIndex); }
+    IRInst* getIsMultisampleInst() { return getOperand(kCoreModule_TextureIsMultisampleParameterIndex); }
+    IRInst* getSampleCountInst() { return getOperand(kCoreModule_TextureSampleCountParameterIndex); }
+    IRInst* getAccessInst() { return getOperand(kCoreModule_TextureAccessParameterIndex); }
+    IRInst* getIsShadowInst() { return getOperand(kCoreModule_TextureIsShadowParameterIndex); }
+    IRInst* getIsCombinedInst() { return getOperand(kCoreModule_TextureIsCombinedParameterIndex); }
+    IRInst* getFormatInst() { return getOperand(kCoreModule_TextureFormatParameterIndex); }
 
     SlangResourceShape GetBaseShape()
     {
@@ -1425,7 +1425,7 @@ struct IRResourceTypeBase : IRType
             return SLANG_RESOURCE_NONE;
         }
     }
-    bool isFeedback() { return getIntVal(getAccessInst()) == kStdlibResourceAccessFeedback; }
+    bool isFeedback() { return getIntVal(getAccessInst()) == kCoreModule_ResourceAccessFeedback; }
     bool isMultisample() { return getIntVal(getIsMultisampleInst()) != 0; }
     bool isArray() { return getIntVal(getIsArrayInst()) != 0; }
     bool isShadow() { return getIntVal(getIsShadowInst()) != 0; }
@@ -1434,18 +1434,18 @@ struct IRResourceTypeBase : IRType
     SlangResourceShape getShape() { return (SlangResourceShape)((uint32_t)GetBaseShape() | (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : SLANG_RESOURCE_NONE)); }
     SlangResourceAccess getAccess()
     {
-        auto constVal = as<IRIntLit>(getOperand(kStdlibTextureAccessParameterIndex));
+        auto constVal = as<IRIntLit>(getOperand(kCoreModule_TextureAccessParameterIndex));
         if (constVal)
         {
             switch (getIntVal(constVal))
             {
-            case kStdlibResourceAccessReadOnly:
+            case kCoreModule_ResourceAccessReadOnly:
                 return SLANG_RESOURCE_ACCESS_READ;
-            case kStdlibResourceAccessReadWrite:
+            case kCoreModule_ResourceAccessReadWrite:
                 return SLANG_RESOURCE_ACCESS_READ_WRITE;
-            case kStdlibResourceAccessRasterizerOrdered:
+            case kCoreModule_ResourceAccessRasterizerOrdered:
                 return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-            case kStdlibResourceAccessFeedback:
+            case kCoreModule_ResourceAccessFeedback:
                 return SLANG_RESOURCE_ACCESS_FEEDBACK;
             default:
                 break;

@@ -774,7 +774,7 @@ namespace Slang
         // Allow implicit conversion from sized array to unsized array when
         // calling a function.
         // Note: we implement the logic here instead of an implicit_conversion
-        // intrinsic in the stdlib because we only want to allow this conversion
+        // intrinsic in the core module because we only want to allow this conversion
         // when calling a function.
         //
         if (site == CoercionSite::Argument)

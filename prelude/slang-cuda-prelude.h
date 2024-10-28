@@ -1348,7 +1348,7 @@ struct RWByteAddressBuffer
         memcpy((char*)data + index, &value, sizeof(T));
     }
     
-        /// Can be used in stdlib to gain access
+        /// Can be used in the core module to gain access
     template <typename T>
     SLANG_CUDA_CALL T* _getPtrAt(size_t index)
     {

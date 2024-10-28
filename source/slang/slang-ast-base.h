@@ -458,7 +458,7 @@ class Val : public NodeBase
     }
     List<ValNodeOperand> m_operands;
 
-    // Private use by stdlib deserialization only. Since we know the Vals serialized into stdlib is already
+    // Private use by the core module deserialization only. Since we know the Vals serialized into the core module is already
     // unique, we can just use `this` pointer as the `m_resolvedVal` so we don't need to resolve them again.
     void _setUnique();
 protected:

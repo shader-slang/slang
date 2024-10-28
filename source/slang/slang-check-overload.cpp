@@ -2096,7 +2096,7 @@ namespace Slang
         // to go through the type coercion logic first/instead, because
         // by doing so we could weed out cases where a type is "constructed"
         // from a value of the same type. There is no need in Slang for
-        // "copy constructors" but the stdlib currently has to define
+        // "copy constructors" but the core module currently has to define
         // some just to make code that does, e.g., `float(1.0f)` work.)
 
         LookupResult initializers = lookUpMember(
@@ -2407,7 +2407,7 @@ namespace Slang
     Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         OverloadResolveContext context;
-        // check if this is a stdlib operator call, if so we want to use cached results
+        // check if this is a core module operator call, if so we want to use cached results
         // to speed up compilation
         bool shouldAddToCache = false;
         OperatorOverloadCacheKey key;

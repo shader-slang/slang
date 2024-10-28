@@ -812,7 +812,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         {
                             // If we are passing an address from a structured buffer as a
                             // ref argument, pass the original pointer as is.
-                            // This is to support stdlib atomic functions.
+                            // This is to support core module atomic functions.
                             newArgs.add(arg);
                             continue;
                         }

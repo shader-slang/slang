@@ -2405,12 +2405,12 @@ for (int isArray = 0; isArray <= 1; isArray++)
 for (int isMS = 0; isMS <= 1; isMS++) {
     if (isMS)
     {
-        if (shapeIndex != kStdlibShapeIndex2D)
+        if (shapeIndex != kCoreModule_ShapeIndex2D)
             continue;
     }
     if (isArray)
     {
-        if (shapeIndex == kStdlibShapeIndex3D)
+        if (shapeIndex == kCoreModule_ShapeIndex3D)
             continue;
     }
     auto shapeTypeName = kTextureShapeTypeNames[shapeIndex];
@@ -3025,7 +3025,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 {
 //@hidden:
     static const int isMS = 0;
-    static const int access = $(kStdlibResourceAccessReadOnly);
+    static const int access = $(kCoreModule_ResourceAccessReadOnly);
 //@public:
     __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
@@ -3258,7 +3258,7 @@ __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let i
 extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 {
 //@hidden:
-    static const int access = $(kStdlibResourceAccessReadOnly);
+    static const int access = $(kCoreModule_ResourceAccessReadOnly);
     static const int isMS = 1;
 //@public:
     __glsl_extension(GL_EXT_samplerless_texture_functions)
@@ -3432,7 +3432,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
 // Load/Subscript for readwrite textures
 ${{{{
-    for (int access = kStdlibResourceAccessReadWrite; access<=kStdlibResourceAccessRasterizerOrdered; access++) {
+    for (int access = kCoreModule_ResourceAccessReadWrite; access <= kCoreModule_ResourceAccessRasterizerOrdered; access++) {
         const char* glslIntrinsic = "$cimageLoad($0, $1)$z";
         const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
         const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
@@ -3748,7 +3748,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 }
 
 ${{{{
-if (access == kStdlibResourceAccessReadWrite) {
+if (access == kCoreModule_ResourceAccessReadWrite) {
 }}}}
 
 // RW MS textures.
@@ -3901,7 +3901,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
 }
 
 ${{{{
-} // if (access == kStdlibResourceAccessReadWrite) // for RW MS textures.
+} // if (access == kCoreModule_ResourceAccessReadWrite) // for RW MS textures.
 } // for (access).
 }}}}
 
@@ -3983,13 +3983,13 @@ ${{{{
     for (int isArray = 0; isArray<=1; isArray++)
     for (int isMS = 0; isMS<=1; isMS++)
     for (int isCombined = 0; isCombined<=1; isCombined++)
-    for (int access = kStdlibResourceAccessReadOnly; access<=kStdlibResourceAccessFeedback; access++) {
-        if (access != kStdlibResourceAccessReadOnly)
+    for (int access = kCoreModule_ResourceAccessReadOnly; access <= kCoreModule_ResourceAccessFeedback; access++) {
+        if (access != kCoreModule_ResourceAccessReadOnly)
         {
             // No RW Cube.
-            if (shape == kStdlibShapeIndexCube) continue;
+            if (shape == kCoreModule_ShapeIndexCube) continue;
         }
-        if (access == kStdlibResourceAccessFeedback)
+        if (access == kCoreModule_ResourceAccessFeedback)
         {
             // Feedback only defined for Texture2D and Texture2DArray.
             if (shape != 1) continue;
@@ -3999,14 +3999,14 @@ ${{{{
         if (isMS)
         {
             // Only Texture2DMS.
-            if (shape != kStdlibShapeIndex2D)
+            if (shape != kCoreModule_ShapeIndex2D)
                 continue;
             // Only Texture2DMS or RWTexture2DMS.
-            if (access >= kStdlibShapeIndex3D)
+            if (access >= kCoreModule_ShapeIndex3D)
                 continue;
         }
         // No 3D Array.
-        if (shape == kStdlibShapeIndex3D && isArray == 1)
+        if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
 }}}}
@@ -9924,7 +9924,7 @@ __generic<T : __BuiltinIntegerType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T max(T x, T y)
 {
-    // Note: a stdlib implementation of `max` (or `min`) will require splitting
+    // Note: a core module implementation of `max` (or `min`) will require splitting
     // floating-point and integer cases apart, because the floating-point
     // version needs to correctly handle the case where one of the inputs
     // is not-a-number.
@@ -15159,7 +15159,7 @@ struct BuiltInTriangleIntersectionAttributes
 // 10.2 Shaders
 
 // Right now new shader stages need to be added directly to the compiler
-// implementation, rather than being something that can be declared in the stdlib.
+// implementation, rather than being something that can be declared in the core module.
 
 // 10.3 - Intrinsics
 
@@ -16058,7 +16058,7 @@ struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
 
 __generic<T:__BuiltinSamplerFeedbackType>
-extension _Texture<T,__Shape2D, 0, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0, 0>
+extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 0, 0, 0>
 {
     // With Clamp
 
@@ -16138,7 +16138,7 @@ extension _Texture<T,__Shape2D, 0, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0,
 };
 
 __generic<T:__BuiltinSamplerFeedbackType>
-extension _Texture<T,__Shape2D, 1, 0, 0, $(kStdlibResourceAccessFeedback), 0, 0, 0>
+extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 0, 0, 0>
 {
     // With Clamp
 
@@ -19254,7 +19254,7 @@ ${
 // We introduce a few convenience type aliases here,
 // which both keep our declarations simpler and easier
 // to understand, but which might *also* be useful to
-// users of the stdlib, so that they can write things
+// users of the standard module, so that they can write things
 // like `Texture2D.Footprint`, and also have auto-complete
 // help them find such members.
 //
@@ -19273,7 +19273,7 @@ ${
 // parameter to the query operation(s). We define
 // the GLSL functions here as intrinsics, so that
 // we can refer to them later in the definitions
-// of our stdlib operaitons.
+// of our standard module operaitons; not just in glsl module.
 //
 // Note: despite the GLSL extension defining the `granularity`
 // member of the query result as having type `uint`, the
@@ -19606,7 +19606,7 @@ for(auto levelChoice : kLevelChoices)
 
 ${
 // We now define the portable operations that will be officially
-// supported by the standard library. For each operation, we
+// supported by the standard module. For each operation, we
 // need to provide both a version that maps to the GLSL extension,
 // and a version that uses the NVAPI functions.
 //
@@ -19850,7 +19850,7 @@ ${{{{
 
 //<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 __generic<Shape:__ITextureShape1D2D3D, let format : int>
-extension _Texture<float, Shape, 0, 0, 0, $(kStdlibResourceAccessReadWrite), 0, 0, format>
+extension _Texture<float, Shape, 0, 0, 0, $(kCoreModule_ResourceAccessReadWrite), 0, 0, format>
 {
     [__requiresNVAPI]
     [ForceInline]

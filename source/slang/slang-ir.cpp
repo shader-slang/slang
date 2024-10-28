@@ -377,7 +377,7 @@ namespace Slang
             type = rateQualType->getValueType();
         }
 
-        // The "true" pointers and the pointer-like stdlib types are the easy cases.
+        // The "true" pointers and the pointer-like core module types are the easy cases.
         if( auto ptrType = as<IRPtrTypeBase>(type) )
         {
             return ptrType->getValueType();

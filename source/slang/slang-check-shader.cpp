@@ -352,7 +352,7 @@ namespace Slang
         //   There's actually a lot of detail to semantic checking, in
         //   that the AST-level code should probably be validating the
         //   use of system-value semantics by linking them to explicit
-        //   declarations in the standard library. We should also be
+        //   declarations in the core module. We should also be
         //   using profile information on those declarations to infer
         //   appropriate profile restrictions on the entry point.
         //

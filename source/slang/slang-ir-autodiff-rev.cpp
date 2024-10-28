@@ -1332,7 +1332,7 @@ namespace Slang
             SLANG_RELEASE_ASSERT(diffBaseSpecialize);
 
             // Note: this assumes that the generic arguments to specialize the derivative is the same as the
-            // generic args to specialize the primal function. This is true for all of our stdlib functions,
+            // generic args to specialize the primal function. This is true for all of our core module functions,
             // but we may need to rely on more general substitution logic here.
             auto diffSpecialize = builder->emitSpecializeInst(
                 builder->getTypeKind(), diffBaseSpecialize->getBase(), args.getCount(), args.getBuffer());
