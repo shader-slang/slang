@@ -99,7 +99,8 @@ public:
     Session(slang::ISession* interface)
         : m_interface(interface) {}
 
-    Module* loadModuleFromSource(const std::string& slangCode);
+    Module* loadModuleFromSource(
+        const std::string& slangCode, const std::string& name, const std::string& path);
 
     ComponentType* createCompositeComponentType(
         const std::vector<ComponentType*>& components);

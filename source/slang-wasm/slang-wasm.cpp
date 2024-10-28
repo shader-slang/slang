@@ -94,17 +94,15 @@ Session* GlobalSession::createSession(int compileTarget)
     return new Session(session);
 }
 
-Module* Session::loadModuleFromSource(const std::string& slangCode)
+Module* Session::loadModuleFromSource(const std::string& slangCode, const std::string& name, const std::string& path)
 {
     Slang::ComPtr<IModule> module;
     {
-        const char * name = "";
-        const char * path = "";
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
         Slang::ComPtr<ISlangBlob> slangCodeBlob = Slang::RawBlob::create(
             slangCode.c_str(), slangCode.size());
         module = m_interface->loadModuleFromSource(
-            name, path, slangCodeBlob, diagnosticsBlob.writeRef());
+            name.c_str(), path.c_str(), slangCodeBlob, diagnosticsBlob.writeRef());
         if (!module)
         {
             g_error.type = std::string("USER");
