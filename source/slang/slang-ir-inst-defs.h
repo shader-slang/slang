@@ -1069,6 +1069,18 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// Mark a call as explicitly calling a differentiable function.
     INST(DifferentiableCallDecoration, differentiableCallDecoration, 0, 0)
 
+        /// Mark a type as being eligible for trimming if necessary. If
+        /// any fields don't have any effective loads from them, they can be 
+        /// removed.
+        ///
+    INST(OptimizableTypeDecoration, optimizableTypeDecoration, 0, 0)
+
+        /// Informs the DCE pass to ignore side-effects on this call for
+        /// the purposes of dead code elimination, even if the call does have
+        /// side-effects.
+        ///
+    INST(IgnoreSideEffectsDecoration, ignoreSideEffectsDecoration, 0, 0)
+
         /// Hint that the result from a call to the decorated function should be stored in backward prop function.
     INST(PreferCheckpointDecoration, PreferCheckpointDecoration, 0, 0)
 
