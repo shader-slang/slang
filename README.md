@@ -53,7 +53,7 @@ Slang binaries are also included in the [Vulkan SDK](https://vulkan.lunarg.com/s
 There are packages built for 32- and 64-bit Windows, as well as 64-bit Ubuntu.
 Each binary release includes the command-line `slangc` compiler, a shared library for the compiler, and the `slang.h` header.
 
-See the user-guide on info on using the `slangc` command-line tool: [Slang Command Line Usage](
+See the user-guide for info on using the `slangc` command-line tool: [Slang Command Line Usage](
 https://shader-slang.com/slang/user-guide/compiling.html#command-line-compilation-with-slangc).
 
 If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Slang Playground](https://shader-slang.com/slang-playground). The playground allows you to compile Slang code to a variety of targets, and even run some simple shaders directly within the browser. The playground loads Slang compiler to your browser and runs all compilation locally. No data will be sent to any servers.
