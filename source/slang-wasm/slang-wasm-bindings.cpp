@@ -47,8 +47,14 @@ EMSCRIPTEN_BINDINGS(slang)
             "getEntryPointCode",
             &slang::wgsl::ComponentType::getEntryPointCode)
         .function(
-            "getEntryPointCodeSpirv",
-            &slang::wgsl::ComponentType::getEntryPointCodeSpirv);
+            "getEntryPointCodeBlob",
+            &slang::wgsl::ComponentType::getEntryPointCodeBlob)
+        .function(
+            "getTargetCodeBlob",
+            &slang::wgsl::ComponentType::getTargetCodeBlob)
+        .function(
+            "getTargetCode",
+            &slang::wgsl::ComponentType::getTargetCode);
 
     class_<slang::wgsl::Module, base<slang::wgsl::ComponentType>>("Module")
         .function(
@@ -58,14 +64,25 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "findAndCheckEntryPoint",
             &slang::wgsl::Module::findAndCheckEntryPoint,
-            return_value_policy::take_ownership());
+            return_value_policy::take_ownership())
+        .function(
+            "getDefinedEntryPoint",
+            &slang::wgsl::Module::getDefinedEntryPoint,
+            return_value_policy::take_ownership())
+        .function(
+            "getDefinedEntryPointCount",
+            &slang::wgsl::Module::getDefinedEntryPointCount);
 
     value_object<slang::wgsl::Error>("Error")
         .field("type", &slang::wgsl::Error::type)
         .field("result", &slang::wgsl::Error::result)
         .field("message", &slang::wgsl::Error::message);
 
-    class_<slang::wgsl::EntryPoint, base<slang::wgsl::ComponentType>>("EntryPoint");
+    class_<slang::wgsl::EntryPoint, base<slang::wgsl::ComponentType>>("EntryPoint")
+        .function(
+            "getName",
+            &slang::wgsl::EntryPoint::getName,
+            allow_raw_pointers());
 
     class_<slang::wgsl::CompileTargets>("CompileTargets")
         .function(

@@ -48,7 +48,9 @@ public:
     ComponentType* link();
 
     std::string getEntryPointCode(int entryPointIndex, int targetIndex);
-    emscripten::val getEntryPointCodeSpirv(int entryPointIndex, int targetIndex);
+    emscripten::val getEntryPointCodeBlob(int entryPointIndex, int targetIndex);
+    std::string getTargetCode(int targetIndex);
+    emscripten::val getTargetCodeBlob(int targetIndex);
 
     slang::IComponentType* interface() const {return m_interface;}
 
@@ -62,9 +64,11 @@ private:
 class EntryPoint : public ComponentType
 {
 public:
-
     EntryPoint(slang::IEntryPoint* interface) : ComponentType(interface) {}
-
+    std::string getName() const
+    {
+        return entryPointInterface()->getFunctionReflection()->getName();
+    }
 private:
 
     slang::IEntryPoint* entryPointInterface() const {
@@ -80,6 +84,8 @@ public:
 
     EntryPoint* findEntryPointByName(const std::string& name);
     EntryPoint* findAndCheckEntryPoint(const std::string& name, int stage);
+    EntryPoint* getDefinedEntryPoint(int index);
+    int getDefinedEntryPointCount();
 
     slang::IModule* moduleInterface() const {
         return static_cast<slang::IModule*>(interface());
@@ -93,7 +99,8 @@ public:
     Session(slang::ISession* interface)
         : m_interface(interface) {}
 
-    Module* loadModuleFromSource(const std::string& slangCode);
+    Module* loadModuleFromSource(
+        const std::string& slangCode, const std::string& name, const std::string& path);
 
     ComponentType* createCompositeComponentType(
         const std::vector<ComponentType*>& components);
