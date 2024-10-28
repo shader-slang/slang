@@ -167,9 +167,9 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
     constexpr float coord = 0.5;
 
-    constexpr ivec2 offset2D = ivec2(0);
-    constexpr ivec3 offset3D = ivec3(0);
-    constexpr ivec2 offsets[4] = { ivec2(0), ivec2(0), ivec2(0), ivec2(0) };
+    constexpr ivec2 offset2D = ivec2(2);
+    constexpr ivec3 offset3D = ivec3(3);
+    constexpr ivec2 offsets[4] = { ivec2(1), ivec2(2), ivec2(3), ivec2(4) };
 
     bool ignoreResultF32 = ignoreResult && T is float;
     bool ignoreResultI32 = ignoreResult && T is int32_t;
