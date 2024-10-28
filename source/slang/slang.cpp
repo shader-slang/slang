@@ -5040,13 +5040,21 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             });
         List<RefPtr<ComponentType>> components;
         components.add(this);
+        bool entryPointsDiscovered = false;
         for (auto module : modules)
         {
             for (auto entryPoint : module->getEntryPoints())
             {
                 components.add(entryPoint);
+                entryPointsDiscovered = true;
             }
         }
+        // If no entry points were discovered, then we should return nullptr.
+        if (!entryPointsDiscovered)
+        {
+            return nullptr;
+        }
+        
         RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
         ComPtr<IComponentType> linkedComponentType;
         SLANG_RETURN_NULL_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
