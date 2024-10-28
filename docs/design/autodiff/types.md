@@ -8,7 +8,7 @@ Here we detail the main components of the type system: the `IDifferentiable` int
 We also detail how auto-diff operators are type-checked (the higher-order function checking system), how the `no_diff` decoration can be used to avoid differentiation through attributed types, and the derivative data flow analysis that warns the the user of unintentionally stopping derivatives.
 
 ## `interface IDifferentiable`
-Defined in core.meta.slang, `IDifferentiable` forms the basis for denoting differentiable types, both within the stdlib, and otherwise. 
+Defined in core.meta.slang, `IDifferentiable` forms the basis for denoting differentiable types, both within the core module, and otherwise. 
 The definition of `IDifferentiable` is designed to encapsulate the following 4 items:
 1. `Differential`: The type of the differential value of the conforming type. This allows custom data-structures to be defined to carry the differential values, which may be optimized for space instead of relying solely on compiler synthesis/
 
@@ -110,7 +110,7 @@ void bwd_myFunc<T:IDifferentiable>(
 Existential types are interface-typed values, where there are multiple possible implementations at run-time. The existential type carries information about the concrete type at run-time and is effectively a 'tagged union' of all possible types.
 
 #### Differential type of an Existential
-The differential type of an existential type is tricky to define since our type system's only restriction on the `.Differential` type is that it also conforms to `IDifferentiable`. The differential type of any interface `IInterface : IDifferentiable` is therefore the interface type `IDifferentiable`. This is problematic since Slang generally requires a static `anyValueSize` that must be a strict upper bound on the sizes of all conforming types (since this size is used to allocate space for the union). Since `IDifferentiable` is defined in the stdlib `core.meta.slang` and can be used by the user, it is impossible to define a reliable bound. 
+The differential type of an existential type is tricky to define since our type system's only restriction on the `.Differential` type is that it also conforms to `IDifferentiable`. The differential type of any interface `IInterface : IDifferentiable` is therefore the interface type `IDifferentiable`. This is problematic since Slang generally requires a static `anyValueSize` that must be a strict upper bound on the sizes of all conforming types (since this size is used to allocate space for the union). Since `IDifferentiable` is defined in the core module `core.meta.slang` and can be used by the user, it is impossible to define a reliable bound. 
 We instead provide a new **any-value-size inference** pass (`slang-ir-any-value-inference.h`/`slang-ir-any-value-inference.cpp`) that assembles a list of types that conform to each interface in the final linked IR and determines a relevant upper bound. This allows us to ignore types that conform to `IDifferentiable` but aren't used in the final IR, and generate a tighter upper bound. 
 
 **Future work:**

@@ -90,7 +90,7 @@ The `shader` style implies
 
 * The code *can* be executed in a GPU-kernel like execution model, launched across multiple threads (as described in the [ABI](#abi)) 
 * Currently no reference counting
-* Only functionality from the Slang stdlib, built in HLSL or anything supplied by a [COM interfaces](#com-interface) is available
+* Only functionality from the Slang core module, built in HLSL or anything supplied by a [COM interfaces](#com-interface) is available
 * Currently [slang-llvm](#slang-llvm) only supports the `shader` style
 
 The `host` style implies 

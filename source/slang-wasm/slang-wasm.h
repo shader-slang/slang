@@ -4,6 +4,11 @@
 #include <unordered_map>
 #include <emscripten/val.h>
 
+namespace Slang
+{
+    class LanguageServerCore;
+}
+
 namespace slang
 {
 namespace wgsl
@@ -43,7 +48,9 @@ public:
     ComponentType* link();
 
     std::string getEntryPointCode(int entryPointIndex, int targetIndex);
-    emscripten::val getEntryPointCodeSpirv(int entryPointIndex, int targetIndex);
+    emscripten::val getEntryPointCodeBlob(int entryPointIndex, int targetIndex);
+    std::string getTargetCode(int targetIndex);
+    emscripten::val getTargetCodeBlob(int targetIndex);
 
     slang::IComponentType* interface() const {return m_interface;}
 
@@ -57,9 +64,11 @@ private:
 class EntryPoint : public ComponentType
 {
 public:
-
     EntryPoint(slang::IEntryPoint* interface) : ComponentType(interface) {}
-
+    std::string getName() const
+    {
+        return entryPointInterface()->getFunctionReflection()->getName();
+    }
 private:
 
     slang::IEntryPoint* entryPointInterface() const {
@@ -75,6 +84,8 @@ public:
 
     EntryPoint* findEntryPointByName(const std::string& name);
     EntryPoint* findAndCheckEntryPoint(const std::string& name, int stage);
+    EntryPoint* getDefinedEntryPoint(int index);
+    int getDefinedEntryPointCount();
 
     slang::IModule* moduleInterface() const {
         return static_cast<slang::IModule*>(interface());
@@ -88,7 +99,8 @@ public:
     Session(slang::ISession* interface)
         : m_interface(interface) {}
 
-    Module* loadModuleFromSource(const std::string& slangCode);
+    Module* loadModuleFromSource(
+        const std::string& slangCode, const std::string& name, const std::string& path);
 
     ComponentType* createCompositeComponentType(
         const std::vector<ComponentType*>& components);
@@ -117,6 +129,124 @@ private:
 };
 
 GlobalSession* createGlobalSession();
+
+namespace lsp
+{
+    struct Position
+    {
+        int line = -1;
+        int character = -1;
+    };
+
+    struct Range
+    {
+        Position start;
+        Position end;
+    };
+
+    struct Location
+    {
+        std::string uri;
+        Range range;
+    };
+
+    struct TextEdit
+    {
+        Range range;
+        std::string text;
+    };
+
+    struct MarkupContent
+    {
+        std::string kind;
+        std::string value;
+    };
+
+    struct Hover
+    {
+        MarkupContent contents;
+        Range range;
+    };
+
+    struct CompletionItem
+    {
+        std::string label;
+        int kind;
+        std::string detail;
+        std::string data;
+        std::optional<MarkupContent> documentation;
+        std::optional<TextEdit> textEdit;
+        std::optional<std::vector<std::string>> commitCharacters;
+    };
+
+    struct CompletionContext
+    {
+        int triggerKind = 1;
+        std::string triggerCharacter;
+    };
+
+    struct ParameterInformation
+    {
+        uint32_t label[2] = { 0, 0 };
+        MarkupContent documentation;
+    };
+
+    struct SignatureInformation
+    {
+        std::string label;
+        MarkupContent documentation;
+        std::vector<ParameterInformation> parameters;
+    };
+
+    struct SignatureHelp
+    {
+        std::vector<SignatureInformation> signatures;
+        uint32_t activeSignature = 0;
+        uint32_t activeParameter = 0;
+    };
+
+    struct DocumentSymbol
+    {
+        std::string name;
+        std::string detail;
+        int kind = 0;
+        Range range;
+        Range selectionRange;
+        std::vector<DocumentSymbol> children;
+    };
+
+    struct Diagnostics
+    {
+        std::string code;
+        Range range;
+        std::string message;
+        int severity;
+    };
+
+    class LanguageServer
+    {
+    private:
+        Slang::LanguageServerCore* m_core = nullptr;
+        void init();
+    public:
+        LanguageServer();
+        ~LanguageServer();
+        void didOpenTextDocument(std::string uri, std::string text);
+        void didCloseTextDocument(std::string uri);
+        void didChangeTextDocument(std::string uri, const std::vector<lsp::TextEdit>& changes);
+        std::optional<lsp::Hover> hover(std::string uri, lsp::Position position);
+        std::optional<std::vector<lsp::Location>> gotoDefinition(std::string uri, lsp::Position position);
+        std::optional<std::vector<lsp::CompletionItem>> completion(
+            std::string uri, lsp::Position position, CompletionContext context);
+        std::optional<lsp::CompletionItem> completionResolve(lsp::CompletionItem args);
+        std::optional<std::vector<uint32_t>> semanticTokens(std::string uri);
+        std::optional<lsp::SignatureHelp> signatureHelp(std::string uri, lsp::Position position);
+        std::optional<std::vector<lsp::DocumentSymbol>> documentSymbol(std::string uri);
+        std::optional<std::vector<lsp::Diagnostics>> getDiagnostics(std::string uri);
+    };
+
+    LanguageServer* createLanguageServer();
+}
 
 } // namespace wgsl
 } // namespace slang

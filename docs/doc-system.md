@@ -85,7 +85,7 @@ Currently the Slang doc system does not support any of the 'advanced' doxygen do
 
 Currently the only documentation style supported is a single file 'markdown' output. Future versions will support splitting into multiple files and linking between them. Also future versions may also support other documentation formats/standards.
 
-It is possible to generate documentation for Slangs internal `stdlib`. This can be achieved with `slangc` via
+It is possible to generate documentation for the slang core module. This can be achieved with `slangc` via
 
 ```
 slangc -doc -compile-core-module

@@ -111,9 +111,9 @@ interface IDifferentiablePtrType : __IDifferentiableBase
 
 ```
 
-Some extras in stdlib allow us to constrain the diffpair type for things like `IArithmetic`
+Some extras in the core module allow us to constrain the diffpair type for things like `IArithmetic`
 ```csharp
-// --- STDLIB EXTRAS ---
+// --- CORE MODULE EXTRAS ---
 
 interface ISelfDifferentiableValueType : IDifferentiableValueType
 {
