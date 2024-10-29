@@ -1,7 +1,6 @@
-#ifndef SLANG_CORE_COMMON_H
-#define SLANG_CORE_COMMON_H
+#pragma once
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 #include <assert.h>
 
@@ -237,7 +236,6 @@ template<typename T> void slang_use_obj(T&) {}
 
 #define SLANG_UNREFERENCED_PARAMETER(P) slang_use_obj(P)
 #define SLANG_UNREFERENCED_VARIABLE(P) slang_use_obj(P)
-#endif
 
 #if defined(SLANG_RT_DYNAMIC)
 #if defined(_MSC_VER)

@@ -208,9 +208,11 @@ struct ByteReader
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialParseUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+// clang-format off
 #define SLANG_SERIAL_BINARY_COMPRESSION_TYPE(x) \
     x(None, none) \
     x(VariableByteLite, lite)
+// clang-format on
 
 /* static */SlangResult SerialParseUtil::parseCompressionType(const UnownedStringSlice& text, SerialCompressionType& outType)
 {
@@ -220,7 +222,10 @@ struct ByteReader
         SerialCompressionType type;
     };
 
-#define SLANG_SERIAL_BINARY_PAIR(type, name) { UnownedStringSlice::fromLiteral(#name), SerialCompressionType::type},
+// clang-format off
+#define SLANG_SERIAL_BINARY_PAIR(type, name) \
+    {UnownedStringSlice::fromLiteral(#name), SerialCompressionType::type},
+// clang-format on
 
     static const Pair s_pairs[] =
     {

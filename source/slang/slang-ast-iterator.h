@@ -1,5 +1,6 @@
 #pragma once
 #include "slang-syntax.h"
+#include "slang-visitor.h"
 
 namespace Slang
 {

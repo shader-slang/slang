@@ -5,7 +5,7 @@
 #include "slang-string.h"
 
 #include "slang-list.h"
-#include "../../include/slang.h"
+#include "slang.h"
 
 namespace Slang
 {

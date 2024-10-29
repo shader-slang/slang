@@ -9,7 +9,7 @@
 
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
-#include "../../include/slang.h"
+#include "slang.h"
 
 #include "../core/slang-semantic-version.h"
 

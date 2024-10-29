@@ -40,7 +40,8 @@ cd "$source_dir" || exit 1
 
 require_bin() {
   local name="$1"
-  local required="$2"
+  local min_version="$2"
+  local max_version="${3:-}"
   local version
 
   if ! command -v "$name" &>/dev/null; then
@@ -50,16 +51,29 @@ require_bin() {
   fi
 
   if [ "$no_version_check" -eq 0 ]; then
-    version=$("$name" --version | grep -oP "$name(?:\s+version)?\s+\K\d+\.\d+\.?\d*")
-    if ! printf '%s\n%s\n' "$required" "$version" | sort -V -C; then
-      echo "$name version $version is too old. Version $required or newer is required."
+    version=$("$name" --version | grep -oP "\d+\.\d+\.?\d*" | head -n1)
+
+    if ! printf '%s\n%s\n' "$min_version" "$version" | sort -V -C; then
+      echo "$name version $version is too old. Version $min_version or newer is required."
       missing_bin=1
+      return
+    fi
+
+    if [ -n "$max_version" ]; then
+      if ! printf '%s\n%s\n' "$version" "$max_version" | sort -V -C; then
+        echo "$name version $version is too new. Version less than $max_version is required."
+        missing_bin=1
+        return
+      fi
     fi
   fi
 }
 
 require_bin "git" "1.8"
 require_bin "gersemi" "0.17"
+require_bin "xargs" "3"
+require_bin "diff" "2"
+require_bin "clang-format" "17" "18"
 
 if [ "$missing_bin" ]; then
   exit 1
@@ -84,7 +98,33 @@ cmake_formatting() {
   fi
 }
 
+cpp_formatting() {
+  readarray -t files < <(git ls-files '*.cpp' '*.hpp' '*.c' '*.h')
+
+  if [ "$check_only" -eq 1 ]; then
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+
+    printf '%s\n' "${files[@]}" | xargs -P "$(nproc)" -I{} bash -c "
+      mkdir -p \"\$(dirname \"$tmpdir/{}\")\"
+      diff -u --color=always --label \"{}\" --label \"{}\" \"{}\" <(clang-format \"{}\") > \"$tmpdir/{}\" 
+      :
+    "
+
+    for file in "${files[@]}"; do
+      if [ -s "$tmpdir/$file" ]; then
+        cat "$tmpdir/$file"
+        exit_code=1
+      fi
+    done
+  else
+    printf '%s\n' "${files[@]}" | xargs -n1 -P "$(nproc)" clang-format -i
+  fi
+}
+
 cmake_formatting
+# Disable until we've formatted the code
+# cpp_formatting
 
 exit $exit_code
-

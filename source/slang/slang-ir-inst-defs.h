@@ -1,5 +1,7 @@
 // slang-ir-inst-defs.h
 
+// clang-format off
+
 #ifndef INST
 #error Must #define `INST` before including `ir-inst-defs.h`
 #endif

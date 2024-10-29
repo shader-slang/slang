@@ -26,6 +26,7 @@ namespace Slang {
 // to set up the thing to hash.
 //
 // Note that bool is in the list because size of bool can change between compilers.
+// clang-format off
 #define SLANG_STATE_TYPES(x) \
     x(Util::FileState) \
     x(Util::PathInfoState) \
@@ -52,7 +53,8 @@ namespace Slang {
         x(OptimizationLevel) \
         x(ContainerFormat) \
         x(PassThroughMode) \
-        x(SlangMatrixLayoutMode) \
+        x(SlangMatrixLayoutMode)
+// clang-format on
 
 #define SLANG_STATE_TYPE_SIZE(x) uint32_t(sizeof(x)), 
 

@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_LIST_H
 #define SLANG_CORE_LIST_H
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 #include "slang-allocator.h"
 #include "slang-math.h"

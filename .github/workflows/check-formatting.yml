@@ -10,7 +10,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup
-        uses: ./.github/actions/format-setup
+      - uses: ./.github/actions/format-setup
       - run: ./extras/formatting.sh --check-only
-

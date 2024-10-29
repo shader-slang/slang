@@ -1,9 +1,10 @@
 #ifndef SLANG_CORE_LINKED_LIST_H
 #define SLANG_CORE_LINKED_LIST_H
 
-#include "../../include/slang.h"
+#include "slang.h"
 
 #include "slang-allocator.h"
+#include "slang-list.h"
 #include <type_traits>
 
 namespace Slang
