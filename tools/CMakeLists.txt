@@ -9,9 +9,9 @@ add_custom_target(
 set_target_properties(all-generators PROPERTIES FOLDER generators)
 
 if(CMAKE_HOST_WIN32)
-  set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
+    set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
 else()
-  set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
+    set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
 endif()
 function(generator dir)
     if(SLANG_GENERATORS_PATH)
@@ -44,7 +44,12 @@ function(generator dir)
     endif()
 endfunction()
 
-generator(slang-cpp-extractor USE_FEWER_WARNINGS LINK_WITH_PRIVATE compiler-core)
+generator(
+    slang-cpp-extractor
+    USE_FEWER_WARNINGS
+    LINK_WITH_PRIVATE
+    compiler-core
+)
 generator(slang-embed)
 generator(slang-generate USE_FEWER_WARNINGS)
 generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
@@ -52,14 +57,15 @@ generator(slang-capability-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
 generator(
     ${slang_SOURCE_DIR}/source/slangc
-    TARGET_NAME slang-bootstrap
+    TARGET_NAME
+    slang-bootstrap
     USE_FEWER_WARNINGS
-    LINK_WITH_PRIVATE 
-        prelude 
-        slang-without-embedded-core-module 
-        slang-capability-lookup 
-        slang-lookup-tables 
-        Threads::Threads
+    LINK_WITH_PRIVATE
+    prelude
+    slang-without-embedded-core-module
+    slang-capability-lookup
+    slang-lookup-tables
+    Threads::Threads
 )
 
 #
@@ -96,10 +102,7 @@ if(SLANG_ENABLE_GFX)
             "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
             "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
             ${CMAKE_DL_LIBS}
-        LINK_WITH_FRAMEWORK
-            Foundation
-            Cocoa
-            QuartzCore
+        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
         INCLUDE_FROM_PRIVATE gfx
@@ -121,11 +124,7 @@ if(SLANG_ENABLE_GFX)
             metal-cpp
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-        LINK_WITH_FRAMEWORK
-            Foundation
-            Cocoa
-            QuartzCore
-            Metal
+        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore Metal
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
@@ -136,7 +135,9 @@ if(SLANG_ENABLE_GFX)
         EXPORT_MACRO_PREFIX SLANG_GFX
         # slang-gfx is in this directory, anything which depends on gfx should include
         # this
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR} ${slang_SOURCE_DIR}/include
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${slang_SOURCE_DIR}
+            ${slang_SOURCE_DIR}/include
         REQUIRES copy-gfx-slang-modules
         INSTALL
         FOLDER gfx
@@ -195,7 +196,12 @@ if(SLANG_ENABLE_TESTS)
         slang-test
         EXECUTABLE
         USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core compiler-core slang ${CMAKE_DL_LIBS} Threads::Threads
+        LINK_WITH_PRIVATE
+            core
+            compiler-core
+            slang
+            ${CMAKE_DL_LIBS}
+            Threads::Threads
         REQUIRES
             # Shared libraries dlopened by slang-test
             slang-reflection-test
@@ -222,13 +228,14 @@ if(SLANG_ENABLE_TESTS)
     add_test(
         NAME slang-test
         COMMAND
-            slang-test -bindir ${slang_SOURCE_DIR}/build/$<CONFIG>/${runtime_subdir}
-            -expected-failure-list ${slang_SOURCE_DIR}/tests/expected-failure.txt
+            slang-test -bindir
+            ${slang_SOURCE_DIR}/build/$<CONFIG>/${runtime_subdir}
+            -expected-failure-list
+            ${slang_SOURCE_DIR}/tests/expected-failure.txt
             -expected-failure-list
             ${slang_SOURCE_DIR}/tests/expected-failure-github.txt
         WORKING_DIRECTORY ${slang_SOURCE_DIR}
     )
-
 
     slang_add_target(
         unit-test
@@ -308,15 +315,16 @@ endif()
 #
 # slang-replay tool for replaying the record files
 #
-if (SLANG_ENABLE_REPLAYER)
+if(SLANG_ENABLE_REPLAYER)
     slang_add_target(
         slang-replay
         EXECUTABLE
-        EXTRA_SOURCE_DIRS 
-            ${slang_SOURCE_DIR}/source/slang-record-replay/replay 
+        EXTRA_SOURCE_DIRS
+            ${slang_SOURCE_DIR}/source/slang-record-replay/replay
             ${slang_SOURCE_DIR}/source/slang-record-replay/util
         LINK_WITH_PRIVATE core compiler-core slang
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/source/slang-record-replay
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${slang_SOURCE_DIR}/source/slang-record-replay
         FOLDER test
     )
 endif()

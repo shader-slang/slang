@@ -2,9 +2,17 @@ cmake_minimum_required(VERSION 3.22)
 
 # Our module dir, include that now so that we can get the version automatically
 # from git describe
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+list(
+APPEND 
+CMAKE_MODULE_PATH 
+"${CMAKE_CURRENT_LIST_DIR}/cmake"
+)
 include(GitVersion)
-get_git_version(SLANG_VERSION_NUMERIC SLANG_VERSION_FULL "${CMAKE_CURRENT_LIST_DIR}")
+get_git_version(
+    SLANG_VERSION_NUMERIC
+    SLANG_VERSION_FULL
+    "${CMAKE_CURRENT_LIST_DIR}"
+)
 
 #
 # Our project
@@ -83,11 +91,22 @@ auto_option(
     Aftermath
     "Enable Aftermath in GFX, and add aftermath crash example to project"
 )
-advanced_option(SLANG_ENABLE_DX_ON_VK "Use dxvk and vkd3d-proton for DirectX support" OFF)
+advanced_option(
+    SLANG_ENABLE_DX_ON_VK
+    "Use dxvk and vkd3d-proton for DirectX support"
+    OFF
+)
 advanced_option(SLANG_ENABLE_SLANG_RHI "Use slang-rhi as dependency" ON)
 
-option(SLANG_EMBED_CORE_MODULE_SOURCE "Embed core module source in the binary" ON)
-option(SLANG_EMBED_CORE_MODULE "Build slang with an embedded version of the core module")
+option(
+    SLANG_EMBED_CORE_MODULE_SOURCE
+    "Embed core module source in the binary"
+    ON
+)
+option(
+    SLANG_EMBED_CORE_MODULE
+    "Build slang with an embedded version of the core module"
+)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC, "Enable _debugUID on IR allocation")
@@ -98,31 +117,62 @@ option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
 option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
-option(SLANG_ENABLE_SLANG_GLSLANG "Enable glslang dependency and slang-glslang wrapper target" ON)
-option(SLANG_ENABLE_TESTS "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT" ON)
-option(SLANG_ENABLE_EXAMPLES "Enable example targets, requires SLANG_ENABLE_GFX" ON)
+option(
+    SLANG_ENABLE_SLANG_GLSLANG
+    "Enable glslang dependency and slang-glslang wrapper target"
+    ON
+)
+option(
+    SLANG_ENABLE_TESTS
+    "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
+    ON
+)
+option(
+    SLANG_ENABLE_EXAMPLES
+    "Enable example targets, requires SLANG_ENABLE_GFX"
+    ON
+)
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
-option(SLANG_GITHUB_TOKEN "Use a given token value for accessing Github REST API" "")
+option(
+    SLANG_GITHUB_TOKEN
+    "Use a given token value for accessing Github REST API"
+    ""
+)
 
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
-advanced_option(SLANG_USE_SYSTEM_VULKAN_HEADERS "Build using system Vulkan headers" OFF)
-advanced_option(SLANG_USE_SYSTEM_SPIRV_HEADERS "Build using system SPIR-V headers" OFF)
-advanced_option(SLANG_USE_SYSTEM_UNORDERED_DENSE "Build using system unordered dense" OFF)
+advanced_option(
+    SLANG_USE_SYSTEM_VULKAN_HEADERS
+    "Build using system Vulkan headers"
+    OFF
+)
+advanced_option(
+    SLANG_USE_SYSTEM_SPIRV_HEADERS
+    "Build using system SPIR-V headers"
+    OFF
+)
+advanced_option(
+    SLANG_USE_SYSTEM_UNORDERED_DENSE
+    "Build using system unordered dense"
+    OFF
+)
 
-option(SLANG_SPIRV_HEADERS_INCLUDE_DIR "Provide a specific path for the SPIR-V headers and grammar files")
+option(
+    SLANG_SPIRV_HEADERS_INCLUDE_DIR
+    "Provide a specific path for the SPIR-V headers and grammar files"
+)
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
-if (${SLANG_USE_SYSTEM_LZ4})
+if(${SLANG_USE_SYSTEM_LZ4})
     add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
 endif()
 
-if (${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+if(${SLANG_USE_SYSTEM_SPIRV_HEADERS})
     add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
 endif()
 
-if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
 endif()
 
@@ -166,9 +216,15 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
         get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
         if(NOT DEFINED url)
             if(SLANG_SLANG_LLVM_FLAVOR STREQUAL FETCH_BINARY_IF_POSSIBLE)
-                message(WARNING "Unable to find a prebuilt binary for slang-llvm, Slang will be built without LLVM support. Please consider setting SLANG_SLANG_LLVM_BINARY_URL manually")
+                message(
+                    WARNING
+                    "Unable to find a prebuilt binary for slang-llvm, Slang will be built without LLVM support. Please consider setting SLANG_SLANG_LLVM_BINARY_URL manually"
+                )
             else()
-                message(FATAL_ERROR "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually")
+                message(
+                    FATAL_ERROR
+                    "Unable to find binary release for slang-llvm, please set a different SLANG_SLANG_LLVM_FLAVOR or set SLANG_SLANG_LLVM_BINARY_URL manually"
+                )
             endif()
         endif()
     endif()
@@ -180,21 +236,23 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
 endif()
 
 set(webgpu_dawn_release_tag "webgpu_dawn-0")
-if(CMAKE_SYSTEM_NAME MATCHES "Windows" AND
-    CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-  set(
-    SLANG_WEBGPU_DAWN_BINARY_URL
-    "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
-  )
+if(
+    CMAKE_SYSTEM_NAME MATCHES "Windows"
+    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
+)
+    set(SLANG_WEBGPU_DAWN_BINARY_URL
+        "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+    )
 endif()
 
 set(slang_tint_release_tag "slang-tint-0")
-if(CMAKE_SYSTEM_NAME MATCHES "Windows" AND
-    CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-  set(
-    SLANG_SLANG_TINT_BINARY_URL
-    "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
-  )
+if(
+    CMAKE_SYSTEM_NAME MATCHES "Windows"
+    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
+)
+    set(SLANG_SLANG_TINT_BINARY_URL
+        "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+    )
 endif()
 
 #
@@ -230,7 +288,7 @@ endif()
 
 find_package(Threads REQUIRED)
 
-if (${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     find_package(unordered_dense CONFIG QUIET)
 endif()
 
@@ -273,20 +331,13 @@ add_subdirectory(examples)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 set(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE ON)
 set(CPACK_STRIP_FILES FALSE)
-install(FILES
-  "${slang_SOURCE_DIR}/README.md"
-  "${slang_SOURCE_DIR}/LICENSE"
-  DESTINATION .
-  COMPONENT metadata
-  EXCLUDE_FROM_ALL
+install(
+    FILES "${slang_SOURCE_DIR}/README.md" "${slang_SOURCE_DIR}/LICENSE"
+    DESTINATION .
+    COMPONENT metadata
+    EXCLUDE_FROM_ALL
 )
-install(DIRECTORY
-  "${slang_SOURCE_DIR}/docs/"
-  DESTINATION share/doc/slang
-)
-install(DIRECTORY
-  "${slang_SOURCE_DIR}/include"
-  DESTINATION .
-)
+install(DIRECTORY "${slang_SOURCE_DIR}/docs/" DESTINATION share/doc/slang)
+install(DIRECTORY "${slang_SOURCE_DIR}/include" DESTINATION .)
 
 include(CPack)
