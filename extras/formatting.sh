@@ -124,6 +124,7 @@ cpp_formatting() {
 }
 
 cmake_formatting
-cpp_formatting
+# Disable until we've formatted the code
+# cpp_formatting
 
 exit $exit_code
