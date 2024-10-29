@@ -21,6 +21,7 @@ buffer MyBlockName
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     //SPV:OpImageGather %
+    //SPV-NOT:Const
     //SPV-SAME: Offset %
     outputBuffer.result = textureGatherOffset(u_sampler, v_texCoord, u_offset);
 }
