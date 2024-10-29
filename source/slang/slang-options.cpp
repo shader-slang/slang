@@ -195,12 +195,35 @@ void initCommandOptions(CommandOptions& options)
         List<UnownedStringSlice> names;
         getCapabilityNames(names);
 
+        // Sort them by name
+        struct CompareUnownedStringSlice
+        {
+            bool operator()(const UnownedStringSlice& lhs, const UnownedStringSlice& rhs)
+            {
+                Count lhsLength = lhs.getLength();
+                Count rhsLength = rhs.getLength();
+                Count minLength = std::min(lhsLength, rhsLength);
+
+                for (Count i = 0; i < minLength; i++)
+                {
+                    auto l = lhs[i];
+                    auto r = rhs[i];
+                    if (l != r)
+                    {
+                        return l < r;
+                    }
+                }
+                return (lhsLength < rhsLength);
+            }
+        };
+        names.sort(CompareUnownedStringSlice());
+
         // We'll just add to keep the list more simple...
         options.addValue("spirv_1_{ 0,1,2,3,4,5 }", "minimum supported SPIR - V version");
 
         for (auto name : names)
         {
-            if (name.startsWith("__") || 
+            if (name == "Invalid" || 
                 name.startsWith("spirv_1_") ||
                 name.startsWith("_"))
             {
