@@ -23,4 +23,4 @@ struct IRInst;
 ///
 void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAlwaysFoldInst);
 
-}
+} // namespace Slang

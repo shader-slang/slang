@@ -121,12 +121,12 @@ struct VulkanAPI
 };
 
 #define RETURN_ON_FAIL(x) \
-    {                           \
-        auto _res = x;          \
-        if (_res != 0)          \
-        {                       \
-            return -1;          \
-        }                       \
+    {                     \
+        auto _res = x;    \
+        if (_res != 0)    \
+        {                 \
+            return -1;    \
+        }                 \
     }
 
 // Loads Vulkan library and creates a VkDevice.

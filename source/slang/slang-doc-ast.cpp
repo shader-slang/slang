@@ -2,14 +2,14 @@
 #include "slang-doc-ast.h"
 
 #include "../core/slang-string-util.h"
-
 #include "slang/slang-ast-support-types.h"
-//#include "slang-ast-builder.h"
-//#include "slang-ast-print.h"
+// #include "slang-ast-builder.h"
+// #include "slang-ast-print.h"
 
-namespace Slang {
+namespace Slang
+{
 
-/* static */DocMarkupExtractor::SearchStyle ASTMarkupUtil::getSearchStyle(Decl* decl)
+/* static */ DocMarkupExtractor::SearchStyle ASTMarkupUtil::getSearchStyle(Decl* decl)
 {
     typedef Extractor::SearchStyle SearchStyle;
 
@@ -50,7 +50,8 @@ namespace Slang {
 
 bool shouldDocumentDecl(Decl* decl)
 {
-    return !getText(decl->getName()).startsWith("$__syn") && !decl->hasModifier<SynthesizedModifier>();
+    return !getText(decl->getName()).startsWith("$__syn") &&
+           !decl->hasModifier<SynthesizedModifier>();
 }
 
 static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
@@ -73,8 +74,8 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
 
     if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
     {
-        // Add the container - which could be a class, struct, enum, namespace, extension, generic etc.
-        // Now add what the container contains
+        // Add the container - which could be a class, struct, enum, namespace, extension, generic
+        // etc. Now add what the container contains
         for (Decl* childDecl : containerDecl->members)
         {
             _addDeclRec(childDecl, outDecls);
@@ -82,7 +83,7 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
     }
 }
 
-/* static */void ASTMarkupUtil::findDecls(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
+/* static */ void ASTMarkupUtil::findDecls(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
 {
     for (Decl* decl : moduleDecl->members)
     {
@@ -90,7 +91,12 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
     }
 }
 
-SlangResult ASTMarkupUtil::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, ASTMarkup* outDoc, bool searchOrindaryComments)
+SlangResult ASTMarkupUtil::extract(
+    ModuleDecl* moduleDecl,
+    SourceManager* sourceManager,
+    DiagnosticSink* sink,
+    ASTMarkup* outDoc,
+    bool searchOrindaryComments)
 {
     List<Decl*> decls;
     findDecls(moduleDecl, decls);
@@ -123,7 +129,9 @@ SlangResult ASTMarkupUtil::extract(ModuleDecl* moduleDecl, SourceManager* source
         extractor.setSearchInOrdinaryComments(searchOrindaryComments);
 
         List<SourceView*> views;
-        SLANG_RETURN_ON_FAIL(extractor.extract(inputItems.getBuffer(), declsCount, sourceManager, sink, views, outItems));
+        SLANG_RETURN_ON_FAIL(
+            extractor
+                .extract(inputItems.getBuffer(), declsCount, sourceManager, sink, views, outItems));
     }
 
     // Set back
@@ -136,14 +144,14 @@ SlangResult ASTMarkupUtil::extract(ModuleDecl* moduleDecl, SourceManager* source
         if (inputItem.searchStyle != Extractor::SearchStyle::None)
         {
             Decl* decl = decls[outputItem.inputIndex];
-       
+
             // Add to the documentation
             ASTMarkup::Entry& docEntry = outDoc->addEntry(decl);
             docEntry.m_markup = outputItem.text;
             docEntry.m_visibility = outputItem.visibilty;
         }
     }
-    
+
     return SLANG_OK;
 }
 

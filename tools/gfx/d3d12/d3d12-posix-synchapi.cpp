@@ -6,14 +6,13 @@
 
 #include "core/slang-common.h"
 
+#include <cerrno>
 #include <fcntl.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/poll.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
-
-#include <cerrno>
 
 // To keep aligned with the d3d12 API, we store file descriptors in the low 32
 // bits of HANDLEs.
@@ -41,16 +40,16 @@ static HANDLE _fdToHandle(int fd, int flags)
 
 HANDLE CreateEventEx(
     LPSECURITY_ATTRIBUTES lpEventAttributes,
-    LPCSTR                lpName,
-    DWORD                 dwFlags,
-    DWORD                 dwDesiredAccess)
+    LPCSTR lpName,
+    DWORD dwFlags,
+    DWORD dwDesiredAccess)
 {
     int fd = ::eventfd(dwFlags & CREATE_EVENT_INITIAL_SET ? 1 : 0, EFD_CLOEXEC | EFD_NONBLOCK);
     // Make sure not to return a zero handle, duplicate the fd if necessary
-    if(fd == 0)
+    if (fd == 0)
     {
         int nextFd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
-        if(fcntl(nextFd, F_SETFL, O_NONBLOCK) == -1)
+        if (fcntl(nextFd, F_SETFL, O_NONBLOCK) == -1)
         {
             close(nextFd);
             nextFd = -1;
@@ -63,7 +62,7 @@ HANDLE CreateEventEx(
 
 BOOL CloseHandle(HANDLE h)
 {
-    if(h == 0)
+    if (h == 0)
     {
         return 1;
     }
@@ -79,22 +78,22 @@ BOOL ResetEvent(HANDLE h)
     uint64_t x;
     int r = 0;
     int nEvents = poll(&pfd, 1, 0);
-    if(pfd.revents != POLLIN)
+    if (pfd.revents != POLLIN)
     {
         // Nothing to read, already reset
         return 1;
     }
-    if(nEvents != 1)
+    if (nEvents != 1)
     {
         return 0;
     }
     r = read(fd, &x, sizeof(x));
-    if(r == sizeof(x))
+    if (r == sizeof(x))
     {
         // We reset it
         return 1;
     }
-    if(r == -1 && errno == EAGAIN)
+    if (r == -1 && errno == EAGAIN)
     {
         // Something else reset it
         return 1;
@@ -106,18 +105,18 @@ BOOL SetEvent(HANDLE h)
 {
     int fd = _handleToFD(h);
     pollfd pfd{fd, POLLOUT, 0};
-    for(;;)
+    for (;;)
     {
         int nEvents = poll(&pfd, 1, -1);
         SLANG_ASSERT(nEvents != -1);
         SLANG_ASSERT(nEvents != 0); // shouldn't have timed out
         const uint64_t one = 1;
         int w = ::write(fd, &one, sizeof(one));
-        if(w == sizeof(one))
+        if (w == sizeof(one))
         {
             return 1;
         }
-        if(errno != EAGAIN)
+        if (errno != EAGAIN)
         {
             return 0;
         }
@@ -137,11 +136,11 @@ DWORD WaitForSingleObject(const HANDLE h, const DWORD ms)
     const bool isInfinite = ms == INFINITE;
     const DWORD fiveSeconds = 5000;
     int nEvents = poll(&pfd, 1, isInfinite ? fiveSeconds : ms);
-    if(pfd.revents != POLLIN)
+    if (pfd.revents != POLLIN)
     {
         return WAIT_FAILED;
     }
-    if(nEvents == -1)
+    if (nEvents == -1)
     {
         return WAIT_FAILED;
     }
@@ -149,29 +148,25 @@ DWORD WaitForSingleObject(const HANDLE h, const DWORD ms)
     {
         return isInfinite ? WAIT_FAILED : WAIT_TIMEOUT;
     }
-    if(manualReset)
+    if (manualReset)
     {
         return WAIT_OBJECT_0;
     }
     r = read(fd, &x, sizeof(x));
-    if(r == sizeof(x))
+    if (r == sizeof(x))
     {
         return WAIT_OBJECT_0;
     }
-    if(r == -1 && errno == EAGAIN)
+    if (r == -1 && errno == EAGAIN)
     {
         return isInfinite ? WAIT_FAILED : WAIT_TIMEOUT;
     }
     return WAIT_FAILED;
 }
 
-DWORD WaitForMultipleObjects(
-    DWORD        n,
-    const HANDLE *hs,
-    BOOL         bWaitAll,
-    DWORD        requestedMs)
+DWORD WaitForMultipleObjects(DWORD n, const HANDLE* hs, BOOL bWaitAll, DWORD requestedMs)
 {
-    if(n == 0)
+    if (n == 0)
     {
         return bWaitAll ? WAIT_OBJECT_0 : WAIT_FAILED;
     }
@@ -185,22 +180,22 @@ DWORD WaitForMultipleObjects(
     DWORD res;
     int fds[n];
     int flagss[n];
-    epoll_event evs[n+1]; // +1 for our timer
+    epoll_event evs[n + 1]; // +1 for our timer
     int ufd = -1;
     int epfd = epoll_create1(EPOLL_CLOEXEC);
-    if(epfd == -1)
+    if (epfd == -1)
     {
         goto fail;
     }
 
-    for(int i = 0; i < n; ++i)
+    for (int i = 0; i < n; ++i)
     {
         fds[i] = _handleToFD(hs[i]);
         flagss[i] = _handleToFlags(hs[i]);
         epoll_event ev;
         ev.data.fd = fds[i];
         ev.events = EPOLLIN | EPOLLONESHOT;
-        if(epoll_ctl(epfd, EPOLL_CTL_ADD, fds[i], &ev) == -1)
+        if (epoll_ctl(epfd, EPOLL_CTL_ADD, fds[i], &ev) == -1)
         {
             goto fail;
         }
@@ -214,13 +209,13 @@ DWORD WaitForMultipleObjects(
     // after the other, and put the values back if we can't claim them all, it
     // sucks.
     //
-    if(bWaitAll)
+    if (bWaitAll)
     {
         // Use a timer to easily know for sure when we've timed out
-        if(dwMilliseconds != INFINITE)
+        if (dwMilliseconds != INFINITE)
         {
             ufd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
-            if(ufd == -1)
+            if (ufd == -1)
             {
                 goto fail;
             }
@@ -229,13 +224,13 @@ DWORD WaitForMultipleObjects(
             spec.it_interval.tv_nsec = 0;
             spec.it_value.tv_sec = 0;
             spec.it_value.tv_nsec = 1000000 * dwMilliseconds;
-            if(timerfd_settime(ufd, 0, &spec, nullptr) == -1)
+            if (timerfd_settime(ufd, 0, &spec, nullptr) == -1)
             {
                 goto fail;
             }
             evs[n].data.fd = ufd;
             evs[n].events = EPOLLIN | EPOLLONESHOT;
-            if(epoll_ctl(epfd, EPOLL_CTL_ADD, ufd, &evs[n]) == -1)
+            if (epoll_ctl(epfd, EPOLL_CTL_ADD, ufd, &evs[n]) == -1)
             {
                 goto fail;
             }
@@ -250,29 +245,29 @@ DWORD WaitForMultipleObjects(
             do
             {
                 // Wait until epoll tells us they're all available, or the timer is
-                const int nEvents = epoll_wait(epfd, evs, n+1, -1);
+                const int nEvents = epoll_wait(epfd, evs, n + 1, -1);
                 // We didn't specify a timeout, so 0 results is abnormal
-                if(nEvents < 1)
+                if (nEvents < 1)
                 {
                     goto fail;
                 }
 
                 // Process all the returned fds
-                for(int i = 0; i < nEvents; ++i)
+                for (int i = 0; i < nEvents; ++i)
                 {
-                    if(!(evs[i].events & EPOLLIN))
+                    if (!(evs[i].events & EPOLLIN))
                     {
                         // Something exceptional happened on the fd
                         // Possibly we could just continue and hope it doesn't
                         // happen again?
                         goto fail;
                     }
-                    if(evs[i].data.fd == ufd)
+                    if (evs[i].data.fd == ufd)
                     {
                         // We're out of time, make this the last loop
                         uint64_t x;
                         int r = read(ufd, &x, sizeof(x));
-                        if(r == sizeof(x))
+                        if (r == sizeof(x))
                         {
                             timesUp = true;
                         }
@@ -287,11 +282,10 @@ DWORD WaitForMultipleObjects(
                         ++nSeenEvents;
                     }
                 }
-            }
-            while(!(timesUp || nSeenEvents == n));
+            } while (!(timesUp || nSeenEvents == n));
 
             // If we got here without seeing enough events, we must have timed out
-            if(nSeenEvents < n)
+            if (nSeenEvents < n)
             {
                 res = isInfinite ? WAIT_FAILED : WAIT_TIMEOUT;
                 goto end;
@@ -303,51 +297,52 @@ DWORD WaitForMultipleObjects(
             // makes the code a bit cleaner.
             // Put all the events back in our epoll instance and see if they're
             // all readable.
-            for(int i = 0; i < n; ++i)
+            for (int i = 0; i < n; ++i)
             {
                 epoll_event modEv;
                 modEv.data.fd = fds[i];
                 modEv.events = EPOLLIN | EPOLLONESHOT;
-                if(epoll_ctl(epfd, EPOLL_CTL_MOD, fds[i], &modEv) == -1)
+                if (epoll_ctl(epfd, EPOLL_CTL_MOD, fds[i], &modEv) == -1)
                 {
                     goto fail;
                 }
             }
             // Remove the timer if we're using it
-            if(dwMilliseconds != INFINITE && epoll_ctl(epfd, EPOLL_CTL_DEL, ufd, nullptr) == -1)
+            if (dwMilliseconds != INFINITE && epoll_ctl(epfd, EPOLL_CTL_DEL, ufd, nullptr) == -1)
             {
                 goto fail;
             }
             int nEvents = epoll_wait(epfd, evs, n, 0);
-            if(nEvents < 0)
+            if (nEvents < 0)
             {
                 goto fail;
             }
-            else if(nEvents < n)
+            else if (nEvents < n)
             {
                 // They're not all still available :(
                 // Put our timer back in and try again from the top
-                if(dwMilliseconds != INFINITE && epoll_ctl(epfd, EPOLL_CTL_ADD, ufd, &evs[n]) == -1)
+                if (dwMilliseconds != INFINITE &&
+                    epoll_ctl(epfd, EPOLL_CTL_ADD, ufd, &evs[n]) == -1)
                 {
                     goto fail;
                 }
                 // Put back the any fds which did trigger
-                for(int i = 0; i < nEvents; ++i)
+                for (int i = 0; i < nEvents; ++i)
                 {
                     epoll_event modEv = evs[i];
                     modEv.events = EPOLLIN | EPOLLONESHOT;
-                    if(epoll_ctl(epfd, EPOLL_CTL_MOD, modEv.data.fd, &modEv) == -1)
+                    if (epoll_ctl(epfd, EPOLL_CTL_MOD, modEv.data.fd, &modEv) == -1)
                     {
                         goto fail;
                     }
                 }
                 continue;
             }
-            else if(nEvents == n)
+            else if (nEvents == n)
             {
-                for(int i = 0; i < nEvents; ++i)
+                for (int i = 0; i < nEvents; ++i)
                 {
-                    if(!(evs->events & EPOLLIN))
+                    if (!(evs->events & EPOLLIN))
                     {
                         goto fail;
                     }
@@ -358,19 +353,19 @@ DWORD WaitForMultipleObjects(
             uint64_t vs[n];
             int i;
             bool failure = false;
-            for(i = 0; i < n; ++i)
+            for (i = 0; i < n; ++i)
             {
-                if(flagss[i] & CREATE_EVENT_MANUAL_RESET)
+                if (flagss[i] & CREATE_EVENT_MANUAL_RESET)
                 {
                     // We don't need to read this to unset it
                     continue;
                 }
                 int r = read(fds[i], &vs[i], sizeof(vs[i]));
-                if(r == sizeof(vs[i]))
+                if (r == sizeof(vs[i]))
                 {
                     continue;
                 }
-                else if(r == -1 && errno == EAGAIN)
+                else if (r == -1 && errno == EAGAIN)
                 {
                     // contention, put things back and try again
                     break;
@@ -385,9 +380,9 @@ DWORD WaitForMultipleObjects(
             if (i < n)
             {
                 // contention or failure
-                for(int j = 0; j < i; ++j)
+                for (int j = 0; j < i; ++j)
                 {
-                    if(flagss[i] & CREATE_EVENT_MANUAL_RESET)
+                    if (flagss[i] & CREATE_EVENT_MANUAL_RESET)
                     {
                         // We didn't read, so we shouldn't write
                         continue;
@@ -401,7 +396,7 @@ DWORD WaitForMultipleObjects(
                     int w = write(fds[j], &vs[j], sizeof(vs[j]));
                     SLANG_ASSERT(w == sizeof(vs[j]));
                 }
-                if(failure)
+                if (failure)
                 {
                     goto fail;
                 }
@@ -413,28 +408,29 @@ DWORD WaitForMultipleObjects(
                 goto end;
             }
 
-            // If we get here then we've got some contention, go back to the top and try again (or timeout)
-        }
-        while(!timesUp);
+            // If we get here then we've got some contention, go back to the top and try again (or
+            // timeout)
+        } while (!timesUp);
     }
     else
     {
         // Wait any
-        const int nEvents = epoll_wait(epfd, evs, n, dwMilliseconds == INFINITE ? -1 : dwMilliseconds);
-        if(nEvents == -1)
+        const int nEvents =
+            epoll_wait(epfd, evs, n, dwMilliseconds == INFINITE ? -1 : dwMilliseconds);
+        if (nEvents == -1)
         {
             goto fail;
         }
-        if(nEvents == 0)
+        if (nEvents == 0)
         {
             res = isInfinite ? WAIT_FAILED : WAIT_TIMEOUT;
             goto end;
         }
         // Try reads until we get one
-        for(int i = 0; i < nEvents; ++i)
+        for (int i = 0; i < nEvents; ++i)
         {
             uint64_t x;
-            if(!evs[i].events & EPOLLIN)
+            if (!evs[i].events & EPOLLIN)
             {
                 continue;
             }

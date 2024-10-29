@@ -20,19 +20,19 @@ public:
     ~BufferResourceImpl();
 
     D3D12Resource m_resource; ///< The resource in gpu memory, allocated on the correct heap
-                                ///< relative to the cpu access flag
+                              ///< relative to the cpu access flag
 
     D3D12_RESOURCE_STATES m_defaultState;
 
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeResourceHandle(InteropHandle* outHandle) override;
+    getNativeResourceHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        map(MemoryRange* rangeToRead, void** outPointer) override;
+    map(MemoryRange* rangeToRead, void** outPointer) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override;
 
@@ -41,4 +41,3 @@ public:
 
 } // namespace d3d12
 } // namespace gfx
-

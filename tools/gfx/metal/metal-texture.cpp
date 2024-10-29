@@ -1,5 +1,6 @@
 // metal-texture.cpp
 #include "metal-texture.h"
+
 #include "metal-util.h"
 
 namespace gfx
@@ -11,13 +12,11 @@ namespace metal
 {
 
 TextureResourceImpl::TextureResourceImpl(const Desc& desc, DeviceImpl* device)
-    : Parent(desc)
-    , m_device(device)
-{}
-
-TextureResourceImpl::~TextureResourceImpl()
+    : Parent(desc), m_device(device)
 {
 }
+
+TextureResourceImpl::~TextureResourceImpl() {}
 
 Result TextureResourceImpl::getNativeResourceHandle(InteropHandle* outHandle)
 {

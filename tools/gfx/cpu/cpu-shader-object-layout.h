@@ -43,7 +43,6 @@ struct SubObjectRangeInfo
 class ShaderObjectLayoutImpl : public ShaderObjectLayoutBase
 {
 public:
-
     // TODO: Once memory lifetime stuff is handled, there is
     // no specific need to even track binding or sub-object
     // ranges for CPU.
@@ -55,7 +54,10 @@ public:
     Index m_subObjectCount = 0;
     Index m_resourceCount = 0;
 
-    ShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* layout);
+    ShaderObjectLayoutImpl(
+        RendererBase* renderer,
+        slang::ISession* session,
+        slang::TypeLayoutReflection* layout);
 
     size_t getSize();
     Index getResourceCount() const;
@@ -72,12 +74,13 @@ private:
 
 public:
     EntryPointLayoutImpl(
-        RendererBase*               renderer,
-        slang::ISession*            session,
-        slang::EntryPointLayout*    entryPointLayout)
+        RendererBase* renderer,
+        slang::ISession* session,
+        slang::EntryPointLayout* entryPointLayout)
         : ShaderObjectLayoutImpl(renderer, session, entryPointLayout->getTypeLayout())
         , m_entryPointLayout(entryPointLayout)
-    {}
+    {
+    }
 
     const char* getEntryPointName();
 };
@@ -88,7 +91,10 @@ public:
     slang::ProgramLayout* m_programLayout = nullptr;
     List<RefPtr<EntryPointLayoutImpl>> m_entryPointLayouts;
 
-    RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::ProgramLayout* programLayout);
+    RootShaderObjectLayoutImpl(
+        RendererBase* renderer,
+        slang::ISession* session,
+        slang::ProgramLayout* programLayout);
 
     int getKernelIndex(UnownedStringSlice kernelName);
     void getKernelThreadGroupSize(int kernelIndex, UInt* threadGroupSizes);

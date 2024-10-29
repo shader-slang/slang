@@ -3,7 +3,8 @@
 
 #include "slang-serialize.h"
 
-namespace Slang {
+namespace Slang
+{
 
 bool ReflectClassInfo::isSubClassOfSlow(const ThisType& super) const
 {
@@ -40,7 +41,10 @@ static bool _checkSubClassRange(ReflectClassInfo*const* typeInfos, Index typeInf
 
 #endif
 
-static uint32_t _calcRangeRec(ReflectClassInfo* classInfo, const Dictionary<const ReflectClassInfo*, List<ReflectClassInfo*> >& childMap, uint32_t index)
+static uint32_t _calcRangeRec(
+    ReflectClassInfo* classInfo,
+    const Dictionary<const ReflectClassInfo*, List<ReflectClassInfo*>>& childMap,
+    uint32_t index)
 {
     classInfo->m_classId = index++;
     // Do the calc range for all the children
@@ -68,29 +72,35 @@ static ReflectClassInfo* _calcRoot(ReflectClassInfo* classInfo)
 }
 
 
-/* static */void ReflectClassInfo::calcClassIdHierachy(uint32_t baseIndex, ReflectClassInfo*const* typeInfos, Index typeInfosCount)
+/* static */ void ReflectClassInfo::calcClassIdHierachy(
+    uint32_t baseIndex,
+    ReflectClassInfo* const* typeInfos,
+    Index typeInfosCount)
 {
     SLANG_ASSERT(typeInfosCount > 0);
 
     // TODO(JS):
-    // Note that the calculating of the ranges could be done more efficiently by adding to an array of struct { super, class }, sorting, by super classs
-    // and using a dictionary to map from class it's first in list of super class use. This works for now though.
+    // Note that the calculating of the ranges could be done more efficiently by adding to an array
+    // of struct { super, class }, sorting, by super classs and using a dictionary to map from class
+    // it's first in list of super class use. This works for now though.
 
-    // The root cannot be shared with another hierarchy - as doing so will mean that the range will be incorrect (it would need to span both trees)
+    // The root cannot be shared with another hierarchy - as doing so will mean that the range will
+    // be incorrect (it would need to span both trees)
     ReflectClassInfo* root = _calcRoot(typeInfos[0]);
 
     // We want to produce a map from a node that holds all of it's children
-    Dictionary<const ThisType*, List<ThisType*> > childMap;
+    Dictionary<const ThisType*, List<ThisType*>> childMap;
 
     const List<ThisType*> emptyList;
     {
-        for (Index i = 0; i < typeInfosCount; ++ i)
+        for (Index i = 0; i < typeInfosCount; ++i)
         {
             auto typeInfo = typeInfos[i];
             if (typeInfo->m_superClass)
             {
                 // Add to that item
-                List<ThisType*>* list = childMap.tryGetValueOrAdd(typeInfo->m_superClass, emptyList);
+                List<ThisType*>* list =
+                    childMap.tryGetValueOrAdd(typeInfo->m_superClass, emptyList);
                 if (!list)
                 {
                     list = childMap.tryGetValue(typeInfo->m_superClass);
@@ -107,7 +117,7 @@ static ReflectClassInfo* _calcRoot(ReflectClassInfo* classInfo)
     // We want to recursively work out a range
     _calcRangeRec(root, childMap, baseIndex);
 
-    //SLANG_ASSERT(_checkSubClassRange(typeInfos, typeInfoCount));
+    // SLANG_ASSERT(_checkSubClassRange(typeInfos, typeInfoCount));
 }
 
 } // namespace Slang

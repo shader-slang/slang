@@ -3,8 +3,8 @@
 
 namespace Slang
 {
-    struct IRModule;
-    class DiagnosticSink;
+struct IRModule;
+class DiagnosticSink;
 
-    void validateUniformity(IRModule* module, DiagnosticSink* sink);
-}
+void validateUniformity(IRModule* module, DiagnosticSink* sink);
+} // namespace Slang

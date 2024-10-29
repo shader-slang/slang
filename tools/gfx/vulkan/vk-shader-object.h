@@ -2,10 +2,10 @@
 #pragma once
 
 #include "vk-base.h"
+#include "vk-helper-functions.h"
 #include "vk-resource-views.h"
 #include "vk-sampler.h"
 #include "vk-shader-object-layout.h"
-#include "vk-helper-functions.h"
 
 namespace gfx
 {
@@ -27,14 +27,16 @@ class ShaderObjectImpl
 {
 public:
     static Result create(
-        IDevice* device, ShaderObjectLayoutImpl* layout, ShaderObjectImpl** outShaderObject);
+        IDevice* device,
+        ShaderObjectLayoutImpl* layout,
+        ShaderObjectImpl** outShaderObject);
 
     RendererBase* getDevice();
 
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
 
@@ -42,16 +44,18 @@ public:
 
     // TODO: Changed size_t to Size? inSize assigned to an Index variable inside implementation
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& inOffset, void const* data, size_t inSize) override;
+    setData(ShaderOffset const& inOffset, void const* data, size_t inSize) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setResource(ShaderOffset const& offset, IResourceView* resourceView) override;
+    setResource(ShaderOffset const& offset, IResourceView* resourceView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
+    setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
-        ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) override;
+        ShaderOffset const& offset,
+        IResourceView* textureView,
+        ISamplerState* sampler) override;
 
 protected:
     friend class RootShaderObjectLayout;
@@ -125,7 +129,8 @@ public:
 
     /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
     Result _ensureOrdinaryDataBufferCreatedIfNeeded(
-        PipelineCommandEncoder* encoder, ShaderObjectLayoutImpl* specializedLayout);
+        PipelineCommandEncoder* encoder,
+        ShaderObjectLayoutImpl* specializedLayout);
 
 public:
     /// Bind this shader object as a "value"
@@ -211,7 +216,9 @@ class EntryPointShaderObject : public ShaderObjectImpl
 
 public:
     static Result create(
-        IDevice* device, EntryPointLayout* layout, EntryPointShaderObject** outShaderObject);
+        IDevice* device,
+        EntryPointLayout* layout,
+        EntryPointShaderObject** outShaderObject);
 
     EntryPointLayout* getLayout();
 
@@ -244,10 +251,11 @@ public:
     List<RefPtr<EntryPointShaderObject>> const& getEntryPoints() const;
 
     virtual GfxCount SLANG_MCALL getEntryPointCount() override;
-    virtual Result SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
+    virtual Result SLANG_MCALL
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
+    copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
 
     /// Bind this object as a root shader object
     Result bindAsRoot(

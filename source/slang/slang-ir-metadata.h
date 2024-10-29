@@ -9,4 +9,4 @@ struct IRModule;
 
 void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata);
 
-}
+} // namespace Slang

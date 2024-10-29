@@ -1,13 +1,13 @@
 // slang-ast-type.cpp
 #include "slang-ast-builder.h"
 #include "slang-ast-modifier.h"
-#include <assert.h>
-#include <typeinfo>
-
+#include "slang-generated-ast-macro.h"
 #include "slang-syntax.h"
 
-#include "slang-generated-ast-macro.h"
-namespace Slang {
+#include <assert.h>
+#include <typeinfo>
+namespace Slang
+{
 
 bool isAbstractTypePack(Type* type)
 {
@@ -90,17 +90,27 @@ Type* ErrorType::_createCanonicalTypeOverride()
     return this;
 }
 
-Val* ErrorType::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
+Val* ErrorType::_substituteImplOverride(
+    ASTBuilder* /* astBuilder */,
+    SubstitutionSet /*subst*/,
+    int* /*ioDiff*/
+)
 {
     return this;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BottomType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void BottomType::_toTextOverride(StringBuilder& out) { out << toSlice("never"); }
+void BottomType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("never");
+}
 
 Val* BottomType::_substituteImplOverride(
-    ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    ASTBuilder* /* astBuilder */,
+    SubstitutionSet /*subst*/,
+    int* /*ioDiff*/
+)
 {
     return this;
 }
@@ -112,11 +122,19 @@ void DeclRefType::_toTextOverride(StringBuilder& out)
     out << getDeclRef();
 }
 
-Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet subst, int* ioDiff);
+Val* maybeSubstituteGenericParam(
+    Val* paramVal,
+    Decl* paramDecl,
+    SubstitutionSet subst,
+    int* ioDiff);
 
-Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* DeclRefType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
-    if (!subst) return this;
+    if (!subst)
+        return this;
 
     int diff = 0;
     DeclRef<Decl> substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
@@ -135,9 +153,12 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
                 return lookupDeclRef->getLookupSource();
             }
         }
-        else if (as<GenericTypeParamDeclBase>(substDeclRef.getDecl()) || as<GenericValueParamDecl>(substDeclRef.getDecl()))
+        else if (
+            as<GenericTypeParamDeclBase>(substDeclRef.getDecl()) ||
+            as<GenericValueParamDecl>(substDeclRef.getDecl()))
         {
-            auto resultVal = maybeSubstituteGenericParam(nullptr, substDeclRef.getDecl(), subst, ioDiff);
+            auto resultVal =
+                maybeSubstituteGenericParam(nullptr, substDeclRef.getDecl(), subst, ioDiff);
             if (resultVal)
             {
                 (*ioDiff)++;
@@ -173,15 +194,13 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArithmeticExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-BasicExpressionType* ArithmeticExpressionType::getScalarType()
-{
-    SLANG_AST_NODE_VIRTUAL_CALL(ArithmeticExpressionType, getScalarType, ())
-}
+BasicExpressionType* ArithmeticExpressionType::getScalarType(){
+    SLANG_AST_NODE_VIRTUAL_CALL(ArithmeticExpressionType, getScalarType, ())}
 
 BasicExpressionType* ArithmeticExpressionType::_getScalarTypeOverride()
 {
     SLANG_UNEXPECTED("ArithmeticExpressionType::_getScalarTypeOverride not overridden");
-    //return nullptr;
+    // return nullptr;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BasicExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -226,7 +245,8 @@ IntVal* VectorExpressionType::getElementCount()
 
 void VectorExpressionType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("vector<") << getElementType() << toSlice(",") << getElementCount() << toSlice(">");
+    out << toSlice("vector<") << getElementType() << toSlice(",") << getElementCount()
+        << toSlice(">");
 }
 
 BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
@@ -238,7 +258,8 @@ BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
 
 void MatrixExpressionType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("matrix<") << getElementType() << toSlice(",") << getRowCount() << toSlice(",") << getColumnCount() << toSlice(">");
+    out << toSlice("matrix<") << getElementType() << toSlice(",") << getRowCount() << toSlice(",")
+        << getColumnCount() << toSlice(">");
 }
 
 BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
@@ -363,7 +384,7 @@ Type* GenericDeclRefType::_createCanonicalTypeOverride()
 
 void NamespaceType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("namespace ") << getDeclRef(); 
+    out << toSlice("namespace ") << getDeclRef();
 }
 
 Type* NamespaceType::_createCanonicalTypeOverride()
@@ -415,22 +436,12 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
     switch (addrSpace)
     {
     case AddressSpace::Generic:
-    case AddressSpace::UserPointer:
-        break;
-    case AddressSpace::GroupShared:
-        out << toSlice(", groupshared");
-        break;
-    case AddressSpace::Global:
-        out << toSlice(", global");
-        break;
-    case AddressSpace::ThreadLocal:
-        out << toSlice(", threadlocal");
-        break;
-    case AddressSpace::Uniform:
-        out << toSlice(", uniform");
-        break;
-    default:
-        break;
+    case AddressSpace::UserPointer: break;
+    case AddressSpace::GroupShared: out << toSlice(", groupshared"); break;
+    case AddressSpace::Global:      out << toSlice(", global"); break;
+    case AddressSpace::ThreadLocal: out << toSlice(", threadlocal"); break;
+    case AddressSpace::Uniform:     out << toSlice(", uniform"); break;
+    default:                        break;
     }
 }
 
@@ -531,7 +542,7 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
 
     // parameter types
     List<Type*> substParamTypes;
-    for (Index pp = 0; pp < getParamCount(); pp++ )
+    for (Index pp = 0; pp < getParamCount(); pp++)
     {
         substParamTypes.add(as<Type>(getParamType(pp)->substituteImpl(astBuilder, subst, &diff)));
     }
@@ -541,7 +552,8 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
         return this;
 
     (*ioDiff)++;
-    FuncType* substType = astBuilder->getFuncType(substParamTypes.getArrayView(), substResultType, substErrorType);
+    FuncType* substType =
+        astBuilder->getFuncType(substParamTypes.getArrayView(), substResultType, substErrorType);
     return substType;
 }
 
@@ -558,7 +570,10 @@ Type* FuncType::_createCanonicalTypeOverride()
         canParamTypes.add(getParamType(pp)->getCanonicalType());
     }
 
-    FuncType* canType = getCurrentASTBuilder()->getFuncType(canParamTypes.getArrayView(), canResultType, canErrorType);
+    FuncType* canType = getCurrentASTBuilder()->getFuncType(
+        canParamTypes.getArrayView(),
+        canResultType,
+        canErrorType);
     return canType;
 }
 
@@ -624,7 +639,9 @@ Type* ExpandType::_createCanonicalTypeOverride()
     {
         capturedPacks.add(getCapturedTypePack(i));
     }
-    return getCurrentASTBuilder()->getExpandType(canonicalPatternType, capturedPacks.getArrayView().arrayView);
+    return getCurrentASTBuilder()->getExpandType(
+        canonicalPatternType,
+        capturedPacks.getArrayView().arrayView);
 }
 
 Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
@@ -640,7 +657,8 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
     ShortList<ConcreteTypePack*> concreteTypePacks;
     for (Index i = 0; i < getCapturedTypePackCount(); i++)
     {
-        auto substCapturedTypePack = getCapturedTypePack(i)->substituteImpl(astBuilder, subst, &diff);
+        auto substCapturedTypePack =
+            getCapturedTypePack(i)->substituteImpl(astBuilder, subst, &diff);
         if (auto expandType = as<ExpandType>(substCapturedTypePack))
         {
             for (Index j = 0; j < expandType->getCapturedTypePackCount(); j++)
@@ -655,7 +673,7 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
             }
         }
     }
-    
+
     if (!diff || concreteTypePacks.getCount() != capturedPacks.getCount())
     {
         auto substPatternType = getPatternType()->substituteImpl(astBuilder, subst, &diff);
@@ -667,15 +685,17 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
         // create a new ExpandType with the substituted pattern/capture types, instead of actually
         // expanding into a concrete type pack.
         (*ioDiff)++;
-        return astBuilder->getExpandType(as<Type>(substPatternType), capturedPacks.getArrayView().arrayView);
+        return astBuilder->getExpandType(
+            as<Type>(substPatternType),
+            capturedPacks.getArrayView().arrayView);
     }
     else
     {
-        // All type pack parameters are now concrete type packs, so we can construct a concrete type pack
-        // by substituting the pattern type with each element of the captured type pack.
+        // All type pack parameters are now concrete type packs, so we can construct a concrete type
+        // pack by substituting the pattern type with each element of the captured type pack.
         ShortList<Type*> expandedTypes;
         SLANG_ASSERT(capturedPacks.getCount() != 0);
-        
+
         for (Index i = 0; i < concreteTypePacks[0]->getTypeCount(); i++)
         {
             subst.packExpansionIndex = i;
@@ -710,7 +730,10 @@ Type* ConcreteTypePack::_createCanonicalTypeOverride()
     return getCurrentASTBuilder()->getTypePack(canonicalElementTypes.getArrayView().arrayView);
 }
 
-Val* ConcreteTypePack::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ConcreteTypePack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     ShortList<Type*> substElementTypes;
@@ -737,19 +760,26 @@ Type* ExtractExistentialType::_createCanonicalTypeOverride()
     return this;
 }
 
-Val* ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ExtractExistentialType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     auto substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
-    auto substOriginalInterfaceType = getOriginalInterfaceType()->substituteImpl(astBuilder, subst, &diff);
-    auto substOriginalInterfaceDeclRef = getOriginalInterfaceDeclRef().substituteImpl(astBuilder, subst, &diff);
+    auto substOriginalInterfaceType =
+        getOriginalInterfaceType()->substituteImpl(astBuilder, subst, &diff);
+    auto substOriginalInterfaceDeclRef =
+        getOriginalInterfaceDeclRef().substituteImpl(astBuilder, subst, &diff);
     if (!diff)
         return this;
 
     (*ioDiff)++;
 
     ExtractExistentialType* substValue = astBuilder->getOrCreate<ExtractExistentialType>(
-        substDeclRef, as<Type>(substOriginalInterfaceType), substOriginalInterfaceDeclRef);
+        substDeclRef,
+        as<Type>(substOriginalInterfaceType),
+        substOriginalInterfaceDeclRef);
     return substValue;
 }
 
@@ -758,7 +788,11 @@ SubtypeWitness* ExtractExistentialType::getSubtypeWitness()
     if (auto cachedValue = this->cachedSubtypeWitness)
         return cachedValue;
 
-    ExtractExistentialSubtypeWitness* openedWitness = getCurrentASTBuilder()->getOrCreate<ExtractExistentialSubtypeWitness>(this, getOriginalInterfaceType(), getDeclRef());
+    ExtractExistentialSubtypeWitness* openedWitness =
+        getCurrentASTBuilder()->getOrCreate<ExtractExistentialSubtypeWitness>(
+            this,
+            getOriginalInterfaceType(),
+            getDeclRef());
     this->cachedSubtypeWitness = openedWitness;
     return openedWitness;
 }
@@ -781,7 +815,8 @@ DeclRef<ThisTypeDecl> ExtractExistentialType::getThisTypeDeclRef()
         }
     SLANG_ASSERT(thisTypeDecl);
 
-    DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef = getCurrentASTBuilder()->getLookupDeclRef(openedWitness, thisTypeDecl).as<ThisTypeDecl>();
+    DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef =
+        getCurrentASTBuilder()->getLookupDeclRef(openedWitness, thisTypeDecl).as<ThisTypeDecl>();
 
     this->cachedThisTypeDeclRef = specialiedInterfaceDeclRef;
     return specialiedInterfaceDeclRef;
@@ -825,20 +860,25 @@ Type* ExistentialSpecializedType::_createCanonicalTypeOverride()
         newArgs.add(canArg);
     }
 
-    ExistentialSpecializedType* canType = getCurrentASTBuilder()->getOrCreate<ExistentialSpecializedType>(
-        getBaseType()->getCanonicalType(),
-        newArgs);
+    ExistentialSpecializedType* canType =
+        getCurrentASTBuilder()->getOrCreate<ExistentialSpecializedType>(
+            getBaseType()->getCanonicalType(),
+            newArgs);
 
     return canType;
 }
 
 static Val* _substituteImpl(ASTBuilder* astBuilder, Val* val, SubstitutionSet subst, int* ioDiff)
 {
-    if (!val) return nullptr;
+    if (!val)
+        return nullptr;
     return val->substituteImpl(astBuilder, subst, ioDiff);
 }
 
-Val* ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ExistentialSpecializedType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
 
@@ -859,7 +899,8 @@ Val* ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder,
 
     (*ioDiff)++;
 
-    ExistentialSpecializedType* substType = astBuilder->getOrCreate<ExistentialSpecializedType>(substBaseType, substArgs);
+    ExistentialSpecializedType* substType =
+        astBuilder->getOrCreate<ExistentialSpecializedType>(substBaseType, substArgs);
     return substType;
 }
 
@@ -922,10 +963,10 @@ Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet su
 {
     int diff = 0;
 
-    auto substLeft  = as<Type>(getLeft()->substituteImpl(astBuilder, subst, &diff));
+    auto substLeft = as<Type>(getLeft()->substituteImpl(astBuilder, subst, &diff));
     auto substRight = as<Type>(getRight()->substituteImpl(astBuilder, subst, &diff));
 
-    if(!diff)
+    if (!diff)
         return this;
 
     (*ioDiff)++;
@@ -938,7 +979,7 @@ Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet su
 
 void ModifiedType::_toTextOverride(StringBuilder& out)
 {
-    for( Index i = 0; i < getModifierCount(); i++ )
+    for (Index i = 0; i < getModifierCount(); i++)
     {
         getModifier(i)->toText(out);
         out.appendChar(' ');
@@ -954,11 +995,16 @@ Type* ModifiedType::_createCanonicalTypeOverride()
         auto modifier = this->getModifier(i);
         modifiers.add(modifier);
     }
-    ModifiedType* canonical = getCurrentASTBuilder()->getOrCreate<ModifiedType>(getBase()->getCanonicalType(), modifiers.getArrayView());
+    ModifiedType* canonical = getCurrentASTBuilder()->getOrCreate<ModifiedType>(
+        getBase()->getCanonicalType(),
+        modifiers.getArrayView());
     return canonical;
 }
 
-Val* ModifiedType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ModifiedType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     Type* substBase = as<Type>(getBase()->substituteImpl(astBuilder, subst, &diff));
@@ -971,12 +1017,13 @@ Val* ModifiedType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionS
         substModifiers.add(substModifier);
     }
 
-    if(!diff)
+    if (!diff)
         return this;
 
     *ioDiff = 1;
 
-    ModifiedType* substType = getCurrentASTBuilder()->getOrCreate<ModifiedType>(substBase, substModifiers.getArrayView());
+    ModifiedType* substType =
+        getCurrentASTBuilder()->getOrCreate<ModifiedType>(substBase, substModifiers.getArrayView());
     return substType;
 }
 
@@ -1083,16 +1130,12 @@ SlangResourceAccess ResourceType::getAccess()
     {
         switch (constIntVal->getValue())
         {
-        case kCoreModule_ResourceAccessReadOnly:
-            return SLANG_RESOURCE_ACCESS_READ;
-        case kCoreModule_ResourceAccessReadWrite:
-            return SLANG_RESOURCE_ACCESS_READ_WRITE;
+        case kCoreModule_ResourceAccessReadOnly:  return SLANG_RESOURCE_ACCESS_READ;
+        case kCoreModule_ResourceAccessReadWrite: return SLANG_RESOURCE_ACCESS_READ_WRITE;
         case kCoreModule_ResourceAccessRasterizerOrdered:
             return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-        case kCoreModule_ResourceAccessFeedback:
-            return SLANG_RESOURCE_ACCESS_FEEDBACK;
-        default:
-            break;
+        case kCoreModule_ResourceAccessFeedback: return SLANG_RESOURCE_ACCESS_FEEDBACK;
+        default:                                 break;
         }
     }
     return SLANG_RESOURCE_ACCESS_NONE;
@@ -1117,91 +1160,78 @@ Type* ResourceType::getElementType()
 void ResourceType::_toTextOverride(StringBuilder& out)
 {
     auto tryPrintSimpleName = [&](String& outString) -> bool
+    {
+        StringBuilder resultSB;
+        auto access = getAccess();
+        switch (access)
         {
-            StringBuilder resultSB;
-            auto access = getAccess();
-            switch (access)
+        case SLANG_RESOURCE_ACCESS_READ: break;
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            resultSB << "RW";
+            ;
+            break;
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: resultSB << "RasterizerOrdered"; break;
+        case SLANG_RESOURCE_ACCESS_FEEDBACK:       resultSB << "Feedback"; break;
+        default:                                   return false;
+        }
+        auto combined = as<ConstantIntVal>(_getGenericTypeArg(this, 7));
+        auto shapeVal = _getGenericTypeArg(this, 1);
+        if (!as<TextureShapeType>(shapeVal))
+            return false;
+        auto shape = getBaseShape();
+        if (!combined)
+            return false;
+        if (combined->getValue() != 0)
+            resultSB << "Sampler";
+        else
+        {
+            if (shape == SLANG_TEXTURE_BUFFER)
+                resultSB << "Buffer";
+            else
+                resultSB << "Texture";
+        }
+        switch (shape)
+        {
+        case SLANG_TEXTURE_1D:   resultSB << "1D"; break;
+        case SLANG_TEXTURE_2D:   resultSB << "2D"; break;
+        case SLANG_TEXTURE_3D:   resultSB << "3D"; break;
+        case SLANG_TEXTURE_CUBE: resultSB << "Cube"; break;
+        }
+        auto isArrayVal = as<ConstantIntVal>(_getGenericTypeArg(this, 2));
+        if (!isArrayVal)
+            return false;
+        if (isArray())
+            resultSB << "Array";
+        auto isMultisampleVal = as<ConstantIntVal>(_getGenericTypeArg(this, 3));
+        if (!isMultisampleVal)
+            return false;
+        if (isMultisample())
+            resultSB << "MS";
+        auto isShadowVal = as<ConstantIntVal>(_getGenericTypeArg(this, 6));
+        if (!isShadowVal)
+            return false;
+        if (isShadow())
+            return false;
+        auto elementType = getElementType();
+        if (elementType)
+        {
+            resultSB << "<";
+            resultSB << elementType->toString();
+            auto sampleCount = _getGenericTypeArg(this, 4);
+            if (auto constIntVal = as<ConstantIntVal>(sampleCount))
             {
-            case SLANG_RESOURCE_ACCESS_READ:
-                break;
-            case SLANG_RESOURCE_ACCESS_READ_WRITE:
-                resultSB << "RW";;
-                break;
-            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-                resultSB << "RasterizerOrdered";
-                break;
-            case SLANG_RESOURCE_ACCESS_FEEDBACK:
-                resultSB << "Feedback";
-                break;
-            default:
-                return false;
+                if (constIntVal->getValue() != 0)
+                    resultSB << ", " << constIntVal->getValue();
             }
-            auto combined = as<ConstantIntVal>(_getGenericTypeArg(this, 7));
-            auto shapeVal = _getGenericTypeArg(this, 1);
-            if (!as<TextureShapeType>(shapeVal))
-                return false;
-            auto shape = getBaseShape();
-            if (!combined)
-                return false;
-            if (combined->getValue() != 0)
-                resultSB << "Sampler";
             else
             {
-                if (shape == SLANG_TEXTURE_BUFFER)
-                    resultSB << "Buffer";
-                else
-                    resultSB << "Texture";
+                return false;
             }
-            switch (shape)
-            {
-            case SLANG_TEXTURE_1D:
-                resultSB << "1D";
-                break;
-            case SLANG_TEXTURE_2D:
-                resultSB << "2D";
-                break;
-            case SLANG_TEXTURE_3D:
-                resultSB << "3D";
-                break;
-            case SLANG_TEXTURE_CUBE:
-                resultSB << "Cube";
-                break;
-            }
-            auto isArrayVal = as<ConstantIntVal>(_getGenericTypeArg(this, 2));
-            if (!isArrayVal)
-                return false;
-            if (isArray())
-                resultSB << "Array";
-            auto isMultisampleVal = as<ConstantIntVal>(_getGenericTypeArg(this, 3));
-            if (!isMultisampleVal)
-                return false;
-            if (isMultisample())
-                resultSB << "MS";
-            auto isShadowVal = as<ConstantIntVal>(_getGenericTypeArg(this, 6));
-            if (!isShadowVal)
-                return false;
-            if (isShadow())
-                return false;
-            auto elementType = getElementType();
-            if (elementType)
-            {
-                resultSB << "<";
-                resultSB << elementType->toString();
-                auto sampleCount = _getGenericTypeArg(this, 4);
-                if (auto constIntVal = as<ConstantIntVal>(sampleCount))
-                {
-                    if (constIntVal->getValue() != 0)
-                        resultSB << ", " << constIntVal->getValue();
-                }
-                else
-                {
-                    return false;
-                }
-                resultSB << ">";
-            }
-            outString = resultSB.toString();
-            return true;
-        };
+            resultSB << ">";
+        }
+        outString = resultSB.toString();
+        return true;
+    };
 
     String simpleName;
 

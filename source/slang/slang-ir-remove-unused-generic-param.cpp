@@ -1,7 +1,8 @@
 #include "slang-ir-remove-unused-generic-param.h"
+
 #include "slang-ir-inst-pass-base.h"
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -9,7 +10,8 @@ struct RemoveUnusedGenericParamContext : InstPassBase
 {
     RemoveUnusedGenericParamContext(IRModule* inModule)
         : InstPassBase(inModule)
-    {}
+    {
+    }
 
     bool processModule()
     {
@@ -23,15 +25,14 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                 switch (returnVal->getOp())
                 {
                 case kIROp_StructType:
-                case kIROp_ClassType:
-                    break;
+                case kIROp_ClassType:  break;
                 case kIROp_Func:
                 case kIROp_FuncType:
                 default:
-                    // Don't simplify functions since this can break signature compatiblity with the
-                    // interface. For example, if we have
-                    // interface IFoo { void genFunc<T>(int x); }
-                    // We can't simplify this by removing `T` even when the function type here does not depend on T.
+                    // Don't simplify functions since this can break signature compatiblity with
+                    // the interface. For example, if we have interface IFoo { void
+                    // genFunc<T>(int x); } We can't simplify this by removing `T` even when the
+                    // function type here does not depend on T.
                     continue;
                 }
                 if (returnVal->findDecoration<IRTargetIntrinsicDecoration>())
@@ -59,7 +60,7 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                 {
                     // Special case: the generic return value is not dependent on the generic param,
                     // we can hoist to global scope safely.
-                    for (auto child = genInst->getFirstBlock()->getFirstOrdinaryInst(); child; )
+                    for (auto child = genInst->getFirstBlock()->getFirstOrdinaryInst(); child;)
                     {
                         auto next = child->getNextInst();
                         if (child->getOp() == kIROp_Return)

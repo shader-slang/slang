@@ -1,9 +1,9 @@
 // slang-ir-autodiff-region.h
 #pragma once
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -12,11 +12,13 @@ struct IndexedRegion : public RefObject
     IRLoop* loop;
     IndexedRegion* parent;
 
-    IndexedRegion(IRLoop* loop, IndexedRegion* parent) : loop(loop), parent(parent)
-    { }
+    IndexedRegion(IRLoop* loop, IndexedRegion* parent)
+        : loop(loop), parent(parent)
+    {
+    }
 
     IRBlock* getInitializerBlock() { return as<IRBlock>(loop->getParent()); }
-    IRBlock* getConditionBlock() 
+    IRBlock* getConditionBlock()
     {
         auto condBlock = as<IRBlock>(loop->getTargetBlock());
         SLANG_RELEASE_ASSERT(as<IRIfElse>(condBlock->getTerminator()));
@@ -25,8 +27,8 @@ struct IndexedRegion : public RefObject
 
     IRBlock* getBreakBlock() { return loop->getBreakBlock(); }
 
-    IRBlock* getUpdateBlock() 
-    { 
+    IRBlock* getUpdateBlock()
+    {
         auto initBlock = getInitializerBlock();
 
         auto condBlock = getConditionBlock();
@@ -39,11 +41,11 @@ struct IndexedRegion : public RefObject
                 lastLoopBlock = predecessor;
         }
 
-        // Should find atleast one predecessor that is _not_ the 
-        // init block (that contains the loop info). This 
+        // Should find atleast one predecessor that is _not_ the
+        // init block (that contains the loop info). This
         // predecessor would be the last block in the loop
         // before looping back to the condition.
-        // 
+        //
         SLANG_RELEASE_ASSERT(lastLoopBlock);
 
         return lastLoopBlock;
@@ -63,20 +65,11 @@ struct IndexedRegionMap : public RefObject
         return region;
     }
 
-    void mapBlock(IRBlock* block, IndexedRegion* region)
-    {
-        map.add(block, region);
-    }
+    void mapBlock(IRBlock* block, IndexedRegion* region) { map.add(block, region); }
 
-    bool hasMapping(IRBlock* block)
-    {
-        return map.containsKey(block);
-    }
+    bool hasMapping(IRBlock* block) { return map.containsKey(block); }
 
-    IndexedRegion* getRegion(IRBlock* block)
-    {
-        return map[block];
-    }
+    IndexedRegion* getRegion(IRBlock* block) { return map[block]; }
 
     List<IndexedRegion*> getAllAncestorRegions(IRBlock* block)
     {
@@ -93,4 +86,4 @@ struct IndexedRegionMap : public RefObject
 RefPtr<IndexedRegionMap> buildIndexedRegionMap(IRGlobalValueWithCode* func);
 
 
-};
+}; // namespace Slang

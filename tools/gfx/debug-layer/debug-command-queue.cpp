@@ -3,9 +3,8 @@
 
 #include "debug-command-buffer.h"
 #include "debug-fence.h"
-#include "debug-transient-heap.h"
-
 #include "debug-helper-functions.h"
+#include "debug-transient-heap.h"
 
 namespace gfx
 {
@@ -20,7 +19,11 @@ const ICommandQueue::Desc& DebugCommandQueue::getDesc()
     return baseObject->getDesc();
 }
 
-void DebugCommandQueue::executeCommandBuffers(GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
+void DebugCommandQueue::executeCommandBuffers(
+    GfxCount count,
+    ICommandBuffer* const* commandBuffers,
+    IFence* fence,
+    uint64_t valueToSignal)
 {
     SLANG_GFX_API_FUNC;
     List<ICommandBuffer*> innerCommandBuffers;
@@ -46,10 +49,15 @@ void DebugCommandQueue::executeCommandBuffers(GfxCount count, ICommandBuffer* co
             }
         }
     }
-    baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer(), getInnerObj(fence), valueToSignal);
+    baseObject->executeCommandBuffers(
+        count,
+        innerCommandBuffers.getBuffer(),
+        getInnerObj(fence),
+        valueToSignal);
     if (fence)
     {
-        getDebugObj(fence)->maxValueToSignal = Math::Max(getDebugObj(fence)->maxValueToSignal, valueToSignal);
+        getDebugObj(fence)->maxValueToSignal =
+            Math::Max(getDebugObj(fence)->maxValueToSignal, valueToSignal);
     }
 }
 
@@ -60,7 +68,9 @@ void DebugCommandQueue::waitOnHost()
 }
 
 Result DebugCommandQueue::waitForFenceValuesOnDevice(
-    GfxCount fenceCount, IFence** fences, uint64_t* waitValues)
+    GfxCount fenceCount,
+    IFence** fences,
+    uint64_t* waitValues)
 {
     SLANG_GFX_API_FUNC;
     List<IFence*> innerFences;

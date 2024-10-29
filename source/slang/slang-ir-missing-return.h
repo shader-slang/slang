@@ -3,10 +3,8 @@
 
 namespace Slang
 {
-    class DiagnosticSink;
-    struct IRModule;
+class DiagnosticSink;
+struct IRModule;
 
-    void checkForMissingReturns(
-        IRModule*       module,
-        DiagnosticSink* sink);
-}
+void checkForMissingReturns(IRModule* module, DiagnosticSink* sink);
+} // namespace Slang

@@ -2,9 +2,8 @@
 #include "vk-shader-table.h"
 
 #include "vk-device.h"
-#include "vk-transient-heap.h"
-
 #include "vk-helper-functions.h"
+#include "vk-transient-heap.h"
 
 namespace gfx
 {
@@ -24,11 +23,14 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     uint32_t handleSize = rtProps.shaderGroupHandleSize;
     m_raygenTableSize = m_rayGenShaderCount * rtProps.shaderGroupBaseAlignment;
     m_missTableSize = (uint32_t)VulkanUtil::calcAligned(
-        m_missShaderCount * handleSize, rtProps.shaderGroupBaseAlignment);
+        m_missShaderCount * handleSize,
+        rtProps.shaderGroupBaseAlignment);
     m_hitTableSize = (uint32_t)VulkanUtil::calcAligned(
-        m_hitGroupCount * handleSize, rtProps.shaderGroupBaseAlignment);
+        m_hitGroupCount * handleSize,
+        rtProps.shaderGroupBaseAlignment);
     m_callableTableSize = (uint32_t)VulkanUtil::calcAligned(
-        m_callableShaderCount * handleSize, rtProps.shaderGroupBaseAlignment);
+        m_callableShaderCount * handleSize,
+        rtProps.shaderGroupBaseAlignment);
     uint32_t tableSize = m_raygenTableSize + m_missTableSize + m_hitTableSize + m_callableTableSize;
 
     auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
@@ -51,8 +53,8 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
 
     IBufferResource* stagingBuffer = nullptr;
     Offset stagingBufferOffset = 0;
-    transientHeapImpl->allocateStagingBuffer(
-        tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
+    transientHeapImpl
+        ->allocateStagingBuffer(tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
     assert(stagingBuffer);
     void* stagingPtr = nullptr;

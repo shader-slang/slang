@@ -1,8 +1,9 @@
 // metal-framebuffer.cpp
 #include "metal-framebuffer.h"
+
 #include "metal-device.h"
-#include "metal-resource-views.h"
 #include "metal-helper-functions.h"
+#include "metal-resource-views.h"
 
 namespace gfx
 {
@@ -39,7 +40,7 @@ Result FramebufferImpl::init(DeviceImpl* device, const IFramebuffer::Desc& desc)
         m_renderTargetViews[i] = static_cast<TextureResourceViewImpl*>(desc.renderTargetViews[i]);
     }
     m_depthStencilView = static_cast<TextureResourceViewImpl*>(desc.depthStencilView);
-    
+
     // Determine framebuffer dimensions & sample count;
     m_width = 1;
     m_height = 1;
@@ -49,8 +50,11 @@ Result FramebufferImpl::init(DeviceImpl* device, const IFramebuffer::Desc& desc)
     {
         const ITextureResource::Desc* textureDesc = view->m_texture->getDesc();
         const IResourceView::Desc* viewDesc = view->getViewDesc();
-        m_width = Math::Max(1u, uint32_t(textureDesc->size.width >> viewDesc->subresourceRange.mipLevel));
-        m_height = Math::Max(1u, uint32_t(textureDesc->size.height >> viewDesc->subresourceRange.mipLevel));
+        m_width =
+            Math::Max(1u, uint32_t(textureDesc->size.width >> viewDesc->subresourceRange.mipLevel));
+        m_height = Math::Max(
+            1u,
+            uint32_t(textureDesc->size.height >> viewDesc->subresourceRange.mipLevel));
         m_sampleCount = Math::Max(m_sampleCount, uint32_t(textureDesc->sampleDesc.numSamples));
         return SLANG_OK;
     };

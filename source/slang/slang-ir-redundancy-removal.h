@@ -4,13 +4,13 @@
 
 namespace Slang
 {
-    struct IRModule;
-    struct IRGlobalValueWithCode;
+struct IRModule;
+struct IRGlobalValueWithCode;
 
-    bool removeRedundancy(IRModule* module);
-    bool removeRedundancyInFunc(IRGlobalValueWithCode* func);
+bool removeRedundancy(IRModule* module);
+bool removeRedundancyInFunc(IRGlobalValueWithCode* func);
 
-    bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func);
+bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func);
 
-    void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module);
-}
+void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module);
+} // namespace Slang

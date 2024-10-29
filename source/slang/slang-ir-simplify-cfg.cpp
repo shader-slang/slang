@@ -1,12 +1,12 @@
 #include "slang-ir-simplify-cfg.h"
 
-#include "slang-ir-insts.h"
-#include "slang-ir.h"
 #include "slang-ir-dominators.h"
-#include "slang-ir-restructure.h"
-#include "slang-ir-util.h"
+#include "slang-ir-insts.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-reachability.h"
+#include "slang-ir-restructure.h"
+#include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -18,7 +18,10 @@ struct CFGSimplificationContext
     Dictionary<IRInst*, List<IRInst*>> relatedAddrMap;
 };
 
-static bool isBlockInRegion(IRDominatorTree* domTree, IRTerminatorInst* regionHeader, IRBlock* block)
+static bool isBlockInRegion(
+    IRDominatorTree* domTree,
+    IRTerminatorInst* regionHeader,
+    IRBlock* block)
 {
     auto headerBlock = cast<IRBlock>(regionHeader->getParent());
     IRBlock* breakBlock = nullptr;
@@ -28,13 +31,13 @@ static bool isBlockInRegion(IRDominatorTree* domTree, IRTerminatorInst* regionHe
         breakBlock = switchInst->getBreakLabel();
 
     auto parentBreakBlocks = getParentBreakBlockSet(domTree, headerBlock);
-    
+
     if (!domTree->dominates(headerBlock, block))
         return false;
 
     if (domTree->dominates(breakBlock, block))
         return false;
-    
+
     for (auto parentBreakBlock : parentBreakBlocks)
     {
         if (domTree->dominates(parentBreakBlock, block))
@@ -46,14 +49,14 @@ static bool isBlockInRegion(IRDominatorTree* domTree, IRTerminatorInst* regionHe
 
 static IRInst* findBreakableRegionHeaderInst(IRDominatorTree* domTree, IRBlock* block)
 {
-    for (auto idom = domTree->getImmediateDominator(block); idom; idom = domTree->getImmediateDominator(idom))
+    for (auto idom = domTree->getImmediateDominator(block); idom;
+         idom = domTree->getImmediateDominator(idom))
     {
         auto terminator = idom->getTerminator();
         switch (terminator->getOp())
         {
         case kIROp_Switch:
-        case kIROp_loop:
-            return terminator;
+        case kIROp_loop:   return terminator;
         }
     }
     return nullptr;
@@ -68,8 +71,10 @@ static bool isTrivialSingleIterationLoop(
     IRLoop* loop)
 {
     auto targetBlock = loop->getTargetBlock();
-    if (targetBlock->getPredecessors().getCount() != 1) return false;
-    if (*targetBlock->getPredecessors().begin() != loop->getParent()) return false;
+    if (targetBlock->getPredecessors().getCount() != 1)
+        return false;
+    if (*targetBlock->getPredecessors().begin() != loop->getParent())
+        return false;
 
     int useCount = 0;
     for (auto use = loop->getBreakBlock()->firstUse; use; use = use->nextUse)
@@ -82,7 +87,7 @@ static bool isTrivialSingleIterationLoop(
     }
 
     // The loop has passed simple test.
-    // 
+    //
     // We need to verify this is a trivial loop by checking if there is any multi-level breaks
     // that skips out of this loop.
     if (!context.domTree)
@@ -106,31 +111,30 @@ static bool isTrivialSingleIterationLoop(
             }
         }
     }
-    
+
     // We'll also check if there's an inner loop that is breaking out into this loop's break block.
-    // If so, we cannot remove it right away since it interferes with the multi-level break elimination
-    // logic.
+    // If so, we cannot remove it right away since it interferes with the multi-level break
+    // elimination logic.
     //
     // Track the break block backwards through the dominator tree, and see if we find a loop block
     // that is not the current loop.
     //
     auto breakPredList = loop->getBreakBlock()->getPredecessors();
-    
+
     if (breakPredList.getCount() > 0)
     {
         auto breakOriginBlock = *loop->getBreakBlock()->getPredecessors().begin();
 
-        for (auto currBlock = breakOriginBlock;
-             currBlock;
+        for (auto currBlock = breakOriginBlock; currBlock;
              currBlock = context.domTree->getImmediateDominator(currBlock))
         {
             auto terminator = currBlock->getTerminator();
             if (terminator == loop)
                 break;
-            
+
             // Check if the break originated from an inner breakable region.
             // If so, the outer loop cannot be trivially removed.
-            // 
+            //
             switch (terminator->getOp())
             {
             case kIROp_loop:
@@ -141,8 +145,7 @@ static bool isTrivialSingleIterationLoop(
                 if (isBlockInRegion(context.domTree, as<IRSwitch>(terminator), breakOriginBlock))
                     return false;
                 break;
-            default:
-                break;
+            default: break;
             }
         }
     }
@@ -150,7 +153,11 @@ static bool isTrivialSingleIterationLoop(
     return true;
 }
 
-static bool doesLoopHasSideEffect(CFGSimplificationContext& context, ReachabilityContext& reachability, IRGlobalValueWithCode* func, IRLoop* loopInst)
+static bool doesLoopHasSideEffect(
+    CFGSimplificationContext& context,
+    ReachabilityContext& reachability,
+    IRGlobalValueWithCode* func,
+    IRLoop* loopInst)
 {
     bool hasMultiLevelBreaks = false;
     if (!context.domTree)
@@ -176,7 +183,8 @@ static bool doesLoopHasSideEffect(CFGSimplificationContext& context, Reachabilit
                 if (as<IRPtrTypeBase>(inst->getDataType()))
                 {
                     auto root = getRootAddr(inst);
-                    if (!root) continue;
+                    if (!root)
+                        continue;
                     auto list = relatedAddrMap.tryGetValue(root);
                     if (!list)
                     {
@@ -197,11 +205,12 @@ static bool doesLoopHasSideEffect(CFGSimplificationContext& context, Reachabilit
         if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(rootAddr))
             return true;
 
-        // If we can't find the address from our map, we conservatively assume it is an unknown address.
+        // If we can't find the address from our map, we conservatively assume it is an unknown
+        // address.
         auto relatedAddrs = relatedAddrMap.tryGetValue(getRootAddr(addr));
         if (!relatedAddrs)
             return true;
-       
+
         // For all related address of `addr` that may alias with it, we check their uses.
         for (auto relatedAddr : *relatedAddrs)
         {
@@ -217,7 +226,7 @@ static bool doesLoopHasSideEffect(CFGSimplificationContext& context, Reachabilit
                 }
             }
         }
-            
+
         return false;
     };
 
@@ -237,9 +246,8 @@ static bool doesLoopHasSideEffect(CFGSimplificationContext& context, Reachabilit
             if (auto call = as<IRCall>(inst))
             {
                 auto callee = getResolvedInstForDecorations(call->getCallee());
-                if (!callee || 
-                    !(callee->findDecoration<IRNoSideEffectDecoration>() || 
-                      callee->findDecoration<IRReadNoneDecoration>()))
+                if (!callee || !(callee->findDecoration<IRNoSideEffectDecoration>() ||
+                                 callee->findDecoration<IRReadNoneDecoration>()))
                     return true;
                 // We are calling a pure function, check if any of the return
                 // variables are used outside the loop.
@@ -340,7 +348,8 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
     {
         if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
         {
-            if (br->getTargetBlock() == condBranch->getAfterBlock() && br->getOp() == kIROp_unconditionalBranch)
+            if (br->getTargetBlock() == condBranch->getAfterBlock() &&
+                br->getOp() == kIROp_unconditionalBranch)
             {
                 return true;
             }
@@ -353,15 +362,22 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
     return false;
 }
 
-static bool arePhiArgsEquivalentInBranchesImpl(IRBlock* branch1, IRBlock* branch2, IRBlock* afterBlock)
+static bool arePhiArgsEquivalentInBranchesImpl(
+    IRBlock* branch1,
+    IRBlock* branch2,
+    IRBlock* afterBlock)
 {
-    if (branch1 == afterBlock) return true;
-    if (branch2 == afterBlock) return true;
+    if (branch1 == afterBlock)
+        return true;
+    if (branch2 == afterBlock)
+        return true;
 
     auto branchInst1 = as<IRUnconditionalBranch>(branch1->getTerminator());
     auto branchInst2 = as<IRUnconditionalBranch>(branch2->getTerminator());
-    if (!branchInst1) return false;
-    if (!branchInst2) return false;
+    if (!branchInst1)
+        return false;
+    if (!branchInst2)
+        return false;
 
     // If both branches are trivial blocks, we must compare the arguments.
     if (branchInst1->getArgCount() != branchInst2->getArgCount())
@@ -394,7 +410,10 @@ static bool arePhiArgsEquivalentInBranches(IRIfElse* ifElse)
     return arePhiArgsEquivalentInBranchesImpl(branch1, branch2, afterBlock);
 }
 
-static bool isTrivialIfElse(IRIfElse* condBranch, bool& isTrueBranchTrivial, bool& isFalseBranchTrivial)
+static bool isTrivialIfElse(
+    IRIfElse* condBranch,
+    bool& isTrueBranchTrivial,
+    bool& isFalseBranchTrivial)
 {
     isTrueBranchTrivial = isTrivialIfElseBranch(condBranch, condBranch->getTrueBlock());
     isFalseBranchTrivial = isTrivialIfElseBranch(condBranch, condBranch->getFalseBlock());
@@ -414,7 +433,8 @@ static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
     {
         if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
         {
-            if (br->getTargetBlock() == switchInst->getBreakLabel() && br->getOp() == kIROp_unconditionalBranch)
+            if (br->getTargetBlock() == switchInst->getBreakLabel() &&
+                br->getOp() == kIROp_unconditionalBranch)
             {
                 return true;
             }
@@ -489,17 +509,19 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
         // with no parameters.
 
         const auto afterBlock = ifElseInst->getAfterBlock();
-        if(!afterBlock->getFirstParam())
+        if (!afterBlock->getFirstParam())
         {
             const auto trueBlock = ifElseInst->getTrueBlock();
             const auto falseBlock = ifElseInst->getFalseBlock();
 
-            if(isTrueBranchTrivial && trueBlock != afterBlock && !trueBlock->hasMoreThanOneUse())
+            if (isTrueBranchTrivial && trueBlock != afterBlock && !trueBlock->hasMoreThanOneUse())
             {
                 trueBlock->replaceUsesWith(afterBlock);
                 trueBlock->removeAndDeallocate();
             }
-            else if(isFalseBranchTrivial && falseBlock != afterBlock && !falseBlock->hasMoreThanOneUse())
+            else if (
+                isFalseBranchTrivial && falseBlock != afterBlock &&
+                !falseBlock->hasMoreThanOneUse())
             {
                 falseBlock->replaceUsesWith(afterBlock);
                 falseBlock->removeAndDeallocate();
@@ -554,8 +576,7 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
                     // If the target block is used by a special control flow inst,
                     // it is likely a merge block and we can't fuse it.
                     return;
-                default:
-                    break;
+                default: break;
                 }
             }
             targetUse->set(target);
@@ -602,7 +623,11 @@ static bool isFalseLit(IRInst* lit)
     return false;
 }
 
-static bool simplifyBoolPhiParam(IRIfElse* ifElse, Array<IRBlock*, 2>& preds, IRParam* param, UInt paramIndex)
+static bool simplifyBoolPhiParam(
+    IRIfElse* ifElse,
+    Array<IRBlock*, 2>& preds,
+    IRParam* param,
+    UInt paramIndex)
 {
     // For bool params where its value is assigned from the same `if-else` statement,
     // we can simplify it into an expression of the condition of the source `if-else`.
@@ -694,7 +719,8 @@ static bool removeTrivialPhiParams(IRBlock* block)
 {
     // We can remove a phi parmeter if:
     // 1. all arguments to a parameter is the same (not really a phi).
-    // 2. the arguments to the parameter is always the same as arguments to another existing parameter (duplicate phi).
+    // 2. the arguments to the parameter is always the same as arguments to another existing
+    // parameter (duplicate phi).
 
     bool changed = false;
     List<IRParam*> params;
@@ -816,7 +842,8 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
                     // break at the end of the loop, we can remove the header and turn it into
                     // a normal branch.
                     auto targetBlock = loop->getTargetBlock();
-                    if (options.removeTrivialSingleIterationLoops && isTrivialSingleIterationLoop(simplificationContext, func, loop))
+                    if (options.removeTrivialSingleIterationLoops &&
+                        isTrivialSingleIterationLoop(simplificationContext, func, loop))
                     {
                         builder.setInsertBefore(loop);
                         List<IRInst*> args;
@@ -836,7 +863,11 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
                             isReachabilityContextValid = true;
                             reachabilityContext = ReachabilityContext(func);
                         }
-                        if (!doesLoopHasSideEffect(simplificationContext, reachabilityContext, func, loop))
+                        if (!doesLoopHasSideEffect(
+                                simplificationContext,
+                                reachabilityContext,
+                                func,
+                                loop))
                         {
                             // The loop isn't computing anything useful outside the loop.
                             // We can delete the entire loop.

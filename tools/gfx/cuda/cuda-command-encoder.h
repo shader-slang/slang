@@ -22,7 +22,7 @@ public:
         return nullptr;
     }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        queryInterface(SlangUUID const& uuid, void** outObject) override
+    queryInterface(SlangUUID const& uuid, void** outObject) override
     {
         if (auto ptr = getInterface(uuid))
         {
@@ -49,20 +49,22 @@ public:
         ITextureResource* const* textures,
         ResourceState src,
         ResourceState dst) override
-    {}
+    {
+    }
 
     virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
         GfxCount count,
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) override
-    {}
-
-    virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferData(
-        IBufferResource* dst, Offset offset, Size size, void* data) override;
+    {
+    }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
-        writeTimestamp(IQueryPool* pool, GfxIndex index) override;
+    uploadBufferData(IBufferResource* dst, Offset offset, Size size, void* data) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    writeTimestamp(IQueryPool* pool, GfxIndex index) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
@@ -120,22 +122,22 @@ public:
         ResourceState src,
         ResourceState dst) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        beginDebugEvent(const char* name, float rgbColor[3]) override;
+    beginDebugEvent(const char* name, float rgbColor[3]) override;
     virtual SLANG_NO_THROW void SLANG_MCALL endDebugEvent() override {}
 };
 
-class ComputeCommandEncoderImpl
-    : public IComputeCommandEncoder
-    , public ResourceCommandEncoderImpl
+class ComputeCommandEncoderImpl : public IComputeCommandEncoder, public ResourceCommandEncoderImpl
 {
 public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
     virtual void* getInterface(SlangUUID const& uuid) override
     {
-        if (uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == GfxGUID::IID_IComputeCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
+        if (uuid == GfxGUID::IID_IResourceCommandEncoder ||
+            uuid == GfxGUID::IID_IComputeCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
             return this;
         return nullptr;
     }
+
 public:
     CommandWriter* m_writer;
     CommandBufferImpl* m_commandBuffer;
@@ -144,15 +146,15 @@ public:
     void init(CommandBufferImpl* cmdBuffer);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
+    bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
+    bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL dispatchCompute(int x, int y, int z) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override;
+    dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset) override;
 };
 
 } // namespace cuda

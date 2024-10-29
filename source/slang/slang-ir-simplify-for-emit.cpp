@@ -1,4 +1,5 @@
 #include "slang-ir-simplify-for-emit.h"
+
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-util.h"
 
@@ -11,8 +12,12 @@ bool isCUDATarget(TargetRequest* targetReq);
 struct SimplifyForEmitContext : public InstPassBase
 {
     SimplifyForEmitContext(IRModule* inModule, TargetRequest* inTargetReq)
-        : InstPassBase(inModule), targetReq(inTargetReq), followUpWorkList(inModule), followUpWorkListSet(inModule)
-    {}
+        : InstPassBase(inModule)
+        , targetReq(inTargetReq)
+        , followUpWorkList(inModule)
+        , followUpWorkListSet(inModule)
+    {
+    }
 
     TargetRequest* targetReq;
     InstWorkList followUpWorkList;
@@ -34,7 +39,7 @@ struct SimplifyForEmitContext : public InstPassBase
             auto nextUse = use->nextUse;
             auto user = use->getUser();
             if (auto store = as<IRStore>(user))
-            {                
+            {
                 IRBuilder builder(module);
                 builder.setInsertBefore(user);
                 UInt i = 0;
@@ -179,7 +184,11 @@ struct SimplifyForEmitContext : public InstPassBase
             List<IRInst*> args;
             for (UInt i = 0; i < inst->getOperandCount(); i++)
                 args.add(inst->getOperand(i));
-            auto newInst = builder.emitIntrinsicInst(inst->getFullType(), inst->getOp(), inst->getOperandCount(), args.getBuffer());
+            auto newInst = builder.emitIntrinsicInst(
+                inst->getFullType(),
+                inst->getOp(),
+                inst->getOperandCount(),
+                args.getBuffer());
             use->set(newInst);
 
             use = nextUse;
@@ -223,25 +232,13 @@ struct SimplifyForEmitContext : public InstPassBase
         //    emit logic to skip producing a temp var for the loaded result.
         switch (inst->getOp())
         {
-        case kIROp_MakeStruct:
-            processMakeStruct(inst);
-            break;
-        case kIROp_MakeArray:
-            processMakeArray(inst);
-            break;
-        case kIROp_MakeArrayFromElement:
-            processMakeArrayFromElement(inst);
-            break;
-        case kIROp_Load:
-            processLoad(as<IRLoad>(inst));
-            break;
+        case kIROp_MakeStruct:           processMakeStruct(inst); break;
+        case kIROp_MakeArray:            processMakeArray(inst); break;
+        case kIROp_MakeArrayFromElement: processMakeArrayFromElement(inst); break;
+        case kIROp_Load:                 processLoad(as<IRLoad>(inst)); break;
         case kIROp_GetElement:
-        case kIROp_FieldExtract:
-            processElementExtract(inst);
-            break;
-        case kIROp_Var:
-            processVar(inst);
-            break;
+        case kIROp_FieldExtract:         processElementExtract(inst); break;
+        case kIROp_Var:                  processVar(inst); break;
         }
     }
 
@@ -258,9 +255,7 @@ struct SimplifyForEmitContext : public InstPassBase
                 {
                 case kIROp_MakeStruct:
                 case kIROp_MakeArray:
-                case kIROp_MakeArrayFromElement:
-                    addToFollowUpWorkList(inst);
-                    break;
+                case kIROp_MakeArrayFromElement: addToFollowUpWorkList(inst); break;
                 }
             }
         }
@@ -279,9 +274,7 @@ struct SimplifyForEmitContext : public InstPassBase
             {
                 switch (inst->getOp())
                 {
-                case kIROp_Load:
-                    addToFollowUpWorkList(inst);
-                    break;
+                case kIROp_Load: addToFollowUpWorkList(inst); break;
                 }
             }
         }
@@ -300,9 +293,7 @@ struct SimplifyForEmitContext : public InstPassBase
             {
                 switch (inst->getOp())
                 {
-                case kIROp_Var:
-                    addToFollowUpWorkList(inst);
-                    break;
+                case kIROp_Var: addToFollowUpWorkList(inst); break;
                 }
             }
         }
@@ -322,9 +313,7 @@ struct SimplifyForEmitContext : public InstPassBase
                 switch (inst->getOp())
                 {
                 case kIROp_GetElement:
-                case kIROp_FieldExtract:
-                    addToFollowUpWorkList(inst);
-                    break;
+                case kIROp_FieldExtract: addToFollowUpWorkList(inst); break;
                 }
             }
         }
@@ -370,7 +359,8 @@ struct SimplifyForEmitContext : public InstPassBase
                             if (as<IRBasicType>(inst->getOperand(a)->getDataType()))
                             {
                                 auto v = builder.emitMakeVectorFromScalar(
-                                    inst->getOperand(1 - a)->getDataType(), inst->getOperand(a));
+                                    inst->getOperand(1 - a)->getDataType(),
+                                    inst->getOperand(a));
                                 inst->setOperand(a, v);
                             }
                         }
@@ -382,7 +372,8 @@ struct SimplifyForEmitContext : public InstPassBase
                             if (as<IRBasicType>(inst->getOperand(a)->getDataType()))
                             {
                                 auto v = builder.emitMakeMatrixFromScalar(
-                                    inst->getOperand(1 - a)->getDataType(), inst->getOperand(a));
+                                    inst->getOperand(1 - a)->getDataType(),
+                                    inst->getOperand(a));
                                 inst->setOperand(a, v);
                             }
                         }
@@ -407,20 +398,27 @@ struct SimplifyForEmitContext : public InstPassBase
                 {
                 case kIROp_Call:
                     {
-                        // If we are calling an intrinsic with any vector<T,1> argument, replace it with T.
+                        // If we are calling an intrinsic with any vector<T,1> argument, replace it
+                        // with T.
                         auto callInst = as<IRCall>(inst);
-                        if (getResolvedInstForDecorations(callInst->getCallee())->findDecoration<IRTargetIntrinsicDecoration>())
+                        if (getResolvedInstForDecorations(callInst->getCallee())
+                                ->findDecoration<IRTargetIntrinsicDecoration>())
                         {
                             for (UInt a = 0; a < callInst->getArgCount(); a++)
                             {
                                 auto arg = callInst->getArg(a);
                                 if (auto argVectorType = as<IRVectorType>(arg->getDataType()))
                                 {
-                                    if (cast<IRIntLit>(argVectorType->getElementCount())->getValue() == 1)
+                                    if (cast<IRIntLit>(argVectorType->getElementCount())
+                                            ->getValue() == 1)
                                     {
                                         builder.setInsertBefore(callInst);
                                         UInt idx = 0;
-                                        auto newArg = builder.emitSwizzle(argVectorType->getElementType(), arg, 1, &idx);
+                                        auto newArg = builder.emitSwizzle(
+                                            argVectorType->getElementType(),
+                                            arg,
+                                            1,
+                                            &idx);
                                         callInst->setOperand(a + 1, newArg);
                                     }
                                 }
@@ -459,4 +457,4 @@ void simplifyForEmit(IRModule* module, TargetRequest* targetRequest)
     context.processModule();
 }
 
-}
+} // namespace Slang

@@ -24,9 +24,11 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     m_rayGenTableOffset = 0;
     m_missTableOffset = raygenTableSize;
     m_hitGroupTableOffset = (uint32_t)D3DUtil::calcAligned(
-        m_missTableOffset + missTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+        m_missTableOffset + missTableSize,
+        D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
     m_callableTableOffset = (uint32_t)D3DUtil::calcAligned(
-        m_hitGroupTableOffset + hitgroupTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+        m_hitGroupTableOffset + hitgroupTableSize,
+        D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
     uint32_t tableSize = m_callableTableOffset + callableTableSize;
 
     auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
@@ -47,8 +49,8 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
 
     IBufferResource* stagingBuffer = nullptr;
     Offset stagingBufferOffset = 0;
-    transientHeapImpl->allocateStagingBuffer(
-        tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
+    transientHeapImpl
+        ->allocateStagingBuffer(tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
     assert(stagingBuffer);
     void* stagingPtr = nullptr;

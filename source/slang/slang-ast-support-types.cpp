@@ -1,14 +1,14 @@
 #include "slang-ast-support-types.h"
+
 #include "slang-ast-base.h"
-#include "slang-ast-type.h"
 #include "slang-ast-expr.h"
+#include "slang-ast-type.h"
 #include "slang-check-impl.h"
 
 namespace Slang
 {
 QualType::QualType(Type* type)
-    : type(type)
-    , isLeftValue(false)
+    : type(type), isLeftValue(false)
 {
     if (as<RefType>(type))
     {
@@ -45,7 +45,8 @@ Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLeve
     {
         if (as<BackwardDifferentiateExpr>(expr))
             outLevel = FunctionDifferentiableLevel::Backward;
-        else if (as<ForwardDifferentiateExpr>(expr) && outLevel == FunctionDifferentiableLevel::None)
+        else if (
+            as<ForwardDifferentiateExpr>(expr) && outLevel == FunctionDifferentiableLevel::None)
             outLevel = FunctionDifferentiableLevel::Forward;
         if (workListSet.add(higherOrder))
         {
@@ -69,4 +70,4 @@ UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
     return UnownedStringSlice();
 }
 
-}
+} // namespace Slang

@@ -1,9 +1,9 @@
 // d3d12-transient-heap.cpp
 #include "d3d12-transient-heap.h"
 
-#include "d3d12-device.h"
 #include "d3d12-buffer.h"
 #include "d3d12-command-buffer.h"
+#include "d3d12-device.h"
 
 namespace gfx
 {
@@ -15,7 +15,10 @@ using namespace Slang;
 Result TransientResourceHeapImpl::synchronize()
 {
     WaitForMultipleObjects(
-        (DWORD)m_waitHandles.getCount(), m_waitHandles.getArrayView().getBuffer(), TRUE, INFINITE);
+        (DWORD)m_waitHandles.getCount(),
+        m_waitHandles.getArrayView().getBuffer(),
+        TRUE,
+        INFINITE);
     m_waitHandles.clear();
     return SLANG_OK;
 }
@@ -139,7 +142,8 @@ Result TransientResourceHeapImpl::init(
 
     auto d3dDevice = device->m_device;
     SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
-        D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
+        D3D12_COMMAND_LIST_TYPE_DIRECT,
+        IID_PPV_ARGS(m_commandAllocator.writeRef())));
 
     allocateNewViewDescriptorHeap(device);
     allocateNewSamplerDescriptorHeap(device);

@@ -1,7 +1,6 @@
 // debug-command-buffer.h
 #pragma once
 #include "debug-base.h"
-
 #include "debug-command-encoder.h"
 #include "debug-shader-object.h"
 
@@ -19,6 +18,7 @@ public:
 
 public:
     DebugTransientResourceHeap* m_transientHeap;
+
 private:
     DebugRenderCommandEncoder m_renderCommandEncoder;
     DebugComputeCommandEncoder m_computeCommandEncoder;
@@ -33,11 +33,11 @@ public:
         IFramebuffer* framebuffer,
         IRenderCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeComputeCommands(IComputeCommandEncoder** outEncoder) override;
+    encodeComputeCommands(IComputeCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeResourceCommands(IResourceCommandEncoder** outEncoder) override;
+    encodeResourceCommands(IResourceCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override;
+    encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL close() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
     virtual SLANG_NO_THROW void SLANG_MCALL invalidateDescriptorHeapBinding() override;
@@ -46,6 +46,7 @@ public:
 private:
     void checkEncodersClosedBeforeNewEncoder();
     void checkCommandBufferOpenWhenCreatingEncoder();
+
 public:
     DebugRootShaderObject rootObject;
     bool isOpen = true;

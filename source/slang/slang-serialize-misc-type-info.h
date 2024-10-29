@@ -2,70 +2,94 @@
 #ifndef SLANG_SERIALIZE_MISC_TYPE_INFO_H
 #define SLANG_SERIALIZE_MISC_TYPE_INFO_H
 
-#include "slang-serialize-type-info.h"
-
 #include "../compiler-core/slang-source-loc.h"
 #include "slang-compiler.h"
+#include "slang-serialize-type-info.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* Conversion for serialization for some more misc Slang types
-*/
+ */
 
 
 // Because is sized, we don't need to convert
-template <>
-struct SerialTypeInfo<FeedbackType::Kind> : public SerialIdentityTypeInfo<FeedbackType::Kind> {};
+template<>
+struct SerialTypeInfo<FeedbackType::Kind> : public SerialIdentityTypeInfo<FeedbackType::Kind>
+{
+};
 
 // SamplerStateFlavor
 
-template <>
-struct SerialTypeInfo<SamplerStateFlavor> : public SerialConvertTypeInfo<SamplerStateFlavor, uint8_t> {};
+template<>
+struct SerialTypeInfo<SamplerStateFlavor>
+    : public SerialConvertTypeInfo<SamplerStateFlavor, uint8_t>
+{
+};
 
 // ImageFormat
-template <>
-struct SerialTypeInfo<ImageFormat> : public SerialConvertTypeInfo<ImageFormat, uint8_t> {};
+template<>
+struct SerialTypeInfo<ImageFormat> : public SerialConvertTypeInfo<ImageFormat, uint8_t>
+{
+};
 
 // Stage
-template <>
-struct SerialTypeInfo<Stage> : public SerialConvertTypeInfo<Stage, uint8_t> {};
+template<>
+struct SerialTypeInfo<Stage> : public SerialConvertTypeInfo<Stage, uint8_t>
+{
+};
 
 // TokenType
-template <>
-struct SerialTypeInfo<TokenType> : public SerialConvertTypeInfo<TokenType, uint8_t> {};
+template<>
+struct SerialTypeInfo<TokenType> : public SerialConvertTypeInfo<TokenType, uint8_t>
+{
+};
 
 // BaseType
-template <>
-struct SerialTypeInfo<BaseType> : public SerialConvertTypeInfo<BaseType, uint8_t> {};
+template<>
+struct SerialTypeInfo<BaseType> : public SerialConvertTypeInfo<BaseType, uint8_t>
+{
+};
 
 // SemanticVersion
-template <>
-struct SerialTypeInfo<SemanticVersion> : public SerialIdentityTypeInfo<SemanticVersion> {};
+template<>
+struct SerialTypeInfo<SemanticVersion> : public SerialIdentityTypeInfo<SemanticVersion>
+{
+};
 
 // SourceLoc
 
 // Make the type exposed, so we can look for it if we want to remap.
-template <>
+template<>
 struct SerialTypeInfo<SourceLoc>
 {
     typedef SourceLoc NativeType;
     typedef SerialSourceLoc SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialSourceLoc) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialSourceLoc)
+    };
 
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
-        SerialSourceLocWriter* sourceLocWriter = writer->getExtraObjects().get<SerialSourceLocWriter>();
-        *(SerialType*)outSerial = sourceLocWriter ? sourceLocWriter->addSourceLoc(*(const NativeType*)inNative) : SerialType(0);
+        SerialSourceLocWriter* sourceLocWriter =
+            writer->getExtraObjects().get<SerialSourceLocWriter>();
+        *(SerialType*)outSerial = sourceLocWriter
+                                      ? sourceLocWriter->addSourceLoc(*(const NativeType*)inNative)
+                                      : SerialType(0);
     }
     static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
     {
-        SerialSourceLocReader* sourceLocReader = reader->getExtraObjects().get<SerialSourceLocReader>();
-        *(NativeType*)outNative = sourceLocReader ? sourceLocReader->getSourceLoc(*(const SerialType*)inSerial) : NativeType::fromRaw(0);
+        SerialSourceLocReader* sourceLocReader =
+            reader->getExtraObjects().get<SerialSourceLocReader>();
+        *(NativeType*)outNative = sourceLocReader
+                                      ? sourceLocReader->getSourceLoc(*(const SerialType*)inSerial)
+                                      : NativeType::fromRaw(0);
     }
 };
 
 // Token
-template <>
+template<>
 struct SerialTypeInfo<Token>
 {
     typedef Token NativeType;
@@ -75,7 +99,10 @@ struct SerialTypeInfo<Token>
         SerialTypeInfo<SourceLoc>::SerialType loc;
         SerialIndex name;
     };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -115,7 +142,7 @@ struct SerialTypeInfo<Token>
 };
 
 // NameLoc
-template <>
+template<>
 struct SerialTypeInfo<NameLoc>
 {
     typedef NameLoc NativeType;
@@ -124,7 +151,10 @@ struct SerialTypeInfo<NameLoc>
         SerialTypeInfo<SourceLoc>::SerialType loc;
         SerialIndex name;
     };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -145,13 +175,16 @@ struct SerialTypeInfo<NameLoc>
 };
 
 // DiagnosticInfo
-template <>
+template<>
 struct SerialTypeInfo<const DiagnosticInfo*>
 {
     typedef const DiagnosticInfo* NativeType;
     typedef SerialIndex SerialType;
 
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -176,10 +209,15 @@ struct SerialTypeInfo<const DiagnosticInfo*>
 };
 
 // DeclAssociation
-template <>
-struct SerialTypeInfo<DeclAssociation> : SerialIdentityTypeInfo<DeclAssociation> {};
-template <>
-struct SerialTypeInfo<DeclAssociationKind> : public SerialConvertTypeInfo<DeclAssociationKind, uint8_t> {};
+template<>
+struct SerialTypeInfo<DeclAssociation> : SerialIdentityTypeInfo<DeclAssociation>
+{
+};
+template<>
+struct SerialTypeInfo<DeclAssociationKind>
+    : public SerialConvertTypeInfo<DeclAssociationKind, uint8_t>
+{
+};
 
 } // namespace Slang
 

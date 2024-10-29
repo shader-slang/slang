@@ -1,28 +1,27 @@
 // test-reporter.cpp
 #include "test-reporter.h"
 
-#include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-process-util.h"
+#include "../../source/core/slang-string-util.h"
 
+#include <mutex>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <mutex>
-
 using namespace Slang;
 
-/* static */TestReporter* TestReporter::s_reporter = nullptr;
+/* static */ TestReporter* TestReporter::s_reporter = nullptr;
 
 static void appendXmlEncode(char c, StringBuilder& out)
 {
     switch (c)
     {
-        case '&':   out << "&amp;"; break;
-        case '<':   out << "&lt;"; break;
-        case '>':   out << "&gt;"; break;
-        case '\'':  out << "&apos;"; break;
-        case '"':   out << "&quot;"; break;
-        default:    out.append(c);
+    case '&':  out << "&amp;"; break;
+    case '<':  out << "&lt;"; break;
+    case '>':  out << "&gt;"; break;
+    case '\'': out << "&apos;"; break;
+    case '"':  out << "&quot;"; break;
+    default:   out.append(c);
     }
 }
 
@@ -30,9 +29,9 @@ static bool isXmlEncodeChar(char c)
 {
     switch (c)
     {
-        case '&':
-        case '<':
-        case '>':
+    case '&':
+    case '<':
+    case '>':
         {
             return true;
         }
@@ -69,8 +68,8 @@ static void appendXmlEncode(const String& in, StringBuilder& out)
     }
 }
 
-TestReporter::TestReporter() :
-    m_outputMode(TestOutputMode::Default)
+TestReporter::TestReporter()
+    : m_outputMode(TestOutputMode::Default)
 {
     m_totalTestCount = 0;
     m_passedTestCount = 0;
@@ -84,7 +83,10 @@ TestReporter::TestReporter() :
     m_isVerbose = false;
 }
 
-Result TestReporter::init(TestOutputMode outputMode, const HashSet<String>& expectedFailureList, bool isSubReporter)
+Result TestReporter::init(
+    TestOutputMode outputMode,
+    const HashSet<String>& expectedFailureList,
+    bool isSubReporter)
 {
     m_outputMode = outputMode;
     m_isSubReporter = isSubReporter;
@@ -92,20 +94,18 @@ Result TestReporter::init(TestOutputMode outputMode, const HashSet<String>& expe
     return SLANG_OK;
 }
 
-TestReporter::~TestReporter()
-{
-}
+TestReporter::~TestReporter() {}
 
 bool TestReporter::canWriteStdError() const
 {
     switch (m_outputMode)
     {
-        case TestOutputMode::XUnit:
-        case TestOutputMode::XUnit2:
+    case TestOutputMode::XUnit:
+    case TestOutputMode::XUnit2:
         {
             return false;
         }
-        default: return true;
+    default: return true;
     }
 }
 
@@ -155,7 +155,11 @@ void TestReporter::addExecutionTime(double time)
     m_currentInfo.executionTime = time;
 }
 
-void TestReporter::addResultWithLocation(TestResult result, const char* testText, const char* file, int line)
+void TestReporter::addResultWithLocation(
+    TestResult result,
+    const char* testText,
+    const char* file,
+    int line)
 {
     assert(m_inTest);
 
@@ -167,7 +171,7 @@ void TestReporter::addResultWithLocation(TestResult result, const char* testText
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     if (result != TestResult::Fail)
     {
-        // We don't need to output the result if it 
+        // We don't need to output the result if it
         return;
     }
 
@@ -179,22 +183,31 @@ void TestReporter::addResultWithLocation(TestResult result, const char* testText
         {
             if (m_numFailResults == m_maxFailTestResults + 1)
             {
-                // It's a failure, but to show that there are more than are going to be shown, just show '...'
+                // It's a failure, but to show that there are more than are going to be shown, just
+                // show '...'
                 message(TestMessageType::TestFailure, "...");
             }
             return;
         }
-    } 
+    }
 
     StringBuilder buf;
-    buf <<  testText << " - " << file << " (" << line << ")";
+    buf << testText << " - " << file << " (" << line << ")";
 
     message(TestMessageType::TestFailure, buf);
 }
 
-void TestReporter::addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line)
+void TestReporter::addResultWithLocation(
+    bool testSucceeded,
+    const char* testText,
+    const char* file,
+    int line)
 {
-    addResultWithLocation(testSucceeded ? TestResult::Pass : TestResult::Fail, testText, file, line);
+    addResultWithLocation(
+        testSucceeded ? TestResult::Pass : TestResult::Fail,
+        testText,
+        file,
+        line);
 }
 
 TestResult TestReporter::addTest(const String& testName, bool isPass)
@@ -218,7 +231,8 @@ void TestReporter::dumpOutputDifference(const String& expectedOutput, const Stri
 {
     StringBuilder builder;
 
-    StringUtil::appendFormat(builder,
+    StringUtil::appendFormat(
+        builder,
         "ERROR:\n"
         "EXPECTED{{{\n%s}}}\n"
         "ACTUAL{{{\n%s}}}\n",
@@ -233,13 +247,13 @@ static char _getTeamCityEscapeChar(char c)
 {
     switch (c)
     {
-        case '|':   return '|';
-        case '\'':  return '\''; 
-        case '\n':  return 'n';
-        case '\r':  return 'r'; 
-        case '[':   return '[';
-        case ']':   return ']';
-        default:    return 0;
+    case '|':  return '|';
+    case '\'': return '\'';
+    case '\n': return 'n';
+    case '\r': return 'r';
+    case '[':  return '[';
+    case ']':  return ']';
+    default:   return 0;
     }
 }
 
@@ -248,7 +262,7 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
     const char* start = in.begin();
     const char* cur = start;
     const char* end = in.end();
-    
+
     for (const char* cur = start; cur < end; cur++)
     {
         const char c = *cur;
@@ -265,7 +279,7 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
             builder.append(escapeChar);
             start = cur + 1;
         }
-    }    
+    }
 
     // Flush the end
     if (end > start)
@@ -311,24 +325,14 @@ void TestReporter::_addResult(TestInfo info)
 
     switch (info.testResult)
     {
-        case TestResult::Fail:
-            m_failedTestCount++;
-            break;
+    case TestResult::Fail: m_failedTestCount++; break;
 
-        case TestResult::Pass:
-            m_passedTestCount++;
-            break;
-        case TestResult::ExpectedFail:
-            m_expectedFailedTestCount++;
-            break;
+    case TestResult::Pass:         m_passedTestCount++; break;
+    case TestResult::ExpectedFail: m_expectedFailedTestCount++; break;
 
-        case TestResult::Ignored:
-            m_ignoredTestCount++;
-            break;
+    case TestResult::Ignored: m_ignoredTestCount++; break;
 
-        default:
-            assert(!"unexpected");
-            break;
+    default: assert(!"unexpected"); break;
     }
 
     m_testInfos.add(info);
@@ -338,21 +342,11 @@ void TestReporter::_addResult(TestInfo info)
         char const* resultString = "UNEXPECTED";
         switch (info.testResult)
         {
-        case TestResult::Fail:
-            resultString = "FAILED";
-            break;
-        case TestResult::ExpectedFail:
-            resultString = "failed(expected)";
-            break;
-        case TestResult::Pass:
-            resultString = "passed";
-            break;
-        case TestResult::Ignored:
-            resultString = "ignored";
-            break;
-        default:
-            assert(!"unexpected");
-            break;
+        case TestResult::Fail:         resultString = "FAILED"; break;
+        case TestResult::ExpectedFail: resultString = "failed(expected)"; break;
+        case TestResult::Pass:         resultString = "passed"; break;
+        case TestResult::Ignored:      resultString = "ignored"; break;
+        default:                       assert(!"unexpected"); break;
         }
 
         StringBuilder buffer;
@@ -360,18 +354,22 @@ void TestReporter::_addResult(TestInfo info)
         {
             _appendTime(info.executionTime, buffer);
         }
-        printf("%s test: '%S' %s\n", resultString, info.name.toWString().begin(), buffer.getBuffer());
+        printf(
+            "%s test: '%S' %s\n",
+            resultString,
+            info.name.toWString().begin(),
+            buffer.getBuffer());
         fflush(stdout);
     };
 
     switch (m_outputMode)
     {
-        default:
+    default:
         {
             defaultOutputFunc(info);
             break;
         }
-        case TestOutputMode::TeamCity:
+    case TestOutputMode::TeamCity:
         {
             StringBuilder escapedTestName;
             _appendEncodedTeamCityString(info.name.getUnownedSlice(), escapedTestName);
@@ -380,13 +378,18 @@ void TestReporter::_addResult(TestInfo info)
 
             switch (info.testResult)
             {
-                case TestResult::Fail:      
+            case TestResult::Fail:
                 {
                     if (info.message.getLength())
                     {
                         StringBuilder escapedMessage;
-                        _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);            
-                        printf("##teamcity[testFailed name='%s' message='%s']\n", escapedTestName.begin(), escapedMessage.begin());
+                        _appendEncodedTeamCityString(
+                            info.message.getUnownedSlice(),
+                            escapedMessage);
+                        printf(
+                            "##teamcity[testFailed name='%s' message='%s']\n",
+                            escapedTestName.begin(),
+                            escapedMessage.begin());
                     }
                     else
                     {
@@ -394,8 +397,8 @@ void TestReporter::_addResult(TestInfo info)
                     }
                     break;
                 }
-                case TestResult::Pass:
-                case TestResult::ExpectedFail:
+            case TestResult::Pass:
+            case TestResult::ExpectedFail:
                 {
                     StringBuilder message;
                     message << info.message;
@@ -413,18 +416,26 @@ void TestReporter::_addResult(TestInfo info)
                     {
                         StringBuilder escapedMessage;
                         _appendEncodedTeamCityString(message.getUnownedSlice(), escapedMessage);
-                        printf("##teamcity[testStdOut name='%s' out='%s']\n", escapedTestName.begin(), escapedMessage.begin());
-                    }                    
+                        printf(
+                            "##teamcity[testStdOut name='%s' out='%s']\n",
+                            escapedTestName.begin(),
+                            escapedMessage.begin());
+                    }
                     break;
                 }
-                case TestResult::Ignored:  
+            case TestResult::Ignored:
                 {
                     if (info.message.getLength())
                     {
                         StringBuilder escapedMessage;
-                        _appendEncodedTeamCityString(info.message.getUnownedSlice(), escapedMessage);
+                        _appendEncodedTeamCityString(
+                            info.message.getUnownedSlice(),
+                            escapedMessage);
 
-                        printf("##teamcity[testIgnored name='%s' message='%s']\n", escapedTestName.begin(), escapedMessage.begin());
+                        printf(
+                            "##teamcity[testIgnored name='%s' message='%s']\n",
+                            escapedTestName.begin(),
+                            escapedMessage.begin());
                     }
                     else
                     {
@@ -432,34 +443,30 @@ void TestReporter::_addResult(TestInfo info)
                     }
                     break;
                 }
-                default:
-                    assert(!"unexpected");
-                    break;
+            default: assert(!"unexpected"); break;
             }
 
             printf("##teamcity[testFinished name='%s']\n", escapedTestName.begin());
             fflush(stdout);
             break;
         }
-        case TestOutputMode::XUnit2:
-        case TestOutputMode::XUnit:
+    case TestOutputMode::XUnit2:
+    case TestOutputMode::XUnit:
         {
             // Don't output anything -> we'll output all in one go at the end
             break;
         }
-        case TestOutputMode::AppVeyor:
+    case TestOutputMode::AppVeyor:
         {
             char const* resultString = "None";
             switch (info.testResult)
             {
-                case TestResult::Fail:      resultString = "Failed";  break;
-                case TestResult::Pass:      resultString = "Passed";  break;
-                case TestResult::Ignored:   resultString = "Ignored"; break;
-                case TestResult::ExpectedFail:   resultString = "ExpectedFail"; break;
+            case TestResult::Fail:         resultString = "Failed"; break;
+            case TestResult::Pass:         resultString = "Passed"; break;
+            case TestResult::Ignored:      resultString = "Ignored"; break;
+            case TestResult::ExpectedFail: resultString = "ExpectedFail"; break;
 
-                default:
-                    assert(!"unexpected");
-                    break;
+            default: assert(!"unexpected"); break;
             }
 
             // https://www.appveyor.com/docs/build-worker-api/#add-tests
@@ -487,10 +494,13 @@ void TestReporter::_addResult(TestInfo info)
 
             ExecuteResult exeRes;
             SlangResult res = ProcessUtil::execute(cmdLine, exeRes);
-            
+
             if (SLANG_FAILED(res))
             {
-                messageFormat(TestMessageType::Info, "failed to add appveyor test results for '%S'\n", info.name.toWString().begin());
+                messageFormat(
+                    TestMessageType::Info,
+                    "failed to add appveyor test results for '%S'\n",
+                    info.name.toWString().begin());
 
 #if 0
                 String cmdLineString = ProcessUtil::getCommandLineString(cmdLine);
@@ -587,7 +597,7 @@ void TestReporter::outputSummary()
 
     switch (m_outputMode)
     {
-        default:
+    default:
         {
             if (!m_totalTestCount)
             {
@@ -638,34 +648,48 @@ void TestReporter::outputSummary()
                 }
                 printf("---\n");
             }
-            
+
             break;
         }
-        
-        case TestOutputMode::XUnit:
+
+    case TestOutputMode::XUnit:
         {
-            // xUnit 1.0 format  
+            // xUnit 1.0 format
 
             printf("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-            printf("<testsuites tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" name=\"AllTests\">\n", m_totalTestCount, m_failedTestCount, m_ignoredTestCount);
-            printf("  <testsuite name=\"all\" tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" time=\"0\">\n", m_totalTestCount, m_failedTestCount, m_ignoredTestCount);
+            printf(
+                "<testsuites tests=\"%d\" failures=\"%d\" disabled=\"%d\" errors=\"0\" "
+                "name=\"AllTests\">\n",
+                m_totalTestCount,
+                m_failedTestCount,
+                m_ignoredTestCount);
+            printf(
+                "  <testsuite name=\"all\" tests=\"%d\" failures=\"%d\" disabled=\"%d\" "
+                "errors=\"0\" time=\"0\">\n",
+                m_totalTestCount,
+                m_failedTestCount,
+                m_ignoredTestCount);
 
             for (const auto& testInfo : m_testInfos)
             {
                 const int numFailed = (testInfo.testResult == TestResult::Fail);
                 const int numIgnored = (testInfo.testResult == TestResult::Ignored);
-                //int numPassed = (testInfo.testResult == TestResult::ePass);
+                // int numPassed = (testInfo.testResult == TestResult::ePass);
 
                 if (testInfo.testResult == TestResult::Pass)
                 {
-                    printf("    <testcase name=\"%s\" status=\"run\"/>\n", testInfo.name.getBuffer());
+                    printf(
+                        "    <testcase name=\"%s\" status=\"run\"/>\n",
+                        testInfo.name.getBuffer());
                 }
                 else
                 {
-                    printf("    <testcase name=\"%s\" status=\"run\">\n", testInfo.name.getBuffer());
+                    printf(
+                        "    <testcase name=\"%s\" status=\"run\">\n",
+                        testInfo.name.getBuffer());
                     switch (testInfo.testResult)
                     {
-                        case TestResult::Fail:
+                    case TestResult::Fail:
                         {
                             StringBuilder buf;
                             appendXmlEncode(testInfo.message, buf);
@@ -675,12 +699,12 @@ void TestReporter::outputSummary()
                             printf("      </error>\n");
                             break;
                         }
-                        case TestResult::Ignored:
+                    case TestResult::Ignored:
                         {
                             printf("      <skip>Ignored</skip>\n");
                             break;
                         }
-                        default: break;
+                    default: break;
                     }
                     printf("    </testcase>\n");
                 }
@@ -690,13 +714,13 @@ void TestReporter::outputSummary()
             printf("</testSuites>\n");
             break;
         }
-        case TestOutputMode::XUnit2:
+    case TestOutputMode::XUnit2:
         {
             // https://xunit.github.io/docs/format-xml-v2
             assert("Not currently supported");
             break;
         }
-        case TestOutputMode::TeamCity:
+    case TestOutputMode::TeamCity:
         {
             // Don't output a summary
             break;
@@ -710,7 +734,7 @@ void TestReporter::startSuite(const String& name)
 
     switch (m_outputMode)
     {
-        case TestOutputMode::TeamCity:
+    case TestOutputMode::TeamCity:
         {
             if (!m_isSubReporter)
             {
@@ -720,7 +744,7 @@ void TestReporter::startSuite(const String& name)
             }
             break;
         }
-        default: break;
+    default: break;
     }
 }
 
@@ -730,7 +754,7 @@ void TestReporter::endSuite()
 
     switch (m_outputMode)
     {
-        case TestOutputMode::TeamCity:
+    case TestOutputMode::TeamCity:
         {
             if (!m_isSubReporter)
             {
@@ -741,9 +765,9 @@ void TestReporter::endSuite()
             }
             break;
         }
-        default: break;
+    default: break;
     }
-    
+
     m_suiteStack.removeLast();
 }
 

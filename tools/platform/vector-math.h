@@ -4,12 +4,13 @@
 // We will use the GLM library for our vector math types, just for simplicity.
 
 #include "../../external/glm/glm/glm.hpp"
-#include "../../external/glm/glm/gtc/matrix_transform.hpp"
 #include "../../external/glm/glm/gtc/constants.hpp"
+#include "../../external/glm/glm/gtc/matrix_transform.hpp"
 #include "../../external/glm/glm/gtc/quaternion.hpp"
 
-namespace gfx {
+namespace gfx
+{
 
 using namespace glm;
 
-} // gfx
+} // namespace gfx

@@ -2,12 +2,11 @@
 
 // Logic for resolving/simplifying Types and DeclRefs.
 
+#include "slang-ast-reflect.h"
+#include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
-
 #include "slang-lookup.h"
 #include "slang-syntax.h"
-#include "slang-ast-synthesis.h"
-#include "slang-ast-reflect.h"
 
 namespace Slang
 {
@@ -32,7 +31,8 @@ Type* DeclRefType::_createCanonicalTypeOverride()
     // A declaration reference is already canonical
     auto resolvedDeclRef = getDeclRef();
     resolvedDeclRef = _resolveAsDeclRef(getDeclRef().declRefBase);
-    if (auto satisfyingVal = _tryLookupConcreteAssociatedTypeFromThisTypeSubst(astBuilder, resolvedDeclRef))
+    if (auto satisfyingVal =
+            _tryLookupConcreteAssociatedTypeFromThisTypeSubst(astBuilder, resolvedDeclRef))
         return as<Type>(satisfyingVal);
     if (resolvedDeclRef != getDeclRef())
         return DeclRefType::create(astBuilder, resolvedDeclRef);
@@ -55,4 +55,4 @@ ConversionCost SubtypeWitness::getOverloadResolutionCost()
     SLANG_AST_NODE_VIRTUAL_CALL(SubtypeWitness, getOverloadResolutionCost, ());
 }
 
-}
+} // namespace Slang

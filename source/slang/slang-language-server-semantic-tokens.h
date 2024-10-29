@@ -1,17 +1,27 @@
 #pragma once
 
-#include "slang.h"
 #include "../core/slang-basic.h"
 #include "slang-ast-all.h"
-#include "slang-syntax.h"
 #include "slang-compiler.h"
+#include "slang-syntax.h"
 #include "slang-workspace-version.h"
+#include "slang.h"
 
 namespace Slang
 {
 enum class SemanticTokenType
 {
-    Type, EnumMember, Variable, Parameter, Function, Property, Namespace, Keyword, Macro, String, NormalText
+    Type,
+    EnumMember,
+    Variable,
+    Parameter,
+    Function,
+    Property,
+    Namespace,
+    Keyword,
+    Macro,
+    String,
+    NormalText
 };
 extern const char* kSemanticTokenTypes[(int)SemanticTokenType::NormalText];
 
@@ -31,7 +41,10 @@ struct SemanticToken
     }
 };
 List<SemanticToken> getSemanticTokens(
-    Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc);
+    Linkage* linkage,
+    Module* module,
+    UnownedStringSlice fileName,
+    DocumentVersion* doc);
 List<uint32_t> getEncodedTokens(List<SemanticToken>& tokens);
 
 } // namespace Slang

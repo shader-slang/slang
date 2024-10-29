@@ -1,3 +1,6 @@
 // #include support
 
-int bar() { return foo(); }
+int bar()
+{
+    return foo();
+}

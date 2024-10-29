@@ -1,35 +1,28 @@
 // slang-dxc-compiler.cpp
 #include "slang-dxc-compiler.h"
 
-#include "../core/slang-common.h"
-#include "slang-com-helper.h"
-
 #include "../core/slang-blob.h"
-
-#include "../core/slang-string-util.h"
-#include "../core/slang-string-slice-pool.h"
-
-#include "../core/slang-io.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
-
+#include "../core/slang-common.h"
+#include "../core/slang-io.h"
+#include "../core/slang-semantic-version.h"
+#include "../core/slang-shared-library.h"
+#include "../core/slang-string-slice-pool.h"
+#include "../core/slang-string-util.h"
+#include "slang-artifact-associated-impl.h"
+#include "slang-artifact-desc-util.h"
+#include "slang-artifact-diagnostic-util.h"
+#include "slang-artifact-util.h"
+#include "slang-com-helper.h"
 #include "slang-include-system.h"
 #include "slang-source-loc.h"
-
-#include "../core/slang-shared-library.h"
-
-#include "slang-artifact-associated-impl.h"
-#include "slang-artifact-util.h"
-#include "slang-artifact-diagnostic-util.h"
-#include "slang-artifact-desc-util.h"
 
 // Enable DXIL by default unless told not to
 #ifndef SLANG_ENABLE_DXIL_SUPPORT
 #if SLANG_APPLE_FAMILY
-#   define SLANG_ENABLE_DXIL_SUPPORT 0
+#define SLANG_ENABLE_DXIL_SUPPORT 0
 #else
-#   define SLANG_ENABLE_DXIL_SUPPORT 1
+#define SLANG_ENABLE_DXIL_SUPPORT 1
 #endif
 #endif
 
@@ -37,15 +30,15 @@
 // generate code on Windows.
 #if SLANG_ENABLE_DXIL_SUPPORT
 
-#    ifdef _WIN32
-#        include <unknwn.h>
-#        include <windows.h>
-#    endif
+#ifdef _WIN32
+#include <unknwn.h>
+#include <windows.h>
+#endif
 
-#    include "../../external/dxc/dxcapi.h"
+#include "../../external/dxc/dxcapi.h"
 
-#    ifndef _WIN32
-#        ifdef __uuidof
+#ifndef _WIN32
+#ifdef __uuidof
 // DXC's WinAdapter.h defines __uuidof(T) over types, but the existing
 // usage in this file is over values (both are accepted on MSVC.)
 // We also need to decay through Slang::ComPtr, hence the helper struct
@@ -59,11 +52,10 @@ struct StripSlangComPtr<Slang::ComPtr<T>>
 {
     using type = T;
 };
-#            undef __uuidof
-#            define __uuidof(x) \
-                __emulated_uuidof<StripSlangComPtr<std::decay_t<decltype(x)>>::type>()
-#        endif
-#    endif
+#undef __uuidof
+#define __uuidof(x) __emulated_uuidof<StripSlangComPtr<std::decay_t<decltype(x)>>::type>()
+#endif
+#endif
 #endif
 
 namespace Slang
@@ -71,11 +63,15 @@ namespace Slang
 
 #if SLANG_ENABLE_DXIL_SUPPORT
 
-static UnownedStringSlice _getSlice(IDxcBlob* blob) { return StringUtil::getSlice((ISlangBlob*)blob); }
+static UnownedStringSlice _getSlice(IDxcBlob* blob)
+{
+    return StringUtil::getSlice((ISlangBlob*)blob);
+}
 
 // IDxcIncludeHandler
 // 7f61fc7d-950d-467f-b3e3-3c02fb49187c
-static const Guid IID_IDxcIncludeHandler = { 0x7f61fc7d, 0x950d, 0x467f, { 0x3c, 0x02, 0xfb, 0x49, 0x18, 0x7c } };
+static const Guid IID_IDxcIncludeHandler =
+    {0x7f61fc7d, 0x950d, 0x467f, {0x3c, 0x02, 0xfb, 0x49, 0x18, 0x7c}};
 
 static UnownedStringSlice _addName(const UnownedStringSlice& inSlice, StringSlicePool& pool)
 {
@@ -89,10 +85,10 @@ static UnownedStringSlice _addName(const UnownedStringSlice& inSlice, StringSlic
     const Index length = slice.getLength();
     buf << slice;
 
-    for (Index i = 0; ; ++i)
+    for (Index i = 0;; ++i)
     {
         buf.reduceLength(length);
-    
+
         if (i > 0)
         {
             buf << "_" << i;
@@ -131,8 +127,8 @@ public:
     // Implement IDxcIncludeHandler
     virtual HRESULT SLANG_MCALL LoadSource(LPCWSTR inFilename, IDxcBlob** outSource) SLANG_OVERRIDE
     {
-        // Hmm DXC does something a bit odd - when it sees a path, it just passes that in with ./ in front!!
-        // NOTE! It doesn't make any difference if it is "" or <> quoted.
+        // Hmm DXC does something a bit odd - when it sees a path, it just passes that in with ./ in
+        // front!! NOTE! It doesn't make any difference if it is "" or <> quoted.
 
         // So we just do a work around where we strip if we see a path starting with ./
         String filePath = String::fromWString(inFilename);
@@ -141,9 +137,9 @@ public:
         if (filePath.startsWith("./"))
         {
             const String remaining = filePath.getUnownedSlice().tail(2);
-            
-            // Okay if we strip ./ and what we have is absolute, then it's the absolute path that we care about,
-            // otherwise we just leave as is.
+
+            // Okay if we strip ./ and what we have is absolute, then it's the absolute path that we
+            // care about, otherwise we just leave as is.
             if (Path::isAbsolute(remaining))
             {
                 filePath = remaining;
@@ -160,13 +156,15 @@ public:
         return res;
     }
 
-    DxcIncludeHandler(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager = nullptr) :
-        m_system(searchDirectories, fileSystemExt, sourceManager)
+    DxcIncludeHandler(
+        SearchDirectoryList* searchDirectories,
+        ISlangFileSystemExt* fileSystemExt,
+        SourceManager* sourceManager = nullptr)
+        : m_system(searchDirectories, fileSystemExt, sourceManager)
     {
     }
 
 protected:
-
     // Used by QueryInterface for casting
     ISlangUnknown* getInterface(const Guid& guid)
     {
@@ -176,7 +174,7 @@ protected:
         }
         return nullptr;
     }
-    
+
     IncludeSystem m_system;
 };
 
@@ -186,11 +184,15 @@ public:
     typedef DownstreamCompilerBase Super;
 
     // IDownstreamCompiler
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL
+    canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
+        SLANG_OVERRIDE;
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -198,13 +200,12 @@ public:
     DXCDownstreamCompiler() {}
 
 protected:
-
     DxcCreateInstanceProc m_createInstance = nullptr;
 
-        /// The commit hash associated with the DXC dll used
-        /// If 0 length, no hash was found
-    String m_commitHash;            
-        /// The commit count. 0 if not set
+    /// The commit hash associated with the DXC dll used
+    /// If 0 length, no hash was found
+    String m_commitHash;
+    /// The commit count. 0 if not set
     uint32_t m_commitCount = 0;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
@@ -231,10 +232,13 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
         return SLANG_FAIL;
     }
 
-    // Must be able to create the compiler. We inly do this here, because we want to get the compiler 
-    // version.
+    // Must be able to create the compiler. We inly do this here, because we want to get the
+    // compiler version.
     ComPtr<IDxcCompiler> dxcCompiler;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+    SLANG_RETURN_ON_FAIL(m_createInstance(
+        CLSID_DxcCompiler,
+        __uuidof(dxcCompiler),
+        (LPVOID*)dxcCompiler.writeRef()));
 
     uint32_t major = 0;
     uint32_t minor = 0;
@@ -277,12 +281,13 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
             StringBuilder buf;
             semanticVersion.append(buf);
 
-            if (customVersionString.startsWith(buf) && 
+            if (customVersionString.startsWith(buf) &&
                 customVersionString.getLength() > buf.getLength() + 2 &&
                 customVersionString[buf.getLength()] == '.')
             {
                 // Get the patch slice
-                UnownedStringSlice patchSlice = StringUtil::getAtInSplit(customVersionString.getUnownedSlice(), '.', 2);
+                UnownedStringSlice patchSlice =
+                    StringUtil::getAtInSplit(customVersionString.getUnownedSlice(), '.', 2);
 
                 Int patchValue;
                 if (SLANG_SUCCEEDED(StringUtil::parseInt(patchSlice, patchValue)) && patchValue > 0)
@@ -298,7 +303,11 @@ SlangResult DXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, IArtifactDiagnostics::Diagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& line,
+    List<UnownedStringSlice>& lineSlices,
+    IArtifactDiagnostics::Diagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
     if (lineSlices.getCount() < 5)
@@ -310,8 +319,8 @@ static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const Unowned
 
     SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[1], outDiagnostic.location.line));
 
-    //Int lineCol;
-    //SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], lineCol));
+    // Int lineCol;
+    // SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], lineCol));
 
     UnownedStringSlice severitySlice = lineSlices[3].trim();
 
@@ -326,7 +335,10 @@ static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const Unowned
     return SLANG_OK;
 }
 
-static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtifactDiagnostics* diagnostics, ComPtr<IDxcBlob>& outBlob)
+static SlangResult _handleOperationResult(
+    IDxcOperationResult* dxcResult,
+    IArtifactDiagnostics* diagnostics,
+    ComPtr<IDxcBlob>& outBlob)
 {
     // Retrieve result.
     HRESULT resultCode = S_OK;
@@ -355,7 +367,12 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
 
             SliceAllocator allocator;
             List<IArtifactDiagnostics::Diagnostic> parsedDiagnostics;
-            SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticsSlice, 0, _parseDiagnosticLine, diagnostics);
+            SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(
+                allocator,
+                diagnosticsSlice,
+                0,
+                _parseDiagnosticLine,
+                diagnostics);
 
             SLANG_UNUSED(diagnosticParseRes);
             SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
@@ -365,7 +382,8 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
     // If it failed, make sure we have an error in the diagnostics
     if (SLANG_FAILED(resultCode))
     {
-        // In case the parsing failed, we still have an error -> so require there is one in the diagnostics
+        // In case the parsing failed, we still have an error -> so require there is one in the
+        // diagnostics
         diagnostics->requireErrorDiagnostic();
     }
     else
@@ -380,7 +398,7 @@ static SlangResult _handleOperationResult(IDxcOperationResult* dxcResult, IArtif
 
 SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
 {
-    if (!isVersionCompatible(inOptions)) 
+    if (!isVersionCompatible(inOptions))
     {
         // Not possible to compile with this version of the interface.
         return SLANG_E_NOT_IMPLEMENTED;
@@ -389,7 +407,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     CompileOptions options = getCompatibleVersion(&inOptions);
 
     // This compiler can only deal at most, a single source code artifact
-    // Should be okay to link together multiple libraries without any source artifacts (assuming that means source code)
+    // Should be okay to link together multiple libraries without any source artifacts (assuming
+    // that means source code)
     if (options.sourceArtifacts.count > 1)
     {
         return SLANG_FAIL;
@@ -401,7 +420,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     if (hasSource)
     {
-        if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_HLSL || options.targetType != SLANG_DXIL)
+        if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_HLSL ||
+            options.targetType != SLANG_DXIL)
         {
             SLANG_ASSERT(!"Can only compile HLSL to DXIL");
             return SLANG_FAIL;
@@ -425,9 +445,13 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     }
 
     ComPtr<IDxcCompiler> dxcCompiler;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+    SLANG_RETURN_ON_FAIL(m_createInstance(
+        CLSID_DxcCompiler,
+        __uuidof(dxcCompiler),
+        (LPVOID*)dxcCompiler.writeRef()));
     ComPtr<IDxcLibrary> dxcLibrary;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef()));
 
     ComPtr<IDxcBlobEncoding> dxcSourceBlob = nullptr;
     ComPtr<ISlangBlob> sourceBlob;
@@ -464,45 +488,36 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     switch (options.matrixLayout)
     {
-        default:
-            break;
+    default: break;
 
-        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
-            args.add(L"-Zpr");
-            break;
+    case SLANG_MATRIX_LAYOUT_ROW_MAJOR: args.add(L"-Zpr"); break;
     }
 
     switch (options.floatingPointMode)
     {
-        default:
-            break;
+    default: break;
 
-        case FloatingPointMode::Precise:
-            args.add(L"-Gis"); // "force IEEE strictness"
-            break;
+    case FloatingPointMode::Precise:
+        args.add(L"-Gis"); // "force IEEE strictness"
+        break;
     }
-
 
 
     switch (options.optimizationLevel)
     {
-        default:
-            break;
+    default: break;
 
-        case OptimizationLevel::None:       args.add(L"-Od"); break;
-        case OptimizationLevel::Default:    args.add(L"-O1"); break;
-        case OptimizationLevel::High:       args.add(L"-O2"); break;
-        case OptimizationLevel::Maximal:    args.add(L"-O3"); break;
+    case OptimizationLevel::None:    args.add(L"-Od"); break;
+    case OptimizationLevel::Default: args.add(L"-O1"); break;
+    case OptimizationLevel::High:    args.add(L"-O2"); break;
+    case OptimizationLevel::Maximal: args.add(L"-O3"); break;
     }
 
     switch (options.debugInfoType)
     {
-        case DebugInfoType::None:
-            break;
+    case DebugInfoType::None: break;
 
-        default:
-            args.add(L"-Zi");
-            break;
+    default: args.add(L"-Zi"); break;
     }
 
     // Slang strives to produce correct code, and by default
@@ -556,9 +571,9 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         searchDirectories.searchDirectories.add(asString(includePath));
     }
 
-    // TODO(JS): 
-    // We don't want to enable HLSL2021 on DXC by default even if it's available because it has
-    // changes that break things. Such as with operator ?:. So for now we disable.
+// TODO(JS):
+// We don't want to enable HLSL2021 on DXC by default even if it's available because it has
+// changes that break things. Such as with operator ?:. So for now we disable.
 #if 0
     // TODO(JS): Enable in a better way perhaps?
     {
@@ -586,27 +601,33 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         sourcePath = ArtifactUtil::findPath(sourceArtifact);
         OSString wideSourcePath = sourcePath.toWString();
 
-        DxcIncludeHandler includeHandler(&searchDirectories, options.fileSystemExt, options.sourceManager);
+        DxcIncludeHandler includeHandler(
+            &searchDirectories,
+            options.fileSystemExt,
+            options.sourceManager);
 
-        SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
+        SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(
+            dxcSourceBlob,
             wideSourcePath.begin(),
             wideEntryPointName.begin(),
             wideProfileName.begin(),
             args.getBuffer(),
             UINT32(args.getCount()),
-            nullptr,            // `#define`s
-            0,                  // `#define` count
-            &includeHandler,    // `#include` handler
+            nullptr,         // `#define`s
+            0,               // `#define` count
+            &includeHandler, // `#include` handler
             dxcOperationResult.writeRef()));
 
-        SLANG_RETURN_ON_FAIL(_handleOperationResult(dxcOperationResult, diagnostics, dxcResultBlob));
+        SLANG_RETURN_ON_FAIL(
+            _handleOperationResult(dxcOperationResult, diagnostics, dxcResultBlob));
     }
 
     // If we have libraries then we need to link...
     if (libraries.getCount())
     {
         ComPtr<IDxcLinker> linker;
-        SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLinker, __uuidof(linker), (void**)linker.writeRef()));
+        SLANG_RETURN_ON_FAIL(
+            m_createInstance(CLSID_DxcLinker, __uuidof(linker), (void**)linker.writeRef()));
 
         StringSlicePool pool(StringSlicePool::Style::Default);
 
@@ -648,22 +669,30 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         SLANG_ASSERT(libraryNames.getCount() == librariesCount);
 
         List<const wchar_t*> linkLibraryNames;
-        
+
         linkLibraryNames.setCount(librariesCount);
-        
+
         for (Index i = 0; i < librariesCount; ++i)
         {
             linkLibraryNames[i] = libraryNames[i].begin();
 
             // Register the library
-            SLANG_RETURN_ON_FAIL(linker->RegisterLibrary(linkLibraryNames[i], (IDxcBlob*)libraryBlobs[i].get()));
+            SLANG_RETURN_ON_FAIL(
+                linker->RegisterLibrary(linkLibraryNames[i], (IDxcBlob*)libraryBlobs[i].get()));
         }
 
         // Use the original profile name
         wideProfileName = asString(options.profileName).toWString();
 
         ComPtr<IDxcOperationResult> linkDxcResult;
-        SLANG_RETURN_ON_FAIL(linker->Link(wideEntryPointName.begin(), wideProfileName.begin(), linkLibraryNames.getBuffer(), UINT32(librariesCount), nullptr, 0, linkDxcResult.writeRef()));
+        SLANG_RETURN_ON_FAIL(linker->Link(
+            wideEntryPointName.begin(),
+            wideProfileName.begin(),
+            linkLibraryNames.getBuffer(),
+            UINT32(librariesCount),
+            nullptr,
+            0,
+            linkDxcResult.writeRef()));
 
         ComPtr<IDxcBlob> linkedBlob;
         SLANG_RETURN_ON_FAIL(_handleOperationResult(linkDxcResult, diagnostics, linkedBlob));
@@ -696,9 +725,15 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
                 ComPtr<IDxcBlob> pdbBlob;
                 ComPtr<IDxcBlobWide> nameBlob;
 
-                if (SLANG_SUCCEEDED(dxcResult->GetOutput(DXC_OUT_PDB, __uuidof(pdbBlob), (void**)pdbBlob.writeRef(), nameBlob.writeRef())))
+                if (SLANG_SUCCEEDED(dxcResult->GetOutput(
+                        DXC_OUT_PDB,
+                        __uuidof(pdbBlob),
+                        (void**)pdbBlob.writeRef(),
+                        nameBlob.writeRef())))
                 {
-                    auto pdbArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactDesc::Kind::BinaryFormat, ArtifactDesc::Payload::PdbDebugInfo));
+                    auto pdbArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+                        ArtifactDesc::Kind::BinaryFormat,
+                        ArtifactDesc::Payload::PdbDebugInfo));
 
                     if (nameBlob)
                     {
@@ -707,7 +742,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
                         const auto name = String::fromWString(wideName);
                         if (name.getLength())
                         {
-                            // Set the name on the artifact. This is the name that must be used for the PDB to be loadable as a file by other tooling.
+                            // Set the name on the artifact. This is the name that must be used for
+                            // the PDB to be loadable as a file by other tooling.
                             pdbArtifact->setName(name.getBuffer());
                         }
                     }
@@ -730,7 +766,10 @@ bool DXCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactD
     return ArtifactDescUtil::isDisassembly(from, to) && from.payload == ArtifactPayload::DXIL;
 }
 
-SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 
+SlangResult DXCDownstreamCompiler::convert(
+    IArtifact* from,
+    const ArtifactDesc& to,
+    IArtifact** outArtifact)
 {
     // Can only disassemble blobs that are DXIL
     if (!canConvert(from->getDesc(), to))
@@ -742,13 +781,21 @@ SlangResult DXCDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& 
     SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, dxilBlob.writeRef()));
 
     ComPtr<IDxcCompiler> dxcCompiler;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcCompiler, __uuidof(dxcCompiler), (LPVOID*)dxcCompiler.writeRef()));
+    SLANG_RETURN_ON_FAIL(m_createInstance(
+        CLSID_DxcCompiler,
+        __uuidof(dxcCompiler),
+        (LPVOID*)dxcCompiler.writeRef()));
     ComPtr<IDxcLibrary> dxcLibrary;
-    SLANG_RETURN_ON_FAIL(m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        m_createInstance(CLSID_DxcLibrary, __uuidof(dxcLibrary), (LPVOID*)dxcLibrary.writeRef()));
 
     // Create blob from the input data
     ComPtr<IDxcBlobEncoding> dxcSourceBlob;
-    SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)dxilBlob->getBufferPointer(), (UINT32)dxilBlob->getBufferSize(), 0, dxcSourceBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL(dxcLibrary->CreateBlobWithEncodingFromPinned(
+        (LPBYTE)dxilBlob->getBufferPointer(),
+        (UINT32)dxilBlob->getBufferSize(),
+        0,
+        dxcSourceBlob.writeRef()));
 
     ComPtr<IDxcBlobEncoding> dxcResultBlob;
     SLANG_RETURN_ON_FAIL(dxcCompiler->Disassemble(dxcSourceBlob, dxcResultBlob.writeRef()));
@@ -770,26 +817,36 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
     m_desc.version.append(versionString);
 
     if (m_commitHash.getLength())
-    {        
+    {
         versionString << "#" << m_commitHash;
     }
     else
     {
         // If we don't have the commitHash, we use the library timestamp, to uniquely identify.
-        versionString << " " << SharedLibraryUtils::getSharedLibraryTimestamp(reinterpret_cast<void*>(m_createInstance));
+        versionString << " "
+                      << SharedLibraryUtils::getSharedLibraryTimestamp(
+                             reinterpret_cast<void*>(m_createInstance));
     }
 
     *outVersionString = StringBlob::moveCreate(versionString).detach();
     return SLANG_OK;
 }
 
-/* static */SlangResult DXCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+/* static */ SlangResult DXCDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
 {
     ComPtr<ISlangSharedLibrary> library;
 
-    const char* dependentNames[] = {"dxil", nullptr } ;
-    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, dependentNames, "dxcompiler", library));
- 
+    const char* dependentNames[] = {"dxil", nullptr};
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(
+        path,
+        loader,
+        dependentNames,
+        "dxcompiler",
+        library));
+
     SLANG_ASSERT(library);
     if (!library)
     {
@@ -806,7 +863,10 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
 
 #else // SLANG_ENABLE_DXIL_SUPPORT
 
-/* static */SlangResult DXCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+/* static */ SlangResult DXCDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
 {
     SLANG_UNUSED(path);
     SLANG_UNUSED(loader);
@@ -816,4 +876,4 @@ SlangResult DXCDownstreamCompiler::getVersionString(slang::IBlob** outVersionStr
 
 #endif // SLANG_ENABLE_DXIL_SUPPORT
 
-}
+} // namespace Slang

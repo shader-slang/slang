@@ -2,9 +2,8 @@
 #ifndef SLANG_AST_DUMP_H
 #define SLANG_AST_DUMP_H
 
-#include "slang-syntax.h"
-
 #include "slang-emit-source-writer.h"
+#include "slang-syntax.h"
 
 namespace Slang
 {
@@ -25,7 +24,7 @@ struct ASTDumpUtil
         enum Enum : Flags
         {
             HideSourceLoc = 0x1,
-            HideScope     = 0x2,
+            HideScope = 0x2,
         };
     };
 

@@ -5,20 +5,21 @@
 
 #include "slang-ir-optix-entry-point-uniforms.h"
 
-#include "slang-ir.h"
 #include "slang-ir-entry-point-pass.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
 
-struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
-    
+struct CollectOptixEntryPointUniformParams : PerEntryPointPass
+{
+
     // *If* the entry point has any uniform parameter then we want to create a
-    // structure type to house them, and then replace the shader parameter 
+    // structure type to house them, and then replace the shader parameter
     // references with an SBT record access.
-    
+
     // We only want to create these if actually needed, so we will declare
     // them here and then initialize them on-demand.
     IRStructType* paramStructType = nullptr;
@@ -42,13 +43,11 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         // parameters of an ordinary compute entry point will translate to CUDA
         // launch parameters).
         //
-        switch( entryPointDecoration->getProfile().getStage() )
+        switch (entryPointDecoration->getProfile().getStage())
         {
-        default:
-            break;
+        default: break;
 
-        case Stage::Compute:
-            return;
+        case Stage::Compute: return;
         }
 
         // We expect all entry points to have explicit layout information attached.
@@ -58,12 +57,12 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         //
         auto funcLayoutDecoration = entryPointFunc->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(funcLayoutDecoration);
-        if(!funcLayoutDecoration)
+        if (!funcLayoutDecoration)
             return;
 
         auto entryPointLayout = as<IREntryPointLayout>(funcLayoutDecoration->getLayout());
         SLANG_ASSERT(entryPointLayout);
-        if(!entryPointLayout)
+        if (!entryPointLayout)
             return;
 
         // The parameter layout for an entry point will either be a structure
@@ -71,7 +70,7 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         // wrapped around such a structure.
         //
         // If we are in the latter case we will need to make sure to allocate
-        // an explicit IR constant buffer for that wrapper, 
+        // an explicit IR constant buffer for that wrapper,
         //
         // TODO: Reconcile the above with CUDA / OptiX...
         entryPointParamsLayout = entryPointLayout->getParamsLayout();
@@ -88,7 +87,7 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         //
         IRParam* nextParam = nullptr;
         UInt paramCounter = 0;
-        for( IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam )
+        for (IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam)
         {
             nextParam = param->getNextParam();
             UInt paramIndex = paramCounter++;
@@ -99,11 +98,11 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
             //
             auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
             SLANG_ASSERT(layoutDecoration);
-            if(!layoutDecoration)
+            if (!layoutDecoration)
                 continue;
             auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
-            if(!paramLayout)
+            if (!paramLayout)
                 continue;
 
             // A parameter that has varying input/output behavior should be left alone,
@@ -113,11 +112,11 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
             // In the case of optix, these varyings come in the form of ray payload
             // and hit attributes
             //
-            if(isVaryingParameter(paramLayout))
+            if (isVaryingParameter(paramLayout))
                 continue;
-            
+
             // At this point we know that `param` is not a varying shader parameter,
-            // so we'll treat it as part of the SBT record. 
+            // so we'll treat it as part of the SBT record.
             //
             // If this is the first parameter we are running into, then we need
             // to deal with creating the structure type and global shader
@@ -145,7 +144,8 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
             // the linker. After all, this pass is traversing the same information
             // anyway, so it could do the work while it is here...
             //
-            auto paramFieldKey = cast<IRStructKey>(entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
+            auto paramFieldKey = cast<IRStructKey>(
+                entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
 
             auto paramField = builder->createStructField(paramStructType, paramFieldKey, paramType);
             SLANG_UNUSED(paramField);
@@ -171,7 +171,7 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
             //
             // We are therefore going to replace the uses one at a time.
             //
-            while(auto use = param->firstUse )
+            while (auto use = param->firstUse)
             {
                 // Given a `use` of the paramter, we will insert
                 // the replacement code right before the instruction
@@ -211,11 +211,12 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
             param->removeAndDeallocate();
         }
 
-        if( collectedParam )
+        if (collectedParam)
         {
             collectedParam->insertBefore(entryPointFunc->getFirstBlock()->getFirstChild());
         }
-        else {
+        else
+        {
             // If we didn't find a uniform parameter, we can safely return now.
             return;
         }
@@ -223,7 +224,8 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         // Now, replace the collected parameter with OptiX SBT accesses.
         auto paramType = collectedParam->getFullType();
         builder->setInsertBefore(entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
-        IRInst* getAttr = builder->emitIntrinsicInst(paramType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
+        IRInst* getAttr =
+            builder->emitIntrinsicInst(paramType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
         collectedParam->replaceUsesWith(getAttr);
         collectedParam->removeAndDeallocate();
         fixUpFuncType(entryPointFunc);
@@ -240,11 +242,14 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         //
         builder.setInsertBefore(m_entryPoint.func);
         paramStructType = builder.createStructType();
-        builder.addNameHintDecoration(paramStructType, UnownedTerminatedStringSlice("ShaderRecordParams"));
+        builder.addNameHintDecoration(
+            paramStructType,
+            UnownedTerminatedStringSlice("ShaderRecordParams"));
 
         // If we need a constant buffer, then the global
         // shader parameter will be a `ConstantBuffer<paramStructType>`
-        // TODO: reconcile this with OptiX, as the current logic works, but is still focused on VK/DXR..
+        // TODO: reconcile this with OptiX, as the current logic works, but is still focused on
+        // VK/DXR..
         //
         auto constantBufferType = builder.getConstantBufferType(paramStructType);
         collectedParam = builder.createParam(constantBufferType);
@@ -258,18 +263,19 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
         // We add a name hint to the global parameter so that it will
         // emit to more readable code when referenced.
         //
-        builder.addNameHintDecoration(collectedParam, UnownedTerminatedStringSlice("shaderRecordParams"));
+        builder.addNameHintDecoration(
+            collectedParam,
+            UnownedTerminatedStringSlice("shaderRecordParams"));
     }
 };
 
-void collectOptiXEntryPointUniformParams(
-    IRModule* module)
+void collectOptiXEntryPointUniformParams(IRModule* module)
 {
-    // look into all entry point functions by checking the IREntryPointDecoration on the children 
-    // Insts of the module. For any ray tracing entry points, collect all uniform parameters into one
-    // common struct, and replace parameter usage with SBT record accesses.
+    // look into all entry point functions by checking the IREntryPointDecoration on the children
+    // Insts of the module. For any ray tracing entry points, collect all uniform parameters into
+    // one common struct, and replace parameter usage with SBT record accesses.
     CollectOptixEntryPointUniformParams context;
     context.processModule(module);
 }
 
-}
+} // namespace Slang

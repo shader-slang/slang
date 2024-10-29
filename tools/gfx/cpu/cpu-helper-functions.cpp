@@ -8,5 +8,4 @@ namespace gfx
 using namespace Slang;
 
 
-
 } // namespace gfx

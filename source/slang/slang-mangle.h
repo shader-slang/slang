@@ -8,29 +8,21 @@
 
 namespace Slang
 {
-    struct IRSpecialize;
+struct IRSpecialize;
 
-    String getMangledName(ASTBuilder* astBuilder, Decl* decl);
-    String getMangledName(ASTBuilder* astBuilder, DeclRefBase* declRef);
-    String getMangledNameFromNameString(const UnownedStringSlice& name);
+String getMangledName(ASTBuilder* astBuilder, Decl* decl);
+String getMangledName(ASTBuilder* astBuilder, DeclRefBase* declRef);
+String getMangledNameFromNameString(const UnownedStringSlice& name);
 
-    String getHashedName(const UnownedStringSlice& mangledName);
+String getHashedName(const UnownedStringSlice& mangledName);
 
-    String getMangledNameForConformanceWitness(
-        ASTBuilder* astBuilder,
-        Type* sub,
-        Type* sup);
-    String getMangledNameForConformanceWitness(
-        ASTBuilder* astBuilder,
-        DeclRef<Decl> sub,
-        DeclRef<Decl> sup);
-    String getMangledNameForConformanceWitness(
-        ASTBuilder* astBuilder,
-        DeclRef<Decl> sub,
-        Type* sup);
-    String getMangledTypeName(
-        ASTBuilder* astBuilder,
-        Type* type);
-}
+String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Type* sup);
+String getMangledNameForConformanceWitness(
+    ASTBuilder* astBuilder,
+    DeclRef<Decl> sub,
+    DeclRef<Decl> sup);
+String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, DeclRef<Decl> sub, Type* sup);
+String getMangledTypeName(ASTBuilder* astBuilder, Type* type);
+} // namespace Slang
 
 #endif

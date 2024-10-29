@@ -1,8 +1,8 @@
 // slang-ir-bind-existentials.cpp
 #include "slang-ir-bind-existentials.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -55,7 +55,7 @@ namespace Slang
 //
 struct BindExistentialSlots
 {
-    IRModule*       module = nullptr;
+    IRModule* module = nullptr;
     DiagnosticSink* sink = nullptr;
 
     void processModule()
@@ -72,12 +72,12 @@ struct BindExistentialSlots
         // We will search for global shader parameters that make
         // use of existential specialization parameters.
         //
-        for( auto inst : module->getGlobalInsts() )
+        for (auto inst : module->getGlobalInsts())
         {
             // We only care about global shader parameters.
             //
             auto globalParam = as<IRGlobalParam>(inst);
-            if(!globalParam)
+            if (!globalParam)
                 continue;
 
             // We only care about global shader parameters
@@ -86,8 +86,9 @@ struct BindExistentialSlots
             // `[bindExistentialSlots(...)]` decoration that
             // was added during IR linking.
             //
-            auto bindSlotsInst = globalParam->findDecorationImpl(kIROp_BindExistentialSlotsDecoration);
-            if(!bindSlotsInst)
+            auto bindSlotsInst =
+                globalParam->findDecorationImpl(kIROp_BindExistentialSlotsDecoration);
+            if (!bindSlotsInst)
                 continue;
 
             replaceTypeUsingExistentialSlots(
@@ -112,13 +113,13 @@ struct BindExistentialSlots
         // We start by iterating over all the functions at
         // global scope and look for entry points.
         //
-        for( auto inst : module->getGlobalInsts() )
+        for (auto inst : module->getGlobalInsts())
         {
             auto func = as<IRFunc>(inst);
-            if(!func)
+            if (!func)
                 continue;
 
-            if(!func->findDecorationImpl(kIROp_EntryPointDecoration))
+            if (!func->findDecorationImpl(kIROp_EntryPointDecoration))
                 continue;
 
             // We then process each entry point we find.
@@ -133,7 +134,8 @@ struct BindExistentialSlots
         // to find the `[bindExistentialSlots(...)]` decoration,
         // if it has one.
         //
-        auto bindEntryPointExistentialSlotsInst = func->findDecorationImpl(kIROp_BindExistentialSlotsDecoration);
+        auto bindEntryPointExistentialSlotsInst =
+            func->findDecorationImpl(kIROp_BindExistentialSlotsDecoration);
 
         // We then need to process each of the entry-point
         // parameters just like we did for global parameters.
@@ -154,7 +156,7 @@ struct BindExistentialSlots
         // Ultimately the simplistic counter approach is less complicated.
         //
         Index slotOffset = 0;
-        for( auto param : func->getParams() )
+        for (auto param : func->getParams())
         {
             processEntryPointParameter(param, bindEntryPointExistentialSlotsInst, slotOffset);
         }
@@ -171,7 +173,7 @@ struct BindExistentialSlots
         // in the `[bindExistentialSlots(...)]` decoration is
         // no longer needed, and we can remove it.
         //
-        if( bindEntryPointExistentialSlotsInst )
+        if (bindEntryPointExistentialSlotsInst)
         {
             bindEntryPointExistentialSlotsInst->removeAndDeallocate();
         }
@@ -186,25 +188,25 @@ struct BindExistentialSlots
     // decoration; both use the same subroutine.
     //
     void processEntryPointParameter(
-        IRInst*     param,
-        IRInst*     bindSlotsInst,
-        Index&      ioSlotOperandOffset)
+        IRInst* param,
+        IRInst* bindSlotsInst,
+        Index& ioSlotOperandOffset)
     {
         // We expect all shader parameters to have layout information,
         // but to be defensive we will skip any that don't.
         //
         auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-        if(!layoutDecoration)
+        if (!layoutDecoration)
             return;
         auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
-        if(!varLayout)
+        if (!varLayout)
             return;
 
         // We only care about parameters that are associated
         // with one or more existential slots.
         //
         auto resInfo = varLayout->findOffsetAttr(LayoutResourceKind::ExistentialTypeParam);
-        if(!resInfo)
+        if (!resInfo)
             return;
 
         // We will use the layout information on the variable to
@@ -212,14 +214,15 @@ struct BindExistentialSlots
         // the type to find out the number of slots.
         //
         UInt slotCount = 0;
-        if(auto typeResInfo = varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::ExistentialTypeParam))
+        if (auto typeResInfo =
+                varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::ExistentialTypeParam))
             slotCount = UInt(typeResInfo->getFiniteSize());
 
         // At this point we know that the parameter consumes
         // some number of slots, so it would be an error
         // if we don't have an instruction to bind the slots.
         //
-        if( !bindSlotsInst )
+        if (!bindSlotsInst)
         {
             // Note: This error is considered an internal error because
             // we should be detecting and diagnosing this problem before
@@ -237,8 +240,8 @@ struct BindExistentialSlots
         // this parameter.
         //
         UInt bindOperandCount = bindSlotsInst->getOperandCount();
-        UInt slotOperandCount = 2*slotCount;
-        if( (ioSlotOperandOffset + slotOperandCount) > bindOperandCount )
+        UInt slotOperandCount = 2 * slotCount;
+        if ((ioSlotOperandOffset + slotOperandCount) > bindOperandCount)
         {
             sink->diagnose(param->sourceLoc, Diagnostics::missingExistentialBindingsForParameter);
             return;
@@ -256,18 +259,15 @@ struct BindExistentialSlots
         // that replaces the type of `param` based on the
         // information in the slots.
         //
-        replaceTypeUsingExistentialSlots(
-            param,
-            slotOperandCount,
-            operandsForInst);
+        replaceTypeUsingExistentialSlots(param, slotOperandCount, operandsForInst);
 
         ioSlotOperandOffset += slotOperandCount;
     }
 
     void replaceTypeUsingExistentialSlots(
-        IRInst*         inst,
-        UInt            slotOperandCount,
-        IRUse const*    slotArgs)
+        IRInst* inst,
+        UInt slotOperandCount,
+        IRUse const* slotArgs)
     {
         // We are going to alter the type of the
         // given `inst` based on information in
@@ -283,17 +283,15 @@ struct BindExistentialSlots
         // is twice the number of slots we are filling.
         //
         List<IRInst*> slotOperands;
-        for(UInt ii = 0; ii < slotOperandCount; ++ii)
+        for (UInt ii = 0; ii < slotOperandCount; ++ii)
             slotOperands.add(slotArgs[ii].get());
 
         // We are going to create a proxy type that represents
         // the results of plugging all the information
         // from the existential slots into the original type.
         //
-        auto newType = builder.getBindExistentialsType(
-            fullType,
-            slotOperandCount,
-            slotOperands.getBuffer());
+        auto newType =
+            builder.getBindExistentialsType(fullType, slotOperandCount, slotOperands.getBuffer());
 
         // We will replace the type of the original parameter
         // with the new proxy type.
@@ -313,7 +311,7 @@ struct BindExistentialSlots
         // new ones we'll be making.
         //
         List<IRUse*> usesToReplace;
-        for( auto use = inst->firstUse; use; use = use->nextUse )
+        for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
 
@@ -322,11 +320,11 @@ struct BindExistentialSlots
             // it (e.g., a global shader parameter). We enumerate
             // the relevant cases here and skip them.
             //
-            if(as<IRDecoration>(user))
+            if (as<IRDecoration>(user))
                 continue;
-            if(as<IRAttr>(user))
+            if (as<IRAttr>(user))
                 continue;
-            if(as<IRLayout>(user))
+            if (as<IRLayout>(user))
                 continue;
 
             usesToReplace.add(use);
@@ -334,7 +332,7 @@ struct BindExistentialSlots
 
         // Now we can loop over our list of uses and replace each.
         //
-        for(auto use : usesToReplace)
+        for (auto use : usesToReplace)
         {
             // We are going to emit a `wrapExistential` (or `makeExistential`)
             // right before each use site of the value.
@@ -356,9 +354,7 @@ struct BindExistentialSlots
     }
 };
 
-void bindExistentialSlots(
-    IRModule*       module,
-    DiagnosticSink* sink)
+void bindExistentialSlots(IRModule* module, DiagnosticSink* sink)
 {
     BindExistentialSlots context;
     context.module = module;
@@ -366,4 +362,4 @@ void bindExistentialSlots(
     context.processModule();
 }
 
-}
+} // namespace Slang

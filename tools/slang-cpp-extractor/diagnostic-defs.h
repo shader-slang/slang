@@ -41,19 +41,39 @@ DIAGNOSTIC(100007, Error, superTypeNotFound, "Super type not found for $0")
 DIAGNOSTIC(100008, Error, superTypeNotAType, "Named super type is not a type $0")
 DIAGNOSTIC(100009, Error, unexpectedUnbalancedToken, "Unexpected unbalanced token")
 DIAGNOSTIC(100010, Error, unexpectedEndOfFile, "Unexpected end of file")
-DIAGNOSTIC(100011, Error, expectingTypeKeyword, "Expecting type keyword - struct or class, found $0")
+DIAGNOSTIC(
+    100011,
+    Error,
+    expectingTypeKeyword,
+    "Expecting type keyword - struct or class, found $0")
 
-DIAGNOSTIC(100012, Error, typeInDifferentTypeSet, "Type $0 in different type set $1 from super class $2")
+DIAGNOSTIC(
+    100012,
+    Error,
+    typeInDifferentTypeSet,
+    "Type $0 in different type set $1 from super class $2")
 DIAGNOSTIC(100013, Error, expectingIdentifier, "Expecting an identifier, found $0")
 DIAGNOSTIC(100014, Error, cannotDeclareTypeInScope, "Cannot declare types in this scope")
 DIAGNOSTIC(100015, Error, identifierAlreadyDefined, "Identifier already defined '$0'")
 DIAGNOSTIC(100016, Error, expectingType, "Expecting a type")
 DIAGNOSTIC(100017, Error, cannotParseExpression, "Cannot parse expression")
 DIAGNOSTIC(100018, Error, cannotOverload, "Cannot overload this declaration");
-DIAGNOSTIC(100019, Error, classMarkerOutsideOfClass, "A class/struct marker is found outside of class or struct");
-DIAGNOSTIC(100020, Error, classMarkerAlreadyFound, "A class/struct marker already found in type '$0'");
+DIAGNOSTIC(
+    100019,
+    Error,
+    classMarkerOutsideOfClass,
+    "A class/struct marker is found outside of class or struct");
+DIAGNOSTIC(
+    100020,
+    Error,
+    classMarkerAlreadyFound,
+    "A class/struct marker already found in type '$0'");
 DIAGNOSTIC(100021, Error, cannotParseType, "Cannot parse type");
-DIAGNOSTIC(100022, Error, destructorNameDoesntMatch, "Destructor name doesn't match class name '$0'");
+DIAGNOSTIC(
+    100022,
+    Error,
+    destructorNameDoesntMatch,
+    "Destructor name doesn't match class name '$0'");
 DIAGNOSTIC(100023, Error, cannotParseCallable, "Cannot parse callable");
 
 // Command line errors 100100

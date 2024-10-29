@@ -3,7 +3,8 @@
 
 #include "diagnostics.h"
 
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
 
 struct UnitTestUtil
@@ -11,6 +12,6 @@ struct UnitTestUtil
     static SlangResult run();
 };
 
-} // CppExtract
+} // namespace CppExtract
 
 #endif
