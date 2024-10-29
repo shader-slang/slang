@@ -1,0 +1,21 @@
+name: Formatting tools setup
+
+description: Performs setup common to the code formatting actions
+
+runs:
+  using: composite
+  steps:
+    - name: install gersemi
+      shell: bash
+      run: |
+        pip3 install gersemi colorama
+
+    - name: install clang-format
+      shell: bash
+      run: |
+        tmpdir=$(mktemp -d)
+        curl -L -H "Authorization: token ${{github.token}}" \
+          -o "$tmpdir/clang-format" \
+          https://github.com/shader-slang/slang-binaries/raw/4e88845ec51641b4c92e68027e359090bdb219e0/clang-format/x86_64-linux/bin/clang-format
+        chmod +x "$tmpdir/clang-format"
+        echo "$tmpdir" >> $GITHUB_PATH

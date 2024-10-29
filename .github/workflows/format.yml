@@ -6,38 +6,74 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
           repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
           ref: ${{ github.event.client_payload.pull_request.head.ref }}
+          path: pr-branch
 
-      - run: pip3 install gersemi
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.client_payload.pull_request.base.ref }}
+          path: target-branch
 
-      - name: install clang-format
+      - name: Setup
+        uses: ./target-branch/.github/actions/format-setup
+
+      - name: Run formatting
+        id: format
         run: |
-          tmpdir=$(mktemp -d)
-          curl -L -H "Authorization: token ${{ secrets.SLANGBOT_PAT }}" \
-            -o "$tmpdir/clang-format" \
-            https://github.com/shader-slang/slang-binaries/raw/4e88845ec51641b4c92e68027e359090bdb219e0/clang-format/x86_64-linux/bin/clang-format
-          chmod +x "$tmpdir/clang-format"
-          echo "$tmpdir" >> $GITHUB_PATH
-
-      - run: ./extras/formatting.sh
+          ./target-branch/extras/formatting.sh --source ./pr-branch
 
       - name: Configure Git commit signing
+        id: git-info
         run: |
           echo "${{ secrets.SLANGBOT_SIGNING_KEY }}" > "${{runner.temp}}"/signing_key
           chmod 600 "${{runner.temp}}"/signing_key
-          git config commit.gpgsign true
-          git config gpg.format ssh
-          git config user.signingkey "${{runner.temp}}"/signing_key
+          git -C pr-branch config commit.gpgsign true
+          git -C pr-branch config gpg.format ssh
+          git -C pr-branch config user.signingkey "${{runner.temp}}"/signing_key
+          bot_info=$(curl -s -H "Authorization: Bearer ${{ secrets.SLANGBOT_PAT }}" \
+            "https://api.github.com/user")
+          echo "bot_identity=$(echo $bot_info | jq --raw-output '.login + " <" + (.id|tostring) + "+" + .login + "@users.noreply.github.com>"')" >> $GITHUB_OUTPUT
+          echo "bot_name=$(echo $bot_info | jq --raw-output '.login')" >> $GITHUB_OUTPUT
 
-      - uses: EndBug/add-and-commit@v9
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@v7
         with:
-          fetch: false
-          message: "format code"
-          push: true
+          token: ${{ secrets.SLANGBOT_PAT }}
+          path: pr-branch
+          commit-message: "format code"
+          title: "Format code for PR #${{ github.event.client_payload.pull_request.number }}"
+          body: "Automated code formatting for ${{ github.event.client_payload.pull_request.url }}"
+          committer: ${{ steps.git-info.outputs.bot_identity }}
+          author: ${{ steps.git-info.outputs.bot_identity }}
+          branch: format-${{ github.event.client_payload.pull_request.number }}-${{ github.event.client_payload.pull_request.head.ref }}
+          base: ${{ github.event.client_payload.pull_request.head.ref }}
+          push-to-fork: ${{ steps.git-info.outputs.bot_name }}/slang
+          delete-branch: true
+
+      - name: Comment on PR
+        uses: peter-evans/create-or-update-comment@v4
+        if: always()
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          issue-number: ${{ github.event.client_payload.pull_request.number }}
+          body: |
+            ${{ 
+              steps.format.conclusion == 'failure'
+              && format('❌ Formatting failed. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+              || (steps.create-pr.conclusion == 'failure' 
+                  && format('❌ Failed to create formatting pull request. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+                  || format('🌈 Formatted, please merge the changes from [this PR]({0})', steps.create-pr.outputs.pull-request-url))
+            }}
 
       - name: Add reaction
         uses: peter-evans/create-or-update-comment@v4
