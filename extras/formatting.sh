@@ -40,7 +40,8 @@ cd "$source_dir" || exit 1
 
 require_bin() {
   local name="$1"
-  local required="$2"
+  local min_version="$2"
+  local max_version="${3:-}"
   local version
 
   if ! command -v "$name" &>/dev/null; then
@@ -51,9 +52,19 @@ require_bin() {
 
   if [ "$no_version_check" -eq 0 ]; then
     version=$("$name" --version | grep -oP "\d+\.\d+\.?\d*" | head -n1)
-    if ! printf '%s\n%s\n' "$required" "$version" | sort -V -C; then
-      echo "$name version $version is too old. Version $required or newer is required."
+
+    if ! printf '%s\n%s\n' "$min_version" "$version" | sort -V -C; then
+      echo "$name version $version is too old. Version $min_version or newer is required."
       missing_bin=1
+      return
+    fi
+
+    if [ -n "$max_version" ]; then
+      if ! printf '%s\n%s\n' "$version" "$max_version" | sort -V -C; then
+        echo "$name version $version is too new. Version less than $max_version is required."
+        missing_bin=1
+        return
+      fi
     fi
   fi
 }
@@ -62,7 +73,7 @@ require_bin "git" "1.8"
 require_bin "gersemi" "0.17"
 require_bin "xargs" "3"
 require_bin "diff" "2"
-require_bin "clang-format" "18"
+require_bin "clang-format" "17" "18"
 
 if [ "$missing_bin" ]; then
   exit 1
