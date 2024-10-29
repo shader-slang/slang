@@ -9,23 +9,24 @@ function(download_and_extract archive_name url)
         set(archive_path ${url})
     else()
         message(STATUS "Fetching ${archive_name} from ${url}")
-        file(DOWNLOAD ${url} ${archive_path}
-             # SHOW_PROGRESS
-             STATUS status
+        file(
+            DOWNLOAD ${url} ${archive_path}
+            # SHOW_PROGRESS
+            STATUS status
         )
 
         list(GET status 0 status_code)
         list(GET status 1 status_string)
         if(NOT status_code EQUAL 0)
-            message(WARNING "Failed to download ${archive_name} from ${url}: ${status_string}")
+            message(
+                WARNING
+                "Failed to download ${archive_name} from ${url}: ${status_string}"
+            )
             return()
         endif()
     endif()
 
-    file(ARCHIVE_EXTRACT
-         INPUT ${archive_path}
-         DESTINATION ${extract_dir}
-    )
+    file(ARCHIVE_EXTRACT INPUT ${archive_path} DESTINATION ${extract_dir})
 
     set(${archive_name}_SOURCE_DIR ${extract_dir} PARENT_SCOPE)
     message(STATUS "${archive_name} downloaded and extracted to ${extract_dir}")
@@ -51,10 +52,7 @@ function(copy_fetched_shared_library library_name url)
     )
     macro(from_glob dir)
         # A little helper function
-        file(
-            GLOB_RECURSE source_object
-            "${dir}/${shared_library_filename}"
-        )
+        file(GLOB_RECURSE source_object "${dir}/${shared_library_filename}")
         list(LENGTH source_object nmatches)
         if(nmatches EQUAL 0)
             message(
@@ -88,7 +86,10 @@ function(copy_fetched_shared_library library_name url)
         elseif(ARG_IGNORE_FAILURE)
             return()
         else()
-            message(SEND_ERROR "Unable to download and extract ${library_name} from ${url}")
+            message(
+                SEND_ERROR
+                "Unable to download and extract ${library_name} from ${url}"
+            )
             return()
         endif()
     endif()

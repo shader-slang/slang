@@ -29,18 +29,23 @@ set(core_module_common_args
     .
     OBJECT
     EXCLUDE_FROM_ALL
-    EXPORT_MACRO_PREFIX SLANG
-    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
-    FOLDER generated
-    LINK_WITH_PRIVATE core
+    EXPORT_MACRO_PREFIX
+    SLANG
+    EXPORT_TYPE_AS
+    ${SLANG_LIB_TYPE}
+    FOLDER
+    generated
+    LINK_WITH_PRIVATE
+    core
     USE_EXTRA_WARNINGS
-    EXPLICIT_SOURCE ./slang-embedded-core-module.cpp 
+    EXPLICIT_SOURCE
+    ./slang-embedded-core-module.cpp
 )
 
 slang_add_target(
     ${core_module_common_args}
     TARGET_NAME slang-embedded-core-module
-    EXPLICIT_SOURCE  ${core_module_generated_header}
+    EXPLICIT_SOURCE ${core_module_generated_header}
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE
     INCLUDE_DIRECTORIES_PRIVATE ${core_module_generated_header_dir}
 )
@@ -56,7 +61,10 @@ slang_add_target(
 
 # List of *.meta.slang headers
 set(core_module_meta_source_dir "${slang_SOURCE_DIR}/source/slang")
-glob_append(core_module_meta_source "${core_module_meta_source_dir}/*.meta.slang")
+glob_append(
+    core_module_meta_source
+    "${core_module_meta_source_dir}/*.meta.slang"
+)
 
 set(core_module_meta_output_dir "${CMAKE_CURRENT_BINARY_DIR}/core-module-meta")
 
@@ -87,7 +95,10 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(generate-core-module-headers DEPENDS ${core_module_meta_generated_headers})
+add_custom_target(
+    generate-core-module-headers
+    DEPENDS ${core_module_meta_generated_headers}
+)
 set_target_properties(generate-core-module-headers PROPERTIES FOLDER generated)
 
 #
@@ -99,22 +110,28 @@ set(core_module_source_common_args
     OBJECT
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE 
-        core 
-        slang-capability-defs 
-        slang-reflect-headers 
-        SPIRV-Headers 
-    INCLUDE_DIRECTORIES_PRIVATE ../slang
-    FOLDER generated
-    EXPLICIT_SOURCE 
-      ./slang-embedded-core-module-source.cpp
-      ${core_module_meta_generated_headers}
-    REQUIRES generate-core-module-headers
-    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE_SOURCE
-    INCLUDE_DIRECTORIES_PRIVATE 
-      ${core_module_meta_output_dir}
-    EXPORT_MACRO_PREFIX SLANG
-    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
+    LINK_WITH_PRIVATE
+    core
+    slang-capability-defs
+    slang-reflect-headers
+    SPIRV-Headers
+    INCLUDE_DIRECTORIES_PRIVATE
+    ../slang
+    FOLDER
+    generated
+    EXPLICIT_SOURCE
+    ./slang-embedded-core-module-source.cpp
+    ${core_module_meta_generated_headers}
+    REQUIRES
+    generate-core-module-headers
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    SLANG_EMBED_CORE_MODULE_SOURCE
+    INCLUDE_DIRECTORIES_PRIVATE
+    ${core_module_meta_output_dir}
+    EXPORT_MACRO_PREFIX
+    SLANG
+    EXPORT_TYPE_AS
+    ${SLANG_LIB_TYPE}
 )
 
 slang_add_target(
