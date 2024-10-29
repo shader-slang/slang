@@ -6,13 +6,12 @@
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-redundancy-removal.h"
 #include "slang-ir-spirv-legalize.h"
 #include "slang-ir-spirv-snippet.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
-#include "slang-ir-redundancy-removal.h"
-#include "slang-ir-spirv-snippet.h"
 #include "slang-spirv-val.h"
 #include "spirv/unified1/spirv.h"
 
@@ -2665,8 +2664,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             irFunc,
             irFunc->getDataType()->getResultType(),
             spvFunctionControl,
-            irFunc->getDataType()
-        );
+            irFunc->getDataType());
 
         // > OpFunctionParameter
         //
@@ -4423,20 +4421,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 break;
             }
         case kIROp_DownstreamModuleImportDecoration:
-           {
-               requireSPIRVCapability(SpvCapabilityLinkage);
-               auto name =
-                   decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-               emitInst(
-                   getSection(SpvLogicalSectionID::Annotations),
-                   decoration,
-                   SpvOpDecorate,
-                   dstID,
-                   SpvDecorationLinkageAttributes,
-                   name,
-                   SpvLinkageTypeImport);
-               break;
-           }        
+            {
+                requireSPIRVCapability(SpvCapabilityLinkage);
+                auto name =
+                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+                emitInst(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decoration,
+                    SpvOpDecorate,
+                    dstID,
+                    SpvDecorationLinkageAttributes,
+                    name,
+                    SpvLinkageTypeImport);
+                break;
+            }        
             // ...
         }
 
@@ -5137,11 +5135,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     void maybeEmitPointerDecoration(SpvInst* varInst, IRInst* inst)
     {
-        maybeEmitPointerDecoration(
-            varInst,
-            inst->getDataType(),
-            as<IRVar>(inst),
-            inst->getOp());
+        maybeEmitPointerDecoration(varInst, inst->getDataType(), as<IRVar>(inst), inst->getOp());
     }
 
     SpvInst* emitParam(SpvInstParent* parent, IRInst* inst)
