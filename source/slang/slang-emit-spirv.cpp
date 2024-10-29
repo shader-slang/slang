@@ -8,11 +8,11 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
-#include "slang-ir-redundancy-removal.h"
-#include "slang-ir-spirv-snippet.h"
 #include "slang-ir-spirv-legalize.h"
 #include "slang-spirv-val.h"
 #include "slang-lookup-spirv.h"
+#include "slang-ir-redundancy-removal.h"
+#include "slang-ir-spirv-snippet.h"
 #include "spirv/unified1/spirv.h"
 #include "../core/slang-memory-arena.h"
 #include <type_traits>
@@ -2685,7 +2685,8 @@ struct SPIRVEmitContext
         for (UInt pp = 0; pp < paramCount; ++pp)
         {
             auto paramType = funcType->getParamType(pp);
-            emitOpFunctionParameter(spvFunc, nullptr, paramType);
+            SpvInst* spvParam = emitOpFunctionParameter(spvFunc, nullptr, paramType);
+            maybeEmitPointerDecoration(spvParam, paramType, false, kIROp_Param);
         }
 
         // [3.32.9. Function Instructions]
@@ -4318,28 +4319,28 @@ struct SPIRVEmitContext
             break;
         }
         case kIROp_DownstreamModuleImportDecoration:
-        {
-            requireSPIRVCapability(SpvCapabilityLinkage);
-            auto name = decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-            emitInst(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                SpvOpDecorate,
-                dstID,
-                SpvDecorationLinkageAttributes, name, SpvLinkageTypeImport);
-            break;
-        }
+           {
+               requireSPIRVCapability(SpvCapabilityLinkage);
+               auto name = decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+               emitInst(getSection(SpvLogicalSectionID::Annotations),
+                   decoration,
+                   SpvOpDecorate,
+                   dstID,
+                   SpvDecorationLinkageAttributes, name, SpvLinkageTypeImport);
+               break;
+           }
         case kIROp_DownstreamModuleExportDecoration:
-        {
-            requireSPIRVCapability(SpvCapabilityLinkage);
-            auto name = decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-            emitInst(getSection(SpvLogicalSectionID::Annotations),
-                decoration,
-                SpvOpDecorate,
-                dstID,
-                SpvDecorationLinkageAttributes, name, SpvLinkageTypeExport);
-            break;
-        }
-        // ...
+           {
+               requireSPIRVCapability(SpvCapabilityLinkage);
+               auto name = decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+               emitInst(getSection(SpvLogicalSectionID::Annotations),
+                   decoration,
+                   SpvOpDecorate,
+                   dstID,
+                   SpvDecorationLinkageAttributes, name, SpvLinkageTypeExport);
+                break;
+            }
+            // ...
         }
 
         if(isRayTracingObject)
