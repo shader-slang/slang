@@ -62,12 +62,12 @@ The result of compiling a translation unit is a module in Slang's internal inter
 A translation unit / module may contain zero or more entry points.
 Slang supports two models for identifying entry points when compiling.
 
-### Entry Point Attributes
+#### Entry Point Attributes
 
 By default, the compiler will scan a translation unit for function declarations marked with the `[shader(...)]` attribute; each such function will be identified as an entry point in the module.
 Developers are encouraged to use this model because it directly documents intention and makes source code less dependent on external compiler configuration options.
 
-### Explicit Entry Point Options
+#### Explicit Entry Point Options
 
 For compatibility with existing code, the Slang compiler also supports explicit specification of entry point functions using configuration options external to shader source code.
 When these options are used the compiler will *ignore* all `[shader(...)]` attributes and only use the explicitly-specified entry points instead.
@@ -128,7 +128,7 @@ A _component type_ is a unit of shader code composition; both modules and entry 
 A _composite_ component type is formed from a list of other component types (for example, one module and two entry points) and can be used to define a unit of shader code that is meant to be used together.
 
 Once a programmer has formed a composite of all the code they intend to use together, they can query the layout of the shader parameters in that composite, or invoke the linking step to
-resolve all cross module refeerences.
+resolve all cross module references.
 
 ### Linking
 
@@ -148,7 +148,12 @@ Second, different compositions of shader code can result in different layouts, w
 The `slangc` tool, included in binary distributions of Slang, is a command-line compiler that can handle most simple compilation tasks.
 `slangc` is intended to be usable as a replacement for tools like `fxc` and `dxc`, and covers most of the same use cases.
 
-### Example
+### All Available Options
+
+See [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
+
+
+### A Simple `slangc` Example
 
 Here we will repeat the example used in the [Getting Started](01-get-started.md) chapter.
 Given the following Slang code:
@@ -171,7 +176,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 we can compile the `computeMain()` entry point to SPIR-V using the following command line:
 
 ```bat
-slangc hello-world.slang -entry computeMain -target spirv -o hello-world.spv
+slangc hello-world.slang -target spirv -o hello-world.spv
 ```
 
 ### Source Files and Translation Units
@@ -194,10 +199,15 @@ When using `slangc`, you will typically want to identify which entry point(s) yo
 The `-entry computeMain` option selects an entry point to be compiled to output code in this invocation of `slangc`.
 
 Because the `computeMain()` entry point in this example has a `[shader(...)]` attribute, the compiler is able to deduce that it should be compiled for the `compute` stage.
+
+```bat
+slangc hello-world.slang -target spirv -o hello-world.spv
+```
+
 In code that does not use `[shader(...)]` attributes, a `-entry` option should be followed by a `-stage` option to specify the stage of the entry point:
 
 ```bat
-slangc hello-world.slang -entry computeMain -stage compute -o hello-world.spv
+slangc hello-world.slang -entry computeMain -stage compute -target spirv -o hello-world.spv
 ```
 
 ### Targets
@@ -234,7 +244,7 @@ For example:
 
 Kernel `-o` options are the most complicated case, because they depend on both a target and entry point.
 A `-o` option applies to the preceding entry point, and the compiler will try to apply it to a matching target based on its file extension.
-For example, a `.spv` output file will be matched to a `-target spriv`.
+For example, a `.spv` output file will be matched to a `-target spirv`.
 
 The compiler makes a best effort to support complicated cases with multiple files, entry points, and targets.
 Users with very complicated compilation requirements will probably be better off using multiple `slangc` invocations or migrating to the compilation API.
@@ -251,13 +261,109 @@ The main other options are:
 
 * `-O<level>` can be used to control optimization levels when the Slang compiler invokes downstream code generator
 
+See [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
+
+### Downstream Arguments
+
+`slangc` may leverage a 'downstream' tool like 'dxc', 'fxc', 'glslang', or 'gcc' for some target compilations. Rather than replicate every possible downstream option, arguments can be passed directly to the downstream tool using the "-X" option in `slangc`.
+
+The mechanism used here is based on the `-X` mechanism used in GCC, to specify arguments to the linker.
+
+```
+-Xlinker option
+```
+
+When used, `option` is not interpreted by GCC, but is passed to the linker once compilation is complete. Slang extends this idea in several ways. First there are many more 'downstream' stages available to Slang than just `linker`. These different stages are known as `SlangPassThrough` types in the API and have the following names
+
+* `fxc` - FXC HLSL compiler
+* `dxc` - DXC HLSL compiler
+* `glslang` - GLSLANG GLSL compiler
+* `visualstudio` - Visual Studio C/C++ compiler
+* `clang` - Clang C/C++ compiler
+* `gcc` - GCC C/C++ compiler
+* `genericcpp` - A generic C++ compiler (can be any one of visual studio, clang or gcc depending on system and availability)
+* `nvrtc` - NVRTC CUDA compiler
+
+The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the `-X`. So for example to send an option `-Gfa` through to DXC you can use 
+
+```
+-Xdxc -Gfa
+```
+
+Note that if an option is available via normal Slang command line options then these should be used. This will generally work across multiple targets, but also avoids options clashing which is undefined behavior currently. The `-X` mechanism is best used for options that are unavailable through normal Slang mechanisms. 
+
+If you want to pass multiple options using this mechanism the `-Xdxc` needs to be in front of every options. For example 
+
+```
+-Xdxc -Gfa -Xdxc -Vd
+```
+
+Would reach `dxc` as 
+
+```
+-Gfa -Vd
+```
+
+This can get a little repetitive especially if there are many parameters, so Slang adds a mechanism to have multiple options passed by using an ellipsis `...`. The syntax is as follows
+
+```
+-Xdxc... -Gfa -Vd -X.
+```
+
+The `...` at the end indicates all the following parameters should be sent to `dxc` until it reaches the matching terminating `-X.` or the end of the command line. 
+
+It is also worth noting that `-X...` options can be nested. This would allow a GCC downstream compilation to control linking, for example with
+
+```
+-Xgcc -Xlinker --split -X.
+```
+
+In this example gcc would see
+
+```
+-Xlinker --split
+```
+
+And the linker would see (as passed through by gcc) 
+
+```
+--split
+```
+
+Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
+
+NOTE! Not all tools that Slang uses downstream make command line argument parsing available. `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
+
+The `-X` mechanism is also supported by render-test tool. In this usage `slang` becomes a downstream tool. Thus you can use the `dxc` option `-Gfa` in a render-test via 
+
+```
+-Xslang... -Xdxc -Gfa -X.
+```
+
+Means that the dxc compilation in the render test (assuming dxc is invoked) will receive 
+
+```
+-Gfa
+```
+
+Some options are made available via the same mechanism for all downstream compilers. 
+
+* Use `-I` to specify include path for downstream compilers
+
+For example to specify an include path "somePath" to DXC you can use...
+
+```
+-Xdxc -IsomePath
+```
+
+
 ### Convenience Features
 
 The `slangc` compiler provides a few conveniences for command-line compilation:
 
 * Most options can appear out of order when they are unambiguous. For example, if there is only a single translation unit a `-entry` option can appear before or after any file.
 
-* A `-target` option can be left out if it can be inferred from the only `-o` option present. For example, `-o hello-world.spv` already implies `-target spriv`.
+* A `-target` option can be left out if it can be inferred from the only `-o` option present. For example, `-o hello-world.spv` already implies `-target spirv`.
 
 * If a `-o` option is left out then kernel code will be written to the standard output. This output can be piped to a file, or can be printed to a console. In the latter case, the compiler will automatically disassemble binary formats for printing.
 
@@ -281,10 +387,6 @@ This allows you to deploy just the `my_library.slang-module` file to users of th
 import my_library;
 ```
 
-### More Options
-
-See [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
-
 ### Limitations
 
 The `slangc` tool is meant to serve the needs of many developers, including those who are currently using `fxc`, `dxc`, or similar tools.
@@ -296,6 +398,167 @@ Notable features that Slang supports which cannot be accessed from `slangc` incl
 * Slang allows applications to control the way that shader modules and entry points are composed (which in turn influences their layout); `slangc` currently implements a single default policy for how to generate a composition of shader code.
 
 Applications that need more control over compilation are encouraged to use the C++ compilation API described in the next section.
+
+### Examples of `slangc` usage
+
+#### Multiple targets and multiple entrypoints
+
+In this example, there are two shader entrypoints defined in one source file.
+
+```hlsl
+// targets.slang
+
+struct VertexOutput
+{
+    nointerpolation int a : SOME_VALUE;
+    float3              b : SV_Position;
+};
+
+[shader("pixel")]
+float4 psMain() : SV_Target
+{
+    return float4(1, 0, 0, 1);
+}
+
+[shader("vertex")]
+VertexOutput vsMain()
+{
+    VertexOutput out;
+    out.a = 0;
+    out.b = float4(0, 1, 0, 1);
+    return out;
+}
+```
+
+A single entrypoint from the preceding shader can be compiled to both SPIR-V Assembly and HLSL targets in one command:
+```bat
+slangc targets.slang -entry psMain -target spirv-asm -o targets.spv-asm -target hlsl -o targets.hlsl
+```
+
+The following command compiles both entrypoints to SPIR-V:
+
+```bat
+slangc targets.slang -entry vsMain -entry psMain -target spirv -o targets.spv
+```
+
+#### Creating a standalone executable example
+
+This example compiles and runs a CPU host-callable style Slang unit.
+
+```hlsl
+// cpu.slang
+
+class MyClass
+{
+    int intMember;
+    __init()
+    {
+        intMember = 0;
+    }
+    int method()
+    {
+        printf("method\n");
+        return intMember;
+    }
+}
+
+export __extern_cpp int main()
+{
+    MyClass obj = new MyClass();
+    return obj.method();
+}
+
+```
+
+Compile the above code as standalone executable, using -I option to find dependent header files:
+```bat
+slangc cpu.slang -target executable -o cpu.exe -Xgenericcpp -I./include -Xgenericcpp -I./external/unordered_dense/include/
+```
+
+Execute the resulting executable:
+```bat
+C:\slang> cpu
+method
+
+```
+
+#### Compiling and linking slang-modules
+
+This example demonstrates the compilation of a slang-module, and linking to a shader which uses that module.
+Two scenarios are provided, one in which the entry-point is compiled in the same `slangc` invocation that links in the dependent slang-module, and another scenario where linking is a separate invocation.
+
+```hlsl
+// lib.slang
+public int foo(int a) 
+{ 
+    return a + 1;
+}
+```
+
+```hlsl
+// entry.slang
+import "lib";
+
+RWStructuredBuffer<int> outputBuffer;
+
+[shader("compute")]
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int index = (int)dispatchThreadID.x;
+    outputBuffer[index] = foo(index);
+}
+```
+
+Compile lib.slang to lib.slang-module:
+```bat
+slangc lib.slang -o lib.slang-module
+```
+
+Scenario 1: Compile entry.slang and link lib and entry together in one step:
+```bat
+slangc entry.slang -target spirv -o program.spv # Compile and link
+```
+
+Scenario 2: Compile entry.slang to entry.slang-module and then link together lib and entry in a second invocation:
+```bat
+slangc entry.slang -o entry.slang-module # Compile
+slangc lib.slang-module entry.slang-module -target spirv -o program.spv # Link
+```
+
+#### Compiling with debug symbols
+
+Debug symbols can be added with the "-g<debug-level>" option.
+
+Adding '-g1' (or higher) to a SPIR-V compilation will emit extended 'DebugInfo' instructions.
+```bat
+slangc vertex.slang -target spirv-asm -o v.spv-asm -g0 # Omit debug symbols
+slangc vertex.slang -target spirv-asm -o v.spv-asm -g1 # Add debug symbols
+```
+
+
+#### Compiling with additional preprocessor macros
+
+User-defined macros can be set on the command-line with the "-D<macro>" or "-D<macro>=<value>" option.
+
+```hlsl
+// macrodefine.slang
+
+[shader("pixel")]
+float4 psMain() : SV_Target
+{
+#if defined(mymacro)
+    return float4(1, 0, 0, 1);
+#else
+    return float4(0, 1, 0, 1);
+#endif
+}
+```
+
+* Setting a user-defined macro "mymacro"
+```bat
+slangc macrodefine.slang -entry psMain -target spirv-asm -o targets.spvasm -Dmymacro
+```
 
 ## Using the Compilation API
 
