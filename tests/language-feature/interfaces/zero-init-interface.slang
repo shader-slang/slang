@@ -1,6 +1,7 @@
 // Test that we can zero-init a struct with interface typed member.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -vk -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -26,7 +27,8 @@ struct MyType
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    MyType t = {};
+    // Note 'MyType' is not a C-Style struct
+    MyType t = {{}};
     // BUFFER: 1
     outputBuffer[0] = t.foo.method();
 }
