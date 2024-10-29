@@ -171,6 +171,7 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
 void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module)
 {
     List<IRInst*> toRemove;
+    auto builder = IRBuilder(module);
     for (auto globalInst : module->getGlobalInsts())
     {
         if (auto funcInst = as<IRFunc>(globalInst))
@@ -181,13 +182,11 @@ void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule
                     (dec->getTarget() == target))
                 {
                     // Gut the function definition, turning it into a declaration
-                    for (auto inst : funcInst->getChildren())
+                    for (auto block : funcInst->getBlocks())
                     {
-                        if (inst->getOp() == kIROp_Block)
-                        {
-                            toRemove.add(inst);
-                        }
+                        toRemove.add(block);
                     }
+                    builder.addDecoration(funcInst, kIROp_DownstreamModuleImportDecoration);
                 }
             }
         }

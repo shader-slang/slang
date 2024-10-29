@@ -6,6 +6,7 @@
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-redundancy-removal.h"
 #include "slang-ir-spirv-legalize.h"
 #include "slang-ir-spirv-snippet.h"
 #include "slang-ir-util.h"
@@ -2628,14 +2629,75 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     /// Emit a declaration for the given `irFunc`
     SpvInst* emitFuncDeclaration(IRFunc* irFunc)
     {
-        if (irFunc->findDecorationImpl(kIROp_SPIRVOpDecoration))
-            return nullptr;
-        // For now we aren't handling function declarations;
-        // we expect to deal only with fully linked modules.
+        // [2.4: Logical Layout of a Module]
         //
-        m_sink->diagnose(irFunc, Diagnostics::internalCompilerError);
-        SLANG_UNEXPECTED("function declaration in SPIR-V emit");
-        UNREACHABLE_RETURN(nullptr);
+        // > All function declarations("declarations" are functions without a
+        //   body; there is no forward declaration to a function with a body).
+        //
+        auto section = getSection(SpvLogicalSectionID::FunctionDeclarations);
+
+        // > A function declaration is as follows.
+        // > * Function declaration, using OpFunction.
+        // > * Function parameter declarations, using OpFunctionParameter.
+        // > * Function end, using OpFunctionEnd.
+        //
+
+        // [3.24. Function Control]
+        //
+        // TODO: We should eventually support emitting the "function control"
+        // mask to include inline and other hint bits based on decorations
+        // set on `irFunc`.
+        //
+        SpvFunctionControlMask spvFunctionControl = SpvFunctionControlMaskNone;
+
+        // [3.32.9. Function Instructions]
+        //
+        // > OpFunction
+        //
+        // Note that the type <id> of a SPIR-V function uses the
+        // *result* type of the function, while the actual function
+        // type is given as a later operand. Slan IR instead uses
+        // the type of a function instruction store, you know, its *type*.
+        //
+        SpvInst* spvFunc = emitOpFunction(
+            section,
+            irFunc,
+            irFunc->getDataType()->getResultType(),
+            spvFunctionControl,
+            irFunc->getDataType());
+
+        // > OpFunctionParameter
+        //
+        // Though parameters always belong to blocks in Slang, there are no
+        // blocks in a function declaration, so we will emit the parameters
+        // as derived from the function's type.
+        //
+        auto funcType = irFunc->getDataType();
+        auto paramCount = funcType->getParamCount();
+        for (UInt pp = 0; pp < paramCount; ++pp)
+        {
+            auto paramType = funcType->getParamType(pp);
+            SpvInst* spvParam = emitOpFunctionParameter(spvFunc, nullptr, paramType);
+            maybeEmitPointerDecoration(spvParam, paramType, false, kIROp_Param);
+        }
+
+        // [3.32.9. Function Instructions]
+        //
+        // > OpFunctionEnd
+        //
+        // In the SPIR-V encoding a function is logically the parent of any
+        // instructions up to a matching `OpFunctionEnd`. In our intermediate
+        // structure we will make the `OpFunctionEnd` be the last child of
+        // the `OpFunction`.
+        //
+        emitOpFunctionEnd(spvFunc, nullptr);
+
+        // We will emit any decorations pertinent to the function to the
+        // appropriate section of the module.
+        //
+        emitDecorations(irFunc, getID(spvFunc));
+
+        return spvFunc;
     }
 
     /// Emit a SPIR-V function definition for the Slang IR function `irFunc`.
@@ -4358,6 +4420,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     SpvLinkageTypeExport);
                 break;
             }
+        case kIROp_DownstreamModuleImportDecoration:
+            {
+                requireSPIRVCapability(SpvCapabilityLinkage);
+                auto name =
+                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+                emitInst(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decoration,
+                    SpvOpDecorate,
+                    dstID,
+                    SpvDecorationLinkageAttributes,
+                    name,
+                    SpvLinkageTypeImport);
+                break;
+            }
             // ...
         }
 
@@ -5019,9 +5096,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return nullptr;
     }
 
-    void maybeEmitPointerDecoration(SpvInst* varInst, IRInst* inst)
+    void maybeEmitPointerDecoration(SpvInst* varInst, IRType* type, bool isVar, IROp op)
     {
-        auto ptrType = as<IRPtrType>(unwrapArray(inst->getDataType()));
+        auto ptrType = as<IRPtrType>(unwrapArray(type));
         if (!ptrType)
             return;
         if (addressSpaceToStorageClass(ptrType->getAddressSpace()) ==
@@ -5033,7 +5110,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
                 varInst,
-                (as<IRVar>(inst) ? SpvDecorationAliasedPointer : SpvDecorationAliased));
+                (isVar ? SpvDecorationAliasedPointer : SpvDecorationAliased));
         }
         else
         {
@@ -5049,12 +5126,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getSection(SpvLogicalSectionID::Annotations),
                     nullptr,
                     varInst,
-                    (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_Var ||
-                             inst->getOp() == kIROp_DebugVar
+                    (op == kIROp_GlobalVar || op == kIROp_Var || op == kIROp_DebugVar
                          ? SpvDecorationAliasedPointer
                          : SpvDecorationAliased));
             }
         }
+    }
+
+    void maybeEmitPointerDecoration(SpvInst* varInst, IRInst* inst)
+    {
+        maybeEmitPointerDecoration(varInst, inst->getDataType(), as<IRVar>(inst), inst->getOp());
     }
 
     SpvInst* emitParam(SpvInstParent* parent, IRInst* inst)
@@ -7533,6 +7614,8 @@ SlangResult emitSPIRVFromIR(
             &writer);
     }
 #endif
+
+    removeAvailableInDownstreamModuleDecorations(CodeGenTarget::SPIRV, irModule);
 
     auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::PreserveParameters);
