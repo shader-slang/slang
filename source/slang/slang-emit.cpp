@@ -63,6 +63,7 @@
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-simplify-global-vars.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
@@ -1363,10 +1364,18 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // Sometimes we will have a GlobalVar with a 'init' that aliases another
+    // concrete value.
+    // These sort of GlobalVar's should be removed in-favor of directly
+    // using the known value since this may be an indirect use of a resource
+    // variable (which is illegal for almost targets).
+    simplifyGlobalVars(irModule);
+
     switch( target )
     {
     default:
         break;
+    case CodeGenTarget::HLSL:
     case CodeGenTarget::GLSL:
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
