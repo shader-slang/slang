@@ -1,14 +1,13 @@
 #include "parser.h"
 
-#include "options.h"
-#include "identifier-lookup.h"
-
 #include "../../source/compiler-core/slang-name-convention-util.h"
-
-#include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-io.h"
+#include "../../source/core/slang-string-util.h"
+#include "identifier-lookup.h"
+#include "options.h"
 
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
 
 // If fails then we need more bits to identify types
@@ -16,14 +15,11 @@ SLANG_COMPILE_TIME_ASSERT(int(Node::Kind::CountOf) <= 8 * sizeof(uint32_t));
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Parser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Parser::Parser(NodeTree* nodeTree, DiagnosticSink* sink) :
-    m_sink(sink),
-    m_nodeTree(nodeTree),
-    m_nodeTypeEnabled(0)
+Parser::Parser(NodeTree* nodeTree, DiagnosticSink* sink)
+    : m_sink(sink), m_nodeTree(nodeTree), m_nodeTypeEnabled(0)
 {
     // Enable types by default
-    const Node::Kind defaultEnabled[] =
-    {
+    const Node::Kind defaultEnabled[] = {
         Node::Kind::ClassType,
         Node::Kind::StructType,
         Node::Kind::Namespace,
@@ -62,7 +58,8 @@ void Parser::setKindsEnabled(const Node::Kind* kinds, Index kindsCount, bool isE
 
 bool Parser::_isMarker(const UnownedStringSlice& name)
 {
-    return name.startsWith(m_options->m_markPrefix.getUnownedSlice()) && name.endsWith(m_options->m_markSuffix.getUnownedSlice());
+    return name.startsWith(m_options->m_markPrefix.getUnownedSlice()) &&
+           name.endsWith(m_options->m_markSuffix.getUnownedSlice());
 }
 
 SlangResult Parser::expect(TokenType type, Token* outToken)
@@ -117,7 +114,8 @@ bool Parser::advanceIfStyle(IdentifierStyle style, Token* outToken)
 {
     if (m_reader.peekTokenType() == TokenType::Identifier)
     {
-        IdentifierStyle readStyle = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+        IdentifierStyle readStyle =
+            m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
         if (readStyle == style)
         {
             Token token = m_reader.advanceToken();
@@ -152,7 +150,7 @@ SlangResult Parser::pushScope(ScopeNode* scopeNode)
     // We can only have one 'special' scope.
     SLANG_ASSERT(scopeNode || m_scopeStack.getLast());
 
-    // We keep to track. 
+    // We keep to track.
     m_scopeStack.add(scopeNode);
 
     // If we pass nullptr, we don't update the current scope.
@@ -168,15 +166,21 @@ SlangResult Parser::pushScope(ScopeNode* scopeNode)
 
     if (scopeNode->m_name.hasContent())
     {
-        // For anonymous namespace, we should look if we already have one and just reopen that. Doing so will mean will
-        // find anonymous namespace clashes
+        // For anonymous namespace, we should look if we already have one and just reopen that.
+        // Doing so will mean will find anonymous namespace clashes
 
         if (Node* foundNode = m_currentScope->findChild(scopeNode->m_name.getContent()))
         {
             if (scopeNode->isClassLike())
             {
-                m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, scopeNode->m_name.getContent());
-                m_sink->diagnose(foundNode->m_name, CPPDiagnostics::seeDeclarationOf, scopeNode->m_name.getContent());
+                m_sink->diagnose(
+                    m_reader.peekToken(),
+                    CPPDiagnostics::typeAlreadyDeclared,
+                    scopeNode->m_name.getContent());
+                m_sink->diagnose(
+                    foundNode->m_name,
+                    CPPDiagnostics::seeDeclarationOf,
+                    scopeNode->m_name.getContent());
                 return SLANG_FAIL;
             }
 
@@ -185,15 +189,18 @@ SlangResult Parser::pushScope(ScopeNode* scopeNode)
                 if (foundNode->m_kind != scopeNode->m_kind)
                 {
                     // Different types can't work
-                    m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, scopeNode->m_name.getContent());
+                    m_sink->diagnose(
+                        m_reader.peekToken(),
+                        CPPDiagnostics::typeAlreadyDeclared,
+                        scopeNode->m_name.getContent());
                     return SLANG_FAIL;
                 }
 
                 ScopeNode* foundScopeNode = as<ScopeNode>(foundNode);
                 SLANG_ASSERT(foundScopeNode);
 
-                // Make sure the node is empty, as we are *not* going to add it, we are just going to use
-                // the pre-existing namespace
+                // Make sure the node is empty, as we are *not* going to add it, we are just going
+                // to use the pre-existing namespace
                 SLANG_ASSERT(scopeNode->m_children.getCount() == 0);
 
                 // We can just use the pre-existing namespace
@@ -224,7 +231,7 @@ SlangResult Parser::popScope()
     {
         return SLANG_OK;
     }
-    
+
     m_currentScope = m_currentScope->m_parentScope;
     return SLANG_OK;
 }
@@ -242,7 +249,7 @@ SlangResult Parser::_maybeConsumeScope()
         }
         else if (type == TokenType::LBrace)
         {
-            //m_reader.advanceToken();
+            // m_reader.advanceToken();
             return consumeToClosingBrace();
         }
         else if (type == TokenType::EndOfFile)
@@ -271,23 +278,23 @@ SlangResult Parser::consumeToClosingBrace(const Token* inOpenBraceToken)
     {
         switch (m_reader.peekTokenType())
         {
-            case TokenType::EndOfFile:
+        case TokenType::EndOfFile:
             {
                 m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::didntFindMatchingBrace);
                 m_sink->diagnose(openToken, CPPDiagnostics::seeOpen);
                 return SLANG_FAIL;
             }
-            case TokenType::LBrace:
+        case TokenType::LBrace:
             {
                 SLANG_RETURN_ON_FAIL(consumeToClosingBrace());
                 break;
             }
-            case TokenType::RBrace:
+        case TokenType::RBrace:
             {
                 m_reader.advanceToken();
                 return SLANG_OK;
             }
-            default:
+        default:
             {
                 m_reader.advanceToken();
                 break;
@@ -331,7 +338,10 @@ SlangResult Parser::_parseEnum()
         }
         else
         {
-            m_sink->diagnose(nameToken.loc, CPPDiagnostics::expectingIdentifier, nameToken.getContent());
+            m_sink->diagnose(
+                nameToken.loc,
+                CPPDiagnostics::expectingIdentifier,
+                nameToken.getContent());
             return SLANG_FAIL;
         }
     }
@@ -348,8 +358,7 @@ SlangResult Parser::_parseEnum()
         while (true)
         {
             TokenType tokenType = m_reader.peekTokenType();
-            if (tokenType == TokenType::Semicolon ||
-                tokenType == TokenType::LBrace ||
+            if (tokenType == TokenType::Semicolon || tokenType == TokenType::LBrace ||
                 tokenType == TokenType::EndOfFile)
             {
                 break;
@@ -358,9 +367,9 @@ SlangResult Parser::_parseEnum()
             backingTokens.add(m_reader.advanceToken());
         }
 
-        // TODO - Look up the backing type. It can only be an integral. We can assume it must be defined before lookup
-        // for our uses here.
-        // If we can't find the type, we could assume it's size is undefined
+        // TODO - Look up the backing type. It can only be an integral. We can assume it must be
+        // defined before lookup for our uses here. If we can't find the type, we could assume it's
+        // size is undefined
 
         if (backingTokens.getCount() > 0)
         {
@@ -377,13 +386,17 @@ SlangResult Parser::_parseEnum()
             Node* node = m_currentScope->findChild(nameToken.getContent());
             if (node)
             {
-                // Strictly speaking we should check the backing type etc, match, but for now ignore and assume it's ok
+                // Strictly speaking we should check the backing type etc, match, but for now ignore
+                // and assume it's ok
 
                 if (node->m_kind == kind)
                 {
                     return SLANG_OK;
                 }
-                m_sink->diagnose(nameToken.loc, CPPDiagnostics::typeAlreadyDeclared, nameToken.getContent());
+                m_sink->diagnose(
+                    nameToken.loc,
+                    CPPDiagnostics::typeAlreadyDeclared,
+                    nameToken.getContent());
                 return SLANG_FAIL;
             }
             return popScope();
@@ -407,7 +420,10 @@ SlangResult Parser::_parseEnum()
 
         if (node->findChild(caseNode->m_name.getContent()))
         {
-            m_sink->diagnose(caseNode->m_name.loc, CPPDiagnostics::identifierAlreadyDefined, caseNode->m_name.getContent());
+            m_sink->diagnose(
+                caseNode->m_name.loc,
+                CPPDiagnostics::identifierAlreadyDefined,
+                caseNode->m_name.getContent());
             return SLANG_FAIL;
         }
 
@@ -433,7 +449,7 @@ SlangResult Parser::_parseEnum()
             m_reader.advanceToken();
             continue;
         }
-    
+
         break;
     }
 
@@ -497,34 +513,34 @@ SlangResult Parser::_consumeTemplate()
         }
     }
 
-    // Search for { or ; to consume remaining 
+    // Search for { or ; to consume remaining
     while (true)
     {
         auto tokenType = m_reader.peekTokenType();
 
         switch (tokenType)
         {
-            case TokenType::EndOfFile:
+        case TokenType::EndOfFile:
             {
                 m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::unexpectedEndOfFile);
                 return SLANG_FAIL;
             }
-            case TokenType::Semicolon:
+        case TokenType::Semicolon:
             {
                 // Ends with semicolon if it's a template pre-declaration
                 m_reader.advanceToken();
                 return SLANG_OK;
             }
-            case TokenType::LBrace:
+        case TokenType::LBrace:
             {
-                // If ends with {, means could be body of a struct/class or a body of a function/method.
-                // Consume it
+                // If ends with {, means could be body of a struct/class or a body of a
+                // function/method. Consume it
                 SLANG_RETURN_ON_FAIL(consumeToClosingBrace());
                 // If we hit a ; just consume and ignore
                 advanceIfToken(TokenType::Semicolon);
                 return SLANG_OK;
             }
-            default:
+        default:
             {
                 // Consume
                 m_reader.advanceToken();
@@ -537,7 +553,8 @@ SlangResult Parser::_consumeTemplate()
 SlangResult Parser::_maybeParseNode(Node::Kind kind)
 {
     // We are looking for
-    // struct/class identifier [: [public|private|protected] Identifier ] { [public|private|proctected:]* marker ( identifier );
+    // struct/class identifier [: [public|private|protected] Identifier ] {
+    // [public|private|proctected:]* marker ( identifier );
 
     if (kind == Node::Kind::Namespace)
     {
@@ -625,7 +642,10 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
             if (peekTokenType == TokenType::EndOfFile)
             {
                 // Expecting brace
-                m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::expectingToken, TokenType::LBrace);
+                m_sink->diagnose(
+                    m_reader.peekToken(),
+                    CPPDiagnostics::expectingToken,
+                    TokenType::LBrace);
                 return SLANG_FAIL;
             }
             else if (peekTokenType == TokenType::LBrace)
@@ -643,7 +663,7 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
     // Push the class scope
     return pushScope(node);
 }
-    
+
 SlangResult Parser::_consumeToSync()
 {
     while (true)
@@ -652,15 +672,15 @@ SlangResult Parser::_consumeToSync()
 
         switch (type)
         {
-            case TokenType::Semicolon:
+        case TokenType::Semicolon:
             {
                 m_reader.advanceToken();
                 return SLANG_OK;
             }
-            case TokenType::Pound:
-            case TokenType::EndOfFile:
-            case TokenType::LBrace:
-            case TokenType::RBrace:
+        case TokenType::Pound:
+        case TokenType::EndOfFile:
+        case TokenType::LBrace:
+        case TokenType::RBrace:
             {
                 return SLANG_OK;
             }
@@ -674,18 +694,18 @@ SlangResult Parser::_maybeParseTemplateArg(Index& ioTemplateDepth)
 {
     switch (m_reader.peekTokenType())
     {
-        case TokenType::Identifier:
+    case TokenType::Identifier:
         {
             TokenReader::ParsingCursor nameCursor;
             SLANG_RETURN_ON_FAIL(_maybeParseType(ioTemplateDepth, nameCursor));
             return SLANG_OK;
         }
-        case TokenType::IntegerLiteral:
+    case TokenType::IntegerLiteral:
         {
             m_reader.advanceToken();
             return SLANG_OK;
         }
-        default: break;
+    default: break;
     }
     return SLANG_FAIL;
 }
@@ -708,7 +728,7 @@ SlangResult Parser::_maybeParseTemplateArgs(Index& ioTemplateDepth)
 
         switch (m_reader.peekTokenType())
         {
-            case TokenType::OpGreater:
+        case TokenType::OpGreater:
             {
                 if (ioTemplateDepth <= 0)
                 {
@@ -719,7 +739,7 @@ SlangResult Parser::_maybeParseTemplateArgs(Index& ioTemplateDepth)
                 m_reader.advanceToken();
                 return SLANG_OK;
             }
-            case TokenType::OpRsh:
+        case TokenType::OpRsh:
             {
                 if (ioTemplateDepth <= 1)
                 {
@@ -730,7 +750,7 @@ SlangResult Parser::_maybeParseTemplateArgs(Index& ioTemplateDepth)
                 m_reader.advanceToken();
                 return SLANG_OK;
             }
-            default:
+        default:
             {
                 while (true)
                 {
@@ -752,48 +772,52 @@ SlangResult Parser::_maybeParseTemplateArgs(Index& ioTemplateDepth)
 
 SlangResult Parser::_maybeConsume(IdentifierStyle style)
 {
-    while (advanceIfStyle(style));
+    while (advanceIfStyle(style))
+        ;
     return SLANG_OK;
 }
 
-// True if two of these token types of the same type placed immediately after one another 
+// True if two of these token types of the same type placed immediately after one another
 // produce a different token. Can be conservative, as if not strictly required
 // it will just mean more spacing in the output
 static bool _canRepeatTokenType(TokenType type)
 {
     switch (type)
     {
-        case TokenType::OpAdd:
-        case TokenType::OpSub:
-        case TokenType::OpAnd:
-        case TokenType::OpOr:
-        case TokenType::OpGreater:
-        case TokenType::OpLess:
-        case TokenType::Identifier:
-        case TokenType::OpAssign:
-        case TokenType::Colon:
+    case TokenType::OpAdd:
+    case TokenType::OpSub:
+    case TokenType::OpAnd:
+    case TokenType::OpOr:
+    case TokenType::OpGreater:
+    case TokenType::OpLess:
+    case TokenType::Identifier:
+    case TokenType::OpAssign:
+    case TokenType::Colon:
         {
             return false;
         }
-        default: break;
+    default: break;
     }
     return true;
 }
 
 // Returns true if there needs to be a space between the previous token type, and the current token
 // type for correct output. It is assumed that the token stream is appropriate.
-// The implementation might need more sophistication, but this at least avoids Blah const *  -> Blahconst* 
+// The implementation might need more sophistication, but this at least avoids Blah const *  ->
+// Blahconst*
 static bool _tokenConcatNeedsSpace(TokenType prev, TokenType cur)
 {
-    if ((cur == TokenType::OpAssign) ||
-        (prev == cur && !_canRepeatTokenType(cur)))
+    if ((cur == TokenType::OpAssign) || (prev == cur && !_canRepeatTokenType(cur)))
     {
         return true;
     }
     return false;
 }
 
-void Parser::_getTypeTokens(TokenReader::ParsingCursor start, TokenReader::ParsingCursor nameCursor, List<Token>& outToks)
+void Parser::_getTypeTokens(
+    TokenReader::ParsingCursor start,
+    TokenReader::ParsingCursor nameCursor,
+    List<Token>& outToks)
 {
     auto endCursor = m_reader.getCursor();
     m_reader.setCursor(start);
@@ -811,7 +835,9 @@ void Parser::_getTypeTokens(TokenReader::ParsingCursor start, TokenReader::Parsi
     }
 }
 
-UnownedStringSlice Parser::_concatType(TokenReader::ParsingCursor start, TokenReader::ParsingCursor nameCursor)
+UnownedStringSlice Parser::_concatType(
+    TokenReader::ParsingCursor start,
+    TokenReader::ParsingCursor nameCursor)
 {
     List<Token> toks;
     _getTypeTokens(start, nameCursor, toks);
@@ -868,7 +894,9 @@ UnownedStringSlice Parser::_concatTokens(TokenReader::ParsingCursor start)
     return typePool->getSlice(typePool->add(buf));
 }
 
-SlangResult Parser::_maybeParseType(Index& ioTemplateDepth, TokenReader::ParsingCursor& outNameCursor)
+SlangResult Parser::_maybeParseType(
+    Index& ioTemplateDepth,
+    TokenReader::ParsingCursor& outNameCursor)
 {
     outNameCursor = TokenReader::ParsingCursor();
 
@@ -876,11 +904,11 @@ SlangResult Parser::_maybeParseType(Index& ioTemplateDepth, TokenReader::Parsing
     {
         if (m_reader.peekTokenType() == TokenType::Identifier)
         {
-            const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+            const IdentifierStyle style =
+                m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
 
             if (style == IdentifierStyle::TypeModifier ||
-                style == IdentifierStyle::IntegerModifier ||
-                style == IdentifierStyle::Class ||
+                style == IdentifierStyle::IntegerModifier || style == IdentifierStyle::Class ||
                 style == IdentifierStyle::Struct)
             {
                 // These are ok keywords in this context
@@ -899,7 +927,8 @@ SlangResult Parser::_maybeParseType(Index& ioTemplateDepth, TokenReader::Parsing
             const Token peekToken = m_reader.peekToken();
             if (peekToken.type == TokenType::Identifier)
             {
-                const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(peekToken.getContent());
+                const IdentifierStyle style =
+                    m_nodeTree->m_identifierLookup->get(peekToken.getContent());
                 if (style == IdentifierStyle::IntegerType)
                 {
                     m_reader.advanceToken();
@@ -907,16 +936,16 @@ SlangResult Parser::_maybeParseType(Index& ioTemplateDepth, TokenReader::Parsing
             }
             break;
         }
-        
+
         advanceIfToken(TokenType::Scope);
         while (true)
         {
             // if we have a struct/class prefix in front of a name just consume it.
             if (m_reader.peekTokenType() == TokenType::Identifier)
             {
-                const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
-                if (style == IdentifierStyle::Class ||
-                    style == IdentifierStyle::Struct)
+                const IdentifierStyle style =
+                    m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+                if (style == IdentifierStyle::Class || style == IdentifierStyle::Struct)
                 {
                     m_reader.advanceToken();
                 }
@@ -928,7 +957,8 @@ SlangResult Parser::_maybeParseType(Index& ioTemplateDepth, TokenReader::Parsing
                 return SLANG_FAIL;
             }
 
-            const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(identifierToken.getContent());
+            const IdentifierStyle style =
+                m_nodeTree->m_identifierLookup->get(identifierToken.getContent());
             if (hasFlag(style, IdentifierFlag::Keyword))
             {
                 return SLANG_FAIL;
@@ -986,11 +1016,14 @@ SlangResult Parser::_maybeParseType(Index& ioTemplateDepth, TokenReader::Parsing
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier));
 
         SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
-        
+
         // We need to parse and add the params
         if (m_reader.peekTokenType() != TokenType::LParent)
         {
-            m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::expectingToken, TokenType::LParent);
+            m_sink->diagnose(
+                m_reader.peekToken(),
+                CPPDiagnostics::expectingToken,
+                TokenType::LParent);
             return SLANG_FAIL;
         }
 
@@ -1108,15 +1141,18 @@ SlangResult Parser::_parseSpecialMacro()
 
 SlangResult Parser::_parseMarker()
 {
-    SLANG_ASSERT(m_reader.peekTokenType() == TokenType::Identifier &&
-        _isMarker(m_reader.peekToken().getContent()) &&
-        m_currentScope->isClassLike());
+    SLANG_ASSERT(
+        m_reader.peekTokenType() == TokenType::Identifier &&
+        _isMarker(m_reader.peekToken().getContent()) && m_currentScope->isClassLike());
 
     ClassLikeNode* node = as<ClassLikeNode>(m_currentScope);
 
     if (node->m_marker.type != TokenType::Unknown)
     {
-        m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::classMarkerAlreadyFound, node->m_name.getContent());
+        m_sink->diagnose(
+            m_reader.peekToken(),
+            CPPDiagnostics::classMarkerAlreadyFound,
+            node->m_name.getContent());
         m_sink->diagnose(node->m_marker, CPPDiagnostics::previousLocation);
         return SLANG_FAIL;
     }
@@ -1128,7 +1164,9 @@ SlangResult Parser::_parseMarker()
     UnownedStringSlice slice(node->m_marker.getContent());
 
     // Strip the prefix and suffix
-    slice = UnownedStringSlice(slice.begin() + m_options->m_markPrefix.getLength(), slice.end() - m_options->m_markSuffix.getLength());
+    slice = UnownedStringSlice(
+        slice.begin() + m_options->m_markPrefix.getLength(),
+        slice.end() - m_options->m_markSuffix.getLength());
 
     // Strip ABSTRACT_ if it's there
     UnownedStringSlice abstractSlice("ABSTRACT_");
@@ -1140,7 +1178,7 @@ SlangResult Parser::_parseMarker()
     // TODO: We could strip other stuff or have other heuristics there, but this is
     // probably okay for now
 
-    // Set the typeSet 
+    // Set the typeSet
     node->m_typeSet = m_nodeTree->getOrAddTypeSet(slice);
 
     // Okay now looking for ( identifier)
@@ -1152,7 +1190,10 @@ SlangResult Parser::_parseMarker()
 
     if (typeNameToken.getContent() != node->m_name.getContent())
     {
-        m_sink->diagnose(typeNameToken, CPPDiagnostics::typeNameDoesntMatch, node->m_name.getContent());
+        m_sink->diagnose(
+            typeNameToken,
+            CPPDiagnostics::typeNameDoesntMatch,
+            node->m_name.getContent());
         return SLANG_FAIL;
     }
 
@@ -1203,16 +1244,14 @@ SlangResult Parser::_maybeParseType(UnownedStringSlice& outType, Token& outName)
 
 static bool _isBalancedOpen(TokenType tokenType)
 {
-    return tokenType == TokenType::LBrace ||
-        tokenType == TokenType::LParent ||
-        tokenType == TokenType::LBracket;
+    return tokenType == TokenType::LBrace || tokenType == TokenType::LParent ||
+           tokenType == TokenType::LBracket;
 }
 
 static bool _isBalancedClose(TokenType tokenType)
 {
-    return tokenType == TokenType::RBrace ||
-        tokenType == TokenType::RParent ||
-        tokenType == TokenType::RBracket;
+    return tokenType == TokenType::RBrace || tokenType == TokenType::RParent ||
+           tokenType == TokenType::RBracket;
 }
 
 static TokenType _getBalancedClose(TokenType tokenType)
@@ -1220,10 +1259,10 @@ static TokenType _getBalancedClose(TokenType tokenType)
     SLANG_ASSERT(_isBalancedOpen(tokenType));
     switch (tokenType)
     {
-        case TokenType::LBrace:         return TokenType::RBrace;
-        case TokenType::LParent:        return TokenType::RParent;
-        case TokenType::LBracket:       return TokenType::RBracket;
-        default:                        return TokenType::Unknown;
+    case TokenType::LBrace:   return TokenType::RBrace;
+    case TokenType::LParent:  return TokenType::RParent;
+    case TokenType::LBracket: return TokenType::RBracket;
+    default:                  return TokenType::Unknown;
     }
 }
 
@@ -1251,7 +1290,7 @@ SlangResult Parser::_parseBalanced(DiagnosticSink* sink)
             return SLANG_OK;
         }
 
-        // If we hit a balanced open, recurse 
+        // If we hit a balanced open, recurse
         if (_isBalancedOpen(tokenType))
         {
             SLANG_RETURN_ON_FAIL(_parseBalanced(sink));
@@ -1300,12 +1339,12 @@ SlangResult Parser::_consumeBalancedParens()
 
         switch (tokenType)
         {
-            case TokenType::LParent:
+        case TokenType::LParent:
             {
                 parenCount++;
                 break;
             }
-            case TokenType::RParent:
+        case TokenType::RParent:
             {
                 --parenCount;
                 // If no more parens then we are done
@@ -1316,12 +1355,12 @@ SlangResult Parser::_consumeBalancedParens()
                 }
                 break;
             }
-            case TokenType::EndOfFile:
+        case TokenType::EndOfFile:
             {
                 // If we hit the end of the file, then not balanced
                 return SLANG_FAIL;
             }
-            default: break;
+        default: break;
         }
 
         m_reader.advanceToken();
@@ -1333,9 +1372,10 @@ SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
     Index parenCount = 0;
     Index bracketCount = 0;
 
-    // TODO(JS): NOTE! This doesn't handle an expression that contains a template params in Something<Arg1, 3>,
-    // because without knowing what Something is, it's not known if < is a comparison or or a 'template' bracket
-    // 
+    // TODO(JS): NOTE! This doesn't handle an expression that contains a template params in
+    // Something<Arg1, 3>, because without knowing what Something is, it's not known if < is a
+    // comparison or or a 'template' bracket
+    //
     // This can be worked around in the originating source by placing in parens
 
     while (true)
@@ -1344,12 +1384,12 @@ SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
 
         switch (tokenType)
         {
-            case TokenType::LParent:
+        case TokenType::LParent:
             {
                 parenCount++;
                 break;
             }
-            case TokenType::RParent:
+        case TokenType::RParent:
             {
                 // If no parens, and nothing else is open then we are done
                 if (parenCount == 0)
@@ -1365,12 +1405,12 @@ SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
                 --parenCount;
                 break;
             }
-            case TokenType::LBracket:
+        case TokenType::LBracket:
             {
                 bracketCount++;
                 break;
             }
-            case TokenType::RBracket:
+        case TokenType::RBracket:
             {
                 // If no brackets are open we are done
                 if (bracketCount == 0)
@@ -1385,7 +1425,7 @@ SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
                 --bracketCount;
                 break;
             }
-            case TokenType::EndOfFile:
+        case TokenType::EndOfFile:
             {
                 if ((bracketCount | parenCount) == 0)
                 {
@@ -1394,9 +1434,9 @@ SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
                 m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::cannotParseExpression);
                 return SLANG_FAIL;
             }
-            case TokenType::RBrace:
-            case TokenType::Semicolon:
-            case TokenType::Comma:
+        case TokenType::RBrace:
+        case TokenType::Semicolon:
+        case TokenType::Comma:
             {
                 if ((bracketCount | parenCount) == 0)
                 {
@@ -1405,7 +1445,7 @@ SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
                 break;
             }
 
-            default: break;
+        default: break;
         }
 
         outExprTokens.add(m_reader.advanceToken());
@@ -1436,7 +1476,10 @@ SlangResult Parser::_parseTypeDef()
 
     if (Node::lookupNameInScope(m_currentScope, nameToken.getContent()))
     {
-        m_sink->diagnose(nameToken.loc, CPPDiagnostics::identifierAlreadyDefined, nameToken.getContent());
+        m_sink->diagnose(
+            nameToken.loc,
+            CPPDiagnostics::identifierAlreadyDefined,
+            nameToken.getContent());
         return SLANG_FAIL;
     }
 
@@ -1484,7 +1527,8 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
 
     while (m_reader.peekTokenType() == TokenType::Identifier)
     {
-        const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+        const IdentifierStyle style =
+            m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
 
         // Check for virtualness
         if (style == IdentifierStyle::Virtual)
@@ -1494,13 +1538,13 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             continue;
         }
 
-        // Check if static 
+        // Check if static
         if (style == IdentifierStyle::Static)
         {
             isStatic = true;
             m_reader.advanceToken();
             continue;
-        } 
+        }
 
         break;
     }
@@ -1511,7 +1555,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     Token nameToken;
 
     bool isConstructor = false;
-    
+
     if (m_currentScope->isClassLike())
     {
         // If it's a dtor
@@ -1524,7 +1568,10 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
 
             if (tok.getContent() != m_currentScope->m_name.getContent())
             {
-                m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::destructorNameDoesntMatch, m_currentScope->m_name.getContent());
+                m_sink->diagnose(
+                    m_reader.peekLoc(),
+                    CPPDiagnostics::destructorNameDoesntMatch,
+                    m_currentScope->m_name.getContent());
                 return SLANG_FAIL;
             }
         }
@@ -1563,7 +1610,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             return SLANG_OK;
         }
     }
-    
+
     // Handles other scenarios, but here for catching operator overloading
     if (nameToken.type == TokenType::Identifier)
     {
@@ -1582,7 +1629,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             SLANG_RETURN_ON_FAIL(_consumeBalancedParens());
             // Consume everything up to ; or {
             SLANG_RETURN_ON_FAIL(_consumeToSync());
-            
+
             return SLANG_OK;
         }
 
@@ -1639,7 +1686,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                         continue;
                     }
                 }
-                
+
                 m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::expectingToken, ", or ) or =");
                 return SLANG_FAIL;
             }
@@ -1662,8 +1709,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                 while (true)
                 {
                     auto peekType = m_reader.peekTokenType();
-                    if (peekType == TokenType::Semicolon ||
-                        peekType == TokenType::LBrace ||
+                    if (peekType == TokenType::Semicolon || peekType == TokenType::LBrace ||
                         peekType == TokenType::EndOfFile)
                     {
                         break;
@@ -1673,14 +1719,15 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                 }
             }
         }
-        
+
         // = 0 ? or = default
         if (advanceIfToken(TokenType::OpAssign))
         {
             if (m_reader.peekTokenType() == TokenType::IntegerLiteral)
             {
                 Int value = -1;
-                if (SLANG_SUCCEEDED(StringUtil::parseInt(m_reader.peekToken().getContent(), value)) &&
+                if (SLANG_SUCCEEDED(
+                        StringUtil::parseInt(m_reader.peekToken().getContent(), value)) &&
                     value == 0)
                 {
                     isPure = true;
@@ -1693,7 +1740,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                 }
             }
             else if (advanceIfStyle(IdentifierStyle::Default))
-            {  
+            {
             }
             else
             {
@@ -1768,7 +1815,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             List<Token> exprTokens;
             SLANG_RETURN_ON_FAIL(_parseExpression(exprTokens));
         }
-        
+
         // Hit end of field/variable
         if (m_reader.peekTokenType() == TokenType::Semicolon)
         {
@@ -1785,21 +1832,21 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             return SLANG_OK;
         }
     }
-     
+
     _consumeToSync();
     return SLANG_OK;
 }
 
-/* static */Node::Kind Parser::_toNodeKind(IdentifierStyle style)
+/* static */ Node::Kind Parser::_toNodeKind(IdentifierStyle style)
 {
     switch (style)
     {
-        case IdentifierStyle::Class:        return Node::Kind::ClassType;
-        case IdentifierStyle::Struct:       return Node::Kind::StructType;
-        case IdentifierStyle::Namespace:    return Node::Kind::Namespace;
-        case IdentifierStyle::Enum:         return Node::Kind::Enum;
-        case IdentifierStyle::TypeDef:      return Node::Kind::TypeDef;
-        default: return Node::Kind::Invalid;
+    case IdentifierStyle::Class:     return Node::Kind::ClassType;
+    case IdentifierStyle::Struct:    return Node::Kind::StructType;
+    case IdentifierStyle::Namespace: return Node::Kind::Namespace;
+    case IdentifierStyle::Enum:      return Node::Kind::Enum;
+    case IdentifierStyle::TypeDef:   return Node::Kind::TypeDef;
+    default:                         return Node::Kind::Invalid;
     }
 }
 
@@ -1839,7 +1886,10 @@ SlangResult Parser::_parsePreDeclare()
 
         if (style != IdentifierStyle::Struct && style != IdentifierStyle::Class)
         {
-            m_sink->diagnose(typeToken, CPPDiagnostics::expectingTypeKeyword, typeToken.getContent());
+            m_sink->diagnose(
+                typeToken,
+                CPPDiagnostics::expectingTypeKeyword,
+                typeToken.getContent());
             return SLANG_FAIL;
         }
         nodeKind = _toNodeKind(style);
@@ -1859,8 +1909,8 @@ SlangResult Parser::_parsePreDeclare()
 
     switch (nodeKind)
     {
-        case Node::Kind::ClassType:
-        case Node::Kind::StructType:
+    case Node::Kind::ClassType:
+    case Node::Kind::StructType:
         {
             RefPtr<ClassLikeNode> node(new ClassLikeNode(nodeKind));
 
@@ -1876,7 +1926,7 @@ SlangResult Parser::_parsePreDeclare()
             popScope();
             break;
         }
-        default:
+    default:
         {
             return SLANG_FAIL;
         }
@@ -1930,7 +1980,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
 
     // Set up the scope stack
     m_scopeStack.clear();
-    
+
     m_currentScope = m_nodeTree->m_rootNode;
     m_scopeStack.add(m_currentScope);
 
@@ -1953,7 +2003,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
     {
         switch (m_reader.peekTokenType())
         {
-            case TokenType::OpBitNot:
+        case TokenType::OpBitNot:
             {
                 // Handle dtor
                 if (m_currentScope->isClassLike())
@@ -1968,13 +2018,14 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                 }
                 break;
             }
-            case TokenType::Identifier:
+        case TokenType::Identifier:
             {
-                const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+                const IdentifierStyle style =
+                    m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
 
                 switch (style)
                 {
-                    case IdentifierStyle::Extern:
+                case IdentifierStyle::Extern:
                     {
                         m_reader.advanceToken();
 
@@ -1988,22 +2039,22 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         }
                         break;
                     }
-                    case IdentifierStyle::Template:
+                case IdentifierStyle::Template:
                     {
                         SLANG_RETURN_ON_FAIL(_consumeTemplate());
                         break;
                     }
-                    case IdentifierStyle::PreDeclare:
+                case IdentifierStyle::PreDeclare:
                     {
                         SLANG_RETURN_ON_FAIL(_parsePreDeclare());
                         break;
                     }
-                    case IdentifierStyle::TypeSet:
+                case IdentifierStyle::TypeSet:
                     {
                         SLANG_RETURN_ON_FAIL(_parseTypeSet());
                         break;
                     }
-                    case IdentifierStyle::Reflected:
+                case IdentifierStyle::Reflected:
                     {
                         m_reader.advanceToken();
                         if (m_currentScope)
@@ -2012,7 +2063,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         }
                         break;
                     }
-                    case IdentifierStyle::Unreflected:
+                case IdentifierStyle::Unreflected:
                     {
                         m_reader.advanceToken();
                         if (m_currentScope)
@@ -2021,13 +2072,13 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         }
                         break;
                     }
-                    case IdentifierStyle::Access:
+                case IdentifierStyle::Access:
                     {
                         m_reader.advanceToken();
                         SLANG_RETURN_ON_FAIL(expect(TokenType::Colon));
                         break;
                     }
-                    case IdentifierStyle::TypeDef:
+                case IdentifierStyle::TypeDef:
                     {
                         if (isTypeEnabled(Node::Kind::TypeDef))
                         {
@@ -2040,7 +2091,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         }
                         break;
                     }
-                    default:
+                default:
                     {
                         IdentifierFlags flags = getFlags(style);
 
@@ -2067,7 +2118,9 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                             {
                                 if (!m_currentScope->isClassLike())
                                 {
-                                    m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::classMarkerOutsideOfClass);
+                                    m_sink->diagnose(
+                                        m_reader.peekLoc(),
+                                        CPPDiagnostics::classMarkerOutsideOfClass);
                                     return SLANG_FAIL;
                                 }
 
@@ -2075,16 +2128,18 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                                 break;
                             }
 
-                            if (m_options->m_markPrefix.getLength() > 0 && content.startsWith(m_options->m_markPrefix.getUnownedSlice()))
+                            if (m_options->m_markPrefix.getLength() > 0 &&
+                                content.startsWith(m_options->m_markPrefix.getUnownedSlice()))
                             {
                                 SLANG_RETURN_ON_FAIL(_parseSpecialMacro());
                                 break;
                             }
 
 
-                            // Special case the node that's the root of the hierarchy (as far as reflection is concerned)
-                            // This could be a field
-                            if (m_currentScope->canContainFields() || m_currentScope->canContainCallable())
+                            // Special case the node that's the root of the hierarchy (as far as
+                            // reflection is concerned) This could be a field
+                            if (m_currentScope->canContainFields() ||
+                                m_currentScope->canContainCallable())
                             {
                                 Node* containedNode = nullptr;
                                 SLANG_RETURN_ON_FAIL(_maybeParseContained(&containedNode));
@@ -2099,18 +2154,18 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                 }
                 break;
             }
-            case TokenType::LBrace:
+        case TokenType::LBrace:
             {
                 SLANG_RETURN_ON_FAIL(consumeToClosingBrace());
                 break;
             }
-            case TokenType::RBrace:
+        case TokenType::RBrace:
             {
                 SLANG_RETURN_ON_FAIL(popScope());
                 m_reader.advanceToken();
                 break;
             }
-            case TokenType::EndOfFile:
+        case TokenType::EndOfFile:
             {
                 // Okay we need to confirm that we are in the root node, and with no open braces
                 if (m_currentScope != m_nodeTree->getRootNode())
@@ -2121,7 +2176,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
 
                 return SLANG_OK;
             }
-            case TokenType::Pound:
+        case TokenType::Pound:
             {
                 Token token = m_reader.peekToken();
                 if (token.flags & TokenFlag::AtStartOfLine)
@@ -2143,7 +2198,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                 m_reader.advanceToken();
                 break;
             }
-            default:
+        default:
             {
                 // Skip it then
                 m_reader.advanceToken();

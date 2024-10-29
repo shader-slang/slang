@@ -13,13 +13,18 @@ namespace d3d12
 using namespace Slang;
 
 Result SwapchainImpl::init(
-    DeviceImpl* renderer, const ISwapchain::Desc& swapchainDesc, WindowHandle window)
+    DeviceImpl* renderer,
+    const ISwapchain::Desc& swapchainDesc,
+    WindowHandle window)
 {
     m_queue = static_cast<CommandQueueImpl*>(swapchainDesc.queue)->m_d3dQueue;
     m_dxgiFactory = renderer->m_deviceInfo.m_dxgiFactory;
     SLANG_RETURN_ON_FAIL(
         D3DSwapchainBase::init(swapchainDesc, window, DXGI_SWAP_EFFECT_FLIP_DISCARD));
-    SLANG_RETURN_ON_FAIL(renderer->m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef())));
+    SLANG_RETURN_ON_FAIL(renderer->m_device->CreateFence(
+        0,
+        D3D12_FENCE_FLAG_NONE,
+        IID_PPV_ARGS(m_fence.writeRef())));
 
     SLANG_RETURN_ON_FAIL(m_swapChain->QueryInterface(m_swapChain3.writeRef()));
     for (GfxIndex i = 0; i < swapchainDesc.imageCount; i++)
@@ -51,7 +56,9 @@ void SwapchainImpl::createSwapchainBufferImages()
         m_swapChain->GetBuffer(i, IID_PPV_ARGS(d3dResource.writeRef()));
         ITextureResource::Desc imageDesc = {};
         imageDesc.allowedStates = ResourceStateSet(
-            ResourceState::Present, ResourceState::RenderTarget, ResourceState::CopyDestination);
+            ResourceState::Present,
+            ResourceState::RenderTarget,
+            ResourceState::CopyDestination);
         imageDesc.type = IResource::Type::Texture2D;
         imageDesc.arraySize = 0;
         imageDesc.format = m_desc.format;
@@ -80,7 +87,8 @@ int SwapchainImpl::acquireNextImage()
 Result SwapchainImpl::present()
 {
     m_fence->SetEventOnCompletion(
-        fenceValue, m_frameEvents[m_swapChain3->GetCurrentBackBufferIndex()]);
+        fenceValue,
+        m_frameEvents[m_swapChain3->GetCurrentBackBufferIndex()]);
     SLANG_RETURN_ON_FAIL(D3DSwapchainBase::present());
     fenceValue++;
     m_queue->Signal(m_fence, fenceValue);

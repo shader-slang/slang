@@ -1,9 +1,9 @@
 #pragma once
 
-#include "slang-gfx.h"
-#include "slang-com-ptr.h"
 #include "core/slang-basic.h"
 #include "renderer-shared.h"
+#include "slang-com-ptr.h"
+#include "slang-gfx.h"
 
 namespace gfx
 {
@@ -115,12 +115,14 @@ public:
         return offset;
     }
 
-    template <typename T> T* getObject(uint32_t offset)
+    template<typename T>
+    T* getObject(uint32_t offset)
     {
         return static_cast<T*>(m_objects[offset].Ptr());
     }
 
-    template <typename T> T* getData(Offset offset)
+    template<typename T>
+    T* getData(Offset offset)
     {
         return reinterpret_cast<T*>(m_data.getBuffer() + offset);
     }
@@ -176,7 +178,10 @@ public:
     void clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil)
     {
         m_commands.add(Command(
-            CommandName::ClearFrame, colorBufferMask, clearDepth ? 1 : 0, clearStencil ? 1 : 0));
+            CommandName::ClearFrame,
+            colorBufferMask,
+            clearDepth ? 1 : 0,
+            clearStencil ? 1 : 0));
     }
 
     void setViewports(GfxCount count, const Viewport* viewports)
@@ -222,7 +227,10 @@ public:
     {
         auto bufferOffset = encodeObject(static_cast<BufferResource*>(buffer));
         m_commands.add(Command(
-            CommandName::SetIndexBuffer, (uint32_t)bufferOffset, (uint32_t)indexFormat, (uint32_t)offset));
+            CommandName::SetIndexBuffer,
+            (uint32_t)bufferOffset,
+            (uint32_t)indexFormat,
+            (uint32_t)offset));
     }
 
     void draw(GfxCount vertexCount, GfxIndex startVertex)
@@ -283,9 +291,8 @@ public:
     void writeTimestamp(IQueryPool* pool, GfxIndex index)
     {
         auto poolOffset = encodeObject(static_cast<QueryPoolBase*>(pool));
-        m_commands.add(
-            Command(CommandName::WriteTimestamp, (uint32_t)poolOffset, (uint32_t)index));
+        m_commands.add(Command(CommandName::WriteTimestamp, (uint32_t)poolOffset, (uint32_t)index));
         m_hasWriteTimestamps = true;
     }
 };
-}
+} // namespace gfx

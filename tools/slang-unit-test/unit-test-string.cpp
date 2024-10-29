@@ -1,16 +1,18 @@
 // unit-test-path.cpp
 
 #include "../../source/core/slang-string-util.h"
-
 #include "tools/unit-test/slang-unit-test.h"
 
-//#include <math.h>
+// #include <math.h>
 
 #include <sstream>
 
 using namespace Slang;
 
-static bool _areEqual(const List<UnownedStringSlice>& lines, const UnownedStringSlice* checkLines, Int checkLinesCount)
+static bool _areEqual(
+    const List<UnownedStringSlice>& lines,
+    const UnownedStringSlice* checkLines,
+    Int checkLinesCount)
 {
     if (checkLinesCount != lines.getCount())
     {
@@ -27,7 +29,10 @@ static bool _areEqual(const List<UnownedStringSlice>& lines, const UnownedString
     return true;
 }
 
-static bool _checkLines(const UnownedStringSlice& input, const UnownedStringSlice* checkLines, Int checkLinesCount)
+static bool _checkLines(
+    const UnownedStringSlice& input,
+    const UnownedStringSlice* checkLines,
+    Int checkLinesCount)
 {
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(input, lines);
@@ -100,7 +105,11 @@ static int64_t _calcULPDistance(double a, double b)
     return distance < 0 ? -distance : distance;
 }
 
-static bool _areApproximatelyEqual(double a, double b, double fixedEpsilon = 1e-10, int ulpsEpsilon = 100)
+static bool _areApproximatelyEqual(
+    double a,
+    double b,
+    double fixedEpsilon = 1e-10,
+    int ulpsEpsilon = 100)
 {
     // Handle the near-zero case.
     const double difference = abs(a - b);
@@ -115,8 +124,11 @@ static bool _areApproximatelyEqual(double a, double b, double fixedEpsilon = 1e-
 SLANG_UNIT_TEST(string)
 {
     {
-        UnownedStringSlice checkLines[] = { UnownedStringSlice::fromLiteral("") };
-        SLANG_CHECK(_checkLines(UnownedStringSlice::fromLiteral(""), checkLines, SLANG_COUNT_OF(checkLines)));
+        UnownedStringSlice checkLines[] = {UnownedStringSlice::fromLiteral("")};
+        SLANG_CHECK(_checkLines(
+            UnownedStringSlice::fromLiteral(""),
+            checkLines,
+            SLANG_COUNT_OF(checkLines)));
     }
     {
         // Will emit no lines
@@ -124,16 +136,30 @@ SLANG_UNIT_TEST(string)
     }
     {
         // Two lines - both empty
-        UnownedStringSlice checkLines[] = { UnownedStringSlice(), UnownedStringSlice()};
-        SLANG_CHECK(_checkLines(UnownedStringSlice::fromLiteral("\n"), checkLines, SLANG_COUNT_OF(checkLines)));
+        UnownedStringSlice checkLines[] = {UnownedStringSlice(), UnownedStringSlice()};
+        SLANG_CHECK(_checkLines(
+            UnownedStringSlice::fromLiteral("\n"),
+            checkLines,
+            SLANG_COUNT_OF(checkLines)));
     }
     {
-        UnownedStringSlice checkLines[] = { UnownedStringSlice::fromLiteral("Hello"), UnownedStringSlice::fromLiteral("World!") };
-        SLANG_CHECK(_checkLines(UnownedStringSlice::fromLiteral("Hello\nWorld!"), checkLines, SLANG_COUNT_OF(checkLines)));
+        UnownedStringSlice checkLines[] = {
+            UnownedStringSlice::fromLiteral("Hello"),
+            UnownedStringSlice::fromLiteral("World!")};
+        SLANG_CHECK(_checkLines(
+            UnownedStringSlice::fromLiteral("Hello\nWorld!"),
+            checkLines,
+            SLANG_COUNT_OF(checkLines)));
     }
     {
-        UnownedStringSlice checkLines[] = { UnownedStringSlice::fromLiteral("Hello"), UnownedStringSlice::fromLiteral("World!"), UnownedStringSlice() };
-        SLANG_CHECK(_checkLines(UnownedStringSlice::fromLiteral("Hello\n\rWorld!\n"), checkLines, SLANG_COUNT_OF(checkLines)));
+        UnownedStringSlice checkLines[] = {
+            UnownedStringSlice::fromLiteral("Hello"),
+            UnownedStringSlice::fromLiteral("World!"),
+            UnownedStringSlice()};
+        SLANG_CHECK(_checkLines(
+            UnownedStringSlice::fromLiteral("Hello\n\rWorld!\n"),
+            checkLines,
+            SLANG_COUNT_OF(checkLines)));
     }
 
     {
@@ -143,16 +169,27 @@ SLANG_UNIT_TEST(string)
     }
     {
         Int value;
-        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-10"), value)) && value == -10);
-        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("0"), value)) && value == 0);
-        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-0"), value)) && value == 0);
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-10"), value)) &&
+            value == -10);
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("0"), value)) && value == 0);
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-0"), value)) && value == 0);
 
-        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("13824"), value)) && value == 13824);
-        SLANG_CHECK(SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-13824"), value)) && value == -13824);
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("13824"), value)) &&
+            value == 13824);
+        SLANG_CHECK(
+            SLANG_SUCCEEDED(StringUtil::parseInt(UnownedStringSlice("-13824"), value)) &&
+            value == -13824);
     }
 
     {
-        UnownedStringSlice values[] = { UnownedStringSlice("hello"), UnownedStringSlice("world"), UnownedStringSlice("!") };
+        UnownedStringSlice values[] = {
+            UnownedStringSlice("hello"),
+            UnownedStringSlice("world"),
+            UnownedStringSlice("!")};
         ArrayView<UnownedStringSlice> valuesView(values, SLANG_COUNT_OF(values));
 
         List<UnownedStringSlice> checkValues;
@@ -192,7 +229,7 @@ SLANG_UNIT_TEST(string)
         }
     }
     {
-       
+
         List<double> values;
         values.add(0.0);
         values.add(-0.0);
@@ -221,7 +258,7 @@ SLANG_UNIT_TEST(string)
             SlangResult res = StringUtil::parseDouble(slice, parsedValue);
 
             auto ulpsParsed = _calcULPDistance(value, parsedValue);
-            
+
             SLANG_CHECK(SLANG_SUCCEEDED(res));
 
             // Check that they are equal
@@ -254,7 +291,7 @@ SLANG_UNIT_TEST(string)
             SlangResult res = StringUtil::parseInt64(slice, parsedValue);
 
             SLANG_CHECK(SLANG_SUCCEEDED(res));
-            
+
             // Check that they are equal
             SLANG_CHECK(value == parsedValue);
         }

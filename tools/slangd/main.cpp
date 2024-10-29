@@ -2,10 +2,10 @@
 
 // This file implements the entry point for `slangd`, the daemon process of Slang's language server.
 
-#include <thread>
-
 #include "../../source/core/slang-basic.h"
 #include "../../source/slang/slang-language-server.h"
+
+#include <thread>
 
 int main(int argc, const char* const* argv)
 {
@@ -23,7 +23,7 @@ int main(int argc, const char* const* argv)
     }
     Slang::LanguageServerStartupOptions options;
     options.parse(argc, argv);
-    auto result =  Slang::runLanguageServer(options);
+    auto result = Slang::runLanguageServer(options);
     slang::shutdown();
     return result;
 }

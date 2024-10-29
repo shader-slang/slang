@@ -3,11 +3,11 @@
 #define SLANG_TOKEN_H_INCLUDED
 
 #include "../core/slang-basic.h"
-
-#include "slang-source-loc.h"
 #include "slang-name.h"
+#include "slang-source-loc.h"
 
-namespace Slang {
+namespace Slang
+{
 
 class Name;
 
@@ -24,22 +24,21 @@ struct TokenFlag
 {
     enum Enum : TokenFlags
     {
-        AtStartOfLine           = 1 << 0,
-        AfterWhitespace         = 1 << 1,
-        ScrubbingNeeded         = 1 << 2,
-        Name                    = 1 << 3,           ///< Determines if 'name' is set or 'chars' in the charsNameUnion
+        AtStartOfLine = 1 << 0,
+        AfterWhitespace = 1 << 1,
+        ScrubbingNeeded = 1 << 2,
+        Name = 1 << 3, ///< Determines if 'name' is set or 'chars' in the charsNameUnion
     };
 };
 
 class Token
 {
 public:
+    TokenType type = TokenType::Unknown;
+    TokenFlags flags = 0;
 
-    TokenType   type = TokenType::Unknown;
-    TokenFlags  flags = 0;
-
-    SourceLoc   loc;
-    uint32_t charsCount = 0;              ///< Amount of characters. Is set if name or not.
+    SourceLoc loc;
+    uint32_t charsCount = 0; ///< Amount of characters. Is set if name or not.
 
     union CharsNameUnion
     {
@@ -53,7 +52,7 @@ public:
     Index getContentLength() const { return charsCount; }
 
     UnownedStringSlice getContent() const;
-        /// Set content
+    /// Set content
     void setContent(const UnownedStringSlice& content);
 
     Name* getName() const;
@@ -62,13 +61,10 @@ public:
 
     SourceLoc getLoc() const { return loc; }
 
-        /// Set the name
+    /// Set the name
     SLANG_FORCE_INLINE void setName(Name* inName);
 
-    Token()
-    {
-        charsNameUnion.chars = nullptr;
-    }
+    Token() { charsNameUnion.chars = nullptr; }
 
     Token(
         TokenType inType,
@@ -76,18 +72,14 @@ public:
         SourceLoc inLoc,
         TokenFlags inFlags = 0)
         : flags(inFlags)
-	{
-        SLANG_ASSERT((inFlags & TokenFlag::Name) == 0); 
-		type = inType;
+    {
+        SLANG_ASSERT((inFlags & TokenFlag::Name) == 0);
+        type = inType;
         charsNameUnion.chars = inContent.begin();
         charsCount = uint32_t(inContent.getLength());
         loc = inLoc;
-	}
-    Token(
-        TokenType inType,
-        Name* name, 
-        SourceLoc inLoc,
-        TokenFlags inFlags = 0)
+    }
+    Token(TokenType inType, Name* name, SourceLoc inLoc, TokenFlags inFlags = 0)
     {
         SLANG_ASSERT(name);
         type = inType;
@@ -101,7 +93,8 @@ public:
 // ---------------------------------------------------------------------------
 SLANG_FORCE_INLINE UnownedStringSlice Token::getContent() const
 {
-    return (flags & TokenFlag::Name) ? charsNameUnion.name->text.getUnownedSlice() : UnownedStringSlice(charsNameUnion.chars, charsCount);
+    return (flags & TokenFlag::Name) ? charsNameUnion.name->text.getUnownedSlice()
+                                     : UnownedStringSlice(charsNameUnion.chars, charsCount);
 }
 
 // ---------------------------------------------------------------------------

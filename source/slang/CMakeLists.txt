@@ -1,4 +1,3 @@
-
 #
 # generate capability files
 #
@@ -20,7 +19,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_CAPABILITY_OUTPUT_DIR}
     COMMAND
         slang-capability-generator ${SLANG_CAPABILITY_SOURCE} --target-directory
-        ${SLANG_CAPABILITY_OUTPUT_DIR} --doc "${slang_SOURCE_DIR}/docs/user-guide/a3-02-reference-capability-atoms.md"
+        ${SLANG_CAPABILITY_OUTPUT_DIR} --doc
+        "${slang_SOURCE_DIR}/docs/user-guide/a3-02-reference-capability-atoms.md"
     DEPENDS ${SLANG_CAPABILITY_SOURCE} slang-capability-generator
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
@@ -105,8 +105,10 @@ target_include_directories(
 # generated lookup tables
 #
 
-if (NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
-    set(SLANG_SPIRV_HEADERS_INCLUDE_DIR "${slang_SOURCE_DIR}/external/spirv-headers/include")
+if(NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
+    set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
+        "${slang_SOURCE_DIR}/external/spirv-headers/include"
+    )
 endif()
 
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
@@ -146,8 +148,7 @@ add_custom_command(
     COMMAND
         ${CMAKE_COMMAND} -E make_directory ${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}
     COMMAND
-        slang-spirv-embed-generator
-        ${SLANG_SPIRV_CORE_SOURCE_JSON}
+        slang-spirv-embed-generator ${SLANG_SPIRV_CORE_SOURCE_JSON}
         ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
     DEPENDS ${SLANG_SPIRV_CORE_SOURCE_JSON} slang-spirv-embed-generator
     VERBATIM
@@ -157,7 +158,9 @@ slang_add_target(
     slang-lookup-tables
     OBJECT
     USE_EXTRA_WARNINGS
-    EXPLICIT_SOURCE ${SLANG_LOOKUP_GENERATED_SOURCE} ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
+    EXPLICIT_SOURCE
+        ${SLANG_LOOKUP_GENERATED_SOURCE}
+        ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
     LINK_WITH_PRIVATE core SPIRV-Headers
     EXCLUDE_FROM_ALL
     FOLDER generated
@@ -167,7 +170,10 @@ slang_add_target(
 # Generate the version header
 #
 
-configure_file(${slang_SOURCE_DIR}/slang-tag-version.h.in slang-version-header/slang-tag-version.h)
+configure_file(
+    ${slang_SOURCE_DIR}/slang-tag-version.h.in
+    slang-version-header/slang-tag-version.h
+)
 
 #
 # Slang itself
@@ -176,51 +182,56 @@ configure_file(${slang_SOURCE_DIR}/slang-tag-version.h.in slang-version-header/s
 set(slang_build_args
     USE_EXTRA_WARNINGS
     EXTRA_COMPILE_OPTIONS_PRIVATE
-        # a warning is disabled for a memset boundary check.
-        # everything looked fine and it is unclear why the checking fails
-        $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
-    INCLUDE_DIRECTORIES_PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
-    EXPORT_MACRO_PREFIX SLANG
-    EXPORT_TYPE_AS ${SLANG_LIB_TYPE} 
-    EXTRA_SOURCE_DIRS ${SLANG_RECORD_REPLAY_SYSTEM}
+    # a warning is disabled for a memset boundary check.
+    # everything looked fine and it is unclear why the checking fails
+    $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
+    INCLUDE_DIRECTORIES_PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
+    EXPORT_MACRO_PREFIX
+    SLANG
+    EXPORT_TYPE_AS
+    ${SLANG_LIB_TYPE}
+    EXTRA_SOURCE_DIRS
+    ${SLANG_RECORD_REPLAY_SYSTEM}
 )
 set(slang_link_args
     LINK_WITH_PRIVATE
-        core
-        prelude
-        compiler-core
-        slang-capability-defs
-        slang-capability-lookup
-        slang-reflect-headers
-        slang-lookup-tables
-        SPIRV-Headers
+    core
+    prelude
+    compiler-core
+    slang-capability-defs
+    slang-capability-lookup
+    slang-reflect-headers
+    slang-lookup-tables
+    SPIRV-Headers
 )
 set(slang_interface_args
     # slang.h is in the project root, so include that directory in the interface
     # for slang
-    INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}
-) 
+    INCLUDE_DIRECTORIES_PUBLIC
+    ${slang_SOURCE_DIR}
+)
 set(slang_public_lib_args
-    PUBLIC_HEADERS 
-        ${slang_SOURCE_DIR}/include/slang*.h 
-        ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/*.h
+    PUBLIC_HEADERS
+    ${slang_SOURCE_DIR}/include/slang*.h
+    ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/*.h
     LINK_WITH_PRIVATE
-        $<IF:$<BOOL:${SLANG_EMBED_STDLIB}>,slang-embedded-stdlib,slang-no-embedded-stdlib>
-        $<IF:$<BOOL:${SLANG_EMBED_STDLIB_SOURCE}>,slang-embedded-stdlib-source,slang-no-embedded-stdlib-source>
+    $<IF:$<BOOL:${SLANG_EMBED_CORE_MODULE}>,slang-embedded-core-module,slang-no-embedded-core-module>
+    $<IF:$<BOOL:${SLANG_EMBED_CORE_MODULE_SOURCE}>,slang-embedded-core-module-source,slang-no-embedded-core-module-source>
     INSTALL
 )
 
 #
-# Minimal static slang used in generating the embedded stdlib
+# Minimal static slang used in generating the embedded core module
 #
 
 #
 # Slang itself
 #
 
-if(NOT SLANG_EMBED_STDLIB)
-    # If we're not embedding stdlib we can just do a normal build of slang,
-    # including all the options, this can also serve as our no embedded stdlib
+if(NOT SLANG_EMBED_CORE_MODULE)
+    # If we're not embedding core module we can just do a normal build of slang,
+    # including all the options, this can also serve as our no embedded core module
     # library for slang-bootstrap (not that we need that anyway)
     slang_add_target(
         .
@@ -231,10 +242,10 @@ if(NOT SLANG_EMBED_STDLIB)
         ${slang_public_lib_args}
         INSTALL_COMPONENT generators
     )
-    add_library(slang-without-embedded-stdlib ALIAS slang) 
+    add_library(slang-without-embedded-core-module ALIAS slang)
 else()
-    # However if we're embedding stdlib, we need to make two different
-    # libraries, one with the embedded stdlib and one without, so first define
+    # However if we're embedding core module, we need to make two different
+    # libraries, one with the embedded core module and one without, so first define
     # the shared objects as one target so we don't build them twice.
     slang_add_target(
         .
@@ -250,13 +261,12 @@ else()
         ${slang_link_args}
         ${slang_interface_args}
         NO_SOURCE
-        TARGET_NAME 
-            slang-without-embedded-stdlib
+        TARGET_NAME slang-without-embedded-core-module
         EXCLUDE_FROM_ALL
-        LINK_WITH_PRIVATE 
+        LINK_WITH_PRIVATE
             slang-common-objects
-            slang-no-embedded-stdlib 
-            slang-embedded-stdlib-source
+            slang-no-embedded-core-module
+            slang-embedded-core-module-source
         OUTPUT_DIR generators
         FOLDER generators
         INSTALL_COMPONENT generators
@@ -267,8 +277,7 @@ else()
         ${slang_link_args}
         ${slang_interface_args}
         ${slang_public_lib_args}
-        LINK_WITH_PRIVATE 
-            slang-common-objects
+        LINK_WITH_PRIVATE slang-common-objects
         NO_SOURCE
     )
 endif()

@@ -1,11 +1,12 @@
 #include "slang-ir-autodiff-primal-hoist.h"
+
+#include "../core/slang-func-ptr.h"
 #include "slang-ast-support-types.h"
 #include "slang-ir-autodiff-region.h"
+#include "slang-ir-insts.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-util.h"
-#include "slang-ir-insts.h"
 #include "slang-ir.h"
-#include "../core/slang-func-ptr.h"
 
 namespace Slang
 {
@@ -113,7 +114,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         indexedBlockInfo.set(recomputeBlock, indexedBlockInfo.getValue(primalBlock));
         return recomputeBlock;
     };
-    
+
     auto firstRecomputeBlock = createRecomputeBlock(func->getFirstBlock());
     firstRecomputeBlock->insertBefore(firstDiffBlock);
     moveParams(firstRecomputeBlock, firstDiffBlock);
@@ -128,14 +129,15 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         IRBlock* recomptueBlock;
 
         // The end of primal block in tihs region.
-        IRBlock* regionEndBlock; 
+        IRBlock* regionEndBlock;
 
         // The first diff block in this region.
         IRBlock* firstDiffBlock;
     };
 
     List<WorkItem> workList;
-    WorkItem firstWorkItem = { func->getFirstBlock(), firstRecomputeBlock, firstRecomputeBlock, firstDiffBlock };
+    WorkItem firstWorkItem =
+        {func->getFirstBlock(), firstRecomputeBlock, firstRecomputeBlock, firstDiffBlock};
     workList.add(firstWorkItem);
 
     recomputeBlockMap[func->getFirstBlock()] = firstRecomputeBlock;
@@ -182,7 +184,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
                             subRegionEndBlock,
                             nextRegionRecomputeBlock,
                             workItem.regionEndBlock,
-                            workItem.firstDiffBlock };
+                            workItem.firstDiffBlock};
                         workList.add(newWorkItem);
                     }
                 }
@@ -195,10 +197,10 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             auto bodyRecomputeBlock = createRecomputeBlock(bodyBlock);
             bodyRecomputeBlock->insertBefore(diffBodyBlock);
             diffBodyBlock->replaceUsesWith(bodyRecomputeBlock);
-            
+
             // Map the primal condition block directly to the diff
             // conditon block (we won't create a recompute block for this)
-            // 
+            //
             recomputeBlockMap[getLoopConditionBlock(loop)] = getLoopConditionBlock(diffLoop);
 
             moveParams(bodyRecomputeBlock, diffBodyBlock);
@@ -209,8 +211,8 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
                 // region in the loop.
                 // Therefore, we set the regionEndBlock for the sub-region as loop's target
                 // block.
-                WorkItem newWorkItem = {
-                    bodyBlock, bodyRecomputeBlock, loop->getTargetBlock(), diffBodyBlock};
+                WorkItem newWorkItem =
+                    {bodyBlock, bodyRecomputeBlock, loop->getTargetBlock(), diffBodyBlock};
                 workList.add(newWorkItem);
             }
         }
@@ -223,16 +225,18 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             {
             case kIROp_Switch:
             case kIROp_ifElse:
-                newTerminator = cloneCtx->cloneInstOutOfOrder(&builder, primalBlock->getTerminator());
+                newTerminator =
+                    cloneCtx->cloneInstOutOfOrder(&builder, primalBlock->getTerminator());
                 break;
             case kIROp_unconditionalBranch:
-                newTerminator = builder.emitBranch(as<IRUnconditionalBranch>(terminator)->getTargetBlock());
+                newTerminator =
+                    builder.emitBranch(as<IRUnconditionalBranch>(terminator)->getTargetBlock());
                 break;
-            default:
-                SLANG_UNREACHABLE("terminator type");
+            default: SLANG_UNREACHABLE("terminator type");
             }
 
-            // Modify jump targets in newTerminator to point to the right recompute block or firstDiffBlock.
+            // Modify jump targets in newTerminator to point to the right recompute block or
+            // firstDiffBlock.
             for (UInt op = 0; op < newTerminator->getOperandCount(); op++)
             {
                 auto target = as<IRBlock>(newTerminator->getOperand(op));
@@ -295,20 +299,20 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     auto addPrimalOperandsToWorkList = [&](IRInst* inst)
     {
         UIndex opIndex = 0;
-        for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount(); operand++, opIndex++)
-        {   
-            if (!isDifferentialInst(operand->get()) &&
-                !as<IRFunc>(operand->get()) &&
-                !as<IRBlock>(operand->get()) &&
-                !(as<IRModuleInst>(operand->get()->getParent())) &&
+        for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount();
+             operand++, opIndex++)
+        {
+            if (!isDifferentialInst(operand->get()) && !as<IRFunc>(operand->get()) &&
+                !as<IRBlock>(operand->get()) && !(as<IRModuleInst>(operand->get()->getParent())) &&
                 !isDifferentialBlock(getBlock(operand->get())))
                 workList.add(operand);
         }
 
-        // Is the type itself computed within our function? 
-        // If so, we'll need to consider that too (this is for existential types, specialize insts, etc)
+        // Is the type itself computed within our function?
+        // If so, we'll need to consider that too (this is for existential types, specialize insts,
+        // etc)
         // TODO: We might not really need to query the checkpointing algorithm for these
-        // since they _have_ to be classified as 'recompute' 
+        // since they _have_ to be classified as 'recompute'
         //
         if (inst->getDataType() && (getParentFunc(inst->getDataType()) == func))
         {
@@ -319,7 +323,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
     // Populate recompute/store/invert sets with insts, by applying the policy
     // to them.
-    // 
+    //
     for (auto block : func->getBlocks())
     {
         // Skip parameter block.
@@ -330,10 +334,9 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
             continue;
 
         for (auto child : block->getChildren())
-        {   
+        {
             // Special case: Ignore the primals used to construct the return pair.
-            if (as<IRMakeDifferentialPair>(child) &&
-                as<IRReturn>(child->firstUse->getUser()))
+            if (as<IRMakeDifferentialPair>(child) && as<IRReturn>(child->firstUse->getUser()))
             {
                 // quick check
                 SLANG_RELEASE_ASSERT(child->firstUse->nextUse == nullptr);
@@ -343,11 +346,12 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
             addPrimalOperandsToWorkList(child);
 
             // We'll be conservative with the decorations we consider as differential uses
-            // of a primal inst, in order to avoid weird behaviour with some decorations 
-            // 
+            // of a primal inst, in order to avoid weird behaviour with some decorations
+            //
             for (auto decoration : child->getDecorations())
             {
-                if (auto primalCtxDecoration = as<IRBackwardDerivativePrimalContextDecoration>(decoration))
+                if (auto primalCtxDecoration =
+                        as<IRBackwardDerivativePrimalContextDecoration>(decoration))
                     workList.add(&primalCtxDecoration->primalContextVar);
                 else if (auto loopExitDecoration = as<IRLoopExitPrimalValueDecoration>(decoration))
                     workList.add(&loopExitDecoration->exitVal);
@@ -356,145 +360,176 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
         addPrimalOperandsToWorkList(block->getTerminator());
     }
-    
+
     while (workList.getCount() > 0)
     {
-        auto use = workList.getLast();
-        workList.removeLast();
-
-        if (processedUses.contains(use))
-            continue;
-
-        processedUses.add(use);
-
-        HoistResult result = this->classify(use);
-
-        if (result.mode == HoistResult::Mode::Store)
+        while (workList.getCount() > 0)
         {
-            SLANG_ASSERT(!checkpointInfo->recomputeSet.contains(result.instToStore));
-            checkpointInfo->storeSet.add(result.instToStore);
-        }
-        else if (result.mode == HoistResult::Mode::Recompute)
-        {
-            SLANG_ASSERT(!checkpointInfo->storeSet.contains(result.instToRecompute));
-            checkpointInfo->recomputeSet.add(result.instToRecompute);
+            auto use = workList.getLast();
+            workList.removeLast();
 
-            if (isDifferentialInst(use.user) && use.irUse)
-                usesToReplace.add(use.irUse);
+            if (processedUses.contains(use))
+                continue;
 
-            if (auto param = as<IRParam>(result.instToRecompute))
+            processedUses.add(use);
+
+            HoistResult result = this->classify(use);
+
+            if (result.mode == HoistResult::Mode::Store)
             {
-                if (auto inductionInfo = inductionValueInsts.tryGetValue(param))
-                {
-                    checkpointInfo->loopInductionInfo.addIfNotExists(param, *inductionInfo);
-                    continue;
-                }
-
-                // Add in the branch-args of every predecessor block.
-                auto paramBlock = as<IRBlock>(param->getParent());
-                UIndex paramIndex = 0;
-                for (auto _param : paramBlock->getParams())
-                {
-                    if (_param == param) break;
-                    paramIndex ++;
-                }
-
-                for (auto predecessor : paramBlock->getPredecessors())
-                {
-                    // If we hit this, the checkpoint policy is trying to recompute 
-                    // values across a loop region boundary (we don't currently support this,
-                    // and in general this is quite inefficient in both compute & memory)
-                    // 
-                    SLANG_RELEASE_ASSERT(!domTree->dominates(paramBlock, predecessor));
-
-                    auto branchInst = as<IRUnconditionalBranch>(predecessor->getTerminator());
-                    SLANG_ASSERT(branchInst->getOperandCount() > paramIndex);
-
-                    workList.add(&branchInst->getArgs()[paramIndex]);
-                }
+                SLANG_ASSERT(!checkpointInfo->recomputeSet.contains(result.instToStore));
+                checkpointInfo->storeSet.add(result.instToStore);
             }
-            else
+            else if (result.mode == HoistResult::Mode::Recompute)
             {
-                if (auto var = as<IRVar>(result.instToRecompute))
+                SLANG_ASSERT(!checkpointInfo->storeSet.contains(result.instToRecompute));
+                checkpointInfo->recomputeSet.add(result.instToRecompute);
+
+                if (isDifferentialInst(use.user) && use.irUse)
+                    usesToReplace.add(use.irUse);
+
+                if (auto param = as<IRParam>(result.instToRecompute))
                 {
-                    for (auto varUse = var->firstUse; varUse; varUse = varUse->nextUse)
+                    if (auto inductionInfo = inductionValueInsts.tryGetValue(param))
                     {
-                        switch (varUse->getUser()->getOp())
-                        {
-                        case kIROp_Store:
-                        case kIROp_Call:
-                            // When we have a var and a store/call insts that writes to the var,
-                            // we treat as if there is a pseudo-use of the store/call to compute
-                            // the var inst, i.e. the var depends on the store/call, despite
-                            // the IR's def-use chain doesn't reflect this.
-                            workList.add(UseOrPseudoUse(var, varUse->getUser()));
+                        checkpointInfo->loopInductionInfo.addIfNotExists(param, *inductionInfo);
+                        continue;
+                    }
+
+                    // Add in the branch-args of every predecessor block.
+                    auto paramBlock = as<IRBlock>(param->getParent());
+                    UIndex paramIndex = 0;
+                    for (auto _param : paramBlock->getParams())
+                    {
+                        if (_param == param)
                             break;
-                        }
+                        paramIndex++;
+                    }
+
+                    for (auto predecessor : paramBlock->getPredecessors())
+                    {
+                        // If we hit this, the checkpoint policy is trying to recompute
+                        // values across a loop region boundary (we don't currently support this,
+                        // and in general this is quite inefficient in both compute & memory)
+                        //
+                        SLANG_RELEASE_ASSERT(!domTree->dominates(paramBlock, predecessor));
+
+                        auto branchInst = as<IRUnconditionalBranch>(predecessor->getTerminator());
+                        SLANG_ASSERT(branchInst->getOperandCount() > paramIndex);
+
+                        workList.add(&branchInst->getArgs()[paramIndex]);
                     }
                 }
                 else
                 {
-                    addPrimalOperandsToWorkList(result.instToRecompute);
+                    if (auto var = as<IRVar>(result.instToRecompute))
+                    {
+                        for (auto varUse = var->firstUse; varUse; varUse = varUse->nextUse)
+                        {
+                            switch (varUse->getUser()->getOp())
+                            {
+                            case kIROp_Store:
+                            case kIROp_Call:
+                                // When we have a var and a store/call insts that writes to the
+                                // var, we treat as if there is a pseudo-use of the store/call
+                                // to compute the var inst, i.e. the var depends on the
+                                // store/call, despite the IR's def-use chain doesn't reflect
+                                // this.
+                                workList.add(UseOrPseudoUse(var, varUse->getUser()));
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        addPrimalOperandsToWorkList(result.instToRecompute);
+                    }
                 }
             }
         }
-    }
 
-    // If a var or call is in recomputeSet, move any var/calls associated with the same call to
-    // recomputeSet.
-    List<IRInst*> instWorkList;
-    HashSet<IRInst*> instWorkListSet;
-    for (auto inst : checkpointInfo->recomputeSet)
-    {
-        switch (inst->getOp())
+        // If a var or call is in recomputeSet, move any var/calls associated with the same call to
+        // recomputeSet.
+        // This is a bit of a 'retro-active' analysis where we go back on processed insts and
+        // correct them.
+        //
+        List<IRInst*> callVarWorkList;
+        HashSet<IRInst*> callVarWorkListSet;
+        for (auto inst : checkpointInfo->recomputeSet)
         {
-        case kIROp_Call:
-        case kIROp_Var:
-            instWorkList.add(inst);
-            instWorkListSet.add(inst);
-            break;
-        }
-    }
-    for (Index i = 0; i < instWorkList.getCount(); i++)
-    {
-        auto inst = instWorkList[i];
-        if (auto var = as<IRVar>(inst))
-        {
-            for (auto use = var->firstUse; use; use = use->nextUse)
+            switch (inst->getOp())
             {
-                if (auto callUser = as<IRCall>(use->getUser()))
-                {
-                    checkpointInfo->recomputeSet.add(callUser);
-                    checkpointInfo->storeSet.remove(callUser);
-                    if (instWorkListSet.add(callUser))
-                        instWorkList.add(callUser);
-                }
-                else if (auto storeUser = as<IRStore>(use->getUser()))
-                {
-                    checkpointInfo->recomputeSet.add(storeUser);
-                    checkpointInfo->storeSet.remove(storeUser);
-                    if (instWorkListSet.add(callUser))
-                        instWorkList.add(callUser);
-                }
+            case kIROp_Call:
+            case kIROp_Var:
+                callVarWorkList.add(inst);
+                callVarWorkListSet.add(inst);
+                break;
             }
         }
-        else if (auto call = as<IRCall>(inst))
+
+        for (Index i = 0; i < callVarWorkList.getCount(); i++)
         {
-            for (UInt j = 0; j < call->getArgCount(); j++)
+            auto inst = callVarWorkList[i];
+            if (auto var = as<IRVar>(inst))
             {
-                if (auto varArg = as<IRVar>(call->getArg(j)))
+                for (auto use = var->firstUse; use; use = use->nextUse)
                 {
-                    checkpointInfo->recomputeSet.add(varArg);
-                    checkpointInfo->storeSet.remove(varArg);
-                    if (instWorkListSet.add(varArg))
-                        instWorkList.add(varArg);
+                    if (auto callUser = as<IRCall>(use->getUser()))
+                    {
+                        checkpointInfo->recomputeSet.add(callUser);
+                        checkpointInfo->storeSet.remove(callUser);
+                        if (callVarWorkListSet.add(callUser))
+                            callVarWorkList.add(callUser);
+                    }
+                    else if (auto storeUser = as<IRStore>(use->getUser()))
+                    {
+                        checkpointInfo->recomputeSet.add(storeUser);
+                        checkpointInfo->storeSet.remove(storeUser);
+                        if (callVarWorkListSet.add(callUser))
+                            callVarWorkList.add(callUser);
+                    }
+                }
+            }
+            else if (auto call = as<IRCall>(inst))
+            {
+                for (UInt j = 0; j < call->getArgCount(); j++)
+                {
+                    if (auto varArg = as<IRVar>(call->getArg(j)))
+                    {
+                        checkpointInfo->recomputeSet.add(varArg);
+                        checkpointInfo->storeSet.remove(varArg);
+                        if (callVarWorkListSet.add(varArg))
+                            callVarWorkList.add(varArg);
+                    }
+                }
+
+                // This next few lines are a bit of a hack.. ideally we need to add the call to the
+                // main worklist for processing, so we don't have to repeat the recomputationn
+                // actions.
+                //
+                auto calleeUse = &call->getOperands()[0];
+                if (!as<IRModuleInst>(calleeUse->get()->getParent()) &&
+                    !processedUses.contains(calleeUse))
+                    addPrimalOperandsToWorkList(call);
+
+                for (auto use = call->firstUse; use; use = use->nextUse)
+                {
+                    if (isDifferentialInst(use->getUser()))
+                        usesToReplace.add(use);
                 }
             }
         }
     }
 
     RefPtr<HoistedPrimalsInfo> hoistInfo = new HoistedPrimalsInfo();
-    applyCheckpointSet(checkpointInfo, func, hoistInfo, usesToReplace, mapDiffBlockToRecomputeBlock, cloneCtx, blockIndexInfo);
+    applyCheckpointSet(
+        checkpointInfo,
+        func,
+        hoistInfo,
+        usesToReplace,
+        mapDiffBlockToRecomputeBlock,
+        cloneCtx,
+        blockIndexInfo);
     return hoistInfo;
 }
 
@@ -527,13 +562,13 @@ struct ImplicationResult
 
 static ImplicationResult join(const ImplicationResult& a, const ImplicationResult& b)
 {
-    if(a.e == ImplicationResult::Falsified || b.e == ImplicationResult::Falsified)
+    if (a.e == ImplicationResult::Falsified || b.e == ImplicationResult::Falsified)
         return {ImplicationResult::Falsified, 0};
-    if(a.e == ImplicationResult::AntecedentHolds)
+    if (a.e == ImplicationResult::AntecedentHolds)
         return b;
-    if(b.e == ImplicationResult::AntecedentHolds)
+    if (b.e == ImplicationResult::AntecedentHolds)
         return a;
-    if(a.factor != b.factor)
+    if (a.factor != b.factor)
         return {ImplicationResult::Falsified, 0};
     return a;
 }
@@ -547,21 +582,21 @@ static ImplicationResult inductionImplicationHolds(
 
 static bool unpackConstantAddition(IRInst* addOrSub, IRInst*& operand, IRIntegerValue& constant)
 {
-    if(addOrSub->getOp() != kIROp_Add && addOrSub->getOp() != kIROp_Sub)
+    if (addOrSub->getOp() != kIROp_Add && addOrSub->getOp() != kIROp_Sub)
         return false;
     const bool negate = addOrSub->getOp() == kIROp_Sub;
 
     auto o = addOrSub->getOperand(0);
     auto c = addOrSub->getOperand(1);
-    if(!as<IRIntLit>(c))
+    if (!as<IRIntLit>(c))
         std::swap(o, c);
     const auto cLit = as<IRIntLit>(c);
-    if(!cLit)
+    if (!cLit)
         return false;
     operand = o;
     constant = cLit->getValue();
     // Check that we can actually represent this!
-    if(negate && constant == std::numeric_limits<IRIntegerValue>::min())
+    if (negate && constant == std::numeric_limits<IRIntegerValue>::min())
         return false;
     constant *= negate ? -1 : 1;
     return true;
@@ -578,7 +613,7 @@ static bool isAdditionOf(
 {
     IRInst* operand;
     IRIntegerValue constant;
-    if(!unpackConstantAddition(inductiveVal, operand, constant))
+    if (!unpackConstantAddition(inductiveVal, operand, constant))
         return false;
 
     const auto impRes = inductionImplicationHolds(
@@ -588,7 +623,7 @@ static bool isAdditionOf(
         operand,
         as<IRBlock>(inductiveVal->getParent()));
 
-    if(impRes.e == ImplicationResult::ConsequentHolds)
+    if (impRes.e == ImplicationResult::ConsequentHolds)
     {
         // TODO: Check for overflow here (strictly speaking it shouldn't
         // matter in the end numerically (except that this could be UB)).
@@ -603,21 +638,19 @@ static bool isAdditionOf(
 static bool isAlwaysFalseInBlock(IRInst* inst, IRBlock* block)
 {
     const auto b = as<IRBoolLit>(inst);
-    if(b)
+    if (b)
         return !b->getValue();
 
     // At the moment we just check that the predecessors of this
     // block have us on the false path of a conditional branch on
     // the instruction under question.
     bool isFalse = true;
-    for(const auto predecessor : block->getPredecessors())
+    for (const auto predecessor : block->getPredecessors())
     {
         const auto predConditionalBranch = as<IRConditionalBranch>(predecessor->getTerminator());
-        isFalse &=
-            predConditionalBranch &&
-            predConditionalBranch->getCondition() == inst &&
-            predConditionalBranch->getFalseBlock() == block;
-        if(!isFalse)
+        isFalse &= predConditionalBranch && predConditionalBranch->getCondition() == inst &&
+                   predConditionalBranch->getFalseBlock() == block;
+        if (!isFalse)
             break;
     }
     return isFalse;
@@ -641,7 +674,7 @@ static ImplicationResult inductionImplicationHolds(
     // If we have a result memoized we can safely return that.
     const ImplicationParams i = {conditionVal, inductiveVal, block};
     const auto memoized = memo.tryGetValue(i);
-    if(memoized)
+    if (memoized)
         return *memoized;
 
     // While we are detemining if the implication holds at this position we set
@@ -649,25 +682,26 @@ static ImplicationResult inductionImplicationHolds(
     // proof
     memo.add(i, {ImplicationResult::Falsified, 0});
     // A helper to record the solution as we're returning
-    const auto andRemember = [&memo, i](ImplicationResult r) {
+    const auto andRemember = [&memo, i](ImplicationResult r)
+    {
         memo.set(i, r);
         return r;
     };
 
     // Our most general solution is if the left hand side of the implication is
     // false, in which case we can return success without specifying a factor
-    if(isAlwaysFalseInBlock(conditionVal, block))
+    if (isAlwaysFalseInBlock(conditionVal, block))
         return andRemember({ImplicationResult::AntecedentHolds, 0});
 
     // Otherwise, we handle the additive case
     // One easy case is that this *is* the previous value, in which case it's a
     // trivial solution with an addition of 0
-    if(prevVal == inductiveVal)
+    if (prevVal == inductiveVal)
         return andRemember({ImplicationResult::ConsequentHolds, 0});
 
     // Otherwise is it a function over the inductive variable
     IRIntegerValue factor;
-    if(isAdditionOf(memo, inductiveVal, prevVal, conditionVal, factor))
+    if (isAdditionOf(memo, inductiveVal, prevVal, conditionVal, factor))
         return andRemember({ImplicationResult::ConsequentHolds, factor});
 
     // The last thing to try is to consider the case where the
@@ -678,7 +712,7 @@ static ImplicationResult inductionImplicationHolds(
 
     // If it's not a parameter then we don't know how to continue
     // (in principle we could also hadle instructions such as loads here)
-    if(!inductiveParam)
+    if (!inductiveParam)
         return {ImplicationResult::Falsified, 0};
 
     const auto conditionParam = as<IRParam>(conditionVal);
@@ -689,21 +723,28 @@ static ImplicationResult inductionImplicationHolds(
     // condition variable are false, so our antecedent holds
     ImplicationResult res = {ImplicationResult::AntecedentHolds, 0};
 
-    for(const auto predecessor : block->getPredecessors())
+    for (const auto predecessor : block->getPredecessors())
     {
         const auto predTerminator = as<IRUnconditionalBranch>(predecessor->getTerminator());
         SLANG_ASSERT(inductiveParamIndex == -1 || predTerminator);
         SLANG_ASSERT(conditionParamIndex == -1 || predTerminator);
 
-        const auto nextInductiveParam =
-            inductiveParamIndex == -1 ? inductiveParam : predTerminator->getArg(inductiveParamIndex);
-        const auto nextConditionParam =
-            conditionParamIndex == -1 ? conditionParam : predTerminator->getArg(conditionParamIndex);
+        const auto nextInductiveParam = inductiveParamIndex == -1
+                                            ? inductiveParam
+                                            : predTerminator->getArg(inductiveParamIndex);
+        const auto nextConditionParam = conditionParamIndex == -1
+                                            ? conditionParam
+                                            : predTerminator->getArg(conditionParamIndex);
 
-        const auto predResult = inductionImplicationHolds(memo, prevVal, nextConditionParam, nextInductiveParam, predecessor);
+        const auto predResult = inductionImplicationHolds(
+            memo,
+            prevVal,
+            nextConditionParam,
+            nextInductiveParam,
+            predecessor);
         res = join(res, predResult);
 
-        if(res.e == ImplicationResult::Falsified)
+        if (res.e == ImplicationResult::Falsified)
             break;
     }
 
@@ -742,7 +783,8 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
                 if (ifElse->getCondition() == param)
                 {
                     // The bool param is used as the condition of the if-else inside the loop,
-                    // this param will always be true during the loop, and we don't need to store it.
+                    // this param will always be true during the loop, and we don't need to store
+                    // it.
                     LoopInductionValueInfo info;
                     info.kind = LoopInductionValueInfo::Kind::AlwaysTrue;
                     inductionValueInsts[param] = info;
@@ -779,13 +821,13 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
                 continue;
 
             // This *is* the loop counter!
-            if(param->findDecoration<IRLoopCounterDecoration>())
+            if (param->findDecoration<IRLoopCounterDecoration>())
                 continue;
 
             auto predecessors = targetBlock->getPredecessors();
             Dictionary<ImplicationParams, ImplicationResult> memo;
             ImplicationResult impRes = {ImplicationResult::AntecedentHolds, 0};
-            for(const auto predecessor : predecessors)
+            for (const auto predecessor : predecessors)
             {
                 // Since this is branching with a parameter, it can only be an
                 // unconditional branch.
@@ -793,31 +835,30 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
                 SLANG_ASSERT(predTerminator);
 
                 // Is this the base case?
-                if(predTerminator == loopInst)
+                if (predTerminator == loopInst)
                     continue;
 
                 const auto conditionArg = predTerminator->getArg(conditionParamIndex);
                 const auto inductiveArg = predTerminator->getArg(paramIndex);
 
                 // Check that the required implication holds for this block
-                const auto predRes = inductionImplicationHolds(memo, param, conditionArg, inductiveArg, predecessor);
+                const auto predRes =
+                    inductionImplicationHolds(memo, param, conditionArg, inductiveArg, predecessor);
                 impRes = join(impRes, predRes);
-                if(impRes.e == ImplicationResult::Falsified)
+                if (impRes.e == ImplicationResult::Falsified)
                     break;
             }
 
-            switch(impRes.e)
+            switch (impRes.e)
             {
-                // This wasn't an induction variable
-                case ImplicationResult::Falsified:
-                    break;
+            // This wasn't an induction variable
+            case ImplicationResult::Falsified: break;
 
-                // The loop doesn't loop (because in every case the break flag is
-                // true)
-                case ImplicationResult::AntecedentHolds:
-                    break;
+            // The loop doesn't loop (because in every case the break flag is
+            // true)
+            case ImplicationResult::AntecedentHolds: break;
 
-                case ImplicationResult::ConsequentHolds:
+            case ImplicationResult::ConsequentHolds:
                 {
                     // The use of the add inst matches all of our conditions as an induction value
                     // that is a constant offset from a multiple of the loop counter.
@@ -856,7 +897,7 @@ void applyToInst(
         {
             // Can completely ignore first block parameters
             if (getBlock(inst) == getBlock(inst)->getParent()->getFirstBlock())
-            {    
+            {
                 return;
             }
             // If this is loop condition, it is always true in reverse blocks.
@@ -868,9 +909,12 @@ void applyToInst(
                 {
                     replacement = builder->getBoolValue(true);
                 }
-                else if (inductionValueInfo.kind == LoopInductionValueInfo::Kind::AffineFunctionOfCounter)
+                else if (
+                    inductionValueInfo.kind ==
+                    LoopInductionValueInfo::Kind::AffineFunctionOfCounter)
                 {
-                    auto indexInfo = blockIndexInfo.tryGetValue(inductionValueInfo.loopInst->getTargetBlock());
+                    auto indexInfo =
+                        blockIndexInfo.tryGetValue(inductionValueInfo.loopInst->getTargetBlock());
                     SLANG_ASSERT(indexInfo);
                     SLANG_ASSERT(indexInfo->getCount() != 0);
                     replacement = indexInfo->getFirst().diffCountParam;
@@ -880,7 +924,9 @@ void applyToInst(
                         replacement = builder->emitMul(
                             replacement->getDataType(),
                             replacement,
-                            builder->getIntValue(replacement->getDataType(), inductionValueInfo.counterFactor));
+                            builder->getIntValue(
+                                replacement->getDataType(),
+                                inductionValueInfo.counterFactor));
                     }
                     if (inductionValueInfo.counterOffset)
                     {
@@ -963,7 +1009,7 @@ void applyCheckpointSet(
 
         if (isDifferentialBlock(block))
             continue;
-        
+
         if (block->findDecoration<IRRecomputeBlockDecoration>())
             continue;
 
@@ -1008,30 +1054,25 @@ void applyCheckpointSet(
                 if (predecessorSet.contains(predecessor))
                     continue;
                 predecessorSet.add(predecessor);
-                
-                auto primalPhiArg = as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii);
+
+                auto primalPhiArg =
+                    as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(ii);
                 auto recomputePredecessor = mapPrimalBlockToRecomputeBlock.getValue(predecessor);
 
                 // For now, find the primal phi argument in this predecessor,
                 // and stick it into the recompute predecessor's branch inst. We
                 // will use a patch-up pass in the end to replace all these
                 // arguments to their recomputed versions if they exist.
-                
+
                 if (isRecomputed)
                 {
                     IRInst* terminator = recomputeBlock->getTerminator();
-                    addPhiOutputArg(&builder,
-                        recomputePredecessor,
-                        terminator,
-                        primalPhiArg);
+                    addPhiOutputArg(&builder, recomputePredecessor, terminator, primalPhiArg);
                 }
                 else if (isInverted)
                 {
                     IRInst* terminator = recomputeBlock->getTerminator();
-                    addPhiOutputArg(&builder,
-                        recomputePredecessor,
-                        terminator,
-                        primalPhiArg);
+                    addPhiOutputArg(&builder, recomputePredecessor, terminator, primalPhiArg);
                 }
             }
             ii++;
@@ -1047,15 +1088,7 @@ void applyCheckpointSet(
             // value. We can't just insert the load at recomputeBlock because at that point the
             // primal logic may have already updated the param with a new value, and instead we
             // want the original value.
-            builder.setInsertBefore(recomputeInsertBeforeInst);    
-            if (auto load = as<IRLoad>(child))
-            {
-                if (load->getPtr()->getOp() == kIROp_Param &&
-                    load->getPtr()->getParent() == func->getFirstBlock())
-                {
-                    builder.setInsertBefore(getParamPreludeBlock(func)->getTerminator());
-                }
-            }
+            builder.setInsertBefore(recomputeInsertBeforeInst);
             applyToInst(&builder, checkpointInfo, hoistInfo, cloneCtx, blockIndexInfo, child);
         }
     }
@@ -1092,9 +1125,7 @@ IRType* getTypeForLocalStorage(
 
         storageType = builder->getArrayType(
             storageType,
-            builder->getIntValue(
-                builder->getUIntType(),
-                index.maxIters + 1));
+            builder->getIntValue(builder->getUIntType(), index.maxIters + 1));
     }
 
     return storageType;
@@ -1133,9 +1164,7 @@ IRInst* emitIndexedStoreAddressForVar(
     IRInst* storeAddr = localVar;
     for (auto& index : defBlockIndices)
     {
-        storeAddr = builder->emitElementAddress(
-            storeAddr, 
-            index.primalCountParam);
+        storeAddr = builder->emitElementAddress(storeAddr, index.primalCountParam);
     }
 
     return storeAddr;
@@ -1155,32 +1184,29 @@ IRInst* emitIndexedLoadAddressForVar(
     {
         if (useBlockIndices.contains(index))
         {
-            // If the use-block is under the same region, use the 
+            // If the use-block is under the same region, use the
             // differential counter variable
             //
             auto diffCounterCurrValue = index.diffCountParam;
 
-            loadAddr = builder->emitElementAddress(
-                loadAddr, 
-                diffCounterCurrValue);
+            loadAddr = builder->emitElementAddress(loadAddr, diffCounterCurrValue);
         }
         else
         {
             // If the use-block is outside this region, use the
             // last available value (by indexing with primal counter minus 1)
-            // An exception is if the stored inst is in a loop header block where 
+            // An exception is if the stored inst is in a loop header block where
             // we use counter directly (since that block runs N+1 times)
-            // 
+            //
             auto primalCounterCurrValue = index.primalCountParam;
-            auto primalCounterLastValue = (index.loopHeaderBlock == defBlock) ? primalCounterCurrValue : 
-                builder->emitSub(
-                    primalCounterCurrValue->getDataType(),
-                    primalCounterCurrValue,
-                    builder->getIntValue(builder->getIntType(), 1));
+            auto primalCounterLastValue = (index.loopHeaderBlock == defBlock)
+                                              ? primalCounterCurrValue
+                                              : builder->emitSub(
+                                                    primalCounterCurrValue->getDataType(),
+                                                    primalCounterCurrValue,
+                                                    builder->getIntValue(builder->getIntType(), 1));
 
-            loadAddr = builder->emitElementAddress(
-                loadAddr, 
-                primalCounterLastValue);
+            loadAddr = builder->emitElementAddress(loadAddr, primalCounterLastValue);
         }
     }
 
@@ -1193,14 +1219,13 @@ IRVar* storeIndexedValue(
     IRInst* instToStore,
     const List<IndexTrackingInfo>& defBlockIndices)
 {
-    IRVar* localVar = emitIndexedLocalVar(defaultVarBlock,
+    IRVar* localVar = emitIndexedLocalVar(
+        defaultVarBlock,
         instToStore->getDataType(),
         defBlockIndices,
         instToStore->sourceLoc);
 
-    IRInst* addr = emitIndexedStoreAddressForVar(builder,
-        localVar,
-        defBlockIndices);
+    IRInst* addr = emitIndexedStoreAddressForVar(builder, localVar, defBlockIndices);
 
     builder->emitStore(addr, instToStore);
 
@@ -1214,18 +1239,19 @@ IRInst* loadIndexedValue(
     const List<IndexTrackingInfo>& defBlockIndices,
     const List<IndexTrackingInfo>& useBlockIndices)
 {
-    IRInst* addr = emitIndexedLoadAddressForVar(builder, localVar, defBlock, defBlockIndices, useBlockIndices);
+    IRInst* addr =
+        emitIndexedLoadAddressForVar(builder, localVar, defBlock, defBlockIndices, useBlockIndices);
 
     return builder->emitLoad(addr);
 }
 
 bool areIndicesEqual(
-    const List<IndexTrackingInfo>& indicesA, 
+    const List<IndexTrackingInfo>& indicesA,
     const List<IndexTrackingInfo>& indicesB)
 {
     if (indicesA.getCount() != indicesB.getCount())
         return false;
-    
+
     for (Index ii = 0; ii < indicesA.getCount(); ii++)
     {
         if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
@@ -1235,13 +1261,11 @@ bool areIndicesEqual(
     return true;
 }
 
-bool areIndicesSubsetOf(
-    List<IndexTrackingInfo>& indicesA, 
-    List<IndexTrackingInfo>& indicesB)
+bool areIndicesSubsetOf(List<IndexTrackingInfo>& indicesA, List<IndexTrackingInfo>& indicesB)
 {
     if (indicesA.getCount() > indicesB.getCount())
         return false;
-    
+
     for (Index ii = 0; ii < indicesA.getCount(); ii++)
     {
         if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
@@ -1295,7 +1319,7 @@ struct UseChain
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             List<UseChain> innerChain = from(use, isRelevantUse, passthroughInst);
-            
+
             for (auto& useChain : innerChain)
             {
                 useChain.chain.add(baseUse);
@@ -1331,23 +1355,25 @@ struct UseChain
 
         IRBuilder chainBuilder(builder->getModule());
         setInsertAfterOrdinaryInst(&chainBuilder, inst);
-        
+
+        chain.reverse();
+
         // Clone the rest of the chain.
         for (auto& use : chain)
         {
-            lastInstInChain = cloneInst(&env, &chainBuilder, use->getUser());
+            lastInstInChain = cloneInst(&env, &chainBuilder, use->get());
         }
 
         // Replace the base use.
-        builder->replaceOperand(baseUse, lastInstInChain);
-        
+        builder->replaceOperand(chain.getLast(), lastInstInChain);
+
         chain.clear();
     }
 
     IRInst* getUser() const
     {
         SLANG_ASSERT(chain.getCount() > 0);
-        return chain.getLast()->getUser();
+        return chain.getFirst()->getUser();
     }
 };
 
@@ -1385,13 +1411,14 @@ static List<IndexTrackingInfo> maybeTrimIndices(
 
 bool canInstBeStored(IRInst* inst)
 {
-    // Cannot store insts whose value is a type or a witness table.
-    // These insts get lowered to target-specific logic, and cannot be 
+    // Cannot store insts whose value is a type or a witness table, or a function.
+    // These insts get lowered to target-specific logic, and cannot be
     // stored into variables or context structs as normal values.
-    // 
-    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()))
+    //
+    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
+        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()))
         return false;
-    
+
     return true;
 }
 
@@ -1433,7 +1460,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     // {
     // primal:
     //      float x_storage[5];
-    //      
+    //
     //      for (int i = 0; i < 5; i++)
     //      {
     //            float x = g(i);
@@ -1454,7 +1481,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
     //
 
     RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
-    
+
     IRBlock* defaultVarBlock = func->getFirstBlock()->getNextBlock();
 
     IRBuilder builder(func->getModule());
@@ -1499,49 +1526,70 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
             SLANG_RELEASE_ASSERT(defBlock);
 
-            List<UseChain> outOfScopeUses;
-            for (auto use = instToStore->firstUse; use;)
+            // Lambda to check if a use is relevant.
+            auto isRelevantUse = [&](IRUse* use)
             {
-                auto nextUse = use->nextUse;
-
-                // Lambda to check if a use is relevant.
-                auto isRelevantUse = [&](IRUse* use)
+                // Only consider uses in differential blocks.
+                // This method is not responsible for other blocks.
+                //
+                IRBlock* userBlock = getBlock(use->getUser());
+                if (isRecomputeInst)
                 {
-                    // Only consider uses in differential blocks. 
-                    // This method is not responsible for other blocks.
-                    //
-                    IRBlock* userBlock = getBlock(use->getUser());
                     if (isDifferentialOrRecomputeBlock(userBlock))
                     {
                         if (!domTree->dominates(defBlock, userBlock))
                         {
                             return true;
                         }
-                        else if (!areIndicesSubsetOf(indexedBlockInfo[defBlock], indexedBlockInfo[userBlock]))
+                        else if (!areIndicesSubsetOf(
+                                     indexedBlockInfo[defBlock],
+                                     indexedBlockInfo[userBlock]))
                         {
                             return true;
                         }
-                        else if (getInstRegionNestLevel(indexedBlockInfo, defBlock, instToStore) > 0 &&
+                        else if (
+                            getInstRegionNestLevel(indexedBlockInfo, defBlock, instToStore) > 0 &&
                             !isDifferentialOrRecomputeBlock(defBlock))
                         {
                             return true;
                         }
-                        else if (as<IRPtrTypeBase>(instToStore->getDataType()) &&
+                        else if (
+                            as<IRPtrTypeBase>(instToStore->getDataType()) &&
                             !isDifferentialOrRecomputeBlock(defBlock))
                         {
                             return true;
                         }
                     }
-                    return false;
-                };
-
-                // Lambda to check if an inst is transparent. We lookup uses 'through' transparent
-                // insts recursively.
-                // 
-                auto isPassthroughInst = [&](IRInst* inst)
+                }
+                else
                 {
-                    return !canInstBeStored(inst);
-                };
+                    if (isDifferentialOrRecomputeBlock(userBlock))
+                        return true;
+                }
+                return false;
+            };
+
+            // Lambda to check if an inst is transparent. We lookup uses 'through' transparent
+            // insts recursively.
+            //
+            auto isPassthroughInst = [&](IRInst* inst)
+            {
+                if (!canInstBeStored(inst))
+                    return true;
+
+                switch (inst->getOp())
+                {
+                case kIROp_GetSequentialID:
+                case kIROp_ExtractExistentialValue: return true;
+                }
+
+                return false;
+            };
+
+            List<UseChain> outOfScopeUses;
+            for (auto use = instToStore->firstUse; use;)
+            {
+                auto nextUse = use->nextUse;
 
                 List<UseChain> useChains = UseChain::from(use, isRelevantUse, isPassthroughInst);
                 outOfScopeUses.addRange(useChains);
@@ -1589,11 +1637,12 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 setInsertAfterOrdinaryInst(&builder, getInstInBlock(storeUse->getUser()));
 
                 // There is an edge-case optimization we apply here,
-                // If none of the out-of-scope uses are actually within the indexed 
+                // If none of the out-of-scope uses are actually within the indexed
                 // region, that means there's no need to allocate a fully indexed var.
-                // 
-                defBlockIndices = maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
-                    
+                //
+                defBlockIndices =
+                    maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
+
                 IRVar* localVar = nullptr;
                 {
                     IRBuilderSourceLocRAII sourceLocationScope(&builder, varToStore->sourceLoc);
@@ -1608,7 +1657,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 {
                     setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use.getUser()));
 
-                    List<IndexTrackingInfo>& useBlockIndices = indexedBlockInfo[getBlock(use.getUser())];
+                    List<IndexTrackingInfo>& useBlockIndices =
+                        indexedBlockInfo[getBlock(use.getUser())];
 
                     IRInst* loadAddr = emitIndexedLoadAddressForVar(
                         &builder,
@@ -1622,12 +1672,12 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 if (!isRecomputeInst)
                     processedStoreSet.add(localVar);
             }
-            else if (!canInstBeStored(instToStore))
+            else if (isPassthroughInst(instToStore))
             {
                 // We won't actually process these insts here. Instead we'll
                 // simply make sure that their operands are either already present
                 // in the worklist or add them to the worklist for legalization.
-                // 
+                //
 
                 List<IRInst*> pendingOperands;
                 for (UIndex ii = 0; ii < instToStore->getOperandCount(); ii++)
@@ -1635,12 +1685,12 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                     auto operand = instToStore->getOperand(ii);
                     if (!instSet.contains(operand) && !seenInstSet.contains(operand))
                     {
-                        if(getBlock(operand) && 
+                        if (getBlock(operand) &&
                             (getBlock(operand)->getParent() == getBlock(instToStore)->getParent()))
                             pendingOperands.add(operand);
                     }
-                } 
-                
+                }
+
                 if (pendingOperands.getCount() > 0)
                 {
                     for (Index ii = pendingOperands.getCount() - 1; ii >= 0; --ii)
@@ -1650,12 +1700,13 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
             else
             {
                 IRBuilderSourceLocRAII sourceLocationScope(&builder, instToStore->sourceLoc);
-                
+
                 // Handle the special case of loop counters.
-                // The only case where there will be a reference of primal loop counter from rev blocks
-                // is the start of a loop in the reverse code. Since loop counters are not considered a
-                // part of their loop region, so we remove the first index info.
-                bool isLoopCounter = (instToStore->findDecoration<IRLoopCounterDecoration>() != nullptr);
+                // The only case where there will be a reference of primal loop counter from rev
+                // blocks is the start of a loop in the reverse code. Since loop counters are not
+                // considered a part of their loop region, so we remove the first index info.
+                bool isLoopCounter =
+                    (instToStore->findDecoration<IRLoopCounterDecoration>() != nullptr);
                 if (isLoopCounter)
                 {
                     defBlockIndices.removeAt(0);
@@ -1663,7 +1714,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 else
                 {
                     // For all others, check out of scope uses and trim indices if possible.
-                    defBlockIndices = maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
+                    defBlockIndices =
+                        maybeTrimIndices(defBlockIndices, indexedBlockInfo, outOfScopeUses);
                 }
 
                 setInsertAfterOrdinaryInst(&builder, instToStore);
@@ -1673,22 +1725,68 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
                 for (auto use : outOfScopeUses)
                 {
-                    List<IndexTrackingInfo> useBlockIndices = indexedBlockInfo[getBlock(use.getUser())];
+                    List<IndexTrackingInfo> useBlockIndices =
+                        indexedBlockInfo[getBlock(use.getUser())];
                     setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use.getUser()));
                     use.replace(
                         &builder,
-                        loadIndexedValue(&builder, localVar, defBlock, defBlockIndices, useBlockIndices));
+                        loadIndexedValue(
+                            &builder,
+                            localVar,
+                            defBlock,
+                            defBlockIndices,
+                            useBlockIndices));
                 }
 
                 if (!isRecomputeInst)
                     processedStoreSet.add(localVar);
             }
 
+            // Put the inst back on the worklist since there's a possibility that we created more
+            // uses for it in the process.
+            //
+            // workList.add(instToStore);
             seenInstSet.add(instToStore);
         }
     };
 
+    // Pull any loop counter in the store set out to another list.
+    //
+    Dictionary<UIndex, OrderedHashSet<IRInst*>> loopCounters;
+    {
+        List<IRInst*> loopCounterInsts;
+        for (auto inst : hoistInfo->storeSet)
+        {
+            if (inst->findDecoration<IRLoopCounterDecoration>())
+            {
+                auto block = cast<IRBlock>(inst->getParent());
+                auto nestDepth = indexedBlockInfo.getValue(block).getCount() - 1;
+
+                if (!loopCounters.containsKey(nestDepth))
+                    loopCounters[nestDepth] = OrderedHashSet<IRInst*>();
+
+                loopCounters[nestDepth].add(inst);
+                loopCounterInsts.add(inst);
+            }
+        }
+
+        for (auto inst : loopCounterInsts)
+            hoistInfo->storeSet.remove(inst);
+    }
+
+    // First handle all non-loop-counter insts.
     ensureInstAvailable(hoistInfo->storeSet, false);
+
+    // Then handle the loop counter insts in reverse-order of nest depth
+    // This ordering is important because loop counters at level N _may_ depend on
+    // the counters at the previous levels.
+    //
+    for (Index ii = (Index)loopCounters.getCount() - 1; ii >= 0; --ii)
+    {
+        ensureInstAvailable(loopCounters[(UIndex)ii], false);
+    }
+
+    // Next handle all recompute insts, from within
     ensureInstAvailable(hoistInfo->recomputeSet, true);
 
     // Replace the old store set with the processed one.
@@ -1742,17 +1840,21 @@ static IRBlock* getUpdateBlock(IRLoop* loop)
             lastLoopBlock = predecessor;
     }
 
-    // Should find atleast one predecessor that is _not_ the 
-    // init block (that contains the loop info). This 
+    // Should find atleast one predecessor that is _not_ the
+    // init block (that contains the loop info). This
     // predecessor would be the last block in the loop
     // before looping back to the condition.
-    // 
+    //
     SLANG_RELEASE_ASSERT(lastLoopBlock);
 
     return lastLoopBlock;
 }
 
-void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalCountParam, IRInst*& diffCountParam)
+void lowerIndexedRegion(
+    IRLoop*& primalLoop,
+    IRLoop*& diffLoop,
+    IRInst*& primalCountParam,
+    IRInst*& diffCountParam)
 {
     IRBuilder builder(primalLoop);
     IRBuilderSourceLocRAII sourceLocationScope(&builder, primalLoop->sourceLoc);
@@ -1763,8 +1865,8 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
     IRBlock* primalInitBlock = as<IRBlock>(primalLoop->getParent());
     builder.setInsertBefore(primalInitBlock->getTerminator());
     {
-        auto primalCondBlock = as<IRUnconditionalBranch>(
-            primalInitBlock->getTerminator())->getTargetBlock();
+        auto primalCondBlock =
+            as<IRUnconditionalBranch>(primalInitBlock->getTerminator())->getTargetBlock();
         builder.setInsertBefore(primalInitBlock->getTerminator());
 
         auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
@@ -1793,7 +1895,8 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
             builder.getIntValue(builder.getIntType(), 1));
         builder.markInstAsPrimal(incCounterVal);
 
-        auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, primalUpdateBlock, terminator, incCounterVal);
+        auto phiCounterArgLoopCycleIndex =
+            addPhiOutputArg(&builder, primalUpdateBlock, terminator, incCounterVal);
 
         SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
     }
@@ -1801,18 +1904,15 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
     {
         IRBlock* diffInitBlock = as<IRBlock>(diffLoop->getParent());
 
-        auto diffCondBlock = as<IRUnconditionalBranch>(
-            diffInitBlock->getTerminator())->getTargetBlock();
+        auto diffCondBlock =
+            as<IRUnconditionalBranch>(diffInitBlock->getTerminator())->getTargetBlock();
         builder.setInsertBefore(diffInitBlock->getTerminator());
         auto revCounterInitVal = builder.emitSub(
             builder.getIntType(),
             primalCountParam,
             builder.getIntValue(builder.getIntType(), 1));
-        auto phiCounterArgLoopEntryIndex = addPhiOutputArg(
-            &builder,
-            diffInitBlock,
-            *(IRInst**)&diffLoop,
-            revCounterInitVal);
+        auto phiCounterArgLoopEntryIndex =
+            addPhiOutputArg(&builder, diffInitBlock, *(IRInst**)&diffLoop, revCounterInitVal);
 
         builder.setInsertBefore(diffCondBlock->getTerminator());
 
@@ -1834,11 +1934,13 @@ void lowerIndexedRegion(IRLoop*& primalLoop, IRLoop*& diffLoop, IRInst*& primalC
             builder.getIntValue(builder.getIntType(), 1));
         builder.markInstAsPrimal(decCounterVal);
 
-        auto phiCounterArgLoopCycleIndex = addPhiOutputArg(&builder, diffUpdateBlock, terminator, decCounterVal);
+        auto phiCounterArgLoopCycleIndex =
+            addPhiOutputArg(&builder, diffUpdateBlock, terminator, decCounterVal);
 
         auto ifElse = as<IRIfElse>(diffCondBlock->getTerminator());
         builder.setInsertBefore(ifElse);
-        auto exitCondition = builder.emitGeq(diffCountParam, builder.getIntValue(builder.getIntType(), 0));
+        auto exitCondition =
+            builder.emitGeq(diffCountParam, builder.getIntValue(builder.getIntType(), 0));
         ifElse->condition.set(exitCondition);
 
         SLANG_RELEASE_ASSERT(phiCounterArgLoopEntryIndex == phiCounterArgLoopCycleIndex);
@@ -1861,11 +1963,14 @@ void buildIndexedBlocks(
     for (auto block : func->getBlocks())
     {
         auto loop = as<IRLoop>(block->getTerminator());
-        if (!loop) continue;
+        if (!loop)
+            continue;
         auto diffDecor = loop->findDecoration<IRDifferentialInstDecoration>();
-        if (!diffDecor) continue;
+        if (!diffDecor)
+            continue;
         auto primalLoop = as<IRLoop>(diffDecor->getPrimalInst());
-        if (!primalLoop) continue;
+        if (!primalLoop)
+            continue;
 
         IndexTrackingInfo indexInfo = {};
         lowerIndexedRegion(primalLoop, loop, indexInfo.primalCountParam, indexInfo.diffCountParam);
@@ -1919,7 +2024,8 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     sortBlocksInFunc(func);
 
     // Determine the strategy we should use to make a primal inst available.
-    // If we decide to recompute the inst, emit the recompute inst in the corresponding recompute block.
+    // If we decide to recompute the inst, emit the recompute inst in the corresponding recompute
+    // block.
     //
     RefPtr<AutodiffCheckpointPolicyBase> chkPolicy = new DefaultCheckpointPolicy(func->getModule());
     chkPolicy->preparePolicy(func);
@@ -1951,11 +2057,9 @@ static CheckpointPreference getCheckpointPreference(IRInst* callee)
     {
         switch (decor->getOp())
         {
-        case kIROp_PreferCheckpointDecoration:
-            return CheckpointPreference::PreferCheckpoint;
+        case kIROp_PreferCheckpointDecoration: return CheckpointPreference::PreferCheckpoint;
         case kIROp_PreferRecomputeDecoration:
-        case kIROp_TargetIntrinsicDecoration:
-            return CheckpointPreference::PreferRecompute;
+        case kIROp_TargetIntrinsicDecoration:  return CheckpointPreference::PreferRecompute;
         }
     }
     return CheckpointPreference::None;
@@ -2027,9 +2131,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_Specialize:
     case kIROp_LookupWitness:
     case kIROp_Param:
-    case kIROp_DetachDerivative:
-        return false;
-    
+    case kIROp_DetachDerivative:                        return false;
+
     // Never store these op codes because they are trivial to compute.
     case kIROp_Add:
     case kIROp_Sub:
@@ -2053,8 +2156,7 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_BitXor:
     case kIROp_Lsh:
     case kIROp_Rsh:
-    case kIROp_Select:
-        return false;
+    case kIROp_Select:  return false;
 
     case kIROp_GetElement:
     case kIROp_FieldExtract:
@@ -2064,8 +2166,7 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_GetOptionalValue:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
-    case kIROp_GetTupleElement:
-        return false;
+    case kIROp_GetTupleElement:  return false;
 
     case kIROp_Load:
         // In general, don't store loads, because:
@@ -2080,14 +2181,31 @@ static bool shouldStoreInst(IRInst* inst)
         return false;
 
     case kIROp_Call:
-        // If the callee prefers recompute policy, don't store.
-        if (getCheckpointPreference(inst->getOperand(0)) == CheckpointPreference::PreferRecompute)
         {
-            return false;
+            // If the callee has a preference, we should follow it.
+            if (getCheckpointPreference(inst->getOperand(0)) ==
+                CheckpointPreference::PreferRecompute)
+            {
+                return false;
+            }
+            else if (
+                getCheckpointPreference(inst->getOperand(0)) ==
+                CheckpointPreference::PreferCheckpoint)
+            {
+                return true;
+            }
+
+            // If not, we'll default to recomputing calls that don't have side effects & don't
+            // load from non-local variables. A previous data-flow pass should have already tagged
+            // functions with the appropriate decorations.
+            //
+            auto callee = getResolvedInstForDecorations(inst->getOperand(0), true);
+            if (callee->findDecoration<IRReadNoneDecoration>())
+                return false;
+
+            break;
         }
-        break;
-    default:
-        break;
+    default: break;
     }
 
     if (as<IRType>(inst))
@@ -2123,8 +2241,8 @@ static bool shouldStoreVar(IRVar* var)
             // of the var will be the same as the decision for the call.
             return shouldStoreInst(callUser);
         }
-        // Default behavior is to store if we can.
-        return true;
+        // Default behavior is to recompute stuff.
+        return false;
     }
     // If the var has never been written to, don't store it.
     return false;
@@ -2175,7 +2293,7 @@ HoistResult DefaultCheckpointPolicy::classify(UseOrPseudoUse use)
 {
     // Store all that we can.. by default, classify will only be called on relevant differential
     // uses (or on uses in a 'recompute' inst)
-    // 
+    //
     if (auto var = as<IRVar>(use.usedVal))
     {
         if (shouldStoreVar(var))
@@ -2202,4 +2320,4 @@ HoistResult DefaultCheckpointPolicy::classify(UseOrPseudoUse use)
     }
 }
 
-};
+}; // namespace Slang

@@ -407,6 +407,9 @@ Extensions
 `spvAtomicFloat16AddEXT`
 > Represents the SPIR-V capability for atomic float 16 add operations.
 
+`spvAtomicFloat64AddEXT`
+> Represents the SPIR-V capability for atomic float 64 add operations.
+
 `spvInt64Atomics`
 > Represents the SPIR-V capability for 64-bit integer atomics.
 
@@ -415,6 +418,9 @@ Extensions
 
 `spvAtomicFloat16MinMaxEXT`
 > Represents the SPIR-V capability for atomic float 16 min/max operations.
+
+`spvAtomicFloat64MinMaxEXT`
+> Represents the SPIR-V capability for atomic float 64 min/max operations.
 
 `spvDerivativeControl`
 > Represents the SPIR-V capability for 'derivative control' operations.
@@ -683,6 +689,9 @@ Compound Capabilities
 
 `cpp_cuda_spirv`
 > CPP, CUDA and SPIRV code-gen targets
+
+`cuda_spirv`
+> CUDA and SPIRV code-gen targets
 
 `cpp_cuda_glsl_spirv`
 > CPP, CUDA, GLSL and SPIRV code-gen targets

@@ -40,13 +40,14 @@ HashCode UIntSet::getHashCode() const
 {
     int rs = 0;
     for (auto val : m_buffer)
-       rs ^= val;
+        rs ^= val;
     return rs;
 }
 
 void UIntSet::resizeAndClear(UInt val)
 {
-    // TODO(JS): This could be faster in that if the resize is larger the additional area is cleared twice
+    // TODO(JS): This could be faster in that if the resize is larger the additional area is cleared
+    // twice
     resize(val);
     clear();
 }
@@ -86,7 +87,9 @@ void UIntSet::unionWith(const UIntSet& set)
     }
 
     if (set.m_buffer.getCount() > m_buffer.getCount())
-        m_buffer.addRange(set.m_buffer.getBuffer() + m_buffer.getCount(), set.m_buffer.getCount() - m_buffer.getCount());
+        m_buffer.addRange(
+            set.m_buffer.getBuffer() + m_buffer.getCount(),
+            set.m_buffer.getCount() - m_buffer.getCount());
 }
 
 bool UIntSet::operator==(const UIntSet& set) const
@@ -98,16 +101,19 @@ bool UIntSet::operator==(const UIntSet& set) const
     const auto bElems = set.m_buffer.getBuffer();
 
     const Index minCount = Math::Min(aCount, bCount);
-    
-    return ::memcmp(aElems, bElems, minCount*sizeof(Element)) == 0 &&
-        _areAllZero(aElems + minCount, aCount - minCount) &&
-        _areAllZero(bElems + minCount, bCount - minCount);
+
+    return ::memcmp(aElems, bElems, minCount * sizeof(Element)) == 0 &&
+           _areAllZero(aElems + minCount, aCount - minCount) &&
+           _areAllZero(bElems + minCount, bCount - minCount);
 }
 
 void UIntSet::intersectWith(const UIntSet& set)
 {
     if (set.m_buffer.getCount() < m_buffer.getCount())
-        ::memset(m_buffer.getBuffer() + set.m_buffer.getCount(), 0, (m_buffer.getCount() - set.m_buffer.getCount()) * sizeof(Element));
+        ::memset(
+            m_buffer.getBuffer() + set.m_buffer.getCount(),
+            0,
+            (m_buffer.getCount() - set.m_buffer.getCount()) * sizeof(Element));
 
     const Index minCount = Math::Min(set.m_buffer.getCount(), m_buffer.getCount());
     for (Index i = 0; i < minCount; i++)
@@ -125,9 +131,10 @@ void UIntSet::subtractWith(const UIntSet& set)
     }
 }
 
-/* static */void UIntSet::calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
+/* static */ void UIntSet::calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
-    outRs.resizeBackingBufferDirectly(Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
+    outRs.resizeBackingBufferDirectly(
+        Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
     outRs.clear();
     for (Index i = 0; i < set1.m_buffer.getCount(); i++)
         outRs.m_buffer[i] |= set1.m_buffer[i];
@@ -135,7 +142,10 @@ void UIntSet::subtractWith(const UIntSet& set)
         outRs.m_buffer[i] |= set2.m_buffer[i];
 }
 
-/* static */void UIntSet::calcIntersection(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
+/* static */ void UIntSet::calcIntersection(
+    UIntSet& outRs,
+    const UIntSet& set1,
+    const UIntSet& set2)
 {
     const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
     outRs.resizeBackingBufferDirectly(minCount);
@@ -144,7 +154,7 @@ void UIntSet::subtractWith(const UIntSet& set)
         outRs.m_buffer[i] = set1.m_buffer[i] & set2.m_buffer[i];
 }
 
-/* static */void UIntSet::calcSubtract(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
+/* static */ void UIntSet::calcSubtract(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
     outRs.resizeBackingBufferDirectly(set1.m_buffer.getCount());
 
@@ -153,7 +163,7 @@ void UIntSet::subtractWith(const UIntSet& set)
         outRs.m_buffer[i] = set1.m_buffer[i] & (~set2.m_buffer[i]);
 }
 
-/* static */bool UIntSet::hasIntersection(const UIntSet& set1, const UIntSet& set2)
+/* static */ bool UIntSet::hasIntersection(const UIntSet& set1, const UIntSet& set2)
 {
     const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
     for (Index i = 0; i < minCount; i++)
@@ -168,7 +178,8 @@ Index UIntSet::countElements() const
 {
     // TODO: This can be made faster using SIMD intrinsics to count set bits.
     uint64_t tmp;
-    constexpr Index loopSize = ((sizeof(Element) / sizeof(tmp)) != 0) ? sizeof(Element) / sizeof(tmp) : 1;
+    constexpr Index loopSize =
+        ((sizeof(Element) / sizeof(tmp)) != 0) ? sizeof(Element) / sizeof(tmp) : 1;
     Index count = 0;
     for (auto index = 0; index < this->m_buffer.getCount(); index++)
     {
@@ -183,5 +194,4 @@ Index UIntSet::countElements() const
     return count;
 }
 
-}
-
+} // namespace Slang

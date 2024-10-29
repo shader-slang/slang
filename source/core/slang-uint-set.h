@@ -1,10 +1,10 @@
 #ifndef SLANG_CORE_UINT_SET_H
 #define SLANG_CORE_UINT_SET_H
 
-#include "slang-list.h"
-#include "slang-math.h"
 #include "slang-common.h"
 #include "slang-hash.h"
+#include "slang-list.h"
+#include "slang-math.h"
 
 #if defined(_MSC_VER)
 #include <intrin.h>
@@ -34,32 +34,36 @@ static inline Index bitscanForward(uint64_t in)
     // check for 0s in 0bit->31bit. If all 0's, check for 0s in 32bit->63bit
     if (_BitScanForward((unsigned long*)&out, *(((uint32_t*)&in))))
         return Index(out);
-    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in)+1));
-    return Index(out)+32;
-#endif// #ifdef _WIN64
+    _BitScanForward((unsigned long*)&out, *(((uint32_t*)&in) + 1));
+    return Index(out) + 32;
+#endif // #ifdef _WIN64
 
-#else 
+#else
     return Index(__builtin_ctzll(in));
-#endif// #if defined(_MSC_VER)
+#endif // #if defined(_MSC_VER)
 }
 
 /* Hold a set of UInt values. Implementation works by storing as a bit per value */
 /// UIntSet is essentially a Element[], where each Element is `b` bits big.
-/// Each index has `b` number of integers. If the bit is 1, we have an element there. 
+/// Each index has `b` number of integers. If the bit is 1, we have an element there.
 /// Value of each element is equal to the binary offset from Element[0], bit 0.
 class UIntSet
 {
 public:
     typedef UIntSet ThisType;
-    typedef uint64_t Element;                                   ///< Type that holds the bits to say if value is present
-    
-    constexpr static Index kElementSize = sizeof(Element) * 8; ///< The number of bits in an element. This also determines how many values a element can hold.
+    typedef uint64_t Element; ///< Type that holds the bits to say if value is present
+
+    constexpr static Index kElementSize =
+        sizeof(Element) * 8; ///< The number of bits in an element. This also determines how many
+                             ///< values a element can hold.
     constexpr static Index kElementMask = kElementSize - 1; ///< Mask to get shift from an index
-    constexpr static Index kElementShift = intLog2(sizeof(Element)*8); ///< How many bits to shift to get Element index from an index. 5 for 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
+    constexpr static Index kElementShift = intLog2(
+        sizeof(Element) * 8); ///< How many bits to shift to get Element index from an index. 5 for
+                              ///< 2^5=32 elements in a uint32_t. 6 for 2^6=64 in a uint64_t.
 
     UIntSet() {}
     UIntSet(const UIntSet& other) { m_buffer = other.m_buffer; }
-    UIntSet(UIntSet && other) { *this = (_Move(other)); }
+    UIntSet(UIntSet&& other) { *this = (_Move(other)); }
     UIntSet(UInt maxVal) { resizeAndClear(maxVal); }
 
     UIntSet& operator=(UIntSet&& other);
@@ -72,65 +76,66 @@ public:
 
     const List<Element>& getBuffer() const { return m_buffer; }
 
-        /// Resize such that val can be stored and clear contents
+    /// Resize such that val can be stored and clear contents
     void resizeAndClear(UInt val);
-        /// Set all of the values up to count, as set
+    /// Set all of the values up to count, as set
     void setAll();
-        /// Resize (but maintain contents) up to bit size.
-        /// NOTE! That since storage is in Element blocks, it may mean some values after size are set (up to the Element boundary)
+    /// Resize (but maintain contents) up to bit size.
+    /// NOTE! That since storage is in Element blocks, it may mean some values after size are set
+    /// (up to the Element boundary)
     void resize(UInt size);
     void resizeBackingBufferDirectly(Index size);
 
-        /// Clear all of the contents (by clearing the bits)
+    /// Clear all of the contents (by clearing the bits)
     void clear();
 
-        /// Clear all the contents and free memory
+    /// Clear all the contents and free memory
     void clearAndDeallocate();
 
-        /// Add a value
+    /// Add a value
     inline void add(UInt val);
     inline void add(const UIntSet& val);
     inline void addRange(const List<UInt>& other);
 
     inline void addRawElement(Element val, Index bitOffset);
 
-        /// Remove a value
+    /// Remove a value
     inline void remove(UInt val);
-        /// Returns true if the value is present
+    /// Returns true if the value is present
     inline bool contains(UInt val) const;
 
     inline bool contains(const UIntSet& set) const;
 
-        /// ==
+    /// ==
     bool operator==(const UIntSet& set) const;
-        /// !=
+    /// !=
     bool operator!=(const UIntSet& set) const { return !(*this == set); }
 
-        /// Store the union between this and set
+    /// Store the union between this and set
     void unionWith(const UIntSet& set);
-        /// Store the intersection between this and set
+    /// Store the intersection between this and set
     void intersectWith(const UIntSet& set);
-        /// Store the subtraction between this and set
+    /// Store the subtraction between this and set
     void subtractWith(const UIntSet& set);
 
-        /// 
+    ///
     bool isEmpty() const;
 
-        /// Swap this with rhs
+    /// Swap this with rhs
     void swapWith(ThisType& rhs) { m_buffer.swapWith(rhs.m_buffer); }
 
     template<typename T>
     List<T> getElements() const;
     Index countElements() const;
 
-        /// Store the union of set1 and set2 in outRs
+    /// Store the union of set1 and set2 in outRs
     static void calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2);
-        /// Store the intersection of set1 and set2 in outRs
+    /// Store the intersection of set1 and set2 in outRs
     static void calcIntersection(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2);
-        /// Store the subtraction of set2 from set1 in outRs
+    /// Store the subtraction of set2 from set1 in outRs
     static void calcSubtract(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2);
 
-        /// Returns true if set1 and set2 have a same value set (ie there is an intersection)
+    /// Returns true if set1 and set2 have a same value set (ie there is an intersection)
     static bool hasIntersection(const UIntSet& set1, const UIntSet& set2);
 
     /// Get LSB Zero of UIntSet. LSB Zero is the smallest value missing from this UIntSet.
@@ -139,6 +144,7 @@ public:
     struct Iterator
     {
         friend class UIntSet;
+
     private:
         const List<Element>* m_context;
         Index m_block = 0;
@@ -151,16 +157,10 @@ public:
             m_processedElement &= m_processedElement - 1;
         }
 
-        Iterator(const List<Element>* context)
-        {
-            m_context = context;
-        }
-    public:
+        Iterator(const List<Element>* context) { m_context = context; }
 
-        Element operator*()
-        {
-            return Element(m_LSB + (kElementSize * m_block));
-        }
+    public:
+        Element operator*() { return Element(m_LSB + (kElementSize * m_block)); }
 
         Iterator& operator++()
         {
@@ -176,19 +176,13 @@ public:
             clearLSB();
             return *this;
         }
-        Iterator& operator++(int)
-        {
-            return ++(*this);
-        }
+        Iterator& operator++(int) { return ++(*this); }
         bool operator==(const Iterator& other) const
         {
-            return other.m_block == this->m_block
-                && other.m_processedElement == this->m_processedElement;
+            return other.m_block == this->m_block &&
+                   other.m_processedElement == this->m_processedElement;
         }
-        bool operator!=(const Iterator& other) const
-        {
-            return !(other == *this);
-        }
+        bool operator!=(const Iterator& other) const { return !(other == *this); }
     };
     Iterator begin() const
     {
@@ -214,10 +208,7 @@ public:
         return tmp;
     }
 
-    bool areAllZero()
-    {
-        return _areAllZero(m_buffer.getBuffer(), m_buffer.getCount());
-    }
+    bool areAllZero() { return _areAllZero(m_buffer.getBuffer(), m_buffer.getCount()); }
 
 protected:
     static bool _areAllZero(const UIntSet::Element* elems, Index count)
@@ -250,7 +241,7 @@ inline bool UIntSet::contains(UInt val) const
 {
     const Index idx = Index(val >> kElementShift);
     return idx < m_buffer.getCount() &&
-        ((m_buffer[idx] & (Element(1) << (val & kElementMask))) != 0);
+           ((m_buffer[idx] & (Element(1) << (val & kElementMask))) != 0);
 }
 
 // --------------------------------------------------------------------------
@@ -313,8 +304,8 @@ inline void UIntSet::addRange(const List<UInt>& other)
 
 inline void UIntSet::addRawElement(Element other, Index elementIndex)
 {
-    if(this->m_buffer.getCount() <= elementIndex)
-        resizeBackingBufferDirectly(elementIndex+1);
+    if (this->m_buffer.getCount() <= elementIndex)
+        resizeBackingBufferDirectly(elementIndex + 1);
     m_buffer[elementIndex] |= other;
 }
 
@@ -325,7 +316,8 @@ List<T> UIntSet::getElements() const
     if (count == 0)
         return {};
 
-    // Specific path for uint64_t. If using SIMD we should not use this path due to larger data types.
+    // Specific path for uint64_t. If using SIMD we should not use this path due to larger data
+    // types.
 
     List<T> elements;
     elements.reserve(count);
@@ -341,5 +333,5 @@ List<T> UIntSet::getElements() const
     return elements;
 }
 
-}
+} // namespace Slang
 #endif

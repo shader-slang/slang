@@ -1,12 +1,12 @@
-#include <cstdio>
-
+#include "../../source/compiler-core/slang-diagnostic-sink.h"
+#include "../../source/compiler-core/slang-lexer.h"
+#include "../../source/compiler-core/slang-perfect-hash.h"
+#include "../../source/compiler-core/slang-spirv-core-grammar.h"
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-writer.h"
-#include "../../source/compiler-core/slang-diagnostic-sink.h"
-#include "../../source/compiler-core/slang-perfect-hash.h"
-#include "../../source/compiler-core/slang-spirv-core-grammar.h"
-#include "../../source/compiler-core/slang-lexer.h"
+
+#include <cstdio>
 
 using namespace Slang;
 
@@ -22,13 +22,13 @@ String dictToPerfectHash(
 {
     HashParams hashParams;
     List<String> names;
-    for(const auto& [name, val] : dict)
+    for (const auto& [name, val] : dict)
         names.add(name);
     auto r = minimalPerfectHash(names, hashParams);
     SLANG_ASSERT(r == HashFindResult::Success);
     List<String> values;
     values.reserve(hashParams.destTable.getCount());
-    for(const auto& v : hashParams.destTable)
+    for (const auto& v : hashParams.destTable)
     {
         values.add(valueToString(dict.getValue(v.getUnownedSlice())));
     }
@@ -49,7 +49,8 @@ void dictToSwitch(
     const F2 valueToAssignmentString,
     WriterHelper& w)
 {
-    const auto line = [&](const auto& l){
+    const auto line = [&](const auto& l)
+    {
         w.put(l);
         w.put("\n");
     };
@@ -58,7 +59,7 @@ void dictToSwitch(
     line("{");
     w.print("    switch(%s)\n", unpackKey);
     line("    {");
-    for(const auto& [k, v] : dict)
+    for (const auto& [k, v] : dict)
     {
         const auto kStr = keyToString(k);
         const auto vStr = valueToAssignmentString(v);
@@ -69,8 +70,7 @@ void dictToSwitch(
             "            return true;\n"
             "        }\n",
             kStr.getBuffer(),
-            vStr.getBuffer()
-        );
+            vStr.getBuffer());
     }
     line("        default: return false;");
     line("    }");
@@ -92,7 +92,8 @@ void qualifiedEnumValueNameSwitch(
     const F valueToAssignmentString,
     WriterHelper& w)
 {
-    const auto line = [&](const auto& l){
+    const auto line = [&](const auto& l)
+    {
         w.put(l);
         w.put("\n");
     };
@@ -100,7 +101,7 @@ void qualifiedEnumValueNameSwitch(
     using K1 = Slang::SPIRVCoreGrammarInfo::OperandKind;
     using K2 = SpvWord;
     Dictionary<K1, Dictionary<K2, V>> stepDict;
-    for(const auto& [k, v] : dict)
+    for (const auto& [k, v] : dict)
     {
         const auto& [k1, k2] = k;
         stepDict[k1][k2] = v;
@@ -111,14 +112,14 @@ void qualifiedEnumValueNameSwitch(
     line("    const auto& [k1, k2] = k;");
     w.print("    switch(%s)\n", unpackKey1);
     line("    {");
-    for(const auto& [k1, inner] : stepDict)
+    for (const auto& [k1, inner] : stepDict)
     {
         const auto k1Str = String(k1.index);
         w.print("        case %s:\n", k1Str.getBuffer());
 
         line("        switch(k2)");
         line("        {");
-        for(const auto& [k2, v] : inner)
+        for (const auto& [k2, v] : inner)
         {
             const auto k2Str = String(k2);
             const auto vStr = valueToAssignmentString(v);
@@ -135,9 +136,10 @@ void qualifiedEnumValueNameSwitch(
 
 static const char* opClassToString(Slang::SPIRVCoreGrammarInfo::OpInfo::Class c)
 {
-    switch(c)
+    switch (c)
     {
-#define GO(n) case SPIRVCoreGrammarInfo::OpInfo::n: return #n;
+#define GO(n) \
+    case SPIRVCoreGrammarInfo::OpInfo::n: return #n;
         GO(Miscellaneous)
         GO(Debug)
         GO(Annotation)
@@ -163,8 +165,7 @@ static const char* opClassToString(Slang::SPIRVCoreGrammarInfo::OpInfo::Class c)
         GO(Pipe)
         GO(NonUniform)
         GO(Reserved)
-        default:
-        GO(Other)
+    default: GO(Other)
 #undef GO
     }
 }
@@ -172,14 +173,13 @@ static const char* opClassToString(Slang::SPIRVCoreGrammarInfo::OpInfo::Class c)
 //
 // Write a C++ embedding of the SPIRVCoreGrammarInfo struct
 //
-void writeInfo(
-    const char* const outCppPath,
-    const SPIRVCoreGrammarInfo& info)
+void writeInfo(const char* const outCppPath, const SPIRVCoreGrammarInfo& info)
 {
     StringBuilder sb;
     StringWriter writer(&sb, WriterFlags(0));
     WriterHelper w(&writer);
-    const auto line = [&](const auto& l){
+    const auto line = [&](const auto& l)
+    {
         w.put(l);
         w.put("\n");
     };
@@ -212,42 +212,45 @@ void writeInfo(
         memberAssignments.add("info->opcodes.embedded = &lookupSpvOp;");
         w.put("static ");
         w.put(dictToPerfectHash(
-            info.opcodes.dict,
-            UnownedStringSlice("SpvOp"),
-            UnownedStringSlice("lookupSpvOp"),
-            [](const auto n){
-                const auto radix = 10;
-                return "static_cast<SpvOp>(" + String(n, radix) + ")";
-            }
-        ).getBuffer());
+                  info.opcodes.dict,
+                  UnownedStringSlice("SpvOp"),
+                  UnownedStringSlice("lookupSpvOp"),
+                  [](const auto n)
+                  {
+                      const auto radix = 10;
+                      return "static_cast<SpvOp>(" + String(n, radix) + ")";
+                  })
+                  .getBuffer());
     }
 
     {
         memberAssignments.add("info->capabilities.embedded = &lookupSpvCapability;");
         w.put("static ");
         w.put(dictToPerfectHash(
-            info.capabilities.dict,
-            UnownedStringSlice("SpvCapability"),
-            UnownedStringSlice("lookupSpvCapability"),
-            [](const auto n){
-                const auto radix = 10;
-                return "static_cast<SpvCapability>(" + String(n, radix) + ")";
-            }
-        ).getBuffer());
+                  info.capabilities.dict,
+                  UnownedStringSlice("SpvCapability"),
+                  UnownedStringSlice("lookupSpvCapability"),
+                  [](const auto n)
+                  {
+                      const auto radix = 10;
+                      return "static_cast<SpvCapability>(" + String(n, radix) + ")";
+                  })
+                  .getBuffer());
     }
 
     {
         memberAssignments.add("info->allEnumsWithTypePrefix.embedded = &lookupEnumWithTypePrefix;");
         w.put("static ");
         w.put(dictToPerfectHash(
-            info.allEnumsWithTypePrefix.dict,
-            UnownedStringSlice("SpvWord"),
-            UnownedStringSlice("lookupEnumWithTypePrefix"),
-            [](const auto n){
-                const auto radix = 10;
-                return "SpvWord{" + String(n, radix) + "}";
-            }
-        ).getBuffer());
+                  info.allEnumsWithTypePrefix.dict,
+                  UnownedStringSlice("SpvWord"),
+                  UnownedStringSlice("lookupEnumWithTypePrefix"),
+                  [](const auto n)
+                  {
+                      const auto radix = 10;
+                      return "SpvWord{" + String(n, radix) + "}";
+                  })
+                  .getBuffer());
     }
 
     {
@@ -258,38 +261,33 @@ void writeInfo(
             "SpvOp",
             "SPIRVCoreGrammarInfo::OpInfo",
             "k",
-            [&](SpvOp o){
-                return "Spv" + String(info.opNames.dict.getValue(o));
-            },
-            [](const Slang::SPIRVCoreGrammarInfo::OpInfo& i){
+            [&](SpvOp o) { return "Spv" + String(info.opNames.dict.getValue(o)); },
+            [](const Slang::SPIRVCoreGrammarInfo::OpInfo& i)
+            {
                 const char* classStr = opClassToString(i.class_);
                 String ret;
-                if(i.numOperandTypes)
+                if (i.numOperandTypes)
                 {
                     ret.append("const static OperandKind operandTypes[] = {");
                     String operandTypes;
-                    for(Index o = 0; o < i.numOperandTypes; ++o)
+                    for (Index o = 0; o < i.numOperandTypes; ++o)
                     {
-                        if(o != 0)
+                        if (o != 0)
                             ret.append(", ");
                         ret.append("{" + String(i.operandTypes[o].index) + "}");
                     }
                     ret.append("};\n            ");
                 }
                 ret.append(
-                      String("v = {SPIRVCoreGrammarInfo::OpInfo::")
-                    + classStr + ", "
-                    + String(i.resultTypeIndex) + ", "
-                    + String(i.resultIdIndex) + ", "
-                    + String(i.minOperandCount) + ", "
-                    + (i.maxOperandCount == 0xffff ? String("0xffff") : String(i.maxOperandCount)) + ", "
-                    + String(i.numOperandTypes) + ", "
-                    + (i.numOperandTypes ? "operandTypes" : "nullptr")
-                    + "}");
+                    String("v = {SPIRVCoreGrammarInfo::OpInfo::") + classStr + ", " +
+                    String(i.resultTypeIndex) + ", " + String(i.resultIdIndex) + ", " +
+                    String(i.minOperandCount) + ", " +
+                    (i.maxOperandCount == 0xffff ? String("0xffff") : String(i.maxOperandCount)) +
+                    ", " + String(i.numOperandTypes) + ", " +
+                    (i.numOperandTypes ? "operandTypes" : "nullptr") + "}");
                 return ret;
             },
-            w
-        );
+            w);
     }
 
     {
@@ -300,28 +298,25 @@ void writeInfo(
             "SpvOp",
             "UnownedStringSlice",
             "k",
-            [&](SpvOp o){
-                return "Spv" + String(info.opNames.dict.getValue(o));
-            },
-            [](const UnownedStringSlice& i){
-                return "v = UnownedStringSlice{\"" + String(i) + "\"}";
-            },
-            w
-        );
+            [&](SpvOp o) { return "Spv" + String(info.opNames.dict.getValue(o)); },
+            [](const UnownedStringSlice& i)
+            { return "v = UnownedStringSlice{\"" + String(i) + "\"}"; },
+            w);
     }
 
     {
         memberAssignments.add("info->operandKinds.embedded = &lookupOperandKind;");
         w.put("static ");
         w.put(dictToPerfectHash(
-            info.operandKinds.dict,
-            UnownedStringSlice("OperandKind"),
-            UnownedStringSlice("lookupOperandKind"),
-            [](const auto n){
-                const auto radix = 10;
-                return "OperandKind{" + String(n.index, radix) + "}";
-            }
-        ).getBuffer());
+                  info.operandKinds.dict,
+                  UnownedStringSlice("OperandKind"),
+                  UnownedStringSlice("lookupOperandKind"),
+                  [](const auto n)
+                  {
+                      const auto radix = 10;
+                      return "OperandKind{" + String(n.index, radix) + "}";
+                  })
+                  .getBuffer());
     }
 
     {
@@ -332,7 +327,7 @@ void writeInfo(
         // reuse the existing string-based perfect hasher
         Dictionary<String, SpvWord> enumDict;
         Index maxNameLength = 0;
-        for(const auto& [q, v] : info.allEnums.dict)
+        for (const auto& [q, v] : info.allEnums.dict)
         {
             const auto i = q.kind.index;
             String k;
@@ -343,11 +338,11 @@ void writeInfo(
             maxNameLength = std::max(maxNameLength, k.getLength());
         }
         w.put(dictToPerfectHash(
-            enumDict,
-            UnownedStringSlice("SpvWord"),
-            UnownedStringSlice("lookupEnumWithHexPrefix"),
-            [&](const auto n){ return "SpvWord{" + String(n) + "}"; }
-        ).getBuffer());
+                  enumDict,
+                  UnownedStringSlice("SpvWord"),
+                  UnownedStringSlice("lookupEnumWithHexPrefix"),
+                  [&](const auto n) { return "SpvWord{" + String(n) + "}"; })
+                  .getBuffer());
 
         // Utilise this helper
         line("static bool lookupQualifiedEnum(const QualifiedEnumName& k, SpvWord& v)");
@@ -359,7 +354,8 @@ void writeInfo(
         line("    name[0] = char((k.kind.index >> 4) + 'a');");
         line("    name[1] = char((k.kind.index & 0xf) + 'a');");
         line("    memcpy(name+2, k.name.begin(), k.name.getLength());");
-        line("    return lookupEnumWithHexPrefix(UnownedStringSlice(name, k.name.getLength() + 2), v);");
+        line("    return lookupEnumWithHexPrefix(UnownedStringSlice(name, k.name.getLength() + 2), "
+             "v);");
         line("}");
         line("");
     }
@@ -372,11 +368,9 @@ void writeInfo(
             "QualifiedEnumValue",
             "UnownedStringSlice",
             "k1.index",
-            [](const UnownedStringSlice& i){
-                return "v = UnownedStringSlice{\"" + String(i) + "\"}";
-            },
-            w
-        );
+            [](const UnownedStringSlice& i)
+            { return "v = UnownedStringSlice{\"" + String(i) + "\"}"; },
+            w);
     }
 
     {
@@ -387,32 +381,25 @@ void writeInfo(
             "OperandKind",
             "UnownedStringSlice",
             "k.index",
-            [&](Slang::SPIRVCoreGrammarInfo::OperandKind o){
-                return String(o.index);
-            },
-            [](const UnownedStringSlice& i){
-                return "v = UnownedStringSlice{\"" + String(i) + "\"}";
-            },
-            w
-        );
+            [&](Slang::SPIRVCoreGrammarInfo::OperandKind o) { return String(o.index); },
+            [](const UnownedStringSlice& i)
+            { return "v = UnownedStringSlice{\"" + String(i) + "\"}"; },
+            w);
     }
 
     {
-        memberAssignments.add("info->operandKindUnderneathIds.embedded = &getOperandKindUnderneathId;");
+        memberAssignments.add(
+            "info->operandKindUnderneathIds.embedded = &getOperandKindUnderneathId;");
         dictToSwitch(
             info.operandKindUnderneathIds.dict,
             "getOperandKindUnderneathId",
             "OperandKind",
             "OperandKind",
             "k.index",
-            [](Slang::SPIRVCoreGrammarInfo::OperandKind o){
-                return String(o.index);
-            },
-            [](Slang::SPIRVCoreGrammarInfo::OperandKind i){
-                return "v = OperandKind{" + String(i.index) + "}";
-            },
-            w
-        );
+            [](Slang::SPIRVCoreGrammarInfo::OperandKind o) { return String(o.index); },
+            [](Slang::SPIRVCoreGrammarInfo::OperandKind i)
+            { return "v = OperandKind{" + String(i.index) + "}"; },
+            w);
     }
 
     //
@@ -422,7 +409,7 @@ void writeInfo(
     line("{");
     line("    static RefPtr<SPIRVCoreGrammarInfo> embedded = [](){");
     line("        RefPtr<SPIRVCoreGrammarInfo> info = new SPIRVCoreGrammarInfo();");
-    for(const auto& a : memberAssignments)
+    for (const auto& a : memberAssignments)
         line(("        " + a).getBuffer());
 
     //
@@ -452,14 +439,14 @@ int main(int argc, const char* const* argv)
     const char* const outCppPath = argv[2];
 
     RefPtr<FileWriter> writer(new FileWriter(stderr, WriterFlag::AutoFlush));
-    SourceManager      sourceManager;
+    SourceManager sourceManager;
     sourceManager.initialize(nullptr, nullptr);
     DiagnosticSink sink(&sourceManager, Lexer::sourceLocationLexer);
     sink.writer = writer;
 
     String contents;
     SLANG_RETURN_ON_FAIL(File::readAllText(inPath, contents));
-    PathInfo    pathInfo = PathInfo::makeFromString(inPath);
+    PathInfo pathInfo = PathInfo::makeFromString(inPath);
     SourceFile* sourceFile = sourceManager.createSourceFileWithString(pathInfo, contents);
     SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
 

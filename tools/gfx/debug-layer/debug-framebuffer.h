@@ -9,8 +9,7 @@ using namespace Slang;
 namespace debug
 {
 
-class DebugFramebuffer
-    : public DebugObject<IFramebuffer>
+class DebugFramebuffer : public DebugObject<IFramebuffer>
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL;

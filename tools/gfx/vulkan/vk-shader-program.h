@@ -36,7 +36,8 @@ public:
         VkShaderModule& outShaderModule);
 
     virtual Result createShaderModule(
-        slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode) override;
+        slang::EntryPointReflection* entryPointInfo,
+        ComPtr<ISlangBlob> kernelCode) override;
 };
 
 

@@ -1,25 +1,23 @@
 
 #include "slang-render-api-util.h"
 
+#include "slang-list.h"
+#include "slang-platform.h"
+#include "slang-string-util.h"
 #include "slang.h"
 
-#include "slang-list.h"
-#include "slang-string-util.h"
-
-#include "slang-platform.h"
-
-namespace Slang {
+namespace Slang
+{
 
 // NOTE! Must keep in same order as RenderApiType and have same amount of entries
-/* static */const RenderApiUtil::Info RenderApiUtil::s_infos[] =
-{
-    { RenderApiType::Vulkan, "vk,vulkan",       ""},
-    { RenderApiType::D3D12,  "dx12,d3d12",      ""},
-    { RenderApiType::D3D11,  "dx11,d3d11",      "hlsl,hlsl-rewrite,slang"},
-    { RenderApiType::Metal,  "mtl,metal",       ""},
-    { RenderApiType::CPU,    "cpu",             ""},
-    { RenderApiType::CUDA,   "cuda",            "cuda,ptx"},
-    { RenderApiType::WebGPU, "wgpu,webgpu",     "wgsl"},
+/* static */ const RenderApiUtil::Info RenderApiUtil::s_infos[] = {
+    {RenderApiType::Vulkan, "vk,vulkan", ""},
+    {RenderApiType::D3D12, "dx12,d3d12", ""},
+    {RenderApiType::D3D11, "dx11,d3d11", "hlsl,hlsl-rewrite,slang"},
+    {RenderApiType::Metal, "mtl,metal", ""},
+    {RenderApiType::CPU, "cpu", ""},
+    {RenderApiType::CUDA, "cuda", "cuda,ptx"},
+    {RenderApiType::WebGPU, "wgpu,webgpu", "wgsl"},
 };
 
 static int _calcAvailableApis()
@@ -36,7 +34,7 @@ static int _calcAvailableApis()
     return flags;
 }
 
-/* static */int RenderApiUtil::getAvailableApis()
+/* static */ int RenderApiUtil::getAvailableApis()
 {
     static int s_availableApis = _calcAvailableApis();
     return s_availableApis;
@@ -53,7 +51,7 @@ UnownedStringSlice RenderApiUtil::getApiName(RenderApiType type)
     return StringUtil::getAtInSplit(UnownedStringSlice(s_infos[index].names), ',', 0);
 }
 
-/* static */RenderApiType RenderApiUtil::findApiTypeByName(const Slang::UnownedStringSlice& name)
+/* static */ RenderApiType RenderApiUtil::findApiTypeByName(const Slang::UnownedStringSlice& name)
 {
     using namespace Slang;
     List<UnownedStringSlice> namesList;
@@ -78,7 +76,9 @@ UnownedStringSlice RenderApiUtil::getApiName(RenderApiType type)
     return RenderApiType::Unknown;
 }
 
-/* static */ Slang::Result RenderApiUtil::findApiFlagsByName(const Slang::UnownedStringSlice& name, RenderApiFlags* flagsOut)
+/* static */ Slang::Result RenderApiUtil::findApiFlagsByName(
+    const Slang::UnownedStringSlice& name,
+    RenderApiFlags* flagsOut)
 {
     // Special case 'all'
     if (name == "all")
@@ -102,7 +102,7 @@ UnownedStringSlice RenderApiUtil::getApiName(RenderApiType type)
 
 static bool isNameStartChar(char c)
 {
-    return (c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || (c == '_');
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_');
 }
 
 static bool isNameNextChar(char c)
@@ -110,15 +110,16 @@ static bool isNameNextChar(char c)
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_') || (c >= '0' && c <= '9');
 }
 
-namespace { // anonymous
-enum class Token 
+namespace
+{ // anonymous
+enum class Token
 {
     eError,
     eOp,
     eId,
     eEnd,
 };
-}
+} // namespace
 
 static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStringSlice& lexemeOut)
 {
@@ -154,18 +155,21 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
     return Token::eId;
 }
 
-/* static */Slang::Result RenderApiUtil::parseApiFlags(const Slang::UnownedStringSlice& textIn, RenderApiFlags initialFlags, RenderApiFlags* apiFlagsOut)
+/* static */ Slang::Result RenderApiUtil::parseApiFlags(
+    const Slang::UnownedStringSlice& textIn,
+    RenderApiFlags initialFlags,
+    RenderApiFlags* apiFlagsOut)
 {
     using namespace Slang;
 
     UnownedStringSlice text(textIn);
     UnownedStringSlice lexeme;
 
-    RenderApiFlags apiFlags = 0; 
-    
+    RenderApiFlags apiFlags = 0;
+
     switch (nextToken(text, lexeme))
     {
-        case Token::eOp:
+    case Token::eOp:
         {
             // If we start with an op - we use the passed in values as the default
             // Rewind back to the start
@@ -173,27 +177,27 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
             apiFlags = initialFlags;
             break;
         }
-        case Token::eId:
+    case Token::eId:
         {
             // If we start with an Id - we use that as the starting state
             SLANG_RETURN_ON_FAIL(findApiFlagsByName(lexeme, &apiFlags));
             break;
         }
-        default: return SLANG_FAIL;
+    default: return SLANG_FAIL;
     }
-    
+
     while (true)
     {
         // Must have an op followed by an id unless we are at the end
         switch (nextToken(text, lexeme))
         {
-            case Token::eEnd:
+        case Token::eEnd:
             {
                 *apiFlagsOut = apiFlags;
                 return SLANG_OK;
             }
-            case Token::eOp:    break;
-            default:            return SLANG_FAIL;
+        case Token::eOp: break;
+        default:         return SLANG_FAIL;
         }
 
         const char op = lexeme[0];
@@ -216,7 +220,7 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
     }
 }
 
-/* static */RenderApiType RenderApiUtil::findRenderApiType(const Slang::UnownedStringSlice& text)
+/* static */ RenderApiType RenderApiUtil::findRenderApiType(const Slang::UnownedStringSlice& text)
 {
     using namespace Slang;
     for (Index j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
@@ -231,7 +235,8 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
     return RenderApiType::Unknown;
 }
 
-/* static */RenderApiType RenderApiUtil::findImplicitLanguageRenderApiType(const Slang::UnownedStringSlice& text)
+/* static */ RenderApiType RenderApiUtil::findImplicitLanguageRenderApiType(
+    const Slang::UnownedStringSlice& text)
 {
     using namespace Slang;
     for (Index j = 0; j < SLANG_COUNT_OF(RenderApiUtil::s_infos); j++)
@@ -260,32 +265,34 @@ static bool _canLoadSharedLibrary(const char* libName)
 }
 #endif
 
-/* static */bool RenderApiUtil::calcHasApi(RenderApiType type)
+/* static */ bool RenderApiUtil::calcHasApi(RenderApiType type)
 {
     switch (type)
     {
 #if SLANG_WINDOWS_FAMILY
-        case RenderApiType::Vulkan: return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
-        case RenderApiType::WebGPU:
-            return _canLoadSharedLibrary("webgpu_dawn") &&
-                _canLoadSharedLibrary("dxcompiler") &&
-                _canLoadSharedLibrary("dxil");
+    case RenderApiType::Vulkan:
+        return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
+    case RenderApiType::WebGPU:
+        return _canLoadSharedLibrary("webgpu_dawn") && _canLoadSharedLibrary("dxcompiler") &&
+               _canLoadSharedLibrary("dxil");
 #elif SLANG_APPLE_FAMILY
-        case RenderApiType::Vulkan: return true;
-        case RenderApiType::Metal:  return true;
+    case RenderApiType::Vulkan: return true;
+    case RenderApiType::Metal:  return true;
 #elif SLANG_UNIX_FAMILY
-        case RenderApiType::Vulkan: return true;
+    case RenderApiType::Vulkan: return true;
 #endif
 
 #if SLANG_ENABLE_DIRECTX
-        case RenderApiType::D3D11:  return _canLoadSharedLibrary(SLANG_ENABLE_DXVK ? "dxvk_d3d11" : "d3d11");
-        case RenderApiType::D3D12:  return _canLoadSharedLibrary(SLANG_ENABLE_VKD3D ? "vkd3d-proton-d3d12" : "d3d12");
+    case RenderApiType::D3D11:
+        return _canLoadSharedLibrary(SLANG_ENABLE_DXVK ? "dxvk_d3d11" : "d3d11");
+    case RenderApiType::D3D12:
+        return _canLoadSharedLibrary(SLANG_ENABLE_VKD3D ? "vkd3d-proton-d3d12" : "d3d12");
 #endif
 
-        case RenderApiType::CPU:    return true;
-        // We'll assume CUDA is available, and if not, trying to create it will detect it
-        case RenderApiType::CUDA:   return true;
-        default: break;
+    case RenderApiType::CPU: return true;
+    // We'll assume CUDA is available, and if not, trying to create it will detect it
+    case RenderApiType::CUDA: return true;
+    default:                  break;
     }
     return false;
 }

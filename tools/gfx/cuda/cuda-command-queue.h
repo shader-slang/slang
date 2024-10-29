@@ -1,11 +1,10 @@
 // cuda-command-queue.h
 #pragma once
 #include "cuda-base.h"
-
 #include "cuda-device.h"
+#include "cuda-helper-functions.h"
 #include "cuda-pipeline-state.h"
 #include "cuda-shader-object.h"
-#include "cuda-helper-functions.h"
 
 namespace gfx
 {
@@ -15,13 +14,11 @@ using namespace Slang;
 namespace cuda
 {
 
-class CommandQueueImpl
-    : public ICommandQueue
-    , public ComObject
+class CommandQueueImpl : public ICommandQueue, public ComObject
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
-        ICommandQueue* getInterface(const Guid& guid);
+    ICommandQueue* getInterface(const Guid& guid);
 
     RefPtr<ComputePipelineStateImpl> currentPipeline;
     RefPtr<RootShaderObjectImpl> currentRootObject;
@@ -35,12 +32,15 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-        GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override;
+        GfxCount count,
+        ICommandBuffer* const* commandBuffers,
+        IFence* fence,
+        uint64_t valueToSignal) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
-        GfxCount fenceCount, IFence** fences, uint64_t* waitValues) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    waitForFenceValuesOnDevice(GfxCount fenceCount, IFence** fences, uint64_t* waitValues) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 

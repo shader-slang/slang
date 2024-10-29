@@ -1,8 +1,8 @@
 #pragma once
 
-#include "slang.h"
 #include "../core/slang-basic.h"
 #include "slang-workspace-version.h"
+#include "slang.h"
 
 namespace Slang
 {
@@ -40,6 +40,12 @@ String findClangFormatTool();
 
 List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text);
 
-List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd, Index cursorOffset, const List<TextRange>& exclusionRanges, const FormatOptions& options);
+List<Edit> formatSource(
+    UnownedStringSlice text,
+    Index lineStart,
+    Index lineEnd,
+    Index cursorOffset,
+    const List<TextRange>& exclusionRanges,
+    const FormatOptions& options);
 
 } // namespace Slang

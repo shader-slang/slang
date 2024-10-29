@@ -3,10 +3,10 @@
 
 namespace Slang
 {
-    struct IRModule;
-    struct IRGeneric;
+struct IRModule;
+struct IRGeneric;
 
-    // Deduplicate insts inside a generic.
-    bool deduplicateGenericChildren(IRModule* module);
-    bool deduplicateGenericChildren(IRGeneric* genericInst);
-}
+// Deduplicate insts inside a generic.
+bool deduplicateGenericChildren(IRModule* module);
+bool deduplicateGenericChildren(IRGeneric* genericInst);
+} // namespace Slang

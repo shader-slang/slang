@@ -1,14 +1,13 @@
 // unit-test-translation-unit-import.cpp
 
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
+#include "slang-com-ptr.h"
 #include "slang.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-#include "slang-com-ptr.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
 
 using namespace Slang;
 
@@ -59,19 +58,30 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
-    auto module = session->loadModuleFromSourceString("m", "m.slang", userSourceBody, diagnosticBlob.writeRef());
+    auto module = session->loadModuleFromSourceString(
+        "m",
+        "m.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    module->findAndCheckEntryPoint("fragMain", SLANG_STAGE_FRAGMENT, entryPoint.writeRef(), diagnosticBlob.writeRef());
+    module->findAndCheckEntryPoint(
+        "fragMain",
+        SLANG_STAGE_FRAGMENT,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
     SLANG_CHECK(entryPoint != nullptr);
 
     auto entryPointFuncReflection = entryPoint->getFunctionReflection();
     SLANG_CHECK(entryPointFuncReflection != nullptr);
     SLANG_CHECK(UnownedStringSlice(entryPointFuncReflection->getName()) == "fragMain");
     SLANG_CHECK(entryPointFuncReflection->getParameterCount() == 1);
-    SLANG_CHECK(UnownedStringSlice(entryPointFuncReflection->getParameterByIndex(0)->getName()) == "pos");
-    SLANG_CHECK(getTypeFullName(entryPointFuncReflection->getParameterByIndex(0)->getType()) == "vector<float,4>");
+    SLANG_CHECK(
+        UnownedStringSlice(entryPointFuncReflection->getParameterByIndex(0)->getName()) == "pos");
+    SLANG_CHECK(
+        getTypeFullName(entryPointFuncReflection->getParameterByIndex(0)->getType()) ==
+        "vector<float,4>");
 
     auto funcReflection = module->getLayout()->findFunctionByName("ordinaryFunc");
     SLANG_CHECK(funcReflection != nullptr);
@@ -82,7 +92,8 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(funcReflection->getParameterCount() == 2);
     SLANG_CHECK(UnownedStringSlice(funcReflection->getParameterByIndex(0)->getName()) == "x");
     SLANG_CHECK(getTypeFullName(funcReflection->getParameterByIndex(0)->getType()) == "float");
-    SLANG_CHECK(funcReflection->getParameterByIndex(0)->findModifier(slang::Modifier::NoDiff) != nullptr);
+    SLANG_CHECK(
+        funcReflection->getParameterByIndex(0)->findModifier(slang::Modifier::NoDiff) != nullptr);
 
     SLANG_CHECK(UnownedStringSlice(funcReflection->getParameterByIndex(1)->getName()) == "y");
     SLANG_CHECK(getTypeFullName(funcReflection->getParameterByIndex(1)->getType()) == "int");
@@ -96,7 +107,9 @@ SLANG_UNIT_TEST(functionReflection)
     auto result = userAttribute->getArgumentValueInt(0, &val);
     SLANG_CHECK(result == SLANG_OK);
     SLANG_CHECK(val == 1024);
-    SLANG_CHECK(funcReflection->findUserAttributeByName(globalSession.get(), "MyFuncProperty") == userAttribute);
+    SLANG_CHECK(
+        funcReflection->findUserAttributeByName(globalSession.get(), "MyFuncProperty") ==
+        userAttribute);
 
     // Check overloaded method resolution
     auto overloadReflection = module->getLayout()->findFunctionByName("foo");
@@ -129,7 +142,7 @@ SLANG_UNIT_TEST(functionReflection)
 
     //
     // More testing for specializeWithArgTypes
-    // 
+    //
 
     // bar1 (IFloat, IFloat) -> int
     //
@@ -144,11 +157,13 @@ SLANG_UNIT_TEST(functionReflection)
     argTypes[1] = float3Type;
 
     resolvedFunctionReflection = bar1Reflection->specializeWithArgTypes(2, argTypes);
-    
+
     SLANG_CHECK(resolvedFunctionReflection != nullptr);
     SLANG_CHECK(resolvedFunctionReflection->getParameterCount() == 2);
-    SLANG_CHECK(getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) == "IFloat");
-    SLANG_CHECK(getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) == "IFloat");
+    SLANG_CHECK(
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) == "IFloat");
+    SLANG_CHECK(
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) == "IFloat");
 
     // bar2 (T : IFloat, float3) -> int
     //
@@ -166,8 +181,11 @@ SLANG_UNIT_TEST(functionReflection)
 
     SLANG_CHECK(resolvedFunctionReflection != nullptr);
     SLANG_CHECK(resolvedFunctionReflection->getParameterCount() == 2);
-    SLANG_CHECK(getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) == "float");
-    SLANG_CHECK(getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) == "vector<float,3>");
+    SLANG_CHECK(
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) == "float");
+    SLANG_CHECK(
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) ==
+        "vector<float,3>");
 
 
     // failure case
@@ -188,4 +206,3 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(resolvedFunctionReflection != nullptr);
     SLANG_CHECK(resolvedFunctionReflection == bar3Reflection);
 }
-

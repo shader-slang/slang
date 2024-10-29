@@ -23,7 +23,7 @@ public:
     D3D12_RESOURCE_STATES m_defaultState;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeResourceHandle(InteropHandle* outHandle) override;
+    getNativeResourceHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
 

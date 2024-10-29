@@ -3,24 +3,20 @@
 #define SLANG_EMIT_C_LIKE_H
 
 #include "../core/slang-basic.h"
-
 #include "slang-compiler.h"
-
 #include "slang-emit-base.h"
 #include "slang-emit-precedence.h"
 #include "slang-emit-source-writer.h"
-
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
 
-class CLikeSourceEmitter: public SourceEmitterBase
+class CLikeSourceEmitter : public SourceEmitterBase
 {
 public:
-
     enum class EmitLayoutSemanticOption
     {
         kPreType,
@@ -31,14 +27,14 @@ public:
     {
         CodeGenContext* codeGenContext = nullptr;
 
-            /// The stage for the entry point we are being asked to compile
+        /// The stage for the entry point we are being asked to compile
         Stage entryPointStage = Stage::Unknown;
 
-            /// The "effective" profile that is being used to emit code,
-            /// combining information from the target and entry point.
+        /// The "effective" profile that is being used to emit code,
+        /// combining information from the target and entry point.
         Profile effectiveProfile = Profile::RawEnum::Unknown;
 
-            /// The source writer to use
+        /// The source writer to use
         SourceWriter* sourceWriter = nullptr;
     };
 
@@ -46,7 +42,7 @@ public:
     {
         kThreadGroupAxisCount = 3,
     };
-    
+
     typedef unsigned int ESemanticMask;
     enum
     {
@@ -55,20 +51,20 @@ public:
         kESemanticMask_Default = kESemanticMask_NoPackOffset,
     };
 
-        /// A C-style declarator, used for emitting types and declarations.
-        ///
-        /// A C-style declaration typically has a *type specifier* (like
-        /// `int` or `MyType`) and a *declarator* (like `myVar` or
-        /// `myArray[]` or `*myPtr`).
-        ///
-        /// The type of a declaration depends on both the type specifier
-        /// the declarator, and we already have logic to "unwrap" the
-        /// syntax of a declarator as part of the parser.
-        ///
-        /// A `DeclaratorInfo` is used for the inverse process: taking
-        /// a complete type and splitting out the parts that need to be
-        /// handled as declarators when emitting code in a C-like language.
-        ///
+    /// A C-style declarator, used for emitting types and declarations.
+    ///
+    /// A C-style declaration typically has a *type specifier* (like
+    /// `int` or `MyType`) and a *declarator* (like `myVar` or
+    /// `myArray[]` or `*myPtr`).
+    ///
+    /// The type of a declaration depends on both the type specifier
+    /// the declarator, and we already have logic to "unwrap" the
+    /// syntax of a declarator as part of the parser.
+    ///
+    /// A `DeclaratorInfo` is used for the inverse process: taking
+    /// a complete type and splitting out the parts that need to be
+    /// handled as declarators when emitting code in a C-like language.
+    ///
     struct DeclaratorInfo
     {
     public:
@@ -87,43 +83,47 @@ public:
     protected:
         DeclaratorInfo(Flavor flavor)
             : flavor(flavor)
-        {}
+        {
+        }
     };
 
-        /// A simple declarator that only includes a name
+    /// A simple declarator that only includes a name
     struct NameDeclaratorInfo : DeclaratorInfo
     {
         const StringSliceLoc* nameAndLoc;
 
         NameDeclaratorInfo(StringSliceLoc const* nameAndLoc)
             : DeclaratorInfo(Flavor::Name), nameAndLoc(nameAndLoc)
-        {}
+        {
+        }
     };
 
-        /// A "chained" declarator that may a nested declarator.
+    /// A "chained" declarator that may a nested declarator.
     struct ChainedDeclaratorInfo : DeclaratorInfo
     {
         DeclaratorInfo* next = nullptr;
 
     protected:
         ChainedDeclaratorInfo(Flavor flavor, DeclaratorInfo* next)
-            : DeclaratorInfo(flavor)
-            , next(next)
-        {}
+            : DeclaratorInfo(flavor), next(next)
+        {
+        }
     };
 
     struct PtrDeclaratorInfo : ChainedDeclaratorInfo
     {
         PtrDeclaratorInfo(DeclaratorInfo* next)
             : ChainedDeclaratorInfo(Flavor::Ptr, next)
-        {}
+        {
+        }
     };
 
     struct RefDeclaratorInfo : ChainedDeclaratorInfo
     {
         RefDeclaratorInfo(DeclaratorInfo* next)
             : ChainedDeclaratorInfo(Flavor::Ref, next)
-        {}
+        {
+        }
     };
 
     struct SizedArrayDeclaratorInfo : ChainedDeclaratorInfo
@@ -131,16 +131,17 @@ public:
         IRInst* elementCount;
 
         SizedArrayDeclaratorInfo(DeclaratorInfo* next, IRInst* elementCount)
-            : ChainedDeclaratorInfo(Flavor::SizedArray, next)
-            , elementCount(elementCount)
-        {}
+            : ChainedDeclaratorInfo(Flavor::SizedArray, next), elementCount(elementCount)
+        {
+        }
     };
 
     struct UnsizedArrayDeclaratorInfo : ChainedDeclaratorInfo
     {
         UnsizedArrayDeclaratorInfo(DeclaratorInfo* next)
             : ChainedDeclaratorInfo(Flavor::UnsizedArray, next)
-        {}
+        {
+        }
     };
 
     struct LiteralSizedArrayDeclaratorInfo : ChainedDeclaratorInfo
@@ -148,9 +149,9 @@ public:
         IRIntegerValue elementCount;
 
         LiteralSizedArrayDeclaratorInfo(DeclaratorInfo* next, IRIntegerValue elementCount)
-            : ChainedDeclaratorInfo(Flavor::LiteralSizedArray, next)
-            , elementCount(elementCount)
-        {}
+            : ChainedDeclaratorInfo(Flavor::LiteralSizedArray, next), elementCount(elementCount)
+        {
+        }
     };
 
     struct AttributedDeclaratorInfo : ChainedDeclaratorInfo
@@ -158,7 +159,8 @@ public:
         AttributedDeclaratorInfo(DeclaratorInfo* next, IRInst* instWithAttributes)
             : ChainedDeclaratorInfo(Flavor::Attributed, next)
             , instWithAttributes(instWithAttributes)
-        {}
+        {
+        }
 
         IRInst* instWithAttributes;
     };
@@ -166,9 +168,9 @@ public:
     struct FuncTypeDeclaratorInfo : ChainedDeclaratorInfo
     {
         FuncTypeDeclaratorInfo(DeclaratorInfo* next, IRFuncType* funcTypeInst)
-            : ChainedDeclaratorInfo(Flavor::Attributed, next)
-            , funcType(funcTypeInst)
-        {}
+            : ChainedDeclaratorInfo(Flavor::Attributed, next), funcType(funcTypeInst)
+        {
+        }
 
         IRFuncType* funcType;
     };
@@ -183,54 +185,53 @@ public:
             ForwardDeclaration,
             Definition,
         };
-        Level   level;
+        Level level;
         IRInst* inst;
     };
 
     // A chain of variables to use for emitting semantic/layout info
     struct EmitVarChain
     {
-        IRVarLayout*      varLayout;
-        EmitVarChain*   next;
+        IRVarLayout* varLayout;
+        EmitVarChain* next;
 
         EmitVarChain()
-            : varLayout(nullptr)
-            , next(nullptr)
-        {}
+            : varLayout(nullptr), next(nullptr)
+        {
+        }
 
         EmitVarChain(IRVarLayout* varLayout)
-            : varLayout(varLayout)
-            , next(nullptr)
-        {}
+            : varLayout(varLayout), next(nullptr)
+        {
+        }
 
         EmitVarChain(IRVarLayout* varLayout, EmitVarChain* next)
-            : varLayout(varLayout)
-            , next(next)
-        {}
+            : varLayout(varLayout), next(next)
+        {
+        }
     };
 
-    
 
-        /// Must be called before used
+    /// Must be called before used
     virtual SlangResult init();
 
-        /// Ctor
+    /// Ctor
     CLikeSourceEmitter(const Desc& desc);
 
-    
-        /// Get the source manager
+
+    /// Get the source manager
     SourceManager* getSourceManager() { return m_codeGenContext->getSourceManager(); }
 
-        /// Get the source writer used
+    /// Get the source writer used
     SourceWriter* getSourceWriter() const { return m_writer; }
 
-        /// Get the diagnostic sink
-    DiagnosticSink* getSink() { return m_codeGenContext->getSink();}
+    /// Get the diagnostic sink
+    DiagnosticSink* getSink() { return m_codeGenContext->getSink(); }
 
-        /// Get the code gen target
+    /// Get the code gen target
     CodeGenTarget getTarget() { return m_target; }
-        /// Get the source style
-    SLANG_FORCE_INLINE SourceLanguage getSourceLanguage() const { return m_sourceLanguage;  }
+    /// Get the source style
+    SLANG_FORCE_INLINE SourceLanguage getSourceLanguage() const { return m_sourceLanguage; }
 
     void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
 
@@ -248,7 +249,7 @@ public:
     //
 
     void ensureTypePrelude(IRType* type);
-    void emitDeclarator(DeclaratorInfo* declarator) {emitDeclaratorImpl(declarator);}
+    void emitDeclarator(DeclaratorInfo* declarator) { emitDeclaratorImpl(declarator); }
     virtual void emitDeclaratorImpl(DeclaratorInfo* declarator);
 
     void emitType(IRType* type, const StringSliceLoc* nameLoc) { emitTypeImpl(type, nameLoc); }
@@ -280,23 +281,23 @@ public:
     UInt getBindingOffset(EmitVarChain* chain, LayoutResourceKind kind);
     UInt getBindingSpace(EmitVarChain* chain, LayoutResourceKind kind);
 
-        /// Finds the binding offset for *all* the kinds that match the kindFlags
-        /// Thus only meaningful if multiple kinds can be treated as the same as far as binding is concerned.
-        /// In particular is useful for GLSL binding emit, where some HLSL resource kinds can appear but are in effect the 
-        /// same as DescriptorSlot
-    UInt getBindingOffsetForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags);   
+    /// Finds the binding offset for *all* the kinds that match the kindFlags
+    /// Thus only meaningful if multiple kinds can be treated as the same as far as binding is
+    /// concerned. In particular is useful for GLSL binding emit, where some HLSL resource kinds can
+    /// appear but are in effect the same as DescriptorSlot
+    UInt getBindingOffsetForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags);
     UInt getBindingSpaceForKinds(EmitVarChain* chain, LayoutResourceKindFlags kindFlags);
-    
-        // Utility code for generating unique IDs as needed
-        // during the emit process (e.g., for declarations
-        // that didn't originally have names, but now need to).
+
+    // Utility code for generating unique IDs as needed
+    // during the emit process (e.g., for declarations
+    // that didn't originally have names, but now need to).
     UInt allocateUniqueID();
 
     // IR-level emit logic
 
     UInt getID(IRInst* value);
 
-        /// "Scrub" a name so that it complies with restrictions of the target language.
+    /// "Scrub" a name so that it complies with restrictions of the target language.
     void appendScrubbedName(const UnownedStringSlice& name, StringBuilder& out);
 
     String generateName(IRInst* inst);
@@ -306,10 +307,13 @@ public:
     String getUnmangledName(IRInst* inst);
 
     void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
-    
+
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst);
 
-    void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec) { emitOperandImpl(inst, outerPrec); }
+    void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec)
+    {
+        emitOperandImpl(inst, outerPrec);
+    }
 
     void emitArgs(IRInst* inst);
 
@@ -324,7 +328,10 @@ public:
 
     // Find the definition of a target intrinsic either from __target_intrinsic decoration, or from
     // a genericAsm inst in the function body. `outInst` is the decoration or the genericAsm inst.
-    bool findTargetIntrinsicDefinition(IRInst* callee, UnownedStringSlice& outDefinition, IRInst*& outInst);
+    bool findTargetIntrinsicDefinition(
+        IRInst* callee,
+        UnownedStringSlice& outDefinition,
+        IRInst*& outInst);
 
     // Check if the string being used to define a target intrinsic
     // is an "ordinary" name, such that we can simply emit a call
@@ -334,10 +341,10 @@ public:
     void emitComInterfaceCallExpr(IRCall* inst, EmitOpInfo const& inOuterPrec);
 
     void emitIntrinsicCallExpr(
-        IRCall*                         inst,
-        UnownedStringSlice              intrinsicDefinition,
-        IRInst*                         intrinsicInst,
-        EmitOpInfo const&               inOuterPrec);
+        IRCall* inst,
+        UnownedStringSlice intrinsicDefinition,
+        IRInst* intrinsicInst,
+        EmitOpInfo const& inOuterPrec);
 
     void emitCallExpr(IRCall* inst, EmitOpInfo outerPrec);
 
@@ -354,24 +361,27 @@ public:
     void emitDecorationLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling);
     void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling);
 
-        /// Emit high-level language statements from a structured region.
+    /// Emit high-level language statements from a structured region.
     void emitRegion(Region* inRegion);
 
-        /// Emit high-level language statements from a structured region tree.
+    /// Emit high-level language statements from a structured region tree.
     void emitRegionTree(RegionTree* regionTree);
 
-        // Is an IR function a definition? (otherwise it is a declaration)
+    // Is an IR function a definition? (otherwise it is a declaration)
     bool isDefinition(IRFunc* func);
 
     void emitEntryPointAttributes(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor);
 
-        /// Emit high-level statements for the body of a function.
+    /// Emit high-level statements for the body of a function.
     void emitFunctionBody(IRGlobalValueWithCode* code);
 
     void emitFuncHeader(IRFunc* func) { emitFuncHeaderImpl(func); }
     void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
 
-    void emitSwitchCaseSelectors(const SwitchRegion::Case* currentCase, bool isDefault) {emitSwitchCaseSelectorsImpl(currentCase, isDefault);}
+    void emitSwitchCaseSelectors(const SwitchRegion::Case* currentCase, bool isDefault)
+    {
+        emitSwitchCaseSelectorsImpl(currentCase, isDefault);
+    }
 
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
 
@@ -383,9 +393,9 @@ public:
 
     IREntryPointLayout* asEntryPoint(IRFunc* func);
 
-        // Detect if the given IR function/type represents a
-        // declaration of an intrinsic/builtin for the
-        // current code-generation target.
+    // Detect if the given IR function/type represents a
+    // declaration of an intrinsic/builtin for the
+    // current code-generation target.
     bool isTargetIntrinsic(IRInst* func);
 
     void emitFunc(IRFunc* func);
@@ -397,25 +407,32 @@ public:
     void emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout);
     void emitClass(IRClassType* structType);
 
-    void emitStructDeclarationSeparator() {emitStructDeclarationSeparatorImpl();}
+    void emitStructDeclarationSeparator() { emitStructDeclarationSeparatorImpl(); }
     virtual void emitStructDeclarationSeparatorImpl();
 
-        /// Emit type attributes that should appear after, e.g., a `struct` keyword
+    /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
-    virtual void emitMemoryQualifiers(IRInst* /*varInst*/) {};
-    virtual void emitStructFieldAttributes(IRStructType * /* structType */, IRStructField * /* field */) {};
+    virtual void emitMemoryQualifiers(IRInst* /*varInst*/){};
+    virtual void emitStructFieldAttributes(
+        IRStructType* /* structType */,
+        IRStructField* /* field */
+    ){};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
-    virtual void emitPackOffsetModifier(IRInst* /*varInst*/, IRType* /*valueType*/, IRPackOffsetDecoration* /*decoration*/) {};
-    
+    virtual void emitPackOffsetModifier(
+        IRInst* /*varInst*/,
+        IRType* /*valueType*/,
+        IRPackOffsetDecoration* /*decoration*/
+    ){};
 
-        /// Emit modifiers that should apply even for a declaration of an SSA temporary.
+
+    /// Emit modifiers that should apply even for a declaration of an SSA temporary.
     virtual void emitTempModifiers(IRInst* temp);
 
     void emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, IRType* varType);
 
-        /// Emit the array brackets that go on the end of a declaration of the given type.
+    /// Emit the array brackets that go on the end of a declaration of the given type.
     void emitArrayBrackets(IRType* inType);
 
     void emitParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
@@ -429,11 +446,17 @@ public:
     void emitGlobalInst(IRInst* inst);
     virtual void emitGlobalInstImpl(IRInst* inst);
 
-    void ensureInstOperand(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel = EmitAction::Level::Definition);
+    void ensureInstOperand(
+        ComputeEmitActionsContext* ctx,
+        IRInst* inst,
+        EmitAction::Level requiredLevel = EmitAction::Level::Definition);
 
     void ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst);
 
-    void ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel);
+    void ensureGlobalInst(
+        ComputeEmitActionsContext* ctx,
+        IRInst* inst,
+        EmitAction::Level requiredLevel);
 
     void emitForwardDeclaration(IRInst* inst);
 
@@ -441,75 +464,120 @@ public:
 
     void executeEmitActions(List<EmitAction> const& actions);
 
-        // Emits front matter, that occurs before the prelude
-        // Doesn't emit generated function/types that's handled by emitPreModule
+    // Emits front matter, that occurs before the prelude
+    // Doesn't emit generated function/types that's handled by emitPreModule
     void emitFrontMatter(TargetRequest* targetReq) { emitFrontMatterImpl(targetReq); }
 
     void emitPreModule() { emitPreModuleImpl(); }
     void emitPostModule() { emitPostModuleImpl(); }
     void emitModule(IRModule* module, DiagnosticSink* sink)
-        { m_irModule = module; emitModuleImpl(module, sink); }
+    {
+        m_irModule = module;
+        emitModuleImpl(module, sink);
+    }
 
     void emitSimpleType(IRType* type);
 
-    void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount) { emitVectorTypeNameImpl(elementType, elementCount); }
+    void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount)
+    {
+        emitVectorTypeNameImpl(elementType, elementCount);
+    }
 
-    void emitTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName) { emitTextureOrTextureSamplerTypeImpl(type, baseName); }
+    void emitTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName)
+    {
+        emitTextureOrTextureSamplerTypeImpl(type, baseName);
+    }
 
     void emitSubpassInputType(IRSubpassInputType* type) { emitSubpassInputTypeImpl(type); }
 
     virtual RefObject* getExtensionTracker() { return nullptr; }
 
-        /// Gets a source language for a target for a target. Returns Unknown if not a known target
+    /// Gets a source language for a target for a target. Returns Unknown if not a known target
     static SourceLanguage getSourceLanguage(CodeGenTarget target);
 
-        /// Gets the default type name for built in scalar types. Different impls may require something different.
-        /// Returns an empty slice if not a built in type
+    /// Gets the default type name for built in scalar types. Different impls may require something
+    /// different. Returns an empty slice if not a built in type
     static UnownedStringSlice getDefaultBuiltinTypeName(IROp op);
 
-        /// Finds the IRNumThreadsDecoration and gets the size from that or sets all dimensions to 1
-    static IRNumThreadsDecoration* getComputeThreadGroupSize(IRFunc* func, Int outNumThreads[kThreadGroupAxisCount]);
+    /// Finds the IRNumThreadsDecoration and gets the size from that or sets all dimensions to 1
+    static IRNumThreadsDecoration* getComputeThreadGroupSize(
+        IRFunc* func,
+        Int outNumThreads[kThreadGroupAxisCount]);
 
-        /// Finds the IRWaveSizeDecoration and gets the size from that.
-    static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int *outWaveSize);
+    /// Finds the IRWaveSizeDecoration and gets the size from that.
+    static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int* outWaveSize);
 
-    protected:
-
+protected:
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual bool doesTargetSupportPtrTypes() { return false; }
-    virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption) { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); SLANG_UNUSED(layoutSemanticOption); }
-    virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
-    virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) = 0;
+    virtual void emitLayoutSemanticsImpl(
+        IRInst* inst,
+        char const* uniformSemanticSpelling,
+        EmitLayoutSemanticOption layoutSemanticOption)
+    {
+        SLANG_UNUSED(inst);
+        SLANG_UNUSED(uniformSemanticSpelling);
+        SLANG_UNUSED(layoutSemanticOption);
+    }
+    virtual void emitParameterGroupImpl(
+        IRGlobalParam* varDecl,
+        IRUniformParameterGroupType* type) = 0;
+    virtual void emitEntryPointAttributesImpl(
+        IRFunc* irFunc,
+        IREntryPointDecoration* entryPointDecor) = 0;
 
-    virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
+    virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType)
+    {
+        SLANG_UNUSED(varDecl);
+        SLANG_UNUSED(varType);
+    }
     virtual void emitLayoutQualifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout); }
 
-        /// Emit front matter inserting prelude where appropriate
+    /// Emit front matter inserting prelude where appropriate
     virtual void emitFrontMatterImpl(TargetRequest* targetReq);
-        /// Emit any declarations, and other material that is needed before the modules contents
-        /// For example on targets that don't have built in vector/matrix support, this is where
-        /// the appropriate generated declarations occur.
+    /// Emit any declarations, and other material that is needed before the modules contents
+    /// For example on targets that don't have built in vector/matrix support, this is where
+    /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl();
     virtual void emitPostModuleImpl();
 
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator);
-    void emitSimpleTypeAndDeclarator(IRType* type, DeclaratorInfo* declarator) {emitSimpleTypeAndDeclaratorImpl(type, declarator);};
-    virtual void emitVarKeywordImpl(IRType * type, IRInst* varDecl);
-    void emitVarKeyword(IRType * type, IRInst* varDecl) {emitVarKeywordImpl(type, varDecl);}
+    void emitSimpleTypeAndDeclarator(IRType* type, DeclaratorInfo* declarator)
+    {
+        emitSimpleTypeAndDeclaratorImpl(type, declarator);
+    };
+    virtual void emitVarKeywordImpl(IRType* type, IRInst* varDecl);
+    void emitVarKeyword(IRType* type, IRInst* varDecl) { emitVarKeywordImpl(type, varDecl); }
 
     virtual void beforeComputeEmitActions(IRModule* module) { SLANG_UNUSED(module); };
 
-    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace) { SLANG_UNUSED(rate); SLANG_UNUSED(addressSpace); }
-    virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) { SLANG_UNUSED(inst); SLANG_UNUSED(allowOffsetLayout); }
+    virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
+    {
+        SLANG_UNUSED(rate);
+        SLANG_UNUSED(addressSpace);
+    }
+    virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
+    {
+        SLANG_UNUSED(inst);
+        SLANG_UNUSED(allowOffsetLayout);
+    }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
     virtual void emitSimpleFuncParamsImpl(IRFunc* func);
-    virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
+    virtual void emitInterpolationModifiersImpl(
+        IRInst* varInst,
+        IRType* valueType,
+        IRVarLayout* layout)
+    {
+        SLANG_UNUSED(varInst);
+        SLANG_UNUSED(valueType);
+        SLANG_UNUSED(layout);
+    }
 
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) { SLANG_UNUSED(varInst) }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
-    virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
-    virtual void emitMatrixLayoutModifiersImpl(IRType* varType) { SLANG_UNUSED(varType);  }
+    virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl); }
+    virtual void emitMatrixLayoutModifiersImpl(IRType* varType) { SLANG_UNUSED(varType); }
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
     virtual void emitSimpleValueImpl(IRInst* inst);
     virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink);
@@ -519,24 +587,35 @@ public:
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
     virtual void emitParamTypeModifier(IRType* type) { SLANG_UNUSED(type); }
-    virtual void emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, IRInst* intrinsicInst, EmitOpInfo const& inOuterPrec);
+    virtual void emitIntrinsicCallExprImpl(
+        IRCall* inst,
+        UnownedStringSlice intrinsicDefinition,
+        IRInst* intrinsicInst,
+        EmitOpInfo const& inOuterPrec);
     virtual void emitFunctionPreambleImpl(IRInst* inst) { SLANG_UNUSED(inst); }
-    virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) { SLANG_UNUSED(decl); }
+    virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
+    {
+        SLANG_UNUSED(decl);
+    }
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) { SLANG_UNUSED(switchInst); }
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault);
-    
+
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
     virtual void emitLivenessImpl(IRInst* inst);
 
     virtual void emitFuncDecorationsImpl(IRFunc* func);
 
-        // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
-    virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }
+    // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
+    virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase* type, char const* baseName)
+    {
+        SLANG_UNUSED(type);
+        SLANG_UNUSED(baseName);
+    }
 
     virtual void emitSubpassInputTypeImpl(IRSubpassInputType* type) { SLANG_UNUSED(type); }
 
-        // Again necessary for & prefix intrinsics. May be removable in the future
+    // Again necessary for & prefix intrinsics. May be removable in the future
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
 
     virtual void emitWitnessTable(IRWitnessTable* witnessTable);
@@ -545,9 +624,23 @@ public:
     virtual void emitInterface(IRInterfaceType* interfaceType);
     virtual void emitRTTIObject(IRRTTIObject* rttiObject);
 
-    virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
-    virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(inOuterPrec); return false; }
-    virtual bool tryEmitInstStmtImpl(IRInst* inst) { SLANG_UNUSED(inst); return false; }
+    virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
+    {
+        SLANG_UNUSED(varDecl);
+        SLANG_UNUSED(varType);
+        return false;
+    }
+    virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
+    {
+        SLANG_UNUSED(inst);
+        SLANG_UNUSED(inOuterPrec);
+        return false;
+    }
+    virtual bool tryEmitInstStmtImpl(IRInst* inst)
+    {
+        SLANG_UNUSED(inst);
+        return false;
+    }
 
     void defaultEmitInstStmt(IRInst* inst);
     void emitInstStmt(IRInst* inst);
@@ -562,17 +655,18 @@ public:
     virtual void _emitPrefixTypeAttr(IRAttr* attr);
     virtual void _emitPostfixTypeAttr(IRAttr* attr);
 
-        // Emit the argument list (including paranthesis) in a `CallInst`
+    // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call, int startingOperandIndex = 1);
     virtual void emitCallArg(IRInst* arg);
 
     String _generateUniqueName(const UnownedStringSlice& slice);
 
-        // Sort witnessTable entries according to the order defined in the witnessed interface type.
+    // Sort witnessTable entries according to the order defined in the witnessed interface type.
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
 
-    // Special handling for swizzleStore call, save the right-handside vector to a temporary variable
-    // first, then assign the corresponding elements to the left-handside vector one by one.
+    // Special handling for swizzleStore call, save the right-handside vector to a temporary
+    // variable first, then assign the corresponding elements to the left-handside vector one by
+    // one.
     void _emitSwizzleStorePerElement(IRInst* inst);
 
     CodeGenContext* m_codeGenContext = nullptr;
@@ -619,8 +713,8 @@ public:
     struct RequiredAfter
     {
         String requireComputeDerivatives;
-    }m_requiredAfter;
+    } m_requiredAfter;
 };
 
-}
+} // namespace Slang
 #endif

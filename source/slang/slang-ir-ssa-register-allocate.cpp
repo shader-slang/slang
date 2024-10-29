@@ -1,11 +1,11 @@
 // slang-ir-ssa-register-allocate.cpp
 #include "slang-ir-ssa-register-allocate.h"
 
-#include "slang-ir-reachability.h"
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-reachability.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -16,8 +16,9 @@ struct RegisterAllocateContext
     bool allocateForCompositeTypeOnly;
 
     RegisterAllocateContext(bool compositeTypeOnly)
-        :allocateForCompositeTypeOnly(compositeTypeOnly)
-    {}
+        : allocateForCompositeTypeOnly(compositeTypeOnly)
+    {
+    }
 
     List<RefPtr<RegisterInfo>>& getRegisterListForType(IRType* type)
     {
@@ -45,8 +46,7 @@ struct RegisterAllocateContext
             if (inst0 == inst1->getOperand(0))
                 return true;
             break;
-        default:
-            break;
+        default: break;
         }
 
         // If insts have the same name, prefer to coalesce them.
@@ -63,7 +63,10 @@ struct RegisterAllocateContext
                areInstsPreferredToBeCoalescedImpl(inst1, inst0);
     }
 
-    bool isRegisterPreferred(RegisterInfo* existingRegister, RegisterInfo* newRegister, IRInst* inst)
+    bool isRegisterPreferred(
+        RegisterInfo* existingRegister,
+        RegisterInfo* newRegister,
+        IRInst* inst)
     {
         int preferredCountExistingReg = 0;
         int preferredCountNewReg = 0;
@@ -95,7 +98,7 @@ struct RegisterAllocateContext
         // the same register.
         auto name1 = inst1->findDecoration<IRNameHintDecoration>();
         auto name2 = inst2->findDecoration<IRNameHintDecoration>();
-        
+
         if (name1 && !name2 || !name1 && name2)
             return true;
 
@@ -107,7 +110,11 @@ struct RegisterAllocateContext
         return true;
     }
 
-    bool isUseOfParamAfterPhiAssignment(IRDominatorTree* dom, IRUse* useToTest, IRInst* phiParam, IRInst* phiArg)
+    bool isUseOfParamAfterPhiAssignment(
+        IRDominatorTree* dom,
+        IRUse* useToTest,
+        IRInst* phiParam,
+        IRInst* phiArg)
     {
         IRParam* param = as<IRParam, IRDynamicCastBehavior::NoUnwrap>(phiParam);
         if (!param)
@@ -146,7 +153,9 @@ struct RegisterAllocateContext
         return true;
     }
 
-    RegisterAllocationResult allocateRegisters(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom)
+    RegisterAllocationResult allocateRegisters(
+        IRGlobalValueWithCode* func,
+        RefPtr<IRDominatorTree>& inOutDom)
     {
         ReachabilityContext reachabilityContext(func);
         mapTypeToRegisterList.clear();
@@ -157,7 +166,7 @@ struct RegisterAllocateContext
         // Note that if inst A does not dominate inst B, then A can't be alive at B.
         // Therefore we only need to test interference against insts that dominates the
         // current inst.
-        // 
+        //
         // We can visit the dominance tree in pre-order and assign insts to registers.
         // This order allows us to easily track what is dominating the current inst.
 
@@ -292,10 +301,8 @@ struct RegisterAllocateContext
             if (allocateForCompositeTypeOnly && !isCompositeType(inst->getFullType()))
                 return false;
             return true;
-        case kIROp_UpdateElement:
-            return true;
-        default:
-            return false;
+        case kIROp_UpdateElement: return true;
+        default:                  return false;
         }
     }
     bool needProcessing(IRGlobalValueWithCode* func)
@@ -312,7 +319,10 @@ struct RegisterAllocateContext
     }
 };
 
-RegisterAllocationResult allocateRegistersForFunc(IRGlobalValueWithCode* func, RefPtr<IRDominatorTree>& inOutDom, bool allocateForCompositeTypeOnly)
+RegisterAllocationResult allocateRegistersForFunc(
+    IRGlobalValueWithCode* func,
+    RefPtr<IRDominatorTree>& inOutDom,
+    bool allocateForCompositeTypeOnly)
 {
     RegisterAllocateContext context(allocateForCompositeTypeOnly);
     if (context.needProcessing(func))
@@ -320,4 +330,4 @@ RegisterAllocationResult allocateRegistersForFunc(IRGlobalValueWithCode* func, R
     return RegisterAllocationResult();
 }
 
-}
+} // namespace Slang

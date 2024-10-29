@@ -24,7 +24,9 @@ SlangResult CUDAErrorInfo::handle() const
         builder << m_errorString;
     }
 
-    getDebugCallback()->handleMessage(DebugMessageType::Error, DebugMessageSource::Driver,
+    getDebugCallback()->handleMessage(
+        DebugMessageType::Error,
+        DebugMessageSource::Driver,
         builder.getUnownedSlice().begin());
 
     // Slang::signalUnexpectedError(builder.getBuffer());
@@ -39,14 +41,14 @@ SlangResult _handleCUDAError(CUresult cuResult, const char* file, int line)
     return info.handle();
 }
 
-#    ifdef RENDER_TEST_OPTIX
+#ifdef RENDER_TEST_OPTIX
 
 static bool _isError(OptixResult result)
 {
     return result != OPTIX_SUCCESS;
 }
 
-#        if 1
+#if 1
 static SlangResult _handleOptixError(OptixResult result, char const* file, int line)
 {
     fprintf(
@@ -63,8 +65,8 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 {
     fprintf(stderr, "optix: %s (%s)\n", message, tag);
 }
-#       endif
-#    endif
+#endif
+#endif
 
 AdapterLUID getAdapterLUID(int deviceIndex)
 {

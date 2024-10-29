@@ -2,11 +2,12 @@
 
 #include "slang-command-options.h"
 
-#include "slang-string-util.h"
-#include "slang-char-util.h"
 #include "slang-byte-encode-util.h"
+#include "slang-char-util.h"
+#include "slang-string-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
 UnownedStringSlice CommandOptions::getFirstNameForOption(Index optionIndex)
 {
@@ -26,7 +27,8 @@ CommandOptions::NameKey CommandOptions::getNameKeyForOption(Index optionIndex)
     const auto& cat = m_categories[opt.categoryIndex];
     NameKey key;
     key.nameIndex = m_pool.findIndex(getFirstNameForOption(optionIndex));
-    key.kind = (cat.kind == CategoryKind::Option) ? LookupKind::Option : makeLookupKind(opt.categoryIndex);
+    key.kind =
+        (cat.kind == CategoryKind::Option) ? LookupKind::Option : makeLookupKind(opt.categoryIndex);
     return key;
 }
 
@@ -38,7 +40,10 @@ CommandOptions::NameKey CommandOptions::getNameKeyForCategory(Index categoryInde
     return key;
 }
 
-SlangResult CommandOptions::_addName(LookupKind kind, const UnownedStringSlice& name, Index targetIndex)
+SlangResult CommandOptions::_addName(
+    LookupKind kind,
+    const UnownedStringSlice& name,
+    Index targetIndex)
 {
     NameKey nameKey;
     nameKey.kind = kind;
@@ -52,7 +57,10 @@ SlangResult CommandOptions::_addName(LookupKind kind, const UnownedStringSlice& 
     return SLANG_OK;
 }
 
-SlangResult CommandOptions::_addOptionName(const UnownedStringSlice& name, Flags flags, Index targetIndex)
+SlangResult CommandOptions::_addOptionName(
+    const UnownedStringSlice& name,
+    Flags flags,
+    Index targetIndex)
 {
     SLANG_RETURN_ON_FAIL(_addName(LookupKind::Option, name, targetIndex));
 
@@ -67,7 +75,10 @@ SlangResult CommandOptions::_addOptionName(const UnownedStringSlice& name, Flags
     return SLANG_OK;
 }
 
-SlangResult CommandOptions::_addValueName(const UnownedStringSlice& name, Index categoryIndex, Index optionIndex)
+SlangResult CommandOptions::_addValueName(
+    const UnownedStringSlice& name,
+    Index categoryIndex,
+    Index optionIndex)
 {
     return _addName(LookupKind(categoryIndex), name, optionIndex);
 }
@@ -122,7 +133,10 @@ Index CommandOptions::_addOption(const UnownedStringSlice& name, const Option& i
     }
 }
 
-Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCount, const Option& inOption)
+Index CommandOptions::_addOption(
+    const UnownedStringSlice* names,
+    Count namesCount,
+    const Option& inOption)
 {
     SLANG_ASSERT(namesCount > 0);
     SLANG_ASSERT(inOption.categoryIndex >= 0);
@@ -134,7 +148,8 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
 
     auto& cat = m_categories[inOption.categoryIndex];
 
-    // If there are already options associated with this category, we have to be in the run of the last ones added
+    // If there are already options associated with this category, we have to be in the run of the
+    // last ones added
     if (cat.optionStartIndex != cat.optionEndIndex)
     {
         // If we aren't at the end then this is an error
@@ -172,9 +187,10 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
     {
         for (Index i = 0; i < namesCount; ++i)
         {
-            _addValueName(names[i], inOption.categoryIndex, optionIndex); 
+            _addValueName(names[i], inOption.categoryIndex, optionIndex);
         }
-        if (SLANG_FAILED(_addUserValue(LookupKind(inOption.categoryIndex), inOption.userValue, optionIndex)))
+        if (SLANG_FAILED(
+                _addUserValue(LookupKind(inOption.categoryIndex), inOption.userValue, optionIndex)))
         {
             return -1;
         }
@@ -198,7 +214,7 @@ Index CommandOptions::_addOption(const UnownedStringSlice* names, Count namesCou
 
     // Set the end index
     cat.optionEndIndex = optionIndex + 1;
-    
+
     return optionIndex;
 }
 
@@ -219,7 +235,11 @@ static void _handlePostFix(UnownedStringSlice& ioSlice, CommandOptions::Flags& i
     }
 }
 
-void CommandOptions::add(const char* inName, const char* usage, const char* description, UserValue userValue)
+void CommandOptions::add(
+    const char* inName,
+    const char* usage,
+    const char* description,
+    UserValue userValue)
 {
     UnownedStringSlice nameSlice(inName);
 
@@ -250,7 +270,13 @@ void CommandOptions::add(const char* inName, const char* usage, const char* desc
     }
 }
 
-void CommandOptions::add(const UnownedStringSlice* names, Count namesCount, const char* usage, const char* description, UserValue userValue, Flags flags)
+void CommandOptions::add(
+    const UnownedStringSlice* names,
+    Count namesCount,
+    const char* usage,
+    const char* description,
+    UserValue userValue,
+    Flags flags)
 {
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
@@ -337,7 +363,10 @@ void CommandOptions::addValue(const UnownedStringSlice& name, UserValue userValu
     _addValue(name, option);
 }
 
-void CommandOptions::addValue(const UnownedStringSlice& name, const UnownedStringSlice& description, UserValue userValue)
+void CommandOptions::addValue(
+    const UnownedStringSlice& name,
+    const UnownedStringSlice& description,
+    UserValue userValue)
 {
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
@@ -346,7 +375,10 @@ void CommandOptions::addValue(const UnownedStringSlice& name, const UnownedStrin
     _addValue(name, option);
 }
 
-void CommandOptions::addValue(const UnownedStringSlice* names, Count namesCount, UserValue userValue)
+void CommandOptions::addValue(
+    const UnownedStringSlice* names,
+    Count namesCount,
+    UserValue userValue)
 {
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
@@ -377,7 +409,11 @@ void CommandOptions::addValue(const char* name, UserValue userValue)
     addValue(UnownedStringSlice(name), userValue);
 }
 
-Index CommandOptions::addCategory(CategoryKind kind, const char* name, const char* description, UserValue userValue)
+Index CommandOptions::addCategory(
+    CategoryKind kind,
+    const char* name,
+    const char* description,
+    UserValue userValue)
 {
     const UnownedStringSlice nameSlice(name);
 
@@ -425,7 +461,10 @@ void CommandOptions::setCategory(const char* name)
     m_currentCategoryIndex = -1;
 }
 
-Index CommandOptions::findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name, NameKey* outNameKey) const
+Index CommandOptions::findTargetIndexByName(
+    LookupKind kind,
+    const UnownedStringSlice& name,
+    NameKey* outNameKey) const
 {
     // Look up directly
     {
@@ -470,7 +509,10 @@ Index CommandOptions::findTargetIndexByName(LookupKind kind, const UnownedString
     return -1;
 }
 
-Index CommandOptions::_findTargetIndexByName(LookupKind kind, const UnownedStringSlice& name, NameKey* outNameKey) const
+Index CommandOptions::_findTargetIndexByName(
+    LookupKind kind,
+    const UnownedStringSlice& name,
+    NameKey* outNameKey) const
 {
     const auto nameIndex = m_pool.findIndex(name);
     // If the name isn't in the pool then there isn't a category with this name
@@ -524,7 +566,9 @@ Index CommandOptions::findCategoryByCaseInsensitiveName(const UnownedStringSlice
     return -1;
 }
 
-Index CommandOptions::findOptionByCategoryUserValue(UserValue categoryUserValue, const UnownedStringSlice& name) const
+Index CommandOptions::findOptionByCategoryUserValue(
+    UserValue categoryUserValue,
+    const UnownedStringSlice& name) const
 {
     Index categoryIndex = findTargetIndexByUserValue(LookupKind::Category, categoryUserValue);
     if (categoryIndex < 0)
@@ -535,14 +579,19 @@ Index CommandOptions::findOptionByCategoryUserValue(UserValue categoryUserValue,
     return findValueByName(categoryIndex, name);
 }
 
-ConstArrayView<CommandOptions::Option> CommandOptions::getOptionsForCategory(Index categoryIndex) const
+ConstArrayView<CommandOptions::Option> CommandOptions::getOptionsForCategory(
+    Index categoryIndex) const
 {
     const auto& cat = m_categories[categoryIndex];
-    return makeConstArrayView(m_options.getBuffer() + cat.optionStartIndex, cat.optionEndIndex - cat.optionStartIndex);
+    return makeConstArrayView(
+        m_options.getBuffer() + cat.optionStartIndex,
+        cat.optionEndIndex - cat.optionStartIndex);
 }
 
 
-void CommandOptions::appendCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const
+void CommandOptions::appendCategoryOptionNames(
+    Index categoryIndex,
+    List<UnownedStringSlice>& outNames) const
 {
     for (const auto& option : getOptionsForCategory(categoryIndex))
     {
@@ -550,28 +599,33 @@ void CommandOptions::appendCategoryOptionNames(Index categoryIndex, List<Unowned
     }
 }
 
-void CommandOptions::getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames) const
+void CommandOptions::getCategoryOptionNames(Index categoryIndex, List<UnownedStringSlice>& outNames)
+    const
 {
     outNames.clear();
     appendCategoryOptionNames(categoryIndex, outNames);
 }
 
-void CommandOptions::splitUsage(const UnownedStringSlice& usageSlice, List<UnownedStringSlice>& outSlices) const
+void CommandOptions::splitUsage(
+    const UnownedStringSlice& usageSlice,
+    List<UnownedStringSlice>& outSlices) const
 {
     const auto* cur = usageSlice.begin();
     const auto* end = usageSlice.end();
 
     while (cur < end)
     {
-        // Find < 
-        while (cur < end && *cur != '<') cur++;
+        // Find <
+        while (cur < end && *cur != '<')
+            cur++;
 
         // If we found it look for the end
         if (cur < end && *cur == '<')
         {
             ++cur;
             auto start = cur;
-            while (cur < end && (CharUtil::isAlphaOrDigit(*cur) || *cur == '-' || *cur == '_') && *cur != '>')
+            while (cur < end && (CharUtil::isAlphaOrDigit(*cur) || *cur == '-' || *cur == '_') &&
+                   *cur != '>')
             {
                 cur++;
             }
@@ -594,7 +648,9 @@ void CommandOptions::splitUsage(const UnownedStringSlice& usageSlice, List<Unown
 }
 
 
-void CommandOptions::findCategoryIndicesFromUsage(const UnownedStringSlice& slice, List<Index>& outCategories) const
+void CommandOptions::findCategoryIndicesFromUsage(
+    const UnownedStringSlice& slice,
+    List<Index>& outCategories) const
 {
     List<UnownedStringSlice> categoryNames;
     splitUsage(slice, categoryNames);
@@ -609,7 +665,10 @@ void CommandOptions::findCategoryIndicesFromUsage(const UnownedStringSlice& slic
     }
 }
 
-Count CommandOptions::getOptionCountInRange(Index categoryIndex, UserValue start, UserValue nonInclEnd) const
+Count CommandOptions::getOptionCountInRange(
+    Index categoryIndex,
+    UserValue start,
+    UserValue nonInclEnd) const
 {
     const UserIndex startIndex = UserIndex(start);
     const UserIndex endIndex = UserIndex(nonInclEnd);
@@ -631,7 +690,8 @@ Count CommandOptions::getOptionCountInRange(Index categoryIndex, UserValue start
     return count;
 }
 
-Count CommandOptions::getOptionCountInRange(LookupKind kind, UserValue start, UserValue nonInclEnd) const
+Count CommandOptions::getOptionCountInRange(LookupKind kind, UserValue start, UserValue nonInclEnd)
+    const
 {
     Index count = 0;
 
@@ -671,7 +731,10 @@ Count CommandOptions::getOptionCountInRange(LookupKind kind, UserValue start, Us
 }
 
 
-bool CommandOptions::hasContiguousUserValueRange(LookupKind kind, UserValue start, UserValue nonInclEnd) const
+bool CommandOptions::hasContiguousUserValueRange(
+    LookupKind kind,
+    UserValue start,
+    UserValue nonInclEnd) const
 {
     const Count rangeCount = Count(nonInclEnd) - Count(start);
     SLANG_ASSERT(rangeCount >= 0);
@@ -686,5 +749,3 @@ bool CommandOptions::hasContiguousUserValueRange(LookupKind kind, UserValue star
 }
 
 } // namespace Slang
-
-

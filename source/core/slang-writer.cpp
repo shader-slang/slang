@@ -1,4 +1,4 @@
-#define  _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 
 #include "slang-writer.h"
 
@@ -9,9 +9,9 @@
 // output when writing assembly dumps.
 #include <fcntl.h>
 #ifdef _WIN32
-#   include <io.h>
+#include <io.h>
 #else
-#   include <unistd.h>
+#include <unistd.h>
 #endif
 
 #include <stdarg.h>
@@ -64,7 +64,9 @@ SlangResult WriterHelper::put(const UnownedStringSlice& text)
 
 ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 {
-    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangWriter::getTypeGuid()) ? static_cast<ISlangWriter*>(this) : nullptr;
+    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangWriter::getTypeGuid())
+               ? static_cast<ISlangWriter*>(this)
+               : nullptr;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! AppendBufferWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
@@ -76,7 +78,8 @@ SLANG_NO_THROW char* SLANG_MCALL AppendBufferWriter::beginAppendBuffer(size_t ma
     return m_appendBuffer.getBuffer();
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
+SLANG_NO_THROW SlangResult SLANG_MCALL
+AppendBufferWriter::endAppendBuffer(char* buffer, size_t numChars)
 {
     SLANG_ASSERT(m_appendBuffer.getBuffer() == buffer && buffer + numChars <= m_appendBuffer.end());
     // Do the actual write
@@ -102,7 +105,8 @@ SlangResult CallbackWriter::write(const char* chars, size_t numChars)
     {
         char* appendBuffer = m_appendBuffer.getBuffer();
         // See if it's from an append buffer
-        if (chars >= appendBuffer && (chars + numChars) < (appendBuffer + m_appendBuffer.getCount()))
+        if (chars >= appendBuffer &&
+            (chars + numChars) < (appendBuffer + m_appendBuffer.getCount()))
         {
             // Set terminating 0
             appendBuffer[(chars + numChars) - appendBuffer] = 0;
@@ -153,7 +157,7 @@ void FileWriter::flush()
     ::fflush(m_file);
 }
 
-/* static */bool FileWriter::isConsole(FILE* file)
+/* static */ bool FileWriter::isConsole(FILE* file)
 {
     const int stdoutFileDesc = _fileno(file);
     return _isatty(stdoutFileDesc) != 0;
@@ -164,21 +168,25 @@ SlangResult FileWriter::setMode(SlangWriterMode mode)
     switch (mode)
     {
     case SLANG_WRITER_MODE_BINARY:
-    {
+        {
 #ifdef _WIN32
-        int stdoutFileDesc = _fileno(m_file);
-        _setmode(stdoutFileDesc, _O_BINARY);
-        return SLANG_OK;
+            int stdoutFileDesc = _fileno(m_file);
+            _setmode(stdoutFileDesc, _O_BINARY);
+            return SLANG_OK;
 #else
-        break;
+            break;
 #endif
-    }
+        }
     default: break;
     }
     return SLANG_FAIL;
 }
 
-/* static */SlangResult FileWriter::create(const char* filePath, const char* writeOptions, WriterFlags flags, ComPtr<ISlangWriter>& outWriter)
+/* static */ SlangResult FileWriter::create(
+    const char* filePath,
+    const char* writeOptions,
+    WriterFlags flags,
+    ComPtr<ISlangWriter>& outWriter)
 {
     flags &= ~WriterFlag::IsUnowned;
 
@@ -215,5 +223,4 @@ SlangResult StringWriter::write(const char* chars, size_t numChars)
     return SLANG_OK;
 }
 
-}
-
+} // namespace Slang

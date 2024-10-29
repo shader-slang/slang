@@ -1,14 +1,13 @@
 // unit-test-image-format-reflection.cpp
 
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
+#include "slang-com-ptr.h"
 #include "slang.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-#include "slang-com-ptr.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
 
 using namespace Slang;
 
@@ -39,20 +38,31 @@ SLANG_UNIT_TEST(imageFormatReflection)
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
-    auto module = session->loadModuleFromSourceString("m", "m.slang", userSourceBody, diagnosticBlob.writeRef());
+    auto module = session->loadModuleFromSourceString(
+        "m",
+        "m.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    module->findAndCheckEntryPoint("fragMain", SLANG_STAGE_FRAGMENT, entryPoint.writeRef(), diagnosticBlob.writeRef());
+    module->findAndCheckEntryPoint(
+        "fragMain",
+        SLANG_STAGE_FRAGMENT,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
     SLANG_CHECK(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
-    slang::IComponentType* components[] = { module, entryPoint.get() };
-    session->createCompositeComponentType(components, 2, compositeProgram.writeRef(), diagnosticBlob.writeRef());
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
     SLANG_CHECK(compositeProgram != nullptr);
 
     auto layout = compositeProgram->getLayout(0);
     auto format = layout->getGlobalParamsTypeLayout()->getBindingRangeImageFormat(0);
     SLANG_CHECK(format == SLANG_IMAGE_FORMAT_rgba32ui);
 }
-

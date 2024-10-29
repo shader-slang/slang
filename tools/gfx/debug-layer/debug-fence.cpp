@@ -33,7 +33,10 @@ Result DebugFence::setCurrentValue(uint64_t value)
     SLANG_GFX_API_FUNC;
     if (value < maxValueToSignal)
     {
-        GFX_DIAGNOSE_ERROR_FORMAT("Cannot set fence value (%d) to lower than pending signal value (%d) on the fence.", value, maxValueToSignal);
+        GFX_DIAGNOSE_ERROR_FORMAT(
+            "Cannot set fence value (%d) to lower than pending signal value (%d) on the fence.",
+            value,
+            maxValueToSignal);
     }
     return baseObject->setCurrentValue(value);
 }

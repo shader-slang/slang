@@ -136,7 +136,8 @@ public:
     public:
         Builder(DeviceImpl* renderer, slang::ISession* session)
             : m_renderer(renderer), m_session(session)
-        {}
+        {
+        }
 
         DeviceImpl* m_renderer;
         slang::ISession* m_session;
@@ -180,7 +181,8 @@ public:
         /// Add any descriptor ranges implied by this object containing a leaf
         /// sub-object described by `typeLayout`, at the given `offset`.
         void _addDescriptorRangesAsValue(
-            slang::TypeLayoutReflection* typeLayout, BindingOffset const& offset);
+            slang::TypeLayoutReflection* typeLayout,
+            BindingOffset const& offset);
 
         /// Add the descriptor ranges implied by a `ConstantBuffer<X>` where `X` is
         /// described by `elementTypeLayout`.
@@ -325,7 +327,8 @@ public:
     {
         Builder(DeviceImpl* device, slang::ISession* session)
             : Super::Builder(device, session)
-        {}
+        {
+        }
 
         Result build(EntryPointLayout** outLayout);
 
@@ -372,7 +375,8 @@ public:
             : Super::Builder(renderer, program->getSession())
             , m_program(program)
             , m_programLayout(programLayout)
-        {}
+        {
+        }
 
         Result build(RootShaderObjectLayout** outLayout);
 

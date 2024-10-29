@@ -1,6 +1,7 @@
 #include "flag-combiner.h"
 
-namespace gfx {
+namespace gfx
+{
 using namespace Slang;
 
 void FlagCombiner::add(uint32_t flags, ChangeType type)

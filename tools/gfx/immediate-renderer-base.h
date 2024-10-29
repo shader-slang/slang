@@ -17,9 +17,7 @@ enum class MapFlavor
     WriteDiscard,
 };
 
-class ImmediateCommandQueueBase
-    : public ICommandQueue
-    , public Slang::ComObject
+class ImmediateCommandQueueBase : public ICommandQueue, public Slang::ComObject
 {
 public:
     // Immediate device also holds a strong reference to an instance of `ImmediateCommandQueue`,
@@ -64,11 +62,12 @@ public:
         GfxCount slotCount,
         IBufferResource* const* buffers,
         const Offset* offsets) = 0;
-    virtual void setIndexBuffer(
-        IBufferResource* buffer, Format indexFormat, Offset offset = 0) = 0;
+    virtual void setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset = 0) = 0;
     virtual void draw(GfxCount vertexCount, GfxIndex startVertex = 0) = 0;
     virtual void drawIndexed(
-        GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0) = 0;
+        GfxCount indexCount,
+        GfxIndex startIndex = 0,
+        GfxIndex baseVertex = 0) = 0;
     virtual void drawInstanced(
         GfxCount vertexCount,
         GfxCount instanceCount,
@@ -103,7 +102,7 @@ public:
     ImmediateRendererBase();
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
+    createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
         const ITransientResourceHeap::Desc& desc,
         ITransientResourceHeap** outHeap) override;
@@ -111,10 +110,7 @@ public:
         const IRenderPassLayout::Desc& desc,
         IRenderPassLayout** outRenderPassLayout) override;
 
-    void uploadBufferData(
-        IBufferResource* dst,
-        Offset offset,
-        Size size, void* data);
+    void uploadBufferData(IBufferResource* dst, Offset offset, Size size, void* data);
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readBufferResource(
         IBufferResource* buffer,
@@ -159,8 +155,7 @@ public:
         SLANG_UNUSED(buffers);
         SLANG_UNUSED(offsets);
     }
-    virtual void setIndexBuffer(
-        IBufferResource* buffer, Format indexFormat, Offset offset = 0)
+    virtual void setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset = 0)
         override
     {
         SLANG_UNUSED(buffer);
@@ -172,8 +167,8 @@ public:
         SLANG_UNUSED(vertexCount);
         SLANG_UNUSED(startVertex);
     }
-    virtual void drawIndexed(
-        GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0) override
+    virtual void drawIndexed(GfxCount indexCount, GfxIndex startIndex = 0, GfxIndex baseVertex = 0)
+        override
     {
         SLANG_UNUSED(indexCount);
         SLANG_UNUSED(startIndex);
@@ -228,7 +223,7 @@ public:
         return SLANG_FAIL;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override
+    createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override
     {
         SLANG_UNUSED(desc);
         SLANG_UNUSED(outFramebuffer);
@@ -243,9 +238,8 @@ public:
         return SLANG_FAIL;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        IInputLayout::Desc const& desc,
-        IInputLayout** outLayout) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout) override
     {
         SLANG_UNUSED(desc);
         SLANG_UNUSED(outLayout);
@@ -274,4 +268,4 @@ public:
         return SLANG_E_NOT_AVAILABLE;
     }
 };
-}
+} // namespace gfx

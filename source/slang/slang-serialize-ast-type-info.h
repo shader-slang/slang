@@ -2,26 +2,28 @@
 #ifndef SLANG_SERIALIZE_AST_TYPE_INFO_H
 #define SLANG_SERIALIZE_AST_TYPE_INFO_H
 
-#include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
-
-#include "slang-serialize-type-info.h"
+#include "slang-ast-support-types.h"
 #include "slang-serialize-misc-type-info.h"
-
+#include "slang-serialize-type-info.h"
 #include "slang-serialize-value-type-info.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AST types !!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 // SyntaxClass<T>
-template <typename T>
+template<typename T>
 struct SerialTypeInfo<SyntaxClass<T>>
 {
     typedef SyntaxClass<T> NativeType;
     typedef uint16_t SerialType;
 
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -40,8 +42,10 @@ struct SerialTypeInfo<SyntaxClass<T>>
 };
 
 // MatrixCoord can just go as is
-template <>
-struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
+template<>
+struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord>
+{
+};
 
 inline void serializeValPointerValue(SerialWriter* writer, Val* ptrValue, SerialIndex* outSerial)
 {
@@ -50,7 +54,10 @@ inline void serializeValPointerValue(SerialWriter* writer, Val* ptrValue, Serial
     *(SerialIndex*)outSerial = writer->addPointer(ptrValue);
 }
 
-inline void deserializeValPointerValue(SerialReader* reader, const SerialIndex* inSerial, void* outPtr)
+inline void deserializeValPointerValue(
+    SerialReader* reader,
+    const SerialIndex* inSerial,
+    void* outPtr)
 {
     auto val = reader->getValPointer(*(const SerialIndex*)inSerial);
     *(void**)outPtr = val.m_ptr;
@@ -61,7 +68,10 @@ struct PtrSerialTypeInfo<T, std::enable_if_t<std::is_base_of_v<Val, T>>>
 {
     typedef T* NativeType;
     typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
@@ -75,8 +85,10 @@ struct PtrSerialTypeInfo<T, std::enable_if_t<std::is_base_of_v<Val, T>>>
     }
 };
 
-template <typename T>
-struct SerialTypeInfo<DeclRef<T>> : public SerialTypeInfo<DeclRefBase*> {};
+template<typename T>
+struct SerialTypeInfo<DeclRef<T>> : public SerialTypeInfo<DeclRefBase*>
+{
+};
 
 // UIntSet
 
@@ -85,7 +97,10 @@ struct SerialTypeInfo<CapabilityAtomSet>
 {
     typedef CapabilityAtomSet NativeType;
     typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialIndex)
+    };
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
         auto& src = *(NativeType*)native;
@@ -102,7 +117,7 @@ struct SerialTypeInfo<CapabilityAtomSet>
         reader->getArray(src, UIntSetBuffer);
 
         dst = CapabilityAtomSet();
-        for(Index i = 0; i < UIntSetBuffer.getCount(); i++)
+        for (Index i = 0; i < UIntSetBuffer.getCount(); i++)
             dst.addRawElement(UIntSetBuffer[i], i);
     }
 };
@@ -119,7 +134,10 @@ struct SerialTypeInfo<CapabilityStageSet>
     };
 
     typedef CapabilityStageSet NativeType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialIndex)
+    };
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
         auto& src = *(const NativeType*)native;
@@ -127,15 +145,17 @@ struct SerialTypeInfo<CapabilityStageSet>
 
         List<SerialTypeInfo<CapabilityStageSet>::SerialType> SatomSetsList;
         SatomSetsList.setCount(src.atomSet.has_value());
-        
-        if(src.atomSet)
+
+        if (src.atomSet)
         {
             auto& i = src.atomSet.value();
             SerialTypeInfo<CapabilityAtomSet>::toSerial(writer, &i, &SatomSetsList[0]);
         }
-        
+
         SerialTypeInfo<CapabilityAtom>::toSerial(writer, &src.stage, &dst.stage);
-        dst.atomSet = writer->addSerialArray<CapabilityStageSet>(SatomSetsList.getBuffer(), SatomSetsList.getCount());
+        dst.atomSet = writer->addSerialArray<CapabilityStageSet>(
+            SatomSetsList.getBuffer(),
+            SatomSetsList.getCount());
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
@@ -166,7 +186,10 @@ struct SerialTypeInfo<CapabilityTargetSet>
     };
 
     typedef CapabilityTargetSet NativeType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialIndex)
+    };
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
         auto& src = *(const NativeType*)native;
@@ -182,7 +205,9 @@ struct SerialTypeInfo<CapabilityTargetSet>
         }
 
         SerialTypeInfo<CapabilityAtom>::toSerial(writer, &src.target, &dst.target);
-        dst.shaderStageSets = writer->addSerialArray<CapabilityStageSet>(SStageSetList.getBuffer(), SStageSetList.getCount());
+        dst.shaderStageSets = writer->addSerialArray<CapabilityStageSet>(
+            SStageSetList.getBuffer(),
+            SStageSetList.getCount());
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
@@ -215,7 +240,10 @@ struct SerialTypeInfo<CapabilitySet>
     };
 
     typedef CapabilitySet NativeType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialIndex)
+    };
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
         auto& src = *(const NativeType*)native;
@@ -231,13 +259,15 @@ struct SerialTypeInfo<CapabilitySet>
             iter++;
         }
 
-        dst.m_targetSets = writer->addSerialArray<CapabilityTargetSet>(STargetSetList.getBuffer(), STargetSetList.getCount());
+        dst.m_targetSets = writer->addSerialArray<CapabilityTargetSet>(
+            STargetSetList.getBuffer(),
+            STargetSetList.getCount());
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
         auto& dst = *(NativeType*)native;
         auto& src = *(const SerialType*)serial;
-        
+
         List<CapabilityTargetSet> items;
         reader->getArray(src.m_targetSets, items);
 
@@ -252,7 +282,7 @@ struct SerialTypeInfo<CapabilitySet>
 };
 
 // ValNodeOperand
-template <>
+template<>
 struct SerialTypeInfo<ValNodeOperand>
 {
     typedef ValNodeOperand NativeType;
@@ -261,7 +291,10 @@ struct SerialTypeInfo<ValNodeOperand>
         int8_t kind;
         int64_t val;
     };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -273,7 +306,10 @@ struct SerialTypeInfo<ValNodeOperand>
         else if (src.kind == ValNodeOperandKind::ValNode)
             serializeValPointerValue(writer, (Val*)src.values.nodeOperand, (SerialIndex*)&dst.val);
         else
-            SerialTypeInfo<NodeBase*>::toSerial(writer, &src.values.nodeOperand, (SerialIndex*)&dst.val);
+            SerialTypeInfo<NodeBase*>::toSerial(
+                writer,
+                &src.values.nodeOperand,
+                (SerialIndex*)&dst.val);
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
@@ -286,9 +322,15 @@ struct SerialTypeInfo<ValNodeOperand>
         if (dst.kind == ValNodeOperandKind::ConstantValue)
             dst.values.intOperand = int64_t(src.val);
         else if (dst.kind == ValNodeOperandKind::ValNode)
-            deserializeValPointerValue(reader, (SerialIndex*)&src.val, (Val**)&dst.values.nodeOperand);
+            deserializeValPointerValue(
+                reader,
+                (SerialIndex*)&src.val,
+                (Val**)&dst.values.nodeOperand);
         else
-            SerialTypeInfo<NodeBase*>::toNative(reader, (SerialIndex*)&src.val, (NodeBase**)&dst.values.nodeOperand);
+            SerialTypeInfo<NodeBase*>::toNative(
+                reader,
+                (SerialIndex*)&src.val,
+                (NodeBase**)&dst.values.nodeOperand);
     }
 };
 
@@ -298,12 +340,15 @@ SLANG_VALUE_TYPE_INFO(LookupResultItem)
 SLANG_VALUE_TYPE_INFO(QualType)
 
 // LookupResult
-template <>
+template<>
 struct SerialTypeInfo<LookupResult>
 {
     typedef LookupResult NativeType;
     typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -358,13 +403,16 @@ SLANG_VALUE_TYPE_INFO(TypeExp)
 SLANG_VALUE_TYPE_INFO(DeclCheckStateExt)
 
 // Modifiers
-template <>
+template<>
 struct SerialTypeInfo<Modifiers>
 {
     typedef Modifiers NativeType;
     typedef SerialIndex SerialType;
 
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -374,7 +422,8 @@ struct SerialTypeInfo<Modifiers>
         {
             modifierIndices.add(writer->addPointer(modifier));
         }
-        *(SerialType*)serial = writer->addArray(modifierIndices.getBuffer(), modifierIndices.getCount());
+        *(SerialType*)serial =
+            writer->addArray(modifierIndices.getBuffer(), modifierIndices.getCount());
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
@@ -396,16 +445,25 @@ struct SerialTypeInfo<Modifiers>
 };
 
 // LookupResultItem_Breadcrumb::ThisParameterMode
-template <>
-struct SerialTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode> : public SerialConvertTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode, uint8_t> {};
+template<>
+struct SerialTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode>
+    : public SerialConvertTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode, uint8_t>
+{
+};
 
 // LookupResultItem_Breadcrumb::Kind
-template <>
-struct SerialTypeInfo<LookupResultItem_Breadcrumb::Kind> : public SerialConvertTypeInfo<LookupResultItem_Breadcrumb::Kind, uint8_t> {};
+template<>
+struct SerialTypeInfo<LookupResultItem_Breadcrumb::Kind>
+    : public SerialConvertTypeInfo<LookupResultItem_Breadcrumb::Kind, uint8_t>
+{
+};
 
 // RequirementWitness::Flavor
-template <>
-struct SerialTypeInfo<RequirementWitness::Flavor> : public SerialConvertTypeInfo<RequirementWitness::Flavor, uint8_t> {};
+template<>
+struct SerialTypeInfo<RequirementWitness::Flavor>
+    : public SerialConvertTypeInfo<RequirementWitness::Flavor, uint8_t>
+{
+};
 
 // RequirementWitness
 SLANG_VALUE_TYPE_INFO(RequirementWitness)

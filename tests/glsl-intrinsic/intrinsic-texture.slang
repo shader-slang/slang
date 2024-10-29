@@ -167,9 +167,9 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
     constexpr float coord = 0.5;
 
-    constexpr ivec2 offset2D = ivec2(0);
-    constexpr ivec3 offset3D = ivec3(0);
-    constexpr ivec2 offsets[4] = { ivec2(0), ivec2(0), ivec2(0), ivec2(0) };
+    constexpr ivec2 offset2D = ivec2(2);
+    constexpr ivec3 offset3D = ivec3(3);
+    constexpr ivec2 offsets[4] = { ivec2(1), ivec2(2), ivec2(3), ivec2(4) };
 
     bool ignoreResultF32 = ignoreResult && T is float;
     bool ignoreResultI32 = ignoreResult && T is int32_t;
@@ -704,8 +704,8 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // GLSL: textureOffset({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
-        && gvec4(T(0)) == textureOffset(gsampler1D, float(coord), int(0))
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        && gvec4(T(0)) == textureOffset(gsampler1D, float(coord), int(1))
 
         // GLSL: textureOffset({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
@@ -714,7 +714,7 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // GLSL: textureOffset({{.*}}sampler2D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler2D, vec2(coord), offset2D)
 
         // GLSL: textureOffset({{.*}}sampler2D
@@ -724,7 +724,7 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // GLSL: textureOffset({{.*}}sampler3D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler3D, vec3(coord), offset3D)
 
         // GLSL: textureOffset({{.*}}sampler3D
@@ -734,7 +734,7 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // GLSL: textureOffset({{.*}}sampler2DShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // S-PIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
+        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
         && (float(0) == textureOffset(uniform_sampler2DShadow, vec3(coord), offset2D) || ignoreResultF32)
 
         // GLSL: textureOffset({{.*}}sampler2DShadow
@@ -744,12 +744,12 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // GLSL: textureOffset({{.*}}sampler2DRect
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler2DRect, vec2(coord), offset2D)
 
         // GLSL: textureOffset({{.*}}sampler2DRectShadow
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // S-PIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
+        // SPIR: OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
         && float(0) == textureOffset(uniform_sampler2DRectShadow, vec3(coord), offset2D)
 
         // GLSL: textureOffset({{.*}}sampler1DShadow
@@ -764,8 +764,8 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // GLSL: textureOffset({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
-        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
-        && gvec4(T(0)) == textureOffset(gsampler1DArray, vec2(coord), int(0))
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        && gvec4(T(0)) == textureOffset(gsampler1DArray, vec2(coord), int(1))
 
         // GLSL: textureOffset({{.*}}sampler1DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
@@ -774,7 +774,7 @@ bool textureFuncs( Sampler1D<vector<T,N>> gsampler1D
 
         // GLSL: textureOffset({{.*}}sampler2DArray
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // S-PIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
+        // SPIR: OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
         && gvec4(T(0)) == textureOffset(gsampler2DArray, vec3(coord), offset2D)
 
         // GLSL: textureOffset({{.*}}sampler2DArray

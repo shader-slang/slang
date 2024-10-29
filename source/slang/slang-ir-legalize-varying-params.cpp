@@ -1,35 +1,35 @@
 // slang-ir-legalize-varying-params.cpp
 #include "slang-ir-legalize-varying-params.h"
 
+#include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
-#include "slang-ir-clone.h"
 #include "slang-parameter-binding.h"
 
 namespace Slang
 {
-    // Convert semantic name (ignores case) into equivlent `SystemValueSemanticName`
-    SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticName)
-    {
-        auto semanticName = rawSemanticName.toLower();
+// Convert semantic name (ignores case) into equivlent `SystemValueSemanticName`
+SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticName)
+{
+    auto semanticName = rawSemanticName.toLower();
 
-        SystemValueSemanticName systemValueSemanticName = SystemValueSemanticName::None;
+    SystemValueSemanticName systemValueSemanticName = SystemValueSemanticName::None;
 
-#define CASE(ID, NAME)                                          \
-            if(semanticName == String(#NAME).toLower())                 \
-            {                                                           \
-                systemValueSemanticName = SystemValueSemanticName::ID;  \
-            }                                                           \
-            else
+#define CASE(ID, NAME)                                         \
+    if (semanticName == String(#NAME).toLower())               \
+    {                                                          \
+        systemValueSemanticName = SystemValueSemanticName::ID; \
+    }                                                          \
+    else
 
-        SYSTEM_VALUE_SEMANTIC_NAMES(CASE)
+    SYSTEM_VALUE_SEMANTIC_NAMES(CASE)
 #undef CASE
-        {
-            systemValueSemanticName = SystemValueSemanticName::Unknown;
-            // no match
-        }
-        return systemValueSemanticName;
+    {
+        systemValueSemanticName = SystemValueSemanticName::Unknown;
+        // no match
     }
+    return systemValueSemanticName;
+}
 
 // This pass implements logic to "legalize" the varying parameter
 // signature of an entry point.
@@ -76,23 +76,22 @@ namespace Slang
 // * Slang allows for `inout` varying parameters, which need to desugar into
 //   distinct `in` and `out` parameters for targets like GLSL.
 
-    /// A placeholder that represents the value of a legalized varying
-    /// parameter, for the purposes of substituting it into IR code.
-    ///
+/// A placeholder that represents the value of a legalized varying
+/// parameter, for the purposes of substituting it into IR code.
+///
 struct LegalizedVaryingVal
 {
 public:
     enum class Flavor
     {
-        None,       ///< No value (conceptually a literal of type `void`)
+        None, ///< No value (conceptually a literal of type `void`)
 
-        Value,      ///< A simple value represented as a single `IRInst*`
+        Value, ///< A simple value represented as a single `IRInst*`
 
-        Address,    ///< A location in memory, identified by an address in an `IRInst*`
+        Address, ///< A location in memory, identified by an address in an `IRInst*`
     };
 
-    LegalizedVaryingVal()
-    {}
+    LegalizedVaryingVal() {}
 
     static LegalizedVaryingVal makeValue(IRInst* irInst)
     {
@@ -120,50 +119,42 @@ public:
 
 private:
     LegalizedVaryingVal(Flavor flavor, IRInst* irInst)
-        : m_flavor(flavor)
-        , m_irInst(irInst)
-    {}
+        : m_flavor(flavor), m_irInst(irInst)
+    {
+    }
 
-    Flavor  m_flavor = Flavor::None;
+    Flavor m_flavor = Flavor::None;
     IRInst* m_irInst = nullptr;
 };
 
-    /// Materialize the value of `val` as a single IR instruction.
-    ///
-    /// Any IR code that is needed to materialize the value will be emitted to `builder`.
+/// Materialize the value of `val` as a single IR instruction.
+///
+/// Any IR code that is needed to materialize the value will be emitted to `builder`.
 IRInst* materialize(IRBuilder& builder, LegalizedVaryingVal const& val)
 {
-    switch( val.getFlavor() )
+    switch (val.getFlavor())
     {
-    case LegalizedVaryingVal::Flavor::None:
-        return nullptr; // TODO: should use a `void` literal
+    case LegalizedVaryingVal::Flavor::None: return nullptr; // TODO: should use a `void` literal
 
-    case LegalizedVaryingVal::Flavor::Value:
-        return val.getValue();
+    case LegalizedVaryingVal::Flavor::Value: return val.getValue();
 
-    case LegalizedVaryingVal::Flavor::Address:
-        return builder.emitLoad(val.getAddress());
+    case LegalizedVaryingVal::Flavor::Address: return builder.emitLoad(val.getAddress());
 
-    default:
-        SLANG_UNEXPECTED("unimplemented");
-        break;
+    default: SLANG_UNEXPECTED("unimplemented"); break;
     }
 }
 
 void assign(IRBuilder& builder, LegalizedVaryingVal const& dest, LegalizedVaryingVal const& src)
 {
-    switch( dest.getFlavor() )
+    switch (dest.getFlavor())
     {
-    case LegalizedVaryingVal::Flavor::None:
-        break;
+    case LegalizedVaryingVal::Flavor::None: break;
 
     case LegalizedVaryingVal::Flavor::Address:
         builder.emitStore(dest.getAddress(), materialize(builder, src));
         break;
 
-    default:
-        SLANG_UNEXPECTED("unimplemented");
-        break;
+    default: SLANG_UNEXPECTED("unimplemented"); break;
     }
 }
 
@@ -180,10 +171,7 @@ void assign(IRBuilder& builder, LegalizedVaryingVal const& dest, IRInst* src)
 // and we define a convenience routine for accessing
 // that information.
 
-IRInst* emitCalcGroupExtents(
-    IRBuilder& builder,
-    IRFunc* entryPoint,
-    IRVectorType* type)
+IRInst* emitCalcGroupExtents(IRBuilder& builder, IRFunc* entryPoint, IRVectorType* type)
 {
     if (auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>())
     {
@@ -196,7 +184,8 @@ IRInst* emitCalcGroupExtents(
             if (!litValue)
                 return nullptr;
 
-            groupExtentAlongAxis[axis] = builder.getIntValue(type->getElementType(), litValue->getValue());
+            groupExtentAlongAxis[axis] =
+                builder.getIntValue(type->getElementType(), litValue->getValue());
         }
 
         return builder.emitMakeVector(type, kAxisCount, groupExtentAlongAxis);
@@ -220,7 +209,7 @@ IRInst* emitCalcGroupExtents(
 // calculating the value of these derived system values from the
 // more primitive ones.
 
-    /// Emit code to calculate `SV_DispatchThreadID`
+/// Emit code to calculate `SV_DispatchThreadID`
 IRInst* emitCalcDispatchThreadID(
     IRBuilder& builder,
     IRType* type,
@@ -236,18 +225,11 @@ IRInst* emitCalcDispatchThreadID(
     // each thread group in threads (as given by
     // `[numthreads(X,Y,Z)]`).
 
-    return builder.emitAdd(type,
-        builder.emitMul(type,
-            groupID,
-            groupExtents),
-        groupThreadID);
+    return builder.emitAdd(type, builder.emitMul(type, groupID, groupExtents), groupThreadID);
 }
 
 /// Emit code to calculate `SV_GroupIndex`
-IRInst* emitCalcGroupIndex(
-    IRBuilder& builder,
-    IRInst* groupThreadID,
-    IRInst* groupExtents)
+IRInst* emitCalcGroupIndex(IRBuilder& builder, IRInst* groupThreadID, IRInst* groupExtents)
 {
     auto intType = builder.getIntType();
     auto uintType = builder.getBasicType(BaseType::UInt);
@@ -272,25 +254,37 @@ IRInst* emitCalcGroupIndex(
     // `offset *= groupExtents.y`
     // `offset += groupExtents.y`
     auto yAxis = builder.getIntValue(intType, 1);
-    offset = builder.emitMul(uintType, offset, builder.emitElementExtract(uintType, groupExtents, yAxis));
-    offset = builder.emitAdd(uintType, offset, builder.emitElementExtract(uintType, groupThreadID, yAxis));
+    offset = builder.emitMul(
+        uintType,
+        offset,
+        builder.emitElementExtract(uintType, groupExtents, yAxis));
+    offset = builder.emitAdd(
+        uintType,
+        offset,
+        builder.emitElementExtract(uintType, groupThreadID, yAxis));
 
     // `offset *= groupExtents.x`
     // `offset += groupExtents.x`
     auto xAxis = builder.getIntValue(intType, 0);
-    offset = builder.emitMul(uintType, offset, builder.emitElementExtract(uintType, groupExtents, xAxis));
-    offset = builder.emitAdd(uintType, offset, builder.emitElementExtract(uintType, groupThreadID, xAxis));
+    offset = builder.emitMul(
+        uintType,
+        offset,
+        builder.emitElementExtract(uintType, groupExtents, xAxis));
+    offset = builder.emitAdd(
+        uintType,
+        offset,
+        builder.emitElementExtract(uintType, groupThreadID, xAxis));
 
     return offset;
 }
 
-    /// Context for the IR pass that legalizing entry-point
-    /// varying parameters for a target.
-    ///
-    /// This is an abstract base type that needs to be inherited
-    /// to implement the appropriate policy for a particular
-    /// compilation target.
-    ///
+/// Context for the IR pass that legalizing entry-point
+/// varying parameters for a target.
+///
+/// This is an abstract base type that needs to be inherited
+/// to implement the appropriate policy for a particular
+/// compilation target.
+///
 struct EntryPointVaryingParamLegalizeContext
 {
     // This pass will be invoked on an entire module, and will
@@ -316,18 +310,18 @@ public:
         // We now search for entry-point definitions in the IR module.
         // All entry points should appear at the global scope.
         //
-        for(auto inst : module->getGlobalInsts())
+        for (auto inst : module->getGlobalInsts())
         {
             // Entry points are IR functions.
             //
             auto func = as<IRFunc>(inst);
-            if(!func)
+            if (!func)
                 continue;
 
             // Entry point functions must have the `[entryPoint]` decoration.
             //
             auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
-            if(!entryPointDecor)
+            if (!entryPointDecor)
                 continue;
 
             // Once we find an entry point we process it immediately.
@@ -337,13 +331,11 @@ public:
     }
 
 protected:
-
     // As discussed in `processModule()`, a subtype can overide
     // the `beginModuleImpl()` method to perform work that should
     // only happen once per module that is processed.
     //
-    virtual void beginModuleImpl()
-    {}
+    virtual void beginModuleImpl() {}
 
     // We have both per-module and per-entry-point state that
     // needs to be managed. The former is set up in `processModule()`,
@@ -357,13 +349,13 @@ protected:
     // The current solution of a single type with statefullness
     // seems easier to manage.
 
-    IRModule*           m_module        = nullptr;
-    DiagnosticSink*     m_sink          = nullptr;
+    IRModule* m_module = nullptr;
+    DiagnosticSink* m_sink = nullptr;
 
-    IRFunc*     m_entryPointFunc    = nullptr;
-    IRBlock*    m_firstBlock        = nullptr;
-    IRInst*     m_firstOrdinaryInst = nullptr;
-    Stage       m_stage             = Stage::Unknown;
+    IRFunc* m_entryPointFunc = nullptr;
+    IRBlock* m_firstBlock = nullptr;
+    IRInst* m_firstOrdinaryInst = nullptr;
+    Stage m_stage = Stage::Unknown;
 
 
     void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
@@ -406,7 +398,7 @@ protected:
         // if it is non-`void`.
         //
         auto resultType = entryPointFunc->getResultType();
-        if( !as<IRVoidType>(resultType) )
+        if (!as<IRVoidType>(resultType))
         {
             // We need to translate the existing function result type
             // into zero or more varying parameters that are legal for
@@ -424,10 +416,10 @@ protected:
             // instead assign `r` to `legalResult` and then `returnVoid`.
             //
             IRBuilder builder(m_module);
-            for( auto block : entryPointFunc->getBlocks() )
+            for (auto block : entryPointFunc->getBlocks())
             {
                 auto returnValInst = as<IRReturn>(block->getTerminator());
-                if(!returnValInst)
+                if (!returnValInst)
                     continue;
 
                 // We have a `returnVal` instruction that returns `resultVal`.
@@ -472,13 +464,13 @@ protected:
         //  of deletion.
         //
         IRParam* nextParam = nullptr;
-        for( auto param = firstOriginalParam; param; param = nextParam )
+        for (auto param = firstOriginalParam; param; param = nextParam)
         {
             nextParam = param->getNextParam();
 
             processParam(param);
 
-            if(param == lastOriginalParam)
+            if (param == lastOriginalParam)
                 break;
         }
     }
@@ -504,7 +496,7 @@ protected:
         m_paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
         SLANG_ASSERT(m_paramLayout);
 
-        if(!isVaryingParameter(m_paramLayout))
+        if (!isVaryingParameter(m_paramLayout))
             return;
 
         // TODO: The GLSL-specific variant of this pass has several
@@ -521,11 +513,11 @@ protected:
         // the strategy we take.
         //
         auto paramType = param->getDataType();
-        if(auto inOutType = as<IRInOutType>(paramType))
+        if (auto inOutType = as<IRInOutType>(paramType))
         {
             processInOutParam(param, inOutType);
         }
-        else if(auto outType = as<IROutType>(paramType))
+        else if (auto outType = as<IROutType>(paramType))
         {
             processOutParam(param, outType);
         }
@@ -571,7 +563,7 @@ protected:
         auto localVar = builder.emitVar(valueType);
         auto localVal = LegalizedVaryingVal::makeAddress(localVar);
 
-        if( const auto inOutType = as<IRInOutType>(paramPtrType) )
+        if (const auto inOutType = as<IRInOutType>(paramPtrType))
         {
             // If the parameter was an `inout` and not just an `out`
             // parameter, we will create one more more legal `in`
@@ -579,10 +571,8 @@ protected:
             // and then assign from those legalized input(s)
             // into our local variable at the start of the function.
             //
-            auto inputVal = createLegalVaryingVal(
-                valueType,
-                m_paramLayout,
-                LayoutResourceKind::VaryingInput);
+            auto inputVal =
+                createLegalVaryingVal(valueType, m_paramLayout, LayoutResourceKind::VaryingInput);
             assign(builder, localVal, inputVal);
         }
 
@@ -597,20 +587,18 @@ protected:
         // introduce one or more legalized `out` parameters
         // to represent the outgoing value.
         //
-        auto outputVal = createLegalVaryingVal(
-            valueType,
-            m_paramLayout,
-            LayoutResourceKind::VaryingOutput);
+        auto outputVal =
+            createLegalVaryingVal(valueType, m_paramLayout, LayoutResourceKind::VaryingOutput);
 
         // In order to have changes to our local variable become
         // visible in the legalized outputs, we need to assign
         // from the local variable to the output as the last
         // operation before any `return` instructions.
         //
-        for( auto block : m_entryPointFunc->getBlocks() )
+        for (auto block : m_entryPointFunc->getBlocks())
         {
             auto returnInst = as<IRReturn>(block->getTerminator());
-            if(!returnInst)
+            if (!returnInst)
                 continue;
 
             builder.setInsertBefore(returnInst);
@@ -630,10 +618,8 @@ protected:
         // We start by creating one or more legalized `in` parameters
         // to represent the incoming value.
         //
-        auto legalVal = createLegalVaryingVal(
-            paramType,
-            m_paramLayout,
-            LayoutResourceKind::VaryingInput);
+        auto legalVal =
+            createLegalVaryingVal(paramType, m_paramLayout, LayoutResourceKind::VaryingInput);
 
         // Next, we "materialize" the legalized value to produce
         // an `IRInst*` that represents it.
@@ -669,7 +655,10 @@ protected:
     // a varying parameter of a given type for a specific direction:
     // either input or output, but not both.
     //
-    LegalizedVaryingVal createLegalVaryingVal(IRType* type, IRVarLayout* varLayout, LayoutResourceKind kind)
+    LegalizedVaryingVal createLegalVaryingVal(
+        IRType* type,
+        IRVarLayout* varLayout,
+        LayoutResourceKind kind)
     {
         // The process we are going to use for creating legalized
         // values is going to involve recursion over the `type`
@@ -685,10 +674,10 @@ protected:
         auto typeLayout = varLayout->getTypeLayout();
 
         VaryingParamInfo info;
-        info.type       = type;
-        info.varLayout  = varLayout;
+        info.type = type;
+        info.varLayout = varLayout;
         info.typeLayout = typeLayout;
-        info.kind       = kind;
+        info.kind = kind;
 
         return _createLegalVaryingVal(info);
     }
@@ -708,8 +697,8 @@ protected:
     //
     struct VaryingArrayDeclaratorInfo
     {
-        IRInst*                     elementCount    = nullptr;
-        VaryingArrayDeclaratorInfo* next            = nullptr;
+        IRInst* elementCount = nullptr;
+        VaryingArrayDeclaratorInfo* next = nullptr;
     };
 
     // Here is the declaration of the bundled information we care
@@ -720,8 +709,8 @@ protected:
         // We obviously care about the type of the parameter we
         // need to legalize, as well as the layout of that type.
         //
-        IRType*                     type                        = nullptr;
-        IRTypeLayout*               typeLayout                  = nullptr;
+        IRType* type = nullptr;
+        IRTypeLayout* typeLayout = nullptr;
 
         // We also care about the variable layout information for
         // the parameter, because that includes things like the semantic
@@ -741,7 +730,7 @@ protected:
         // semantic of `STUFF`, but the `type` and `typeLayout` will
         // refer to the `int` type.
         //
-        IRVarLayout*                varLayout                   = nullptr;
+        IRVarLayout* varLayout = nullptr;
 
         // As discussed above, sometimes `varLayout` will refer to an
         // outer declaration of array type, while `type` and `typeLayout`
@@ -755,7 +744,7 @@ protected:
         // then it will need to use these `arrayDeclarators` to wrap the
         // type up to make it correct.
         //
-        VaryingArrayDeclaratorInfo* arrayDeclarators            = nullptr;
+        VaryingArrayDeclaratorInfo* arrayDeclarators = nullptr;
 
         // In some cases the decision-making about how to lower a parameter
         // will depend on the kind of varying parameter (input or output).
@@ -764,7 +753,7 @@ protected:
         // support true `inout` varying parameters, and `LayoutResourceKind`
         // cannot currently handle those.
         //
-        LayoutResourceKind          kind                        = LayoutResourceKind::None;
+        LayoutResourceKind kind = LayoutResourceKind::None;
 
         // When we arrive at a leaf parameter/field, we can identify whether
         // it is a user-defined or system-value varying based on its semantic name.
@@ -773,7 +762,7 @@ protected:
         // the enumerated `systemValueSemanticName` rather than needing to
         // implement their own parsing of semantic name strings.
         //
-        SystemValueSemanticName     systemValueSemanticName     = SystemValueSemanticName::None;
+        SystemValueSemanticName systemValueSemanticName = SystemValueSemanticName::None;
     };
 
     LegalizedVaryingVal _createLegalVaryingVal(VaryingParamInfo const& info)
@@ -803,15 +792,15 @@ protected:
         {
             return createSimpleLegalVaryingVal(info);
         }
-        else if( as<IRBasicType>(type) )
+        else if (as<IRBasicType>(type))
         {
             return createSimpleLegalVaryingVal(info);
         }
-        else if( as<IRVectorType>(type) )
+        else if (as<IRVectorType>(type))
         {
             return createSimpleLegalVaryingVal(info);
         }
-        else if( as<IRMatrixType>(type) )
+        else if (as<IRMatrixType>(type))
         {
             // Note: For now we are handling matrix types in a varying
             // parameter list as if they were ordinary types like
@@ -824,7 +813,7 @@ protected:
             //
             return createSimpleLegalVaryingVal(info);
         }
-        else if( auto arrayType = as<IRArrayType>(type) )
+        else if (auto arrayType = as<IRArrayType>(type))
         {
             // A varying parameter of array type is an interesting beast,
             // because depending on the element type of the array we
@@ -856,7 +845,7 @@ protected:
 
             return _createLegalVaryingVal(elementInfo);
         }
-        else if( auto streamType = as<IRHLSLStreamOutputType>(type))
+        else if (auto streamType = as<IRHLSLStreamOutputType>(type))
         {
             // Handling a geometry shader stream output type like
             // `TriangleStream<T>` is similar to handling an array,
@@ -917,7 +906,7 @@ protected:
         //
         auto varLayout = info.varLayout;
         auto semanticInst = varLayout->findSystemValueSemanticAttr();
-        if( semanticInst )
+        if (semanticInst)
         {
             // We will compare the semantic name against our list of
             // system-value semantics using conversion to lower-case
@@ -930,9 +919,10 @@ protected:
             // avoid all the `String`s we crete and thren throw
             // away here.
             //
-            auto systemValueSemanticName = convertSystemValueSemanticNameToEnum(String(semanticInst->getName()));
+            auto systemValueSemanticName =
+                convertSystemValueSemanticNameToEnum(String(semanticInst->getName()));
 
-            if( systemValueSemanticName != SystemValueSemanticName::None )
+            if (systemValueSemanticName != SystemValueSemanticName::None)
             {
                 // If the leaf parameter has a system-value semantic, then
                 // we need to translate the system value in whatever way
@@ -993,7 +983,10 @@ protected:
     {
         SLANG_UNUSED(info);
 
-        m_sink->diagnose(m_param, Diagnostics::unimplemented, "this target doesn't support this system-defined varying parameter");
+        m_sink->diagnose(
+            m_param,
+            Diagnostics::unimplemented,
+            "this target doesn't support this system-defined varying parameter");
 
         return LegalizedVaryingVal();
     }
@@ -1002,7 +995,10 @@ protected:
     {
         SLANG_UNUSED(info);
 
-        m_sink->diagnose(m_param, Diagnostics::unimplemented, "this target doesn't support this user-defined varying parameter");
+        m_sink->diagnose(
+            m_param,
+            Diagnostics::unimplemented,
+            "this target doesn't support this user-defined varying parameter");
 
         return LegalizedVaryingVal();
     }
@@ -1032,14 +1028,21 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     IRType* uint3Type = nullptr;
 
     // Scans through and returns the first typeLayout attribute of non-zero size.
-    static LayoutResourceKind getLayoutResourceKind(IRTypeLayout* typeLayout) {
-        for (auto attr : typeLayout->getSizeAttrs()) {
-            if (attr->getSize() != 0) return attr->getResourceKind();
+    static LayoutResourceKind getLayoutResourceKind(IRTypeLayout* typeLayout)
+    {
+        for (auto attr : typeLayout->getSizeAttrs())
+        {
+            if (attr->getSize() != 0)
+                return attr->getResourceKind();
         }
         return LayoutResourceKind::None;
     }
 
-    IRInst* emitOptiXAttributeFetch(int& ioBaseAttributeIndex, IRType* typeToFetch, IRBuilder* builder) {
+    IRInst* emitOptiXAttributeFetch(
+        int& ioBaseAttributeIndex,
+        IRType* typeToFetch,
+        IRBuilder* builder)
+    {
         if (auto structType = as<IRStructType>(typeToFetch))
         {
             List<IRInst*> fieldVals;
@@ -1062,30 +1065,40 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             List<IRInst*> elementVals;
             for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
             {
-                auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                auto elementVal =
+                    emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
                 if (!elementVal)
                     return nullptr;
                 elementVals.add(elementVal);
             }
-            return builder->emitMakeArray(typeToFetch, elementVals.getCount(), elementVals.getBuffer());
+            return builder->emitMakeArray(
+                typeToFetch,
+                elementVals.getCount(),
+                elementVals.getBuffer());
         }
         else if (auto matType = as<IRMatrixType>(typeToFetch))
         {
             auto rowCountInst = as<IRIntLit>(matType->getRowCount());
             if (rowCountInst)
             {
-                auto rowType = builder->getVectorType(matType->getElementType(), matType->getColumnCount());
+                auto rowType =
+                    builder->getVectorType(matType->getElementType(), matType->getColumnCount());
                 IRType* elementType = rowType;
                 IRIntegerValue elementCount = rowCountInst->getValue();
                 List<IRInst*> elementVals;
                 for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
                 {
-                    auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                    auto elementVal =
+                        emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
                     if (!elementVal)
                         return nullptr;
                     elementVals.add(elementVal);
                 }
-                return builder->emitIntrinsicInst(typeToFetch, kIROp_MakeMatrix, elementVals.getCount(), elementVals.getBuffer());
+                return builder->emitIntrinsicInst(
+                    typeToFetch,
+                    kIROp_MakeMatrix,
+                    elementVals.getCount(),
+                    elementVals.getBuffer());
             }
         }
         else if (auto vecType = as<IRVectorType>(typeToFetch))
@@ -1096,20 +1109,25 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             List<IRInst*> elementVals;
             for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
             {
-                auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                auto elementVal =
+                    emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
                 if (!elementVal)
                     return nullptr;
                 elementVals.add(elementVal);
             }
-            return builder->emitMakeVector(typeToFetch, elementVals.getCount(), elementVals.getBuffer());
+            return builder->emitMakeVector(
+                typeToFetch,
+                elementVals.getCount(),
+                elementVals.getBuffer());
         }
         else if (const auto basicType = as<IRBasicType>(typeToFetch))
         {
             IRIntegerValue idx = ioBaseAttributeIndex;
             auto idxInst = builder->getIntValue(builder->getIntType(), idx);
             ioBaseAttributeIndex++;
-            IRInst* args[] = { typeToFetch, idxInst };
-            IRInst* getAttr = builder->emitIntrinsicInst(typeToFetch, kIROp_GetOptiXHitAttribute, 2, args);
+            IRInst* args[] = {typeToFetch, idxInst};
+            IRInst* getAttr =
+                builder->emitIntrinsicInst(typeToFetch, kIROp_GetOptiXHitAttribute, 2, args);
             return getAttr;
         }
 
@@ -1154,15 +1172,24 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         // a unique name).
 
         threadIdxGlobalParam = builder.createGlobalParam(uint3Type);
-        builder.addTargetIntrinsicDecoration(threadIdxGlobalParam, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("threadIdx"));
+        builder.addTargetIntrinsicDecoration(
+            threadIdxGlobalParam,
+            CapabilitySet::makeEmpty(),
+            UnownedTerminatedStringSlice("threadIdx"));
         builder.addLayoutDecoration(threadIdxGlobalParam, varLayout);
 
         blockIdxGlobalParam = builder.createGlobalParam(uint3Type);
-        builder.addTargetIntrinsicDecoration(blockIdxGlobalParam, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("blockIdx"));
+        builder.addTargetIntrinsicDecoration(
+            blockIdxGlobalParam,
+            CapabilitySet::makeEmpty(),
+            UnownedTerminatedStringSlice("blockIdx"));
         builder.addLayoutDecoration(blockIdxGlobalParam, varLayout);
 
         blockDimGlobalParam = builder.createGlobalParam(uint3Type);
-        builder.addTargetIntrinsicDecoration(blockDimGlobalParam, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("blockDim"));
+        builder.addTargetIntrinsicDecoration(
+            blockDimGlobalParam,
+            CapabilitySet::makeEmpty(),
+            UnownedTerminatedStringSlice("blockDim"));
         builder.addLayoutDecoration(blockDimGlobalParam, varLayout);
     }
 
@@ -1202,10 +1229,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             threadIdxGlobalParam,
             blockDimGlobalParam);
 
-        groupThreadIndex = emitCalcGroupIndex(
-            builder,
-            threadIdxGlobalParam,
-            blockDimGlobalParam);
+        groupThreadIndex = emitCalcGroupIndex(builder, threadIdxGlobalParam, blockDimGlobalParam);
 
         // Note: we don't pay attention to whether the
         // kernel actually makes use of either of these
@@ -1229,14 +1253,17 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         // function, we can easily return the right
         // value to use for a system-value parameter.
 
-        switch( info.systemValueSemanticName )
+        switch (info.systemValueSemanticName)
         {
-        case SystemValueSemanticName::GroupID:          return LegalizedVaryingVal::makeValue(blockIdxGlobalParam);
-        case SystemValueSemanticName::GroupThreadID:    return LegalizedVaryingVal::makeValue(threadIdxGlobalParam);
-        case SystemValueSemanticName::GroupIndex: return LegalizedVaryingVal::makeValue(groupThreadIndex);
-        case SystemValueSemanticName::DispatchThreadID: return LegalizedVaryingVal::makeValue(dispatchThreadID);
-        default:
-            return diagnoseUnsupportedSystemVal(info);
+        case SystemValueSemanticName::GroupID:
+            return LegalizedVaryingVal::makeValue(blockIdxGlobalParam);
+        case SystemValueSemanticName::GroupThreadID:
+            return LegalizedVaryingVal::makeValue(threadIdxGlobalParam);
+        case SystemValueSemanticName::GroupIndex:
+            return LegalizedVaryingVal::makeValue(groupThreadIndex);
+        case SystemValueSemanticName::DispatchThreadID:
+            return LegalizedVaryingVal::makeValue(dispatchThreadID);
+        default: return diagnoseUnsupportedSystemVal(info);
         }
     }
 
@@ -1245,37 +1272,47 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         auto layoutResourceKind = getLayoutResourceKind(info.typeLayout);
         switch (layoutResourceKind)
         {
-        case LayoutResourceKind::RayPayload: {
-            IRBuilder builder(m_module);
-            builder.setInsertBefore(m_firstOrdinaryInst);
-            IRPtrType* ptrType = builder.getPtrType(info.type);
-            IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
-            return LegalizedVaryingVal::makeAddress(getRayPayload);
-            // Todo: compute how many registers are required for the current payload. 
-            // If more than 32, use the above logic. 
-            // Otherwise, either use the optix_get_payload or optix_set_payload 
-            // intrinsics depending on input/output
-            /*if (info.kind == LayoutResourceKind::VaryingInput) {
+        case LayoutResourceKind::RayPayload:
+            {
+                IRBuilder builder(m_module);
+                builder.setInsertBefore(m_firstOrdinaryInst);
+                IRPtrType* ptrType = builder.getPtrType(info.type);
+                IRInst* getRayPayload =
+                    builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+                return LegalizedVaryingVal::makeAddress(getRayPayload);
+                // Todo: compute how many registers are required for the current payload.
+                // If more than 32, use the above logic.
+                // Otherwise, either use the optix_get_payload or optix_set_payload
+                // intrinsics depending on input/output
+                /*if (info.kind == LayoutResourceKind::VaryingInput) {
+                }
+                else if (info.kind == LayoutResourceKind::VaryingOutput) {
+                }
+                else {
+                    return diagnoseUnsupportedUserVal(info);
+                }*/
             }
-            else if (info.kind == LayoutResourceKind::VaryingOutput) {
+        case LayoutResourceKind::HitAttributes:
+            {
+                IRBuilder builder(m_module);
+                builder.setInsertBefore(m_firstOrdinaryInst);
+                int ioBaseAttributeIndex = 0;
+                IRInst* getHitAttributes = emitOptiXAttributeFetch(
+                    /*ioBaseAttributeIndex*/ ioBaseAttributeIndex,
+                    /* type to fetch */ info.type,
+                    /*the builder in use*/ &builder);
+                if (ioBaseAttributeIndex > 8)
+                {
+                    m_sink->diagnose(
+                        m_param,
+                        Diagnostics::unexpected,
+                        "the supplied hit attribute exceeds the maximum hit attribute structure "
+                        "size (32 bytes)");
+                    return LegalizedVaryingVal();
+                }
+                return LegalizedVaryingVal::makeValue(getHitAttributes);
             }
-            else {
-                return diagnoseUnsupportedUserVal(info);
-            }*/ 
-        }
-        case LayoutResourceKind::HitAttributes: {
-            IRBuilder builder(m_module);
-            builder.setInsertBefore(m_firstOrdinaryInst);
-            int ioBaseAttributeIndex = 0;
-            IRInst* getHitAttributes = emitOptiXAttributeFetch(/*ioBaseAttributeIndex*/ ioBaseAttributeIndex, /* type to fetch */info.type, /*the builder in use*/ &builder);
-            if (ioBaseAttributeIndex > 8) {
-                m_sink->diagnose(m_param, Diagnostics::unexpected, "the supplied hit attribute exceeds the maximum hit attribute structure size (32 bytes)");
-                return LegalizedVaryingVal();
-            }
-            return LegalizedVaryingVal::makeValue(getHitAttributes);
-        }
-        default:
-            return diagnoseUnsupportedUserVal(info);
+        default: return diagnoseUnsupportedUserVal(info);
         }
     }
 };
@@ -1292,15 +1329,15 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
     // to synthesize an IR definition of that type and its fields, so that
     // we can use it across entry points.
 
-    IRType*         uintType        = nullptr;
-    IRVectorType*   uint3Type       = nullptr;
-    IRType*         uint3PtrType    = nullptr;
+    IRType* uintType = nullptr;
+    IRVectorType* uint3Type = nullptr;
+    IRType* uint3PtrType = nullptr;
 
-    IRStructType*   varyingInputStructType = nullptr;
-    IRPtrType*      varyingInputStructPtrType = nullptr;
+    IRStructType* varyingInputStructType = nullptr;
+    IRPtrType* varyingInputStructPtrType = nullptr;
 
-    IRStructKey*    groupIDKey = nullptr;
-    IRStructKey*    groupThreadIDKey = nullptr;
+    IRStructKey* groupIDKey = nullptr;
+    IRStructKey* groupThreadIDKey = nullptr;
 
     void beginModuleImpl() SLANG_OVERRIDE
     {
@@ -1319,14 +1356,23 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         varyingInputStructType = builder.createStructType();
         varyingInputStructPtrType = builder.getPtrType(varyingInputStructType);
 
-        builder.addTargetIntrinsicDecoration(varyingInputStructType, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("ComputeThreadVaryingInput"));
+        builder.addTargetIntrinsicDecoration(
+            varyingInputStructType,
+            CapabilitySet::makeEmpty(),
+            UnownedTerminatedStringSlice("ComputeThreadVaryingInput"));
 
         groupIDKey = builder.createStructKey();
-        builder.addTargetIntrinsicDecoration(groupIDKey, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("groupID"));
+        builder.addTargetIntrinsicDecoration(
+            groupIDKey,
+            CapabilitySet::makeEmpty(),
+            UnownedTerminatedStringSlice("groupID"));
         builder.createStructField(varyingInputStructType, groupIDKey, uint3Type);
 
         groupThreadIDKey = builder.createStructKey();
-        builder.addTargetIntrinsicDecoration(groupThreadIDKey, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("groupThreadID"));
+        builder.addTargetIntrinsicDecoration(
+            groupThreadIDKey,
+            CapabilitySet::makeEmpty(),
+            UnownedTerminatedStringSlice("groupThreadID"));
         builder.createStructField(varyingInputStructType, groupThreadIDKey, uint3Type);
     }
 
@@ -1358,8 +1404,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
         builder.setInsertBefore(m_firstOrdinaryInst);
 
-        groupID = builder.emitLoad(
-            builder.emitFieldAddress(uint3PtrType, varyingInputParam, groupIDKey));
+        groupID =
+            builder.emitLoad(builder.emitFieldAddress(uint3PtrType, varyingInputParam, groupIDKey));
 
         groupThreadID = builder.emitLoad(
             builder.emitFieldAddress(uint3PtrType, varyingInputParam, groupThreadIDKey));
@@ -1374,7 +1420,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         //
         groupExtents = emitCalcGroupExtents(builder, m_entryPointFunc, uint3Type);
 
-        dispatchThreadID = emitCalcDispatchThreadID(builder, uint3Type, groupID, groupThreadID, groupExtents);
+        dispatchThreadID =
+            emitCalcDispatchThreadID(builder, uint3Type, groupID, groupThreadID, groupExtents);
 
         groupThreadIndex = emitCalcGroupIndex(builder, groupThreadID, groupExtents);
     }
@@ -1389,33 +1436,31 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         // not referened will simply be eliminated as dead code
         // in later passes.
 
-        switch( info.systemValueSemanticName )
+        switch (info.systemValueSemanticName)
         {
-        case SystemValueSemanticName::GroupID:          return LegalizedVaryingVal::makeValue(groupID);
-        case SystemValueSemanticName::GroupThreadID:    return LegalizedVaryingVal::makeValue(groupThreadID);
-        case SystemValueSemanticName::GroupIndex: return LegalizedVaryingVal::makeValue(groupThreadIndex);
-        case SystemValueSemanticName::DispatchThreadID: return LegalizedVaryingVal::makeValue(dispatchThreadID);
+        case SystemValueSemanticName::GroupID: return LegalizedVaryingVal::makeValue(groupID);
+        case SystemValueSemanticName::GroupThreadID:
+            return LegalizedVaryingVal::makeValue(groupThreadID);
+        case SystemValueSemanticName::GroupIndex:
+            return LegalizedVaryingVal::makeValue(groupThreadIndex);
+        case SystemValueSemanticName::DispatchThreadID:
+            return LegalizedVaryingVal::makeValue(dispatchThreadID);
 
-        default:
-            return diagnoseUnsupportedSystemVal(info);
+        default: return diagnoseUnsupportedSystemVal(info);
         }
     }
 };
 
-void legalizeEntryPointVaryingParamsForCPU(
-    IRModule*               module,
-    DiagnosticSink*         sink)
+void legalizeEntryPointVaryingParamsForCPU(IRModule* module, DiagnosticSink* sink)
 {
     CPUEntryPointVaryingParamLegalizeContext context;
     context.processModule(module, sink);
 }
 
-void legalizeEntryPointVaryingParamsForCUDA(
-    IRModule*               module,
-    DiagnosticSink*         sink)
+void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink)
 {
     CUDAEntryPointVaryingParamLegalizeContext context;
     context.processModule(module, sink);
 }
 
-}
+} // namespace Slang

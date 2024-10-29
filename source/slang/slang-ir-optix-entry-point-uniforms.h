@@ -7,4 +7,4 @@ namespace Slang
 struct IRModule;
 void collectOptiXEntryPointUniformParams(IRModule* module);
 
-}
+} // namespace Slang

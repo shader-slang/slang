@@ -1,6 +1,7 @@
 #include "slang-ir-vk-invert-y.h"
-#include "slang-ir.h"
+
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -10,9 +11,12 @@ static IRInst* _invertYOfVector(IRBuilder& builder, IRInst* originalVector)
     auto vectorType = as<IRVectorType>(originalVector->getDataType());
     SLANG_ASSERT(vectorType);
     UInt elementIndexY = 1;
-    auto originalY = builder.emitSwizzle(vectorType->getElementType(), originalVector, 1, &elementIndexY);
+    auto originalY =
+        builder.emitSwizzle(vectorType->getElementType(), originalVector, 1, &elementIndexY);
     auto negY = builder.emitNeg(originalY->getDataType(), originalY);
-    auto newVal = builder.emitSwizzleSet(originalVector->getDataType(), originalVector, negY, 1, &elementIndexY);
+    auto newVal =
+        builder
+            .emitSwizzleSet(originalVector->getDataType(), originalVector, negY, 1, &elementIndexY);
     return newVal;
 }
 // Find outputs to SV_Position and invert the y coordinates of it right before the write.
@@ -24,7 +28,9 @@ void invertYOfPositionOutput(IRModule* module)
         {
             // Find all loads and stores to it.
             IRBuilder builder(module);
-            traverseUses(globalInst, [&](IRUse* use)
+            traverseUses(
+                globalInst,
+                [&](IRUse* use)
                 {
                     if (auto store = as<IRStore>(use->getUser()))
                     {
@@ -41,7 +47,8 @@ void invertYOfPositionOutput(IRModule* module)
                         // Since we negate the y coordinate before writing
                         // to gl_Position, we also need to negate the value after reading from it.
                         builder.setInsertAfter(load);
-                        // Store existing uses of the load that we are going to replace with inverted val later.
+                        // Store existing uses of the load that we are going to replace with
+                        // inverted val later.
                         List<IRUse*> oldUses;
                         for (auto loadUse = load->firstUse; loadUse; loadUse = loadUse->nextUse)
                             oldUses.add(loadUse);
@@ -62,9 +69,15 @@ static IRInst* _invertWOfVector(IRBuilder& builder, IRInst* originalVector)
     auto vectorType = as<IRVectorType>(originalVector->getDataType());
     SLANG_ASSERT(vectorType);
     UInt elementIndexW = 3;
-    auto originalW = builder.emitSwizzle(vectorType->getElementType(), originalVector, 1, &elementIndexW);
-    auto rcpW = builder.emitDiv(originalW->getDataType(), builder.getFloatValue(originalW->getDataType(), 1.0), originalW);
-    auto newVal = builder.emitSwizzleSet(originalVector->getDataType(), originalVector, rcpW, 1, &elementIndexW);
+    auto originalW =
+        builder.emitSwizzle(vectorType->getElementType(), originalVector, 1, &elementIndexW);
+    auto rcpW = builder.emitDiv(
+        originalW->getDataType(),
+        builder.getFloatValue(originalW->getDataType(), 1.0),
+        originalW);
+    auto newVal =
+        builder
+            .emitSwizzleSet(originalVector->getDataType(), originalVector, rcpW, 1, &elementIndexW);
     return newVal;
 }
 
@@ -77,7 +90,9 @@ void rcpWOfPositionInput(IRModule* module)
         {
             // Find all loads and replace them with reciprocals.
             IRBuilder builder(module);
-            traverseUses(globalInst, [&](IRUse* use)
+            traverseUses(
+                globalInst,
+                [&](IRUse* use)
                 {
                     // Get the inverted vector.
                     builder.setInsertBefore(use->getUser());
@@ -88,4 +103,4 @@ void rcpWOfPositionInput(IRModule* module)
         }
     }
 }
-}
+} // namespace Slang

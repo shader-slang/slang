@@ -79,55 +79,23 @@ runs:
         echo "bin_dir=$bin_dir" >> "$GITHUB_ENV"
         echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
 
-    # Try to restore a LLVM build cache, and build it otherwise
-    - name: "Restore cache (attempt: 1/2)"
-      uses: actions/cache/restore@v4
+    # Try to restore an LLVM install, and build it otherwise
+    - uses: actions/cache/restore@v4
       id: cache-llvm
       if: inputs.build-llvm == 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
-
-    # Checkout while waiting for the second try of restoring the cache
-    - name: Checkout LLVM project if restore cache failed
-      uses: actions/checkout@v4
-      id: checkout-llvm
-      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
-      with:
-        #repository: llvm/llvm-project
-        repository: shader-slang/llvm-project
-        ref: llvmorg-13.0.1
-        path: build/llvm-source
-        fetch-depth: '1'
-        fetch-tags: true
-
-    # Once the cache server is busy, it usually becomes busy for awhile.
-    # The second attempt here is more likely to fail again.
-    # But the overhead of retry is very low, and let's try after spending some time checking out LLVM repo.
-    - name: "Restore cache (attempt: 2/2)"
-      uses: actions/cache/restore@v4
-      id: cache-llvm-2
-      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
-      with:
-        path: ${{ github.workspace }}/build/llvm-project-install
-        key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
-
-    # Build LLVM only if all attempts of the restoring the cache failed.
     - name: Build LLVM
-      id: build-llvm
-      if: steps.checkout-llvm.outcome == 'success' && steps.cache-llvm-2.outputs.cache-hit != 'true'
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
       run: |
         ./external/build-llvm.sh \
-          --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
-          --repo "${{github.workspace}}/build/llvm-source" \
-          --branch llvmorg-13.0.1
-
-    # Save LLVM cache if the building step was successful
-    - name: Save LLVM cache
-      uses: actions/cache/save@v4
-      if: steps.build-llvm.outcome == 'success'
+          --install-prefix "${{github.workspace}}/build/llvm-project-install" \
+          --repo "https://${{github.token}}@github.com/llvm/llvm-project"
+    - uses: actions/cache/save@v4
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}

@@ -1,30 +1,30 @@
 // vk-helper-functions.h
 #pragma once
 
-#include "vk-base.h"
 #include "core/slang-blob.h"
+#include "vk-base.h"
 #include "vk-util.h"
 
 // Vulkan has a different coordinate system to ogl
 // http://anki3d.org/vulkan-coordinate-system/
 #ifndef ENABLE_VALIDATION_LAYER
-#    if _DEBUG
-#        define ENABLE_VALIDATION_LAYER 1
-#    else
-#        define ENABLE_VALIDATION_LAYER 0
-#    endif
+#if _DEBUG
+#define ENABLE_VALIDATION_LAYER 1
+#else
+#define ENABLE_VALIDATION_LAYER 0
+#endif
 #endif
 
 #ifdef _MSC_VER
-#    include <stddef.h>
-#    pragma warning(disable : 4996)
-#    if (_MSC_VER < 1900)
-#        define snprintf sprintf_s
-#    endif
+#include <stddef.h>
+#pragma warning(disable : 4996)
+#if (_MSC_VER < 1900)
+#define snprintf sprintf_s
+#endif
 #endif
 
 #if SLANG_WINDOWS_FAMILY
-#    include <dxgi1_2.h>
+#include <dxgi1_2.h>
 #endif
 
 namespace gfx
@@ -108,13 +108,14 @@ struct BindingOffset : SimpleBindingOffset
     /// Create an offset from a simple offset
     explicit BindingOffset(SimpleBindingOffset const& offset)
         : SimpleBindingOffset(offset)
-    {}
+    {
+    }
 
     /// Create an offset based on offset information in the given Slang `varLayout`
     BindingOffset(slang::VariableLayoutReflection* varLayout)
-        : SimpleBindingOffset(varLayout)
-        , pending(varLayout->getPendingDataLayout())
-    {}
+        : SimpleBindingOffset(varLayout), pending(varLayout->getPendingDataLayout())
+    {
+    }
 
     /// Add any values in the given `offset`
     void operator+=(SimpleBindingOffset const& offset) { SimpleBindingOffset::operator+=(offset); }
@@ -166,7 +167,9 @@ VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state);
 VkImageViewType _calcImageViewType(ITextureResource::Type type, const ITextureResource::Desc& desc);
 VkImageUsageFlagBits _calcImageUsageFlags(ResourceStateSet states);
 VkImageUsageFlags _calcImageUsageFlags(
-    ResourceStateSet states, MemoryType memoryType, const void* initData);
+    ResourceStateSet states,
+    MemoryType memoryType,
+    const void* initData);
 
 VkAccessFlags calcAccessFlagsFromImageLayout(VkImageLayout layout);
 VkPipelineStageFlags calcPipelineStageFlagsFromImageLayout(VkImageLayout layout);

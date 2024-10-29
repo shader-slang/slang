@@ -1,10 +1,9 @@
 // slang-ir-metadata.cpp
 #include "slang-ir-metadata.h"
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
-
 #include "../compiler-core/slang-artifact-associated-impl.h"
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -14,8 +13,14 @@ namespace Slang
 // analysis scenarios in the future.
 
 
-// Inserts a single resource binding (which takes `count` slots, where 0 means unbounded) into the list of resource ranges.
-static void _insertBinding(List<ShaderBindingRange>& ranges, LayoutResourceKind kind, UInt spaceIndex, UInt registerIndex, UInt count)
+// Inserts a single resource binding (which takes `count` slots, where 0 means unbounded) into the
+// list of resource ranges.
+static void _insertBinding(
+    List<ShaderBindingRange>& ranges,
+    LayoutResourceKind kind,
+    UInt spaceIndex,
+    UInt registerIndex,
+    UInt count)
 {
     // Construct a new range from the provided resource.
     ShaderBindingRange newRange;
@@ -55,15 +60,18 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
         }
 
         auto param = as<IRGlobalParam>(inst);
-        if (!param) continue;
-        
+        if (!param)
+            continue;
+
         auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecoration) continue;
-        
+        if (!layoutDecoration)
+            continue;
+
         auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
-        if (!varLayout) continue;
-        
-        for(auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
+        if (!varLayout)
+            continue;
+
+        for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
         {
             auto kind = sizeAttr->getResourceKind();
 
@@ -85,4 +93,4 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
     }
 }
 
-}
+} // namespace Slang

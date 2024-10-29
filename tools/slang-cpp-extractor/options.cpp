@@ -2,7 +2,8 @@
 
 #include "diagnostics.h"
 
-namespace CppExtract {
+namespace CppExtract
+{
 
 SlangResult OptionsParser::_parseArgFlag(const char* option, bool& outFlag)
 {
@@ -52,7 +53,11 @@ SlangResult OptionsParser::_parseArgReplaceValue(const char* option, String& ioV
     return SLANG_OK;
 }
 
-SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSink* sink, Options& outOptions)
+SlangResult OptionsParser::parse(
+    int argc,
+    const char* const* argv,
+    DiagnosticSink* sink,
+    Options& outOptions)
 {
     outOptions.reset();
 
@@ -86,12 +91,14 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
             }
             else if (arg == "-mark-prefix")
             {
-                SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-mark-prefix", outOptions.m_markPrefix));
+                SLANG_RETURN_ON_FAIL(
+                    _parseArgReplaceValue("-mark-prefix", outOptions.m_markPrefix));
                 continue;
             }
             else if (arg == "-mark-suffix")
             {
-                SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-mark-suffix", outOptions.m_markSuffix));
+                SLANG_RETURN_ON_FAIL(
+                    _parseArgReplaceValue("-mark-suffix", outOptions.m_markSuffix));
                 continue;
             }
             else if (arg == "-defs")
@@ -106,7 +113,8 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
             }
             else if (arg == "-strip-prefix")
             {
-                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-strip-prefix", outOptions.m_stripFilePrefix));
+                SLANG_RETURN_ON_FAIL(
+                    _parseArgWithValue("-strip-prefix", outOptions.m_stripFilePrefix));
                 continue;
             }
             else if (arg == "-unit-test")

@@ -1,17 +1,18 @@
 #include "slang-json-rpc.h"
 
 #include "slang-com-helper.h"
-
 #include "slang-json-native.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // https://www.jsonrpc.org/specification
 
 
 /* static */ const UnownedStringSlice JSONRPC::jsonRpc = UnownedStringSlice::fromLiteral("jsonrpc");
-/* static */const UnownedStringSlice JSONRPC::jsonRpcVersion = UnownedStringSlice::fromLiteral("2.0");
-/* static */const UnownedStringSlice JSONRPC::id = UnownedStringSlice::fromLiteral("id");
+/* static */ const UnownedStringSlice JSONRPC::jsonRpcVersion =
+    UnownedStringSlice::fromLiteral("2.0");
+/* static */ const UnownedStringSlice JSONRPC::id = UnownedStringSlice::fromLiteral("id");
 
 static const auto g_result = UnownedStringSlice::fromLiteral("result");
 static const auto g_error = UnownedStringSlice::fromLiteral("error");
@@ -29,7 +30,8 @@ static const StructRttiInfo _makeJSONRPCErrorResponse_ErrorRtti()
     builder.addField("message", &obj.message);
     return builder.make();
 }
-/* static */const StructRttiInfo JSONRPCErrorResponse::Error::g_rttiInfo = _makeJSONRPCErrorResponse_ErrorRtti();
+/* static */ const StructRttiInfo JSONRPCErrorResponse::Error::g_rttiInfo =
+    _makeJSONRPCErrorResponse_ErrorRtti();
 
 static const StructRttiInfo _makeJSONRPCErrorResponseRtti()
 {
@@ -43,7 +45,8 @@ static const StructRttiInfo _makeJSONRPCErrorResponseRtti()
 
     return builder.make();
 }
-/* static */const StructRttiInfo JSONRPCErrorResponse::g_rttiInfo = _makeJSONRPCErrorResponseRtti();
+/* static */ const StructRttiInfo JSONRPCErrorResponse::g_rttiInfo =
+    _makeJSONRPCErrorResponseRtti();
 
 static const StructRttiInfo _makeJSONRPCCallResponseRtti()
 {
@@ -58,7 +61,7 @@ static const StructRttiInfo _makeJSONRPCCallResponseRtti()
 
     return builder.make();
 }
-/* static */const StructRttiInfo JSONRPCCall::g_rttiInfo = _makeJSONRPCCallResponseRtti();
+/* static */ const StructRttiInfo JSONRPCCall::g_rttiInfo = _makeJSONRPCCallResponseRtti();
 
 static const StructRttiInfo _makeJSONResultResponseResponseRtti()
 {
@@ -71,9 +74,12 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
 
     return builder.make();
 }
-/* static */const StructRttiInfo JSONResultResponse::g_rttiInfo = _makeJSONResultResponseResponseRtti();
+/* static */ const StructRttiInfo JSONResultResponse::g_rttiInfo =
+    _makeJSONResultResponseResponseRtti();
 
-/* static */JSONRPCMessageType JSONRPCUtil::getMessageType(JSONContainer* container, const JSONValue& value)
+/* static */ JSONRPCMessageType JSONRPCUtil::getMessageType(
+    JSONContainer* container,
+    const JSONValue& value)
 {
     if (value.getKind() == JSONValue::Kind::Object)
     {
@@ -103,13 +109,18 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
     return JSONRPCMessageType::Invalid;
 }
 
-/* static */SlangResult JSONRPCUtil::parseJSON(const UnownedStringSlice& slice, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue)
+/* static */ SlangResult JSONRPCUtil::parseJSON(
+    const UnownedStringSlice& slice,
+    JSONContainer* container,
+    DiagnosticSink* sink,
+    JSONValue& outValue)
 {
     SourceManager* sourceManager = sink->getSourceManager();
 
     // Now need to parse as JSON
     String contents(slice);
-    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceFile* sourceFile =
+        sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
 
     JSONLexer lexer;
@@ -124,7 +135,12 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
     return SLANG_OK;
 }
 
-/* static */SlangResult JSONRPCUtil::convertToNative(JSONContainer* container, const JSONValue& value, DiagnosticSink* sink, const RttiInfo* rttiInfo, void* out)
+/* static */ SlangResult JSONRPCUtil::convertToNative(
+    JSONContainer* container,
+    const JSONValue& value,
+    DiagnosticSink* sink,
+    const RttiInfo* rttiInfo,
+    void* out)
 {
     auto typeMap = JSONNativeUtil::getTypeFuncsMap();
 
@@ -133,7 +149,11 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
     return SLANG_OK;
 }
 
-/* static */SlangResult JSONRPCUtil::convertToJSON(const RttiInfo* rttiInfo, const void* in, DiagnosticSink* sink, StringBuilder& out)
+/* static */ SlangResult JSONRPCUtil::convertToJSON(
+    const RttiInfo* rttiInfo,
+    const void* in,
+    DiagnosticSink* sink,
+    StringBuilder& out)
 {
     SourceManager* sourceManager = sink->getSourceManager();
     JSONContainer container(sourceManager);
@@ -153,7 +173,7 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
     return SLANG_OK;
 }
 
-/* static */JSONValue JSONRPCUtil::getId(JSONContainer* container, const JSONValue& root)
+/* static */ JSONValue JSONRPCUtil::getId(JSONContainer* container, const JSONValue& root)
 {
     if (root.getKind() == JSONValue::Kind::Object)
     {
@@ -162,7 +182,8 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
         if (key != JSONKey(0))
         {
             auto obj = container->getObject(root);
-            Index index = obj.findFirstIndex([key](const JSONKeyValue& pair) -> bool { return pair.key == key; });
+            Index index = obj.findFirstIndex(
+                [key](const JSONKeyValue& pair) -> bool { return pair.key == key; });
 
             if (index >= 0)
             {

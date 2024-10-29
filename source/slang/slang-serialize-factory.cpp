@@ -2,21 +2,18 @@
 #include "slang-serialize-factory.h"
 
 #include "../core/slang-math.h"
-
 #include "slang-ast-builder.h"
-
-#include "slang-ref-object-reflect.h"
 #include "slang-ast-reflect.h"
-
-#include "slang-serialize-ast.h"
 #include "slang-ref-object-reflect.h"
+#include "slang-serialize-ast.h"
 
 // Needed for ModuleSerialFilter
 // Needed for 'findModuleForDecl'
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!! DefaultSerialObjectFactory !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -24,11 +21,11 @@ void* DefaultSerialObjectFactory::create(SerialTypeKind typeKind, SerialSubType 
 {
     switch (typeKind)
     {
-        case SerialTypeKind::NodeBase:
+    case SerialTypeKind::NodeBase:
         {
             return m_astBuilder->createByNodeType(ASTNodeType(subType));
         }
-        case SerialTypeKind::RefObject:
+    case SerialTypeKind::RefObject:
         {
             const ReflectClassInfo* info = SerialRefObjects::getClassInfo(RefObjectType(subType));
 
@@ -39,7 +36,7 @@ void* DefaultSerialObjectFactory::create(SerialTypeKind typeKind, SerialSubType 
             }
             return nullptr;
         }
-        default: break;
+    default: break;
     }
 
     return nullptr;
@@ -84,7 +81,8 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
             // This is because <symbol_mangled_name> does not necessarily include the name of its
             // parent module when it is qualified as `extern` or `export`.
             //
-            String mangledName = getText(moduleDecl->getName()) +"!"+ getMangledName(astBuilder, decl);
+            String mangledName =
+                getText(moduleDecl->getName()) + "!" + getMangledName(astBuilder, decl);
 
             // Add as an import symbol
             return writer->addImportSymbol(mangledName);
@@ -101,7 +99,7 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialClassesUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */SlangResult SerialClassesUtil::addSerialClasses(SerialClasses* serialClasses)
+/* static */ SlangResult SerialClassesUtil::addSerialClasses(SerialClasses* serialClasses)
 {
     ASTSerialUtil::addSerialClasses(serialClasses);
     SerialRefObjects::addSerialClasses(serialClasses);
@@ -112,7 +110,7 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
     return SLANG_OK;
 }
 
-/* static */SlangResult SerialClassesUtil::create(RefPtr<SerialClasses>& out)
+/* static */ SlangResult SerialClassesUtil::create(RefPtr<SerialClasses>& out)
 {
     RefPtr<SerialClasses> classes(new SerialClasses);
     SLANG_RETURN_ON_FAIL(addSerialClasses(classes));

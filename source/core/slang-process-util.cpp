@@ -2,15 +2,17 @@
 
 #include "slang-process-util.h"
 
-#include "slang-string.h"
+#include "slang-com-helper.h"
 #include "slang-string-escape-util.h"
 #include "slang-string-util.h"
+#include "slang-string.h"
 
-#include "slang-com-helper.h"
+namespace Slang
+{
 
-namespace Slang {
-
-/* static */SlangResult ProcessUtil::execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult)
+/* static */ SlangResult ProcessUtil::execute(
+    const CommandLine& commandLine,
+    ExecuteResult& outExecuteResult)
 {
     RefPtr<Process> process;
     SLANG_RETURN_ON_FAIL(Process::create(commandLine, 0, process));
@@ -27,11 +29,15 @@ static Index _getCount(List<Byte>* buf)
 static String _getText(const ConstArrayView<Byte>& bytes)
 {
     StringBuilder buf;
-    StringUtil::appendStandardLines(UnownedStringSlice((const char*)bytes.begin(), (const char*)bytes.end()), buf);
+    StringUtil::appendStandardLines(
+        UnownedStringSlice((const char*)bytes.begin(), (const char*)bytes.end()),
+        buf);
     return buf.produceString();
 }
 
-/* static */SlangResult ProcessUtil::readUntilTermination(Process* process, ExecuteResult& outExecuteResult)
+/* static */ SlangResult ProcessUtil::readUntilTermination(
+    Process* process,
+    ExecuteResult& outExecuteResult)
 {
     List<Byte> stdOut;
     List<Byte> stdError;
@@ -47,7 +53,10 @@ static String _getText(const ConstArrayView<Byte>& bytes)
     return SLANG_OK;
 }
 
-/* static */SlangResult ProcessUtil::readUntilTermination(Process* process, List<Byte>* outStdOut, List<Byte>* outStdError)
+/* static */ SlangResult ProcessUtil::readUntilTermination(
+    Process* process,
+    List<Byte>* outStdOut,
+    List<Byte>* outStdError)
 {
     Stream* stdOutStream = process->getStream(StdStreamType::Out);
     Stream* stdErrorStream = process->getStream(StdStreamType::ErrorOut);
@@ -70,7 +79,7 @@ static String _getText(const ConstArrayView<Byte>& bytes)
     }
 
     // Read anything remaining
-    for(;;)
+    for (;;)
     {
         const auto preCount = _getCount(outStdOut) + _getCount(outStdError);
         StreamUtil::readOrDiscard(stdOutStream, 0, outStdOut);
