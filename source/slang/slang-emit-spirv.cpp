@@ -4434,7 +4434,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     name,
                     SpvLinkageTypeImport);
                 break;
-            }        
+            }
             // ...
         }
 
