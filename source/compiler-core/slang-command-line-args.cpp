@@ -6,9 +6,10 @@
 #include "../core/slang-type-text-util.h"
 #include "slang-core-diagnostics.h"
 
-namespace Slang {
+namespace Slang
+{
 
-void CommandLineArgs::setArgs(const char*const* args, size_t argCount)
+void CommandLineArgs::setArgs(const char* const* args, size_t argCount)
 {
     m_args.clear();
 
@@ -17,7 +18,7 @@ void CommandLineArgs::setArgs(const char*const* args, size_t argCount)
     const SourceLoc startLoc = sourceManager->getNextRangeStart();
 
     StringBuilder buf;
-   
+
     auto escapeHandler = Process::getEscapeHandler();
 
     for (size_t i = 0; i < argCount; ++i)
@@ -39,14 +40,16 @@ void CommandLineArgs::setArgs(const char*const* args, size_t argCount)
         buf << " ";
     }
 
-    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), buf.produceString());
-    SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc::fromRaw(0));
+    SourceFile* sourceFile =
+        sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), buf.produceString());
+    SourceView* sourceView =
+        sourceManager->createSourceView(sourceFile, nullptr, SourceLoc::fromRaw(0));
 
     SLANG_UNUSED(sourceView);
     SLANG_ASSERT(sourceView->getRange().begin == startLoc);
 }
 
-bool CommandLineArgs::hasArgs(const char*const* args, Index count) const
+bool CommandLineArgs::hasArgs(const char* const* args, Index count) const
 {
     if (m_args.getCount() != count)
     {
@@ -164,12 +167,16 @@ Index DownstreamArgs::addName(const String& name)
     if (index < 0)
     {
         index = m_entries.getCount();
-        m_entries.add(Entry{name, CommandLineArgs(m_context) });
+        m_entries.add(Entry{name, CommandLineArgs(m_context)});
     }
     return index;
 }
 
-Index DownstreamArgs::_findOrAddName(SourceLoc loc, const UnownedStringSlice& name, Flags flags, DiagnosticSink* sink)
+Index DownstreamArgs::_findOrAddName(
+    SourceLoc loc,
+    const UnownedStringSlice& name,
+    Flags flags,
+    DiagnosticSink* sink)
 {
     if (name.getLength() <= 0)
     {
@@ -225,7 +232,10 @@ const CommandLineArgs& DownstreamArgs::getArgsByName(const char* name) const
     return m_entries[index].args;
 }
 
-SlangResult DownstreamArgs::stripDownstreamArgs(CommandLineArgs& ioArgs, Flags flags, DiagnosticSink* sink)
+SlangResult DownstreamArgs::stripDownstreamArgs(
+    CommandLineArgs& ioArgs,
+    Flags flags,
+    DiagnosticSink* sink)
 {
     CommandLineReader reader(&ioArgs, sink);
 
@@ -237,7 +247,8 @@ SlangResult DownstreamArgs::stripDownstreamArgs(CommandLineArgs& ioArgs, Flags f
         {
             if (arg.value.endsWith("..."))
             {
-                const UnownedStringSlice name = arg.value.getUnownedSlice().subString(2, arg.value.getLength() - 5);
+                const UnownedStringSlice name =
+                    arg.value.getUnownedSlice().subString(2, arg.value.getLength() - 5);
                 const Index nameIndex = _findOrAddName(arg.loc, name, flags, sink);
                 if (nameIndex < 0)
                 {
@@ -283,7 +294,9 @@ SlangResult DownstreamArgs::stripDownstreamArgs(CommandLineArgs& ioArgs, Flags f
                 CommandLineArgs& args = getArgsAt(nameIndex);
 
                 // Copy the values in the range
-                args.m_args.addRange(ioArgs.m_args.getBuffer() + startIndex + 1, index - (startIndex + 1));
+                args.m_args.addRange(
+                    ioArgs.m_args.getBuffer() + startIndex + 1,
+                    index - (startIndex + 1));
 
                 // If we aren't at the end, we must be pointing to -X., so skip that
                 index += Index(index < count);

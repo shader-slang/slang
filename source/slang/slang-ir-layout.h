@@ -17,29 +17,29 @@
 //
 
 #include "slang-ir.h"
+
 #include <limits>
 
 namespace Slang
 {
 struct CompilerOptionSet;
 
-    /// Align `value` to the next multiple of `alignment`, which must be a power of two.
+/// Align `value` to the next multiple of `alignment`, which must be a power of two.
 inline IRIntegerValue align(IRIntegerValue value, int alignment)
 {
-    return (value + alignment-1) & ~IRIntegerValue(alignment-1);
+    return (value + alignment - 1) & ~IRIntegerValue(alignment - 1);
 }
 
 
-    /// The size and alignment of an IR type.
+/// The size and alignment of an IR type.
 struct IRSizeAndAlignment
 {
-    IRSizeAndAlignment()
-    {}
+    IRSizeAndAlignment() {}
 
     IRSizeAndAlignment(IRIntegerValue size, int alignment)
-        : size(size)
-        , alignment(alignment)
-    {}
+        : size(size), alignment(alignment)
+    {
+    }
 
     IRIntegerValue size = 0;
 
@@ -48,10 +48,7 @@ struct IRSizeAndAlignment
 
     int alignment = 1;
 
-    inline IRIntegerValue getStride()
-    {
-        return align(size, alignment);
-    }
+    inline IRIntegerValue getStride() { return align(size, alignment); }
 };
 
 struct IRTypeLayoutRules
@@ -65,8 +62,12 @@ public:
 
     /// Get alignment and size of a vector given components of vector.
     /// This alignment is not assuming this vector is a member of a struct.
-    virtual IRSizeAndAlignment getVectorSizeAndAlignment(IRSizeAndAlignment element, IRIntegerValue count) = 0;
-    virtual IRIntegerValue adjustOffsetForNextAggregateMember(IRIntegerValue currentSize, IRIntegerValue lastElementAlignment) = 0;
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(
+        IRSizeAndAlignment element,
+        IRIntegerValue count) = 0;
+    virtual IRIntegerValue adjustOffsetForNextAggregateMember(
+        IRIntegerValue currentSize,
+        IRIntegerValue lastElementAlignment) = 0;
     static IRTypeLayoutRules* getStd430();
     static IRTypeLayoutRules* getStd140();
     static IRTypeLayoutRules* getNatural();
@@ -74,25 +75,39 @@ public:
     static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);
 };
 
-Result getOffset(CompilerOptionSet& optionSet, IRTypeLayoutRules* rules, IRStructField* field, IRIntegerValue* outOffset);
+Result getOffset(
+    CompilerOptionSet& optionSet,
+    IRTypeLayoutRules* rules,
+    IRStructField* field,
+    IRIntegerValue* outOffset);
 
-Result getSizeAndAlignment(CompilerOptionSet& optionSet, IRTypeLayoutRules* rules, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+Result getSizeAndAlignment(
+    CompilerOptionSet& optionSet,
+    IRTypeLayoutRules* rules,
+    IRType* type,
+    IRSizeAndAlignment* outSizeAndAlignment);
 
-    /// Compute (if necessary) and return the natural size and alignment of `type`.
-    ///
-    /// This operation may fail if `type` is not one that can be stored in
-    /// general-purpose memory for the current target. In that case the
-    /// type is considered to have no natural layout.
-    ///
-Result getNaturalSizeAndAlignment(CompilerOptionSet& optionSet, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+/// Compute (if necessary) and return the natural size and alignment of `type`.
+///
+/// This operation may fail if `type` is not one that can be stored in
+/// general-purpose memory for the current target. In that case the
+/// type is considered to have no natural layout.
+///
+Result getNaturalSizeAndAlignment(
+    CompilerOptionSet& optionSet,
+    IRType* type,
+    IRSizeAndAlignment* outSizeAndAlignment);
 
-    /// Compute (if necessary) and return the natural offset of `field`
-    ///
-    /// This operation can fail if the parent type of `field` is not one
-    /// that can be stored in general-purpose memory. In that case, the
-    /// field is considered to have no natural offset.
-    ///
-Result getNaturalOffset(CompilerOptionSet& optionSet, IRStructField* field, IRIntegerValue* outOffset);
+/// Compute (if necessary) and return the natural offset of `field`
+///
+/// This operation can fail if the parent type of `field` is not one
+/// that can be stored in general-purpose memory. In that case, the
+/// field is considered to have no natural offset.
+///
+Result getNaturalOffset(
+    CompilerOptionSet& optionSet,
+    IRStructField* field,
+    IRIntegerValue* outOffset);
 
 /// Compute (if necessary) and return the std430 size and alignment of `type`.
 ///
@@ -100,7 +115,10 @@ Result getNaturalOffset(CompilerOptionSet& optionSet, IRStructField* field, IRIn
 /// general-purpose memory for the current target. In that case the
 /// type is considered to have no std430 layout.
 ///
-Result getStd430SizeAndAlignment(CompilerOptionSet& optionSet, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+Result getStd430SizeAndAlignment(
+    CompilerOptionSet& optionSet,
+    IRType* type,
+    IRSizeAndAlignment* outSizeAndAlignment);
 
 /// Compute (if necessary) and return the std430 offset of `field`
 ///
@@ -108,7 +126,9 @@ Result getStd430SizeAndAlignment(CompilerOptionSet& optionSet, IRType* type, IRS
 /// that can be stored in general-purpose memory. In that case, the
 /// field is considered to have no std430 offset.
 ///
-Result getStd430Offset(CompilerOptionSet& optionSet, IRStructField* field, IRIntegerValue* outOffset);
+Result getStd430Offset(
+    CompilerOptionSet& optionSet,
+    IRStructField* field,
+    IRIntegerValue* outOffset);
 
-}
-
+} // namespace Slang

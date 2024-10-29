@@ -1,13 +1,16 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-reflect.h"
-#include "slang-generated-ast.h"
-#include "slang-generated-ast-macro.h"
 #include "slang-check-impl.h"
+#include "slang-generated-ast-macro.h"
+#include "slang-generated-ast.h"
 
 namespace Slang
 {
 
-DeclRefBase* DirectDeclRef::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+DeclRefBase* DirectDeclRef::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     SLANG_UNUSED(astBuilder);
     SLANG_UNUSED(subst);
@@ -53,7 +56,10 @@ DeclRefBase* _resolveAsDeclRef(DeclRefBase* declRefToResolve)
     return declRefToResolve;
 }
 
-DeclRefBase* MemberDeclRef::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+DeclRefBase* MemberDeclRef::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     auto substParent = getParentOperand()->substituteImpl(astBuilder, subst, &diff);
@@ -101,15 +107,18 @@ Decl* LookupDeclRef::getSupDecl()
     SLANG_UNEXPECTED("Invalid lookup declref");
 }
 
-DeclRefBase* LookupDeclRef::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+DeclRefBase* LookupDeclRef::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
- 
+
     auto substWitness = as<SubtypeWitness>(getWitness()->substituteImpl(astBuilder, subst, &diff));
     if (diff == 0)
         return this;
     (*ioDiff)++;
-    
+
     auto substSource = as<Type>(getLookupSource()->substituteImpl(astBuilder, subst, &diff));
     SLANG_ASSERT(substSource);
 
@@ -162,7 +171,8 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
 {
     auto astBuilder = getCurrentASTBuilder();
     Decl* requirementKey = getDecl();
-    RequirementWitness requirementWitness = tryLookUpRequirementWitness(astBuilder, newWitness, requirementKey);
+    RequirementWitness requirementWitness =
+        tryLookUpRequirementWitness(astBuilder, newWitness, requirementKey);
     switch (requirementWitness.getFlavor())
     {
     default:
@@ -170,11 +180,11 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         break;
 
     case RequirementWitness::Flavor::val:
-    {
-        auto satisfyingVal = requirementWitness.getVal()->resolve();
-        return satisfyingVal;
-    }
-    break;
+        {
+            auto satisfyingVal = requirementWitness.getVal()->resolve();
+            return satisfyingVal;
+        }
+        break;
     }
 
     // Hard code implementation of T.Differential.Differential == T.Differential rule.
@@ -196,7 +206,8 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     auto innerDeclRefType = as<DeclRefType>(newLookupSource);
     if (!innerDeclRefType)
         return nullptr;
-    auto innerBuiltinReq = innerDeclRefType->getDeclRef().getDecl()->findModifier<BuiltinRequirementModifier>();
+    auto innerBuiltinReq =
+        innerDeclRefType->getDeclRef().getDecl()->findModifier<BuiltinRequirementModifier>();
     if (!innerBuiltinReq)
         return nullptr;
     if (innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialType)
@@ -212,7 +223,10 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     return innerDeclRefType;
 }
 
-DeclRefBase* GenericAppDeclRef::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     auto substGenericDeclRef = getGenericDeclRef()->substituteImpl(astBuilder, subst, &diff);
@@ -224,10 +238,16 @@ DeclRefBase* GenericAppDeclRef::_substituteImplOverride(ASTBuilder* astBuilder, 
     if (diff == 0)
         return this;
     (*ioDiff)++;
-    return astBuilder->getGenericAppDeclRef(substGenericDeclRef, substArgs.getArrayView(), getDecl());
+    return astBuilder->getGenericAppDeclRef(
+        substGenericDeclRef,
+        substArgs.getArrayView(),
+        getDecl());
 }
 
-GenericDecl* GenericAppDeclRef::getGenericDecl() { return as<GenericDecl>(getGenericDeclRef()->getDecl()); }
+GenericDecl* GenericAppDeclRef::getGenericDecl()
+{
+    return as<GenericDecl>(getGenericDeclRef()->getDecl());
+}
 
 
 void GenericAppDeclRef::_toTextOverride(StringBuilder& out)
@@ -243,7 +263,8 @@ void GenericAppDeclRef::_toTextOverride(StringBuilder& out)
     Index argCount = args.getCount();
     for (Index aa = 0; aa < Math::Min(paramCount, argCount); ++aa)
     {
-        if (aa != 0) out << ", ";
+        if (aa != 0)
+            out << ", ";
         args[aa]->toText(out);
     }
     out << ">";
@@ -266,7 +287,10 @@ Val* GenericAppDeclRef::_resolveImplOverride()
             diff = true;
     }
     if (diff)
-        resolvedVal = astBuilder->getGenericAppDeclRef(resolvedGenericDeclRef, resolvedArgs.getArrayView(), getDecl());
+        resolvedVal = astBuilder->getGenericAppDeclRef(
+            resolvedGenericDeclRef,
+            resolvedArgs.getArrayView(),
+            getDecl());
     return resolvedVal;
 }
 
@@ -282,8 +306,14 @@ DeclRefBase* DeclRefBase::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet
     SLANG_AST_NODE_VIRTUAL_CALL(DeclRefBase, substituteImpl, (astBuilder, subst, ioDiff));
 }
 
-DeclRefBase* DeclRefBase::getBase() { SLANG_AST_NODE_VIRTUAL_CALL(DeclRefBase, getBase, ()); }
-void DeclRefBase::toText(StringBuilder& out) { SLANG_AST_NODE_VIRTUAL_CALL(DeclRefBase, toText, (out)); }
+DeclRefBase* DeclRefBase::getBase()
+{
+    SLANG_AST_NODE_VIRTUAL_CALL(DeclRefBase, getBase, ());
+}
+void DeclRefBase::toText(StringBuilder& out)
+{
+    SLANG_AST_NODE_VIRTUAL_CALL(DeclRefBase, toText, (out));
+}
 
 Name* DeclRefBase::getName() const
 {
@@ -371,7 +401,8 @@ SubstExpr<Expr> applySubstitutionToExpr(SubstitutionSet substSet, Expr* expr)
 }
 
 
-DeclRefBase* SubstitutionSet::applyToDeclRef(ASTBuilder* astBuilder, DeclRefBase* otherDeclRef) const
+DeclRefBase* SubstitutionSet::applyToDeclRef(ASTBuilder* astBuilder, DeclRefBase* otherDeclRef)
+    const
 {
     int diff = 0;
     return otherDeclRef->substituteImpl(astBuilder, *this, &diff);
@@ -430,7 +461,7 @@ GenericAppDeclRef* SubstitutionSet::findGenericAppDeclRef() const
 DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,
-    DeclRef<Decl>   declRef)
+    DeclRef<Decl> declRef)
 {
     if (declRef.as<GenericTypeParamDeclBase>())
         return declRef;
@@ -464,7 +495,8 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         {
             parentDeclRef = astBuilder->getDirectDeclRef(current);
         }
-        parentDeclRef = astBuilder->getGenericAppDeclRef(parentDeclRef.as<GenericDecl>(), args.getArrayView());
+        parentDeclRef =
+            astBuilder->getGenericAppDeclRef(parentDeclRef.as<GenericDecl>(), args.getArrayView());
     }
     if (!parentDeclRef)
         return declRef;
@@ -472,4 +504,4 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         return parentDeclRef;
     return astBuilder->getMemberDeclRef(parentDeclRef, declRef.getDecl());
 }
-}
+} // namespace Slang

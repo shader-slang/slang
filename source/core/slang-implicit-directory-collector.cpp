@@ -7,8 +7,10 @@ namespace Slang
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ImplicitDirectoryCollector !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ImplicitDirectoryCollector::ImplicitDirectoryCollector(const String& canonicalPath, bool directoryExists) :
-    m_directoryExists(directoryExists)
+ImplicitDirectoryCollector::ImplicitDirectoryCollector(
+    const String& canonicalPath,
+    bool directoryExists)
+    : m_directoryExists(directoryExists)
 {
     if (!isRootPath(canonicalPath.getUnownedSlice()))
     {
@@ -19,7 +21,7 @@ ImplicitDirectoryCollector::ImplicitDirectoryCollector(const String& canonicalPa
     }
 }
 
-/* static */bool ImplicitDirectoryCollector::isRootPath(const UnownedStringSlice& path)
+/* static */ bool ImplicitDirectoryCollector::isRootPath(const UnownedStringSlice& path)
 {
     const auto length = path.getLength();
     if (length == 0)
@@ -34,7 +36,9 @@ ImplicitDirectoryCollector::ImplicitDirectoryCollector(const String& canonicalPa
     return false;
 }
 
-void ImplicitDirectoryCollector::addRemainingPath(SlangPathType pathType, const UnownedStringSlice& inPathRemainder)
+void ImplicitDirectoryCollector::addRemainingPath(
+    SlangPathType pathType,
+    const UnownedStringSlice& inPathRemainder)
 {
     // If it's zero length we probably don't want to add it
     if (inPathRemainder.getLength() == 0)
@@ -51,7 +55,8 @@ void ImplicitDirectoryCollector::addRemainingPath(SlangPathType pathType, const 
     if (slashIndex >= 0)
     {
         pathType = SLANG_PATH_TYPE_DIRECTORY;
-        pathRemainder = UnownedStringSlice(pathRemainder.begin(), pathRemainder.begin() + slashIndex);
+        pathRemainder =
+            UnownedStringSlice(pathRemainder.begin(), pathRemainder.begin() + slashIndex);
     }
 
     const Index countIndex = m_map.findOrAdd(pathRemainder, pathType);
@@ -60,7 +65,9 @@ void ImplicitDirectoryCollector::addRemainingPath(SlangPathType pathType, const 
     SLANG_ASSERT(SlangPathType(m_map.getValueAt(countIndex)) == pathType);
 }
 
-void ImplicitDirectoryCollector::addPath(SlangPathType pathType, const UnownedStringSlice& canonicalPath)
+void ImplicitDirectoryCollector::addPath(
+    SlangPathType pathType,
+    const UnownedStringSlice& canonicalPath)
 {
     if (canonicalPath != toSlice(".") && hasPrefix(canonicalPath))
     {
@@ -69,7 +76,9 @@ void ImplicitDirectoryCollector::addPath(SlangPathType pathType, const UnownedSt
     }
 }
 
-SlangResult ImplicitDirectoryCollector::enumerate(FileSystemContentsCallBack callback, void* userData)
+SlangResult ImplicitDirectoryCollector::enumerate(
+    FileSystemContentsCallBack callback,
+    void* userData)
 {
     const Int count = m_map.getCount();
 

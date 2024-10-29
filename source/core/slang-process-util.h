@@ -4,7 +4,8 @@
 
 #include "slang-process.h"
 
-namespace Slang {
+namespace Slang
+{
 
 struct ExecuteResult
 {
@@ -24,17 +25,20 @@ struct ExecuteResult
 
 struct ProcessUtil
 {
-        /// Execute the command line 
+    /// Execute the command line
     static SlangResult execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult);
 
-        /// Read from read from streams until process terminates.
-        /// Passing nullptr for a stream, will just discard what's in the stream
-    static SlangResult readUntilTermination(Process* process, List<Byte>* outStdOut, List<Byte>* stdError);
+    /// Read from read from streams until process terminates.
+    /// Passing nullptr for a stream, will just discard what's in the stream
+    static SlangResult readUntilTermination(
+        Process* process,
+        List<Byte>* outStdOut,
+        List<Byte>* stdError);
 
-        /// Read streams from process. 
+    /// Read streams from process.
     static SlangResult readUntilTermination(Process* process, ExecuteResult& outExecuteResult);
 };
 
-}
+} // namespace Slang
 
 #endif // SLANG_PROCESS_UTIL_H

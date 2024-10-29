@@ -1,131 +1,121 @@
 // slang-emit.cpp
 
-#include "../core/slang-writer.h"
-#include "../core/slang-type-text-util.h"
-
+#include "../compiler-core/slang-artifact-associated-impl.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
+#include "../compiler-core/slang-artifact-impl.h"
+#include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-name.h"
-
+#include "../core/slang-castable.h"
+#include "../core/slang-performance-profiler.h"
+#include "../core/slang-type-text-util.h"
+#include "../core/slang-writer.h"
+#include "slang-emit-c-like.h"
+#include "slang-emit-cpp.h"
+#include "slang-emit-cuda.h"
+#include "slang-emit-glsl.h"
+#include "slang-emit-hlsl.h"
+#include "slang-emit-metal.h"
+#include "slang-emit-source-writer.h"
+#include "slang-emit-torch.h"
+#include "slang-emit-wgsl.h"
 #include "slang-ir-any-value-inference.h"
+#include "slang-ir-autodiff.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
-#include "slang-ir-check-unsupported-inst.h"
-#include "slang-ir-collect-global-uniforms.h"
-#include "slang-ir-cleanup-void.h"
-#include "slang-ir-composite-reg-to-mem.h"
-#include "slang-ir-dce.h"
-#include "slang-ir-diff-call.h"
 #include "slang-ir-check-recursive-type.h"
 #include "slang-ir-check-shader-parameter-type.h"
-#include "slang-ir-autodiff.h"
+#include "slang-ir-check-unsupported-inst.h"
+#include "slang-ir-cleanup-void.h"
+#include "slang-ir-collect-global-uniforms.h"
+#include "slang-ir-com-interface.h"
+#include "slang-ir-composite-reg-to-mem.h"
+#include "slang-ir-dce.h"
 #include "slang-ir-defunctionalization.h"
+#include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
-#include "slang-ir-eliminate-phis.h"
 #include "slang-ir-eliminate-multilevel-break.h"
-#include "slang-ir-entry-point-uniforms.h"
+#include "slang-ir-eliminate-phis.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
+#include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
+#include "slang-ir-glsl-liveness.h"
 #include "slang-ir-hlsl-legalize.h"
-#include "slang-ir-metal-legalize.h"
-#include "slang-ir-wgsl-legalize.h"
-#include "slang-ir-insts.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
+#include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
+#include "slang-ir-legalize-vector-types.h"
 #include "slang-ir-link.h"
-#include "slang-ir-com-interface.h"
-#include "slang-ir-user-type-hint.h"
+#include "slang-ir-liveness.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-append-consume-structured-buffer.h"
 #include "slang-ir-lower-binding-query.h"
+#include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-lower-buffer-element-type.h"
+#include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
-#include "slang-ir-lower-tuple-types.h"
-#include "slang-ir-lower-result-type.h"
-#include "slang-ir-lower-optional-type.h"
-#include "slang-ir-lower-bit-cast.h"
-#include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-l-value-cast.h"
+#include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-reinterpret.h"
-#include "slang-ir-loop-unroll.h"
-#include "slang-ir-legalize-image-subscript.h"
-#include "slang-ir-legalize-vector-types.h"
+#include "slang-ir-lower-result-type.h"
+#include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-metadata.h"
+#include "slang-ir-metal-legalize.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
-#include "slang-ir-restructure.h"
-#include "slang-ir-restructure-scoping.h"
 #include "slang-ir-resolve-texture-format.h"
+#include "slang-ir-restructure-scoping.h"
+#include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
-#include "slang-ir-specialize.h"
+#include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
-#include "slang-ir-specialize-resources.h"
 #include "slang-ir-specialize-matrix-layout.h"
-#include "slang-ir-ssa.h"
+#include "slang-ir-specialize-resources.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-ssa.h"
+#include "slang-ir-string-hash.h"
 #include "slang-ir-strip-cached-dict.h"
 #include "slang-ir-strip-witness-tables.h"
+#include "slang-ir-strip.h"
 #include "slang-ir-synthesize-active-mask.h"
-#include "slang-ir-validate.h"
-#include "slang-ir-wrap-structured-buffers.h"
-#include "slang-ir-liveness.h"
-#include "slang-ir-glsl-liveness.h"
 #include "slang-ir-translate-glsl-global-var.h"
-#include "slang-ir-legalize-uniform-buffer-load.h"
-#include "slang-ir-lower-buffer-element-type.h"
-#include "slang-ir-string-hash.h"
-#include "slang-ir-simplify-for-emit.h"
-#include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-uniformity.h"
-#include "slang-ir-vk-invert-y.h"
+#include "slang-ir-user-type-hint.h"
+#include "slang-ir-validate.h"
 #include "slang-ir-variable-scope-correction.h"
+#include "slang-ir-vk-invert-y.h"
+#include "slang-ir-wgsl-legalize.h"
+#include "slang-ir-wrap-structured-buffers.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
+#include "slang-spirv-val.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
-
-#include "slang-ir-strip.h"
-
-#include "slang-emit-source-writer.h"
-
-#include "slang-emit-c-like.h"
-
-#include "slang-emit-glsl.h"
-#include "slang-emit-hlsl.h"
-#include "slang-emit-metal.h"
-#include "slang-emit-wgsl.h"
-#include "slang-emit-cpp.h"
-#include "slang-emit-cuda.h"
-#include "slang-emit-torch.h"
-
-#include "slang-spirv-val.h"
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-associated-impl.h"
-
-#include "../core/slang-castable.h"
-#include "../core/slang-performance-profiler.h"
 
 #include <assert.h>
 
 Slang::String get_slang_cpp_host_prelude();
 Slang::String get_slang_torch_prelude();
 
-namespace Slang {
+namespace Slang
+{
 
-EntryPointLayout* findEntryPointLayout(
-    ProgramLayout*          programLayout,
-    EntryPoint*             entryPoint)
+EntryPointLayout* findEntryPointLayout(ProgramLayout* programLayout, EntryPoint* entryPoint)
 {
     // TODO: This function shouldn't need to exist, and it
     // somewhat hampers the capabilities of the compiler (e.g.,
@@ -137,9 +127,9 @@ EntryPointLayout* findEntryPointLayout(
     // knowing that those indices will align with the order
     // of entry points on the `ComponentType` for the program.
 
-    for( auto entryPointLayout : programLayout->entryPoints )
+    for (auto entryPointLayout : programLayout->entryPoints)
     {
-        if(entryPointLayout->entryPoint.getName() != entryPoint->getName())
+        if (entryPointLayout->entryPoint.getName() != entryPoint->getName())
             continue;
 
         // TODO: We need to be careful about this check, since it relies on
@@ -149,7 +139,7 @@ EntryPointLayout* findEntryPointLayout(
         // `EntryPoint` directly to the `EntryPointLayout`, and maybe
         // that is precisely what we should build...
         //
-        if(entryPointLayout->profile != entryPoint->getProfile())
+        if (entryPointLayout->profile != entryPoint->getProfile())
             continue;
 
         return entryPointLayout;
@@ -158,28 +148,27 @@ EntryPointLayout* findEntryPointLayout(
     return nullptr;
 }
 
-    /// Given a layout computed for a scope, get the layout to use when lookup up variables.
-    ///
-    /// A scope (such as the global scope of a program) groups its
-    /// parameters into a pseudo-`struct` type for layout purposes,
-    /// and in some cases that type will in turn be wrapped in a
-    /// `ConstantBuffer` type to indicate that the parameters needed
-    /// an implicit constant buffer to be allocated.
-    ///
-    /// This function "unwraps" the type layout to find the structure
-    /// type layout that must be stored inside.
-    ///
-StructTypeLayout* getScopeStructLayout(
-    ScopeLayout*  scopeLayout)
+/// Given a layout computed for a scope, get the layout to use when lookup up variables.
+///
+/// A scope (such as the global scope of a program) groups its
+/// parameters into a pseudo-`struct` type for layout purposes,
+/// and in some cases that type will in turn be wrapped in a
+/// `ConstantBuffer` type to indicate that the parameters needed
+/// an implicit constant buffer to be allocated.
+///
+/// This function "unwraps" the type layout to find the structure
+/// type layout that must be stored inside.
+///
+StructTypeLayout* getScopeStructLayout(ScopeLayout* scopeLayout)
 {
     auto scopeTypeLayout = scopeLayout->parametersLayout->typeLayout;
 
-    if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(scopeTypeLayout) )
+    if (auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(scopeTypeLayout))
     {
         scopeTypeLayout = constantBufferTypeLayout->offsetElementTypeLayout;
     }
 
-    if( auto structTypeLayout = as<StructTypeLayout>(scopeTypeLayout) )
+    if (auto structTypeLayout = as<StructTypeLayout>(scopeTypeLayout))
     {
         return structTypeLayout;
     }
@@ -188,38 +177,45 @@ StructTypeLayout* getScopeStructLayout(
     return nullptr;
 }
 
-    /// Given a layout computed for a program, get the layout to use when lookup up variables.
-    ///
-    /// This is just an alias of `getScopeStructLayout`.
-    ///
-StructTypeLayout* getGlobalStructLayout(
-    ProgramLayout*  programLayout)
+/// Given a layout computed for a program, get the layout to use when lookup up variables.
+///
+/// This is just an alias of `getScopeStructLayout`.
+///
+StructTypeLayout* getGlobalStructLayout(ProgramLayout* programLayout)
 {
     return getScopeStructLayout(programLayout);
 }
 
 static void dumpIRIfEnabled(
     CodeGenContext* codeGenContext,
-    IRModule*       irModule,
-    char const*     label = nullptr)
+    IRModule* irModule,
+    char const* label = nullptr)
 {
-    if(codeGenContext->shouldDumpIR())
+    if (codeGenContext->shouldDumpIR())
     {
         DiagnosticSinkWriter writer(codeGenContext->getSink());
-        //FILE* f = nullptr;
-        //fopen_s(&f, (String("dump-") + label + ".txt").getBuffer(), "wt");
-        //FileWriter writer(f, 0);
-        dumpIR(irModule, codeGenContext->getIRDumpOptions(), label, codeGenContext->getSourceManager(), &writer);
-        //fclose(f);
+        // FILE* f = nullptr;
+        // fopen_s(&f, (String("dump-") + label + ".txt").getBuffer(), "wt");
+        // FileWriter writer(f, 0);
+        dumpIR(
+            irModule,
+            codeGenContext->getIRDumpOptions(),
+            label,
+            codeGenContext->getSourceManager(),
+            &writer);
+        // fclose(f);
     }
 }
 
-static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, DiagnosticSink* sink, IRModule* irModule)
+static void reportCheckpointIntermediates(
+    CodeGenContext* codeGenContext,
+    DiagnosticSink* sink,
+    IRModule* irModule)
 {
     // Report checkpointing information
     CompilerOptionSet& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
     SourceManager* sourceManager = sink->getSourceManager();
-    
+
     SourceWriter typeWriter(sourceManager, LineDirectiveMode::None, nullptr);
 
     CLikeSourceEmitter::Desc description;
@@ -231,11 +227,12 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
     int nonEmptyStructs = 0;
     for (auto inst : irModule->getGlobalInsts())
     {
-        IRStructType *structType = as<IRStructType>(inst);
+        IRStructType* structType = as<IRStructType>(inst);
         if (!structType)
             continue;
 
-        auto checkpointDecoration = structType->findDecoration<IRCheckpointIntermediateDecoration>();
+        auto checkpointDecoration =
+            structType->findDecoration<IRCheckpointIntermediateDecoration>();
         if (!checkpointDecoration)
             continue;
 
@@ -249,12 +246,16 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
             continue;
 
         auto func = checkpointDecoration->getSourceFunction();
-        sink->diagnose(structType, Diagnostics::reportCheckpointIntermediates, func, structSize.size);
+        sink->diagnose(
+            structType,
+            Diagnostics::reportCheckpointIntermediates,
+            func,
+            structSize.size);
         nonEmptyStructs++;
 
         for (auto field : structType->getFields())
         {
-            IRType *fieldType = field->getFieldType();
+            IRType* fieldType = field->getFieldType();
             IRSizeAndAlignment fieldSize;
             getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
             if (fieldSize.size == 0)
@@ -263,7 +264,8 @@ static void reportCheckpointIntermediates(CodeGenContext* codeGenContext, Diagno
             typeWriter.clearContent();
             emitter.emitType(fieldType);
 
-            sink->diagnose(field->sourceLoc,
+            sink->diagnose(
+                field->sourceLoc,
                 field->findDecoration<IRLoopCounterDecoration>()
                     ? Diagnostics::reportCheckpointCounter
                     : Diagnostics::reportCheckpointVariable,
@@ -316,16 +318,15 @@ struct RequiredLoweringPassSet
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
 //
-void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext* codeGenContext, IRInst* inst)
+void calcRequiredLoweringPassSet(
+    RequiredLoweringPassSet& result,
+    CodeGenContext* codeGenContext,
+    IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_ResultType:
-        result.resultType = true;
-        break;
-    case kIROp_OptionalType:
-        result.optionalType = true;
-        break;
+    case kIROp_ResultType:   result.resultType = true; break;
+    case kIROp_OptionalType: result.optionalType = true; break;
     case kIROp_TextureType:
         if (!isKhronosTarget(codeGenContext->getTargetReq()))
         {
@@ -353,28 +354,20 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
         result.existentialTypeLayout = true;
         break;
     case kIROp_GetRegisterIndex:
-    case kIROp_GetRegisterSpace:
-        result.bindingQuery = true;
-        break;
+    case kIROp_GetRegisterSpace:               result.bindingQuery = true; break;
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
-    case kIROp_MakeDifferentialPairUserCode:
-        result.autodiff = true;
-        break;
+    case kIROp_MakeDifferentialPairUserCode:   result.autodiff = true; break;
     case kIROp_VerticesType:
     case kIROp_IndicesType:
-    case kIROp_PrimitivesType:
-        result.meshOutput = true;
-        break;
+    case kIROp_PrimitivesType:                 result.meshOutput = true; break;
     case kIROp_CreateExistentialObject:
     case kIROp_MakeExistential:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
-    case kIROp_LookupWitness:
-        result.generics = true;
-        break;
+    case kIROp_LookupWitness:                  result.generics = true; break;
     case kIROp_Specialize:
         {
             auto specInst = as<IRSpecialize>(inst);
@@ -382,41 +375,27 @@ void calcRequiredLoweringPassSet(RequiredLoweringPassSet& result, CodeGenContext
                 result.generics = true;
         }
         break;
-    case kIROp_Reinterpret:
-        result.reinterpret = true;
-        break;
-    case kIROp_BitCast:
-        result.bitcast = true;
-        break;
-    case kIROp_AutoPyBindCudaDecoration:
-        result.derivativePyBindWrapper = true;
-        break;
+    case kIROp_Reinterpret:              result.reinterpret = true; break;
+    case kIROp_BitCast:                  result.bitcast = true; break;
+    case kIROp_AutoPyBindCudaDecoration: result.derivativePyBindWrapper = true; break;
     case kIROp_Param:
         if (as<IRFuncType>(inst->getDataType()))
             result.higherOrderFunc = true;
         break;
     case kIROp_GlobalInputDecoration:
     case kIROp_GlobalOutputDecoration:
-    case kIROp_GetWorkGroupSize:
-        result.glslGlobalVar = true;
-        break;
+    case kIROp_GetWorkGroupSize:       result.glslGlobalVar = true; break;
     case kIROp_BindExistentialSlotsDecoration:
         result.bindExistential = true;
         result.generics = true;
         result.existentialTypeLayout = true;
         break;
-    case kIROp_GLSLShaderStorageBufferType:
-        result.glslSSBO = true;
-        break;
+    case kIROp_GLSLShaderStorageBufferType: result.glslSSBO = true; break;
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
     case kIROp_HLSLRWByteAddressBufferType:
-    case kIROp_HLSLByteAddressBufferType:
-        result.byteAddressBuffer = true;
-        break;
-    case kIROp_DynamicResourceType:
-        result.dynamicResource = true;
-        break;
+    case kIROp_HLSLByteAddressBufferType:   result.byteAddressBuffer = true; break;
+    case kIROp_DynamicResourceType:         result.dynamicResource = true; break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -440,30 +419,33 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     switch (inst->getOp())
     {
     case kIROp_StaticAssert:
-    {
-        IRInst* condi = inst->getOperand(0);
-        if (auto condiLit = as<IRBoolLit>(condi))
         {
-            if (!condiLit->getValue())
+            IRInst* condi = inst->getOperand(0);
+            if (auto condiLit = as<IRBoolLit>(condi))
             {
-                IRInst* msg = inst->getOperand(1);
-                if (auto msgLit = as<IRStringLit>(msg))
+                if (!condiLit->getValue())
                 {
-                    sink->diagnose(inst, Diagnostics::staticAssertionFailure, msgLit->getStringSlice());
-                }
-                else
-                {
-                    sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
+                    IRInst* msg = inst->getOperand(1);
+                    if (auto msgLit = as<IRStringLit>(msg))
+                    {
+                        sink->diagnose(
+                            inst,
+                            Diagnostics::staticAssertionFailure,
+                            msgLit->getStringSlice());
+                    }
+                    else
+                    {
+                        sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
+                    }
                 }
             }
-        }
-        else
-        {
-            sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
-        }
+            else
+            {
+                sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
+            }
 
-        return true;
-    }
+            return true;
+        }
     }
 
     List<IRInst*> removeList;
@@ -528,9 +510,9 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
 }
 
 Result linkAndOptimizeIR(
-    CodeGenContext*                         codeGenContext,
-    LinkingAndOptimizationOptions const&    options,
-    LinkedIR&                               outLinkedIR)
+    CodeGenContext* codeGenContext,
+    LinkingAndOptimizationOptions const& options,
+    LinkedIR& outLinkedIR)
 {
     SLANG_PROFILE;
     auto session = codeGenContext->getSession();
@@ -539,7 +521,7 @@ Result linkAndOptimizeIR(
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetProgram = codeGenContext->getTargetProgram();
 
-    // Get the artifact desc for the target 
+    // Get the artifact desc for the target
     const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
 
     // We start out by performing "linking" at the level of the IR.
@@ -569,7 +551,7 @@ Result linkAndOptimizeIR(
     RequiredLoweringPassSet requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    if(!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
+    if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
 
     if (requiredLoweringPassSet.glslGlobalVar)
@@ -632,44 +614,39 @@ Result linkAndOptimizeIR(
     //
     {
         CollectEntryPointUniformParamsOptions passOptions;
-        switch( target )
+        switch (target)
         {
-        case CodeGenTarget::HostCPPSource:
-            break;
-        case CodeGenTarget::CUDASource:
-            collectOptiXEntryPointUniformParams(irModule);
-            #if 0
+        case CodeGenTarget::HostCPPSource: break;
+        case CodeGenTarget::CUDASource:    collectOptiXEntryPointUniformParams(irModule);
+#if 0
             dumpIRIfEnabled(codeGenContext, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
-            #endif
+#endif
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
         case CodeGenTarget::CPPSource:
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
-        default:
-            collectEntryPointUniformParams(irModule, passOptions);
-        #if 0
+        default: collectEntryPointUniformParams(irModule, passOptions);
+#if 0
             dumpIRIfEnabled(codeGenContext, irModule, "ENTRY POINT UNIFORMS COLLECTED");
-        #endif
+#endif
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
         }
     }
 
-    switch( target )
+    switch (target)
     {
-    default:
-        moveEntryPointUniformParamsToGlobalScope(irModule);
-    #if 0
+    default: moveEntryPointUniformParamsToGlobalScope(irModule);
+#if 0
         dumpIRIfEnabled(codeGenContext, irModule, "ENTRY POINT UNIFORMS MOVED");
-    #endif
+#endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CUDASource:
-        break;
+    case CodeGenTarget::CUDASource:    break;
     }
 
     if (requiredLoweringPassSet.optionalType)
@@ -678,24 +655,21 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
-    case CodeGenTarget::PyTorchCppBinding:
-    break;
+    case CodeGenTarget::PyTorchCppBinding: break;
 
-    default:
-        removeTorchAndCUDAEntryPoints(irModule);
-        break;
+    default: removeTorchAndCUDAEntryPoints(irModule); break;
     }
 
     switch (target)
     {
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::HostCPPSource:
-    {
-        lowerComInterfaces(irModule, artifactDesc.style, sink);
-        generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
-        generateDllExportFuncs(irModule, sink);
-        break;
-    }
+        {
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
+            generateDllExportFuncs(irModule, sink);
+            break;
+        }
     default: break;
     }
 
@@ -711,12 +685,16 @@ Result linkAndOptimizeIR(
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     lowerLValueCast(targetProgram, irModule);
 
-    IRSimplificationOptions defaultIRSimplificationOptions = IRSimplificationOptions::getDefault(targetProgram);
-    IRSimplificationOptions fastIRSimplificationOptions = IRSimplificationOptions::getFast(targetProgram);
+    IRSimplificationOptions defaultIRSimplificationOptions =
+        IRSimplificationOptions::getDefault(targetProgram);
+    IRSimplificationOptions fastIRSimplificationOptions =
+        IRSimplificationOptions::getFast(targetProgram);
     IRDeadCodeEliminationOptions deadCodeEliminationOptions = IRDeadCodeEliminationOptions();
-    fastIRSimplificationOptions.minimalOptimization = defaultIRSimplificationOptions.minimalOptimization;
+    fastIRSimplificationOptions.minimalOptimization =
+        defaultIRSimplificationOptions.minimalOptimization;
     deadCodeEliminationOptions.useFastAnalysis = fastIRSimplificationOptions.minimalOptimization;
-    deadCodeEliminationOptions.keepGlobalParamsAlive = targetProgram->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
+    deadCodeEliminationOptions.keepGlobalParamsAlive =
+        targetProgram->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
 
     simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
 
@@ -737,17 +715,16 @@ Result linkAndOptimizeIR(
         fuseCallsToSaturatedCooperation(irModule);
 
     switch (target)
-    {   
+    {
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::PyTorchCppBinding:
-    {
-        // Generate any requested derivative wrappers
-        if (requiredLoweringPassSet.derivativePyBindWrapper)
-            generateDerivativeWrappers(irModule, sink);
-        break;
-    }
-    default:
-        break;
+        {
+            // Generate any requested derivative wrappers
+            if (requiredLoweringPassSet.derivativePyBindWrapper)
+                generateDerivativeWrappers(irModule, sink);
+            break;
+        }
+    default: break;
     }
 
     if (requiredLoweringPassSet.autodiff)
@@ -755,7 +732,7 @@ Result linkAndOptimizeIR(
         // Generate warnings for potentially incorrect or badly-performing autodiff patterns.
         checkAutodiffPatterns(targetProgram, irModule, sink);
     }
-    
+
     // Next, we need to ensure that the code we emit for
     // the target doesn't contain any operations that would
     // be illegal on the target platform. For example,
@@ -792,7 +769,7 @@ Result linkAndOptimizeIR(
             applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
-    
+
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
         // since we may be missing out cases prevented by the functions that we just specialzied.
         performMandatoryEarlyInlining(irModule);
@@ -835,7 +812,7 @@ Result linkAndOptimizeIR(
 
     // Finalization is always run so AD-related instructions can be removed,
     // even the AD pass itself is not run.
-    // 
+    //
     finalizeAutoDiffPass(targetProgram, irModule);
 
     finalizeSpecialization(irModule);
@@ -856,8 +833,7 @@ Result linkAndOptimizeIR(
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
         break;
-    default:
-        break;
+    default: break;
     }
 
     if (codeGenContext->removeAvailableInDownstreamIR)
@@ -896,11 +872,11 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // If we have any witness tables that are marked as `KeepAlive`, 
+    // If we have any witness tables that are marked as `KeepAlive`,
     // but are not used for dynamic dispatch, unpin them so we don't
     // do unnecessary work to lower them.
     unpinWitnessTables(irModule);
-    
+
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
@@ -913,7 +889,8 @@ Result linkAndOptimizeIR(
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
-        // We could fail because (perhaps, somehow) end up with getStringHash that the operand is not a string literal
+        // We could fail because (perhaps, somehow) end up with getStringHash that the operand is
+        // not a string literal
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
     }
 
@@ -976,13 +953,14 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    if (codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::VulkanEmitReflection))
+    if (codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
+            CompilerOptionName::VulkanEmitReflection))
     {
         addUserTypeHintDecorations(irModule);
     }
 
     // We don't need the legalize pass for C/C++ based types
-    if(options.shouldLegalizeExistentialAndResourceTypes )
+    if (options.shouldLegalizeExistentialAndResourceTypes)
     {
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -1011,10 +989,7 @@ Result linkAndOptimizeIR(
         //
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
-            legalizeExistentialTypeLayout(
-                targetProgram,
-                irModule,
-                sink);
+            legalizeExistentialTypeLayout(targetProgram, irModule, sink);
         }
 
 #if 0
@@ -1033,25 +1008,19 @@ Result linkAndOptimizeIR(
         // What used to be individual variables/parameters/arguments/etc.
         // then become multiple variables/parameters/arguments/etc.
         //
-        legalizeResourceTypes(
-            targetProgram,
-            irModule,
-            sink);
+        legalizeResourceTypes(targetProgram, irModule, sink);
 
         //  Debugging output of legalization
-    #if 0
+#if 0
         dumpIRIfEnabled(codeGenContext, irModule, "LEGALIZED");
-    #endif
+#endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
     else
     {
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
-        legalizeEmptyTypes(
-            targetProgram,
-            irModule,
-            sink);
+        legalizeEmptyTypes(targetProgram, irModule, sink);
     }
 
     legalizeVectorTypes(irModule, sink);
@@ -1108,7 +1077,7 @@ Result linkAndOptimizeIR(
     // the options for matrix layout set via `#pragma`
     // or command-line options.
     //
-    switch(target)
+    switch (target)
     {
     case CodeGenTarget::HLSL:
         {
@@ -1120,8 +1089,7 @@ Result linkAndOptimizeIR(
         }
         break;
 
-    default:
-        break;
+    default: break;
     }
 
     // For all targets, we translate load/store operations
@@ -1137,10 +1105,9 @@ Result linkAndOptimizeIR(
         // load/store operations down to invididual scalars
         // (splitting up vector ops).
         //
-        switch( target )
+        switch (target)
         {
-        default:
-            break;
+        default: break;
 
         case CodeGenTarget::GLSL:
         case CodeGenTarget::SPIRV:
@@ -1194,14 +1161,14 @@ Result linkAndOptimizeIR(
         // bit-cast, or if we prefer to leave them
         // as load/store of the original type.
         //
-        switch( target )
+        switch (target)
         {
         case CodeGenTarget::HLSL:
             {
                 auto profile = codeGenContext->getTargetProgram()->getOptionSet().getProfile();
-                if( profile.getFamily() == ProfileFamily::DX )
+                if (profile.getFamily() == ProfileFamily::DX)
                 {
-                    if(profile.getVersion() <= ProfileVersion::DX_5_0)
+                    if (profile.getVersion() <= ProfileVersion::DX_5_0)
                     {
                         // Fxc and earlier dxc versions do not support
                         // a templates `.Load<T>` operation on byte-address
@@ -1215,45 +1182,43 @@ Result linkAndOptimizeIR(
             }
             break;
 
-        default:
-            break;
+        default: break;
         }
 
-        legalizeByteAddressBufferOps(session, targetProgram, irModule, codeGenContext->getSink(), byteAddressBufferOptions);
+        legalizeByteAddressBufferOps(
+            session,
+            targetProgram,
+            irModule,
+            codeGenContext->getSink(),
+            byteAddressBufferOptions);
     }
 
     // For CUDA targets only, we will need to turn operations
     // the implicitly reference the "active mask" into ones
     // that use (and pass around) an explicit mask instead.
     //
-    switch(target)
+    switch (target)
     {
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::PTX:
         {
-            synthesizeActiveMask(
-                irModule,
-                codeGenContext->getSink());
+            synthesizeActiveMask(irModule, codeGenContext->getSink());
 
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "AFTER synthesizeActiveMask");
 #endif
             validateIRModuleIfEnabled(codeGenContext, irModule);
-
         }
         break;
 
-    default:
-        break;
+    default: break;
     }
 
     switch (target)
     {
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
-    case CodeGenTarget::WGSL:
-        resolveTextureFormat(irModule);
-        break;
+    case CodeGenTarget::WGSL:  resolveTextureFormat(irModule); break;
     }
 
     // For GLSL only, we will need to perform "legalization" of
@@ -1268,36 +1233,37 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-    {
-        GLSLExtensionTracker glslExtensionTracker;
-        GLSLExtensionTracker* glslExtensionTrackerPtr = options.sourceEmitter
-            ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
-            : &glslExtensionTracker;
+        {
+            GLSLExtensionTracker glslExtensionTracker;
+            GLSLExtensionTracker* glslExtensionTrackerPtr =
+                options.sourceEmitter
+                    ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
+                    : &glslExtensionTracker;
 
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
 #endif
 
-        legalizeEntryPointsForGLSL(
-            session,
-            irModule,
-            irEntryPoints,
-            codeGenContext,
-            glslExtensionTrackerPtr);
+            legalizeEntryPointsForGLSL(
+                session,
+                irModule,
+                irEntryPoints,
+                codeGenContext,
+                glslExtensionTrackerPtr);
 
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "GLSL LEGALIZED");
 #endif
             validateIRModuleIfEnabled(codeGenContext, irModule);
-    }
-    break;
+        }
+        break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
-    {
-        legalizeIRForMetal(irModule, sink);
-    }
-    break;
+        {
+            legalizeIRForMetal(irModule, sink);
+        }
+        break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
         {
@@ -1314,21 +1280,20 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSL:
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
-    {
-        legalizeIRForWGSL(irModule, sink);
-    }
-    break;
-
-    default:
+        {
+            legalizeIRForWGSL(irModule, sink);
+        }
         break;
+
+    default: break;
     }
 
-    // Legalize non struct parameters that are expected to be structs for HLSL. 
-    if(isD3DTarget(targetRequest))
+    // Legalize non struct parameters that are expected to be structs for HLSL.
+    if (isD3DTarget(targetRequest))
         legalizeNonStructParameterToStructForHLSL(irModule);
 
     // Create aliases for all dynamic resource parameters.
-    if(requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
+    if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         legalizeDynamicResourcesForGLSL(codeGenContext, irModule);
 
     // Legalize `ImageSubscript` loads.
@@ -1342,10 +1307,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRVAssembly:
         {
             legalizeImageSubscript(targetRequest, irModule, sink);
-        } 
+        }
         break;
-    default:
-        break;
+    default: break;
     }
 
     // Legalize constant buffer loads.
@@ -1359,39 +1323,36 @@ Result linkAndOptimizeIR(
             legalizeDispatchMeshPayloadForGLSL(irModule);
         }
         break;
-    default:
-        break;
+    default: break;
     }
 
-    switch( target )
+    switch (target)
     {
-    default:
-        break;
-    case CodeGenTarget::GLSL:
-        moveGlobalVarInitializationToEntryPoints(irModule);
-        break;
+    default:                  break;
+    case CodeGenTarget::GLSL: moveGlobalVarInitializationToEntryPoints(irModule); break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         moveGlobalVarInitializationToEntryPoints(irModule);
-        if(targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EnableExperimentalPasses))
+        if (targetProgram->getOptionSet().getBoolOption(
+                CompilerOptionName::EnableExperimentalPasses))
             introduceExplicitGlobalContext(irModule, target);
-    #if 0
+#if 0
         dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
-    #endif
+#endif
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
         moveGlobalVarInitializationToEntryPoints(irModule);
         introduceExplicitGlobalContext(irModule, target);
-        if(target == CodeGenTarget::CPPSource)
+        if (target == CodeGenTarget::CPPSource)
         {
             convertEntryPointPtrParamsToRawPtrs(irModule);
         }
-    #if 0
+#if 0
         dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
-    #endif
+#endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
     }
@@ -1420,8 +1381,9 @@ Result linkAndOptimizeIR(
 
     if (isKhronosTarget(targetRequest))
     {
-        // As a fallback, if the above specialization steps failed to remove resource type parameters, we will
-        // inline the functions in question to make sure we can produce valid GLSL.
+        // As a fallback, if the above specialization steps failed to remove resource type
+        // parameters, we will inline the functions in question to make sure we can produce valid
+        // GLSL.
         performGLSLResourceReturnFunctionInlining(targetProgram, irModule);
     }
 #if 0
@@ -1448,7 +1410,7 @@ Result linkAndOptimizeIR(
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
-    if(!isMetalTarget(targetRequest))
+    if (!isMetalTarget(targetRequest))
         legalizeArrayReturnType(irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
@@ -1489,7 +1451,8 @@ Result linkAndOptimizeIR(
     //
     {
         // Get the liveness mode.
-        const LivenessMode livenessMode = codeGenContext->shouldTrackLiveness() ? LivenessMode::Enabled : LivenessMode::Disabled;
+        const LivenessMode livenessMode =
+            codeGenContext->shouldTrackLiveness() ? LivenessMode::Enabled : LivenessMode::Disabled;
         //
         // Downstream targets may benefit from having live-range information for
         // local variables, and our IR currently encodes a reasonably good version
@@ -1574,7 +1537,7 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    if ( (target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly) )
+    if ((target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly))
     {
         // We need to perform a final pass to ensure that all the
         // variables in the IR module have their scopes set correctly.
@@ -1617,14 +1580,15 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto targetRequest = getTargetReq();
     auto targetProgram = getTargetProgram();
 
-    auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(CompilerOptionName::LineDirectiveMode);
+    auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(
+        CompilerOptionName::LineDirectiveMode);
     // We will generally use C-style line directives in order to give the user good
     // source locations on error messages from downstream compilers, but there are
     // a few exceptions.
     if (lineDirectiveMode == LineDirectiveMode::Default)
     {
 
-        switch(targetRequest->getTarget())
+        switch (targetRequest->getTarget())
         {
 
         case CodeGenTarget::GLSL:
@@ -1639,9 +1603,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             // See https://github.com/gpuweb/gpuweb/issues/606.
             lineDirectiveMode = LineDirectiveMode::None;
             break;
-
         }
-
     }
 
     ComPtr<IBoxValue<SourceMap>> sourceMap;
@@ -1652,7 +1614,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         sourceMap = new BoxValue<SourceMap>;
     }
 
-    SourceWriter sourceWriter(sourceManager, lineDirectiveMode, sourceMap );
+    SourceWriter sourceWriter(sourceManager, lineDirectiveMode, sourceMap);
 
     CLikeSourceEmitter::Desc desc;
 
@@ -1671,59 +1633,60 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     }
     desc.sourceWriter = &sourceWriter;
 
-    // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might reference
-    // items in the linkedIR module
+    // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might
+    // reference items in the linkedIR module
     LinkedIR linkedIR;
 
     RefPtr<CLikeSourceEmitter> sourceEmitter;
     SourceLanguage sourceLanguage = CLikeSourceEmitter::getSourceLanguage(target);
-    
+
     switch (target)
     {
     default:
         switch (sourceLanguage)
         {
-            case SourceLanguage::CPP:
+        case SourceLanguage::CPP:
             {
                 sourceEmitter = new CPPSourceEmitter(desc);
                 break;
             }
-            case SourceLanguage::GLSL:
+        case SourceLanguage::GLSL:
             {
                 sourceEmitter = new GLSLSourceEmitter(desc);
                 break;
             }
-            case SourceLanguage::HLSL:
+        case SourceLanguage::HLSL:
             {
                 sourceEmitter = new HLSLSourceEmitter(desc);
                 break;
             }
-            case SourceLanguage::CUDA:
+        case SourceLanguage::CUDA:
             {
                 sourceEmitter = new CUDASourceEmitter(desc);
                 break;
             }
-            case SourceLanguage::Metal:
+        case SourceLanguage::Metal:
             {
                 sourceEmitter = new MetalSourceEmitter(desc);
                 break;
             }
-            case SourceLanguage::WGSL:
+        case SourceLanguage::WGSL:
             {
                 sourceEmitter = new WGSLSourceEmitter(desc);
                 break;
             }
-            default: break;
+        default: break;
         }
         break;
-    case CodeGenTarget::PyTorchCppBinding:
-        sourceEmitter = new TorchCppSourceEmitter(desc);
-        break;
+    case CodeGenTarget::PyTorchCppBinding: sourceEmitter = new TorchCppSourceEmitter(desc); break;
     }
 
     if (!sourceEmitter)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToGenerateCodeForTarget, TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::unableToGenerateCodeForTarget,
+            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
         return SLANG_FAIL;
     }
 
@@ -1737,8 +1700,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
         switch (sourceLanguage)
         {
-        default:
-            break;
+        default: break;
 
         case SourceLanguage::CPP:
         case SourceLanguage::C:
@@ -1747,13 +1709,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             break;
         }
 
-        SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(
-            this,
-            linkingAndOptimizationOptions,
-            linkedIR));
-        
+        SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(this, linkingAndOptimizationOptions, linkedIR));
+
         auto irModule = linkedIR.module;
-        
+
         // Perform final simplifications to help emit logic to generate more compact code.
         simplifyForEmit(irModule, targetRequest);
 
@@ -1778,7 +1737,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     // of the output. An example is that the "#version" line in a GLSL source must
     // appear before anything else.
     sourceWriter.supressLineDirective();
-    
+
     // When emitting front matter we can emit the target-language-specific directives
     // needed to get the default matrix layout to match what was requested
     // for the given target.
@@ -1799,9 +1758,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     switch (target)
     {
-    case CodeGenTarget::PyTorchCppBinding:
-        sourceWriter.emit(get_slang_torch_prelude());
-        break;
+    case CodeGenTarget::PyTorchCppBinding: sourceWriter.emit(get_slang_torch_prelude()); break;
     default:
         if (isHeterogeneousTarget(target))
         {
@@ -1841,7 +1798,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::Json, ArtifactPayload::SourceMap, ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+            ArtifactKind::Json,
+            ArtifactPayload::SourceMap,
+            ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 
@@ -1853,10 +1813,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 }
 
 SlangResult emitSPIRVFromIR(
-    CodeGenContext*         codeGenContext,
-    IRModule*               irModule,
-    const List<IRFunc*>&    irEntryPoints,
-    List<uint8_t>&          spirvOut);
+    CodeGenContext* codeGenContext,
+    IRModule* irModule,
+    const List<IRFunc*>& irEntryPoints,
+    List<uint8_t>& spirvOut);
 
 SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
@@ -1865,10 +1825,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     // Outside because we want to keep IR in scope whilst we are processing emits
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
-    SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(
-        codeGenContext,
-        linkingAndOptimizationOptions,
-        linkedIR));
+    SLANG_RETURN_ON_FAIL(
+        linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
@@ -1884,7 +1842,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         spirv = _Move(outSpirv);
     }
 #endif
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    auto artifact =
+        ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
 #if 0
@@ -1895,16 +1854,21 @@ SlangResult emitSPIRVForEntryPointsDirectly(
 #endif
 
     IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
-        PassThroughMode::SpirvOpt, codeGenContext->getSink());
+        PassThroughMode::SpirvOpt,
+        codeGenContext->getSink());
     if (compiler)
     {
         if (!codeGenContext->shouldSkipSPIRVValidation())
         {
             StringBuilder runSpirvValEnvVar;
-            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"), runSpirvValEnvVar);
+            PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"),
+                runSpirvValEnvVar);
             if (runSpirvValEnvVar.getUnownedSlice() == "1")
             {
-                if (SLANG_FAILED(compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount()/4))))
+                if (SLANG_FAILED(compiler->validate(
+                        (uint32_t*)spirv.getBuffer(),
+                        int(spirv.getCount() / 4))))
                 {
                     String err;
                     String dis;
@@ -1912,8 +1876,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
                     codeGenContext->getSink()->diagnoseWithoutSourceView(
                         SourceLoc{},
                         Diagnostics::spirvValidationFailed,
-                        dis
-                    );
+                        dis);
                 }
             }
         }
@@ -1923,12 +1886,23 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
-        switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization))
+        switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
+            CompilerOptionName::Optimization))
         {
-        case OptimizationLevel::None:       downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None; break;
-        case OptimizationLevel::Default:    downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Default;  break;
-        case OptimizationLevel::High:       downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;  break;
-        case OptimizationLevel::Maximal:    downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Maximal;  break;
+        case OptimizationLevel::None:
+            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
+            break;
+        case OptimizationLevel::Default:
+            downstreamOptions.optimizationLevel =
+                DownstreamCompileOptions::OptimizationLevel::Default;
+            break;
+        case OptimizationLevel::High:
+            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
+            break;
+        case OptimizationLevel::Maximal:
+            downstreamOptions.optimizationLevel =
+                DownstreamCompileOptions::OptimizationLevel::Maximal;
+            break;
         default: SLANG_ASSERT(!"Unhandled optimization level"); break;
         }
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
@@ -1940,7 +1914,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+        SLANG_RETURN_ON_FAIL(
+            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
     }
 
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);

@@ -11,7 +11,10 @@ endif()
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.25")
     set(system SYSTEM)
 else()
-    message(STATUS "CMake 3.25 is required to suppress warnings originating in headers in external/ but you are using ${CMAKE_VERSION}, be prepared for some warnings")
+    message(
+        STATUS
+        "CMake 3.25 is required to suppress warnings originating in headers in external/ but you are using ${CMAKE_VERSION}, be prepared for some warnings"
+    )
     set(system)
 endif()
 
@@ -24,12 +27,12 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     endif()
 endif()
 
-if (NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
+if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     add_subdirectory(unordered_dense EXCLUDE_FROM_ALL ${system})
 endif()
 
 # Miniz
-if (NOT ${SLANG_USE_SYSTEM_MINIZ})
+if(NOT ${SLANG_USE_SYSTEM_MINIZ})
     add_subdirectory(miniz EXCLUDE_FROM_ALL ${system})
     set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
     # Work around https://github.com/richgel999/miniz/pull/292
@@ -41,28 +44,31 @@ if (NOT ${SLANG_USE_SYSTEM_MINIZ})
 endif()
 
 # LZ4
-if (NOT ${SLANG_USE_SYSTEM_LZ4})
+if(NOT ${SLANG_USE_SYSTEM_LZ4})
     set(LZ4_BUNDLED_MODE ON)
     add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL ${system})
     if(MSVC)
-		target_compile_options(
-		    lz4_static
-		    PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
-		)
+        target_compile_options(
+            lz4_static
+            PRIVATE /wd5045 /wd4820 /wd4711 /wd6385 /wd6262
+        )
     endif()
 endif()
 
 # Vulkan headers
-if (NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
+if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
     add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
 endif()
 
 # metal-cpp headers
 add_library(metal-cpp INTERFACE)
-target_include_directories(metal-cpp INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp")
+target_include_directories(
+    metal-cpp
+    INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp"
+)
 
 # SPIRV-Headers
-if (NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+if(NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
     add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
 endif()
 

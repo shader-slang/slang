@@ -67,9 +67,8 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
     subpassDesc.colorAttachmentCount = desc.renderTargetCount;
     subpassDesc.pColorAttachments = framebufferLayout->m_colorReferences.getBuffer();
     subpassDesc.pResolveAttachments = nullptr;
-    subpassDesc.pDepthStencilAttachment = framebufferLayout->m_hasDepthStencilTarget
-                                              ? &framebufferLayout->m_depthReference
-                                              : nullptr;
+    subpassDesc.pDepthStencilAttachment =
+        framebufferLayout->m_hasDepthStencilTarget ? &framebufferLayout->m_depthReference : nullptr;
     subpassDesc.preserveAttachmentCount = 0u;
     subpassDesc.pPreserveAttachments = nullptr;
 
@@ -80,7 +79,10 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
     renderPassCreateInfo.subpassCount = 1;
     renderPassCreateInfo.pSubpasses = &subpassDesc;
     SLANG_VK_RETURN_ON_FAIL(m_renderer->m_api.vkCreateRenderPass(
-        m_renderer->m_api.m_device, &renderPassCreateInfo, nullptr, &m_renderPass));
+        m_renderer->m_api.m_device,
+        &renderPassCreateInfo,
+        nullptr,
+        &m_renderPass));
     return SLANG_OK;
 }
 

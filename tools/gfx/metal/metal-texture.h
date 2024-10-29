@@ -25,7 +25,8 @@ public:
     MTL::TextureType m_textureType;
     MTL::PixelFormat m_pixelFormat;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    getNativeResourceHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
 

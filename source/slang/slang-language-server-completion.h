@@ -1,9 +1,9 @@
 // slang-language-server-completion.h
 #pragma once
 
-#include "slang-workspace-version.h"
-#include "slang-language-server-ast-lookup.h"
 #include "../compiler-core/slang-language-server-protocol.h"
+#include "slang-language-server-ast-lookup.h"
+#include "slang-workspace-version.h"
 
 namespace Slang
 {
@@ -22,11 +22,13 @@ struct CompletionResult
     List<LanguageServerProtocol::TextEditCompletionItem> textEditItems;
     CompletionResult() = default;
     CompletionResult(List<LanguageServerProtocol::CompletionItem>&& other)
-        :items(_Move(other))
-    {}
+        : items(_Move(other))
+    {
+    }
     CompletionResult(List<LanguageServerProtocol::TextEditCompletionItem>&& other)
-        :textEditItems(_Move(other))
-    {}
+        : textEditItems(_Move(other))
+    {
+    }
 };
 
 struct CompletionContext
@@ -46,12 +48,14 @@ struct CompletionContext
     LanguageServerResult<CompletionResult> tryCompleteAttributes();
     LanguageServerResult<CompletionResult> tryCompleteImport();
     LanguageServerResult<CompletionResult> tryCompleteInclude();
-    LanguageServerResult<CompletionResult> tryCompleteRawFileName(UnownedStringSlice lineContent, Index fileNameStartPos, bool isImportString);
+    LanguageServerResult<CompletionResult> tryCompleteRawFileName(
+        UnownedStringSlice lineContent,
+        Index fileNameStartPos,
+        bool isImportString);
 
 
     CompletionResult collectMembersAndSymbols();
-    CompletionResult createSwizzleCandidates(
-        Type* baseType, IntegerLiteralValue elementCount[2]);
+    CompletionResult createSwizzleCandidates(Type* baseType, IntegerLiteralValue elementCount[2]);
     CompletionResult createCapabilityCandidates();
     CompletionResult collectAttributes();
     LanguageServerProtocol::CompletionItem generateGUIDCompletionItem();

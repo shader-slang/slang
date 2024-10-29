@@ -1,12 +1,14 @@
 // slang-ast-decl.cpp
-#include "slang-ast-builder.h"
-#include "slang-syntax.h"
-#include <assert.h>
-
-#include "slang-generated-ast-macro.h"
 #include "slang-ast-decl.h"
 
-namespace Slang {
+#include "slang-ast-builder.h"
+#include "slang-generated-ast-macro.h"
+#include "slang-syntax.h"
+
+#include <assert.h>
+
+namespace Slang
+{
 
 const TypeExp& TypeConstraintDecl::getSup() const
 {
@@ -16,7 +18,7 @@ const TypeExp& TypeConstraintDecl::getSup() const
 const TypeExp& TypeConstraintDecl::_getSupOverride() const
 {
     SLANG_UNEXPECTED("TypeConstraintDecl::_getSupOverride not overridden");
-    //return TypeExp::empty;
+    // return TypeExp::empty;
 }
 
 InterfaceDecl* findParentInterfaceDecl(Decl* decl)
@@ -106,14 +108,14 @@ void ContainerDecl::buildMemberDictionary()
 bool isLocalVar(const Decl* decl)
 {
     const auto varDecl = as<VarDecl>(decl);
-    if(!varDecl)
+    if (!varDecl)
         return false;
     const Decl* pp = varDecl->parentDecl;
-    if(as<ScopeDecl>(pp))
+    if (as<ScopeDecl>(pp))
         return true;
-    while(auto genericDecl = as<GenericDecl>(pp))
+    while (auto genericDecl = as<GenericDecl>(pp))
         pp = genericDecl->inner;
-    if(as<FunctionDeclBase>(pp))
+    if (as<FunctionDeclBase>(pp))
         return true;
 
     return false;

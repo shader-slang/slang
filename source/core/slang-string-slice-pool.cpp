@@ -1,22 +1,21 @@
 #include "slang-string-slice-pool.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* static */ const StringSlicePool::Handle StringSlicePool::kNullHandle;
 /* static */ const StringSlicePool::Handle StringSlicePool::kEmptyHandle;
 
-/* static */const Index StringSlicePool::kDefaultHandlesCount;
+/* static */ const Index StringSlicePool::kDefaultHandlesCount;
 
-StringSlicePool::StringSlicePool(Style style) :
-    m_style(style),
-    m_arena(1024)
+StringSlicePool::StringSlicePool(Style style)
+    : m_style(style), m_arena(1024)
 {
     clear();
 }
 
-StringSlicePool::StringSlicePool(const ThisType& rhs):
-    m_style(rhs.m_style),
-    m_arena(1024)
+StringSlicePool::StringSlicePool(const ThisType& rhs)
+    : m_style(rhs.m_style), m_arena(1024)
 {
     // Set with rhs
     _set(rhs);
@@ -42,7 +41,7 @@ void StringSlicePool::_set(const ThisType& rhs)
 
     if (count == 0)
         return;
-    
+
     // We need the same amount of slices
     m_slices.setCount(count);
 
@@ -117,19 +116,19 @@ void StringSlicePool::clear()
 
     switch (m_style)
     {
-        case Style::Default:
+    case Style::Default:
         {
             // Add the defaults
             m_slices.setCount(2);
 
             m_slices[0] = UnownedStringSlice((const char*)nullptr, (const char*)nullptr);
             m_slices[1] = UnownedStringSlice::fromLiteral("");
-            
+
             // Add the empty entry
             m_map.add(m_slices[1], kEmptyHandle);
             break;
         }
-        case Style::Empty:
+    case Style::Empty:
         {
             // There are no defaults
             m_slices.clear();
@@ -155,7 +154,9 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
     }
 
     // Create a scoped copy
-    UnownedStringSlice scopePath(m_arena.allocateString(slice.begin(), slice.getLength()), slice.getLength());
+    UnownedStringSlice scopePath(
+        m_arena.allocateString(slice.begin(), slice.getLength()),
+        slice.getLength());
 
     const auto index = m_slices.getCount();
 
@@ -176,7 +177,9 @@ bool StringSlicePool::findOrAdd(const Slice& slice, Handle& outHandle)
     // Need to add.
 
     // Make a copy stored in the arena
-    UnownedStringSlice scopeSlice(m_arena.allocateString(slice.begin(), slice.getLength()), slice.getLength());
+    UnownedStringSlice scopeSlice(
+        m_arena.allocateString(slice.begin(), slice.getLength()),
+        slice.getLength());
 
     // Add using the arenas copy
     Handle newHandle = Handle(m_slices.getCount());
@@ -196,12 +199,12 @@ StringSlicePool::Handle StringSlicePool::add(StringRepresentation* stringRep)
     }
     return add(StringRepresentation::asSlice(stringRep));
 }
- 
+
 StringSlicePool::Handle StringSlicePool::add(const char* chars)
 {
     switch (m_style)
     {
-        case Style::Default:
+    case Style::Default:
         {
             if (!chars)
             {
@@ -213,7 +216,7 @@ StringSlicePool::Handle StringSlicePool::add(const char* chars)
             }
             break;
         }
-        case Style::Empty:
+    case Style::Empty:
         {
             if (chars == nullptr)
             {
@@ -223,7 +226,7 @@ StringSlicePool::Handle StringSlicePool::add(const char* chars)
             }
         }
     }
-    
+
     return add(UnownedStringSlice(chars));
 }
 

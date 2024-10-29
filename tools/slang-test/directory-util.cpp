@@ -5,7 +5,9 @@
 
 using namespace Slang;
 
-/* static */SlangResult DirectoryUtil::findDirectories(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths)
+/* static */ SlangResult DirectoryUtil::findDirectories(
+    const Slang::String& directoryPath,
+    Slang::List<Slang::String>& outPaths)
 {
     outPaths.clear();
     CombinePathVisitor visitor(directoryPath, Path::TypeFlag::Directory);
@@ -14,7 +16,10 @@ using namespace Slang;
     return SLANG_OK;
 }
 
-/* static */SlangResult DirectoryUtil::findFilesMatchingPattern(const Slang::String& directoryPath, const char* pattern, Slang::List<Slang::String>& outPaths)
+/* static */ SlangResult DirectoryUtil::findFilesMatchingPattern(
+    const Slang::String& directoryPath,
+    const char* pattern,
+    Slang::List<Slang::String>& outPaths)
 {
     outPaths.clear();
     CombinePathVisitor visitor(directoryPath, Path::TypeFlag::File);
@@ -23,7 +28,9 @@ using namespace Slang;
     return SLANG_OK;
 }
 
-/* static */SlangResult DirectoryUtil::findFiles(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths)
+/* static */ SlangResult DirectoryUtil::findFiles(
+    const Slang::String& directoryPath,
+    Slang::List<Slang::String>& outPaths)
 {
     return findFilesMatchingPattern(directoryPath, nullptr, outPaths);
 }

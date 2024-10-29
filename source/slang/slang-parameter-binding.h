@@ -3,10 +3,10 @@
 
 #include "../core/slang-basic.h"
 #include "slang-syntax.h"
-
 #include "slang.h"
 
-namespace Slang {
+namespace Slang
+{
 
 class Program;
 class TargetRequest;
@@ -24,19 +24,16 @@ class TargetRequest;
 // and attach that information to the syntax nodes
 // of the program.
 
-void generateParameterBindings(
-    Program*        program,
-    TargetRequest*  targetReq,
-    DiagnosticSink* sink);
+void generateParameterBindings(Program* program, TargetRequest* targetReq, DiagnosticSink* sink);
 
 /// Given a string that specifies a name and index (e.g., `COLOR0`),
 /// split it into slices for the name part and the index part.
-/// 
+///
 bool splitNameAndIndex(
     UnownedStringSlice const& text,
     UnownedStringSlice& outName,
     UnownedStringSlice& outDigits);
 
-}
+} // namespace Slang
 
-#endif 
+#endif

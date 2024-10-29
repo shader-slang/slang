@@ -17,7 +17,8 @@
 
 #include "slang-ir.h"
 
-namespace Slang {
+namespace Slang
+{
 
 //
 // Let's start with the implementation of the public API for `IRDominatorTree`
@@ -43,7 +44,7 @@ bool IRDominatorTree::properlyDominates(IRBlock* dominator, IRBlock* dominated)
     // of those (zero) control flow paths go through
     // `dominator`.
     //
-    if(isUnreachable(dominated))
+    if (isUnreachable(dominated))
         return true;
 
     // If `dominated` is reachable then there must exist at least
@@ -51,7 +52,7 @@ bool IRDominatorTree::properlyDominates(IRBlock* dominator, IRBlock* dominated)
     // reachable, it cannot be on that path, and thus must
     // not be a dominator.
     //
-    if(isUnreachable(dominator))
+    if (isUnreachable(dominator))
         return false;
 
 
@@ -66,8 +67,8 @@ bool IRDominatorTree::properlyDominates(IRBlock* dominator, IRBlock* dominated)
     Int dominatedIndex = getBlockIndex(dominated);
     Node& dominatorNode = nodes[dominatorIndex];
 
-    return (dominatedIndex >= dominatorNode.beginDescendents)
-        && (dominatedIndex < dominatorNode.endDescendents);
+    return (dominatedIndex >= dominatorNode.beginDescendents) &&
+           (dominatedIndex < dominatorNode.endDescendents);
 }
 
 bool IRDominatorTree::dominates(IRBlock* dominator, IRBlock* dominated)
@@ -77,7 +78,7 @@ bool IRDominatorTree::dominates(IRBlock* dominator, IRBlock* dominated)
     // First, a node always dominated itself, so if the blocks are
     // the the same, then we are done:
     //
-    if(dominator == dominated)
+    if (dominator == dominated)
         return true;
     //
     // Otherwise, for distinct blocks we just check for
@@ -115,7 +116,7 @@ IRBlock* IRDominatorTree::getImmediateDominator(IRBlock* block)
 {
     // An unreachable block has no immediate dominator.
     //
-    if(isUnreachable(block))
+    if (isUnreachable(block))
         return nullptr;
 
     // The immediate dominator of a block is its parent
@@ -124,10 +125,12 @@ IRBlock* IRDominatorTree::getImmediateDominator(IRBlock* block)
     // invalid node indices.
 
     Int blockIndex = getBlockIndex(block);
-    if(blockIndex == kInvalidIndex) return nullptr;
+    if (blockIndex == kInvalidIndex)
+        return nullptr;
 
     Int parentIndex = nodes[blockIndex].parent;
-    if(parentIndex == kInvalidIndex) return nullptr;
+    if (parentIndex == kInvalidIndex)
+        return nullptr;
 
     return nodes[parentIndex].block;
 }
@@ -136,7 +139,7 @@ IRDominatorTree::DominatedList IRDominatorTree::getImmediatelyDominatedBlocks(IR
 {
     // An unreachable block doesn't immediately dominate anything.
     //
-    if(isUnreachable(block))
+    if (isUnreachable(block))
         return DominatedList();
 
     // Because of our representation, the immediately dominated blocks
@@ -144,13 +147,11 @@ IRDominatorTree::DominatedList IRDominatorTree::getImmediatelyDominatedBlocks(IR
     // node already.
 
     Int blockIndex = getBlockIndex(block);
-    if(blockIndex == kInvalidIndex) return DominatedList();
+    if (blockIndex == kInvalidIndex)
+        return DominatedList();
 
     Node& node = nodes[blockIndex];
-    return DominatedList(
-        this,
-        node.beginDescendents,
-        node.endChildren);
+    return DominatedList(this, node.beginDescendents, node.endChildren);
 }
 
 IRDominatorTree::DominatedList IRDominatorTree::getProperlyDominatedBlocks(IRBlock* block)
@@ -159,7 +160,7 @@ IRDominatorTree::DominatedList IRDominatorTree::getProperlyDominatedBlocks(IRBlo
     // unreachable blocks, but setting things up to answer that
     // query "correctly" would be a hassle.
     //
-    if(isUnreachable(block))
+    if (isUnreachable(block))
         return DominatedList();
 
     // Because of our representation, the properly dominated blocks
@@ -167,19 +168,17 @@ IRDominatorTree::DominatedList IRDominatorTree::getProperlyDominatedBlocks(IRBlo
     // node already.
 
     Int blockIndex = getBlockIndex(block);
-    if(blockIndex == kInvalidIndex) return DominatedList();
+    if (blockIndex == kInvalidIndex)
+        return DominatedList();
 
     Node& node = nodes[blockIndex];
-    return DominatedList(
-        this,
-        node.beginDescendents,
-        node.endDescendents);
+    return DominatedList(this, node.beginDescendents, node.endDescendents);
 }
 
 Int IRDominatorTree::getBlockIndex(IRBlock* block)
 {
     Int index = kInvalidIndex;
-    if(!mapBlockToIndex.tryGetValue(block, index))
+    if (!mapBlockToIndex.tryGetValue(block, index))
     {
         SLANG_UNEXPECTED("block was not present in dominator tree");
     }
@@ -195,19 +194,14 @@ bool IRDominatorTree::isUnreachable(IRBlock* block)
 // IRDominatorTree::DominatedList
 
 IRDominatorTree::DominatedList::DominatedList()
-    : mTree(nullptr)
-    , mBegin(0)
-    , mEnd(0)
-{}
+    : mTree(nullptr), mBegin(0), mEnd(0)
+{
+}
 
-IRDominatorTree::DominatedList::DominatedList(
-    IRDominatorTree* tree,
-    Int begin,
-    Int end)
-    : mTree(tree)
-    , mBegin(begin)
-    , mEnd(end)
-{}
+IRDominatorTree::DominatedList::DominatedList(IRDominatorTree* tree, Int begin, Int end)
+    : mTree(tree), mBegin(begin), mEnd(end)
+{
+}
 
 IRDominatorTree::DominatedList::Iterator IRDominatorTree::DominatedList::begin() const
 {
@@ -223,16 +217,14 @@ IRDominatorTree::DominatedList::Iterator IRDominatorTree::DominatedList::end() c
 // IRDominatorTree::DominatedList::Iterator
 
 IRDominatorTree::DominatedList::Iterator::Iterator()
-    : mTree(nullptr)
-    , mIndex(0)
-{}
+    : mTree(nullptr), mIndex(0)
+{
+}
 
-IRDominatorTree::DominatedList::Iterator::Iterator(
-    IRDominatorTree* tree,
-    Int index)
-    : mTree(tree)
-    , mIndex(index)
-{}
+IRDominatorTree::DominatedList::Iterator::Iterator(IRDominatorTree* tree, Int index)
+    : mTree(tree), mIndex(index)
+{
+}
 
 IRBlock* IRDominatorTree::DominatedList::Iterator::operator*() const
 {
@@ -327,34 +319,36 @@ struct PostorderComputationContext : public DepthFirstSearchContext
     /// List to append the computed order onto
     List<IRBlock*>* order;
 
-    virtual void postVisit(IRBlock* block) SLANG_OVERRIDE
-    {
-        order->add(block);
-    }
+    virtual void postVisit(IRBlock* block) SLANG_OVERRIDE { order->add(block); }
 };
 
 void computeReachableSet(IRGlobalValueWithCode* code, HashSet<IRBlock*>& outSet)
 {
     DepthFirstSearchContext context;
     if (code->getFirstBlock())
-        context.walk(code->getFirstBlock(), [](IRBlock* block) {return block->getSuccessors(); });
+        context.walk(code->getFirstBlock(), [](IRBlock* block) { return block->getSuccessors(); });
     outSet = _Move(context.visited);
 }
 
-/// Compute a postorder traversal of the blocks in `code`, writing the resulting order to `outOrder`.
+/// Compute a postorder traversal of the blocks in `code`, writing the resulting order to
+/// `outOrder`.
 void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
 {
     HashSet<IRBlock*> reachableSet;
     computePostorder(code, outOrder, reachableSet);
 }
 
-/// Compute a postorder traversal of the blocks in `code`, writing the resulting order to `outOrder`.
-void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder, HashSet<IRBlock*>& outReachableSet)
+/// Compute a postorder traversal of the blocks in `code`, writing the resulting order to
+/// `outOrder`.
+void computePostorder(
+    IRGlobalValueWithCode* code,
+    List<IRBlock*>& outOrder,
+    HashSet<IRBlock*>& outReachableSet)
 {
     PostorderComputationContext context;
     context.order = &outOrder;
     if (code->getFirstBlock())
-        context.walk(code->getFirstBlock(), [](IRBlock* block) {return block->getSuccessors(); });
+        context.walk(code->getFirstBlock(), [](IRBlock* block) { return block->getSuccessors(); });
 
     // Append unvisited blocks (unreachable blocks) to the begining of postOrder.
     List<IRBlock*> prefix;
@@ -382,7 +376,7 @@ void computePostorderOnReverseCFG(IRGlobalValueWithCode* code, List<IRBlock*>& o
         case kIROp_Return:
         case kIROp_MissingReturn:
         case kIROp_Unreachable:
-            context.walk(block, [](IRBlock* b) {return b->getPredecessors(); });
+            context.walk(block, [](IRBlock* b) { return b->getPredecessors(); });
             break;
         }
     }
@@ -413,7 +407,7 @@ struct DominatorTreeComputationContext
     // traversal, so that we can look up a block based on its "name"
     //
     List<IRBlock*> postorder;
-    // 
+    //
     // Also maintain a set of reachable blocks.
     //
     HashSet<IRBlock*> reachableSet;
@@ -425,10 +419,7 @@ struct DominatorTreeComputationContext
     // to an index-based representation.
     //
     Dictionary<IRBlock*, BlockName> mapBlockToName;
-    BlockName getBlockName(IRBlock* block)
-    {
-        return mapBlockToName[block];
-    }
+    BlockName getBlockName(IRBlock* block) { return mapBlockToName[block]; }
 
     //
     // The algorithm iteratively builds up an array `doms` that upon
@@ -451,7 +442,7 @@ struct DominatorTreeComputationContext
         // We will initialize our map from the block objects to their "name"
         // (index in the traversal order), before moving on.
         BlockName blockCount = BlockName(postorder.getCount());
-        for(BlockName bb = 0; bb < blockCount; ++bb)
+        for (BlockName bb = 0; bb < blockCount; ++bb)
         {
             mapBlockToName[postorder[bb]] = bb;
         }
@@ -459,7 +450,7 @@ struct DominatorTreeComputationContext
         // Next we initialize the `doms` array that we will iteratively turn
         // into an encoding of the dominator tree.
         doms.setCount(blockCount);
-        for(BlockName bb = 0; bb < blockCount; ++bb)
+        for (BlockName bb = 0; bb < blockCount; ++bb)
         {
             doms[bb] = kUndefined;
         }
@@ -482,7 +473,7 @@ struct DominatorTreeComputationContext
         // changes.
         //
         bool changed = true;
-        while(changed)
+        while (changed)
         {
             changed = false;
 
@@ -501,7 +492,7 @@ struct DominatorTreeComputationContext
             // the loop, and if the CFG had only a single block, then our *starting*
             // block index would be `-1`.
             //
-            for(auto b = blockCount - 2; b >= 0; --b)
+            for (auto b = blockCount - 2; b >= 0; --b)
             {
                 // We are walking through block indices, but the predecessor
                 // lists are encoded in the IR blocks themselves.
@@ -529,19 +520,19 @@ struct DominatorTreeComputationContext
                 BlockName new_idom = kUndefined;
 
                 // Now we will loop over *all* of the predecessors, ...
-                for(auto pred : block->getPredecessors())
+                for (auto pred : block->getPredecessors())
                 {
                     // ... and skip those that haven't been "processed".
                     BlockName p = getBlockName(pred);
                     BlockName dominatorOfPredecessor = doms[p];
-                    if(dominatorOfPredecessor == kUndefined)
+                    if (dominatorOfPredecessor == kUndefined)
                         continue;
 
                     // When we encounter the first "processed" predecessor,
                     // we can initialize the variable tracking our best
                     // guess at the immediate dominator.
                     //
-                    if(new_idom == kUndefined)
+                    if (new_idom == kUndefined)
                     {
                         new_idom = p;
                     }
@@ -564,7 +555,7 @@ struct DominatorTreeComputationContext
                 // converged yet, and we need to keep going.
                 //
                 BlockName oldDominator = doms[b];
-                if(oldDominator != new_idom)
+                if (oldDominator != new_idom)
                 {
                     doms[b] = new_idom;
                     changed = true;
@@ -610,11 +601,11 @@ struct DominatorTreeComputationContext
         BlockName finger1 = b1;
         BlockName finger2 = b2;
 
-        while(finger1 != finger2)
+        while (finger1 != finger2)
         {
-            while(finger1 < finger2)
+            while (finger1 < finger2)
                 finger1 = doms[finger1];
-            while(finger2 < finger1)
+            while (finger2 < finger1)
                 finger2 = doms[finger2];
         }
         return finger1;
@@ -665,7 +656,7 @@ struct DominatorTreeComputationContext
         // block to help us fill out the tree.
         BlockName blockCount = BlockName(doms.getCount());
         List<BlockInfo> blockInfos;
-        for(BlockName bb = 0; bb < blockCount; ++bb)
+        for (BlockName bb = 0; bb < blockCount; ++bb)
         {
             blockInfos.add(BlockInfo());
         }
@@ -680,10 +671,10 @@ struct DominatorTreeComputationContext
         // Because our blocks are ordered in postorder, we can do this
         // bottom-up walk just by iterating over them in the given order.
         //
-        for(BlockName bb = 0; bb < blockCount; ++bb)
+        for (BlockName bb = 0; bb < blockCount; ++bb)
         {
             BlockName parent = doms[bb];
-            if(parent == kUndefined)
+            if (parent == kUndefined)
                 continue;
 
             // For our iteration order to make sense, we need to be certain
@@ -706,8 +697,8 @@ struct DominatorTreeComputationContext
             //
             // When adding up the indirect descendents of `parent`, we need to include both
             // the direct and indirect descendents of our node `bb`.
-            blockInfos[parent].indirectDescendentCount += blockInfos[bb].childCount
-                + blockInfos[bb].indirectDescendentCount;
+            blockInfos[parent].indirectDescendentCount +=
+                blockInfos[bb].childCount + blockInfos[bb].indirectDescendentCount;
         }
         //
         // The next pass is a top-down pass that uses the accumulated
@@ -729,7 +720,7 @@ struct DominatorTreeComputationContext
         // For the remaining nodes, we'll compute them in a top-down
         // pass (using reverse postorder).
         //
-        for(BlockName bb = blockCount-1; bb >= 0; --bb)
+        for (BlockName bb = blockCount - 1; bb >= 0; --bb)
         {
             // We will skip nodes without a parent in the dominator tree.
             // This should really only be the start node, but it might
@@ -740,24 +731,24 @@ struct DominatorTreeComputationContext
             // else add a pass to eliminate unreachable blocks first.
             //
             BlockName parent = doms[bb];
-            if(parent == kUndefined)
+            if (parent == kUndefined)
                 continue;
 
             // The absolute index of a node is the absolute index for its
             // parent's descendent list, plus the relative offset of this
             // child node in its parent.
             //
-            blockInfos[bb].nodeIndex = blockInfos[parent].firstDescendentIndex
-                + blockInfos[bb].childOffsetInParent;
+            blockInfos[bb].nodeIndex =
+                blockInfos[parent].firstDescendentIndex + blockInfos[bb].childOffsetInParent;
 
             // The other descendents of a node are always laid out in the space
             // after its immediate children. Thus, the index for where this node
             // will place its descendents (direct + indirect) must come after
             // the storage for the children of the parent.
             //
-            blockInfos[bb].firstDescendentIndex = blockInfos[parent].firstDescendentIndex
-                + blockInfos[parent].childCount
-                + blockInfos[bb].descendentOffsetInParent;
+            blockInfos[bb].firstDescendentIndex = blockInfos[parent].firstDescendentIndex +
+                                                  blockInfos[parent].childCount +
+                                                  blockInfos[bb].descendentOffsetInParent;
         }
 
         // We now have all the information we need, and can start to fill in
@@ -776,7 +767,7 @@ struct DominatorTreeComputationContext
         // to be careful around whehter we are working with a block index/name,
         // or a node index.
         //
-        for(BlockName bb = 0; bb < blockCount; ++bb)
+        for (BlockName bb = 0; bb < blockCount; ++bb)
         {
             // Find the IR block, look up our pre-computed information,
             // and find the corresponding node in the dominator tree.
@@ -799,7 +790,8 @@ struct DominatorTreeComputationContext
             // over to its corresponding node index.
             //
             BlockName parent = doms[bb];
-            node.parent = parent == kUndefined ? IRDominatorTree::kInvalidIndex : blockInfos[parent].nodeIndex;
+            node.parent = parent == kUndefined ? IRDominatorTree::kInvalidIndex
+                                               : blockInfos[parent].nodeIndex;
 
             // Finally we need to compute the range information to use for the
             // descendents (both immediate children and indirect descendents).
@@ -857,4 +849,4 @@ RefPtr<IRDominatorTree> computeDominatorTree(IRGlobalValueWithCode* code)
     return context.createDominatorTree(code);
 }
 
-}
+} // namespace Slang

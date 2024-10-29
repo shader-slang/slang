@@ -1,14 +1,12 @@
 // unit-test-byte-encode.cpp
 
 #include "../../source/core/slang-byte-encode-util.h"
+#include "../../source/core/slang-list.h"
+#include "../../source/core/slang-random-generator.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-
-#include "../../source/core/slang-random-generator.h"
-#include "../../source/core/slang-list.h"
 
 using namespace Slang;
 
@@ -91,28 +89,38 @@ SLANG_UNIT_TEST(byteEncode)
         {
             const int v = ByteEncodeUtil::calcMsb8(uint32_t((randGen.nextInt32() & 0xf) | 1));
 
-            // Make the commonality of different numbers that bytes are most common, then shorts etc..
+            // Make the commonality of different numbers that bytes are most common, then shorts
+            // etc..
             uint32_t mask;
             switch (v)
             {
-                case 0: mask = 0xffffffff; break;
-                case 1: mask = 0x00ffffff; break;
-                case 2: mask = 0x0000ffff; break;
-                case 3: mask = 0x000000ff; break;
+            case 0: mask = 0xffffffff; break;
+            case 1: mask = 0x00ffffff; break;
+            case 2: mask = 0x0000ffff; break;
+            case 3: mask = 0x000000ff; break;
             }
 
             initialBuffer[i] = randGen.nextInt32() & mask;
         }
-        
-        size_t numEncodeBytes = ByteEncodeUtil::encodeLiteUInt32(initialBuffer.begin(), blockSize, encodedBuffer.begin());
 
-        SLANG_CHECK(ByteEncodeUtil::calcEncodeLiteSizeUInt32(initialBuffer.begin(), blockSize) == numEncodeBytes);
+        size_t numEncodeBytes = ByteEncodeUtil::encodeLiteUInt32(
+            initialBuffer.begin(),
+            blockSize,
+            encodedBuffer.begin());
 
-        size_t numEncodeBytes2 = ByteEncodeUtil::decodeLiteUInt32(encodedBuffer.begin(), blockSize, decodeBuffer.begin());
-       
+        SLANG_CHECK(
+            ByteEncodeUtil::calcEncodeLiteSizeUInt32(initialBuffer.begin(), blockSize) ==
+            numEncodeBytes);
+
+        size_t numEncodeBytes2 = ByteEncodeUtil::decodeLiteUInt32(
+            encodedBuffer.begin(),
+            blockSize,
+            decodeBuffer.begin());
+
         SLANG_CHECK(numEncodeBytes2 == numEncodeBytes);
-        
-        SLANG_CHECK(memcmp(decodeBuffer.begin(), initialBuffer.begin(), sizeof(uint32_t) * blockSize) == 0);
+
+        SLANG_CHECK(
+            memcmp(decodeBuffer.begin(), initialBuffer.begin(), sizeof(uint32_t) * blockSize) == 0);
     }
 
     {
@@ -134,6 +142,5 @@ SLANG_UNIT_TEST(byteEncode)
             checkUInt32(uint32_t(i));
         }
 #endif
-    } 
-
+    }
 }

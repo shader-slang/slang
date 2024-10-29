@@ -2,13 +2,14 @@
  * MD5 implementation is based on:
  * http://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
  * Original file header is at the bottom of this file.
- * 
+ *
  * SHA1 implementation is based on:
  * https://github.com/983/SHA1
  * Original LICENSE is at the bottom of this file.
  */
 
 #include "slang-crypto.h"
+
 #include "../core/slang-char-util.h"
 
 namespace Slang
@@ -32,7 +33,11 @@ namespace Slang
     return str;
 }
 
-/*static*/ bool DigestUtil::stringToDigest(const char* str, SlangInt strLength, void *digest, SlangInt digestSize)
+/*static*/ bool DigestUtil::stringToDigest(
+    const char* str,
+    SlangInt strLength,
+    void* digest,
+    SlangInt digestSize)
 {
     SLANG_ASSERT(str && strLength >= 0 && digest && digestSize >= 0);
 
@@ -52,7 +57,8 @@ namespace Slang
             ::memset(digest, 0, digestSize);
             return false;
         }
-        data[i] = uint8_t(lower | upper << 4);;
+        data[i] = uint8_t(lower | upper << 4);
+        ;
     }
 
     return true;
@@ -164,17 +170,17 @@ MD5::Digest MD5::finalize()
  * architectures that lack an AND-NOT instruction, just like in Colin Plumb's
  * implementation.
  */
-#define F(x, y, z)			((z) ^ ((x) & ((y) ^ (z))))
-#define G(x, y, z)			((y) ^ ((z) & ((x) ^ (y))))
-#define H(x, y, z)			(((x) ^ (y)) ^ (z))
-#define H2(x, y, z)			((x) ^ ((y) ^ (z)))
-#define I(x, y, z)			((y) ^ ((x) | ~(z)))
+#define F(x, y, z) ((z) ^ ((x) & ((y) ^ (z))))
+#define G(x, y, z) ((y) ^ ((z) & ((x) ^ (y))))
+#define H(x, y, z) (((x) ^ (y)) ^ (z))
+#define H2(x, y, z) ((x) ^ ((y) ^ (z)))
+#define I(x, y, z) ((y) ^ ((x) | ~(z)))
 
 /*
  * The MD5 transformation for all four rounds.
  */
-#define STEP(f, a, b, c, d, x, t, s) \
-    (a) += f((b), (c), (d)) + (x) + (t); \
+#define STEP(f, a, b, c, d, x, t, s)                           \
+    (a) += f((b), (c), (d)) + (x) + (t);                       \
     (a) = (((a) << (s)) | (((a) & 0xffffffff) >> (32 - (s)))); \
     (a) += (b);
 
@@ -182,14 +188,10 @@ MD5::Digest MD5::finalize()
  * SET reads 4 input bytes in little-endian byte order and stores them in a
  * properly aligned word in host byte order.
  */
-#define SET(n) \
-    (m_block[(n)] = \
-    (uint32_t)ptr[(n) * 4] | \
-    ((uint32_t)ptr[(n) * 4 + 1] << 8) | \
-    ((uint32_t)ptr[(n) * 4 + 2] << 16) | \
-    ((uint32_t)ptr[(n) * 4 + 3] << 24))
-#define GET(n) \
-    (m_block[(n)])
+#define SET(n)                                                                   \
+    (m_block[(n)] = (uint32_t)ptr[(n) * 4] | ((uint32_t)ptr[(n) * 4 + 1] << 8) | \
+                    ((uint32_t)ptr[(n) * 4 + 2] << 16) | ((uint32_t)ptr[(n) * 4 + 3] << 24))
+#define GET(n) (m_block[(n)])
 
 const void* MD5::processBlock(const void* data, SlangInt size)
 {
@@ -286,8 +288,7 @@ const void* MD5::processBlock(const void* data, SlangInt size)
         d += saved_d;
 
         ptr += 64;
-    }
-    while (size -= 64);
+    } while (size -= 64);
 
     m_a = a;
     m_b = b;
@@ -405,14 +406,12 @@ void SHA1::addByte(uint8_t byte)
 
 void SHA1::processBlock(const uint8_t* ptr)
 {
-    auto rol32 = [](uint32_t x, uint32_t n)
-    {
-        return (x << n) | (x >> (32 - n));
-    };
+    auto rol32 = [](uint32_t x, uint32_t n) { return (x << n) | (x >> (32 - n)); };
 
     auto makeWord = [](const uint8_t* p)
     {
-        return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+        return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) |
+               (uint32_t)p[3];
     };
 
     const uint32_t c0 = 0x5a827999;
@@ -433,23 +432,34 @@ void SHA1::processBlock(const uint8_t* ptr)
         w[i] = makeWord(ptr + i * 4);
     }
 
-#define SHA1_LOAD(i) w[i&15] = rol32(w[(i + 13) & 15] ^ w[(i + 8) & 15] ^ w[(i + 2) & 15] ^ w[i & 15], 1);
-#define SHA1_ROUND_0(v,u,x,y,z,i)              z += ((u & (x ^ y)) ^ y) + w[i & 15] + c0 + rol32(v, 5); u = rol32(u, 30);
-#define SHA1_ROUND_1(v,u,x,y,z,i) SHA1_LOAD(i) z += ((u & (x ^ y)) ^ y) + w[i & 15] + c0 + rol32(v, 5); u = rol32(u, 30);
-#define SHA1_ROUND_2(v,u,x,y,z,i) SHA1_LOAD(i) z += (u ^ x ^ y) + w[i & 15] + c1 + rol32(v, 5); u = rol32(u, 30);
-#define SHA1_ROUND_3(v,u,x,y,z,i) SHA1_LOAD(i) z += (((u | x) & y) | (u & x)) + w[i & 15] + c2 + rol32(v, 5); u = rol32(u, 30);
-#define SHA1_ROUND_4(v,u,x,y,z,i) SHA1_LOAD(i) z += (u ^ x ^ y) + w[i & 15] + c3 + rol32(v, 5); u = rol32(u, 30);
+#define SHA1_LOAD(i) \
+    w[i & 15] = rol32(w[(i + 13) & 15] ^ w[(i + 8) & 15] ^ w[(i + 2) & 15] ^ w[i & 15], 1);
+#define SHA1_ROUND_0(v, u, x, y, z, i)                       \
+    z += ((u & (x ^ y)) ^ y) + w[i & 15] + c0 + rol32(v, 5); \
+    u = rol32(u, 30);
+#define SHA1_ROUND_1(v, u, x, y, z, i)                                    \
+    SHA1_LOAD(i) z += ((u & (x ^ y)) ^ y) + w[i & 15] + c0 + rol32(v, 5); \
+    u = rol32(u, 30);
+#define SHA1_ROUND_2(v, u, x, y, z, i)                            \
+    SHA1_LOAD(i) z += (u ^ x ^ y) + w[i & 15] + c1 + rol32(v, 5); \
+    u = rol32(u, 30);
+#define SHA1_ROUND_3(v, u, x, y, z, i)                                          \
+    SHA1_LOAD(i) z += (((u | x) & y) | (u & x)) + w[i & 15] + c2 + rol32(v, 5); \
+    u = rol32(u, 30);
+#define SHA1_ROUND_4(v, u, x, y, z, i)                            \
+    SHA1_LOAD(i) z += (u ^ x ^ y) + w[i & 15] + c3 + rol32(v, 5); \
+    u = rol32(u, 30);
 
-    SHA1_ROUND_0(a, b, c, d, e,  0);
-    SHA1_ROUND_0(e, a, b, c, d,  1);
-    SHA1_ROUND_0(d, e, a, b, c,  2);
-    SHA1_ROUND_0(c, d, e, a, b,  3);
-    SHA1_ROUND_0(b, c, d, e, a,  4);
-    SHA1_ROUND_0(a, b, c, d, e,  5);
-    SHA1_ROUND_0(e, a, b, c, d,  6);
-    SHA1_ROUND_0(d, e, a, b, c,  7);
-    SHA1_ROUND_0(c, d, e, a, b,  8);
-    SHA1_ROUND_0(b, c, d, e, a,  9);
+    SHA1_ROUND_0(a, b, c, d, e, 0);
+    SHA1_ROUND_0(e, a, b, c, d, 1);
+    SHA1_ROUND_0(d, e, a, b, c, 2);
+    SHA1_ROUND_0(c, d, e, a, b, 3);
+    SHA1_ROUND_0(b, c, d, e, a, 4);
+    SHA1_ROUND_0(a, b, c, d, e, 5);
+    SHA1_ROUND_0(e, a, b, c, d, 6);
+    SHA1_ROUND_0(d, e, a, b, c, 7);
+    SHA1_ROUND_0(c, d, e, a, b, 8);
+    SHA1_ROUND_0(b, c, d, e, a, 9);
     SHA1_ROUND_0(a, b, c, d, e, 10);
     SHA1_ROUND_0(e, a, b, c, d, 11);
     SHA1_ROUND_0(d, e, a, b, c, 12);
@@ -535,14 +545,14 @@ void SHA1::processBlock(const uint8_t* ptr)
     m_state[4] += e;
 }
 
-/* static */SHA1::Digest SHA1::compute(const void* data, SlangInt size)
+/* static */ SHA1::Digest SHA1::compute(const void* data, SlangInt size)
 {
     SHA1 sha1;
     sha1.update(data, size);
     return sha1.finalize();
 }
 
-}
+} // namespace Slang
 
 
 /*
@@ -584,12 +594,12 @@ void SHA1::processBlock(const uint8_t* ptr)
 
 /*
  * This is free and unencumbered software released into the public domain.
- * 
+ *
  * Anyone is free to copy, modify, publish, use, compile, sell, or
  * distribute this software, either in source code form or as a compiled
  * binary, for any purpose, commercial or non-commercial, and by any
  * means.
- * 
+ *
  * In jurisdictions that recognize copyright laws, the author or authors
  * of this software dedicate any and all copyright interest in the
  * software to the public domain. We make this dedication for the benefit
@@ -597,7 +607,7 @@ void SHA1::processBlock(const uint8_t* ptr)
  * successors. We intend this dedication to be an overt act of
  * relinquishment in perpetuity of all present and future rights to this
  * software under copyright law.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -605,6 +615,6 @@ void SHA1::processBlock(const uint8_t* ptr)
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- * 
+ *
  * For more information, please refer to <http://unlicense.org>
  */

@@ -7,17 +7,13 @@ using namespace Slang;
 namespace platform
 {
 
-void Application::init()
-{
-}
+void Application::init() {}
 
-void Application::doEvents() { }
+void Application::doEvents() {}
 
-void Application::quit() { }
+void Application::quit() {}
 
-void Application::dispose()
-{
-}
+void Application::dispose() {}
 
 void Application::run(Window* mainWindow, bool waitForEvents)
 {
@@ -25,7 +21,10 @@ void Application::run(Window* mainWindow, bool waitForEvents)
     SLANG_UNUSED(waitForEvents);
 }
 
-Window* Application::createWindow(const WindowDesc& desc) { return nullptr; }
+Window* Application::createWindow(const WindowDesc& desc)
+{
+    return nullptr;
+}
 
 
 } // namespace platform

@@ -1,35 +1,29 @@
 // slang-ir-strip.cpp
 #include "slang-ir-strip.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
-namespace Slang {
-
-    /// Should `inst` be stripped, given the current `options`?
-static bool _shouldStripInst(
-    IRInst*                 inst,
-    IRStripOptions const&   options)
+namespace Slang
 {
-    switch( inst->getOp() )
+
+/// Should `inst` be stripped, given the current `options`?
+static bool _shouldStripInst(IRInst* inst, IRStripOptions const& options)
+{
+    switch (inst->getOp())
     {
-    default:
-        return false;
+    default: return false;
 
-    case kIROp_HighLevelDeclDecoration:
-        return true;
+    case kIROp_HighLevelDeclDecoration: return true;
 
-    case kIROp_NameHintDecoration:
-        return options.shouldStripNameHints;
+    case kIROp_NameHintDecoration: return options.shouldStripNameHints;
     }
 }
 
-    /// Recursively strip `inst` and its children according to `options`.
-static void _stripFrontEndOnlyInstructionsRec(
-    IRInst*                 inst,
-    IRStripOptions const&   options)
+/// Recursively strip `inst` and its children according to `options`.
+static void _stripFrontEndOnlyInstructionsRec(IRInst* inst, IRStripOptions const& options)
 {
-    if( _shouldStripInst(inst, options) )
+    if (_shouldStripInst(inst, options))
     {
         inst->removeAndDeallocate();
         return;
@@ -41,7 +35,7 @@ static void _stripFrontEndOnlyInstructionsRec(
     }
 
     IRInst* nextChild = nullptr;
-    for( IRInst* child = inst->getFirstDecorationOrChild(); child; child = nextChild )
+    for (IRInst* child = inst->getFirstDecorationOrChild(); child; child = nextChild)
     {
         nextChild = child->getNextInst();
 
@@ -49,11 +43,9 @@ static void _stripFrontEndOnlyInstructionsRec(
     }
 }
 
-void stripFrontEndOnlyInstructions(
-    IRModule*               module,
-    IRStripOptions const&   options)
+void stripFrontEndOnlyInstructions(IRModule* module, IRStripOptions const& options)
 {
     _stripFrontEndOnlyInstructionsRec(module->getModuleInst(), options);
 }
 
-}
+} // namespace Slang

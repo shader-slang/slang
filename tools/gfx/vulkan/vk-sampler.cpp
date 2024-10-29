@@ -11,7 +11,8 @@ namespace vk
 
 SamplerStateImpl::SamplerStateImpl(DeviceImpl* device)
     : m_device(device)
-{}
+{
+}
 
 SamplerStateImpl::~SamplerStateImpl()
 {

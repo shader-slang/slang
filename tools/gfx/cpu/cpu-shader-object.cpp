@@ -54,7 +54,6 @@ ResourceViewBase* CPUShaderObjectData::getResourceView(
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = Format::Unknown;
         m_bufferView = new BufferResourceViewImpl(viewDesc, m_bufferResource);
-
     }
     m_bufferResource->getDesc()->sizeInBytes = m_ordinaryData.getCount();
     m_bufferResource->m_data = m_ordinaryData.getBuffer();
@@ -129,7 +128,7 @@ SLANG_NO_THROW GfxCount SLANG_MCALL ShaderObjectImpl::getEntryPointCount()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
+ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     *outEntryPoint = nullptr;
     return SLANG_OK;
@@ -146,7 +145,7 @@ SLANG_NO_THROW size_t SLANG_MCALL ShaderObjectImpl::getSize()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setData(ShaderOffset const& offset, void const* data, size_t size)
+ShaderObjectImpl::setData(ShaderOffset const& offset, void const* data, size_t size)
 {
     size = Math::Min(size, size_t(m_data.getCount() - offset.uniformOffset));
     memcpy((char*)m_data.getBuffer() + offset.uniformOffset, data, size);
@@ -154,7 +153,7 @@ SLANG_NO_THROW Result SLANG_MCALL
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* inView)
+ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* inView)
 {
     auto layout = getLayout();
 
@@ -172,40 +171,40 @@ SLANG_NO_THROW Result SLANG_MCALL
     switch (view->getViewKind())
     {
     case ResourceViewImpl::Kind::Texture:
-    {
-        auto textureView = static_cast<TextureResourceViewImpl*>(view);
+        {
+            auto textureView = static_cast<TextureResourceViewImpl*>(view);
 
-        slang_prelude::IRWTexture* textureObj = textureView;
-        SLANG_RETURN_ON_FAIL(setData(offset, &textureObj, sizeof(textureObj)));
-    }
-    break;
+            slang_prelude::IRWTexture* textureObj = textureView;
+            SLANG_RETURN_ON_FAIL(setData(offset, &textureObj, sizeof(textureObj)));
+        }
+        break;
 
     case ResourceViewImpl::Kind::Buffer:
-    {
-        auto bufferView = static_cast<BufferResourceViewImpl*>(view);
-        auto buffer = bufferView->getBuffer();
-        auto desc = *buffer->getDesc();
+        {
+            auto bufferView = static_cast<BufferResourceViewImpl*>(view);
+            auto buffer = bufferView->getBuffer();
+            auto desc = *buffer->getDesc();
 
-        void* dataPtr = buffer->m_data;
-        size_t size = desc.sizeInBytes;
-        if (desc.elementSize > 1)
-            size /= desc.elementSize;
+            void* dataPtr = buffer->m_data;
+            size_t size = desc.sizeInBytes;
+            if (desc.elementSize > 1)
+                size /= desc.elementSize;
 
-        auto ptrOffset = offset;
-        SLANG_RETURN_ON_FAIL(setData(ptrOffset, &dataPtr, sizeof(dataPtr)));
+            auto ptrOffset = offset;
+            SLANG_RETURN_ON_FAIL(setData(ptrOffset, &dataPtr, sizeof(dataPtr)));
 
-        auto sizeOffset = offset;
-        sizeOffset.uniformOffset += sizeof(dataPtr);
-        SLANG_RETURN_ON_FAIL(setData(sizeOffset, &size, sizeof(size)));
-    }
-    break;
+            auto sizeOffset = offset;
+            sizeOffset.uniformOffset += sizeof(dataPtr);
+            SLANG_RETURN_ON_FAIL(setData(sizeOffset, &size, sizeof(size)));
+        }
+        break;
     }
 
     return SLANG_OK;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setObject(ShaderOffset const& offset, IShaderObject* object)
+ShaderObjectImpl::setObject(ShaderOffset const& offset, IShaderObject* object)
 {
     SLANG_RETURN_ON_FAIL(Super::setObject(offset, object));
 
@@ -217,21 +216,20 @@ SLANG_NO_THROW Result SLANG_MCALL
     switch (bindingRange.bindingType)
     {
     default:
-    {
-        void* bufferPtr = subObject->m_data.getBuffer();
-        SLANG_RETURN_ON_FAIL(setData(offset, &bufferPtr, sizeof(void*)));
-    }
-    break;
+        {
+            void* bufferPtr = subObject->m_data.getBuffer();
+            SLANG_RETURN_ON_FAIL(setData(offset, &bufferPtr, sizeof(void*)));
+        }
+        break;
     case slang::BindingType::ExistentialValue:
     case slang::BindingType::RawBuffer:
-    case slang::BindingType::MutableRawBuffer:
-        break;
+    case slang::BindingType::MutableRawBuffer: break;
     }
     return SLANG_OK;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
+ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
 {
     SLANG_UNUSED(sampler);
     SLANG_UNUSED(offset);
@@ -239,7 +237,9 @@ SLANG_NO_THROW Result SLANG_MCALL
 }
 
 SLANG_NO_THROW Result SLANG_MCALL ShaderObjectImpl::setCombinedTextureSampler(
-    ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler)
+    ShaderOffset const& offset,
+    IResourceView* textureView,
+    ISamplerState* sampler)
 {
     SLANG_UNUSED(sampler);
     setResource(offset, textureView);
@@ -294,7 +294,7 @@ SLANG_NO_THROW GfxCount SLANG_MCALL RootShaderObjectImpl::getEntryPointCount()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
+RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
     returnComPtr(outEntryPoint, m_entryPoints[index]);
     return SLANG_OK;

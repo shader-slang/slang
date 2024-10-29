@@ -2,12 +2,12 @@
 #ifndef SLANG_DOC_MARKDOWN_WRITER_H
 #define SLANG_DOC_MARKDOWN_WRITER_H
 
-#include "slang-doc-ast.h"
-
 #include "slang-ast-print.h"
 #include "slang-compiler.h"
+#include "slang-doc-ast.h"
 
-namespace Slang {
+namespace Slang
+{
 
 class ASTBuilder;
 
@@ -94,7 +94,11 @@ struct DeclDocumentation
     void parse(const UnownedStringSlice& text);
     void writeDescription(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl);
     void writeGenericParameters(StringBuilder& out, DocMarkdownWriter* writer, Decl* decl);
-    void writeSection(StringBuilder& sb, DocMarkdownWriter* writer, Decl* decl, DocPageSection section);
+    void writeSection(
+        StringBuilder& sb,
+        DocMarkdownWriter* writer,
+        Decl* decl,
+        DocPageSection section);
 };
 
 struct DocMarkdownWriter
@@ -121,12 +125,15 @@ struct DocMarkdownWriter
         typedef Requirement ThisType;
 
         bool operator==(const ThisType& rhs) const { return capabilitySet == rhs.capabilitySet; }
-        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(capabilitySet == rhs.capabilitySet); }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const
+        {
+            return !(capabilitySet == rhs.capabilitySet);
+        }
 
         CapabilitySet capabilitySet;
     };
 
-        /// Write out all documentation to the output buffer
+    /// Write out all documentation to the output buffer
     DocumentPage* writeAll(UnownedStringSlice configStr);
     String writeTOC();
 
@@ -138,11 +145,17 @@ struct DocMarkdownWriter
     void writePageRecursive(DocumentPage* page);
     void writePage(DocumentPage* page);
 
-        /// This will write information about *all* of the overridden versions of a function/method
-    void writeCallableOverridable(DocumentPage* page, const ASTMarkup::Entry& entry, CallableDecl* callable);
+    /// This will write information about *all* of the overridden versions of a function/method
+    void writeCallableOverridable(
+        DocumentPage* page,
+        const ASTMarkup::Entry& entry,
+        CallableDecl* callable);
 
     void writeEnum(const ASTMarkup::Entry& entry, EnumDecl* enumDecl);
-    void writeAggType(DocumentPage* page, const ASTMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl);
+    void writeAggType(
+        DocumentPage* page,
+        const ASTMarkup::Entry& entry,
+        AggTypeDeclBase* aggTypeDecl);
     void writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl);
     void writeProperty(const ASTMarkup::Entry& entry, PropertyDecl* propertyDecl);
     void writeTypeDef(const ASTMarkup::Entry& entry, TypeDefDecl* typeDefDecl);
@@ -154,32 +167,38 @@ struct DocMarkdownWriter
     void writePreamble();
 
     void writeSignature(CallableDecl* callableDecl);
-    void writeExtensionConditions(StringBuilder& sb, ExtensionDecl* decl, const char* prefix, bool isHtml);
+    void writeExtensionConditions(
+        StringBuilder& sb,
+        ExtensionDecl* decl,
+        const char* prefix,
+        bool isHtml);
 
     bool isVisible(const ASTMarkup::Entry& entry);
     bool isVisible(Decl* decl);
     bool isVisible(const Name* name);
 
-    DocumentPage* findPageForToken(DocumentPage* currentPage, String token, String& outSectionName, Decl*& outDecl);
+    DocumentPage* findPageForToken(
+        DocumentPage* currentPage,
+        String token,
+        String& outSectionName,
+        Decl*& outDecl);
     String findLinkForToken(DocumentPage* currentPage, String token);
 
-        /// Get the output string
+    /// Get the output string
     Dictionary<String, RefPtr<DocumentPage>>& getOutput() { return m_output; }
 
     DocumentPage* getPage(Decl* decl);
     StringBuilder* getBuilder(Decl* decl);
 
-        /// Ctor.
-    DocMarkdownWriter(ASTMarkup* markup, ASTBuilder* astBuilder, DiagnosticSink* sink) :
-        m_markup(markup),
-        m_astBuilder(astBuilder),
-        m_sink(sink)
+    /// Ctor.
+    DocMarkdownWriter(ASTMarkup* markup, ASTBuilder* astBuilder, DiagnosticSink* sink)
+        : m_markup(markup), m_astBuilder(astBuilder), m_sink(sink)
     {
     }
 
     struct StringListSet;
-    
-        /// Given a list of ASTPrinter::Parts, works out the different parts of the sig
+
+    /// Given a list of ASTPrinter::Parts, works out the different parts of the sig
     static void getSignature(const List<Part>& parts, Signature& outSig);
 
     struct NameAndText
@@ -199,7 +218,7 @@ struct DocMarkdownWriter
     NameAndText _getNameAndText(ASTMarkup::Entry* entry, Decl* decl);
     NameAndText _getNameAndText(Decl* decl);
 
-    template <typename T>
+    template<typename T>
     List<NameAndText> _getAsNameAndTextList(const FilteredMemberList<T>& in)
     {
         List<NameAndText> out;
@@ -209,7 +228,7 @@ struct DocMarkdownWriter
         }
         return out;
     }
-    template <typename T>
+    template<typename T>
     List<String> _getAsStringList(const List<T*>& in)
     {
         List<String> strings;
@@ -229,11 +248,13 @@ struct DocMarkdownWriter
     void _appendCommaList(const List<String>& strings, char wrapChar);
 
     void _appendRequirements(const DocMarkdownWriter::Requirement& requirements);
-    void _maybeAppendRequirements(const UnownedStringSlice& title, const List<DocMarkdownWriter::Requirement>& uniqueRequirements);
+    void _maybeAppendRequirements(
+        const UnownedStringSlice& title,
+        const List<DocMarkdownWriter::Requirement>& uniqueRequirements);
 
     void _appendExpr(StringBuilder& sb, Expr* expr);
 
-        /// Appends prefix and the list of types derived from
+    /// Appends prefix and the list of types derived from
     void _appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl);
     void _appendEscaped(const UnownedStringSlice& text);
 

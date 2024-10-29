@@ -2,7 +2,6 @@
 #pragma once
 
 #include "../core/slang-dictionary.h"
-
 #include "slang-ir.h"
 
 namespace Slang
@@ -14,38 +13,38 @@ struct IRInst;
 // correcting "cloning" IR code, whether individual
 // instructions, or whole functions.
 
-    /// An environment for mapping existing values to their cloned replacements.
-    ///
-    /// This type serves two main roles in the process of IR cloning:
-    ///
-    /// * Before cloning begins, a client will usually
-    ///   register the mapping from things that are to be
-    ///   replaced entirely (like function parameters to
-    ///   be specialized away) to their replacements (e.g.,
-    ///   a constant value).
-    ///
-    /// * During the process of cloning, env environment
-    ///   will be maintained and updated so that when, e.g.,
-    ///   an instruction later in a function refers to
-    ///   something from earlier, we can look up the
-    ///   replacement.
-    ///
+/// An environment for mapping existing values to their cloned replacements.
+///
+/// This type serves two main roles in the process of IR cloning:
+///
+/// * Before cloning begins, a client will usually
+///   register the mapping from things that are to be
+///   replaced entirely (like function parameters to
+///   be specialized away) to their replacements (e.g.,
+///   a constant value).
+///
+/// * During the process of cloning, env environment
+///   will be maintained and updated so that when, e.g.,
+///   an instruction later in a function refers to
+///   something from earlier, we can look up the
+///   replacement.
+///
 struct IRCloneEnv
 {
-        /// A mapping from old values to their replacements.
+    /// A mapping from old values to their replacements.
     Dictionary<IRInst*, IRInst*> mapOldValToNew;
 
-        /// A parent environment to fall back to if `mapOldValToNew` doesn't contain a key.
+    /// A parent environment to fall back to if `mapOldValToNew` doesn't contain a key.
     IRCloneEnv* parent = nullptr;
 
-        /// Should `mapOldValToNew` keep a copy of children's oldToNew mapping?
+    /// Should `mapOldValToNew` keep a copy of children's oldToNew mapping?
     bool squashChildrenMapping = false;
 };
 
-    /// Look up the replacement for `oldVal`, if any, registered in `env`.
-    ///
-    /// Returns `nullptr` if `oldVal` has no registered replacement.
-    ///
+/// Look up the replacement for `oldVal`, if any, registered in `env`.
+///
+/// Returns `nullptr` if `oldVal` has no registered replacement.
+///
 IRInst* lookUp(IRCloneEnv* env, IRInst* oldVal);
 
 // The SSA property and the way we have structured
@@ -66,95 +65,85 @@ IRInst* lookUp(IRCloneEnv* env, IRInst* oldVal);
 // and its direct operands, but not any decorations
 // or children.
 
-    /// Clone `oldInst` and its direct operands.
-    ///
-    /// The "direct operands" include the type of the instruction.
-    /// The type and operands of `oldInst` will be mapped to now
-    /// values using `findOrCloneOperand` with the given `env`.
-    ///
-    /// Any new instruction that gets emitted will be output to
-    /// the provided `builder`, which must be non-null.
-    ///
-    /// This operation does *not* clone any children or decorations on `oldInst`.
-    /// This operation does *not* register its result as a replacement
-    /// for `oldInst` in the given `env`.
-    ///
-IRInst* cloneInstAndOperands(
-    IRCloneEnv*     env,
-    IRBuilder*      builder,
-    IRInst*         oldInst);
+/// Clone `oldInst` and its direct operands.
+///
+/// The "direct operands" include the type of the instruction.
+/// The type and operands of `oldInst` will be mapped to now
+/// values using `findOrCloneOperand` with the given `env`.
+///
+/// Any new instruction that gets emitted will be output to
+/// the provided `builder`, which must be non-null.
+///
+/// This operation does *not* clone any children or decorations on `oldInst`.
+/// This operation does *not* register its result as a replacement
+/// for `oldInst` in the given `env`.
+///
+IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst);
 
 // The second phase of cloning an instruction is to clone
 // its decorations and children. This step only needs to
 // be performed on those instructions that *have* decorations
 // and/or children.
 
-    /// Clone any decorations and/or children of `oldInst` onto `newInst`
-    ///
-    /// Any new instructions that get emitted will use the
-    /// provided `sharedBuilder`, which must be non-null.
-    ///
-    /// During the process of cloning decorations/children, operand values
-    /// will be looked up in the provided `env`, which should provide
-    /// replacement values for instructions that should have a different
-    /// identity in the clone.
-    /// The provided `env` will *not* be updated/modified during the
-    /// process of cloding decorations/children.
-    ///
-    /// If any child or decoration on `oldInst` already has a replacement
-    /// registered in `env`, it will *not* be cloned into `newInst`.
-    ///
+/// Clone any decorations and/or children of `oldInst` onto `newInst`
+///
+/// Any new instructions that get emitted will use the
+/// provided `sharedBuilder`, which must be non-null.
+///
+/// During the process of cloning decorations/children, operand values
+/// will be looked up in the provided `env`, which should provide
+/// replacement values for instructions that should have a different
+/// identity in the clone.
+/// The provided `env` will *not* be updated/modified during the
+/// process of cloding decorations/children.
+///
+/// If any child or decoration on `oldInst` already has a replacement
+/// registered in `env`, it will *not* be cloned into `newInst`.
+///
 void cloneInstDecorationsAndChildren(
-    IRCloneEnv*         env,
-    IRModule*           module,
-    IRInst*             oldInst,
-    IRInst*             newInst);
+    IRCloneEnv* env,
+    IRModule* module,
+    IRInst* oldInst,
+    IRInst* newInst);
 
 // For the case where the user knows the sequencing constraints
 // on cloning operands before uses can be satisfied, we provide
 // a convenience wrapper around the two phases of cloning:
 
-    /// Clone `oldInst` and return the cloned value.
-    ///
-    /// This function is a convenience wrapper around
-    /// `cloneInstAndOperands` and `cloneInstDecorationsAndChildren`.
-    /// It also registers the resultint instruction as
-    /// the replacement value for `oldInst` in the given `env`
-    /// which must therefore be non-null.
-    ///
-IRInst* cloneInst(
-    IRCloneEnv*     env,
-    IRBuilder*      builder,
-    IRInst*         oldInst);
+/// Clone `oldInst` and return the cloned value.
+///
+/// This function is a convenience wrapper around
+/// `cloneInstAndOperands` and `cloneInstDecorationsAndChildren`.
+/// It also registers the resultint instruction as
+/// the replacement value for `oldInst` in the given `env`
+/// which must therefore be non-null.
+///
+IRInst* cloneInst(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst);
 
-    /// Clone `oldDecoration` and attach the clone to `newParent`.
-    ///
-    /// Uses `module` to allocate any new instructions.
-    ///
+/// Clone `oldDecoration` and attach the clone to `newParent`.
+///
+/// Uses `module` to allocate any new instructions.
+///
 void cloneDecoration(
-    IRCloneEnv*     parentEnv,
-    IRDecoration*   oldDecoration,
-    IRInst*         newParent,
-    IRModule*       module);
+    IRCloneEnv* parentEnv,
+    IRDecoration* oldDecoration,
+    IRInst* newParent,
+    IRModule* module);
 
-    /// Clone `oldDecoration` and attach the clone to `newParent`.
-    ///
-    /// Uses the module of `newParent` to allocate any new instructions,
-    /// so that `newParent` must already be installed somewhere
-    /// in the ownership hierarchy of an existing module.
-    ///
-void cloneDecoration(
-    IRDecoration*   oldDecoration,
-    IRInst*         newParent);
+/// Clone `oldDecoration` and attach the clone to `newParent`.
+///
+/// Uses the module of `newParent` to allocate any new instructions,
+/// so that `newParent` must already be installed somewhere
+/// in the ownership hierarchy of an existing module.
+///
+void cloneDecoration(IRDecoration* oldDecoration, IRInst* newParent);
 
 
-    /// Find the "cloned" value to use for an operand.
-    ///
-    /// This either returns the value registered for `oldOperand`
-    /// in `env`, or else `oldOperand` itself.
-IRInst* findCloneForOperand(
-    IRCloneEnv*     env,
-    IRInst*         oldOperand);
+/// Find the "cloned" value to use for an operand.
+///
+/// This either returns the value registered for `oldOperand`
+/// in `env`, or else `oldOperand` itself.
+IRInst* findCloneForOperand(IRCloneEnv* env, IRInst* oldOperand);
 
 // It isn't technically part of the cloning infrastructure,
 // but when make specialized copies of IR instructions via
@@ -183,4 +172,4 @@ struct IRSimpleSpecializationKey
     HashCode getHashCode() const;
 };
 
-}
+} // namespace Slang

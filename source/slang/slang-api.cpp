@@ -1,13 +1,13 @@
 // slang-api.cpp
 
-#include "slang-compiler.h"
-#include "slang-repro.h"
-#include "slang-capability.h"
-#include "../core/slang-rtti-info.h"
 #include "../core/slang-performance-profiler.h"
+#include "../core/slang-rtti-info.h"
 #include "../core/slang-shared-library.h"
 #include "../slang-record-replay/record/slang-global-session.h"
 #include "../slang-record-replay/util/record-utility.h"
+#include "slang-capability.h"
+#include "slang-compiler.h"
+#include "slang-repro.h"
 
 // implementation of C interface
 
@@ -22,9 +22,9 @@ SLANG_API SlangSession* spCreateSession(const char*)
     return globalSession.detach();
 }
 
-// Attempt to load a previously compiled core module from the same file system location as the slang dll.
-// Returns SLANG_OK when the cache is sucessfully loaded.
-// Also returns the filename to the core module cache and the timestamp of current slang dll.
+// Attempt to load a previously compiled core module from the same file system location as the slang
+// dll. Returns SLANG_OK when the cache is sucessfully loaded. Also returns the filename to the core
+// module cache and the timestamp of current slang dll.
 SlangResult tryLoadCoreModuleFromCache(
     slang::IGlobalSession* globalSession,
     Slang::String& outCachePath,
@@ -65,37 +65,43 @@ SlangResult trySaveCoreModuleToCache(
     if (dllTimestamp != 0 && cacheFilename.getLength() != 0)
     {
         Slang::ComPtr<ISlangBlob> coreModuleBlobPtr;
-        SLANG_RETURN_ON_FAIL(
-            globalSession->saveCoreModule(SLANG_ARCHIVE_TYPE_RIFF_LZ4, coreModuleBlobPtr.writeRef()));
+        SLANG_RETURN_ON_FAIL(globalSession->saveCoreModule(
+            SLANG_ARCHIVE_TYPE_RIFF_LZ4,
+            coreModuleBlobPtr.writeRef()));
 
         Slang::FileStream fileStream;
         SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
 
         SLANG_RETURN_ON_FAIL(fileStream.write(&dllTimestamp, sizeof(dllTimestamp)));
-        SLANG_RETURN_ON_FAIL(fileStream.write(coreModuleBlobPtr->getBufferPointer(), coreModuleBlobPtr->getBufferSize()))
+        SLANG_RETURN_ON_FAIL(fileStream.write(
+            coreModuleBlobPtr->getBufferPointer(),
+            coreModuleBlobPtr->getBufferSize()))
     }
 
     return SLANG_OK;
 }
 
-SLANG_API SlangResult slang_createGlobalSession(
-    SlangInt                apiVersion,
-    slang::IGlobalSession** outGlobalSession)
+SLANG_API SlangResult
+slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession)
 {
     Slang::ComPtr<slang::IGlobalSession> globalSession;
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
-    // Set inst debug alloc counter to 0 so IRInsts for core module always starts from a large value.
+    // Set inst debug alloc counter to 0 so IRInsts for core module always starts from a large
+    // value.
     Slang::_debugGetIRAllocCounter() = 0x80000000;
 #endif
 
-    SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutCoreModule(apiVersion, globalSession.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        slang_createGlobalSessionWithoutCoreModule(apiVersion, globalSession.writeRef()));
 
     // If we have the embedded core module, load from that, else compile it
     ISlangBlob* coreModuleBlob = slang_getEmbeddedCoreModule();
     if (coreModuleBlob)
     {
-        SLANG_RETURN_ON_FAIL(globalSession->loadCoreModule(coreModuleBlob->getBufferPointer(), coreModuleBlob->getBufferSize()));
+        SLANG_RETURN_ON_FAIL(globalSession->loadCoreModule(
+            coreModuleBlob->getBufferPointer(),
+            coreModuleBlob->getBufferSize()));
     }
     else
     {
@@ -149,7 +155,7 @@ SLANG_API void slang_shutdown()
 }
 
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
-    SlangInt                apiVersion,
+    SlangInt apiVersion,
     slang::IGlobalSession** outGlobalSession)
 {
     if (apiVersion != 0)
@@ -167,10 +173,10 @@ SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     return SLANG_OK;
 }
 
-SLANG_API void spDestroySession(
-    SlangSession*   inSession)
+SLANG_API void spDestroySession(SlangSession* inSession)
 {
-    if (!inSession) return;
+    if (!inSession)
+        return;
 
     Slang::Session* session = Slang::asInternal(inSession);
     // It is assumed there is only a single reference on the session (the one placed
@@ -186,42 +192,38 @@ SLANG_API const char* spGetBuildTagString()
 }
 
 SLANG_API void spAddBuiltins(
-    SlangSession*   session,
-    char const*     sourcePath,
-    char const*     sourceString)
+    SlangSession* session,
+    char const* sourcePath,
+    char const* sourceString)
 {
     session->addBuiltins(sourcePath, sourceString);
 }
 
 SLANG_API void spSessionSetSharedLibraryLoader(
-    SlangSession*               session,
+    SlangSession* session,
     ISlangSharedLibraryLoader* loader)
 {
     session->setSharedLibraryLoader(loader);
 }
 
-SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
-    SlangSession*               session)
+SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(SlangSession* session)
 {
     return session->getSharedLibraryLoader();
 }
 
-SLANG_API SlangResult spSessionCheckCompileTargetSupport(
-    SlangSession*                session,
-    SlangCompileTarget           target)
+SLANG_API SlangResult
+spSessionCheckCompileTargetSupport(SlangSession* session, SlangCompileTarget target)
 {
     return session->checkCompileTargetSupport(target);
 }
 
-SLANG_API SlangResult spSessionCheckPassThroughSupport(
-    SlangSession*       session,
-    SlangPassThrough    passThrough)
+SLANG_API SlangResult
+spSessionCheckPassThroughSupport(SlangSession* session, SlangPassThrough passThrough)
 {
     return session->checkPassThroughSupport(passThrough);
 }
 
-SLANG_API SlangCompileRequest* spCreateCompileRequest(
-    SlangSession* session)
+SLANG_API SlangCompileRequest* spCreateCompileRequest(SlangSession* session)
 {
     slang::ICompileRequest* request = nullptr;
     // Will return with suitable ref count
@@ -231,16 +233,12 @@ SLANG_API SlangCompileRequest* spCreateCompileRequest(
     return request;
 }
 
-SLANG_API SlangProfileID spFindProfile(
-    SlangSession* session,
-    char const*     name)
+SLANG_API SlangProfileID spFindProfile(SlangSession* session, char const* name)
 {
     return session->findProfile(name);
 }
 
-SLANG_API SlangCapabilityID spFindCapability(
-    SlangSession*   session,
-    char const*     name)
+SLANG_API SlangCapabilityID spFindCapability(SlangSession* session, char const* name)
 {
     return session->findCapability(name);
 }
@@ -250,8 +248,7 @@ SLANG_API SlangCapabilityID spFindCapability(
 /*!
 @brief Destroy a compile request.
 */
-SLANG_API void spDestroyCompileRequest(
-    slang::ICompileRequest*    request)
+SLANG_API void spDestroyCompileRequest(slang::ICompileRequest* request)
 {
     if (request)
     {
@@ -261,61 +258,55 @@ SLANG_API void spDestroyCompileRequest(
 
 /* All other functions just call into the ICompileResult interface. */
 
-SLANG_API void spSetFileSystem(
-    slang::ICompileRequest*    request,
-    ISlangFileSystem*       fileSystem)
+SLANG_API void spSetFileSystem(slang::ICompileRequest* request, ISlangFileSystem* fileSystem)
 {
     SLANG_ASSERT(request);
     request->setFileSystem(fileSystem);
 }
 
-SLANG_API void spSetCompileFlags(
-    slang::ICompileRequest*    request,
-    SlangCompileFlags       flags)
+SLANG_API void spSetCompileFlags(slang::ICompileRequest* request, SlangCompileFlags flags)
 {
     SLANG_ASSERT(request);
     request->setCompileFlags(flags);
 }
 
-SLANG_API SlangCompileFlags spGetCompileFlags(
-    slang::ICompileRequest*    request)
+SLANG_API SlangCompileFlags spGetCompileFlags(slang::ICompileRequest* request)
 {
     SLANG_ASSERT(request);
     return request->getCompileFlags();
 }
 
-SLANG_API void spSetDumpIntermediates(
-    slang::ICompileRequest*    request,
-    int                     enable)
+SLANG_API void spSetDumpIntermediates(slang::ICompileRequest* request, int enable)
 {
     SLANG_ASSERT(request);
     request->setDumpIntermediates(enable);
 }
 
-SLANG_API void spSetDumpIntermediatePrefix(
-    slang::ICompileRequest*    request,
-    const char* prefix)
+SLANG_API void spSetDumpIntermediatePrefix(slang::ICompileRequest* request, const char* prefix)
 {
     SLANG_ASSERT(request);
     request->setDumpIntermediatePrefix(prefix);
 }
 
-SLANG_API void spSetLineDirectiveMode(
-    slang::ICompileRequest*    request,
-    SlangLineDirectiveMode  mode)
+SLANG_API void spSetLineDirectiveMode(slang::ICompileRequest* request, SlangLineDirectiveMode mode)
 {
     SLANG_ASSERT(request);
     request->setLineDirectiveMode(mode);
 }
 
 SLANG_API void spSetTargetForceGLSLScalarBufferLayout(
-    slang::ICompileRequest* request, int targetIndex, bool forceScalarLayout)
+    slang::ICompileRequest* request,
+    int targetIndex,
+    bool forceScalarLayout)
 {
     SLANG_ASSERT(request);
     request->setTargetForceGLSLScalarBufferLayout(targetIndex, forceScalarLayout);
 }
 
-SLANG_API void spSetTargetUseMinimumSlangOptimization(slang::ICompileRequest* request, int targetIndex, bool val)
+SLANG_API void spSetTargetUseMinimumSlangOptimization(
+    slang::ICompileRequest* request,
+    int targetIndex,
+    bool val)
 {
     SLANG_ASSERT(request);
     request->setTargetUseMinimumSlangOptimization(targetIndex, val);
@@ -336,51 +327,46 @@ SLANG_API void spSetTargetLineDirectiveMode(
     request->setTargetLineDirectiveMode(targetIndex, mode);
 }
 
-SLANG_API void spSetCommandLineCompilerMode(
-    slang::ICompileRequest* request)
+SLANG_API void spSetCommandLineCompilerMode(slang::ICompileRequest* request)
 {
     SLANG_ASSERT(request);
     request->setCommandLineCompilerMode();
 }
 
-SLANG_API void spSetCodeGenTarget(
-    slang::ICompileRequest*    request,
-    SlangCompileTarget target)
+SLANG_API void spSetCodeGenTarget(slang::ICompileRequest* request, SlangCompileTarget target)
 {
     SLANG_ASSERT(request);
     request->setCodeGenTarget(target);
 }
 
-SLANG_API int spAddCodeGenTarget(
-    slang::ICompileRequest*    request,
-    SlangCompileTarget      target)
+SLANG_API int spAddCodeGenTarget(slang::ICompileRequest* request, SlangCompileTarget target)
 {
     SLANG_ASSERT(request);
     return request->addCodeGenTarget(target);
 }
 
 SLANG_API void spSetTargetProfile(
-    slang::ICompileRequest*    request,
-    int                     targetIndex,
-    SlangProfileID          profile)
+    slang::ICompileRequest* request,
+    int targetIndex,
+    SlangProfileID profile)
 {
     SLANG_ASSERT(request);
     request->setTargetProfile(targetIndex, profile);
 }
 
 SLANG_API void spSetTargetFlags(
-    slang::ICompileRequest*    request,
-    int                     targetIndex,
-    SlangTargetFlags        flags)
+    slang::ICompileRequest* request,
+    int targetIndex,
+    SlangTargetFlags flags)
 {
     SLANG_ASSERT(request);
     request->setTargetFlags(targetIndex, flags);
 }
 
 SLANG_API void spSetTargetFloatingPointMode(
-    slang::ICompileRequest*    request,
-    int                     targetIndex,
-    SlangFloatingPointMode  mode)
+    slang::ICompileRequest* request,
+    int targetIndex,
+    SlangFloatingPointMode mode)
 {
     SLANG_ASSERT(request);
     request->setTargetFloatingPointMode(targetIndex, mode);
@@ -388,123 +374,107 @@ SLANG_API void spSetTargetFloatingPointMode(
 
 SLANG_API void spAddTargetCapability(
     slang::ICompileRequest* request,
-    int                     targetIndex,
-    SlangCapabilityID       capability)
+    int targetIndex,
+    SlangCapabilityID capability)
 {
     SLANG_ASSERT(request);
     request->addTargetCapability(targetIndex, capability);
 }
 
-SLANG_API void spSetMatrixLayoutMode(
-    slang::ICompileRequest*    request,
-    SlangMatrixLayoutMode   mode)
+SLANG_API void spSetMatrixLayoutMode(slang::ICompileRequest* request, SlangMatrixLayoutMode mode)
 {
     SLANG_ASSERT(request);
     request->setMatrixLayoutMode(mode);
 }
 
 SLANG_API void spSetTargetMatrixLayoutMode(
-    slang::ICompileRequest*    request,
-    int                     targetIndex,
-    SlangMatrixLayoutMode   mode)
+    slang::ICompileRequest* request,
+    int targetIndex,
+    SlangMatrixLayoutMode mode)
 {
     SLANG_ASSERT(request);
     request->setTargetMatrixLayoutMode(targetIndex, mode);
 }
 
-SLANG_API void spSetDebugInfoLevel(
-    slang::ICompileRequest*    request,
-    SlangDebugInfoLevel     level)
+SLANG_API void spSetDebugInfoLevel(slang::ICompileRequest* request, SlangDebugInfoLevel level)
 {
     SLANG_ASSERT(request);
     request->setDebugInfoLevel(level);
 }
 
-SLANG_API void spSetDebugInfoFormat(
-    slang::ICompileRequest* request,
-    SlangDebugInfoFormat format)
+SLANG_API void spSetDebugInfoFormat(slang::ICompileRequest* request, SlangDebugInfoFormat format)
 {
     SLANG_ASSERT(request);
     request->setDebugInfoFormat(format);
 }
 
-SLANG_API void spSetOptimizationLevel(
-    slang::ICompileRequest*    request,
-    SlangOptimizationLevel  level)
+SLANG_API void spSetOptimizationLevel(slang::ICompileRequest* request, SlangOptimizationLevel level)
 {
     SLANG_ASSERT(request);
     request->setOptimizationLevel(level);
 }
 
 SLANG_API void spSetOutputContainerFormat(
-    slang::ICompileRequest*    request,
-    SlangContainerFormat    format)
+    slang::ICompileRequest* request,
+    SlangContainerFormat format)
 {
     SLANG_ASSERT(request);
     request->setOutputContainerFormat(format);
 }
 
-SLANG_API void spSetPassThrough(
-    slang::ICompileRequest*    request,
-    SlangPassThrough        passThrough)
+SLANG_API void spSetPassThrough(slang::ICompileRequest* request, SlangPassThrough passThrough)
 {
     SLANG_ASSERT(request);
     request->setPassThrough(passThrough);
 }
 
 SLANG_API void spSetDiagnosticCallback(
-    slang::ICompileRequest*    request,
+    slang::ICompileRequest* request,
     SlangDiagnosticCallback callback,
-    void const*             userData)
+    void const* userData)
 {
     SLANG_ASSERT(request);
     request->setDiagnosticCallback(callback, userData);
 }
 
 SLANG_API void spSetWriter(
-    slang::ICompileRequest*    request,
-    SlangWriterChannel      chan,
-    ISlangWriter*           writer)
+    slang::ICompileRequest* request,
+    SlangWriterChannel chan,
+    ISlangWriter* writer)
 {
     SLANG_ASSERT(request);
     request->setWriter(chan, writer);
 }
 
-SLANG_API ISlangWriter* spGetWriter(
-    slang::ICompileRequest*    request,
-    SlangWriterChannel      chan)
+SLANG_API ISlangWriter* spGetWriter(slang::ICompileRequest* request, SlangWriterChannel chan)
 {
     SLANG_ASSERT(request);
     return request->getWriter(chan);
 }
 
-SLANG_API void spAddSearchPath(
-    slang::ICompileRequest*    request,
-    const char*             path)
+SLANG_API void spAddSearchPath(slang::ICompileRequest* request, const char* path)
 {
     SLANG_ASSERT(request);
     request->addSearchPath(path);
 }
 
 SLANG_API void spAddPreprocessorDefine(
-    slang::ICompileRequest*    request,
-    const char*             key,
-    const char*             value)
+    slang::ICompileRequest* request,
+    const char* key,
+    const char* value)
 {
     SLANG_ASSERT(request);
     request->addPreprocessorDefine(key, value);
 }
 
-SLANG_API char const* spGetDiagnosticOutput(
-    slang::ICompileRequest*    request)
+SLANG_API char const* spGetDiagnosticOutput(slang::ICompileRequest* request)
 {
     SLANG_ASSERT(request);
     return request->getDiagnosticOutput();
 }
 
-SLANG_API SlangResult spGetDiagnosticOutputBlob(
-    slang::ICompileRequest*    request,
-    ISlangBlob**            outBlob)
+SLANG_API SlangResult
+spGetDiagnosticOutputBlob(slang::ICompileRequest* request, ISlangBlob** outBlob)
 {
     SLANG_ASSERT(request);
     return request->getDiagnosticOutputBlob(outBlob);
@@ -513,16 +483,16 @@ SLANG_API SlangResult spGetDiagnosticOutputBlob(
 // New-fangled compilation API
 
 SLANG_API int spAddTranslationUnit(
-    slang::ICompileRequest*    request,
-    SlangSourceLanguage     language,
-    char const*             inName)
+    slang::ICompileRequest* request,
+    SlangSourceLanguage language,
+    char const* inName)
 {
     SLANG_ASSERT(request);
     return request->addTranslationUnit(language, inName);
 }
 
 SLANG_API void spSetDefaultModuleName(
-    slang::ICompileRequest*    request,
+    slang::ICompileRequest* request,
     const char* defaultModuleName)
 {
     SLANG_ASSERT(request);
@@ -530,7 +500,7 @@ SLANG_API void spSetDefaultModuleName(
 }
 
 SLANG_API SlangResult spAddLibraryReference(
-    slang::ICompileRequest*    request,
+    slang::ICompileRequest* request,
     const char* basePath,
     const void* libData,
     size_t libDataSize)
@@ -540,170 +510,168 @@ SLANG_API SlangResult spAddLibraryReference(
 }
 
 SLANG_API void spTranslationUnit_addPreprocessorDefine(
-    slang::ICompileRequest*    request,
-    int                     translationUnitIndex,
-    const char*             key,
-    const char*             value)
+    slang::ICompileRequest* request,
+    int translationUnitIndex,
+    const char* key,
+    const char* value)
 {
     SLANG_ASSERT(request);
     request->addTranslationUnitPreprocessorDefine(translationUnitIndex, key, value);
 }
 
 SLANG_API void spAddTranslationUnitSourceFile(
-    slang::ICompileRequest*    request,
-    int                     translationUnitIndex,
-    char const*             path)
+    slang::ICompileRequest* request,
+    int translationUnitIndex,
+    char const* path)
 {
     SLANG_ASSERT(request);
     request->addTranslationUnitSourceFile(translationUnitIndex, path);
 }
 
 SLANG_API void spAddTranslationUnitSourceString(
-    slang::ICompileRequest*    request,
-    int                     translationUnitIndex,
-    char const*             path,
-    char const*             source)
+    slang::ICompileRequest* request,
+    int translationUnitIndex,
+    char const* path,
+    char const* source)
 {
     SLANG_ASSERT(request);
     request->addTranslationUnitSourceString(translationUnitIndex, path, source);
 }
 
 SLANG_API void spAddTranslationUnitSourceStringSpan(
-    slang::ICompileRequest*    request,
-    int                     translationUnitIndex,
-    char const*             path,
-    char const*             sourceBegin,
-    char const*             sourceEnd)
+    slang::ICompileRequest* request,
+    int translationUnitIndex,
+    char const* path,
+    char const* sourceBegin,
+    char const* sourceEnd)
 {
     SLANG_ASSERT(request);
     request->addTranslationUnitSourceStringSpan(translationUnitIndex, path, sourceBegin, sourceEnd);
 }
 
 SLANG_API void spAddTranslationUnitSourceBlob(
-    slang::ICompileRequest*    request,
-    int                     translationUnitIndex,
-    char const*             path,
-    ISlangBlob*             sourceBlob)
+    slang::ICompileRequest* request,
+    int translationUnitIndex,
+    char const* path,
+    ISlangBlob* sourceBlob)
 {
     SLANG_ASSERT(request);
     request->addTranslationUnitSourceBlob(translationUnitIndex, path, sourceBlob);
 }
 
 SLANG_API int spAddEntryPoint(
-    slang::ICompileRequest*    request,
-    int                     translationUnitIndex,
-    char const*             name,
-    SlangStage              stage)
+    slang::ICompileRequest* request,
+    int translationUnitIndex,
+    char const* name,
+    SlangStage stage)
 {
     SLANG_ASSERT(request);
     return request->addEntryPoint(translationUnitIndex, name, stage);
 }
 
 SLANG_API int spAddEntryPointEx(
-    slang::ICompileRequest*    request,
-    int                     translationUnitIndex,
-    char const*             name,
-    SlangStage              stage,
-    int                     genericParamTypeNameCount,
-    char const **           genericParamTypeNames)
+    slang::ICompileRequest* request,
+    int translationUnitIndex,
+    char const* name,
+    SlangStage stage,
+    int genericParamTypeNameCount,
+    char const** genericParamTypeNames)
 {
     SLANG_ASSERT(request);
-    return request->addEntryPointEx(translationUnitIndex, name, stage, genericParamTypeNameCount, genericParamTypeNames);
+    return request->addEntryPointEx(
+        translationUnitIndex,
+        name,
+        stage,
+        genericParamTypeNameCount,
+        genericParamTypeNames);
 }
 
 SLANG_API SlangResult spSetGlobalGenericArgs(
-    slang::ICompileRequest*    request,
-    int                     genericArgCount,
-    char const**            genericArgs)
+    slang::ICompileRequest* request,
+    int genericArgCount,
+    char const** genericArgs)
 {
     SLANG_ASSERT(request);
     return request->setGlobalGenericArgs(genericArgCount, genericArgs);
 }
 
 SLANG_API SlangResult spSetTypeNameForGlobalExistentialTypeParam(
-    slang::ICompileRequest*    request,
-    int                     slotIndex,
-    char const*             typeName)
+    slang::ICompileRequest* request,
+    int slotIndex,
+    char const* typeName)
 {
     SLANG_ASSERT(request);
     return request->setTypeNameForGlobalExistentialTypeParam(slotIndex, typeName);
 }
 
 SLANG_API SlangResult spSetTypeNameForEntryPointExistentialTypeParam(
-    slang::ICompileRequest*    request,
-    int                     entryPointIndex,
-    int                     slotIndex,
-    char const*             typeName)
+    slang::ICompileRequest* request,
+    int entryPointIndex,
+    int slotIndex,
+    char const* typeName)
 {
     SLANG_ASSERT(request);
-    return request->setTypeNameForEntryPointExistentialTypeParam(entryPointIndex, slotIndex, typeName);
+    return request->setTypeNameForEntryPointExistentialTypeParam(
+        entryPointIndex,
+        slotIndex,
+        typeName);
 }
 
-SLANG_API SlangResult spCompile(
-    slang::ICompileRequest*    request)
+SLANG_API SlangResult spCompile(slang::ICompileRequest* request)
 {
     SLANG_ASSERT(request);
     return request->compile();
 }
 
-SLANG_API int
-spGetDependencyFileCount(
-    slang::ICompileRequest*    request)
+SLANG_API int spGetDependencyFileCount(slang::ICompileRequest* request)
 {
     SLANG_ASSERT(request);
     return request->getDependencyFileCount();
 }
 
-SLANG_API char const*
-spGetDependencyFilePath(
-    slang::ICompileRequest*    request,
-    int                     index)
+SLANG_API char const* spGetDependencyFilePath(slang::ICompileRequest* request, int index)
 {
     SLANG_ASSERT(request);
     return request->getDependencyFilePath(index);
 }
 
-SLANG_API int
-spGetTranslationUnitCount(
-    slang::ICompileRequest*    request)
+SLANG_API int spGetTranslationUnitCount(slang::ICompileRequest* request)
 {
     SLANG_ASSERT(request);
     return request->getTranslationUnitCount();
 }
 
 SLANG_API void const* spGetEntryPointCode(
-    slang::ICompileRequest*    request,
-    int                     entryPointIndex,
-    size_t*                 outSize)
+    slang::ICompileRequest* request,
+    int entryPointIndex,
+    size_t* outSize)
 {
     SLANG_ASSERT(request);
     return request->getEntryPointCode(entryPointIndex, outSize);
 }
 
 SLANG_API SlangResult spGetEntryPointCodeBlob(
-    slang::ICompileRequest*    request,
-    int                     entryPointIndex,
-    int                     targetIndex,
-    ISlangBlob**            outBlob)
+    slang::ICompileRequest* request,
+    int entryPointIndex,
+    int targetIndex,
+    ISlangBlob** outBlob)
 {
     SLANG_ASSERT(request);
     return request->getEntryPointCodeBlob(entryPointIndex, targetIndex, outBlob);
 }
 
 SLANG_API SlangResult spGetEntryPointHostCallable(
-    slang::ICompileRequest*    request,
-    int                     entryPointIndex,
-    int                     targetIndex,
-    ISlangSharedLibrary**   outSharedLibrary)
+    slang::ICompileRequest* request,
+    int entryPointIndex,
+    int targetIndex,
+    ISlangSharedLibrary** outSharedLibrary)
 {
     SLANG_ASSERT(request);
     return request->getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary);
 }
 
-SLANG_API SlangResult spGetTargetCodeBlob(
-    slang::ICompileRequest* request,
-    int targetIndex,
-    ISlangBlob** outBlob)
+SLANG_API SlangResult
+spGetTargetCodeBlob(slang::ICompileRequest* request, int targetIndex, ISlangBlob** outBlob)
 {
     SLANG_ASSERT(request);
     return request->getTargetCodeBlob(targetIndex, outBlob);
@@ -718,25 +686,19 @@ SLANG_API SlangResult spGetTargetHostCallable(
     return request->getTargetHostCallable(targetIndex, outSharedLibrary);
 }
 
-SLANG_API char const* spGetEntryPointSource(
-    slang::ICompileRequest*    request,
-    int                     entryPointIndex)
+SLANG_API char const* spGetEntryPointSource(slang::ICompileRequest* request, int entryPointIndex)
 {
     SLANG_ASSERT(request);
     return request->getEntryPointSource(entryPointIndex);
 }
 
-SLANG_API void const* spGetCompileRequestCode(
-    slang::ICompileRequest*    request,
-    size_t*                 outSize)
+SLANG_API void const* spGetCompileRequestCode(slang::ICompileRequest* request, size_t* outSize)
 {
     SLANG_ASSERT(request);
     return request->getCompileRequestCode(outSize);
 }
 
-SLANG_API SlangResult spGetContainerCode(
-    slang::ICompileRequest*    request,
-    ISlangBlob**            outBlob)
+SLANG_API SlangResult spGetContainerCode(slang::ICompileRequest* request, ISlangBlob** outBlob)
 {
     SLANG_ASSERT(request);
     return request->getContainerCode(outBlob);
@@ -752,31 +714,27 @@ SLANG_API SlangResult spLoadRepro(
     return request->loadRepro(fileSystem, data, size);
 }
 
-SLANG_API SlangResult spSaveRepro(
-    slang::ICompileRequest* request,
-    ISlangBlob** outBlob)
+SLANG_API SlangResult spSaveRepro(slang::ICompileRequest* request, ISlangBlob** outBlob)
 {
     SLANG_ASSERT(request);
     return request->saveRepro(outBlob);
 }
 
-SLANG_API SlangResult spEnableReproCapture(
-    slang::ICompileRequest* request)
+SLANG_API SlangResult spEnableReproCapture(slang::ICompileRequest* request)
 {
     SLANG_ASSERT(request);
     return request->enableReproCapture();
 }
 
-SLANG_API SlangResult spCompileRequest_getProgram(
-    slang::ICompileRequest*    request,
-    slang::IComponentType** outProgram)
+SLANG_API SlangResult
+spCompileRequest_getProgram(slang::ICompileRequest* request, slang::IComponentType** outProgram)
 {
     SLANG_ASSERT(request);
     return request->getProgram(outProgram);
 }
 
 SLANG_API SlangResult spCompileRequest_getProgramWithEntryPoints(
-    slang::ICompileRequest*    request,
+    slang::ICompileRequest* request,
     slang::IComponentType** outProgram)
 {
     SLANG_ASSERT(request);
@@ -784,25 +742,24 @@ SLANG_API SlangResult spCompileRequest_getProgramWithEntryPoints(
 }
 
 SLANG_API SlangResult spCompileRequest_getModule(
-    slang::ICompileRequest*    request,
-    SlangInt                translationUnitIndex,
-    slang::IModule**        outModule)
+    slang::ICompileRequest* request,
+    SlangInt translationUnitIndex,
+    slang::IModule** outModule)
 {
     SLANG_ASSERT(request);
     return request->getModule(translationUnitIndex, outModule);
 }
 
-SLANG_API SlangResult spCompileRequest_getSession(
-    slang::ICompileRequest* request,
-    slang::ISession** outSession)
+SLANG_API SlangResult
+spCompileRequest_getSession(slang::ICompileRequest* request, slang::ISession** outSession)
 {
     SLANG_ASSERT(request);
     return request->getSession(outSession);
 }
 
 SLANG_API SlangResult spCompileRequest_getEntryPoint(
-    slang::ICompileRequest*    request,
-    SlangInt                entryPointIndex,
+    slang::ICompileRequest* request,
+    SlangInt entryPointIndex,
     slang::IComponentType** outEntryPoint)
 {
     SLANG_ASSERT(request);
@@ -821,25 +778,23 @@ SLANG_API SlangResult spGetCompileTimeProfile(
 
 // Get the output code associated with a specific translation unit
 SLANG_API char const* spGetTranslationUnitSource(
-    slang::ICompileRequest*    /*request*/,
-    int                     /*translationUnitIndex*/)
+    slang::ICompileRequest* /*request*/,
+    int /*translationUnitIndex*/
+)
 {
     fprintf(stderr, "DEPRECATED: spGetTranslationUnitSource()\n");
     return nullptr;
 }
 
-SLANG_API SlangResult spProcessCommandLineArguments(
-    SlangCompileRequest*    request,
-    char const* const*      args,
-    int                     argCount)
+SLANG_API SlangResult
+spProcessCommandLineArguments(SlangCompileRequest* request, char const* const* args, int argCount)
 {
     return request->processCommandLineArguments(args, argCount);
 }
 
 // Reflection API
 
-SLANG_API SlangReflection* spGetReflection(
-    slang::ICompileRequest*    request)
+SLANG_API SlangReflection* spGetReflection(slang::ICompileRequest* request)
 {
     SLANG_ASSERT(request);
     return request->getReflection();
@@ -849,7 +804,11 @@ SLANG_API SlangReflection* spGetReflection(
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Session !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproData, size_t reproDataSize, ISlangMutableFileSystem* fileSystem)
+SLANG_API SlangResult spExtractRepro(
+    SlangSession* session,
+    const void* reproData,
+    size_t reproDataSize,
+    ISlangMutableFileSystem* fileSystem)
 {
     using namespace Slang;
     SLANG_UNUSED(session);
@@ -894,7 +853,8 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     base.set(buffer.getBuffer(), buffer.getCount());
 
     ComPtr<ISlangFileSystemExt> fileSystem;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, replaceFileSystem, fileSystem));
+    SLANG_RETURN_ON_FAIL(
+        ReproUtil::loadFileSystem(base, requestState, replaceFileSystem, fileSystem));
 
     *outFileSystem = fileSystem.detach();
     return SLANG_OK;

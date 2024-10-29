@@ -1,8 +1,7 @@
 // unit-test-lock-file.cpp
-#include "tools/unit-test/slang-unit-test.h"
-
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <atomic>
 #include <future>
@@ -11,7 +10,9 @@
 
 using namespace Slang;
 
-static const String fileName = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file" + String(Process::getId()));
+static const String fileName = Path::simplify(
+    Path::getParentDirectory(Path::getExecutablePath()) + "/test_lock_file" +
+    String(Process::getId()));
 
 SLANG_UNIT_TEST(lockFileOpenClose)
 {
@@ -86,8 +87,8 @@ SLANG_UNIT_TEST(lockFileSync)
         SLANG_CHECK(lockFile2.tryLock(LockFile::LockType::Exclusive) == SLANG_E_TIME_OUT);
 
         // Start a number of threads and wait for them to start up.
-        // Each thread immediately tries to acquire the lock in non-blocking mode (expected to fail).
-        // Next each thread acquires the lock in blocking mode.
+        // Each thread immediately tries to acquire the lock in non-blocking mode (expected to
+        // fail). Next each thread acquires the lock in blocking mode.
         std::vector<LockTask> tasks(32);
         for (auto& task : tasks)
         {

@@ -1,4 +1,5 @@
 #include "slang-ir-augment-make-existential.h"
+
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 
@@ -12,10 +13,9 @@ struct AugmentMakeExistentialContext
     InstHashSet workListSet;
 
     AugmentMakeExistentialContext(IRModule* inModule)
-        : module(inModule)
-        , workList(inModule)
-        , workListSet(inModule)
-    {}
+        : module(inModule), workList(inModule), workListSet(inModule)
+    {
+    }
 
     void addToWorkList(IRInst* inst)
     {
@@ -45,11 +45,8 @@ struct AugmentMakeExistentialContext
     {
         switch (inst->getOp())
         {
-        case kIROp_MakeExistential:
-            processMakeExistential((IRMakeExistential*)inst);
-            break;
-        default:
-            break;
+        case kIROp_MakeExistential: processMakeExistential((IRMakeExistential*)inst); break;
+        default:                    break;
         }
     }
 

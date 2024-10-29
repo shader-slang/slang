@@ -1,68 +1,86 @@
 #include "slang-zip-file-system.h"
 
+#include "slang-blob.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
-
-#include "slang-io.h"
-#include "slang-string-util.h"
-#include "slang-blob.h"
-#include "slang-string-slice-pool.h"
-#include "slang-uint-set.h"
-#include "slang-riff.h"
-
 #include "slang-implicit-directory-collector.h"
+#include "slang-io.h"
+#include "slang-riff.h"
+#include "slang-string-slice-pool.h"
+#include "slang-string-util.h"
+#include "slang-uint-set.h"
 
 #include <miniz.h>
 
 namespace Slang
 {
 
-class ZipFileSystemImpl : public ISlangMutableFileSystem, public IArchiveFileSystem, public ComBaseObject
+class ZipFileSystemImpl : public ISlangMutableFileSystem,
+                          public IArchiveFileSystem,
+                          public ComBaseObject
 {
 public:
-    // ISlangUnknown 
+    // ISlangUnknown
     SLANG_COM_BASE_IUNKNOWN_ALL
 
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // ISlangFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob)
+        SLANG_OVERRIDE;
 
     // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(const char* path, ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(const char* path, SlangPathType* pathTypeOut) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(PathKind pathKind, const char* path, ISlangBlob** outPath) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getFileUniqueIdentity(const char* path, ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
+        SlangPathType fromPathType,
+        const char* fromPath,
+        const char* path,
+        ISlangBlob** pathOut) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getPathType(const char* path, SlangPathType* pathTypeOut) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getPath(PathKind pathKind, const char* path, ISlangBlob** outPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE {}
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE { return OSPathKind::None; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
+        const char* path,
+        FileSystemContentsCallBack callback,
+        void* userData) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE
+    {
+        return OSPathKind::None;
+    }
 
     // ISlangModifyableFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFileBlob(const char* path, ISlangBlob* dataBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    saveFileBlob(const char* path, ISlangBlob* dataBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
     // IArchiveFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadArchive(const void* archive, size_t archiveSizeInBytes) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    loadArchive(const void* archive, size_t archiveSizeInBytes) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL setCompressionStyle(const CompressionStyle& style)
+        SLANG_OVERRIDE;
 
     ZipFileSystemImpl();
     ~ZipFileSystemImpl();
 
 protected:
-
     enum class Mode
     {
-        None,               // m_archive is not initialized
-        Read,               // m_archive is a reader
-        ReadWrite,          // m_archive is a writer (that can be read from)
+        None,      // m_archive is not initialized
+        Read,      // m_archive is a reader
+        ReadWrite, // m_archive is a writer (that can be read from)
     };
 
     SlangResult _requireMode(Mode mode);
-        /// Do the mode change.
+    /// Do the mode change.
     SlangResult _requireModeImpl(Mode newMode);
 
     bool _hasArchive() { return m_mode != Mode::None; }
@@ -72,14 +90,16 @@ protected:
 
     SlangResult _copyToAndInitWriter(mz_zip_archive& outWriter);
 
-        /// Returns SLANG_E_NOT_FOUND if no directory or contents found
-        /// terminationState controls when search terminates. If State::Undefined, will enumerate everything.
-        /// If outContents not set, will just determine if the directory exists
-    SlangResult _getPathContents(ImplicitDirectoryCollector::State terminationState, ImplicitDirectoryCollector* outCollector);
+    /// Returns SLANG_E_NOT_FOUND if no directory or contents found
+    /// terminationState controls when search terminates. If State::Undefined, will enumerate
+    /// everything. If outContents not set, will just determine if the directory exists
+    SlangResult _getPathContents(
+        ImplicitDirectoryCollector::State terminationState,
+        ImplicitDirectoryCollector* outCollector);
 
     void _rebuildMap();
 
-        /// Returns true if the named item is at the index
+    /// Returns true if the named item is at the index
     UnownedStringSlice _getPathAtIndex(Index index);
 
     void* getInterface(const Guid& guid);
@@ -99,19 +119,18 @@ protected:
 
     mz_file_read_func m_readFunc;
 
-    mz_zip_archive m_archive;           
+    mz_zip_archive m_archive;
 };
 
 void* ZipFileSystemImpl::getInterface(const Guid& guid)
 {
-    if (    guid == ISlangUnknown::getTypeGuid() || 
-            guid == ISlangCastable::getTypeGuid())
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangCastable::getTypeGuid())
     {
         return static_cast<ISlangMutableFileSystem*>(this);
     }
-    else if (guid == ISlangFileSystem::getTypeGuid() || 
-            guid == ISlangFileSystemExt::getTypeGuid() || 
-            guid == ISlangMutableFileSystem::getTypeGuid())
+    else if (
+        guid == ISlangFileSystem::getTypeGuid() || guid == ISlangFileSystemExt::getTypeGuid() ||
+        guid == ISlangMutableFileSystem::getTypeGuid())
     {
         return static_cast<ISlangMutableFileSystem*>(this);
     }
@@ -137,8 +156,9 @@ void* ZipFileSystemImpl::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-// This is a very awkward hack to make it so we can get a read func, without having to implement all of the tracking etc.
-// All this does is create an empty zip, convert into a reader, and then grab the read function
+// This is a very awkward hack to make it so we can get a read func, without having to implement all
+// of the tracking etc. All this does is create an empty zip, convert into a reader, and then grab
+// the read function
 static mz_file_read_func _calcReadFunc()
 {
     mz_zip_archive archive;
@@ -169,16 +189,16 @@ static mz_file_read_func _getReadFunc()
     return readFunc;
 }
 
-ZipFileSystemImpl::ZipFileSystemImpl():
-    m_mode(Mode::None)
+ZipFileSystemImpl::ZipFileSystemImpl()
+    : m_mode(Mode::None)
 {
-   m_readFunc = _getReadFunc();
+    m_readFunc = _getReadFunc();
 }
 
- ZipFileSystemImpl::~ZipFileSystemImpl()
- {
-     _requireMode(Mode::None);
- }
+ZipFileSystemImpl::~ZipFileSystemImpl()
+{
+    _requireMode(Mode::None);
+}
 
 void ZipFileSystemImpl::_rebuildMap()
 {
@@ -231,13 +251,13 @@ SlangResult ZipFileSystemImpl::_copyToAndInitWriter(mz_zip_archive& outWriter)
     mz_zip_zero_struct(&outWriter);
     switch (m_mode)
     {
-        case Mode::None:
+    case Mode::None:
         {
             _initReadWrite(outWriter);
             return SLANG_OK;
         }
-        case Mode::Read:
-        case Mode::ReadWrite:
+    case Mode::Read:
+    case Mode::ReadWrite:
         {
             _initReadWrite(outWriter);
 
@@ -250,14 +270,16 @@ SlangResult ZipFileSystemImpl::_copyToAndInitWriter(mz_zip_archive& outWriter)
                     continue;
                 }
 
-                // It's worth noting - it's not clear if this will work, because m_archive might not be a reader, in the miniz docs.
-                // If it's a writer, it's not clear how to convert a writer to a reader *selectively* which
-                // we require if we are going to lazily handle removals.
+                // It's worth noting - it's not clear if this will work, because m_archive might not
+                // be a reader, in the miniz docs. If it's a writer, it's not clear how to convert a
+                // writer to a reader *selectively* which we require if we are going to lazily
+                // handle removals.
                 //
-                // The fix to make this work is the hack that sets the m_reader, such that in effect the writer is both read and write.
-                // That works because the default writer behavior is a single block of memory for the archive, and that is compatible
-                // with the reader.
-                if (! mz_zip_writer_add_from_zip_reader(&outWriter, &m_archive, i))
+                // The fix to make this work is the hack that sets the m_reader, such that in effect
+                // the writer is both read and write. That works because the default writer behavior
+                // is a single block of memory for the archive, and that is compatible with the
+                // reader.
+                if (!mz_zip_writer_add_from_zip_reader(&outWriter, &m_archive, i))
                 {
                     mz_zip_end(&outWriter);
                     return SLANG_FAIL;
@@ -267,9 +289,9 @@ SlangResult ZipFileSystemImpl::_copyToAndInitWriter(mz_zip_archive& outWriter)
             return SLANG_OK;
         }
 
-        default: break;
+    default: break;
     }
-    return SLANG_FAIL;   
+    return SLANG_FAIL;
 }
 
 SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
@@ -278,37 +300,37 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
 
     switch (m_mode)
     {
-        case Mode::None:
+    case Mode::None:
         {
             switch (newMode)
             {
-                case Mode::Read:
+            case Mode::Read:
                 {
                     mz_uint flags = 0;
                     mz_zip_zero_struct(&m_archive);
                     mz_zip_reader_init(&m_archive, 0, flags);
                     break;
                 }
-                case Mode::ReadWrite:
+            case Mode::ReadWrite:
                 {
                     _initReadWrite(m_archive);
                     break;
                 }
-                default: break;
+            default: break;
             }
             break;
         }
-        case Mode::Read:
+    case Mode::Read:
         {
             switch (newMode)
             {
-                case Mode::None:
+            case Mode::None:
                 {
                     m_data.deallocate();
                     mz_zip_end(&m_archive);
                     break;
                 }
-                case Mode::ReadWrite:
+            case Mode::ReadWrite:
                 {
                     // If nothing is removed, we can just convert
                     if (m_removedSet.isEmpty())
@@ -343,18 +365,19 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
             }
             break;
         }
-        case Mode::ReadWrite:
+    case Mode::ReadWrite:
         {
             switch (newMode)
             {
-                case Mode::None:
+            case Mode::None:
                 {
                     mz_zip_writer_end(&m_archive);
                     break;
                 }
-                case Mode::Read:
+            case Mode::Read:
                 {
-                    // If anything has been removed we copy selectively into a new writer, and then convert that
+                    // If anything has been removed we copy selectively into a new writer, and then
+                    // convert that
                     if (!m_removedSet.isEmpty())
                     {
                         // There are entries that are deleted... so we need to copy selectively
@@ -378,14 +401,18 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
 
                     // Read
                     mz_zip_zero_struct(&m_archive);
-                    if (!mz_zip_reader_init_mem(&m_archive, m_data.getData(), m_data.getSizeInBytes(), 0))
+                    if (!mz_zip_reader_init_mem(
+                            &m_archive,
+                            m_data.getData(),
+                            m_data.getSizeInBytes(),
+                            0))
                     {
                         m_data.deallocate();
                         return SLANG_FAIL;
                     }
                     break;
                 }
-                default: break;
+            default: break;
             }
         }
     }
@@ -415,12 +442,15 @@ SlangResult ZipFileSystemImpl::_requireMode(Mode newMode)
 SlangResult ZipFileSystemImpl::_getFixedPath(const char* path, String& outPath)
 {
     StringBuilder simplifiedPath;
-    SLANG_RETURN_ON_FAIL(Path::simplify(path, Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, simplifiedPath));
+    SLANG_RETURN_ON_FAIL(
+        Path::simplify(path, Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, simplifiedPath));
     outPath = simplifiedPath;
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystemImpl::_findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex)
+SlangResult ZipFileSystemImpl::_findEntryIndexFromFixedPath(
+    const String& fixedPath,
+    mz_uint& outIndex)
 {
     const Index index = m_pathMap.getValue(fixedPath.getUnownedSlice());
 
@@ -463,7 +493,12 @@ SlangResult ZipFileSystemImpl::loadFile(char const* path, ISlangBlob** outBlob)
     const mz_uint flags = 0;
 
     // Extract to memory
-    if (!mz_zip_reader_extract_to_mem(&m_archive, index, alloc.getData(), alloc.getSizeInBytes(), flags))
+    if (!mz_zip_reader_extract_to_mem(
+            &m_archive,
+            index,
+            alloc.getData(),
+            alloc.getSizeInBytes(),
+            flags))
     {
         return SLANG_FAIL;
     }
@@ -499,7 +534,8 @@ SlangResult ZipFileSystemImpl::getPathType(const char* path, SlangPathType* outP
     {
         // It could be an *implicit* directory (ie as part of a path). So lets look for that...
         ImplicitDirectoryCollector collector(fixedPath);
-        SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::DirectoryExists, &collector));
+        SLANG_RETURN_ON_FAIL(
+            _getPathContents(ImplicitDirectoryCollector::State::DirectoryExists, &collector));
         if (collector.getDirectoryExists())
         {
             *outPathType = SLANG_PATH_TYPE_DIRECTORY;
@@ -514,8 +550,8 @@ SlangResult ZipFileSystemImpl::getPath(PathKind pathKind, const char* path, ISla
 {
     switch (pathKind)
     {
-        case PathKind::Display:
-        case PathKind::Canonical:
+    case PathKind::Display:
+    case PathKind::Canonical:
         {
             // Get the fixed path
             String fixedPath;
@@ -540,33 +576,39 @@ SlangResult ZipFileSystemImpl::getPath(PathKind pathKind, const char* path, ISla
             *outPath = StringUtil::createStringBlob(fixedPath).detach();
             return SLANG_OK;
         }
-        case PathKind::Simplified:
+    case PathKind::Simplified:
         {
             *outPath = StringUtil::createStringBlob(Path::simplify(path)).detach();
             return SLANG_OK;
         }
-        default: break;
+    default: break;
     }
 
     return SLANG_E_NOT_AVAILABLE;
 }
 
-SlangResult ZipFileSystemImpl::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
+SlangResult ZipFileSystemImpl::getFileUniqueIdentity(
+    const char* path,
+    ISlangBlob** outUniqueIdentity)
 {
     return getPath(PathKind::Canonical, path, outUniqueIdentity);
 }
 
-SlangResult ZipFileSystemImpl::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult ZipFileSystemImpl::calcCombinedPath(
+    SlangPathType fromPathType,
+    const char* fromPath,
+    const char* path,
+    ISlangBlob** pathOut)
 {
     String relPath;
     switch (fromPathType)
     {
-        case SLANG_PATH_TYPE_FILE:
+    case SLANG_PATH_TYPE_FILE:
         {
             relPath = Path::combine(Path::getParentDirectory(fromPath), path);
             break;
         }
-        case SLANG_PATH_TYPE_DIRECTORY:
+    case SLANG_PATH_TYPE_DIRECTORY:
         {
             relPath = Path::combine(fromPath, path);
             break;
@@ -577,7 +619,9 @@ SlangResult ZipFileSystemImpl::calcCombinedPath(SlangPathType fromPathType, cons
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystemImpl::_getPathContents(ImplicitDirectoryCollector::State terminationState, ImplicitDirectoryCollector* outCollector)
+SlangResult ZipFileSystemImpl::_getPathContents(
+    ImplicitDirectoryCollector::State terminationState,
+    ImplicitDirectoryCollector* outCollector)
 {
     if (!_hasArchive())
     {
@@ -602,11 +646,13 @@ SlangResult ZipFileSystemImpl::_getPathContents(ImplicitDirectoryCollector::Stat
         }
 
         UnownedStringSlice currentPath(fileStat.m_filename);
-        SlangPathType pathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
+        SlangPathType pathType =
+            fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
         outCollector->addPath(pathType, currentPath);
 
         // If a termination state is defined, and we reach it, we are done
-        if (terminationState != ImplicitDirectoryCollector::State::None && outCollector->hasState(terminationState))
+        if (terminationState != ImplicitDirectoryCollector::State::None &&
+            outCollector->hasState(terminationState))
         {
             return SLANG_OK;
         }
@@ -615,7 +661,10 @@ SlangResult ZipFileSystemImpl::_getPathContents(ImplicitDirectoryCollector::Stat
     return outCollector->getDirectoryExists() ? SLANG_OK : SLANG_E_NOT_FOUND;
 }
 
-SlangResult ZipFileSystemImpl::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
+SlangResult ZipFileSystemImpl::enumeratePathContents(
+    const char* path,
+    FileSystemContentsCallBack callback,
+    void* userData)
 {
     if (!_hasArchive())
     {
@@ -699,8 +748,9 @@ SlangResult ZipFileSystemImpl::remove(const char* path)
     if (fileStat.m_is_directory)
     {
         // Find the directory contents
-        ImplicitDirectoryCollector collector(fixedPath); 
-        SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::HasContent, &collector));
+        ImplicitDirectoryCollector collector(fixedPath);
+        SLANG_RETURN_ON_FAIL(
+            _getPathContents(ImplicitDirectoryCollector::State::HasContent, &collector));
 
         if (collector.hasContent())
         {
@@ -744,7 +794,7 @@ SlangResult ZipFileSystemImpl::createDirectory(const char* path)
     SLANG_ASSERT(_getPathAtIndex(entryCount) == fixedPath.getUnownedSlice());
 
     // Set the index, that we added at end
-    m_pathMap.add(fixedPath.getUnownedSlice(), entryCount); 
+    m_pathMap.add(fixedPath.getUnownedSlice(), entryCount);
     return SLANG_OK;
 }
 
@@ -755,7 +805,7 @@ SlangResult ZipFileSystemImpl::storeArchive(bool blobOwnsContent, ISlangBlob** o
     {
         _requireMode(Mode::ReadWrite);
     }
-        
+
     _requireMode(Mode::Read);
 
     ComPtr<ISlangBlob> blob;
@@ -776,7 +826,7 @@ SlangResult ZipFileSystemImpl::storeArchive(bool blobOwnsContent, ISlangBlob** o
 
 SlangResult ZipFileSystemImpl::loadArchive(const void* archive, size_t archiveSizeInBytes)
 {
-    // Making the mode None empties the archive 
+    // Making the mode None empties the archive
     SLANG_RETURN_ON_FAIL(_requireMode(Mode::None));
 
     // Store a copy of the archive contents
@@ -806,10 +856,10 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
 {
     switch (style.m_type)
     {
-        case CompressionStyle::Type::BestSpeed:         m_compressionLevel = MZ_BEST_SPEED; break;
-        case CompressionStyle::Type::BestCompression:   m_compressionLevel = MZ_BEST_COMPRESSION; break;
-        case CompressionStyle::Type::Default:           m_compressionLevel = MZ_DEFAULT_LEVEL; break;
-        case CompressionStyle::Type::Level:
+    case CompressionStyle::Type::BestSpeed:       m_compressionLevel = MZ_BEST_SPEED; break;
+    case CompressionStyle::Type::BestCompression: m_compressionLevel = MZ_BEST_COMPRESSION; break;
+    case CompressionStyle::Type::Default:         m_compressionLevel = MZ_DEFAULT_LEVEL; break;
+    case CompressionStyle::Type::Level:
         {
             int level = int(style.m_level * 10.0f + 0.5);
             level = (level < 0) ? 0 : level;
@@ -820,13 +870,13 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
     }
 }
 
-/* static */SlangResult ZipFileSystem::create(ComPtr<ISlangMutableFileSystem>& out)
+/* static */ SlangResult ZipFileSystem::create(ComPtr<ISlangMutableFileSystem>& out)
 {
     out = new ZipFileSystemImpl;
     return SLANG_OK;
 }
 
-/* static */bool ZipFileSystem::isArchive(const void* data, size_t dataSizeInBytes)
+/* static */ bool ZipFileSystem::isArchive(const void* data, size_t dataSizeInBytes)
 {
     if (dataSizeInBytes < sizeof(FourCC))
     {
@@ -839,9 +889,9 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
     // https://en.wikipedia.org/wiki/List_of_file_signatures
     switch (fourCC)
     {
-        case SLANG_FOUR_CC(0x50, 0x4B, 0x03, 0x04):
-        case SLANG_FOUR_CC(0x50, 0x4B, 0x05, 0x06):
-        case SLANG_FOUR_CC(0x50, 0x4B, 0x07, 0x08):
+    case SLANG_FOUR_CC(0x50, 0x4B, 0x03, 0x04):
+    case SLANG_FOUR_CC(0x50, 0x4B, 0x05, 0x06):
+    case SLANG_FOUR_CC(0x50, 0x4B, 0x07, 0x08):
         {
             // It's a zip
             return true;

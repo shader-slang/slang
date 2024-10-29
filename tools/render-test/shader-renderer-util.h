@@ -1,26 +1,30 @@
 // shader-renderer-util.h
 #pragma once
 
-#include <slang-rhi.h>
 #include "shader-input-layout.h"
 
-namespace renderer_test {
+#include <slang-rhi.h>
+
+namespace renderer_test
+{
 
 using namespace Slang;
 
 ComPtr<ISampler> _createSampler(IDevice* device, const InputSamplerDesc& srcDesc);
 
-/// Utility class containing functions that construct items on the renderer using the ShaderInputLayout representation
+/// Utility class containing functions that construct items on the renderer using the
+/// ShaderInputLayout representation
 struct ShaderRendererUtil
 {
-        /// Generate a texture using the InputTextureDesc and construct a Texture using the Renderer with the contents
+    /// Generate a texture using the InputTextureDesc and construct a Texture using the Renderer
+    /// with the contents
     static Slang::Result generateTexture(
         const InputTextureDesc& inputDesc,
         ResourceState defaultState,
         IDevice* device,
         ComPtr<ITexture>& textureOut);
 
-        /// Create texture resource using inputDesc, and texData to describe format, and contents
+    /// Create texture resource using inputDesc, and texData to describe format, and contents
     static Slang::Result createTexture(
         const InputTextureDesc& inputDesc,
         const TextureData& texData,
@@ -28,7 +32,7 @@ struct ShaderRendererUtil
         IDevice* device,
         ComPtr<ITexture>& textureOut);
 
-        /// Create the BufferResource using the renderer from the contents of inputDesc
+    /// Create the BufferResource using the renderer from the contents of inputDesc
     static Slang::Result createBuffer(
         const InputBufferDesc& inputDesc,
         size_t bufferSize,
@@ -37,4 +41,4 @@ struct ShaderRendererUtil
         ComPtr<IBuffer>& bufferOut);
 };
 
-} // renderer_test
+} // namespace renderer_test

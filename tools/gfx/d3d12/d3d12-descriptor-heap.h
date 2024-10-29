@@ -1,68 +1,86 @@
 #pragma once
 
 
-#include <dxgi.h>
-#include <d3d12.h>
-
-#include "slang-com-ptr.h"
-#include "core/slang-virtual-object-pool.h"
-#include "core/slang-short-list.h"
 #include "core/slang-basic.h"
+#include "core/slang-short-list.h"
+#include "core/slang-virtual-object-pool.h"
+#include "slang-com-ptr.h"
 
-namespace gfx {
+#include <d3d12.h>
+#include <dxgi.h>
 
-/*! \brief A simple class to manage an underlying Dx12 Descriptor Heap. Allocations are made linearly in order. It is not possible to free
-individual allocations, but all allocations can be deallocated with 'deallocateAll'. */
+namespace gfx
+{
+
+/*! \brief A simple class to manage an underlying Dx12 Descriptor Heap. Allocations are made
+linearly in order. It is not possible to free individual allocations, but all allocations can be
+deallocated with 'deallocateAll'. */
 class D3D12DescriptorHeap
 {
 public:
     typedef D3D12DescriptorHeap ThisType;
 
-        /// Initialize
-    Slang::Result init(ID3D12Device* device, int size, D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flags);
-        /// Initialize with an array of handles copying over the representation
-    Slang::Result init(ID3D12Device* device, const D3D12_CPU_DESCRIPTOR_HANDLE* handles, int numHandles, D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flags);
+    /// Initialize
+    Slang::Result init(
+        ID3D12Device* device,
+        int size,
+        D3D12_DESCRIPTOR_HEAP_TYPE type,
+        D3D12_DESCRIPTOR_HEAP_FLAGS flags);
+    /// Initialize with an array of handles copying over the representation
+    Slang::Result init(
+        ID3D12Device* device,
+        const D3D12_CPU_DESCRIPTOR_HANDLE* handles,
+        int numHandles,
+        D3D12_DESCRIPTOR_HEAP_TYPE type,
+        D3D12_DESCRIPTOR_HEAP_FLAGS flags);
 
-        /// Returns the number of slots that have been used
+    /// Returns the number of slots that have been used
     SLANG_FORCE_INLINE int getUsedSize() const { return m_currentIndex; }
 
-        /// Get the total amount of descriptors possible on the heap
+    /// Get the total amount of descriptors possible on the heap
     SLANG_FORCE_INLINE int getTotalSize() const { return m_totalSize; }
-        /// Allocate a descriptor. Returns the index, or -1 if none left.
+    /// Allocate a descriptor. Returns the index, or -1 if none left.
     SLANG_FORCE_INLINE int allocate();
-        /// Allocate a number of descriptors. Returns the start index (or -1 if not possible)
+    /// Allocate a number of descriptors. Returns the start index (or -1 if not possible)
     SLANG_FORCE_INLINE int allocate(int numDescriptors);
 
-        ///
+    ///
     SLANG_FORCE_INLINE int placeAt(int index);
 
-        /// Deallocates all allocations, and starts allocation from the start of the underlying heap again
+    /// Deallocates all allocations, and starts allocation from the start of the underlying heap
+    /// again
     SLANG_FORCE_INLINE void deallocateAll() { m_currentIndex = 0; }
 
-        /// Get the size of each
+    /// Get the size of each
     SLANG_FORCE_INLINE int getDescriptorSize() const { return m_descriptorSize; }
 
-        /// Get the GPU heap start
-    SLANG_FORCE_INLINE D3D12_GPU_DESCRIPTOR_HANDLE getGpuStart() const { return m_heap->GetGPUDescriptorHandleForHeapStart(); }
-        /// Get the CPU heap start
-    SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE getCpuStart() const { return m_heap->GetCPUDescriptorHandleForHeapStart(); }
+    /// Get the GPU heap start
+    SLANG_FORCE_INLINE D3D12_GPU_DESCRIPTOR_HANDLE getGpuStart() const
+    {
+        return m_heap->GetGPUDescriptorHandleForHeapStart();
+    }
+    /// Get the CPU heap start
+    SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE getCpuStart() const
+    {
+        return m_heap->GetCPUDescriptorHandleForHeapStart();
+    }
 
-        /// Get the GPU handle at the specified index
+    /// Get the GPU handle at the specified index
     SLANG_FORCE_INLINE D3D12_GPU_DESCRIPTOR_HANDLE getGpuHandle(int index) const;
-        /// Get the CPU handle at the specified index
+    /// Get the CPU handle at the specified index
     SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandle(int index) const;
 
-        /// Get the underlying heap
+    /// Get the underlying heap
     SLANG_FORCE_INLINE ID3D12DescriptorHeap* getHeap() const { return m_heap; }
 
-        /// Ctor
+    /// Ctor
     D3D12DescriptorHeap();
 
 protected:
     Slang::ComPtr<ID3D12Device> m_device;
-    Slang::ComPtr<ID3D12DescriptorHeap> m_heap;    ///< The underlying heap being allocated from
-    int m_totalSize;                                ///< Total amount of allocations available on the heap
-    int m_currentIndex;                        ///< The current descriptor
+    Slang::ComPtr<ID3D12DescriptorHeap> m_heap; ///< The underlying heap being allocated from
+    int m_totalSize;                         ///< Total amount of allocations available on the heap
+    int m_currentIndex;                      ///< The current descriptor
     int m_descriptorSize;                    ///< The size of each descriptor
     D3D12_DESCRIPTOR_HEAP_FLAGS m_heapFlags; ///< The flags of the heap
 };
@@ -83,17 +101,21 @@ struct D3D12Descriptor
 ///
 class D3D12GeneralDescriptorHeap : public Slang::RefObject
 {
-    ID3D12Device*                           m_device;
-    int                                     m_chunkSize;
-    D3D12_DESCRIPTOR_HEAP_TYPE              m_type;
+    ID3D12Device* m_device;
+    int m_chunkSize;
+    D3D12_DESCRIPTOR_HEAP_TYPE m_type;
 
-    D3D12DescriptorHeap                     m_heap;
+    D3D12DescriptorHeap m_heap;
     Slang::VirtualObjectPool m_allocator;
 
 public:
     int getSize() { return m_chunkSize; }
 
-    Slang::Result init(ID3D12Device* device, int chunkSize, D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flag)
+    Slang::Result init(
+        ID3D12Device* device,
+        int chunkSize,
+        D3D12_DESCRIPTOR_HEAP_TYPE type,
+        D3D12_DESCRIPTOR_HEAP_FLAGS flag)
     {
         m_device = device;
         m_chunkSize = chunkSize;
@@ -114,17 +136,14 @@ public:
         return m_heap.getGpuHandle(index);
     }
 
-    int allocate(int count)
-    {
-        return m_allocator.alloc(count);
-    }
+    int allocate(int count) { return m_allocator.alloc(count); }
 
     Slang::Result allocate(D3D12Descriptor* outDescriptor)
     {
         // TODO: this allocator would take some work to make thread-safe
 
         int index = m_allocator.alloc(1);
-        if(index < 0)
+        if (index < 0)
         {
             assert(!"descriptor allocation failed");
             return SLANG_FAIL;
@@ -137,10 +156,7 @@ public:
         return SLANG_OK;
     }
 
-    void free(int index, int count)
-    {
-        m_allocator.free(index, count);
-    }
+    void free(int index, int count) { m_allocator.free(index, count); }
 
     void free(D3D12Descriptor descriptor)
     {
@@ -167,7 +183,8 @@ public:
         m_subHeaps.add(subHeap);
         if (m_subHeapStartingIndex.getCount())
         {
-            m_subHeapStartingIndex.add(m_subHeapStartingIndex.getLast() + m_subHeaps.getLast()->getSize());
+            m_subHeapStartingIndex.add(
+                m_subHeapStartingIndex.getLast() + m_subHeaps.getLast()->getSize());
         }
         else
         {
@@ -268,7 +285,6 @@ public:
                     break;
                 }
             }
-            
         }
     }
 };
@@ -344,7 +360,10 @@ struct DescriptorHeapReference
 {
     enum class Type
     {
-        Linear, General, ExpandingGeneral, ExpandingLinear
+        Linear,
+        General,
+        ExpandingGeneral,
+        ExpandingLinear
     };
     union Ptr
     {
@@ -380,44 +399,31 @@ struct DescriptorHeapReference
     {
         switch (type)
         {
-        case Type::Linear:
-            return ptr.linearHeap->getCpuHandle(index);
-        case Type::General:
-            return ptr.generalHeap->getCpuHandle(index);
-        case Type::ExpandingGeneral:
-            return ptr.generalExpandingHeap->getCpuHandle(index);
-        case Type::ExpandingLinear:
-            return ptr.linearExpandingHeap->getCpuHandle(index);
-        default:
-            return D3D12_CPU_DESCRIPTOR_HANDLE();
+        case Type::Linear:           return ptr.linearHeap->getCpuHandle(index);
+        case Type::General:          return ptr.generalHeap->getCpuHandle(index);
+        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->getCpuHandle(index);
+        case Type::ExpandingLinear:  return ptr.linearExpandingHeap->getCpuHandle(index);
+        default:                     return D3D12_CPU_DESCRIPTOR_HANDLE();
         }
     }
     D3D12_GPU_DESCRIPTOR_HANDLE getGpuHandle(int index) const
     {
         switch (type)
         {
-        case Type::Linear:
-            return ptr.linearHeap->getGpuHandle(index);
-        case Type::General:
-            return ptr.generalHeap->getGpuHandle(index);
-        case Type::ExpandingGeneral:
-            return ptr.generalExpandingHeap->getGpuHandle(index);
-        default:
-            return D3D12_GPU_DESCRIPTOR_HANDLE();
+        case Type::Linear:           return ptr.linearHeap->getGpuHandle(index);
+        case Type::General:          return ptr.generalHeap->getGpuHandle(index);
+        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->getGpuHandle(index);
+        default:                     return D3D12_GPU_DESCRIPTOR_HANDLE();
         }
     }
     int allocate(int numDescriptors)
     {
         switch (type)
         {
-        case Type::Linear:
-            return ptr.linearHeap->allocate(numDescriptors);
-        case Type::General:
-            return ptr.generalHeap->allocate(numDescriptors);
-        case Type::ExpandingGeneral:
-            return ptr.generalExpandingHeap->allocate(numDescriptors);
-        default:
-            return ptr.linearExpandingHeap->allocate(numDescriptors);
+        case Type::Linear:           return ptr.linearHeap->allocate(numDescriptors);
+        case Type::General:          return ptr.generalHeap->allocate(numDescriptors);
+        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->allocate(numDescriptors);
+        default:                     return ptr.linearExpandingHeap->allocate(numDescriptors);
         }
     }
     void free(int index, int count)
@@ -425,33 +431,28 @@ struct DescriptorHeapReference
         switch (type)
         {
         default:
-        case Type::Linear:
-            SLANG_ASSERT(!"Linear heap does not support free().");
-            break;
-        case Type::General:
-            return ptr.generalHeap->free(index, count);
-        case Type::ExpandingGeneral:
-            return ptr.generalExpandingHeap->free(index, count);
+        case Type::Linear:           SLANG_ASSERT(!"Linear heap does not support free()."); break;
+        case Type::General:          return ptr.generalHeap->free(index, count);
+        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->free(index, count);
         }
     }
     void freeIfSupported(int index, int count)
     {
         switch (type)
         {
-        case Type::Linear:
-            return;
-        case Type::General:
-            return ptr.generalHeap->free(index, count);
-        case Type::ExpandingGeneral:
-            return ptr.generalExpandingHeap->free(index, count);
-        default:
-            break;
+        case Type::Linear:           return;
+        case Type::General:          return ptr.generalHeap->free(index, count);
+        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->free(index, count);
+        default:                     break;
         }
     }
 };
 
 // ---------------------------------------------------------------------------
-int D3D12DescriptorHeap::allocate() { return allocate(1); }
+int D3D12DescriptorHeap::allocate()
+{
+    return allocate(1);
+}
 // ---------------------------------------------------------------------------
 int D3D12DescriptorHeap::allocate(int numDescriptors)
 {
@@ -511,4 +512,3 @@ SLANG_FORCE_INLINE D3D12_GPU_DESCRIPTOR_HANDLE D3D12DescriptorHeap::getGpuHandle
 }
 
 } // namespace gfx
-

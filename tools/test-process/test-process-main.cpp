@@ -1,19 +1,16 @@
 // test-process-main.cpp
 
+#include "../../source/core/slang-http.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process-util.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-string.h"
+#include "../../source/core/slang-test-tool-util.h"
+#include "slang-com-helper.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-
-#include "slang-com-helper.h"
-
-#include "../../source/core/slang-string.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-process-util.h"
-
-#include "../../source/core/slang-test-tool-util.h"
-#include "../../source/core/slang-http.h"
 
 namespace TestProcess
 {
@@ -80,7 +77,7 @@ static SlangResult _outputReflect()
 
     List<Byte> buffer;
 
-    Index startIndex = 0; 
+    Index startIndex = 0;
 
     while (true)
     {
@@ -88,7 +85,9 @@ static SlangResult _outputReflect()
 
         while (true)
         {
-            UnownedStringSlice slice((const char*)buffer.begin() + startIndex, (const char*)buffer.end());
+            UnownedStringSlice slice(
+                (const char*)buffer.begin() + startIndex,
+                (const char*)buffer.end());
             UnownedStringSlice line;
 
             if (!StringUtil::extractLine(slice, line) || slice.begin() == nullptr)
@@ -107,7 +106,9 @@ static SlangResult _outputReflect()
             fputc('\n', fileOut);
 
             // Move the start index forward
-            const Index newStartIndex = slice.begin() ? Index(slice.begin() - (const char*)buffer.getBuffer()) : buffer.getCount();
+            const Index newStartIndex = slice.begin()
+                                            ? Index(slice.begin() - (const char*)buffer.getBuffer())
+                                            : buffer.getCount();
             SLANG_ASSERT(newStartIndex > startIndex);
             startIndex = newStartIndex;
         }
@@ -157,7 +158,7 @@ static SlangResult _httpReflect(int argc, const char* const* argv)
     return SLANG_OK;
 }
 
-static SlangResult execute(int argc, const char*const* argv)
+static SlangResult execute(int argc, const char* const* argv)
 {
     if (argc < 2)
     {

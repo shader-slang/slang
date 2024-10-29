@@ -1,20 +1,19 @@
 #ifndef CPP_EXTRACT_PARSER_H
 #define CPP_EXTRACT_PARSER_H
 
+#include "../../source/compiler-core/slang-lexer.h"
 #include "diagnostics.h"
-#include "node.h"
 #include "identifier-lookup.h"
 #include "node-tree.h"
+#include "node.h"
 
-#include "../../source/compiler-core/slang-lexer.h"
-
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
 
 class Parser
 {
 public:
-
     typedef uint32_t NodeTypeBitType;
 
     SlangResult expect(TokenType type, Token* outToken = nullptr);
@@ -28,11 +27,14 @@ public:
     SlangResult consumeToClosingBrace(const Token* openBraceToken = nullptr);
     SlangResult popScope();
 
-        /// Parse the contents of the source file
+    /// Parse the contents of the source file
     SlangResult parse(SourceOrigin* sourceOrigin, const Options* options);
 
     void setKindEnabled(Node::Kind kind, bool isEnabled = true);
-    bool isTypeEnabled(Node::Kind kind) { return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(kind))) != 0; }
+    bool isTypeEnabled(Node::Kind kind)
+    {
+        return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(kind))) != 0;
+    }
 
     void setKindsEnabled(const Node::Kind* kinds, Index kindsCount, bool isEnabled = true);
 
@@ -61,29 +63,34 @@ protected:
     SlangResult _maybeParseType(Index& ioTemplateDepth, TokenReader::ParsingCursor& outCursor);
 
     SlangResult _parseExpression(List<Token>& outExprTokens);
-    
+
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
-        /// Parse balanced - if a sink is set will report to that sink
+    /// Parse balanced - if a sink is set will report to that sink
     SlangResult _parseBalanced(DiagnosticSink* sink);
 
     bool _isCtor();
 
-        /// Concatenate all tokens from start to the current position
+    /// Concatenate all tokens from start to the current position
     UnownedStringSlice _concatTokens(TokenReader::ParsingCursor start);
     UnownedStringSlice _concatTokens(const Token* toks, Index toksCount);
 
-    UnownedStringSlice _concatType(TokenReader::ParsingCursor start, TokenReader::ParsingCursor nameCursor);
+    UnownedStringSlice _concatType(
+        TokenReader::ParsingCursor start,
+        TokenReader::ParsingCursor nameCursor);
 
-    void _getTypeTokens(TokenReader::ParsingCursor start, TokenReader::ParsingCursor nameCursor, List<Token>& outToks);
+    void _getTypeTokens(
+        TokenReader::ParsingCursor start,
+        TokenReader::ParsingCursor nameCursor,
+        List<Token>& outToks);
 
-        /// Consume what looks like a template definition
+    /// Consume what looks like a template definition
     SlangResult _consumeTemplate();
     SlangResult _maybeConsume(IdentifierStyle style);
 
     SlangResult _consumeToSync();
-        /// Consumes balanced parens. Will return an error if not matched. Assumes starts on opening (
+    /// Consumes balanced parens. Will return an error if not matched. Assumes starts on opening (
     SlangResult _consumeBalancedParens();
 
     NodeTypeBitType m_nodeTypeEnabled;
@@ -93,16 +100,16 @@ protected:
 
     List<ScopeNode*> m_scopeStack;
 
-    ScopeNode* m_currentScope;          ///< The current scope being processed
-    SourceOrigin* m_sourceOrigin;       ///< The source origin that all tokens are in
+    ScopeNode* m_currentScope;    ///< The current scope being processed
+    SourceOrigin* m_sourceOrigin; ///< The source origin that all tokens are in
 
-    DiagnosticSink* m_sink;             ///< Diagnostic sink 
+    DiagnosticSink* m_sink; ///< Diagnostic sink
 
-    NodeTree* m_nodeTree;    ///< Shared state between parses. Nodes will be added to this
+    NodeTree* m_nodeTree; ///< Shared state between parses. Nodes will be added to this
 
     const Options* m_options;
 };
 
-} // CppExtract
+} // namespace CppExtract
 
 #endif

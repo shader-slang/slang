@@ -1,42 +1,95 @@
 // slang-language-server-completion.cpp
 
 #include "slang-language-server-completion.h"
-#include "slang-language-server-ast-lookup.h"
-#include "slang-language-server.h"
-
-#include "slang-ast-all.h"
-#include "slang-check-impl.h"
-#include "slang-syntax.h"
-
-#include "../core/slang-file-system.h"
 
 #include "../core/slang-char-util.h"
+#include "../core/slang-file-system.h"
+#include "slang-ast-all.h"
+#include "slang-check-impl.h"
+#include "slang-language-server-ast-lookup.h"
+#include "slang-language-server.h"
+#include "slang-syntax.h"
+
 #include <chrono>
 
 namespace Slang
 {
 
 static const char* kDeclKeywords[] = {
-    "throws",    "static",         "const",     "in",        "out",     "inout",
-    "ref",       "__subscript",    "__init",    "property",  "get",     "set",
-    "class",     "struct",         "interface", "public",    "private", "internal",
-    "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
-    "extension", "associatedtype", "namespace", "This",    "using",
-    "__generic", "__exported",     "import",    "enum",      "cbuffer",   "tbuffer",   "func",
-    "functype",  "typename",       "each",      "expand",    "where" };
+    "throws",     "static",         "const",     "in",       "out",     "inout",
+    "ref",        "__subscript",    "__init",    "property", "get",     "set",
+    "class",      "struct",         "interface", "public",   "private", "internal",
+    "protected",  "typedef",        "typealias", "uniform",  "export",  "groupshared",
+    "extension",  "associatedtype", "namespace", "This",     "using",   "__generic",
+    "__exported", "import",         "enum",      "cbuffer",  "tbuffer", "func",
+    "functype",   "typename",       "each",      "expand",   "where"};
 static const char* kStmtKeywords[] = {
-    "if",        "else",           "switch",    "case",      "default", "return",
-    "try",       "throw",          "throws",    "catch",     "while",   "for",
-    "do",        "static",         "const",     "in",        "out",     "inout",
-    "ref",       "__subscript",    "__init",    "property",  "get",     "set",
-    "class",     "struct",         "interface", "public",    "private", "internal",
-    "protected", "typedef",        "typealias", "uniform",   "export",  "groupshared",
-    "extension", "associatedtype", "this",      "namespace", "This",    "using",
-    "__generic", "__exported",     "import",    "enum",      "break",   "continue",
-    "discard",   "defer",          "cbuffer",   "tbuffer",   "func",    "is",
-    "as",        "nullptr",        "none",      "true",      "false",   "functype", 
-    "sizeof",    "alignof",        "__target_switch",        "__intrinsic_asm",
-    "each",      "expand" };
+    "if",
+    "else",
+    "switch",
+    "case",
+    "default",
+    "return",
+    "try",
+    "throw",
+    "throws",
+    "catch",
+    "while",
+    "for",
+    "do",
+    "static",
+    "const",
+    "in",
+    "out",
+    "inout",
+    "ref",
+    "__subscript",
+    "__init",
+    "property",
+    "get",
+    "set",
+    "class",
+    "struct",
+    "interface",
+    "public",
+    "private",
+    "internal",
+    "protected",
+    "typedef",
+    "typealias",
+    "uniform",
+    "export",
+    "groupshared",
+    "extension",
+    "associatedtype",
+    "this",
+    "namespace",
+    "This",
+    "using",
+    "__generic",
+    "__exported",
+    "import",
+    "enum",
+    "break",
+    "continue",
+    "discard",
+    "defer",
+    "cbuffer",
+    "tbuffer",
+    "func",
+    "is",
+    "as",
+    "nullptr",
+    "none",
+    "true",
+    "false",
+    "functype",
+    "sizeof",
+    "alignof",
+    "__target_switch",
+    "__intrinsic_asm",
+    "each",
+    "expand"};
 
 static const char* hlslSemanticNames[] = {
     "register",
@@ -191,15 +244,11 @@ CompletionResult CompletionContext::gatherFileAndModuleCompletionItems(
                             {
                                 switch (ch)
                                 {
-                                case '-':
-                                    nameSB.appendChar('_');
-                                    break;
+                                case '-': nameSB.appendChar('_'); break;
                                 case '.':
                                     // Ignore any file items that contains a "."
                                     return;
-                                default:
-                                    nameSB.appendChar(ch);
-                                    break;
+                                default: nameSB.appendChar(ch); break;
                                 }
                             }
                             else
@@ -218,9 +267,11 @@ CompletionResult CompletionContext::gatherFileAndModuleCompletionItems(
                             item.detail = Path::combine(context->path, String(name));
                             Path::getCanonical(item.detail, item.detail);
 
-                            if (item.detail.getUnownedSlice().startsWithCaseInsensitive(context->workspaceRoot.getUnownedSlice()))
+                            if (item.detail.getUnownedSlice().startsWithCaseInsensitive(
+                                    context->workspaceRoot.getUnownedSlice()))
                             {
-                                item.detail = item.detail.getUnownedSlice().tail(context->workspaceRoot.getLength());
+                                item.detail = item.detail.getUnownedSlice().tail(
+                                    context->workspaceRoot.getLength());
                             }
                             context->items.add(item);
                         }
@@ -238,7 +289,9 @@ CompletionResult CompletionContext::gatherFileAndModuleCompletionItems(
 
     for (auto& searchPath : this->version->workspace->additionalSearchPaths)
     {
-        auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
+        auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::high_resolution_clock::now() - startTime)
+                               .count();
         if (elapsedTime > 200)
         {
             isIncomplete = true;
@@ -250,7 +303,9 @@ CompletionResult CompletionContext::gatherFileAndModuleCompletionItems(
     {
         for (auto& searchPath : this->version->workspace->workspaceSearchPaths)
         {
-            auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
+            auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                   std::chrono::high_resolution_clock::now() - startTime)
+                                   .count();
             if (elapsedTime > 200)
             {
                 isIncomplete = true;
@@ -281,7 +336,8 @@ CompletionResult CompletionContext::gatherFileAndModuleCompletionItems(
 
     if (!isIncomplete)
     {
-        bool useCommitChars = translateModuleName && (commitCharacterBehavior != CommitCharacterBehavior::Disabled);
+        bool useCommitChars =
+            translateModuleName && (commitCharacterBehavior != CommitCharacterBehavior::Disabled);
         if (useCommitChars)
         {
             if (translateModuleName)
@@ -301,7 +357,7 @@ CompletionResult CompletionContext::gatherFileAndModuleCompletionItems(
 
 LanguageServerResult<CompletionResult> CompletionContext::tryCompleteImport()
 {
-    const char* prefixes[] = { "import ", "__include ", "implementing " };
+    const char* prefixes[] = {"import ", "__include ", "implementing "};
     UnownedStringSlice lineContent;
     Index pos = -1;
     for (auto prefix : prefixes)
@@ -319,7 +375,8 @@ LanguageServerResult<CompletionResult> CompletionContext::tryCompleteImport()
     }
     return SLANG_FAIL;
 validLine:;
-    while (pos < lineContent.getLength() && pos < col - 1 && CharUtil::isWhitespace(lineContent[pos]))
+    while (pos < lineContent.getLength() && pos < col - 1 &&
+           CharUtil::isWhitespace(lineContent[pos]))
         pos++;
     if (pos < lineContent.getLength() && lineContent[pos] == '"')
     {
@@ -340,7 +397,8 @@ validLine:;
     if (lastPos > pos)
         prefixSlice = lineContent.subString(pos, lastPos - pos);
     Index sectionEnd = col - 1;
-    while (sectionEnd < lineContent.getLength() && (lineContent[sectionEnd] != '.' && lineContent[sectionEnd] != ';'))
+    while (sectionEnd < lineContent.getLength() &&
+           (lineContent[sectionEnd] != '.' && lineContent[sectionEnd] != ';'))
         sectionEnd++;
     Index fileNameEnd = sectionEnd;
     while (fileNameEnd < lineContent.getLength() && lineContent[fileNameEnd] != ';')
@@ -356,10 +414,20 @@ validLine:;
     }
     auto prefix = prefixSB.produceString();
     return gatherFileAndModuleCompletionItems(
-        prefix, true, false, line - 1, fileNameEnd, lastPos + 1, sectionEnd, 0);
+        prefix,
+        true,
+        false,
+        line - 1,
+        fileNameEnd,
+        lastPos + 1,
+        sectionEnd,
+        0);
 }
 
-LanguageServerResult<CompletionResult> CompletionContext::tryCompleteRawFileName(UnownedStringSlice lineContent, Index pos, bool isImportString)
+LanguageServerResult<CompletionResult> CompletionContext::tryCompleteRawFileName(
+    UnownedStringSlice lineContent,
+    Index pos,
+    bool isImportString)
 {
     while (pos < lineContent.getLength() && (lineContent[pos] != '\"' && lineContent[pos] != '<'))
         pos++;
@@ -381,7 +449,7 @@ LanguageServerResult<CompletionResult> CompletionContext::tryCompleteRawFileName
     if (sectionEnd < 0)
         return SLANG_FAIL;
     while (sectionEnd < lineContent.getLength() &&
-        (lineContent[sectionEnd] != '\"' && lineContent[sectionEnd] != '>' &&
+           (lineContent[sectionEnd] != '\"' && lineContent[sectionEnd] != '>' &&
             lineContent[sectionEnd] != '/' && lineContent[sectionEnd] != '\\'))
     {
         sectionEnd++;
@@ -445,7 +513,8 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
             linkage->contentAssistInfo.completionSuggestions.swizzleBaseType,
             linkage->contentAssistInfo.completionSuggestions.elementCount);
     }
-    else if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
+    else if (
+        linkage->contentAssistInfo.completionSuggestions.scopeKind ==
         CompletionSuggestions::ScopeKind::Capabilities)
     {
         return createCapabilityCandidates();
@@ -456,7 +525,9 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
     switch (linkage->contentAssistInfo.completionSuggestions.scopeKind)
     {
     case CompletionSuggestions::ScopeKind::Member:
-        useCommitChars = (commitCharacterBehavior == CommitCharacterBehavior::MembersOnly || commitCharacterBehavior == CommitCharacterBehavior::All);
+        useCommitChars =
+            (commitCharacterBehavior == CommitCharacterBehavior::MembersOnly ||
+             commitCharacterBehavior == CommitCharacterBehavior::All);
         break;
     case CompletionSuggestions::ScopeKind::Expr:
     case CompletionSuggestions::ScopeKind::Decl:
@@ -464,8 +535,7 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
         useCommitChars = (commitCharacterBehavior == CommitCharacterBehavior::All);
         addKeywords = true;
         break;
-    default:
-        return result;
+    default: return result;
     }
     HashSet<String> deduplicateSet;
     for (Index i = 0;
@@ -576,7 +646,7 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
                 result.add(item);
             }
         }
-        
+
         for (auto& def : linkage->contentAssistInfo.preprocessorInfo.macroDefinitions)
         {
             if (!def.name)
@@ -607,7 +677,7 @@ CompletionResult CompletionContext::createCapabilityCandidates()
     List<LanguageServerProtocol::CompletionItem> result;
     List<UnownedStringSlice> names;
     getCapabilityNames(names);
-    for (auto name : names.getArrayView(1, names.getCount()-1))
+    for (auto name : names.getArrayView(1, names.getCount() - 1))
     {
         if (name.startsWith("_"))
             continue;
@@ -621,7 +691,8 @@ CompletionResult CompletionContext::createCapabilityCandidates()
 }
 
 CompletionResult CompletionContext::createSwizzleCandidates(
-    Type* type, IntegerLiteralValue elementCount[2])
+    Type* type,
+    IntegerLiteralValue elementCount[2])
 {
     List<LanguageServerProtocol::CompletionItem> result;
     // Hard code members for vector and matrix types.
@@ -703,7 +774,7 @@ LanguageServerProtocol::CompletionItem CompletionContext::generateGUIDCompletion
     StringBuilder sb;
     sb << "COM(\"";
     auto docHash = doc->getURI().getHashCode() ^ doc->getText().getHashCode();
-    int sectionLengths[] = { 8,4,4,4,12 };
+    int sectionLengths[] = {8, 4, 4, 4, 12};
     srand((unsigned int)std::chrono::high_resolution_clock::now().time_since_epoch().count());
     auto hashStr = String(docHash, 16);
     sectionLengths[0] -= (int)hashStr.getLength();

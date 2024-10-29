@@ -50,7 +50,10 @@ public:
     Index m_subObjectCount = 0;
     Index m_resourceCount = 0;
 
-    ShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* layout);
+    ShaderObjectLayoutImpl(
+        RendererBase* renderer,
+        slang::ISession* session,
+        slang::TypeLayoutReflection* layout);
 
     Index getResourceCount() const;
     Index getSubObjectCount() const;

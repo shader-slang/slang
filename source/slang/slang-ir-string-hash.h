@@ -1,9 +1,8 @@
 // slang-ir-string-hash.h
 #pragma once
 
-#include "slang-ir.h"
-
 #include "../core/slang-string-slice-pool.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -15,14 +14,14 @@ class DiagnosticSink;
 // adds all of it's strings to ioPool.
 void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& ioPool);
 
-// Given a pool, with > 0 strings adds a GlobalHashedStringLiterals to the module. 
+// Given a pool, with > 0 strings adds a GlobalHashedStringLiterals to the module.
 void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module);
 
 // Find all of the IRGetStringHash instructions within the module
 void findGetStringHashInsts(IRModule* module, List<IRGetStringHash*>& outInsts);
 
-// Looks at all getStringHash instructions to make sure they access something valid (like a string literal)
-// sink is optional and can be passed as nullptr
+// Looks at all getStringHash instructions to make sure they access something valid (like a string
+// literal) sink is optional and can be passed as nullptr
 Result checkGetStringHashInsts(IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang

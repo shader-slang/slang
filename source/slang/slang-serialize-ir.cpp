@@ -1,14 +1,13 @@
 // slang-serialize-ir.cpp
 #include "slang-serialize-ir.h"
 
-#include "../core/slang-text-io.h"
 #include "../core/slang-byte-encode-util.h"
-
+#include "../core/slang-math.h"
+#include "../core/slang-text-io.h"
 #include "slang-ir-insts.h"
 
-#include "../core/slang-math.h"
-
-namespace Slang {
+namespace Slang
+{
 
 static bool _isConstant(IROp opIn)
 {
@@ -31,15 +30,19 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
 Result IRSerialWriter::_calcDebugInfo(SerialSourceLocWriter* sourceLocWriter)
 {
     // We need to find the unique source Locs
-    // We are not going to store SourceLocs directly, because there may be multiple views mapping down to
-    // the same underlying source file
+    // We are not going to store SourceLocs directly, because there may be multiple views mapping
+    // down to the same underlying source file
 
     // First find all the unique locs
     struct InstLoc
     {
         typedef InstLoc ThisType;
 
-        SLANG_FORCE_INLINE bool operator<(const ThisType& rhs) const { return sourceLoc < rhs.sourceLoc || (sourceLoc == rhs.sourceLoc && instIndex < rhs.instIndex); }
+        SLANG_FORCE_INLINE bool operator<(const ThisType& rhs) const
+        {
+            return sourceLoc < rhs.sourceLoc ||
+                   (sourceLoc == rhs.sourceLoc && instIndex < rhs.instIndex);
+        }
 
         uint32_t instIndex;
         uint32_t sourceLoc;
@@ -63,7 +66,7 @@ Result IRSerialWriter::_calcDebugInfo(SerialSourceLocWriter* sourceLocWriter)
 
     // Sort them
     instLocs.sort();
-    
+
     // Look for runs
     const InstLoc* startInstLoc = instLocs.begin();
     const InstLoc* endInstLoc = instLocs.end();
@@ -71,23 +74,27 @@ Result IRSerialWriter::_calcDebugInfo(SerialSourceLocWriter* sourceLocWriter)
     while (startInstLoc < endInstLoc)
     {
         const uint32_t startSourceLoc = startInstLoc->sourceLoc;
-        
+
         // Find the run with the same source loc
 
         const InstLoc* curInstLoc = startInstLoc + 1;
         uint32_t curInstIndex = startInstLoc->instIndex + 1;
 
         // Find the run size with same source loc and run of instruction indices
-        for (; curInstLoc < endInstLoc && curInstLoc->sourceLoc == startSourceLoc && curInstLoc->instIndex == curInstIndex; ++curInstLoc, ++curInstIndex)
+        for (; curInstLoc < endInstLoc && curInstLoc->sourceLoc == startSourceLoc &&
+               curInstLoc->instIndex == curInstIndex;
+             ++curInstLoc, ++curInstIndex)
         {
         }
 
         // Add the run
 
         IRSerialData::SourceLocRun sourceLocRun;
-        sourceLocRun.m_numInst = curInstIndex - startInstLoc->instIndex;;
+        sourceLocRun.m_numInst = curInstIndex - startInstLoc->instIndex;
+        ;
         sourceLocRun.m_startInstIndex = IRSerialData::InstIndex(startInstLoc->instIndex);
-        sourceLocRun.m_sourceLoc = sourceLocWriter->addSourceLoc(SourceLoc::fromRaw(startSourceLoc));
+        sourceLocRun.m_sourceLoc =
+            sourceLocWriter->addSourceLoc(SourceLoc::fromRaw(startSourceLoc));
 
         m_serialData->m_debugSourceLocRuns.add(sourceLocRun);
 
@@ -98,7 +105,11 @@ Result IRSerialWriter::_calcDebugInfo(SerialSourceLocWriter* sourceLocWriter)
     return SLANG_OK;
 }
 
-Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocWriter, SerialOptionFlags options, IRSerialData* serialData)
+Result IRSerialWriter::write(
+    IRModule* module,
+    SerialSourceLocWriter* sourceLocWriter,
+    SerialOptionFlags options,
+    IRSerialData* serialData)
 {
     typedef Ser::Inst::PayloadType PayloadType;
 
@@ -113,10 +124,10 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
     // Reset
     m_instMap.clear();
     m_decorations.clear();
-    
+
     // Stack for parentInst
     List<IRInst*> parentInstStack;
-  
+
     IRModuleInst* moduleInst = module->getModuleInst();
     parentInstStack.add(moduleInst);
 
@@ -131,10 +142,11 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
         parentInstStack.removeLast();
         SLANG_ASSERT(m_instMap.containsKey(parentInst));
 
-        // Okay we go through each of the children in order. If they are IRInstParent derived, we add to stack to process later 
-        // cos we want breadth first so the order of children is the same as their index order, meaning we don't need to store explicit indices
+        // Okay we go through each of the children in order. If they are IRInstParent derived, we
+        // add to stack to process later cos we want breadth first so the order of children is the
+        // same as their index order, meaning we don't need to store explicit indices
         const Ser::InstIndex startChildInstIndex = Ser::InstIndex(m_insts.getCount());
-        
+
         IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
         for (IRInst* child : childrenList)
         {
@@ -142,7 +154,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
             SLANG_ASSERT(!m_instMap.containsKey(child));
 
             _addInstruction(child);
-            
+
             parentInstStack.add(child);
         }
 
@@ -186,7 +198,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
 
             dstInst.m_op = uint16_t(srcInst->getOp() & kIROpMask_OpMask);
             dstInst.m_payloadType = PayloadType::Empty;
-            
+
             dstInst.m_resultTypeIndex = getInstIndex(srcInst->getFullType());
 
             IRConstant* irConst = as<IRConstant>(srcInst);
@@ -194,52 +206,54 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
             {
                 switch (srcInst->getOp())
                 {
-                    // Special handling for the ir const derived types
-                    case kIROp_BlobLit:
+                // Special handling for the ir const derived types
+                case kIROp_BlobLit:
                     {
-			// Blobs are serialized into string table like strings
+                        // Blobs are serialized into string table like strings
                         auto stringLit = static_cast<IRBlobLit*>(srcInst);
                         dstInst.m_payloadType = PayloadType::String_1;
-                        dstInst.m_payload.m_stringIndices[0] = getStringIndex(stringLit->getStringSlice());
+                        dstInst.m_payload.m_stringIndices[0] =
+                            getStringIndex(stringLit->getStringSlice());
                         break;
                     }
-                    case kIROp_StringLit:
+                case kIROp_StringLit:
                     {
                         auto stringLit = static_cast<IRStringLit*>(srcInst);
                         dstInst.m_payloadType = PayloadType::String_1;
-                        dstInst.m_payload.m_stringIndices[0] = getStringIndex(stringLit->getStringSlice());
+                        dstInst.m_payload.m_stringIndices[0] =
+                            getStringIndex(stringLit->getStringSlice());
                         break;
                     }
-                    case kIROp_IntLit:
+                case kIROp_IntLit:
                     {
                         dstInst.m_payloadType = PayloadType::Int64;
                         dstInst.m_payload.m_int64 = irConst->value.intVal;
                         break;
                     }
-                    case kIROp_PtrLit:
+                case kIROp_PtrLit:
                     {
                         dstInst.m_payloadType = PayloadType::Int64;
-                        dstInst.m_payload.m_int64 = (intptr_t) irConst->value.ptrVal;
+                        dstInst.m_payload.m_int64 = (intptr_t)irConst->value.ptrVal;
                         break;
                     }
-                    case kIROp_FloatLit:
+                case kIROp_FloatLit:
                     {
                         dstInst.m_payloadType = PayloadType::Float64;
-                        dstInst.m_payload.m_float64 = irConst->value.floatVal; 
+                        dstInst.m_payload.m_float64 = irConst->value.floatVal;
                         break;
                     }
-                    case kIROp_BoolLit:
+                case kIROp_BoolLit:
                     {
                         dstInst.m_payloadType = PayloadType::UInt32;
                         dstInst.m_payload.m_uint32 = irConst->value.intVal ? 1 : 0;
                         break;
                     }
-                    case kIROp_VoidLit:
+                case kIROp_VoidLit:
                     {
                         dstInst.m_payloadType = PayloadType::Empty;
                         break;
                     }
-                    default:
+                default:
                     {
                         SLANG_RELEASE_ASSERT(!"Unhandled constant type");
                         return SLANG_FAIL;
@@ -248,17 +262,20 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
                 continue;
             }
 
-            // ModuleInst is different, in so far as it holds a pointer to IRModule, but we don't need 
-            // to save that off in a special way, so can just use regular path
-             
+            // ModuleInst is different, in so far as it holds a pointer to IRModule, but we don't
+            // need to save that off in a special way, so can just use regular path
+
             const int numOperands = int(srcInst->operandCount);
             Ser::InstIndex* dstOperands = nullptr;
 
             if (numOperands <= Ser::Inst::kMaxOperands)
             {
                 // Checks the compile below is valid
-                SLANG_COMPILE_TIME_ASSERT(PayloadType(0) == PayloadType::Empty && PayloadType(1) == PayloadType::Operand_1 && PayloadType(2) == PayloadType::Operand_2);
-                
+                SLANG_COMPILE_TIME_ASSERT(
+                    PayloadType(0) == PayloadType::Empty &&
+                    PayloadType(1) == PayloadType::Operand_1 &&
+                    PayloadType(2) == PayloadType::Operand_2);
+
                 dstInst.m_payloadType = PayloadType(numOperands);
                 dstOperands = dstInst.m_payload.m_operands;
             }
@@ -269,7 +286,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
                 int operandArrayBaseIndex = int(m_serialData->m_externalOperands.getCount());
                 m_serialData->m_externalOperands.setCount(operandArrayBaseIndex + numOperands);
 
-                dstOperands = m_serialData->m_externalOperands.begin() + operandArrayBaseIndex; 
+                dstOperands = m_serialData->m_externalOperands.begin() + operandArrayBaseIndex;
 
                 auto& externalOperands = dstInst.m_payload.m_externalOperand;
                 externalOperands.m_arrayIndex = Ser::ArrayIndex(operandArrayBaseIndex);
@@ -295,7 +312,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
         const Index numInsts = m_insts.getCount();
         serialData->m_rawSourceLocs.setCount(numInsts);
 
-        Ser::RawSourceLoc* dstLocs =  serialData->m_rawSourceLocs.begin();
+        Ser::RawSourceLoc* dstLocs = serialData->m_rawSourceLocs.begin();
         // 0 is null, just mark as no location
         dstLocs[0] = Ser::RawSourceLoc(0);
         for (Index i = 1; i < numInsts; ++i)
@@ -314,7 +331,10 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
     return SLANG_OK;
 }
 
-Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialData::Inst>& instsIn, List<uint8_t>& encodeArrayOut)
+Result _encodeInsts(
+    SerialCompressionType compressionType,
+    const List<IRSerialData::Inst>& instsIn,
+    List<uint8_t>& encodeArrayOut)
 {
     typedef IRSerialData::Inst::PayloadType PayloadType;
 
@@ -324,17 +344,21 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
     }
 
     encodeArrayOut.clear();
-    
+
     const size_t numInsts = size_t(instsIn.getCount());
     const IRSerialData::Inst* insts = instsIn.begin();
-        
+
     uint8_t* encodeOut = encodeArrayOut.begin();
     uint8_t* encodeEnd = encodeArrayOut.end();
 
     // Calculate the maximum instruction size with worst case possible encoding
     // 2 bytes hold the payload size, and the result type
-    // Note that if there were some free bits, we could encode some of this stuff into bits, but if we remove payloadType, then there are no free bits
-    const size_t maxInstSize = 1 + ByteEncodeUtil::kMaxLiteEncodeUInt16 + Math::Max(sizeof(insts->m_payload.m_float64), size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
+    // Note that if there were some free bits, we could encode some of this stuff into bits, but if
+    // we remove payloadType, then there are no free bits
+    const size_t maxInstSize = 1 + ByteEncodeUtil::kMaxLiteEncodeUInt16 +
+                               Math::Max(
+                                   sizeof(insts->m_payload.m_float64),
+                                   size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
 
     for (size_t i = 0; i < numInsts; ++i)
     {
@@ -344,7 +368,7 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
         if (encodeOut + maxInstSize >= encodeEnd)
         {
             const size_t offset = size_t(encodeOut - encodeArrayOut.begin());
-            
+
             const UInt oldCapacity = encodeArrayOut.getCapacity();
 
             encodeArrayOut.reserve(oldCapacity + (oldCapacity >> 1) + maxInstSize);
@@ -362,35 +386,41 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
 
         switch (inst.m_payloadType)
         {
-            case PayloadType::Empty:
+        case PayloadType::Empty:
             {
                 break;
             }
-            case PayloadType::Operand_1:
-            case PayloadType::String_1:
-            case PayloadType::UInt32:
+        case PayloadType::Operand_1:
+        case PayloadType::String_1:
+        case PayloadType::UInt32:
             {
                 // 1 UInt32
-                encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_payload.m_operands[0], encodeOut);
+                encodeOut += ByteEncodeUtil::encodeLiteUInt32(
+                    (uint32_t)inst.m_payload.m_operands[0],
+                    encodeOut);
                 break;
             }
-            case PayloadType::Operand_2:
-            case PayloadType::OperandAndUInt32:
-            case PayloadType::OperandExternal:
-            case PayloadType::String_2:
+        case PayloadType::Operand_2:
+        case PayloadType::OperandAndUInt32:
+        case PayloadType::OperandExternal:
+        case PayloadType::String_2:
             {
                 // 2 UInt32
-                encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_payload.m_operands[0], encodeOut);
-                encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_payload.m_operands[1], encodeOut);
+                encodeOut += ByteEncodeUtil::encodeLiteUInt32(
+                    (uint32_t)inst.m_payload.m_operands[0],
+                    encodeOut);
+                encodeOut += ByteEncodeUtil::encodeLiteUInt32(
+                    (uint32_t)inst.m_payload.m_operands[1],
+                    encodeOut);
                 break;
             }
-            case PayloadType::Float64:
+        case PayloadType::Float64:
             {
                 memcpy(encodeOut, &inst.m_payload.m_float64, sizeof(inst.m_payload.m_float64));
                 encodeOut += sizeof(inst.m_payload.m_float64);
                 break;
             }
-            case PayloadType::Int64:
+        case PayloadType::Int64:
             {
                 memcpy(encodeOut, &inst.m_payload.m_int64, sizeof(inst.m_payload.m_int64));
                 encodeOut += sizeof(inst.m_payload.m_int64);
@@ -399,12 +429,16 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
         }
     }
 
-    // Fix the size 
+    // Fix the size
     encodeArrayOut.setCount(UInt(encodeOut - encodeArrayOut.begin()));
     return SLANG_OK;
 }
 
-Result _writeInstArrayChunk(SerialCompressionType compressionType, FourCC chunkId, const List<IRSerialData::Inst>& array, RiffContainer* container)
+Result _writeInstArrayChunk(
+    SerialCompressionType compressionType,
+    FourCC chunkId,
+    const List<IRSerialData::Inst>& array,
+    RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -416,11 +450,11 @@ Result _writeInstArrayChunk(SerialCompressionType compressionType, FourCC chunkI
 
     switch (compressionType)
     {
-        case SerialCompressionType::None:
+    case SerialCompressionType::None:
         {
             return SerialRiffUtil::writeArrayChunk(compressionType, chunkId, array, container);
         }
-        case SerialCompressionType::VariableByteLite:
+    case SerialCompressionType::VariableByteLite:
         {
             List<uint8_t> compressedPayload;
             SLANG_RETURN_ON_FAIL(_encodeInsts(compressionType, array, compressedPayload));
@@ -429,41 +463,65 @@ Result _writeInstArrayChunk(SerialCompressionType compressionType, FourCC chunkI
 
             SerialBinary::CompressedArrayHeader header;
             header.numEntries = uint32_t(array.getCount());
-            header.numCompressedEntries = 0;          
+            header.numCompressedEntries = 0;
 
             container->write(&header, sizeof(header));
             container->write(compressedPayload.getBuffer(), compressedPayload.getCount());
 
             return SLANG_OK;
         }
-        default: break;
+    default: break;
     }
     return SLANG_FAIL;
 }
 
-/* static */Result IRSerialWriter::writeContainer(const IRSerialData& data, SerialCompressionType compressionType, RiffContainer* container)
+/* static */ Result IRSerialWriter::writeContainer(
+    const IRSerialData& data,
+    SerialCompressionType compressionType,
+    RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
 
     ScopeChunk scopeModule(container, Chunk::Kind::List, Bin::kIRModuleFourCc);
 
-    SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(compressionType, Bin::kInstFourCc, data.m_insts, container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(compressionType, Bin::kChildRunFourCc, data.m_childRuns, container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(compressionType, Bin::kExternalOperandsFourCc, data.m_externalOperands, container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(SerialCompressionType::None, SerialBinary::kStringTableFourCc, data.m_stringTable, container));
+    SLANG_RETURN_ON_FAIL(
+        _writeInstArrayChunk(compressionType, Bin::kInstFourCc, data.m_insts, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
+        compressionType,
+        Bin::kChildRunFourCc,
+        data.m_childRuns,
+        container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
+        compressionType,
+        Bin::kExternalOperandsFourCc,
+        data.m_externalOperands,
+        container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
+        SerialCompressionType::None,
+        SerialBinary::kStringTableFourCc,
+        data.m_stringTable,
+        container));
 
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(SerialCompressionType::None, Bin::kUInt32RawSourceLocFourCc, data.m_rawSourceLocs, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
+        SerialCompressionType::None,
+        Bin::kUInt32RawSourceLocFourCc,
+        data.m_rawSourceLocs,
+        container));
 
     if (data.m_debugSourceLocRuns.getCount())
     {
-        SerialRiffUtil::writeArrayChunk(compressionType, Bin::kDebugSourceLocRunFourCc, data.m_debugSourceLocRuns, container);
+        SerialRiffUtil::writeArrayChunk(
+            compressionType,
+            Bin::kDebugSourceLocRunFourCc,
+            data.m_debugSourceLocRuns,
+            container);
     }
 
     return SLANG_OK;
 }
 
-/* static */void IRSerialWriter::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
+/* static */ void IRSerialWriter::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
 {
     // We reserve 0 for null
     instsOut.setCount(1);
@@ -496,7 +554,11 @@ Result _writeInstArrayChunk(SerialCompressionType compressionType, FourCC chunkI
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-static Result _decodeInsts(SerialCompressionType compressionType, const uint8_t* encodeCur, size_t encodeInSize, List<IRSerialData::Inst>& instsOut)
+static Result _decodeInsts(
+    SerialCompressionType compressionType,
+    const uint8_t* encodeCur,
+    size_t encodeInSize,
+    List<IRSerialData::Inst>& instsOut)
 {
     const uint8_t* encodeEnd = encodeCur + encodeInSize;
 
@@ -525,40 +587,46 @@ static Result _decodeInsts(SerialCompressionType compressionType, const uint8_t*
 
         const PayloadType payloadType = PayloadType(*encodeCur++);
         inst.m_payloadType = payloadType;
-        
+
         // Read the result value
-        encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, (uint32_t*)&inst.m_resultTypeIndex);
+        encodeCur +=
+            ByteEncodeUtil::decodeLiteUInt32(encodeCur, (uint32_t*)&inst.m_resultTypeIndex);
 
         switch (inst.m_payloadType)
         {
-            case PayloadType::Empty:
+        case PayloadType::Empty:
             {
                 break;
             }
-            case PayloadType::Operand_1:
-            case PayloadType::String_1:
-            case PayloadType::UInt32:
+        case PayloadType::Operand_1:
+        case PayloadType::String_1:
+        case PayloadType::UInt32:
             {
                 // 1 UInt32
-                encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, (uint32_t*)&inst.m_payload.m_operands[0]);
+                encodeCur += ByteEncodeUtil::decodeLiteUInt32(
+                    encodeCur,
+                    (uint32_t*)&inst.m_payload.m_operands[0]);
                 break;
             }
-            case PayloadType::Operand_2:
-            case PayloadType::OperandAndUInt32:
-            case PayloadType::OperandExternal:
-            case PayloadType::String_2:
+        case PayloadType::Operand_2:
+        case PayloadType::OperandAndUInt32:
+        case PayloadType::OperandExternal:
+        case PayloadType::String_2:
             {
                 // 2 UInt32
-                encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, 2, (uint32_t*)&inst.m_payload.m_operands[0]);
+                encodeCur += ByteEncodeUtil::decodeLiteUInt32(
+                    encodeCur,
+                    2,
+                    (uint32_t*)&inst.m_payload.m_operands[0]);
                 break;
             }
-            case PayloadType::Float64:
+        case PayloadType::Float64:
             {
                 memcpy(&inst.m_payload.m_float64, encodeCur, sizeof(inst.m_payload.m_float64));
                 encodeCur += sizeof(inst.m_payload.m_float64);
                 break;
             }
-            case PayloadType::Int64:
+        case PayloadType::Int64:
             {
                 memcpy(&inst.m_payload.m_int64, encodeCur, sizeof(inst.m_payload.m_int64));
                 encodeCur += sizeof(inst.m_payload.m_int64);
@@ -570,7 +638,10 @@ static Result _decodeInsts(SerialCompressionType compressionType, const uint8_t*
     return SLANG_OK;
 }
 
-static Result _readInstArrayChunk(SerialCompressionType containerCompressionType, RiffContainer::DataChunk* chunk, List<IRSerialData::Inst>& arrayOut)
+static Result _readInstArrayChunk(
+    SerialCompressionType containerCompressionType,
+    RiffContainer::DataChunk* chunk,
+    List<IRSerialData::Inst>& arrayOut)
 {
     SerialCompressionType compressionType = SerialCompressionType::None;
     if (chunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk->m_fourCC))
@@ -580,12 +651,12 @@ static Result _readInstArrayChunk(SerialCompressionType containerCompressionType
 
     switch (compressionType)
     {
-        case SerialCompressionType::None:
+    case SerialCompressionType::None:
         {
             SerialRiffUtil::ListResizerForType<IRSerialData::Inst> resizer(arrayOut);
             return SerialRiffUtil::readArrayChunk(compressionType, chunk, resizer);
         }
-        case SerialCompressionType::VariableByteLite:
+    case SerialCompressionType::VariableByteLite:
         {
             RiffReadHelper read = chunk->asReadHelper();
 
@@ -594,10 +665,11 @@ static Result _readInstArrayChunk(SerialCompressionType containerCompressionType
 
             arrayOut.setCount(header.numEntries);
 
-            SLANG_RETURN_ON_FAIL(_decodeInsts(compressionType, read.getData(), read.getRemainingSize(), arrayOut));
+            SLANG_RETURN_ON_FAIL(
+                _decodeInsts(compressionType, read.getData(), read.getRemainingSize(), arrayOut));
             break;
         }
-        default:
+    default:
         {
             return SLANG_FAIL;
         }
@@ -606,7 +678,10 @@ static Result _readInstArrayChunk(SerialCompressionType containerCompressionType
     return SLANG_OK;
 }
 
-/* static */Result IRSerialReader::readContainer(RiffContainer::ListChunk* module, SerialCompressionType containerCompressionType, IRSerialData* outData)
+/* static */ Result IRSerialReader::readContainer(
+    RiffContainer::ListChunk* module,
+    SerialCompressionType containerCompressionType,
+    IRSerialData* outData)
 {
     typedef IRSerialBinary Bin;
 
@@ -619,44 +694,57 @@ static Result _readInstArrayChunk(SerialCompressionType containerCompressionType
         {
             continue;
         }
-        
+
         switch (dataChunk->m_fourCC)
         {
-            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kInstFourCc):
-            case Bin::kInstFourCc:
+        case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kInstFourCc):
+        case Bin::kInstFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readInstArrayChunk(containerCompressionType, dataChunk, outData->m_insts));
+                SLANG_RETURN_ON_FAIL(
+                    _readInstArrayChunk(containerCompressionType, dataChunk, outData->m_insts));
                 break;
             }
-            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kChildRunFourCc):
-            case Bin::kChildRunFourCc:
+        case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kChildRunFourCc):
+        case Bin::kChildRunFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(containerCompressionType, dataChunk, outData->m_childRuns));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
+                    containerCompressionType,
+                    dataChunk,
+                    outData->m_childRuns));
                 break;
             }
-            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kExternalOperandsFourCc):
-            case Bin::kExternalOperandsFourCc:
+        case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kExternalOperandsFourCc):
+        case Bin::kExternalOperandsFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(containerCompressionType, dataChunk, outData->m_externalOperands));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
+                    containerCompressionType,
+                    dataChunk,
+                    outData->m_externalOperands));
                 break;
             }
-            case SerialBinary::kStringTableFourCc:
+        case SerialBinary::kStringTableFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, outData->m_stringTable));
+                SLANG_RETURN_ON_FAIL(
+                    SerialRiffUtil::readArrayUncompressedChunk(dataChunk, outData->m_stringTable));
                 break;
             }
-            case Bin::kUInt32RawSourceLocFourCc:
+        case Bin::kUInt32RawSourceLocFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, outData->m_rawSourceLocs));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(
+                    dataChunk,
+                    outData->m_rawSourceLocs));
                 break;
             }
-            case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kDebugSourceLocRunFourCc):
-            case Bin::kDebugSourceLocRunFourCc:
+        case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kDebugSourceLocRunFourCc):
+        case Bin::kDebugSourceLocRunFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(containerCompressionType, dataChunk, outData->m_debugSourceLocRuns));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
+                    containerCompressionType,
+                    dataChunk,
+                    outData->m_debugSourceLocRuns));
                 break;
             }
-            default:
+        default:
             {
                 break;
             }
@@ -666,7 +754,11 @@ static Result _readInstArrayChunk(SerialCompressionType containerCompressionType
     return SLANG_OK;
 }
 
-Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSourceLocReader* sourceLocReader, RefPtr<IRModule>& outModule)
+Result IRSerialReader::read(
+    const IRSerialData& data,
+    Session* session,
+    SerialSourceLocReader* sourceLocReader,
+    RefPtr<IRModule>& outModule)
 {
     // Only used in debug builds
     [[maybe_unused]] typedef Ser::Inst::PayloadType PayloadType;
@@ -678,7 +770,10 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
     m_module = module;
 
     // Convert m_stringTable into StringSlicePool.
-    SerialStringTableUtil::decodeStringTable(data.m_stringTable.getBuffer(), data.m_stringTable.getCount(), m_stringTable);
+    SerialStringTableUtil::decodeStringTable(
+        data.m_stringTable.getBuffer(),
+        data.m_stringTable.getCount(),
+        m_stringTable);
 
     // Each IR instruction has:
     //
@@ -687,7 +782,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
     // * Zero or more children
     //
     // Most instructions are entirely defined by those properties.
-    // 
+    //
     // The instructions that represent simple constants (integers, strings, etc.) are
     // unique in that they have "payload" data that holds their value, instead of having
     // any operands.
@@ -737,7 +832,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
         auto moduleInst = module->getModuleInst();
 
         // Set the IRModuleInst
-        insts[1] = moduleInst; 
+        insts[1] = moduleInst;
     }
 
     for (Index i = 2; i < numInsts; ++i)
@@ -750,7 +845,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
         {
             // Handling of constants
 
-            // Calculate the minimum object size (ie not including the payload of value)    
+            // Calculate the minimum object size (ie not including the payload of value)
             const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
 
             // All IR constants have zero operands.
@@ -758,57 +853,70 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
 
             IRConstant* irConst = nullptr;
             switch (op)
-            {                    
-                case kIROp_BoolLit:
+            {
+            case kIROp_BoolLit:
                 {
                     // TODO: Most of these cases could use the templated `_allocateInst<T>`
                     // *if* we had distinct `IRConstant` subtypes to represent these
                     // cases and their subtype-specific payloads.
 
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
-                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount, prefixSize + sizeof(IRIntegerValue)));
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(
+                        op,
+                        operandCount,
+                        prefixSize + sizeof(IRIntegerValue)));
                     irConst->value.intVal = srcInst.m_payload.m_uint32 != 0;
                     break;
                 }
-                case kIROp_IntLit:
+            case kIROp_IntLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
-                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount, prefixSize + sizeof(IRIntegerValue)));
-                    irConst->value.intVal = srcInst.m_payload.m_int64; 
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(
+                        op,
+                        operandCount,
+                        prefixSize + sizeof(IRIntegerValue)));
+                    irConst->value.intVal = srcInst.m_payload.m_int64;
                     break;
                 }
-                case kIROp_PtrLit:
+            case kIROp_PtrLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
-                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount, prefixSize + sizeof(void*)));
-                    irConst->value.ptrVal = (void*) (intptr_t) srcInst.m_payload.m_int64; 
+                    irConst = static_cast<IRConstant*>(
+                        module->_allocateInst(op, operandCount, prefixSize + sizeof(void*)));
+                    irConst->value.ptrVal = (void*)(intptr_t)srcInst.m_payload.m_int64;
                     break;
                 }
-                case kIROp_FloatLit:
+            case kIROp_FloatLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Float64);
-                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount,  prefixSize + sizeof(IRFloatingPointValue)));
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(
+                        op,
+                        operandCount,
+                        prefixSize + sizeof(IRFloatingPointValue)));
                     irConst->value.floatVal = srcInst.m_payload.m_float64;
                     break;
                 }
-                case kIROp_VoidLit:
+            case kIROp_VoidLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
-                    irConst = static_cast<IRConstant*>(module->_allocateInst(
-                        op, operandCount, prefixSize));
+                    irConst = static_cast<IRConstant*>(
+                        module->_allocateInst(op, operandCount, prefixSize));
                     break;
                 }
-                case kIROp_BlobLit:
-                case kIROp_StringLit:
+            case kIROp_BlobLit:
+            case kIROp_StringLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
 
-                    const UnownedStringSlice slice = m_stringTable.getSlice(StringSlicePool::Handle(srcInst.m_payload.m_stringIndices[0]));
-                        
-                    const size_t sliceSize = slice.getLength();
-                    const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
+                    const UnownedStringSlice slice = m_stringTable.getSlice(
+                        StringSlicePool::Handle(srcInst.m_payload.m_stringIndices[0]));
 
-                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount, instSize));
+                    const size_t sliceSize = slice.getLength();
+                    const size_t instSize =
+                        prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
+
+                    irConst =
+                        static_cast<IRConstant*>(module->_allocateInst(op, operandCount, instSize));
 
                     IRConstant::StringValue& dstString = irConst->value.stringVal;
 
@@ -819,7 +927,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
                     memcpy(dstChars, slice.begin(), sliceSize);
                     break;
                 }
-                default:
+            default:
                 {
                     SLANG_ASSERT(!"Unknown constant type");
                     return SLANG_FAIL;
@@ -848,14 +956,14 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
         if (srcInst.m_resultTypeIndex != Ser::InstIndex(0))
         {
             IRInst* resultInst = insts[int(srcInst.m_resultTypeIndex)];
-            // NOTE! Counter intuitively the IRType* paramter may not be IRType* derived for example 
+            // NOTE! Counter intuitively the IRType* paramter may not be IRType* derived for example
             // IRGlobalGenericParam is valid, but isn't IRType* derived
 
-            //SLANG_RELEASE_ASSERT(as<IRType>(resultInst));
+            // SLANG_RELEASE_ASSERT(as<IRType>(resultInst));
             dstInst->setFullType(static_cast<IRType*>(resultInst));
         }
-       
-        //if (!isParentDerived(op))
+
+        // if (!isParentDerived(op))
         {
             const Ser::InstIndex* srcOperandIndices;
             const int numOperands = data.getOperands(srcInst, &srcOperandIndices);
@@ -868,7 +976,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
             }
         }
     }
-    
+
     // Patch up the children
     {
         const Index numChildRuns = data.m_childRuns.getCount();
@@ -894,7 +1002,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
         for (Index i = 1; i < numInsts; ++i)
         {
             IRInst* dstInst = insts[i];
-            
+
             dstInst->sourceLoc.setRaw(Slang::SourceLoc::RawValue(srcLocs[i]));
         }
     }
@@ -909,7 +1017,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
         // Just guess initially 0 for the source file that contains the initial run
         SerialSourceLocData::SourceRange range = SerialSourceLocData::SourceRange::getInvalid();
         int fix = 0;
-        
+
         const Index numRuns = sourceRuns.getCount();
         for (Index i = 0; i < numRuns; ++i)
         {

@@ -23,8 +23,7 @@ public:
     Result init(DeviceImpl* device, const IQueryPool::Desc& desc);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getResult(GfxIndex index, GfxCount count, uint64_t* data) override;
-
+    getResult(GfxIndex index, GfxCount count, uint64_t* data) override;
 };
 
 } // namespace metal

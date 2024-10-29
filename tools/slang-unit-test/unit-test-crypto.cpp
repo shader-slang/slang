@@ -1,7 +1,6 @@
 // unit-test-sha1.cpp
-#include "tools/unit-test/slang-unit-test.h"
-
 #include "../../source/core/slang-crypto.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
@@ -29,7 +28,7 @@ SLANG_UNIT_TEST(crypto)
         SLANG_CHECK(Digest("0123456789abcdef").toString() == "0123456789abcdef");
 
         Slang::ComPtr<ISlangBlob> blob = Digest("0123456789abcdef").toBlob();
-        const uint8_t check[] = { 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef };
+        const uint8_t check[] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
         SLANG_CHECK(blob->getBufferSize() == 8);
         SLANG_CHECK(::memcmp(blob->getBufferPointer(), check, 8) == 0);
 
@@ -48,7 +47,8 @@ SLANG_UNIT_TEST(crypto)
     // One call to update()
     {
         MD5 sha1;
-        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.");
+        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+                         "tempor incididunt ut labore et dolore magna aliqua.");
         sha1.update(str.getBuffer(), str.getLength());
         auto digest = sha1.finalize();
         SLANG_CHECK(digest.toString() == "818c6e601a24f72750da0f6c9b8ebe28");
@@ -57,8 +57,10 @@ SLANG_UNIT_TEST(crypto)
     // Two calls to update()
     {
         MD5 sha1;
-        const String str1("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.");
-        const String str2("Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.");
+        const String str1("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+                          "tempor incididunt ut labore et dolore magna aliqua.");
+        const String str2("Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi "
+                          "ut aliquip ex ea commodo consequat.");
         sha1.update(str1.getBuffer(), str1.getLength());
         sha1.update(str2.getBuffer(), str2.getLength());
         auto digest = sha1.finalize();
@@ -68,9 +70,12 @@ SLANG_UNIT_TEST(crypto)
     // compute()
     {
         SLANG_CHECK(MD5::compute(nullptr, 0).toString() == "d41d8cd98f00b204e9800998ecf8427e");
-        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.");
-        SLANG_CHECK(MD5::compute(str.getBuffer(), str.getLength()).toString() == "818c6e601a24f72750da0f6c9b8ebe28");
-    }    
+        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+                         "tempor incididunt ut labore et dolore magna aliqua.");
+        SLANG_CHECK(
+            MD5::compute(str.getBuffer(), str.getLength()).toString() ==
+            "818c6e601a24f72750da0f6c9b8ebe28");
+    }
 
     // SHA1
 
@@ -84,7 +89,8 @@ SLANG_UNIT_TEST(crypto)
     // One call to update()
     {
         SHA1 sha1;
-        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.");
+        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+                         "tempor incididunt ut labore et dolore magna aliqua.");
         sha1.update(str.getBuffer(), str.getLength());
         auto digest = sha1.finalize();
         SLANG_CHECK(digest.toString() == "cca0871ecbe200379f0a1e4b46de177e2d62e655");
@@ -93,8 +99,10 @@ SLANG_UNIT_TEST(crypto)
     // Two calls to update()
     {
         SHA1 sha1;
-        const String str1("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.");
-        const String str2("Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.");
+        const String str1("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+                          "tempor incididunt ut labore et dolore magna aliqua.");
+        const String str2("Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi "
+                          "ut aliquip ex ea commodo consequat.");
         sha1.update(str1.getBuffer(), str1.getLength());
         sha1.update(str2.getBuffer(), str2.getLength());
         auto digest = sha1.finalize();
@@ -103,9 +111,13 @@ SLANG_UNIT_TEST(crypto)
 
     // compute()
     {
-        SLANG_CHECK(SHA1::compute(nullptr, 0).toString() == "da39a3ee5e6b4b0d3255bfef95601890afd80709");
-        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.");
-        SLANG_CHECK(SHA1::compute(str.getBuffer(), str.getLength()).toString() == "cca0871ecbe200379f0a1e4b46de177e2d62e655");
+        SLANG_CHECK(
+            SHA1::compute(nullptr, 0).toString() == "da39a3ee5e6b4b0d3255bfef95601890afd80709");
+        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+                         "tempor incididunt ut labore et dolore magna aliqua.");
+        SLANG_CHECK(
+            SHA1::compute(str.getBuffer(), str.getLength()).toString() ==
+            "cca0871ecbe200379f0a1e4b46de177e2d62e655");
     }
 
     // DigestBuider
@@ -169,5 +181,5 @@ SLANG_UNIT_TEST(crypto)
 
         auto digest = builder.finalize();
         SLANG_CHECK(digest.toString() == "4ae71336e44bf9bf79d2752e234818a5");
-    }    
+    }
 }

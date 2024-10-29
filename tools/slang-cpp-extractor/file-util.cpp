@@ -2,10 +2,12 @@
 
 #include "../../source/core/slang-io.h"
 
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
 
-namespace { // anonymous 
+namespace
+{ // anonymous
 struct DiagnosticReporter
 {
     SlangResult report(SlangResult res)
@@ -27,9 +29,8 @@ struct DiagnosticReporter
         return res;
     }
 
-    DiagnosticReporter(const String& filename, DiagnosticSink* sink) :
-        m_filename(filename),
-        m_sink(sink)
+    DiagnosticReporter(const String& filename, DiagnosticSink* sink)
+        : m_filename(filename), m_sink(sink)
     {
     }
 
@@ -37,14 +38,18 @@ struct DiagnosticReporter
     String m_filename;
 };
 
-} // anonymous
+} // namespace
 
-/* static */SlangResult FileUtil::readAllText(const Slang::String& fileName, DiagnosticSink* sink, String& outRead)
+/* static */ SlangResult FileUtil::readAllText(
+    const Slang::String& fileName,
+    DiagnosticSink* sink,
+    String& outRead)
 {
     DiagnosticReporter reporter(fileName, sink);
-        
+
     RefPtr<FileStream> stream = new FileStream;
-    SLANG_RETURN_ON_FAIL(reporter.report(stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite)));
+    SLANG_RETURN_ON_FAIL(reporter.report(
+        stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite)));
 
     StreamReader reader;
     SLANG_RETURN_ON_FAIL(reporter.report(reader.init(stream)));
@@ -53,12 +58,16 @@ struct DiagnosticReporter
     return SLANG_OK;
 }
 
-/* static */SlangResult FileUtil::writeAllText(const Slang::String& fileName, DiagnosticSink* sink, const UnownedStringSlice& text)
+/* static */ SlangResult FileUtil::writeAllText(
+    const Slang::String& fileName,
+    DiagnosticSink* sink,
+    const UnownedStringSlice& text)
 {
     // TODO(JS):
-    // There is an optimization/behavior here,that checks if the contents has changed. It only writes if it hasn't
-    // That might not be what you want (both because of extra work of read, the file modified stamp or other reasons, file is write only etc)
-    // NOTE! That this also does the work of the comparison after it is decoded, but the *bytes* might actually be different.
+    // There is an optimization/behavior here,that checks if the contents has changed. It only
+    // writes if it hasn't That might not be what you want (both because of extra work of read, the
+    // file modified stamp or other reasons, file is write only etc) NOTE! That this also does the
+    // work of the comparison after it is decoded, but the *bytes* might actually be different.
 
     if (File::exists(fileName))
     {
@@ -78,7 +87,7 @@ struct DiagnosticReporter
     StreamWriter writer;
     SLANG_RETURN_ON_FAIL(reporter.report(writer.init(stream)));
     SLANG_RETURN_ON_FAIL(reporter.report(writer.write(text)))
-    return SLANG_OK;   
+    return SLANG_OK;
 }
 
 /* static */ void FileUtil::indent(Index indentCount, StringBuilder& out)

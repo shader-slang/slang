@@ -1,11 +1,11 @@
 // slang-ir-autodiff-cfg-norm.cpp
 #include "slang-ir-autodiff-cfg-norm.h"
+
+#include "slang-ir-dominators.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-ssa.h"
-
-#include "slang-ir-validate.h"
 #include "slang-ir-util.h"
-#include "slang-ir-dominators.h"
+#include "slang-ir-validate.h"
 
 namespace Slang
 {
@@ -24,14 +24,16 @@ struct RegionEndpoint
         , inBreakRegion(inBreakRegion)
         , inBaseRegion(inBaseRegion)
         , isRegionEmpty(false)
-    {}
+    {
+    }
 
     RegionEndpoint(IRBlock* exitBlock, bool inBreakRegion, bool inBaseRegion, bool isRegionEmpty)
         : exitBlock(exitBlock)
         , inBreakRegion(inBreakRegion)
         , inBaseRegion(inBaseRegion)
         , isRegionEmpty(isRegionEmpty)
-    {}
+    {
+    }
 
     RegionEndpoint() {}
 };
@@ -80,7 +82,10 @@ IRBlock* getOrCreateTopLevelCondition(IRLoop* loopInst)
         //
         condBuilder.setInsertInto(condBlock);
         auto ifElse = as<IRIfElse>(condBuilder.emitIfElse(
-            condBuilder.getBoolValue(true), firstBlock, loopInst->getBreakBlock(), firstBlock));
+            condBuilder.getBoolValue(true),
+            firstBlock,
+            loopInst->getBreakBlock(),
+            firstBlock));
 
         // We'll insert a blank block between the condition and the
         // break block, since otherwise, we might trip up the later
@@ -98,7 +103,8 @@ struct CFGNormalizationPass
 
     CFGNormalizationPass(CFGNormalizationContext ctx)
         : cfgContext(ctx)
-    {}
+    {
+    }
 
     void replaceBreakWithAfterBlock(
         IRBuilder* builder,
@@ -167,11 +173,11 @@ struct CFGNormalizationPass
             if (as<IRVar>(child))
             {
                 if (auto loopInst = as<IRLoop>(region->headerBlock->getTerminator()))
-                {   
+                {
                     // In order to avoid introducing unnecessary loop state, we'll move vars
                     // to the loop's target (first loop block) instead of the loop header.
                     // (unless the var is already in the header or target)
-                    // 
+                    //
                     if (block != region->headerBlock && block != loopInst->getTargetBlock())
                         child->insertBefore(loopInst->getTargetBlock()->getTerminator());
                 }
@@ -184,7 +190,9 @@ struct CFGNormalizationPass
     }
 
     RegionEndpoint getNormalizedRegionEndpoint(
-        BreakableRegionInfo* parentRegion, IRBlock* entryBlock, List<IRBlock*> afterBlocks)
+        BreakableRegionInfo* parentRegion,
+        IRBlock* entryBlock,
+        List<IRBlock*> afterBlocks)
     {
         IRBlock* currentBlock = entryBlock;
         _moveVarsToRegionHeader(parentRegion, currentBlock);
@@ -361,10 +369,10 @@ struct CFGNormalizationPass
                     // In this case, we can safely assume that the after block does not
                     // have anything to execute. Further, we need to re-wire the
                     // previously unreachable block to the parent break block.
-                    // Note that this operation is safe because if the after block was 
-                    // originally unreachable, all potential paths to it must have 
+                    // Note that this operation is safe because if the after block was
+                    // originally unreachable, all potential paths to it must have
                     // broken out of the region.
-                    // 
+                    //
                     if (auto unreachInst = as<IRUnreachable>(afterBlock->getTerminator()))
                     {
                         // Link it to the parentAfterBlock.
@@ -376,7 +384,7 @@ struct CFGNormalizationPass
                         // We can now safely assume that the after block is empty.
                         // Set 'afterBaseRegion' to false, which should lead the rest
                         // of the logic to avoid splitting the after block
-                        // 
+                        //
                         afterBaseRegion = false;
                     }
 
@@ -525,7 +533,9 @@ struct CFGNormalizationPass
 
                     // Normalize the region from the first loop block till break.
                     auto preBreakEndPoint = getNormalizedRegionEndpoint(
-                        &info, firstLoopBlock, List<IRBlock*>(info.breakBlock));
+                        &info,
+                        firstLoopBlock,
+                        List<IRBlock*>(info.breakBlock));
 
                     // Should not be empty.. but check anyway
                     SLANG_RELEASE_ASSERT(!preBreakEndPoint.isRegionEmpty);
@@ -546,16 +556,19 @@ struct CFGNormalizationPass
                     return info.breakBlock;
                 }
 
-                auto condBlock =
-                    getOrCreateTopLevelCondition(as<IRLoop>(branchInst));
+                auto condBlock = getOrCreateTopLevelCondition(as<IRLoop>(branchInst));
 
                 auto ifElse = as<IRIfElse>(condBlock->getTerminator());
 
                 auto trueEndPoint = getNormalizedRegionEndpoint(
-                    &info, ifElse->getTrueBlock(), List<IRBlock*>(condBlock, info.breakBlock));
+                    &info,
+                    ifElse->getTrueBlock(),
+                    List<IRBlock*>(condBlock, info.breakBlock));
 
                 auto falseEndPoint = getNormalizedRegionEndpoint(
-                    &info, ifElse->getFalseBlock(), List<IRBlock*>(condBlock, info.breakBlock));
+                    &info,
+                    ifElse->getFalseBlock(),
+                    List<IRBlock*>(condBlock, info.breakBlock));
 
                 RegionEndpoint loopEndPoint;
                 bool isLoopOnTrueSide = true;
@@ -576,15 +589,15 @@ struct CFGNormalizationPass
                 // Right now, we only support loops where the loop is on the true side of
                 // the condition. If we encounter the other case, flip the condition.
                 //
-                if(!isLoopOnTrueSide)
+                if (!isLoopOnTrueSide)
                 {
                     IRBuilderInsertLocScope locScope{&builder};
                     // Invert the cond
                     builder.setInsertBefore(ifElse);
                     const auto c = ifElse->getCondition();
                     const auto negatedCond = c->getOp() == kIROp_Not
-                        ? c->getOperand(0)
-                        : builder.emitNot(builder.getBoolType(), c);
+                                                 ? c->getOperand(0)
+                                                 : builder.emitNot(builder.getBoolType(), c);
                     ifElse->condition.set(negatedCond);
                     const auto t = ifElse->getTrueBlock();
                     const auto f = ifElse->getFalseBlock();
@@ -660,7 +673,9 @@ struct CFGNormalizationPass
                 {
                     auto caseBlock = switchInst->getCaseLabel(ii);
                     auto caseEndPoint = getNormalizedRegionEndpoint(
-                                            &info, caseBlock, List<IRBlock*>(info.breakBlock))
+                                            &info,
+                                            caseBlock,
+                                            List<IRBlock*>(info.breakBlock))
                                             .exitBlock;
 
                     // Consistency check (if this case hits, it's probably
@@ -670,10 +685,11 @@ struct CFGNormalizationPass
                             ->getTargetBlock() == info.breakBlock);
                 }
 
-                auto defaultEndPoint =
-                    getNormalizedRegionEndpoint(
-                        &info, switchInst->getDefaultLabel(), List<IRBlock*>(info.breakBlock))
-                        .exitBlock;
+                auto defaultEndPoint = getNormalizedRegionEndpoint(
+                                           &info,
+                                           switchInst->getDefaultLabel(),
+                                           List<IRBlock*>(info.breakBlock))
+                                           .exitBlock;
 
                 // Consistency check (if this case hits, it's probably
                 // because the switch has fall-through, which we don't support)
@@ -683,8 +699,7 @@ struct CFGNormalizationPass
 
                 return info.breakBlock;
             }
-        default:
-            break;
+        default: break;
         }
 
         SLANG_UNEXPECTED("Unhandled control-flow inst");
@@ -737,10 +752,13 @@ static void legalizeDefUse(IRGlobalValueWithCode* func)
                     if (loopUser->getTargetBlock() == commonDominator)
                     {
                         bool shouldMoveToHeader = false;
-                        // Check that the break-block dominates any of the uses are past the break block
+                        // Check that the break-block dominates any of the uses are past the break
+                        // block
                         for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
                         {
-                            if (dom->dominates(loopUser->getBreakBlock(), _use->getUser()->getParent()))
+                            if (dom->dominates(
+                                    loopUser->getBreakBlock(),
+                                    _use->getUser()->getParent()))
                             {
                                 shouldMoveToHeader = true;
                                 break;
@@ -773,10 +791,13 @@ static void legalizeDefUse(IRGlobalValueWithCode* func)
                 builder.setInsertAfter(inst);
                 builder.emitStore(tempVar, inst);
 
-                traverseUses(inst, [&](IRUse* use)
+                traverseUses(
+                    inst,
+                    [&](IRUse* use)
                     {
                         auto userBlock = as<IRBlock>(use->getUser()->getParent());
-                        if (!userBlock) return;
+                        if (!userBlock)
+                            return;
                         // Only fix the use of the current definition of `inst` does not
                         // dominate it.
                         if (!dom->dominates(block, userBlock))
@@ -793,12 +814,18 @@ static void legalizeDefUse(IRGlobalValueWithCode* func)
 }
 
 void normalizeCFG(
-    IRModule* module, IRGlobalValueWithCode* func, IRCFGNormalizationPass const& options)
+    IRModule* module,
+    IRGlobalValueWithCode* func,
+    IRCFGNormalizationPass const& options)
 {
     // Remove phis to simplify our pass. We'll add them back in later
     // with constructSSA.
     //
-    eliminatePhisInFunc(LivenessMode::Disabled, func->getModule(), func, PhiEliminationOptions::getFast());
+    eliminatePhisInFunc(
+        LivenessMode::Disabled,
+        func->getModule(),
+        func,
+        PhiEliminationOptions::getFast());
 
     CFGNormalizationContext context = {module, options.sink};
     CFGNormalizationPass cfgPass(context);

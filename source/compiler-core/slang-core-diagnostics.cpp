@@ -1,18 +1,19 @@
 // slang-core-diagnostics.cpp
 #include "slang-core-diagnostics.h"
 
-namespace Slang {
+namespace Slang
+{
 
 namespace MiscDiagnostics
 {
-#define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, #name, messageFormat };
+#define DIAGNOSTIC(id, severity, name, messageFormat) \
+    const DiagnosticInfo name = {id, Severity::severity, #name, messageFormat};
 #include "slang-misc-diagnostic-defs.h"
 #undef DIAGNOSTIC
-}
+} // namespace MiscDiagnostics
 
-static const DiagnosticInfo* const kMiscDiagnostics[] =
-{
-#define DIAGNOSTIC(id, severity, name, messageFormat) &MiscDiagnostics::name, 
+static const DiagnosticInfo* const kMiscDiagnostics[] = {
+#define DIAGNOSTIC(id, severity, name, messageFormat) &MiscDiagnostics::name,
 #include "slang-misc-diagnostic-defs.h"
 #undef DIAGNOSTIC
 };
@@ -20,14 +21,14 @@ static const DiagnosticInfo* const kMiscDiagnostics[] =
 
 namespace LexerDiagnostics
 {
-#define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, #name, messageFormat };
+#define DIAGNOSTIC(id, severity, name, messageFormat) \
+    const DiagnosticInfo name = {id, Severity::severity, #name, messageFormat};
 #include "slang-lexer-diagnostic-defs.h"
 #undef DIAGNOSTIC
-}
+} // namespace LexerDiagnostics
 
-static const DiagnosticInfo* const kLexerDiagnostics[] =
-{
-#define DIAGNOSTIC(id, severity, name, messageFormat) &LexerDiagnostics::name, 
+static const DiagnosticInfo* const kLexerDiagnostics[] = {
+#define DIAGNOSTIC(id, severity, name, messageFormat) &LexerDiagnostics::name,
 #include "slang-lexer-diagnostic-defs.h"
 #undef DIAGNOSTIC
 };

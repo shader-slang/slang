@@ -2,7 +2,8 @@
 
 #include "shader-renderer-util.h"
 
-namespace renderer_test {
+namespace renderer_test
+{
 
 using namespace Slang;
 using Slang::Result;
@@ -27,17 +28,14 @@ inline int calcMaxDimension(Extents size, TextureType type)
 {
     switch (type)
     {
-    case TextureType::Texture1D:
-        return size.width;
-    case TextureType::Texture3D:
-        return Math::Max(Math::Max(size.width, size.height), size.depth);
+    case TextureType::Texture1D: return size.width;
+    case TextureType::Texture3D: return Math::Max(Math::Max(size.width, size.height), size.depth);
     case TextureType::TextureCube: // fallthru
     case TextureType::Texture2D:
         {
             return Math::Max(size.width, size.height);
         }
-    default:
-        return 0;
+    default: return 0;
     }
 }
 
@@ -69,7 +67,8 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     TextureDesc textureDesc = {};
 
     // Default to R8G8B8A8_UNORM
-    const Format format = (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
+    const Format format =
+        (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
 
     textureDesc.sampleCount = inputDesc.sampleCount;
     textureDesc.format = format;
@@ -78,21 +77,16 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     textureDesc.usage = TextureUsage::CopyDestination | TextureUsage::CopySource;
     switch (defaultState)
     {
-    case ResourceState::ShaderResource:
-        textureDesc.usage |= TextureUsage::ShaderResource;
-        break;
-    case ResourceState::UnorderedAccess:
-        textureDesc.usage |= TextureUsage::UnorderedAccess;
-        break;
-    default:
-        return SLANG_FAIL;
+    case ResourceState::ShaderResource:  textureDesc.usage |= TextureUsage::ShaderResource; break;
+    case ResourceState::UnorderedAccess: textureDesc.usage |= TextureUsage::UnorderedAccess; break;
+    default:                             return SLANG_FAIL;
     }
     textureDesc.defaultState = defaultState;
 
     // It's the same size in all dimensions
     switch (inputDesc.dimension)
     {
-        case 1:
+    case 1:
         {
             textureDesc.type = TextureType::Texture1D;
             textureDesc.size.width = inputDesc.size;
@@ -101,7 +95,7 @@ inline int calcNumMipLevels(TextureType type, Extents size)
 
             break;
         }
-        case 2:
+    case 2:
         {
             textureDesc.type = inputDesc.isCube ? TextureType::TextureCube : TextureType::Texture2D;
             textureDesc.size.width = inputDesc.size;
@@ -109,7 +103,7 @@ inline int calcNumMipLevels(TextureType type, Extents size)
             textureDesc.size.depth = 1;
             break;
         }
-        case 3:
+    case 3:
         {
             textureDesc.type = TextureType::Texture3D;
             textureDesc.size.width = inputDesc.size;
@@ -125,11 +119,12 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     }
 
     List<SubresourceData> initSubresources;
-    int arrayLayerCount = textureDesc.arrayLength * (textureDesc.type == TextureType::TextureCube ? 6 : 1);
+    int arrayLayerCount =
+        textureDesc.arrayLength * (textureDesc.type == TextureType::TextureCube ? 6 : 1);
     int subResourceCounter = 0;
-    for( int a = 0; a < arrayLayerCount; ++a )
+    for (int a = 0; a < arrayLayerCount; ++a)
     {
-        for( int m = 0; m < textureDesc.mipLevelCount; ++m )
+        for (int m = 0; m < textureDesc.mipLevelCount; ++m)
         {
             int subResourceIndex = subResourceCounter++;
             const int mipWidth = calcMipSize(textureDesc.size.width, m);
@@ -163,7 +158,8 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     bufferDesc.size = bufferSize;
     bufferDesc.format = inputDesc.format;
     bufferDesc.elementSize = inputDesc.stride;
-    bufferDesc.usage = BufferUsage::CopyDestination | BufferUsage::CopySource | BufferUsage::ShaderResource | BufferUsage::UnorderedAccess;
+    bufferDesc.usage = BufferUsage::CopyDestination | BufferUsage::CopySource |
+                       BufferUsage::ShaderResource | BufferUsage::UnorderedAccess;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
 
     ComPtr<IBuffer> bufferResource = device->createBuffer(bufferDesc, initData);
@@ -187,10 +183,9 @@ static SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
     return samplerDesc;
 }
 
-ComPtr<ISampler> _createSampler(IDevice* device,
-    const InputSamplerDesc& srcDesc)
+ComPtr<ISampler> _createSampler(IDevice* device, const InputSamplerDesc& srcDesc)
 {
     return device->createSampler(_calcSamplerDesc(srcDesc));
 }
 
-} // renderer_test
+} // namespace renderer_test

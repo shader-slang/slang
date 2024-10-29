@@ -1,50 +1,49 @@
 // slang-unix-process.cpp
-#include "../slang-process.h"
-
 #include "../slang-common.h"
-#include "../slang-string-util.h"
-#include "../slang-string-escape-util.h"
 #include "../slang-memory-arena.h"
+#include "../slang-process.h"
+#include "../slang-string-escape-util.h"
+#include "../slang-string-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-//#include <dirent.h>
+// #include <dirent.h>
 #include <errno.h>
-#include <poll.h>
 #include <fcntl.h>
-
+#include <poll.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #if SLANG_OSX
-#   include <signal.h>
+#include <signal.h>
 #endif
 
 #include <time.h>
 
-namespace Slang {
+namespace Slang
+{
 
 class UnixProcess : public Process
 {
 public:
-    // Process 
+    // Process
     virtual bool isTerminated() SLANG_OVERRIDE;
     virtual bool waitForTermination(Int timeInMs) SLANG_OVERRIDE;
     virtual void terminate(int32_t returnValue) SLANG_OVERRIDE;
     virtual void kill(int32_t returnValue) SLANG_OVERRIDE;
 
-    UnixProcess(pid_t pid, Stream*const* streams);
+    UnixProcess(pid_t pid, Stream* const* streams);
 
 protected:
-        /// Returns true if terminated
+    /// Returns true if terminated
     bool _updateTerminationState(int options);
 
-    bool m_isTerminated = false;        ///< True if ths process is terminated
-    pid_t m_pid;                        ///< The process id
+    bool m_isTerminated = false; ///< True if ths process is terminated
+    pid_t m_pid;                 ///< The process id
 };
 
 class UnixPipeStream : public Stream
@@ -54,7 +53,12 @@ public:
 
     // Stream
     virtual Int64 getPosition() SLANG_OVERRIDE { return 0; }
-    virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE { SLANG_UNUSED(origin); SLANG_UNUSED(offset); return SLANG_E_NOT_AVAILABLE; }
+    virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(origin);
+        SLANG_UNUSED(offset);
+        return SLANG_E_NOT_AVAILABLE;
+    }
     virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
     virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
     virtual bool isEnd() SLANG_OVERRIDE { return m_isClosed; }
@@ -63,18 +67,15 @@ public:
     virtual void close() SLANG_OVERRIDE;
     virtual SlangResult flush() SLANG_OVERRIDE;
 
-    UnixPipeStream(int fd, FileAccess access, bool isOwned) :
-        m_fd(fd),
-        m_access(access),
-        m_isOwned(isOwned),
-        m_isClosed(false)
+    UnixPipeStream(int fd, FileAccess access, bool isOwned)
+        : m_fd(fd), m_access(access), m_isOwned(isOwned), m_isClosed(false)
     {
     }
 
 protected:
-        /// This read file descriptor non blocking. Doing so will change the behavior of
-        /// read - it can fail and return an error indicating there is no data, instead of blocking.
-        /// Currently this mechanism isn't used, as checking via poll seemed to work.
+    /// This read file descriptor non blocking. Doing so will change the behavior of
+    /// read - it can fail and return an error indicating there is no data, instead of blocking.
+    /// Currently this mechanism isn't used, as checking via poll seemed to work.
     void _setReadNonBlocking()
     {
         // Makes non blocking
@@ -86,16 +87,16 @@ protected:
     }
     bool _has(FileAccess access) const { return (Index(access) & Index(m_access)) != 0; }
 
-    bool m_isClosed;        ///< If true this stream has been closed (ie cannot read/write to anymore)
-    bool m_isOwned;         ///< True if m_fd is owned by this object. 
-    FileAccess m_access;    ///< Access allowed to this stream - either Read or Write
-    int m_fd;               /// The 'file descriptor' for the pipe
+    bool m_isClosed;     ///< If true this stream has been closed (ie cannot read/write to anymore)
+    bool m_isOwned;      ///< True if m_fd is owned by this object.
+    FileAccess m_access; ///< Access allowed to this stream - either Read or Write
+    int m_fd;            /// The 'file descriptor' for the pipe
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!! UnixProcess !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-UnixProcess::UnixProcess(pid_t pid, Stream* const* streams):
-    m_pid(pid)
+UnixProcess::UnixProcess(pid_t pid, Stream* const* streams)
+    : m_pid(pid)
 {
     // Set to an 'odd value'
     m_returnValue = -1;
@@ -145,15 +146,16 @@ bool UnixProcess::waitForTermination(Int timeInMs)
     // If < 0 we will wait blocking until terminated
     if (timeInMs < 0)
     {
-        while (!_updateTerminationState(0));
+        while (!_updateTerminationState(0))
+            ;
         return true;
     }
 
-    // Note that the amount of time waiting is very approximate (we are relying on sleeps time and don't take into
-    // account time outside of sleeping)
+    // Note that the amount of time waiting is very approximate (we are relying on sleeps time and
+    // don't take into account time outside of sleeping)
 
     // How often to test
-    const Int checkRateMs = 100;            /// Check every 0.1 seconds
+    const Int checkRateMs = 100; /// Check every 0.1 seconds
 
     while (timeInMs > 0)
     {
@@ -283,7 +285,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
             {
                 return SLANG_OK;
             }
-            // Okay - guess we have an error then 
+            // Okay - guess we have an error then
             return SLANG_FAIL;
         }
 
@@ -291,7 +293,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
 
         // If no bytes were wanted, then there could still be bytes in the pipe
         // before a HUP. So don't fall through to check for HUP.
-        // 
+        //
         // If some bytes *were* wanted and none were read, we can allow fall through to
         // handle HUP.
         if (length == 0 || count > 0)
@@ -355,7 +357,7 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 
 /* !!!!!!!!!!!!!!!!!!!!!! Process !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */UnownedStringSlice Process::getExecutableSuffix()
+/* static */ UnownedStringSlice Process::getExecutableSuffix()
 {
 #if __CYGWIN__
     return UnownedStringSlice::fromLiteral(".exe");
@@ -364,7 +366,7 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 #endif
 }
 
-/* static */StringEscapeHandler* Process::getEscapeHandler()
+/* static */ StringEscapeHandler* Process::getEscapeHandler()
 {
     return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
 }
@@ -377,9 +379,8 @@ static int pipeCLOEXEC(int pipefd[2])
     // without pipe2 on macOS, there's an unavoidable race here where
     // another process could fork and execv with execWatchPipe before we
     // can set CLOEXEC on it...
-    if(pipe(pipefd) == -1 ||
-       fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) == -1 ||
-       fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) == -1)
+    if (pipe(pipefd) == -1 || fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) == -1 ||
+        fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) == -1)
     {
         return -1;
     }
@@ -389,7 +390,10 @@ static int pipeCLOEXEC(int pipefd[2])
 #endif
 }
 
-/* static */SlangResult Process::create(const CommandLine& commandLine, Process::Flags, RefPtr<Process>& outProcess)
+/* static */ SlangResult Process::create(
+    const CommandLine& commandLine,
+    Process::Flags,
+    RefPtr<Process>& outProcess)
 {
     const char* whatFailed = nullptr;
     pid_t childPid;
@@ -404,7 +408,7 @@ static int pipeCLOEXEC(int pipefd[2])
     // Add the command
     argPtrs.add(exe.m_pathOrName.getBuffer());
 
-    // Add all the args - they don't need any explicit escaping 
+    // Add all the args - they don't need any explicit escaping
     for (auto arg : commandLine.m_args)
     {
         // All args for this target must be unescaped (as they are in CommandLine)
@@ -425,9 +429,7 @@ static int pipeCLOEXEC(int pipefd[2])
     // automatically if the child's exec succeeds
     int execWatchPipe[2] = {-1, -1};
 
-    if (pipe(stdinPipe) == -1 ||
-        pipe(stdoutPipe) == -1 ||
-        pipe(stderrPipe) == -1 ||
+    if (pipe(stdinPipe) == -1 || pipe(stdoutPipe) == -1 || pipe(stderrPipe) == -1 ||
         pipeCLOEXEC(execWatchPipe) == -1)
     {
         whatFailed = "pipe";
@@ -438,36 +440,36 @@ static int pipeCLOEXEC(int pipefd[2])
     // 0,1,2 in the child.
     whatFailed = "fcntl";
     int next;
-    if(stdinPipe[0] < 3)
+    if (stdinPipe[0] < 3)
     {
-        if(-1 == (next = fcntl(stdinPipe[0], F_DUPFD, 3)))
+        if (-1 == (next = fcntl(stdinPipe[0], F_DUPFD, 3)))
         {
             goto reportErr;
         }
         close(stdinPipe[0]);
         stdinPipe[0] = next;
     }
-    if(stdoutPipe[1] < 3)
+    if (stdoutPipe[1] < 3)
     {
-        if(-1 == (next = fcntl(stdoutPipe[1], F_DUPFD, 3)))
+        if (-1 == (next = fcntl(stdoutPipe[1], F_DUPFD, 3)))
         {
             goto reportErr;
         }
         close(stdoutPipe[1]);
         stdoutPipe[1] = next;
     }
-    if(stderrPipe[1] < 3)
+    if (stderrPipe[1] < 3)
     {
-        if(-1 == (next = fcntl(stderrPipe[1], F_DUPFD, 3)))
+        if (-1 == (next = fcntl(stderrPipe[1], F_DUPFD, 3)))
         {
             goto reportErr;
         }
         close(stderrPipe[1]);
         stderrPipe[1] = next;
     }
-    if(execWatchPipe[1] < 3)
+    if (execWatchPipe[1] < 3)
     {
-        if(-1 == (next = fcntl(execWatchPipe[1], F_DUPFD_CLOEXEC, 3)))
+        if (-1 == (next = fcntl(execWatchPipe[1], F_DUPFD_CLOEXEC, 3)))
         {
             goto reportErr;
         }
@@ -516,14 +518,14 @@ static int pipeCLOEXEC(int pipefd[2])
 
         // Signal the failure to our parent
         int execErr = errno;
-        if(::write(execWatchPipe[1], &execErr, sizeof(execErr)))
+        if (::write(execWatchPipe[1], &execErr, sizeof(execErr)))
             fprintf(stderr, "error: `exec` watch pipe write failed\n");
 
         // NOTE! Because we have dup2 into STDERR_FILENO, this error will *not* generally appear on
-        // the terminal but in the stderrPipe. 
+        // the terminal but in the stderrPipe.
         fprintf(stderr, "error: `exec` failed\n");
 
-        // Terminate with failure. 
+        // Terminate with failure.
         // Call _exit() rather than exit() so we don't run anything registered with atexit()
         ::_exit(kCannotExecute);
     }
@@ -538,11 +540,14 @@ static int pipeCLOEXEC(int pipefd[2])
         RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
 
         // Previously code didn't need to close, so we'll make stream now own the handles
-        streams[Index(StdStreamType::Out)] = new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
+        streams[Index(StdStreamType::Out)] =
+            new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
         stdoutPipe[0] = -1;
-        streams[Index(StdStreamType::ErrorOut)] = new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
+        streams[Index(StdStreamType::ErrorOut)] =
+            new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
         stderrPipe[0] = -1;
-        streams[Index(StdStreamType::In)] = new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
+        streams[Index(StdStreamType::In)] =
+            new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
         stdinPipe[1] = -1;
 
         // Check that the exec actually succeeded
@@ -550,7 +555,7 @@ static int pipeCLOEXEC(int pipefd[2])
         // Our success is if we read zero bytes, indicating that the pipe was
         // closed by the child's exec and O_CLOEXEC. (and us just above)
         const int readRes = ::read(execWatchPipe[0], &execErrCode, sizeof(execErrCode));
-        if(readRes < 0)
+        if (readRes < 0)
         {
             whatFailed = "read from forked process";
             goto reportErr;
@@ -563,11 +568,14 @@ static int pipeCLOEXEC(int pipefd[2])
             const bool verbose = false;
             if (verbose)
             {
-                fprintf(stderr, "error: exec for \"%s\" failed: %s\n", argPtrs[0],
-                        ::strerror(execErrCode));
+                fprintf(
+                    stderr,
+                    "error: exec for \"%s\" failed: %s\n",
+                    argPtrs[0],
+                    ::strerror(execErrCode));
             }
             whatFailed = "exec";
-            // Don't report the exec as we expect some of them to fail 
+            // Don't report the exec as we expect some of them to fail
             goto closePipes;
         }
 
@@ -592,19 +600,19 @@ closePipes:
     return whatFailed ? SLANG_FAIL : SLANG_OK;
 }
 
-/* static */uint64_t Process::getClockFrequency()
+/* static */ uint64_t Process::getClockFrequency()
 {
     return 1000000000;
 }
 
-/* static */uint64_t Process::getClockTick()
+/* static */ uint64_t Process::getClockTick()
 {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     return uint64_t(now.tv_sec) * 1000000000 + now.tv_nsec;
 }
 
-/* static */void Process::sleepCurrentThread(Int timeInMs)
+/* static */ void Process::sleepCurrentThread(Int timeInMs)
 {
     struct timespec timeSpec;
 
@@ -626,26 +634,26 @@ closePipes:
     nanosleep(&timeSpec, nullptr);
 }
 
-/* static */SlangResult Process::getStdStream(StdStreamType type, RefPtr<Stream>& out)
+/* static */ SlangResult Process::getStdStream(StdStreamType type, RefPtr<Stream>& out)
 {
     switch (type)
     {
-        case StdStreamType::In:
+    case StdStreamType::In:
         {
             out = new UnixPipeStream(STDIN_FILENO, FileAccess::Read, false);
             break;
         }
-        case StdStreamType::Out:
+    case StdStreamType::Out:
         {
             out = new UnixPipeStream(STDOUT_FILENO, FileAccess::Write, false);
-            break; 
+            break;
         }
-        case StdStreamType::ErrorOut:
+    case StdStreamType::ErrorOut:
         {
             out = new UnixPipeStream(STDERR_FILENO, FileAccess::Write, false);
             break;
         }
-        default: return SLANG_FAIL;
+    default: return SLANG_FAIL;
     }
     return SLANG_OK;
 }

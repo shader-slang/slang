@@ -1,7 +1,8 @@
 // slang-ir-init-local-var.cpp
 #include "slang-ir-init-local-var.h"
-#include "slang-ir.h"
+
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -31,8 +32,7 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                             initialized = true;
                         break;
                     case kIROp_GetElementPtr:
-                    case kIROp_FieldAddress:
-                        continue;
+                    case kIROp_FieldAddress:  continue;
                     default:
                         if (userSet.contains(nextInst))
                         {
@@ -49,7 +49,7 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                     continue;
 
                 IRBuilderSourceLocRAII sourceLocationScope(&builder, inst->sourceLoc);
-                
+
                 builder.setInsertAfter(inst);
                 builder.emitStore(
                     inst,

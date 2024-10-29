@@ -11,14 +11,11 @@ using namespace Slang;
 namespace cuda
 {
 
-class CommandBufferImpl
-    : public ICommandBuffer
-    , public CommandWriter
-    , public ComObject
+class CommandBufferImpl : public ICommandBuffer, public CommandWriter, public ComObject
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
-        ICommandBuffer* getInterface(const Guid& guid);
+    ICommandBuffer* getInterface(const Guid& guid);
 
 public:
     DeviceImpl* m_device;
@@ -33,11 +30,11 @@ public:
         IRenderCommandEncoder** outEncoder) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeResourceCommands(IResourceCommandEncoder** outEncoder) override;
+    encodeResourceCommands(IResourceCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeComputeCommands(IComputeCommandEncoder** outEncoder) override;
+    encodeComputeCommands(IComputeCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override;
+    encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL close() override {}
 

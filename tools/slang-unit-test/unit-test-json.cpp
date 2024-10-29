@@ -1,14 +1,14 @@
 
 #include "../../source/compiler-core/slang-json-lexer.h"
-#include "../../source/core/slang-string-escape-util.h"
 #include "../../source/compiler-core/slang-json-parser.h"
 #include "../../source/compiler-core/slang-json-value.h"
-
+#include "../../source/core/slang-string-escape-util.h"
 #include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct Element
 {
@@ -16,14 +16,15 @@ struct Element
     const char* value;
 };
 
-} // anonymous
+} // namespace
 
 static SlangResult _lex(const char* in, DiagnosticSink* sink, List<JSONToken>& toks)
 {
     SourceManager* sourceManager = sink->getSourceManager();
 
     String contents(in);
-    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceFile* sourceFile =
+        sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
 
     JSONLexer lexer;
@@ -55,7 +56,8 @@ static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONListener* li
     SourceManager* sourceManager = sink->getSourceManager();
 
     String contents(in);
-    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceFile* sourceFile =
+        sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
 
     JSONLexer lexer;
@@ -66,7 +68,11 @@ static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONListener* li
     return SLANG_OK;
 }
 
-static bool _areEqual(SourceManager* sourceManager, const List<JSONToken>& toks, const Element* eles, Index elesCount)
+static bool _areEqual(
+    SourceManager* sourceManager,
+    const List<JSONToken>& toks,
+    const Element* eles,
+    Index elesCount)
 {
     if (toks.getCount() != elesCount)
     {
@@ -74,7 +80,7 @@ static bool _areEqual(SourceManager* sourceManager, const List<JSONToken>& toks,
     }
 
     SourceView* sourceView = toks.getCount() ? sourceManager->findSourceView(toks[0].loc) : nullptr;
-    const char*const content = sourceView ? sourceView->getContent().begin() : nullptr;
+    const char* const content = sourceView ? sourceView->getContent().begin() : nullptr;
 
     for (Index i = 0; i < toks.getCount(); ++i)
     {
@@ -108,32 +114,32 @@ SLANG_UNIT_TEST(json)
     DiagnosticSink sink(&sourceManager, nullptr);
 
     {
-        const char text[] = " { \"Hello\" : [ \"World\", 1, 2.0, -3.0, -435.5345435, 45e-10, 421.00e+20, 17e1] }";
+        const char text[] =
+            " { \"Hello\" : [ \"World\", 1, 2.0, -3.0, -435.5345435, 45e-10, 421.00e+20, 17e1] }";
 
-        const Element eles[] =
-        {
-            {JSONTokenType::LBrace, "{" },
+        const Element eles[] = {
+            {JSONTokenType::LBrace, "{"},
             {JSONTokenType::StringLiteral, "\"Hello\""},
-            {JSONTokenType::Colon, ":" },
-            {JSONTokenType::LBracket, "[" },
-            {JSONTokenType::StringLiteral, "\"World\"" },
-            {JSONTokenType::Comma, "," },
-            {JSONTokenType::IntegerLiteral, "1" },
-            {JSONTokenType::Comma, "," },
-            {JSONTokenType::FloatLiteral, "2.0" },
-            {JSONTokenType::Comma, "," },
-            {JSONTokenType::FloatLiteral, "-3.0" },
-            {JSONTokenType::Comma, "," },
-            {JSONTokenType::FloatLiteral, "-435.5345435" },
-            {JSONTokenType::Comma, "," },
-            {JSONTokenType::FloatLiteral, "45e-10" },
-            {JSONTokenType::Comma, "," },
-            {JSONTokenType::FloatLiteral, "421.00e+20" },
-            {JSONTokenType::Comma, "," },
-            {JSONTokenType::FloatLiteral, "17e1" },
-            {JSONTokenType::RBracket, "]" },
-            {JSONTokenType::RBrace, "}" },
-            {JSONTokenType::EndOfFile, "" },
+            {JSONTokenType::Colon, ":"},
+            {JSONTokenType::LBracket, "["},
+            {JSONTokenType::StringLiteral, "\"World\""},
+            {JSONTokenType::Comma, ","},
+            {JSONTokenType::IntegerLiteral, "1"},
+            {JSONTokenType::Comma, ","},
+            {JSONTokenType::FloatLiteral, "2.0"},
+            {JSONTokenType::Comma, ","},
+            {JSONTokenType::FloatLiteral, "-3.0"},
+            {JSONTokenType::Comma, ","},
+            {JSONTokenType::FloatLiteral, "-435.5345435"},
+            {JSONTokenType::Comma, ","},
+            {JSONTokenType::FloatLiteral, "45e-10"},
+            {JSONTokenType::Comma, ","},
+            {JSONTokenType::FloatLiteral, "421.00e+20"},
+            {JSONTokenType::Comma, ","},
+            {JSONTokenType::FloatLiteral, "17e1"},
+            {JSONTokenType::RBracket, "]"},
+            {JSONTokenType::RBrace, "}"},
+            {JSONTokenType::EndOfFile, ""},
         };
 
         List<JSONToken> toks;
@@ -145,7 +151,7 @@ SLANG_UNIT_TEST(json)
     {
         StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
 
-        
+
         {
             const auto slice = UnownedStringSlice::fromLiteral("\n\r\b\f\t \"\\/ Some text...");
 
@@ -173,8 +179,9 @@ SLANG_UNIT_TEST(json)
                 {
                     const uint32_t digitValue = (v >> ((3 - i) * 4)) & 0xf;
 
-                    char digitC = (digitValue > 9) ? char(digitValue - 10 + 'a') : char(digitValue + '0');
-                    work[i + 2] =  digitC;
+                    char digitC =
+                        (digitValue > 9) ? char(digitValue - 10 + 'a') : char(digitValue + '0');
+                    work[i + 2] = digitC;
                 }
 
                 buf << UnownedStringSlice(work, 6);
@@ -241,7 +248,6 @@ SLANG_UNIT_TEST(json)
             }
 
             SLANG_CHECK(container->areEqual(value, copy));
-
         }
     }
 
@@ -254,7 +260,7 @@ SLANG_UNIT_TEST(json)
 
             for (Int i = 0; i < 100; ++i)
             {
-            
+
                 values.add(JSONValue::makeInt(i));
                 values.add(JSONValue::makeFloat(-double(i)));
             }
@@ -266,11 +272,14 @@ SLANG_UNIT_TEST(json)
             SLANG_CHECK(arrayView.getCount() == values.getCount());
 
             // Check the values are the same
-            SLANG_CHECK(container->areEqual(arrayView.getBuffer(), values.getBuffer(), arrayView.getCount()));
+            SLANG_CHECK(container->areEqual(
+                arrayView.getBuffer(),
+                values.getBuffer(),
+                arrayView.getCount()));
 
             {
                 JSONWriter writer(JSONWriter::IndentationStyle::KNR, 80);
-                
+
                 container->traverseRecursively(array, &writer);
             }
         }
@@ -296,7 +305,7 @@ SLANG_UNIT_TEST(json)
         RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
         const char aText[] = "{ \"a\" : 10, \"b\" : 20.0, \"a\" : \"Hello\" }";
 
-        
+
         JSONBuilder builder(container);
         SLANG_CHECK(SLANG_SUCCEEDED(_parse(aText, &sink, &builder)));
         const JSONValue a = builder.getRootValue();
@@ -319,7 +328,8 @@ SLANG_UNIT_TEST(json)
 
     {
         RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
-        const char aText[] = "{ \"a\" : \"Hi!\", \"b\" : 20.0, \"c\" : \"Hello\", \"d\" : 30, \"e\": null, \"f\": true }";
+        const char aText[] = "{ \"a\" : \"Hi!\", \"b\" : 20.0, \"c\" : \"Hello\", \"d\" : 30, "
+                             "\"e\": null, \"f\": true }";
 
         JSONBuilder builder(container);
         SLANG_CHECK(SLANG_SUCCEEDED(_parse(aText, &sink, &builder)));
@@ -329,7 +339,7 @@ SLANG_UNIT_TEST(json)
 
         for (char c = 'a'; c <= 'f'; c++)
         {
-            const char name[] = { c, 0 };
+            const char name[] = {c, 0};
             JSONKey key = container->getKey(UnownedStringSlice(name, 1));
             auto value = container->findObjectValue(rootValue, key);
 
@@ -357,4 +367,3 @@ SLANG_UNIT_TEST(json)
         SLANG_CHECK(values[5].asBool() == true);
     }
 }
-

@@ -2,11 +2,10 @@
 #ifndef SLANG_EMIT_SOURCE_WRITER_H
 #define SLANG_EMIT_SOURCE_WRITER_H
 
-#include "../core/slang-basic.h"
-
-#include "slang-compiler.h"
 #include "../compiler-core/slang-source-map.h"
+#include "../core/slang-basic.h"
 #include "../core/slang-castable.h"
+#include "slang-compiler.h"
 
 namespace Slang
 {
@@ -20,11 +19,11 @@ namespace Slang
 class SourceWriter
 {
 public:
-        /// Emits without span without any extra processing
+    /// Emits without span without any extra processing
     void emitRawTextSpan(char const* textBegin, char const* textEnd);
     void emitRawText(char const* text);
 
-        /// Emit different types into the stream
+    /// Emit different types into the stream
     void emit(char const* textBegin, char const* textEnd);
     void emit(char const* text);
     void emit(const String& text);
@@ -45,7 +44,7 @@ public:
 
     void emitChar(char c);
 
-        /// Emit names (doing so can also advance to a new source location)
+    /// Emit names (doing so can also advance to a new source location)
     void emitName(const StringSliceLoc& nameAndLoc);
     void emitName(const NameLoc& nameAndLoc);
     void emitName(Name* name, const SourceLoc& loc);
@@ -54,52 +53,55 @@ public:
     void supressLineDirective() { m_supressLineDirective = true; }
     void resumeLineDirective() { m_supressLineDirective = false; }
 
-        /// Indent the text
+    /// Indent the text
     void indent();
-        /// Dedent (the opposite of indenting) the text
+    /// Dedent (the opposite of indenting) the text
     void dedent();
 
-        /// Move the current source location to that specified
+    /// Move the current source location to that specified
     void advanceToSourceLocation(const SourceLoc& sourceLocation);
-        /// Only advances if the sourceLocation is valid
+    /// Only advances if the sourceLocation is valid
     void advanceToSourceLocationIfValid(const SourceLoc& sourceLocation);
 
-        /// Get the content as a string
+    /// Get the content as a string
     String getContent() { return m_builder.produceString(); }
-        /// Clear the content
+    /// Clear the content
     void clearContent() { m_builder.clear(); }
-        /// Get the content as a string and clear the internal representation
+    /// Get the content as a string and clear the internal representation
     String getContentAndClear();
 
-        /// Get the line directive mode used
+    /// Get the line directive mode used
     LineDirectiveMode getLineDirectiveMode() const { return m_lineDirectiveMode; }
-        /// Get the source manager user
+    /// Get the source manager user
     SourceManager* getSourceManager() const { return m_sourceManager; }
 
-        /// Get the associated source map. If source map tracking is not required, can return nullptr.
+    /// Get the associated source map. If source map tracking is not required, can return nullptr.
     IBoxValue<SourceMap>* getSourceMap() const { return m_sourceMap; }
 
-        /// Ctor
-    SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, IBoxValue<SourceMap>* sourceMap);
+    /// Ctor
+    SourceWriter(
+        SourceManager* sourceManager,
+        LineDirectiveMode lineDirectiveMode,
+        IBoxValue<SourceMap>* sourceMap);
 
 protected:
     void _emitTextSpan(char const* textBegin, char const* textEnd);
     void _flushSourceLocationChange();
 
-        // Emit a `#line` directive to the output, and also
-        // ensure that source location tracking information
-        // is correct based on the directive we just output.
+    // Emit a `#line` directive to the output, and also
+    // ensure that source location tracking information
+    // is correct based on the directive we just output.
     void _emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceLoc& sourceLocation);
 
     void _emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocation);
 
     void _updateSourceMap(const HumaneSourceLoc& sourceLocation);
 
-        // Emit a `#line` directive to the output.
-        // Doesn't update state of source-location tracking.
+    // Emit a `#line` directive to the output.
+    // Doesn't update state of source-location tracking.
     void _emitLineDirective(const HumaneSourceLoc& sourceLocation);
 
-        /// Calculate the current location in the ouput
+    /// Calculate the current location in the ouput
     void _calcLocation(Index& outLineIndex, Index& outColumnIndex);
 
     // The string of code we've built so far.
@@ -114,9 +116,9 @@ protected:
 
     SourceLoc m_nextSourceLoc;
     HumaneSourceLoc m_nextHumaneSourceLocation;
-    
+
     // Used to determine the current location in the output for outputting the source map
-    // This is separate from m_loc, because m_loc doesn't appear to track the line/column directly 
+    // This is separate from m_loc, because m_loc doesn't appear to track the line/column directly
     // in the output stream - for example when #line emits a "raw" emit takes place.
     Count m_currentOutputOffset = 0;
     Index m_currentLineIndex = 0;
@@ -125,7 +127,7 @@ protected:
     bool m_needToUpdateSourceLocation = false;
 
     bool m_supressLineDirective = false;
-   
+
     // Are we at the start of a line, so that we should indent
     // before writing any other text?
     bool m_isAtStartOfLine = true;
@@ -147,5 +149,5 @@ protected:
     LineDirectiveMode m_lineDirectiveMode;
 };
 
-}
+} // namespace Slang
 #endif

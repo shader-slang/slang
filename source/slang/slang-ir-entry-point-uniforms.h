@@ -14,13 +14,12 @@ struct CollectEntryPointUniformParamsOptions
     bool alwaysCreateCollectedParam = false;
 };
 
-    /// Collect entry point uniform parameters into a wrapper `struct` and/or buffer
+/// Collect entry point uniform parameters into a wrapper `struct` and/or buffer
 void collectEntryPointUniformParams(
-    IRModule*                                       module,
-    CollectEntryPointUniformParamsOptions const&    options);
+    IRModule* module,
+    CollectEntryPointUniformParamsOptions const& options);
 
-    /// Move any uniform parameters of entry points to the global scope instead.
-void moveEntryPointUniformParamsToGlobalScope(
-    IRModule*   module);
+/// Move any uniform parameters of entry points to the global scope instead.
+void moveEntryPointUniformParamsToGlobalScope(IRModule* module);
 
-}
+} // namespace Slang

@@ -2,9 +2,8 @@
 #include "debug-command-buffer.h"
 
 #include "debug-framebuffer.h"
-#include "debug-render-pass.h"
-
 #include "debug-helper-functions.h"
+#include "debug-render-pass.h"
 
 namespace gfx
 {
@@ -43,7 +42,9 @@ void DebugCommandBuffer::encodeRenderCommands(
     auto innerFramebuffer = getInnerObj(framebuffer);
     m_renderCommandEncoder.isOpen = true;
     baseObject->encodeRenderCommands(
-        innerRenderPass, innerFramebuffer, &m_renderCommandEncoder.baseObject);
+        innerRenderPass,
+        innerFramebuffer,
+        &m_renderCommandEncoder.baseObject);
     if (m_renderCommandEncoder.baseObject)
         *outEncoder = &m_renderCommandEncoder;
     else
@@ -116,15 +117,15 @@ void DebugCommandBuffer::close()
     }
     if (m_computeCommandEncoder.isOpen)
     {
-        GFX_DIAGNOSE_ERROR(
-            "A compute command encoder on this command buffer is still open. "
-            "IComputeCommandEncoder::endEncoding() must be called before closing a command buffer.");
+        GFX_DIAGNOSE_ERROR("A compute command encoder on this command buffer is still open. "
+                           "IComputeCommandEncoder::endEncoding() must be called before closing a "
+                           "command buffer.");
     }
     if (m_resourceCommandEncoder.isOpen)
     {
-        GFX_DIAGNOSE_ERROR(
-            "A resource command encoder on this command buffer is still open. "
-            "IResourceCommandEncoder::endEncoding() must be called before closing a command buffer.");
+        GFX_DIAGNOSE_ERROR("A resource command encoder on this command buffer is still open. "
+                           "IResourceCommandEncoder::endEncoding() must be called before closing a "
+                           "command buffer.");
     }
     isOpen = false;
     baseObject->close();
@@ -140,9 +141,12 @@ void DebugCommandBuffer::invalidateDescriptorHeapBinding()
 {
     SLANG_GFX_API_FUNC;
     ComPtr<ICommandBufferD3D12> cmdBuf;
-    if (SLANG_FAILED(baseObject->queryInterface(SlangUUID SLANG_UUID_ICommandBufferD3D12, (void**)cmdBuf.writeRef())))
+    if (SLANG_FAILED(baseObject->queryInterface(
+            SlangUUID SLANG_UUID_ICommandBufferD3D12,
+            (void**)cmdBuf.writeRef())))
     {
-        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide ICommandBufferD3D12 interface.");
+        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide "
+                           "ICommandBufferD3D12 interface.");
         return;
     }
     return cmdBuf->invalidateDescriptorHeapBinding();
@@ -152,9 +156,12 @@ void DebugCommandBuffer::ensureInternalDescriptorHeapsBound()
 {
     SLANG_GFX_API_FUNC;
     ComPtr<ICommandBufferD3D12> cmdBuf;
-    if (SLANG_FAILED(baseObject->queryInterface(SlangUUID SLANG_UUID_ICommandBufferD3D12, (void**)cmdBuf.writeRef())))
+    if (SLANG_FAILED(baseObject->queryInterface(
+            SlangUUID SLANG_UUID_ICommandBufferD3D12,
+            (void**)cmdBuf.writeRef())))
     {
-        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide ICommandBufferD3D12 interface.");
+        GFX_DIAGNOSE_ERROR("The current command buffer implementation does not provide "
+                           "ICommandBufferD3D12 interface.");
         return;
     }
     return cmdBuf->ensureInternalDescriptorHeapsBound();

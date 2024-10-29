@@ -4,16 +4,10 @@
 
 namespace Slang
 {
-    struct IRModule;
-    class DiagnosticSink;
+struct IRModule;
+class DiagnosticSink;
 
-    void lowerGLSLShaderStorageBufferObjectsToPointers(
-        IRModule* module,
-        DiagnosticSink* sink
-    );
+void lowerGLSLShaderStorageBufferObjectsToPointers(IRModule* module, DiagnosticSink* sink);
 
-    void lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(
-        IRModule* module,
-        DiagnosticSink* sink
-    );
-}
+void lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(IRModule* module, DiagnosticSink* sink);
+} // namespace Slang

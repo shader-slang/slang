@@ -1,8 +1,8 @@
 #include "slang-ir-propagate-func-properties.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 
 namespace Slang
@@ -24,10 +24,8 @@ static bool isResourceLoad(IROp op)
     case kIROp_ByteAddressBufferLoad:
     case kIROp_StructuredBufferLoadStatus:
     case kIROp_RWStructuredBufferLoad:
-    case kIROp_RWStructuredBufferLoadStatus:
-        return true;
-    default:
-        return false;
+    case kIROp_RWStructuredBufferLoadStatus: return true;
+    default:                                 return false;
     }
 }
 
@@ -44,10 +42,8 @@ static bool isKnownOpCodeWithSideEffect(IROp op)
     case kIROp_Param:
     case kIROp_Unreachable:
     case kIROp_Store:
-    case kIROp_SwizzledStore:
-        return true;
-    default:
-        return false;
+    case kIROp_SwizzledStore:       return true;
+    default:                        return false;
     }
 }
 
@@ -61,8 +57,7 @@ public:
         {
             switch (decoration->getOp())
             {
-            case kIROp_ReadNoneDecoration:
-                return true;
+            case kIROp_ReadNoneDecoration: return true;
             }
         }
         return false;
@@ -75,8 +70,7 @@ public:
             switch (decoration->getOp())
             {
             case kIROp_ReadNoneDecoration:
-            case kIROp_TargetIntrinsicDecoration:
-                return false;
+            case kIROp_TargetIntrinsicDecoration: return false;
             }
         }
         return true;
@@ -94,9 +88,8 @@ public:
                 {
                     if (inst->mightHaveSideEffects() || isResourceLoad(inst->getOp()))
                     {
-                        // We have a inst that has side effect that is not understood by this method,
-                        // e.g. bufferStore, discard, etc.
-                        // or we are seeing a resource load.
+                        // We have a inst that has side effect that is not understood by this
+                        // method, e.g. bufferStore, discard, etc. or we are seeing a resource load.
                         // These operations are not movable or removable,
                         // and should not be treated as ReadNone.
                         hasReadNoneCall = true;
@@ -265,8 +258,7 @@ public:
             {
             case kIROp_ReadNoneDecoration:
             case kIROp_NoSideEffectDecoration:
-            case kIROp_TargetIntrinsicDecoration:
-                return false;
+            case kIROp_TargetIntrinsicDecoration: return false;
             }
         }
         return true;
@@ -279,8 +271,7 @@ public:
             switch (decoration->getOp())
             {
             case kIROp_ReadNoneDecoration:
-            case kIROp_NoSideEffectDecoration:
-                return true;
+            case kIROp_NoSideEffectDecoration: return true;
             }
         }
         return false;
@@ -364,8 +355,8 @@ bool propagateFuncProperties(IRModule* module)
     bool changed = propagateFuncPropertiesImpl(module, &readNoneContext);
 
     NoSideEffectFuncPropertyPropagationContext noSideEffectContext;
-    changed|= propagateFuncPropertiesImpl(module, &noSideEffectContext);
+    changed |= propagateFuncPropertiesImpl(module, &noSideEffectContext);
 
     return changed;
 }
-}
+} // namespace Slang

@@ -14,9 +14,7 @@ using namespace Slang;
 namespace vk
 {
 
-class CommandBufferImpl
-    : public ICommandBuffer
-    , public ComObject
+class CommandBufferImpl : public ICommandBuffer, public ComObject
 {
 public:
     // There are a pair of cyclic references between a `TransientResourceHeap` and
@@ -59,11 +57,11 @@ public:
         IFramebuffer* framebuffer,
         IRenderCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeComputeCommands(IComputeCommandEncoder** outEncoder) override;
+    encodeComputeCommands(IComputeCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeResourceCommands(IResourceCommandEncoder** outEncoder) override;
+    encodeResourceCommands(IResourceCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override;
+    encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL close() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };

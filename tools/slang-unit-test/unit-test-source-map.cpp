@@ -1,28 +1,29 @@
 
 #include "../../source/compiler-core/slang-json-lexer.h"
-#include "../../source/core/slang-string-escape-util.h"
-#include "../../source/compiler-core/slang-json-parser.h"
-#include "../../source/compiler-core/slang-json-value.h"
-
 #include "../../source/compiler-core/slang-json-native.h"
-
-#include "../../source/compiler-core/slang-source-map.h"
+#include "../../source/compiler-core/slang-json-parser.h"
 #include "../../source/compiler-core/slang-json-source-map-util.h"
-
+#include "../../source/compiler-core/slang-json-value.h"
+#include "../../source/compiler-core/slang-source-map.h"
 #include "../../source/core/slang-rtti-info.h"
-
+#include "../../source/core/slang-string-escape-util.h"
 #include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
-static SlangResult _read(JSONContainer* container, const String& json, DiagnosticSink* sink, SourceMap& outSourceMap)
+static SlangResult _read(
+    JSONContainer* container,
+    const String& json,
+    DiagnosticSink* sink,
+    SourceMap& outSourceMap)
 {
     auto sourceManager = sink->getSourceManager();
 
     JSONValue rootValue;
     {
         // Now need to parse as JSON
-        SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), json);
+        SourceFile* sourceFile =
+            sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), json);
         SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
 
         JSONLexer lexer;
@@ -41,7 +42,11 @@ static SlangResult _read(JSONContainer* container, const String& json, Diagnosti
     return SLANG_OK;
 }
 
-static SlangResult _write(JSONContainer* container, const SourceMap& sourceMap, DiagnosticSink* sink, String& out)
+static SlangResult _write(
+    JSONContainer* container,
+    const SourceMap& sourceMap,
+    DiagnosticSink* sink,
+    String& out)
 {
     // Write it out
     JSONValue jsonValue;
@@ -78,10 +83,10 @@ static SlangResult _check()
 
     SourceMap sourceMap;
     SLANG_RETURN_ON_FAIL(_read(container, jsonSource, &sink, sourceMap));
-    
+
     String json;
     SLANG_RETURN_ON_FAIL(_write(container, sourceMap, &sink, json));
-    
+
     SourceMap readSourceMap;
     SLANG_RETURN_ON_FAIL(_read(container, json, &sink, readSourceMap));
 
@@ -89,7 +94,7 @@ static SlangResult _check()
     {
         return SLANG_FAIL;
     }
-  
+
     // Lets try copy construction
     {
         SourceMap copy(sourceMap);
@@ -117,4 +122,3 @@ SLANG_UNIT_TEST(sourceMap)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_check()));
 }
-

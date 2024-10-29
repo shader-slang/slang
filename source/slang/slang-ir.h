@@ -10,43 +10,44 @@
 #if defined(__cpp_lib_bit_cast)
 #include <bit>
 #endif
-#include <functional>
-
-#include "../core/slang-basic.h"
-#include "../core/slang-memory-arena.h"
-
 #include "../compiler-core/slang-source-loc.h"
 #include "../compiler-core/slang-source-map.h"
-
-#include "slang-type-system-shared.h"
+#include "../core/slang-basic.h"
+#include "../core/slang-memory-arena.h"
 #include "slang-container-pool.h"
+#include "slang-type-system-shared.h"
 
-namespace Slang {
+#include <functional>
 
-class   Decl;
-class   DiagnosticSink;
-class   GenericDecl;
-class   FuncType;
-class   Layout;
-class   Type;
-class   Session;
-class   Name;
-struct  IRBuilder;
-struct  IRFunc;
-struct  IRGlobalValueWithCode;
-struct  IRInst;
-struct  IRModule;
-struct  IRStructField;
-struct  IRStructKey;
+namespace Slang
+{
+
+class Decl;
+class DiagnosticSink;
+class GenericDecl;
+class FuncType;
+class Layout;
+class Type;
+class Session;
+class Name;
+struct IRBuilder;
+struct IRFunc;
+struct IRGlobalValueWithCode;
+struct IRInst;
+struct IRModule;
+struct IRStructField;
+struct IRStructKey;
 
 typedef unsigned int IROpFlags;
 enum : IROpFlags
 {
     kIROpFlags_None = 0,
-    kIROpFlag_Parent = 1 << 0,                  ///< This op is a parent op
-    kIROpFlag_UseOther = 1 << 1,                ///< If set this op can use 'other bits' to store information
-    kIROpFlag_Hoistable = 1 << 2,               ///< If set this op is a hoistable inst that needs to be deduplicated.
-    kIROpFlag_Global = 1 << 3,                  ///< If set this op should always be hoisted but should never be deduplicated.
+    kIROpFlag_Parent = 1 << 0,   ///< This op is a parent op
+    kIROpFlag_UseOther = 1 << 1, ///< If set this op can use 'other bits' to store information
+    kIROpFlag_Hoistable =
+        1 << 2, ///< If set this op is a hoistable inst that needs to be deduplicated.
+    kIROpFlag_Global =
+        1 << 3, ///< If set this op should always be hoisted but should never be deduplicated.
 };
 
 /* Bit usage of IROp is a follows
@@ -54,29 +55,28 @@ enum : IROpFlags
           MainOp | Other
 Bit range: 0-10   | Remaining bits
 
-For doing range checks (for example for doing isa tests), the value is masked by kIROpMask_OpMask, such that the Other bits don't interfere.
-The other bits can be used for storage for anything that needs to identify as a different 'op' or 'type'. It is currently 
-used currently for storing the TextureFlavor of a IRResourceTypeBase derived types for example. 
+For doing range checks (for example for doing isa tests), the value is masked by kIROpMask_OpMask,
+such that the Other bits don't interfere. The other bits can be used for storage for anything that
+needs to identify as a different 'op' or 'type'. It is currently used currently for storing the
+TextureFlavor of a IRResourceTypeBase derived types for example.
 
 TODO: We should eliminate the use of the "other" bits so that the entire value/state
 of an instruction is manifest in its opcode, operands, and children.
 */
 enum IROp : int32_t
 {
-#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS)  \
-    kIROp_##ID,
+#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) kIROp_##ID,
 #include "slang-ir-inst-defs.h"
 
-        /// The total number of valid opcodes
+    /// The total number of valid opcodes
     kIROpCount,
 
-        /// An invalid opcode used to represent a missing or unknown opcode value.
+    /// An invalid opcode used to represent a missing or unknown opcode value.
     kIROp_Invalid = kIROpCount,
 
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
-#define INST_RANGE(BASE, FIRST, LAST)       \
-    kIROp_First##BASE   = kIROp_##FIRST,    \
-    kIROp_Last##BASE    = kIROp_##LAST,
+#define INST_RANGE(BASE, FIRST, LAST) \
+    kIROp_First##BASE = kIROp_##FIRST, kIROp_Last##BASE = kIROp_##LAST,
 
 #include "slang-ir-inst-defs.h"
 };
@@ -84,7 +84,8 @@ enum IROp : int32_t
 /* IROpMeta describes values for the layout of IROps */
 enum IROpMeta
 {
-    kIROpMeta_OtherShift = 10, ///< Number of bits for op (shift right by this to get the other bits)
+    kIROpMeta_OtherShift =
+        10, ///< Number of bits for op (shift right by this to get the other bits)
 };
 
 /* IROpMask contains bitmasks for accessing aspects of IROps */
@@ -122,14 +123,14 @@ IROp findIROp(const UnownedStringSlice& name);
 struct IROpInfo
 {
     // What is the name/mnemonic for this operation
-    char const*     name;
+    char const* name;
 
     // How many required arguments are there
     // (not including the mandatory type argument)
-    unsigned int    fixedArgCount;
+    unsigned int fixedArgCount;
 
     // Flags to control how we emit additional info
-    IROpFlags       flags;
+    IROpFlags flags;
 
     bool isHoistable() const { return (flags & kIROpFlag_Hoistable) != 0; }
     bool isGlobal() const { return (flags & kIROpFlag_Global) != 0; }
@@ -155,7 +156,7 @@ struct IRUse
     IRInst* user = nullptr;
 
     // The next use of the same value
-    IRUse*  nextUse = nullptr;
+    IRUse* nextUse = nullptr;
 
     // A "link" back to where this use is referenced,
     // so that we can simplify updates.
@@ -173,14 +174,12 @@ struct IRAttr;
 // A double-linked list of instruction
 struct IRInstListBase
 {
-    IRInstListBase()
-    {}
+    IRInstListBase() {}
 
     IRInstListBase(IRInst* first, IRInst* last)
-        : first(first)
-        , last(last)
-    {}
-
+        : first(first), last(last)
+    {
+    }
 
 
     IRInst* first = nullptr;
@@ -193,19 +192,19 @@ struct IRInstListBase
     {
         IRInst* inst;
 
-        Iterator() : inst(nullptr) {}
-        Iterator(IRInst* inst) : inst(inst) {}
+        Iterator()
+            : inst(nullptr)
+        {
+        }
+        Iterator(IRInst* inst)
+            : inst(inst)
+        {
+        }
 
         void operator++();
-        IRInst* operator*()
-        {
-            return inst;
-        }
+        IRInst* operator*() { return inst; }
 
-        bool operator!=(Iterator const& i)
-        {
-            return inst != i.inst;
-        }
+        bool operator!=(Iterator const& i) { return inst != i.inst; }
     };
 
     Iterator begin();
@@ -222,24 +221,26 @@ struct IRInstList : IRInstListBase
 
     IRInstList(T* first, T* last)
         : IRInstListBase(first, last)
-    {}
+    {
+    }
 
     explicit IRInstList(IRInstListBase const& list)
         : IRInstListBase(list)
-    {}
+    {
+    }
 
-    T* getFirst() { return (T*) first; }
-    T* getLast() { return (T*) last; }
+    T* getFirst() { return (T*)first; }
+    T* getLast() { return (T*)last; }
 
     struct Iterator : public IRInstListBase::Iterator
     {
         Iterator() {}
-        Iterator(IRInst* inst) : IRInstListBase::Iterator(inst) {}
-
-        T* operator*()
+        Iterator(IRInst* inst)
+            : IRInstListBase::Iterator(inst)
         {
-            return (T*) inst;
         }
+
+        T* operator*() { return (T*)inst; }
     };
 
     Iterator begin() { return Iterator(first); }
@@ -265,18 +266,15 @@ struct IRModifiableInstList
         Index position = 0;
 
         Iterator() {}
-        Iterator(IRModifiableInstList<T>* inList, Index inPos) : list(inList), position(inPos) {}
-
-        T* operator*()
+        Iterator(IRModifiableInstList<T>* inList, Index inPos)
+            : list(inList), position(inPos)
         {
-            return (T*)(list->workList[position]);
         }
+
+        T* operator*() { return (T*)(list->workList[position]); }
         void operator++();
 
-        bool operator!=(Iterator const& i)
-        {
-            return i.list != list || i.position != position;
-        }
+        bool operator!=(Iterator const& i) { return i.list != list || i.position != position; }
     };
 
     Iterator begin() { return Iterator(this, 0); }
@@ -292,7 +290,8 @@ struct IRFilteredInstList : IRInstListBase
 
     explicit IRFilteredInstList(IRInstListBase const& list)
         : IRFilteredInstList(list.first, list.last)
-    {}
+    {
+    }
 
     T* getFirst() { return (T*)first; }
     T* getLast() { return (T*)last; }
@@ -301,60 +300,51 @@ struct IRFilteredInstList : IRInstListBase
     {
         IRInst* exclusiveLast;
         Iterator() {}
-        Iterator(IRInst* inst, IRInst* lastIter) : IRInstListBase::Iterator(inst), exclusiveLast(lastIter) {}
-        void operator++();
-        T* operator*()
+        Iterator(IRInst* inst, IRInst* lastIter)
+            : IRInstListBase::Iterator(inst), exclusiveLast(lastIter)
         {
-            return (T*)inst;
         }
+        void operator++();
+        T* operator*() { return (T*)inst; }
     };
 
     Iterator begin();
     Iterator end();
 };
 
-    /// A list of contiguous operands that can be iterated over as `IRInst`s.
+/// A list of contiguous operands that can be iterated over as `IRInst`s.
 struct IROperandListBase
 {
     IROperandListBase()
-        : m_begin(nullptr)
-        , m_end(nullptr)
-    {}
+        : m_begin(nullptr), m_end(nullptr)
+    {
+    }
 
-    IROperandListBase(
-        IRUse* begin,
-        IRUse* end)
-        : m_begin(begin)
-        , m_end(end)
-    {}
+    IROperandListBase(IRUse* begin, IRUse* end)
+        : m_begin(begin), m_end(end)
+    {
+    }
 
     struct Iterator
     {
     public:
         Iterator()
             : m_cursor(nullptr)
-        {}
+        {
+        }
 
         Iterator(IRUse* use)
             : m_cursor(use)
-        {}
-
-        IRInst* operator*() const
         {
-            return m_cursor->get();
         }
+
+        IRInst* operator*() const { return m_cursor->get(); }
 
         IRUse* getCursor() const { return m_cursor; }
 
-        void operator++()
-        {
-            m_cursor++;
-        }
+        void operator++() { m_cursor++; }
 
-        bool operator!=(Iterator const& that) const
-        {
-            return m_cursor != that.m_cursor;
-        }
+        bool operator!=(Iterator const& that) const { return m_cursor != that.m_cursor; }
 
     protected:
         IRUse* m_cursor;
@@ -365,199 +355,190 @@ struct IROperandListBase
 
     Int getCount() const { return m_end - m_begin; }
 
-    IRInst* operator[](Int index) const
-    {
-        return m_begin[index].get();
-    }
+    IRInst* operator[](Int index) const { return m_begin[index].get(); }
 
 protected:
     IRUse* m_begin;
     IRUse* m_end;
 };
 
-    /// A list of contiguous operands that can be iterated over as all being of type `T`.
+/// A list of contiguous operands that can be iterated over as all being of type `T`.
 template<typename T>
 struct IROperandList : IROperandListBase
 {
     typedef IROperandListBase Super;
-public:
-    IROperandList()
-    {}
 
-    IROperandList(
-        IRUse* begin,
-        IRUse* end)
+public:
+    IROperandList() {}
+
+    IROperandList(IRUse* begin, IRUse* end)
         : Super(begin, end)
-    {}
+    {
+    }
 
     struct Iterator : public IROperandListBase::Iterator
     {
         typedef IROperandListBase::Iterator Super;
+
     public:
-        Iterator()
-        {}
+        Iterator() {}
 
         Iterator(IRUse* use)
             : Super(use)
-        {}
-
-        T* operator*() const
         {
-            return (T*) m_cursor->get();
         }
+
+        T* operator*() const { return (T*)m_cursor->get(); }
     };
 
     Iterator begin() const { return Iterator(m_begin); }
     Iterator end() const { return Iterator(m_end); }
 
-    T* operator[](Int index) const
-    {
-        return (T*) m_begin[index].get();
-    }
+    T* operator[](Int index) const { return (T*)m_begin[index].get(); }
 };
 
-    /// A marker for a place where IR instructions can be inserted
-    ///
-    /// An insertion location is defined relative to an existing IR
-    /// instruction, along with an enumeration that specifies where
-    /// new instructions should be inserted relative to the existing one.
-    ///
-    /// Available options are:
-    ///
-    /// * `None`, meaning the instruction is null/absent. This can either
-    ///   represent an invalid/unitialized location, or an intention for
-    ///   new instructions to be created without any parent.
-    ///
-    /// * `AtEnd`, meaning new instructions will be inserted as the last
-    ///   child of the existing instruction. This is useful for filling
-    ///   in the children of a basic block or other container for a sequence
-    ///   of instructions. Note that since each new instruction will become
-    ///   the last one in the parent, instructions emitted at such a location
-    ///   will appear in the same order that they were emitted.
-    ///
-    /// * `Before`, meaning new instructions will be inserted before the existing
-    ///   one. This is useful for inserting new instructions to compute a value
-    ///   needed during optimization of an existing instruction (including when
-    ///   the new instructions will *replace* the existing one). Because each
-    ///   new instruction is inserted right before the existing one, the instructions
-    ///   will appear in the same order that they were emitted.
-    ///
-    /// * `AtStart`, meaning new instructions will be inserted as the first
-    ///   child of the existing instruction. This is useful for adding things
-    ///   like decorations to an existing instruction (since decorations are
-    ///   currently required to precede all other kinds of child instructions).
-    ///   Note that if multiple new instructions are inserted in this mode they
-    ///   will appear in the *reverse* of the order they were emitted.
-    ///
-    /// * `After`, meaning new instructions will be inserted as the next child
-    ///   after the existing instruction.
-    ///   Note that if multiple new instructions are inserted in this mode they
-    ///   will appear in the *reverse* of the order they were emitted.
-    ///
-    /// An insertion location is usable and valid so long as the instruction it is
-    /// defined relative to is valid to insert into or next to. If the reference
-    /// instruction is moved, subsequent insertions will use its new location, but
-    /// already-inserted instructions will *not*.
-    ///
-    /// Note that at present there is no way to construct an `IRInsertLoc` that
-    /// can reliably be used to insert at certain locations that can be clearly
-    /// defined verbally (e.g., "at the end of the parameter list of this function").
-    /// Often a suitable approximation will work inside a specific pass (e.g., when
-    /// first constructing a function, the `AtEnd` mode could be used to insert
-    /// all parameters before any body instructions are inserted, and for an existing
-    /// function new parameters could be inserted `Before` the first existing body
-    /// instruction). Such approximations require knowing which kinds of IR modifications
-    /// will and will not be performed while the location is in use.
-    ///
+/// A marker for a place where IR instructions can be inserted
+///
+/// An insertion location is defined relative to an existing IR
+/// instruction, along with an enumeration that specifies where
+/// new instructions should be inserted relative to the existing one.
+///
+/// Available options are:
+///
+/// * `None`, meaning the instruction is null/absent. This can either
+///   represent an invalid/unitialized location, or an intention for
+///   new instructions to be created without any parent.
+///
+/// * `AtEnd`, meaning new instructions will be inserted as the last
+///   child of the existing instruction. This is useful for filling
+///   in the children of a basic block or other container for a sequence
+///   of instructions. Note that since each new instruction will become
+///   the last one in the parent, instructions emitted at such a location
+///   will appear in the same order that they were emitted.
+///
+/// * `Before`, meaning new instructions will be inserted before the existing
+///   one. This is useful for inserting new instructions to compute a value
+///   needed during optimization of an existing instruction (including when
+///   the new instructions will *replace* the existing one). Because each
+///   new instruction is inserted right before the existing one, the instructions
+///   will appear in the same order that they were emitted.
+///
+/// * `AtStart`, meaning new instructions will be inserted as the first
+///   child of the existing instruction. This is useful for adding things
+///   like decorations to an existing instruction (since decorations are
+///   currently required to precede all other kinds of child instructions).
+///   Note that if multiple new instructions are inserted in this mode they
+///   will appear in the *reverse* of the order they were emitted.
+///
+/// * `After`, meaning new instructions will be inserted as the next child
+///   after the existing instruction.
+///   Note that if multiple new instructions are inserted in this mode they
+///   will appear in the *reverse* of the order they were emitted.
+///
+/// An insertion location is usable and valid so long as the instruction it is
+/// defined relative to is valid to insert into or next to. If the reference
+/// instruction is moved, subsequent insertions will use its new location, but
+/// already-inserted instructions will *not*.
+///
+/// Note that at present there is no way to construct an `IRInsertLoc` that
+/// can reliably be used to insert at certain locations that can be clearly
+/// defined verbally (e.g., "at the end of the parameter list of this function").
+/// Often a suitable approximation will work inside a specific pass (e.g., when
+/// first constructing a function, the `AtEnd` mode could be used to insert
+/// all parameters before any body instructions are inserted, and for an existing
+/// function new parameters could be inserted `Before` the first existing body
+/// instruction). Such approximations require knowing which kinds of IR modifications
+/// will and will not be performed while the location is in use.
+///
 struct IRInsertLoc
 {
 public:
-        /// The different kinds of insertion locations.
+    /// The different kinds of insertion locations.
     enum class Mode
     {
-        None,       //< Don't insert new instructions at all; just create them
-        Before,     //< Insert immediately before the existing instruction
-        After,      //< Insert immediately after the existing instruction
-        AtStart,    //< Insert at the start of the existing instruction's child list
-        AtEnd,      //< Insert at the start of the existing instruction's child list
+        None,    //< Don't insert new instructions at all; just create them
+        Before,  //< Insert immediately before the existing instruction
+        After,   //< Insert immediately after the existing instruction
+        AtStart, //< Insert at the start of the existing instruction's child list
+        AtEnd,   //< Insert at the start of the existing instruction's child list
     };
 
-        /// Construct a default insertion location in the `None` mode.
-    IRInsertLoc()
-    {}
+    /// Construct a default insertion location in the `None` mode.
+    IRInsertLoc() {}
 
-        /// Construct a location that inserts before `inst`
+    /// Construct a location that inserts before `inst`
     static IRInsertLoc before(IRInst* inst)
     {
         SLANG_ASSERT(inst);
         return IRInsertLoc(Mode::Before, inst);
     }
 
-        /// Construct a location that inserts after `inst`
-        ///
-        /// Note: instructions inserted at this location will appear in the opposite
-        /// of the order they were emitted.
+    /// Construct a location that inserts after `inst`
+    ///
+    /// Note: instructions inserted at this location will appear in the opposite
+    /// of the order they were emitted.
     static IRInsertLoc after(IRInst* inst)
     {
         SLANG_ASSERT(inst);
         return IRInsertLoc(Mode::After, inst);
     }
 
-        /// Construct a location that inserts at the start of the child list for `parent`
-        ///
-        /// Note: instructions inserted at this location will appear in the opposite
-        /// of the order they were emitted.
+    /// Construct a location that inserts at the start of the child list for `parent`
+    ///
+    /// Note: instructions inserted at this location will appear in the opposite
+    /// of the order they were emitted.
     static IRInsertLoc atStart(IRInst* parent)
     {
         SLANG_ASSERT(parent);
         return IRInsertLoc(Mode::AtStart, parent);
     }
 
-        /// Construct a location that inserts at the end of the child list for `parent`
+    /// Construct a location that inserts at the end of the child list for `parent`
     static IRInsertLoc atEnd(IRInst* parent)
     {
         SLANG_ASSERT(parent);
         return IRInsertLoc(Mode::AtEnd, parent);
     }
 
-        /// Get the insertion mode for this location
+    /// Get the insertion mode for this location
     Mode getMode() const { return m_mode; }
 
-        /// Get the instruction that this location inserts relative to
+    /// Get the instruction that this location inserts relative to
     IRInst* getInst() const { return m_inst; }
 
-        /// Get the parent instruction that new instructions will insert into.
-        ///
-        /// For the `AtStart` and `AtEnd` modes, this returns `getInst()`.
-        /// For the `Before` and `After` modes, this returns `getInst()->getParent()`
+    /// Get the parent instruction that new instructions will insert into.
+    ///
+    /// For the `AtStart` and `AtEnd` modes, this returns `getInst()`.
+    /// For the `Before` and `After` modes, this returns `getInst()->getParent()`
     IRInst* getParent() const;
 
-        /// Get the parent basic block, if any, that new instructions will insert into.
-        ///
-        /// This returns the same instruction as `getParent()` if the parent is a basic block.
-        /// Otherwise, returns null.
+    /// Get the parent basic block, if any, that new instructions will insert into.
+    ///
+    /// This returns the same instruction as `getParent()` if the parent is a basic block.
+    /// Otherwise, returns null.
     IRBlock* getBlock() const;
 
-        /// Get the enclosing function (or other code-bearing value) that instructions are inserted into.
-        ///
-        /// This searches up the parent chain starting with `getParent()` looking for a code-bearing
-        /// value that things are being inserted into (could be a function, generic, etc.)
-        ///
+    /// Get the enclosing function (or other code-bearing value) that instructions are inserted
+    /// into.
+    ///
+    /// This searches up the parent chain starting with `getParent()` looking for a code-bearing
+    /// value that things are being inserted into (could be a function, generic, etc.)
+    ///
     IRInst* getFunc() const;
 
 private:
-        /// Internal constructor
+    /// Internal constructor
     IRInsertLoc(Mode mode, IRInst* inst)
-        : m_mode(mode)
-        , m_inst(inst)
-    {}
+        : m_mode(mode), m_inst(inst)
+    {
+    }
 
-        /// The insertion mode
+    /// The insertion mode
     Mode m_mode = Mode::None;
 
-        /// The instruction that insertions will be made relative to.
-        ///
-        /// Should always be null for the `None` mode and non-null for all other modes.
+    /// The instruction that insertions will be made relative to.
+    ///
+    /// Should always be null for the `None` mode and non-null for all other modes.
     IRInst* m_inst = nullptr;
 };
 
@@ -598,10 +579,7 @@ struct IRInst
     // pointer.
     uint32_t operandCount = 0;
 
-    UInt getOperandCount()
-    {
-        return operandCount;
-    }
+    UInt getOperandCount() { return operandCount; }
 
     // Source location information for this value, if any
     SourceLoc sourceLoc;
@@ -620,52 +598,52 @@ struct IRInst
     template<typename T>
     T* findDecoration();
 
-        /// Get all the attributes attached to this instruction.
+    /// Get all the attributes attached to this instruction.
     IROperandList<IRAttr> getAllAttrs();
 
-        /// Find the first attribute of type `T` attached to this instruction.
+    /// Find the first attribute of type `T` attached to this instruction.
     template<typename T>
     T* findAttr()
     {
-        for( auto attr : getAllAttrs() )
+        for (auto attr : getAllAttrs())
         {
-            if(auto found = as<T>(attr))
+            if (auto found = as<T>(attr))
                 return found;
         }
         return nullptr;
     }
 
-        /// Find all attributes of type `T` attached to this instruction.
-        ///
-        /// This operation assumes that attributes are grouped by type,
-        /// so that all the attributes of type `T` are contiguous.
-        ///
+    /// Find all attributes of type `T` attached to this instruction.
+    ///
+    /// This operation assumes that attributes are grouped by type,
+    /// so that all the attributes of type `T` are contiguous.
+    ///
     template<typename T>
     IROperandList<T> findAttrs()
     {
         auto allAttrs = getAllAttrs();
         auto bb = allAttrs.begin();
         auto end = allAttrs.end();
-        while(bb != end && !as<T>(*bb))
+        while (bb != end && !as<T>(*bb))
             ++bb;
         auto ee = bb;
-        while(ee != end && as<T>(*ee))
+        while (ee != end && as<T>(*ee))
             ++ee;
-        return IROperandList<T>(bb.getCursor(),ee.getCursor());
+        return IROperandList<T>(bb.getCursor(), ee.getCursor());
     }
 
     // The first use of this value (start of a linked list)
-    IRUse*      firstUse = nullptr;
+    IRUse* firstUse = nullptr;
 
 
     // The parent of this instruction.
-    IRInst*   parent;
+    IRInst* parent;
 
     IRInst* getParent() { return parent; }
 
     // The next and previous instructions with the same parent
-    IRInst*         next;
-    IRInst*         prev;
+    IRInst* next;
+    IRInst* prev;
 
     IRInst* getNextInst() { return next; }
     IRInst* getPrevInst() { return prev; }
@@ -680,37 +658,29 @@ struct IRInst
     //
     IRInst* getFirstChild();
     IRInst* getLastChild();
-    IRInstList<IRInst> getChildren()
-    {
-        return IRInstList<IRInst>(
-            getFirstChild(),
-            getLastChild());
-    }
+    IRInstList<IRInst> getChildren() { return IRInstList<IRInst>(getFirstChild(), getLastChild()); }
 
     IRModifiableInstList<IRInst> getModifiableChildren()
     {
-        return IRModifiableInstList<IRInst>(
-            this,
-            getFirstChild(),
-            getLastChild());
+        return IRModifiableInstList<IRInst>(this, getFirstChild(), getLastChild());
     }
 
-        /// A doubly-linked list containing any decorations and then any children of this instruction.
-        ///
-        /// We store both the decorations and children of an instruction
-        /// in the same list, to conserve space in the instruction itself
-        /// (rather than storing distinct lists for decorations and children).
-        ///
-        // Note: This field is *not* being declared `private` because doing so could
-        // mess with our required memory layout, where `typeUse` below is assumed
-        // to be the last field in `IRInst` and to come right before any additional
-        // `IRUse` values that represent operands.
-        //
+    /// A doubly-linked list containing any decorations and then any children of this instruction.
+    ///
+    /// We store both the decorations and children of an instruction
+    /// in the same list, to conserve space in the instruction itself
+    /// (rather than storing distinct lists for decorations and children).
+    ///
+    // Note: This field is *not* being declared `private` because doing so could
+    // mess with our required memory layout, where `typeUse` below is assumed
+    // to be the last field in `IRInst` and to come right before any additional
+    // `IRUse` values that represent operands.
+    //
     IRInstListBase m_decorationsAndChildren;
 
 
     IRInst* getFirstDecorationOrChild() { return m_decorationsAndChildren.first; }
-    IRInst* getLastDecorationOrChild()  { return m_decorationsAndChildren.last;  }
+    IRInst* getLastDecorationOrChild() { return m_decorationsAndChildren.last; }
     IRInstListBase getDecorationsAndChildren() { return m_decorationsAndChildren; }
     IRModifiableInstList<IRInst> getModifiableDecorationsAndChildren()
     {
@@ -738,8 +708,8 @@ struct IRInst
     // no value.
     IRUse typeUse;
 
-    IRType* getFullType() { return (IRType*) typeUse.get(); }
-    void setFullType(IRType* type) { typeUse.init(this, (IRInst*) type); }
+    IRType* getFullType() { return (IRType*)typeUse.get(); }
+    void setFullType(IRType* type) { typeUse.init(this, (IRInst*)type); }
 
     IRRate* getRate();
 
@@ -750,7 +720,7 @@ struct IRInst
     // just a series of `IRUse` values representing
     // operands of the instruction.
 
-    IRUse*      getOperands();
+    IRUse* getOperands();
 
     IRInst* getOperand(UInt index)
     {
@@ -809,7 +779,7 @@ struct IRInst
     // `op(a,c)`.
     void removeOperand(Index index);
 
-        /// Transfer any decorations of this instruction to the `target` instruction.
+    /// Transfer any decorations of this instruction to the `target` instruction.
     void transferDecorationsTo(IRInst* target);
 
     /// Does this instruction have any uses?
@@ -832,14 +802,15 @@ struct IRInst
     /// this function will return it, and will otherwise return `null`.
     IRModule* getModule();
 
-        /// Insert this instruction into `inParent`, after `inPrev` and before `inNext`.
-        ///
-        /// `inParent` must be non-null
-        /// If `inPrev` is non-null it must satisfy `inPrev->getNextInst() == inNext` and `inPrev->getParent() == inParent`
-        /// If `inNext` is non-null it must satisfy `inNext->getPrevInst() == inPrev` and `inNext->getParent() == inParent`
-        ///
-        /// If both `inPrev` and `inNext` are null, then `inParent` must have no (raw) children.
-        ///
+    /// Insert this instruction into `inParent`, after `inPrev` and before `inNext`.
+    ///
+    /// `inParent` must be non-null
+    /// If `inPrev` is non-null it must satisfy `inPrev->getNextInst() == inNext` and
+    /// `inPrev->getParent() == inParent` If `inNext` is non-null it must satisfy
+    /// `inNext->getPrevInst() == inPrev` and `inNext->getParent() == inParent`
+    ///
+    /// If both `inPrev` and `inNext` are null, then `inParent` must have no (raw) children.
+    ///
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
 
     /// Print the IR to stdout for debugging purposes
@@ -851,21 +822,22 @@ struct IRInst
 
     IRBlock* getFirstBlock() { return (IRBlock*)getFirstChild(); }
     IRBlock* getLastBlock() { return (IRBlock*)getLastChild(); }
-
 };
 
 enum class IRDynamicCastBehavior
 {
-    Unwrap, NoUnwrap
+    Unwrap,
+    NoUnwrap
 };
 
 template<typename T, IRDynamicCastBehavior behavior = IRDynamicCastBehavior::Unwrap>
 T* dynamicCast(IRInst* inst)
 {
-    if (!inst) return nullptr;
+    if (!inst)
+        return nullptr;
     if (T::isaImpl(inst->getOp()))
         return static_cast<T*>(inst);
-    if constexpr(behavior == IRDynamicCastBehavior::Unwrap)
+    if constexpr (behavior == IRDynamicCastBehavior::Unwrap)
     {
         if (inst->getOp() == kIROp_AttributedType)
             return dynamicCast<T>(inst->getOperand(0));
@@ -907,9 +879,9 @@ SourceLoc const& getDiagnosticPos(IRInst* inst);
 template<typename T>
 T* IRInst::findDecoration()
 {
-    for( auto decoration : getDecorations() )
+    for (auto decoration : getDecorations())
     {
-        if(auto match = as<T>(decoration))
+        if (auto match = as<T>(decoration))
             return match;
     }
     return nullptr;
@@ -992,11 +964,28 @@ typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::end()
 
 // Types
 
-#define IR_LEAF_ISA(NAME) static bool isaImpl(IROp op) { return (kIROpMask_OpMask & op) == kIROp_##NAME; }
-#define IR_PARENT_ISA(NAME) static bool isaImpl(IROp opIn) { const int op = (kIROpMask_OpMask & opIn); return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; }
+#define IR_LEAF_ISA(NAME)                               \
+    static bool isaImpl(IROp op)                        \
+    {                                                   \
+        return (kIROpMask_OpMask & op) == kIROp_##NAME; \
+    }
+#define IR_PARENT_ISA(NAME)                                       \
+    static bool isaImpl(IROp opIn)                                \
+    {                                                             \
+        const int op = (kIROpMask_OpMask & opIn);                 \
+        return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; \
+    }
 
-#define SIMPLE_IR_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_LEAF_ISA(NAME) };
-#define SIMPLE_IR_PARENT_TYPE(NAME, BASE) struct IR##NAME : IR##BASE { IR_PARENT_ISA(NAME) };
+#define SIMPLE_IR_TYPE(NAME, BASE) \
+    struct IR##NAME : IR##BASE     \
+    {                              \
+        IR_LEAF_ISA(NAME)          \
+    };
+#define SIMPLE_IR_PARENT_TYPE(NAME, BASE) \
+    struct IR##NAME : IR##BASE            \
+    {                                     \
+        IR_PARENT_ISA(NAME)               \
+    };
 
 
 // All types in the IR are represented as instructions which conceptually
@@ -1045,7 +1034,7 @@ SIMPLE_IR_TYPE(NativeStringType, StringTypeBase)
 SIMPLE_IR_TYPE(DynamicType, Type)
 
 // True if types are equal
-// Note compares nominal types by name alone 
+// Note compares nominal types by name alone
 bool isTypeEqual(IRType* a, IRType* b);
 
 // True if this is an integral IRBasicType, not including Char or Ptr types
@@ -1096,9 +1085,9 @@ struct IRConstant : IRInst
     };
 
     struct StringValue
-    {   
-        uint32_t numChars;           ///< The number of chars
-        char chars[1];               ///< Chars added at end. NOTE! Must be last member of struct! 
+    {
+        uint32_t numChars; ///< The number of chars
+        char chars[1];     ///< Chars added at end. NOTE! Must be last member of struct!
     };
     struct StringSliceValue
     {
@@ -1108,40 +1097,42 @@ struct IRConstant : IRInst
 
     union ValueUnion
     {
-        IRIntegerValue          intVal;         ///< Used for integrals and boolean
-        IRFloatingPointValue    floatVal;
-        void*                   ptrVal;
+        IRIntegerValue intVal; ///< Used for integrals and boolean
+        IRFloatingPointValue floatVal;
+        void* ptrVal;
 
-        /// Either of these types could be set with kIROp_StringLit. 
-        /// Which is used is currently determined with decorations - if a kIROp_TransitoryDecoration is set, then the transitory StringVal is used, else stringVal
+        /// Either of these types could be set with kIROp_StringLit.
+        /// Which is used is currently determined with decorations - if a kIROp_TransitoryDecoration
+        /// is set, then the transitory StringVal is used, else stringVal
         // which relies on chars being held after the struct).
-        StringValue             stringVal;
-        StringSliceValue        transitoryStringVal;           
+        StringValue stringVal;
+        StringSliceValue transitoryStringVal;
     };
 
-        /// Returns a string slice (or empty string if not appropriate)
+    /// Returns a string slice (or empty string if not appropriate)
     UnownedStringSlice getStringSlice();
 
-         /// Returns the kind of floating point value we have
+    /// Returns the kind of floating point value we have
     FloatKind getFloatKind() const;
 
-        /// Returns true if the value is finite.
-        /// NOTE! Only works on floating point types
+    /// Returns true if the value is finite.
+    /// NOTE! Only works on floating point types
     bool isFinite() const;
 
-        /// True if constants are equal
+    /// True if constants are equal
     bool equal(IRConstant* rhs);
-        /// True if the value is equal.
-        /// Does *NOT* compare if the type is equal. 
+    /// True if the value is equal.
+    /// Does *NOT* compare if the type is equal.
     bool isValueEqual(IRConstant* rhs);
 
-        /// Get the hash 
+    /// Get the hash
     HashCode getHashCode();
 
     IR_PARENT_ISA(Constant)
 
     // Must be last member, because data may be held behind
-    // NOTE! The total size of IRConstant may not be allocated - only enough space is allocated for the value type held in the union.
+    // NOTE! The total size of IRConstant may not be allocated - only enough space is allocated for
+    // the value type held in the union.
     ValueUnion value;
 };
 
@@ -1172,7 +1163,7 @@ IRIntegerValue getIntVal(IRInst* inst);
 
 struct IRStringLit : IRConstant
 {
-    
+
     IR_LEAF_ISA(StringLit);
 };
 
@@ -1215,24 +1206,21 @@ struct IRParam : IRInst
     IR_LEAF_ISA(Param)
 };
 
-    /// A control-flow edge from one basic block to another
+/// A control-flow edge from one basic block to another
 struct IREdge
 {
 public:
-    IREdge()
-    {}
+    IREdge() {}
 
     explicit IREdge(IRUse* use)
         : m_use(use)
-    {}
+    {
+    }
 
     IRBlock* getPredecessor() const;
     IRBlock* getSuccessor() const;
 
-    IRUse* getUse() const
-    {
-        return m_use;
-    }
+    IRUse* getUse() const { return m_use; }
 
     bool isCritical() const;
 
@@ -1276,19 +1264,17 @@ struct IRBlock : IRInst
     // instructions at the start of the block. These play
     // the role of function parameters for the entry block
     // of a function, and of phi nodes in other blocks.
-    IRParam* getFirstParam() { return as<IRParam, IRDynamicCastBehavior::NoUnwrap>(getFirstInst()); }
-    IRParam* getLastParam();
-    IRInstList<IRParam> getParams()
+    IRParam* getFirstParam()
     {
-        return IRInstList<IRParam>(
-            getFirstParam(),
-            getLastParam());
+        return as<IRParam, IRDynamicCastBehavior::NoUnwrap>(getFirstInst());
     }
+    IRParam* getLastParam();
+    IRInstList<IRParam> getParams() { return IRInstList<IRParam>(getFirstParam(), getLastParam()); }
     // Linear in the parameter index, returns -1 if the param doesn't exist
     Index getParamIndex(IRParam* const needle)
     {
         Index ret = 0;
-        for(const auto p : getParams())
+        for (const auto p : getParams())
         {
             if (p == needle)
                 return ret;
@@ -1305,9 +1291,7 @@ struct IRBlock : IRInst
     IRInst* getLastOrdinaryInst();
     IRInstList<IRInst> getOrdinaryInsts()
     {
-        return IRInstList<IRInst>(
-            getFirstOrdinaryInst(),
-            getLastOrdinaryInst());
+        return IRInstList<IRInst>(getFirstOrdinaryInst(), getLastOrdinaryInst());
     }
 
     // The predecessor and successor lists of a block are needed
@@ -1327,7 +1311,10 @@ struct IRBlock : IRInst
     //
     struct PredecessorList
     {
-        PredecessorList(IRUse* begin) : b(begin) {}
+        PredecessorList(IRUse* begin)
+            : b(begin)
+        {
+        }
         IRUse* b;
 
         UInt getCount();
@@ -1335,28 +1322,31 @@ struct IRBlock : IRInst
 
         struct Iterator
         {
-            Iterator(IRUse* use) : use(use) {}
+            Iterator(IRUse* use)
+                : use(use)
+            {
+            }
 
             IRBlock* operator*();
 
             void operator++();
 
-            bool operator!=(Iterator const& that)
-            {
-                return use != that.use;
-            }
+            bool operator!=(Iterator const& that) { return use != that.use; }
 
             IREdge getEdge() const { return IREdge(use); }
             IRUse* use;
         };
 
         Iterator begin() { return Iterator(b); }
-        Iterator end()   { return Iterator(nullptr); }
+        Iterator end() { return Iterator(nullptr); }
     };
 
     struct SuccessorList
     {
-        SuccessorList(IRUse* begin, IRUse* end, UInt stride = 1) : begin_(begin), end_(end), stride(stride) {}
+        SuccessorList(IRUse* begin, IRUse* end, UInt stride = 1)
+            : begin_(begin), end_(end), stride(stride)
+        {
+        }
         IRUse* begin_;
         IRUse* end_;
         UInt stride;
@@ -1365,16 +1355,16 @@ struct IRBlock : IRInst
 
         struct Iterator
         {
-            Iterator(IRUse* use, UInt stride) : use(use), stride(stride) {}
+            Iterator(IRUse* use, UInt stride)
+                : use(use), stride(stride)
+            {
+            }
 
             IRBlock* operator*();
 
             void operator++();
 
-            bool operator!=(Iterator const& that)
-            {
-                return use != that.use;
-            }
+            bool operator!=(Iterator const& that) { return use != that.use; }
 
             IREdge getEdge() const { return IREdge(use); }
 
@@ -1383,7 +1373,7 @@ struct IRBlock : IRInst
         };
 
         Iterator begin() { return Iterator(begin_, stride); }
-        Iterator end()   { return Iterator(end_, stride); }
+        Iterator end() { return Iterator(end_, stride); }
     };
 
     PredecessorList getPredecessors();
@@ -1400,8 +1390,14 @@ struct IRResourceTypeBase : IRType
 {
     IRInst* getShapeInst() { return getOperand(kCoreModule_TextureShapeParameterIndex); }
     IRInst* getIsArrayInst() { return getOperand(kCoreModule_TextureIsArrayParameterIndex); }
-    IRInst* getIsMultisampleInst() { return getOperand(kCoreModule_TextureIsMultisampleParameterIndex); }
-    IRInst* getSampleCountInst() { return getOperand(kCoreModule_TextureSampleCountParameterIndex); }
+    IRInst* getIsMultisampleInst()
+    {
+        return getOperand(kCoreModule_TextureIsMultisampleParameterIndex);
+    }
+    IRInst* getSampleCountInst()
+    {
+        return getOperand(kCoreModule_TextureSampleCountParameterIndex);
+    }
     IRInst* getAccessInst() { return getOperand(kCoreModule_TextureAccessParameterIndex); }
     IRInst* getIsShadowInst() { return getOperand(kCoreModule_TextureIsShadowParameterIndex); }
     IRInst* getIsCombinedInst() { return getOperand(kCoreModule_TextureIsCombinedParameterIndex); }
@@ -1411,18 +1407,12 @@ struct IRResourceTypeBase : IRType
     {
         switch (getOperand(1)->getOp())
         {
-        case kIROp_TextureShape1DType:
-            return SLANG_TEXTURE_1D;
-        case kIROp_TextureShape2DType:
-            return SLANG_TEXTURE_2D;
-        case kIROp_TextureShape3DType:
-            return SLANG_TEXTURE_3D;
-        case kIROp_TextureShapeCubeType:
-            return SLANG_TEXTURE_CUBE;
-        case kIROp_TextureShapeBufferType:
-            return SLANG_TEXTURE_BUFFER;
-        default:
-            return SLANG_RESOURCE_NONE;
+        case kIROp_TextureShape1DType:     return SLANG_TEXTURE_1D;
+        case kIROp_TextureShape2DType:     return SLANG_TEXTURE_2D;
+        case kIROp_TextureShape3DType:     return SLANG_TEXTURE_3D;
+        case kIROp_TextureShapeCubeType:   return SLANG_TEXTURE_CUBE;
+        case kIROp_TextureShapeBufferType: return SLANG_TEXTURE_BUFFER;
+        default:                           return SLANG_RESOURCE_NONE;
         }
     }
     bool isFeedback() { return getIntVal(getAccessInst()) == kCoreModule_ResourceAccessFeedback; }
@@ -1430,8 +1420,12 @@ struct IRResourceTypeBase : IRType
     bool isArray() { return getIntVal(getIsArrayInst()) != 0; }
     bool isShadow() { return getIntVal(getIsShadowInst()) != 0; }
     bool isCombined() { return getIntVal(getIsCombinedInst()) != 0; }
-    
-    SlangResourceShape getShape() { return (SlangResourceShape)((uint32_t)GetBaseShape() | (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : SLANG_RESOURCE_NONE)); }
+
+    SlangResourceShape getShape()
+    {
+        return (SlangResourceShape)((uint32_t)GetBaseShape() |
+                                    (isArray() ? SLANG_TEXTURE_ARRAY_FLAG : SLANG_RESOURCE_NONE));
+    }
     SlangResourceAccess getAccess()
     {
         auto constVal = as<IRIntLit>(getOperand(kCoreModule_TextureAccessParameterIndex));
@@ -1439,16 +1433,12 @@ struct IRResourceTypeBase : IRType
         {
             switch (getIntVal(constVal))
             {
-            case kCoreModule_ResourceAccessReadOnly:
-                return SLANG_RESOURCE_ACCESS_READ;
-            case kCoreModule_ResourceAccessReadWrite:
-                return SLANG_RESOURCE_ACCESS_READ_WRITE;
+            case kCoreModule_ResourceAccessReadOnly:  return SLANG_RESOURCE_ACCESS_READ;
+            case kCoreModule_ResourceAccessReadWrite: return SLANG_RESOURCE_ACCESS_READ_WRITE;
             case kCoreModule_ResourceAccessRasterizerOrdered:
                 return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-            case kCoreModule_ResourceAccessFeedback:
-                return SLANG_RESOURCE_ACCESS_FEEDBACK;
-            default:
-                break;
+            case kCoreModule_ResourceAccessFeedback: return SLANG_RESOURCE_ACCESS_FEEDBACK;
+            default:                                 break;
             }
         }
         return SLANG_RESOURCE_ACCESS_UNKNOWN;
@@ -1616,7 +1606,7 @@ struct IRArrayTypeBase : IRType
     IR_PARENT_ISA(ArrayTypeBase)
 };
 
-struct IRArrayType: IRArrayTypeBase
+struct IRArrayType : IRArrayTypeBase
 {
     IR_LEAF_ISA(ArrayType)
 };
@@ -1637,8 +1627,8 @@ SIMPLE_IR_TYPE(ActualGlobalRate, Rate)
 
 struct IRRateQualifiedType : IRType
 {
-    IRRate* getRate() { return (IRRate*) getOperand(0); }
-    IRType* getValueType() { return (IRType*) getOperand(1); }
+    IRRate* getRate() { return (IRRate*)getOperand(0); }
+    IRType* getValueType() { return (IRType*)getOperand(1); }
 
     IR_LEAF_ISA(RateQualifiedType)
 };
@@ -1740,11 +1730,16 @@ struct IRPtrTypeBase : IRType
 {
     IRType* getValueType() { return (IRType*)getOperand(0); }
 
-    bool hasAddressSpace() { return getOperandCount() > 1 && getAddressSpace() != AddressSpace::Generic; }
+    bool hasAddressSpace()
+    {
+        return getOperandCount() > 1 && getAddressSpace() != AddressSpace::Generic;
+    }
 
     AddressSpace getAddressSpace()
     {
-        return getOperandCount() > 1 ? (AddressSpace)static_cast<IRIntLit*>(getOperand(1))->getValue() : AddressSpace::Generic;
+        return getOperandCount() > 1
+                   ? (AddressSpace) static_cast<IRIntLit*>(getOperand(1))->getValue()
+                   : AddressSpace::Generic;
     }
 
     IR_PARENT_ISA(PtrTypeBase)
@@ -1774,21 +1769,21 @@ struct IRPseudoPtrType : public IRPtrTypeBase
     IR_LEAF_ISA(PseudoPtrType);
 };
 
-    /// The base class of RawPointerType and RTTIPointerType.
+/// The base class of RawPointerType and RTTIPointerType.
 struct IRRawPointerTypeBase : IRType
 {
     IR_PARENT_ISA(RawPointerTypeBase);
 };
 
-    /// Represents a pointer to an object of unknown type.
+/// Represents a pointer to an object of unknown type.
 struct IRRawPointerType : IRRawPointerTypeBase
 {
     IR_LEAF_ISA(RawPointerType)
 };
 
-    /// Represents a pointer to an object whose type is determined at runtime,
-    /// with type information available through `rttiOperand`.
-    ///
+/// Represents a pointer to an object whose type is determined at runtime,
+/// with type information available through `rttiOperand`.
+///
 struct IRRTTIPointerType : IRRawPointerTypeBase
 {
     IRInst* getRTTIOperand() { return getOperand(0); }
@@ -1813,16 +1808,14 @@ struct IRGetStringHash : IRInst
     IRStringLit* getStringLit() { return as<IRStringLit>(getOperand(0)); }
 };
 
-    /// Get the type pointed to be `ptrType`, or `nullptr` if it is not a pointer(-like) type.
-    ///
-    /// The given IR `builder` will be used if new instructions need to be created.
-IRType* tryGetPointedToType(
-        IRBuilder*  builder,
-        IRType*     type);
+/// Get the type pointed to be `ptrType`, or `nullptr` if it is not a pointer(-like) type.
+///
+/// The given IR `builder` will be used if new instructions need to be created.
+IRType* tryGetPointedToType(IRBuilder* builder, IRType* type);
 
 struct IRFuncType : IRType
 {
-    IRType* getResultType() { return (IRType*) getOperand(0); }
+    IRType* getResultType() { return (IRType*)getOperand(0); }
     UInt getParamCount() { return getOperandCount() - 1; }
     IRType* getParamType(UInt index) { return (IRType*)getOperand(1 + index); }
     IROperandList<IRType> getParamTypes()
@@ -1843,8 +1836,7 @@ struct IRHitObjectType : IRType
     IR_LEAF_ISA(HitObjectType)
 };
 
-bool isDefinition(
-    IRInst* inVal);
+bool isDefinition(IRInst* inVal);
 
 // A structure type is represented as a parent instruction,
 // where the child instructions represent the fields of the
@@ -1877,12 +1869,9 @@ struct IRStructField : IRInst
         // refer to via an `IRType*`) which do not actually
         // inherit from `IRType` in the hierarchy.
         //
-        return (IRType*) getOperand(1);
+        return (IRType*)getOperand(1);
     }
-    void setFieldType(IRType* type)
-    {
-        setOperand(1, type);
-    }
+    void setFieldType(IRType* type) { setOperand(1, type); }
 
     IR_LEAF_ISA(StructField)
 };
@@ -1894,14 +1883,20 @@ struct IRStructField : IRInst
 //
 struct IRStructType : IRType
 {
-    IRFilteredInstList<IRStructField> getFields() { return IRFilteredInstList<IRStructField>(getChildren()); }
+    IRFilteredInstList<IRStructField> getFields()
+    {
+        return IRFilteredInstList<IRStructField>(getChildren());
+    }
 
     IR_LEAF_ISA(StructType)
 };
 
 struct IRClassType : IRType
 {
-    IRFilteredInstList<IRStructField> getFields() { return IRFilteredInstList<IRStructField>(getChildren()); }
+    IRFilteredInstList<IRStructField> getFields()
+    {
+        return IRFilteredInstList<IRStructField>(getChildren());
+    }
 
     IR_LEAF_ISA(ClassType)
 };
@@ -1915,20 +1910,14 @@ struct IRThisType : IRType
 {
     IR_LEAF_ISA(ThisType)
 
-    IRInst* getConstraintType()
-    {
-        return getOperand(0);
-    }
+    IRInst* getConstraintType() { return getOperand(0); }
 };
 
 struct IRThisTypeWitness : IRInst
 {
     IR_LEAF_ISA(ThisTypeWitness)
 
-    IRInst* getConstraintType()
-    {
-        return getOperand(0);
-    }
+    IRInst* getConstraintType() { return getOperand(0); }
 };
 
 struct IRInterfaceRequirementEntry : IRInst
@@ -1953,14 +1942,14 @@ struct IRConjunctionType : IRType
     IR_LEAF_ISA(ConjunctionType)
 
     Int getCaseCount() { return getOperandCount(); }
-    IRType* getCaseType(Int index) { return (IRType*) getOperand(index); }
+    IRType* getCaseType(Int index) { return (IRType*)getOperand(index); }
 };
 
 struct IRAttributedType : IRType
 {
     IR_LEAF_ISA(AttributedType)
 
-    IRType* getBaseType() { return (IRType*) getOperand(0); }
+    IRType* getBaseType() { return (IRType*)getOperand(0); }
     IRInst* getAttr() { return getOperand(1); }
 };
 
@@ -2031,14 +2020,14 @@ struct IRTypeType : IRType
     IR_LEAF_ISA(TypeType);
 };
 
-    /// Represents the IR type for an `IRRTTIObject`.
+/// Represents the IR type for an `IRRTTIObject`.
 struct IRRTTIType : IRType
 {
     IR_LEAF_ISA(RTTIType);
 };
 
-    /// Represents a handle to an RTTI object.
-    /// This is lowered as an integer number identifying a type.
+/// Represents a handle to an RTTI object.
+/// This is lowered as an integer number identifying a type.
 struct IRRTTIHandleType : IRType
 {
     IR_LEAF_ISA(RTTIHandleType);
@@ -2047,10 +2036,7 @@ struct IRRTTIHandleType : IRType
 struct IRAnyValueType : IRType
 {
     IR_LEAF_ISA(AnyValueType);
-    IRInst* getSize()
-    {
-        return getOperand(0);
-    }
+    IRInst* getSize() { return getOperand(0); }
 };
 
 struct IRWitnessTableTypeBase : IRType
@@ -2073,7 +2059,7 @@ struct IRBindExistentialsTypeBase : IRType
 {
     IR_PARENT_ISA(BindExistentialsTypeBase)
 
-    IRType* getBaseType() { return (IRType*) getOperand(0); }
+    IRType* getBaseType() { return (IRType*)getOperand(0); }
     UInt getExistentialArgCount() { return getOperandCount() - 1; }
     IRUse* getExistentialArgs() { return getOperands() + 1; }
     IRInst* getExistentialArg(UInt index) { return getExistentialArgs()[index].get(); }
@@ -2082,7 +2068,6 @@ struct IRBindExistentialsTypeBase : IRType
 struct IRBindExistentialsType : IRBindExistentialsTypeBase
 {
     IR_LEAF_ISA(BindExistentialsType)
-
 };
 
 struct IRBoundInterfaceType : IRBindExistentialsTypeBase
@@ -2090,7 +2075,7 @@ struct IRBoundInterfaceType : IRBindExistentialsTypeBase
     IR_LEAF_ISA(BoundInterfaceType)
 
     IRType* getInterfaceType() { return getBaseType(); }
-    IRType* getConcreteType() { return (IRType*) getExistentialArg(0); }
+    IRType* getConcreteType() { return (IRType*)getExistentialArg(0); }
     IRInst* getWitnessTable() { return getExistentialArg(1); }
 };
 
@@ -2103,10 +2088,7 @@ struct IRGlobalValueWithCode : IRInst
     // blocks of its definition.
     IRBlock* getFirstBlock() { return cast<IRBlock>(getFirstChild()); }
     IRBlock* getLastBlock() { return cast<IRBlock>(getLastChild()); }
-    IRInstList<IRBlock> getBlocks()
-    {
-        return IRInstList<IRBlock>(getChildren());
-    }
+    IRInstList<IRBlock> getBlocks() { return IRInstList<IRBlock>(getChildren()); }
 
     IR_PARENT_ISA(GlobalValueWithCode)
 };
@@ -2132,7 +2114,7 @@ struct IRGlobalValueWithParams : IRGlobalValueWithCode
 struct IRFunc : IRGlobalValueWithParams
 {
     // The type of the IR-level function
-    IRFuncType* getDataType() { return (IRFuncType*) IRInst::getDataType(); }
+    IRFuncType* getDataType() { return (IRFuncType*)IRInst::getDataType(); }
 
     // Convenience accessors for working with the
     // function's type.
@@ -2145,19 +2127,19 @@ struct IRFunc : IRGlobalValueWithParams
     IR_LEAF_ISA(Func)
 };
 
-    /// Adjust the type of an IR function based on its parameter list.
-    ///
-    /// The function type formed will use the types of the actual
-    /// parameters in the body of `func`, as well as the given `resultType`.
-    ///
+/// Adjust the type of an IR function based on its parameter list.
+///
+/// The function type formed will use the types of the actual
+/// parameters in the body of `func`, as well as the given `resultType`.
+///
 void fixUpFuncType(IRFunc* func, IRType* resultType);
 
-    /// Adjust the type of an IR function based on its parameter list.
-    ///
-    /// The function type formed will use the types of the actual
-    /// parameters in the body of `func`, as well as the result type
-    /// that is found on the current type of `func`.
-    ///
+/// Adjust the type of an IR function based on its parameter list.
+///
+/// The function type formed will use the types of the actual
+/// parameters in the body of `func`, as well as the result type
+/// that is found on the current type of `func`.
+///
 void fixUpFuncType(IRFunc* func);
 
 // A generic is akin to a function, but is conceptually executed
@@ -2238,10 +2220,14 @@ public:
 
     bool operator==(IRInstKey const& right) const
     {
-        if (hashCode != right.getHashCode()) return false;
-        if (getInst()->getOp() != right.getInst()->getOp()) return false;
-        if (getInst()->getFullType() != right.getInst()->getFullType()) return false;
-        if (getInst()->operandCount != right.getInst()->operandCount) return false;
+        if (hashCode != right.getHashCode())
+            return false;
+        if (getInst()->getOp() != right.getInst()->getOp())
+            return false;
+        if (getInst()->getFullType() != right.getInst()->getFullType())
+            return false;
+        if (getInst()->operandCount != right.getInst()->operandCount)
+            return false;
 
         auto argCount = getInst()->operandCount;
         auto leftArgs = getInst()->getOperands();
@@ -2269,22 +2255,13 @@ struct IRConstantKey
 struct IRDeduplicationContext
 {
 public:
-    IRDeduplicationContext(IRModule* module)
-    {
-        init(module);
-    }
+    IRDeduplicationContext(IRModule* module) { init(module); }
 
     void init(IRModule* module);
 
-    IRModule* getModule()
-    {
-        return m_module;
-    }
+    IRModule* getModule() { return m_module; }
 
-    Session* getSession()
-    {
-        return m_session;
-    }
+    Session* getSession() { return m_session; }
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
 
@@ -2298,18 +2275,18 @@ public:
 
     void _addGlobalNumberingEntry(IRInst* inst)
     {
-        m_globalValueNumberingMap.add(IRInstKey{ inst }, inst);
+        m_globalValueNumberingMap.add(IRInstKey{inst}, inst);
         m_instReplacementMap.remove(inst);
         tryHoistInst(inst);
     }
     void _removeGlobalNumberingEntry(IRInst* inst)
     {
         IRInst* value = nullptr;
-        if (m_globalValueNumberingMap.tryGetValue(IRInstKey{ inst }, value))
+        if (m_globalValueNumberingMap.tryGetValue(IRInstKey{inst}, value))
         {
             if (value == inst)
             {
-                m_globalValueNumberingMap.remove(IRInstKey{ inst });
+                m_globalValueNumberingMap.remove(IRInstKey{inst});
             }
         }
     }
@@ -2343,19 +2320,25 @@ struct IRAnalysis
 struct IRModule : RefObject
 {
 public:
-    enum 
+    enum
     {
-        kMemoryArenaBlockSize = 16 * 1024,           ///< Use 16k block size for memory arena
+        kMemoryArenaBlockSize = 16 * 1024, ///< Use 16k block size for memory arena
     };
 
     static RefPtr<IRModule> create(Session* session);
 
     SLANG_FORCE_INLINE Session* getSession() const { return m_session; }
-    SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst;  }
+    SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst; }
     SLANG_FORCE_INLINE MemoryArena& getMemoryArena() { return m_memoryArena; }
 
-    SLANG_FORCE_INLINE IBoxValue<SourceMap>* getObfuscatedSourceMap() const { return m_obfuscatedSourceMap; }
-    SLANG_FORCE_INLINE void setObfuscatedSourceMap(IBoxValue<SourceMap>* sourceMap) { m_obfuscatedSourceMap = sourceMap; }
+    SLANG_FORCE_INLINE IBoxValue<SourceMap>* getObfuscatedSourceMap() const
+    {
+        return m_obfuscatedSourceMap;
+    }
+    SLANG_FORCE_INLINE void setObfuscatedSourceMap(IBoxValue<SourceMap>* sourceMap)
+    {
+        m_obfuscatedSourceMap = sourceMap;
+    }
 
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
@@ -2367,87 +2350,81 @@ public:
         return nullptr;
     }
     IRDominatorTree* findOrCreateDominatorTree(IRGlobalValueWithCode* func);
-    void invalidateAnalysisForInst(IRGlobalValueWithCode* func) { m_mapInstToAnalysis.remove(func); }
+    void invalidateAnalysisForInst(IRGlobalValueWithCode* func)
+    {
+        m_mapInstToAnalysis.remove(func);
+    }
     void invalidateAllAnalysis() { m_mapInstToAnalysis.clear(); }
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
 
-        /// Create an empty instruction with the `op` opcode and space for
-        /// a number of operands given by `operandCount`.
-        ///
-        /// The memory allocation will be *at least* `minSizeInBytes`, so
-        /// if `sizeof(T)` is passed in the reuslt is guaranteed to be big
-        /// enough for a `T` instance. It is safe to leave `minSizeInBytes` as zero
-        /// for instructions where the only additional space they require is
-        /// for their operands (which is most of them).
-        ///
-        /// The returned instruction is "empty" in thes sense that the `IRUse`s
-        /// for its type and operands are *not* initialized. The caller takes
-        /// full responsibility for initializing those uses as needed.
-        ///
-        /// This function does not (and cannot) perform any kind of deduplication
-        /// or simplification. Clients take responsibility for only using this
-        /// operation when they genuinely want a fresh instruction to be allocated.
-        ///
-        /// Note: the `_` prefix indicates that this is a low-level operation that
-        /// must cient code should not be invoking. When in doubt, plase try to
-        /// operations in `IRBuilder` to emit an instruction whenever possible.
-        ///
-    IRInst* _allocateInst(
-        IROp    op,
-        Int     operandCount,
-        size_t  minSizeInBytes = 0);
+    /// Create an empty instruction with the `op` opcode and space for
+    /// a number of operands given by `operandCount`.
+    ///
+    /// The memory allocation will be *at least* `minSizeInBytes`, so
+    /// if `sizeof(T)` is passed in the reuslt is guaranteed to be big
+    /// enough for a `T` instance. It is safe to leave `minSizeInBytes` as zero
+    /// for instructions where the only additional space they require is
+    /// for their operands (which is most of them).
+    ///
+    /// The returned instruction is "empty" in thes sense that the `IRUse`s
+    /// for its type and operands are *not* initialized. The caller takes
+    /// full responsibility for initializing those uses as needed.
+    ///
+    /// This function does not (and cannot) perform any kind of deduplication
+    /// or simplification. Clients take responsibility for only using this
+    /// operation when they genuinely want a fresh instruction to be allocated.
+    ///
+    /// Note: the `_` prefix indicates that this is a low-level operation that
+    /// must cient code should not be invoking. When in doubt, plase try to
+    /// operations in `IRBuilder` to emit an instruction whenever possible.
+    ///
+    IRInst* _allocateInst(IROp op, Int operandCount, size_t minSizeInBytes = 0);
 
     template<typename T>
-    T* _allocateInst(
-        IROp    op,
-        Int     operandCount)
+    T* _allocateInst(IROp op, Int operandCount)
     {
-        return (T*) _allocateInst(op, operandCount, sizeof(T));
+        return (T*)_allocateInst(op, operandCount, sizeof(T));
     }
 
-    ContainerPool& getContainerPool()
-    {
-        return m_containerPool;
-    }
+    ContainerPool& getContainerPool() { return m_containerPool; }
+
 private:
     IRModule() = delete;
 
-        /// Ctor
+    /// Ctor
     IRModule(Session* session)
-        : m_session(session)
-        , m_memoryArena(kMemoryArenaBlockSize)
-        , m_deduplicationContext(this)
+        : m_session(session), m_memoryArena(kMemoryArenaBlockSize), m_deduplicationContext(this)
     {
     }
 
-        // The compilation session in use.
-    Session*    m_session = nullptr;
+    // The compilation session in use.
+    Session* m_session = nullptr;
 
-        /// The root IR instruction for the module.
-        ///
-        /// All other IR instructions that make up the state/contents of the module are
-        /// descendents of this instruction. Thus if we follow the chain of parent
-        /// instructions from an arbitrary IR instruction we expect to find the
-        /// `IRModuleInst` for the module the instruction belongs to, if any.
-        ///
+    /// The root IR instruction for the module.
+    ///
+    /// All other IR instructions that make up the state/contents of the module are
+    /// descendents of this instruction. Thus if we follow the chain of parent
+    /// instructions from an arbitrary IR instruction we expect to find the
+    /// `IRModuleInst` for the module the instruction belongs to, if any.
+    ///
     IRModuleInst* m_moduleInst = nullptr;
 
-        /// The memory arena from which all IR instructions (and any associated state) in this module are allocated.
+    /// The memory arena from which all IR instructions (and any associated state) in this module
+    /// are allocated.
     MemoryArena m_memoryArena;
 
-        /// A pool to allow reuse of common types of containers to reduce memory allocations
-        /// and rehashing.
+    /// A pool to allow reuse of common types of containers to reduce memory allocations
+    /// and rehashing.
     ContainerPool m_containerPool;
 
-        /// Shared contexts for constructing and deduplicating the IR.
+    /// Shared contexts for constructing and deduplicating the IR.
     mutable IRDeduplicationContext m_deduplicationContext;
 
-        /// Holds the obfuscated source map for this module if applicable
+    /// Holds the obfuscated source map for this module if applicable
     ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
 
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
-
 };
 
 
@@ -2550,18 +2527,18 @@ struct IRDumpOptions
     {
         enum Enum : Flags
         {
-            SourceLocations = 0x1,          ///< If set will output source locations
-            DumpDebugIds    = 0x2,          ///< If set *and* debug build will write ids
+            SourceLocations = 0x1, ///< If set will output source locations
+            DumpDebugIds = 0x2,    ///< If set *and* debug build will write ids
         };
     };
 
-        /// How much detail to include in dumped IR.
-        ///
-        /// Used with the `dumpIR` functions to determine
-        /// whether a completely faithful, but verbose, IR
-        /// dump is produced, or something simplified for ease
-        /// or reading.
-        ///
+    /// How much detail to include in dumped IR.
+    ///
+    /// Used with the `dumpIR` functions to determine
+    /// whether a completely faithful, but verbose, IR
+    /// dump is produced, or something simplified for ease
+    /// or reading.
+    ///
     enum class Mode
     {
         /// Produce a simplified IR dump.
@@ -2581,31 +2558,51 @@ struct IRDumpOptions
     };
 
     Mode mode = Mode::Simplified;
-        /// Flags to control output
-        /// Add Flag::SourceLocations to output source locations set on IR
-    Flags flags = 0;    
+    /// Flags to control output
+    /// Add Flag::SourceLocations to output source locations set on IR
+    Flags flags = 0;
 };
 
-void printSlangIRAssembly(StringBuilder& builder, IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager);
-String getSlangIRAssembly(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager);
+void printSlangIRAssembly(
+    StringBuilder& builder,
+    IRModule* module,
+    const IRDumpOptions& options,
+    SourceManager* sourceManager);
+String getSlangIRAssembly(
+    IRModule* module,
+    const IRDumpOptions& options,
+    SourceManager* sourceManager);
 
-void dumpIR(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer);
-void dumpIR(IRInst* globalVal, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer);
-void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, SourceManager* sourceManager, ISlangWriter* writer);
+void dumpIR(
+    IRModule* module,
+    const IRDumpOptions& options,
+    SourceManager* sourceManager,
+    ISlangWriter* writer);
+void dumpIR(
+    IRInst* globalVal,
+    const IRDumpOptions& options,
+    SourceManager* sourceManager,
+    ISlangWriter* writer);
+void dumpIR(
+    IRModule* module,
+    const IRDumpOptions& options,
+    char const* label,
+    SourceManager* sourceManager,
+    ISlangWriter* writer);
 
-    /// True if the op type can be handled 'nominally' meaning that pointer identity is applicable. 
+/// True if the op type can be handled 'nominally' meaning that pointer identity is applicable.
 bool isNominalOp(IROp op);
 
-    // True if the IR inst represents a builtin object (e.g. __BuiltinFloatingPointType).
+// True if the IR inst represents a builtin object (e.g. __BuiltinFloatingPointType).
 bool isBuiltin(IRInst* inst);
 
-    // Get the enclosuing function of an instruction.
+// Get the enclosuing function of an instruction.
 IRFunc* getParentFunc(IRInst* inst);
 
-    // Is child a descendent of inst
+// Is child a descendent of inst
 bool hasDescendent(IRInst* inst, IRInst* child);
 
-    // True if moving this inst will not change the semantics of the program
+// True if moving this inst will not change the semantics of the program
 bool isMovableInst(IRInst* inst);
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
@@ -2626,7 +2623,7 @@ static void traverseUsers(IRInst* inst, F f)
     {
         if (u->usedValue != inst)
             continue;
-        if(auto s = as<I>(u->getUser()))
+        if (auto s = as<I>(u->getUser()))
         {
             f(s);
         }
@@ -2661,8 +2658,8 @@ static A argType(std::function<R(A*)>);
 
 // Get the class type from a pointer to member function
 template<typename R, typename T>
-static T thisArg(R (T::*&&())());
-}
+static T thisArg(R (T::* && ())());
+} // namespace detail
 
 // A tool to "pattern match" an instruction against multiple cases
 // Use like:
@@ -2681,7 +2678,7 @@ R instMatch(IRInst* i, R def, F f, Fs... fs)
 {
     // Recursive case
     using P = decltype(detail::argType(std::function{std::declval<F>()}));
-    if(auto s = as<P>(i))
+    if (auto s = as<P>(i))
     {
         return f(s);
     }
@@ -2712,7 +2709,7 @@ void instMatch_(IRInst* i, F f, Fs... fs)
 {
     // Recursive case
     using P = decltype(detail::argType(std::function{std::declval<F>()}));
-    if(auto s = as<P>(i))
+    if (auto s = as<P>(i))
     {
         return f(s);
     }
@@ -2732,7 +2729,7 @@ template<typename R, typename T, typename F, typename... Fs>
 R* composeGetters(T* t, F f, Fs... fs)
 {
     using D = decltype(detail::thisArg(std::declval<F>));
-    if(D* d = as<D>(t))
+    if (D* d = as<D>(t))
     {
         auto* n = std::invoke(f, d);
         return composeGetters<R>(n, fs...);

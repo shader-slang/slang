@@ -23,7 +23,7 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
     }
 
     SLANG_ASSERT(UIndex(ss.getCount()) < std::numeric_limits<UInt32>::max());
-    const UInt32       nBuckets = UInt32(ss.getCount());
+    const UInt32 nBuckets = UInt32(ss.getCount());
     List<List<String>> initialBuckets;
     initialBuckets.setCount(nBuckets);
 
@@ -55,7 +55,8 @@ HashFindResult minimalPerfectHash(const List<String>& ss, HashParams& hashParams
     {
         initialBuckets[hash(s)].add(s);
     }
-    initialBuckets.stableSort([](const List<String>& a, const List<String>& b) { return a.getCount() > b.getCount(); });
+    initialBuckets.stableSort([](const List<String>& a, const List<String>& b)
+                              { return a.getCount() > b.getCount(); });
 
     // These are our outputs, the salts are calculated such that for all input
     // word, x, hash(x, salt[hash(x, 0)]) is unique
@@ -138,12 +139,16 @@ String perfectHashToEmbeddableCpp(
     StringBuilder sb;
     StringWriter writer(&sb, WriterFlags(0));
     WriterHelper w(&writer);
-    const auto line = [&](const char* l){
+    const auto line = [&](const char* l)
+    {
         w.put(l);
         w.put("\n");
     };
 
-    w.print("bool %s(const UnownedStringSlice& str, %s& value)\n", String(funcName).getBuffer(), String(valueType).getBuffer());
+    w.print(
+        "bool %s(const UnownedStringSlice& str, %s& value)\n",
+        String(funcName).getBuffer(),
+        String(valueType).getBuffer());
     line("{");
 
     w.print("    static const unsigned tableSalt[%d] = {\n", (int)hashParams.saltTable.getCount());
@@ -176,11 +181,7 @@ String perfectHashToEmbeddableCpp(
     {
         const auto& s = hashParams.destTable[i];
         const auto& v = values[i];
-        w.print(
-            "        {\"%s\", %s},\n",
-            s.getBuffer(),
-            v.getBuffer()
-        );
+        w.print("        {\"%s\", %s},\n", s.getBuffer(), v.getBuffer());
     }
     line("    };");
     line("");
@@ -211,4 +212,4 @@ String perfectHashToEmbeddableCpp(
     return sb.produceString();
 }
 
-}
+} // namespace Slang

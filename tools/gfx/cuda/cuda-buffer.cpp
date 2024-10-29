@@ -19,7 +19,10 @@ BufferResourceImpl::~BufferResourceImpl()
     }
 }
 
-uint64_t BufferResourceImpl::getBindlessHandle() { return (uint64_t)m_cudaMemory; }
+uint64_t BufferResourceImpl::getBindlessHandle()
+{
+    return (uint64_t)m_cudaMemory;
+}
 
 DeviceAddress BufferResourceImpl::getDeviceAddress()
 {

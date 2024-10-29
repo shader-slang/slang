@@ -1,14 +1,12 @@
 // slang-ir-specialize-resources.cpp
 #include "slang-ir-specialize-resources.h"
 
-#include "slang-ir-specialize-function-call.h"
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
-
 #include "slang-ir-clone.h"
-#include "slang-ir-ssa-simplification.h"
-
 #include "slang-ir-inline.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-specialize-function-call.h"
+#include "slang-ir-ssa-simplification.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -55,14 +53,14 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         // succeed), but eventually we should turn it off more
         // carefully.
         //
-        if(as<IRUniformParameterGroupType>(type))
+        if (as<IRUniformParameterGroupType>(type))
             return true;
 
         // For GL/Vulkan targets, we also need to specialize
         // any parameters that use structured or byte-addressed
         // buffers or images with format qualifiers.
         //
-        if( isKhronosTarget(targetRequest) )
+        if (isKhronosTarget(targetRequest))
         {
             if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
                 return isIllegalSPIRVParameterType(type, isArray);
@@ -85,9 +83,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
     }
 };
 
-bool specializeResourceParameters(
-    CodeGenContext* codeGenContext,
-    IRModule*       module)
+bool specializeResourceParameters(CodeGenContext* codeGenContext, IRModule* module)
 {
     bool result = false;
     ResourceParameterSpecializationCondition condition;
@@ -104,7 +100,9 @@ bool specializeResourceParameters(
 
 void inlineAllCallsOfFunction(IRFunc* func)
 {
-    traverseUses(func, [&](IRUse* use)
+    traverseUses(
+        func,
+        [&](IRUse* use)
         {
             auto user = use->getUser();
             auto call = as<IRCall>(user);
@@ -116,7 +114,7 @@ void inlineAllCallsOfFunction(IRFunc* func)
         });
 }
 
-    /// A pass to specialize resource-typed function outputs
+/// A pass to specialize resource-typed function outputs
 struct ResourceOutputSpecializationPass
 {
     // This pass is kind of a dual to `specializeResourceParameters()`.
@@ -127,8 +125,8 @@ struct ResourceOutputSpecializationPass
     // *call sites* for those functions based on the values that are output.
 
     CodeGenContext* codeGenContext;
-    TargetRequest*  targetRequest;
-    IRModule*       module;
+    TargetRequest* targetRequest;
+    IRModule* module;
 
     /// Functions that requires specialization but are currently unspecializable.
     HashSet<IRFunc*>* unspecializableFuncs;
@@ -143,10 +141,7 @@ struct ResourceOutputSpecializationPass
         Ok = 1,
     };
 
-    bool failedResult(SpecializeFuncResult val)
-    {
-        return val < SpecializeFuncResult::Ok;
-    }
+    bool failedResult(SpecializeFuncResult val) { return val < SpecializeFuncResult::Ok; }
 
     bool processModule()
     {
@@ -157,10 +152,10 @@ struct ResourceOutputSpecializationPass
         // (which must appear at the global level) and specializing
         // them if needed.
         //
-        for( auto inst : module->getGlobalInsts() )
+        for (auto inst : module->getGlobalInsts())
         {
             auto func = as<IRFunc>(inst);
-            if(!func)
+            if (!func)
                 continue;
 
             changed |= processFunc(func);
@@ -183,7 +178,7 @@ struct ResourceOutputSpecializationPass
         // If there are no suitable outputs, then we bail out and skip
         // the given function.
         //
-        if(!shouldSpecializeFunc(oldFunc))
+        if (!shouldSpecializeFunc(oldFunc))
             return false;
 
         // It is possible that we have a function that we *should* specialize
@@ -209,11 +204,7 @@ struct ResourceOutputSpecializationPass
         newFunc->setFullType(oldFunc->getFullType());
 
         IRCloneEnv cloneEnv;
-        cloneInstDecorationsAndChildren(
-            &cloneEnv,
-            module,
-            oldFunc,
-            newFunc);
+        cloneInstDecorationsAndChildren(&cloneEnv, module, oldFunc, newFunc);
 
         // At first `newFunc` is a direct clone of `oldFunc`, and thus doesn't
         // solve any of our problems. We will traverse `oldFunc` and specialize
@@ -222,7 +213,7 @@ struct ResourceOutputSpecializationPass
         //
         FuncInfo funcInfo;
         SpecializeFuncResult result = specializeFunc(newFunc, funcInfo);
-        if( failedResult(result) )
+        if (failedResult(result))
         {
             // Even though we deterined that we *should* specialize
             // this function, we were not able to because of some
@@ -250,9 +241,9 @@ struct ResourceOutputSpecializationPass
             // Otherwise don't add to 'unspecializableFuncs'
             //
             // Ensure oldFunc has uses, else, there is nothing to specialize here.
-            // If oldFunc has IRKeepAlive, this code should be assumed to have a 
+            // If oldFunc has IRKeepAlive, this code should be assumed to have a
             // "dynamic" resource value.
-            if(result == SpecializeFuncResult::ThisFuncFailed && oldFunc->hasUses())
+            if (result == SpecializeFuncResult::ThisFuncFailed && oldFunc->hasUses())
                 unspecializableFuncs->add(oldFunc);
             return false;
         }
@@ -270,7 +261,7 @@ struct ResourceOutputSpecializationPass
         // was applied to the function result.
         //
         IRType* newResultType = oldFunc->getResultType();
-        if( funcInfo.result.flavor != OutputInfo::Flavor::None )
+        if (funcInfo.result.flavor != OutputInfo::Flavor::None)
             newResultType = builder.getVoidType();
         fixUpFuncType(newFunc, newResultType);
 
@@ -294,7 +285,9 @@ struct ResourceOutputSpecializationPass
         // the aid of this pass.
         //
         List<IRCall*> calls;
-        traverseUses(oldFunc, [&](IRUse* use)
+        traverseUses(
+            oldFunc,
+            [&](IRUse* use)
             {
                 auto user = use->getUser();
                 auto call = as<IRCall>(user);
@@ -314,7 +307,7 @@ struct ResourceOutputSpecializationPass
         // fail, because specialization does not depend on what is passed *in* to each
         // call, but only on what gets passed *out*.
         //
-        for( auto oldCall : calls )
+        for (auto oldCall : calls)
         {
             specializeCallSite(oldCall, newFunc, funcInfo);
         }
@@ -322,7 +315,7 @@ struct ResourceOutputSpecializationPass
 
         // Since we can no longer fail and we are replacing all `Func` uses, 'KeepAlive'
         // can be removed from the oldFunc so DCE can it clean-up.
-        if(auto keepAliveDecoration = oldFunc->findDecoration<IRKeepAliveDecoration>())
+        if (auto keepAliveDecoration = oldFunc->findDecoration<IRKeepAliveDecoration>())
             keepAliveDecoration->removeAndDeallocate();
         return true;
     }
@@ -338,7 +331,7 @@ struct ResourceOutputSpecializationPass
         // We cannot specialize a function if we do not have
         // access to its definition.
         //
-        if(!func->isDefinition())
+        if (!func->isDefinition())
             return false;
         UnownedStringSlice def;
         IRInst* intrinsicInst;
@@ -349,21 +342,21 @@ struct ResourceOutputSpecializationPass
         // or `inout` parameters of a resource type, then we
         // should specialize the function.
         //
-        for( auto param : func->getParams() )
+        for (auto param : func->getParams())
         {
             auto paramType = param->getDataType();
             auto outType = as<IROutTypeBase>(paramType);
-            if(!outType)
+            if (!outType)
                 continue;
             auto valueType = outType->getValueType();
-            if(isResourceType(valueType))
+            if (isResourceType(valueType))
                 return true;
         }
 
         // If the result type of the function is a resource type,
         // then we should specialize the function.
         //
-        if( isResourceType(func->getResultType()) )
+        if (isResourceType(func->getResultType()))
         {
             return true;
         }
@@ -393,19 +386,19 @@ struct ResourceOutputSpecializationPass
     {
         type = unwrapArray(type);
 
-        if(as<IRResourceTypeBase>(type))
+        if (as<IRResourceTypeBase>(type))
             return true;
 
-        if(as<IRUniformParameterGroupType>(type))
+        if (as<IRUniformParameterGroupType>(type))
             return true;
 
-        if(as<IRHLSLStructuredBufferTypeBase>(type))
+        if (as<IRHLSLStructuredBufferTypeBase>(type))
             return true;
 
-        if(as<IRByteAddressBufferTypeBase>(type))
+        if (as<IRByteAddressBufferTypeBase>(type))
             return true;
 
-        if(as<IRSamplerStateTypeBase>(type))
+        if (as<IRSamplerStateTypeBase>(type))
             return true;
 
         if (as<IRRayQueryType>(type))
@@ -427,28 +420,28 @@ struct ResourceOutputSpecializationPass
     // `OutputInfo`, which will track information about one
     // (possible) function output that might need specialization.
 
-        /// Information about a possible output of a function (return value or output parameter)
+    /// Information about a possible output of a function (return value or output parameter)
     struct OutputInfo
     {
         enum class Flavor
         {
-            None,       ///< Not actually an output, or does not need specialization
+            None, ///< Not actually an output, or does not need specialization
 
-            Undefined,  ///< Needs specialization, but no suitable replacement value is known
+            Undefined, ///< Needs specialization, but no suitable replacement value is known
 
-            Replace,    ///< A replacement value should be computed based on `representative`
+            Replace, ///< A replacement value should be computed based on `representative`
         };
 
-            /// What sort of output value is this?
+        /// What sort of output value is this?
         Flavor flavor = Flavor::None;
 
-            /// For an output value with the `Replace` flavor, the representative value to clone.
+        /// For an output value with the `Replace` flavor, the representative value to clone.
         IRInst* representative = nullptr;
 
-            /// The index of the first new output parameter introduced for this output
+        /// The index of the first new output parameter introduced for this output
         Index firstNewOutputParamIndex = 0;
 
-            /// The number of new output parameters introduced for this output
+        /// The number of new output parameters introduced for this output
         Index newOutputParamCount = 0;
     };
 
@@ -456,8 +449,10 @@ struct ResourceOutputSpecializationPass
     // we will define a subtype specific to that case, even though
     // it does not currently need to track any additional data.
 
-        /// A representation of the return-value output of a function
-    struct ReturnValueInfo : OutputInfo {};
+    /// A representation of the return-value output of a function
+    struct ReturnValueInfo : OutputInfo
+    {
+    };
 
     // Parameters can be outputs, so they will also collect information
     // into `OutputInfo`s, but they also need additional information
@@ -465,10 +460,10 @@ struct ResourceOutputSpecializationPass
     // at call sites, and how we specialize the parameter affects
     // what we need to do with those arguments.
 
-        /// A representation of a parameter (possibly an output) of a function
+    /// A representation of a parameter (possibly an output) of a function
     struct ParamInfo : OutputInfo
     {
-            /// Represents what to do with an existing argument at a call site.
+        /// Represents what to do with an existing argument at a call site.
         enum class OldArgMode
         {
             Keep,   ///< Keep the argument as-is.
@@ -476,7 +471,7 @@ struct ResourceOutputSpecializationPass
             Deref,  ///< Dereference the argument; it used to be `inout` and is now just `in`
         };
 
-            /// What do do with existing arguments at call sites
+        /// What do do with existing arguments at call sites
         OldArgMode oldArgMode = OldArgMode::Keep;
     };
 
@@ -515,22 +510,22 @@ struct ResourceOutputSpecializationPass
     // In order to track new parameters like `i` above,
     // we introduce the `NewOutputParamInfo` type.
 
-        /// Represents a new output parameter introduced during speicalization
+    /// Represents a new output parameter introduced during speicalization
     struct NewOutputParamInfo
     {
-            /// The type of the new parameter's *value* (not the pointer type for an `out` parameter)
+        /// The type of the new parameter's *value* (not the pointer type for an `out` parameter)
         IRType* type;
     };
 
     // Finally, we can aggregate the types above to represent the
     // collected information about a function to be specialized.
 
-        /// Information about a function to be specialized
+    /// Information about a function to be specialized
     struct FuncInfo
     {
-        ReturnValueInfo             result;
-        List<ParamInfo>             oldParams;
-        List<NewOutputParamInfo>    newOutputParams;
+        ReturnValueInfo result;
+        List<ParamInfo> oldParams;
+        List<NewOutputParamInfo> newOutputParams;
     };
 
     // We now turn to the code that fills in the `FuncInfo` structure.
@@ -561,18 +556,20 @@ struct ResourceOutputSpecializationPass
         // and can be eliminated later.
         //
         IRParam* nextParam = nullptr;
-        for( IRParam* param = func->getFirstParam(); param; param = nextParam )
+        for (IRParam* param = func->getFirstParam(); param; param = nextParam)
         {
             nextParam = param->getNextParam();
 
             ParamInfo paramInfo;
             auto result = maybeSpecializeParam(param, paramInfo, outFuncInfo);
-            if (failedResult(result)) return result;
+            if (failedResult(result))
+                return result;
             outFuncInfo.oldParams.add(paramInfo);
         }
 
         auto result = maybeSpecializeResult(func, outFuncInfo.result, outFuncInfo);
-        if (failedResult(result)) return result;
+        if (failedResult(result))
+            return result;
 
         return SpecializeFuncResult::Ok;
     }
@@ -580,13 +577,16 @@ struct ResourceOutputSpecializationPass
     // The logic for specializing a function result (the return value) is
     // simpler than that for parameters, so we will look at it first.
 
-    SpecializeFuncResult maybeSpecializeResult(IRFunc* func, ReturnValueInfo& outResultInfo, FuncInfo& ioFuncInfo)
+    SpecializeFuncResult maybeSpecializeResult(
+        IRFunc* func,
+        ReturnValueInfo& outResultInfo,
+        FuncInfo& ioFuncInfo)
     {
         // If the result type of the function isn't a resource type,
         // then we don't need to specialize the result, and we
         // can succeed without doing anything.
         //
-        if( !isResourceType(func->getResultType()) )
+        if (!isResourceType(func->getResultType()))
             return SpecializeFuncResult::Ok;
 
         // Otherwise, we know that we will need to produce specialization
@@ -608,10 +608,10 @@ struct ResourceOutputSpecializationPass
         // Identifying the return sites is as simple as looking at
         // the terminator instructions of all blocks in the function.
         //
-        for( auto block : func->getBlocks() )
+        for (auto block : func->getBlocks())
         {
             auto returnInst = as<IRReturn>(block->getTerminator());
-            if(!returnInst)
+            if (!returnInst)
                 continue;
 
             auto value = returnInst->getVal();
@@ -637,7 +637,8 @@ struct ResourceOutputSpecializationPass
             // ones, then the specialization process will fail.
             //
             auto result = specializeOutputValue(value, outResultInfo, ioFuncInfo);
-            if (failedResult(result)) return result;
+            if (failedResult(result))
+                return result;
 
             // We will replace the `return <value>;` operation with
             // a simple `return;`, because the new specialized function
@@ -682,10 +683,14 @@ struct ResourceOutputSpecializationPass
         // We can now determine how many new output parameters, if any,
         // were introduced for the sake of this output.
         //
-        ioValueInfo.newOutputParamCount = ioFuncInfo.newOutputParams.getCount() - ioValueInfo.firstNewOutputParamIndex;
+        ioValueInfo.newOutputParamCount =
+            ioFuncInfo.newOutputParams.getCount() - ioValueInfo.firstNewOutputParamIndex;
     }
 
-    SpecializeFuncResult specializeOutputValue(IRInst* value, OutputInfo& ioOutputInfo, FuncInfo& ioFuncInfo)
+    SpecializeFuncResult specializeOutputValue(
+        IRInst* value,
+        OutputInfo& ioOutputInfo,
+        FuncInfo& ioFuncInfo)
     {
         // This function is called or each `value` that might be written
         // to the output identified by `ioOutputInfo`.
@@ -694,7 +699,7 @@ struct ResourceOutputSpecializationPass
         // the `representative` value will not have been set.
         //
         IRInst* representative = ioOutputInfo.representative;
-        if( !representative )
+        if (!representative)
         {
             // In that case, we will use the given `value` as the
             // representative value of this output.
@@ -712,7 +717,7 @@ struct ResourceOutputSpecializationPass
         // At the very least, we expect them to be operations with
         // the same opcode.
         //
-        if(value->getOp() != representative->getOp())
+        if (value->getOp() != representative->getOp())
             return SpecializeFuncResult::ThisFuncFailed;
 
         // Furthermore, only certain instructions are amenable to
@@ -726,7 +731,7 @@ struct ResourceOutputSpecializationPass
         // Each supported instruction opcode might introduce new
         // constraints on how `value` and `representative` must match.
         //
-        switch( value->getOp() )
+        switch (value->getOp())
         {
         default:
             // Any opcode we do not specifically enable should cause
@@ -741,21 +746,22 @@ struct ResourceOutputSpecializationPass
             // We do need to require that all values used for the
             // same output refer to the *same* global parameter.
             //
-            if(value != representative) return SpecializeFuncResult::ThisFuncFailed;
+            if (value != representative)
+                return SpecializeFuncResult::ThisFuncFailed;
             return SpecializeFuncResult::Ok;
 
-        // TODO: There are a number of additional cases that we should
-        // enable here.
-        //
-        // The most obvious new cases to support are:
-        //
-        // * Function parameters: if the output value is one of the
-        //   parameter of the function, then callers can just use the
-        //   same value they passed for the corresponding argument.
-        //
-        // * Array indexing: if the array itself is suitable to specialize,
-        //   then it should be possible to return the array index via
-        //   a new `out` parameter, and have the caller do the indexing.
+            // TODO: There are a number of additional cases that we should
+            // enable here.
+            //
+            // The most obvious new cases to support are:
+            //
+            // * Function parameters: if the output value is one of the
+            //   parameter of the function, then callers can just use the
+            //   same value they passed for the corresponding argument.
+            //
+            // * Array indexing: if the array itself is suitable to specialize,
+            //   then it should be possible to return the array index via
+            //   a new `out` parameter, and have the caller do the indexing.
         }
 
         // Note: the `FuncInfo` is currently being passed in in aid of the
@@ -787,7 +793,10 @@ struct ResourceOutputSpecializationPass
     // is more involved than that for the function `return` value, so we
     // put it off until we'd discussed the shared subroutines.
 
-    SpecializeFuncResult maybeSpecializeParam(IRParam* param, ParamInfo& outParamInfo, FuncInfo& ioFuncInfo)
+    SpecializeFuncResult maybeSpecializeParam(
+        IRParam* param,
+        ParamInfo& outParamInfo,
+        FuncInfo& ioFuncInfo)
     {
         // We only want to specialize in the case where the parameter
         // is an `out` or `inout` (both inherit from `IROutTypeBase`),
@@ -795,10 +804,10 @@ struct ResourceOutputSpecializationPass
         //
         auto paramType = param->getDataType();
         auto outType = as<IROutTypeBase>(paramType);
-        if(!outType)
+        if (!outType)
             return SpecializeFuncResult::Ok;
         auto valueType = outType->getValueType();
-        if(!isResourceType(valueType))
+        if (!isResourceType(valueType))
             return SpecializeFuncResult::Ok;
 
         prepareOutputValue(outParamInfo, ioFuncInfo);
@@ -822,7 +831,7 @@ struct ResourceOutputSpecializationPass
         //
         IRVar* newVar = bodyBuilder.emitVar(valueType);
 
-        if( as<IRInOutType>(outType) )
+        if (as<IRInOutType>(outType))
         {
             // If the parameter is an `inout` rather than just
             // an `out`, then we still need a parameter to
@@ -855,7 +864,7 @@ struct ResourceOutputSpecializationPass
             outParamInfo.oldArgMode = ParamInfo::OldArgMode::Ignore;
         }
 
-        // Before we change something (and likely break this 
+        // Before we change something (and likely break this
         // function if something fails after a change) we want
         // to identify all the places in the function
         // that `store` to the given output parameter.
@@ -891,55 +900,58 @@ struct ResourceOutputSpecializationPass
         // TODO: We should decide on an encoding for the behavior of
         // `out`/`inout` parameters that doesn't have as many "gotcha" cases.
         //
-        // We will also now recursively specialize all `IRCall` inside a 'parent function' 
+        // We will also now recursively specialize all `IRCall` inside a 'parent function'
         // when trying to specialize a 'parent function'. This is to ensure we do not remove
-        // a parameter SSA needs for SSA'ing a localVar into a globalVar (and DCE requires 
+        // a parameter SSA needs for SSA'ing a localVar into a globalVar (and DCE requires
         // to not DCE an important 'IRCall').
-        // 
+        //
         SpecializeFuncResult recursiveSpecializationResult = SpecializeFuncResult::Ok;
         List<IRStore*> stores;
-        traverseUses(param, [&](IRUse* use)
+        traverseUses(
+            param,
+            [&](IRUse* use)
             {
                 auto user = use->getUser();
                 switch (user->getOp())
                 {
                 case kIROp_Store:
-                {
-                    auto store = as<IRStore>(user);
-                    if (store->ptr.get() != param)
-                        return;
-                    stores.add(store);
-                    return;
-                }
-                case kIROp_Call:
-                {
-                    // This call may require an inline if it fails to specialize
-                    IRFunc* func = as<IRFunc>(as<IRCall>(user)->getCallee());
-                    if (!func)
-                        return;
-                    
-                    if(!processFunc(func))
                     {
-                        recursiveSpecializationResult = SpecializeFuncResult::OtherFuncFailed;
+                        auto store = as<IRStore>(user);
+                        if (store->ptr.get() != param)
+                            return;
+                        stores.add(store);
+                        return;
                     }
-                    return;
-                }
-                default:
-                    return;
+                case kIROp_Call:
+                    {
+                        // This call may require an inline if it fails to specialize
+                        IRFunc* func = as<IRFunc>(as<IRCall>(user)->getCallee());
+                        if (!func)
+                            return;
+
+                        if (!processFunc(func))
+                        {
+                            recursiveSpecializationResult = SpecializeFuncResult::OtherFuncFailed;
+                        }
+                        return;
+                    }
+                default: return;
                 };
             });
-        if (failedResult(recursiveSpecializationResult)) return recursiveSpecializationResult;
+        if (failedResult(recursiveSpecializationResult))
+            return recursiveSpecializationResult;
 
         // Having identified the places where a value is stored to
         // the output parameter, we iterate over those values to
         // ensure that they are all specializable and consistent
         // with one another.
         //
-        for(auto store : stores)
+        for (auto store : stores)
         {
             auto value = store->val.get();
             auto result = specializeOutputValue(value, outParamInfo, ioFuncInfo);
-            if (failedResult(result)) return result;
+            if (failedResult(result))
+                return result;
 
             // Given our assumptions about how `store`s to output
             // parameters are used, we can eliminate all these `store`s
@@ -961,10 +973,7 @@ struct ResourceOutputSpecializationPass
         return SpecializeFuncResult::Ok;
     }
 
-    void specializeCallSite(
-        IRCall*         oldCall,
-        IRFunc*         newFunc,
-        FuncInfo const& funcInfo)
+    void specializeCallSite(IRCall* oldCall, IRFunc* newFunc, FuncInfo const& funcInfo)
     {
         // Given an existing call, we will insert a new call right before
         // it and then remove the old one.
@@ -979,7 +988,7 @@ struct ResourceOutputSpecializationPass
         // these outputs.
         //
         List<IRVar*> newOutputVars;
-        for( auto const& newOutputParamInfo : funcInfo.newOutputParams )
+        for (auto const& newOutputParamInfo : funcInfo.newOutputParams)
         {
             auto newOutputVar = builder.emitVar(newOutputParamInfo.type);
             newOutputVars.add(newOutputVar);
@@ -991,7 +1000,7 @@ struct ResourceOutputSpecializationPass
         //
         List<IRInst*> newArgs;
         Index oldParamCounter = 0;
-        for( auto const& oldParamInfo : funcInfo.oldParams )
+        for (auto const& oldParamInfo : funcInfo.oldParams)
         {
             // We can grab the argument from the old call
             // that was being used for this parameter, but
@@ -1005,11 +1014,9 @@ struct ResourceOutputSpecializationPass
             // we will pass the argument, or data derived from it,
             // or nothing.
             //
-            switch( oldParamInfo.oldArgMode )
+            switch (oldParamInfo.oldArgMode)
             {
-            default:
-                SLANG_UNEXPECTED("unhandled case");
-                break;
+            default: SLANG_UNEXPECTED("unhandled case"); break;
 
             case ParamInfo::OldArgMode::Keep:
                 // If the parameter was not specialized away, then
@@ -1045,7 +1052,7 @@ struct ResourceOutputSpecializationPass
             // in the parameter list right after the location of the original
             // parameter.
             //
-            for( Index i = 0; i < oldParamInfo.newOutputParamCount; ++i )
+            for (Index i = 0; i < oldParamInfo.newOutputParamCount; ++i)
             {
                 newArgs.add(newOutputVars[oldParamInfo.firstNewOutputParamIndex + i]);
             }
@@ -1055,7 +1062,7 @@ struct ResourceOutputSpecializationPass
         // part of specialization; any parameters it introduces will go
         // over all the others.
         //
-        for( Index i = 0; i < funcInfo.result.newOutputParamCount; ++i )
+        for (Index i = 0; i < funcInfo.result.newOutputParamCount; ++i)
         {
             newArgs.add(newOutputVars[funcInfo.result.firstNewOutputParamIndex + i]);
         }
@@ -1080,14 +1087,14 @@ struct ResourceOutputSpecializationPass
         // the output parameters that have been specialized.
         //
         oldParamCounter = 0;
-        for( auto const& oldParamInfo : funcInfo.oldParams )
+        for (auto const& oldParamInfo : funcInfo.oldParams)
         {
             auto oldParamIndex = oldParamCounter++;
             auto oldArg = oldCall->getArg(oldParamIndex);
 
             // We skip over parameters that were not specialized.
             //
-            if(oldParamInfo.flavor == OutputInfo::Flavor::None)
+            if (oldParamInfo.flavor == OutputInfo::Flavor::None)
                 continue;
 
             if (oldParamInfo.flavor == OutputInfo::Flavor::Undefined)
@@ -1111,7 +1118,7 @@ struct ResourceOutputSpecializationPass
         // specialized, then we need to handle it much like the
         // parameter case above.
         //
-        if( funcInfo.result.flavor != OutputInfo::Flavor::None )
+        if (funcInfo.result.flavor != OutputInfo::Flavor::None)
         {
             // We materialize the expected function result into
             // an IR value in the context of the caller, and then
@@ -1162,7 +1169,7 @@ struct ResourceOutputSpecializationPass
         // value in the context of the caller.
         //
         auto representative = info.representative;
-        switch( representative->getOp() )
+        switch (representative->getOp())
         {
         default:
             // Because we only allow certain instructions when specializing
@@ -1178,8 +1185,8 @@ struct ResourceOutputSpecializationPass
             //
             return representative;
 
-        // TODO: As other cases are added to `specializeOutputValue()`, we will
-        // need to add corresponding cases here.
+            // TODO: As other cases are added to `specializeOutputValue()`, we will
+            // need to add corresponding cases here.
         }
     }
 
@@ -1202,17 +1209,17 @@ struct ResourceOutputSpecializationPass
     // would need to be worked out there is interaction with separate compilation,
     // but transforming them so that the function signatures are changed makes
     // the challenge more explicit and thus perhaps easier to tackle.
-
 };
 
 bool specializeResourceOutputs(
-    CodeGenContext*         codeGenContext,
-    IRModule*               module,
-    HashSet<IRFunc*>&          unspecializableFuncs)
+    CodeGenContext* codeGenContext,
+    IRModule* module,
+    HashSet<IRFunc*>& unspecializableFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
-    if(isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
-    {}
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
+    {
+    }
     else
     {
         // Don't bother applying this pass on targets that won't
@@ -1233,9 +1240,7 @@ bool specializeResourceOutputs(
     return pass.processModule();
 }
 
-bool specializeResourceUsage(
-    CodeGenContext* codeGenContext,
-    IRModule*       irModule)
+bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
 {
     bool result = false;
     // We apply two kinds of specialization to clean up resource value usage:
@@ -1263,8 +1268,7 @@ bool specializeResourceUsage(
             // for D3D targets that are not okay for Vulkan), we
             // pass down the target request along with the IR.
             //
-            changed |= specializeResourceOutputs(
-                codeGenContext, irModule, unspecializableFuncs);
+            changed |= specializeResourceOutputs(codeGenContext, irModule, unspecializableFuncs);
             changed |= specializeResourceParameters(codeGenContext, irModule);
 
             // After specialization of function outputs, we may find that there
@@ -1274,7 +1278,9 @@ bool specializeResourceUsage(
             //
             if (changed)
             {
-                simplifyIR(codeGenContext->getTargetProgram(), irModule,
+                simplifyIR(
+                    codeGenContext->getTargetProgram(),
+                    irModule,
                     IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
             }
             result |= changed;
@@ -1286,7 +1292,9 @@ bool specializeResourceUsage(
         for (auto func : unspecializableFuncs)
             inlineAllCallsOfFunction(func);
 
-        simplifyIR(codeGenContext->getTargetProgram(), irModule,
+        simplifyIR(
+            codeGenContext->getTargetProgram(),
+            irModule,
             IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
     return result;
@@ -1307,13 +1315,11 @@ bool isIllegalGLSLParameterType(IRType* type)
         switch (texType->getAccess())
         {
         case SLANG_RESOURCE_ACCESS_READ_WRITE:
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-            return true;
-        default:
-            break;
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: return true;
+        default:                                   break;
         }
     }
-    if(as<IRSubpassInputType>(type))
+    if (as<IRSubpassInputType>(type))
         return true;
     if (as<IRMeshOutputType>(type))
         return true;
