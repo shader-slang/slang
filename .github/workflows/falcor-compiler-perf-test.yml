@@ -4,19 +4,19 @@ name: Falcor Compiler Perf-Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENCE"
+      - "CONTRIBUTION.md"
+      - "README.md"
   pull_request:
-    branches: [ master ]
+    branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENCE"
+      - "CONTRIBUTION.md"
+      - "README.md"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -42,61 +42,61 @@ jobs:
       run:
         shell: bash
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: 'recursive'
-        fetch-depth: '0'
+      - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+          fetch-depth: "0"
 
-    - name: Setup
-      uses: ./.github/actions/common-setup
-      with:
-        os: ${{matrix.os}}
-        compiler: ${{matrix.compiler}}
-        platform: ${{matrix.platform}}
-        config: ${{matrix.config}}
-        build-llvm: true
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{matrix.os}}
+          compiler: ${{matrix.compiler}}
+          platform: ${{matrix.platform}}
+          config: ${{matrix.config}}
+          build-llvm: true
 
-    - name: Build Slang
-      run: |
-        cmake --preset default --fresh \
-          -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-          -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
-          -DSLANG_ENABLE_CUDA=1
-        cmake --workflow --preset "${{matrix.config}}"
+      - name: Build Slang
+        run: |
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
+            -DSLANG_ENABLE_CUDA=1
+          cmake --workflow --preset "${{matrix.config}}"
 
-    - uses: robinraju/release-downloader@v1.9
-      id: download
-      with:
-        # The source repository path.
-        # Expected format {owner}/{repo}
-        # Default: ${{ github.repository }}
-        repository: "shader-slang/falcor-compile-perf-test"
+      - uses: robinraju/release-downloader@v1.9
+        id: download
+        with:
+          # The source repository path.
+          # Expected format {owner}/{repo}
+          # Default: ${{ github.repository }}
+          repository: "shader-slang/falcor-compile-perf-test"
 
-        # A flag to set the download target as latest release
-        # The default value is 'false'
-        latest: true
+          # A flag to set the download target as latest release
+          # The default value is 'false'
+          latest: true
 
-        # The name of the file to download.
-        # Use this field only to specify filenames other than tarball or zipball, if any.
-        # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
-        fileName: "falcor_perf_test-*-win-64.zip"
+          # The name of the file to download.
+          # Use this field only to specify filenames other than tarball or zipball, if any.
+          # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
+          fileName: "falcor_perf_test-*-win-64.zip"
 
-        # Download the attached zipball (*.zip)
-        zipBall: true
+          # Download the attached zipball (*.zip)
+          zipBall: true
 
-        # Relative path under $GITHUB_WORKSPACE to place the downloaded file(s)
-        # It will create the target directory automatically if not present
-        # eg: out-file-path: "my-downloads" => It will create directory $GITHUB_WORKSPACE/my-downloads
-        out-file-path: "./falcor-perf-test"
+          # Relative path under $GITHUB_WORKSPACE to place the downloaded file(s)
+          # It will create the target directory automatically if not present
+          # eg: out-file-path: "my-downloads" => It will create directory $GITHUB_WORKSPACE/my-downloads
+          out-file-path: "./falcor-perf-test"
 
-        # Somehow there is a bug in this flag, the executable extracted is not runnable. We have to
-        # extract ourselves.
-        extract: false
+          # Somehow there is a bug in this flag, the executable extracted is not runnable. We have to
+          # extract ourselves.
+          extract: false
 
-    - name: run falcor-compiler-perf-test
-      shell: pwsh
-      run: |
-        $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
-        Expand-Archive $filename -DestinationPath .\falcor-perf-test
-        $env:PATH += ";.\build\${{matrix.config}}\bin";
-        .\falcor-perf-test\bin\Release\falcor_perftest.exe
+      - name: run falcor-compiler-perf-test
+        shell: pwsh
+        run: |
+          $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
+          Expand-Archive $filename -DestinationPath .\falcor-perf-test
+          $env:PATH += ";.\build\${{matrix.config}}\bin";
+          .\falcor-perf-test\bin\Release\falcor_perftest.exe

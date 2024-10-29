@@ -4,10 +4,10 @@ on:
   push:
     branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENCE"
+      - "CONTRIBUTION.md"
+      - "README.md"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -18,8 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: 'true'
-          fetch-depth: '0'
+          submodules: "true"
+          fetch-depth: "0"
       - name: Common setup
         uses: ./.github/actions/common-setup
         with:
@@ -34,8 +34,8 @@ jobs:
           cmake --workflow --preset release
       - uses: actions/checkout@v3
         with:
-          repository: 'shader-slang/MDL-SDK'
-          path: 'external/MDL-SDK'
+          repository: "shader-slang/MDL-SDK"
+          path: "external/MDL-SDK"
       - name: Run benchmark
         run: |
           cd tools/benchmark
@@ -44,8 +44,8 @@ jobs:
           python compile.py --samples 16 --target dxil
       - uses: actions/checkout@v3
         with:
-          repository: 'shader-slang/slang-material-modules-benchmark'
-          path: 'external/slang-material-modules-benchmark'
+          repository: "shader-slang/slang-material-modules-benchmark"
+          path: "external/slang-material-modules-benchmark"
           token: ${{ secrets.SLANG_MDL_BENCHMARK_RESULTS_PAT }}
       - name: Push results
         run: |

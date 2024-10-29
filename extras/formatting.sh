@@ -74,6 +74,7 @@ require_bin "gersemi" "0.17"
 require_bin "xargs" "3"
 require_bin "diff" "2"
 require_bin "clang-format" "17" "18"
+require_bin "prettier" "3"
 
 if [ "$missing_bin" ]; then
   exit 1
@@ -123,7 +124,18 @@ cpp_formatting() {
   fi
 }
 
-cmake_formatting
-cpp_formatting
+yaml_json_formatting() {
+  readarray -t files < <(git ls-files "*.yaml" "*.yml" "*.json" ':!external/**')
+
+  if [ "$check_only" -eq 1 ]; then
+    prettier --check "${files[@]}" || exit_code=1
+  else
+    prettier --write "${files[@]}" | grep -v '(unchanged)'
+  fi
+}
+
+# cmake_formatting
+# cpp_formatting
+yaml_json_formatting
 
 exit $exit_code
