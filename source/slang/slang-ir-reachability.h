@@ -11,7 +11,8 @@ struct ReachabilityContext
 {
     Dictionary<IRBlock*, int> mapBlockToId;
     List<IRBlock*> allBlocks;
-    List<UIntSet> sourceBlocks; // sourcesBlocks[i] stores the set of blocks from which block i can be reached.
+    List<UIntSet> sourceBlocks; // sourcesBlocks[i] stores the set of blocks from which block i can
+                                // be reached.
 
     ReachabilityContext() = default;
     ReachabilityContext(IRGlobalValueWithCode* code);
@@ -20,4 +21,4 @@ struct ReachabilityContext
     bool isBlockReachable(IRBlock* from, IRBlock* to);
 };
 
-}
+} // namespace Slang

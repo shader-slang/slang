@@ -1,6 +1,5 @@
 // perfect-hash-main.cpp
 
-#include <stdio.h>
 #include "../../source/compiler-core/slang-json-parser.h"
 #include "../../source/compiler-core/slang-json-value.h"
 #include "../../source/compiler-core/slang-lexer.h"
@@ -8,6 +7,8 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-secure-crt.h"
 #include "../../source/core/slang-string-util.h"
+
+#include <stdio.h>
 
 using namespace Slang;
 
@@ -17,10 +18,10 @@ static SlangResult parseJson(const char* inputPath, DiagnosticSink* sink, JSONLi
 
     String contents;
     SLANG_RETURN_ON_FAIL(File::readAllText(inputPath, contents));
-    PathInfo    pathInfo = PathInfo::makeFromString(inputPath);
+    PathInfo pathInfo = PathInfo::makeFromString(inputPath);
     SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, contents);
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
-    JSONLexer   lexer;
+    JSONLexer lexer;
     lexer.init(sourceView, sink);
     JSONParser parser;
     SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &listener, sink));
@@ -30,7 +31,10 @@ static SlangResult parseJson(const char* inputPath, DiagnosticSink* sink, JSONLi
 // Extract from a json value, the "opname" member from all the objects in the
 // "instructions" array.
 // Returns the empty list on failure
-static List<String> extractOpNames(UnownedStringSlice& error, const JSONValue& v, JSONContainer& container)
+static List<String> extractOpNames(
+    UnownedStringSlice& error,
+    const JSONValue& v,
+    JSONContainer& container)
 {
     List<String> opnames;
 
@@ -53,7 +57,8 @@ static List<String> extractOpNames(UnownedStringSlice& error, const JSONValue& v
     const auto instructions = container.findObjectValue(v, instKey);
     if (!instructions.isValid() || instructions.type != JSONValue::Type::Array)
     {
-        error = UnownedStringSlice("JSON parsing failed, no \"instructions\" member of array type\n");
+        error =
+            UnownedStringSlice("JSON parsing failed, no \"instructions\" member of array type\n");
         return {};
     }
     for (const auto& inst : container.getArray(instructions))
@@ -61,7 +66,8 @@ static List<String> extractOpNames(UnownedStringSlice& error, const JSONValue& v
         const auto opname = container.findObjectValue(inst, opnameKey);
         if (!opname.isValid() || opname.getKind() != JSONValue::Kind::String)
         {
-            error = UnownedStringSlice("JSON parsing failed, no \"opname\" member of string type for instruction\n");
+            error = UnownedStringSlice(
+                "JSON parsing failed, no \"opname\" member of string type for instruction\n");
             return {};
         }
         opnames.add(container.getString(opname));
@@ -102,7 +108,7 @@ int main(int argc, const char* const* argv)
     const char* const enumHeader = argv[5];
 
     RefPtr<FileWriter> writer(new FileWriter(stderr, WriterFlag::AutoFlush));
-    SourceManager      sourceManager;
+    SourceManager sourceManager;
     sourceManager.initialize(nullptr, nullptr);
     DiagnosticSink sink(&sourceManager, Lexer::sourceLocationLexer);
     sink.writer = writer;
@@ -113,7 +119,7 @@ int main(int argc, const char* const* argv)
     {
         // If source is a json file parse it.
         JSONContainer container(sink.getSourceManager());
-        JSONBuilder   builder(&container);
+        JSONBuilder builder(&container);
         if (SLANG_FAILED(parseJson(inPath, &sink, builder)))
         {
             sink.diagnoseRaw(Severity::Error, "Json parsing failed\n");
@@ -139,7 +145,13 @@ int main(int argc, const char* const* argv)
             opnames.add(w);
     }
 
-    if (SLANG_FAILED(writePerfectHashLookupCppFile(outCppPath, opnames, enumName, enumerantPrefix, enumHeader, &sink)))
+    if (SLANG_FAILED(writePerfectHashLookupCppFile(
+            outCppPath,
+            opnames,
+            enumName,
+            enumerantPrefix,
+            enumHeader,
+            &sink)))
         return -1;
 
     return 0;

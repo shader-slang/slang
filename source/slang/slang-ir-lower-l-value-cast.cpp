@@ -1,17 +1,15 @@
 #include "slang-ir-lower-l-value-cast.h"
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
-
 #include "slang-ir-clone.h"
-
+#include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
 
 struct LValueCastLoweringContext
-{    
+{
     void _addToWorkList(IRInst* inst)
     {
         if (!findOuterGeneric(inst) && !m_workList.contains(inst))
@@ -25,11 +23,8 @@ struct LValueCastLoweringContext
         switch (inst->getOp())
         {
         case kIROp_InOutImplicitCast:
-        case kIROp_OutImplicitCast:
-            _processLValueCast(inst);
-            break;
-        default:
-            break;
+        case kIROp_OutImplicitCast:   _processLValueCast(inst); break;
+        default:                      break;
         }
     }
 
@@ -51,9 +46,9 @@ struct LValueCastLoweringContext
         }
     }
 
-        /// True if the conversion from a to b, can be achieved 
-        /// via a reinterpret cast/bitcast
-        /// Only some targets can allow such conversions
+    /// True if the conversion from a to b, can be achieved
+    /// via a reinterpret cast/bitcast
+    /// Only some targets can allow such conversions
     bool _canReinterpretCast(IRType* a, IRType* b)
     {
         auto ptrA = as<IRPtrTypeBase>(a);
@@ -105,7 +100,7 @@ struct LValueCastLoweringContext
             const auto& infoB = BaseTypeInfo::getInfo(baseB);
 
             // We allow reinterpret case for int type conversions of the same bit size for now
-            if (infoA.sizeInBytes == infoB.sizeInBytes && 
+            if (infoA.sizeInBytes == infoB.sizeInBytes &&
                 (infoA.flags & infoB.flags & BaseTypeInfo::Flag::Integer))
             {
                 return true;
@@ -115,12 +110,11 @@ struct LValueCastLoweringContext
         return false;
     }
 
-        /// True if for HLSL the cast can be removed entirely
+    /// True if for HLSL the cast can be removed entirely
     bool _canRemoveCastForHLSL(IRType* a, IRType* b)
     {
-        // Currently _canReinterpret is exactly the same class of types that we can just ignore the cast totally 
-        // for HLSL
-        // If _canReinterpretCast changes, this will need to be updated
+        // Currently _canReinterpret is exactly the same class of types that we can just ignore the
+        // cast totally for HLSL If _canReinterpretCast changes, this will need to be updated
         return _canReinterpretCast(a, b);
     }
 
@@ -132,7 +126,7 @@ struct LValueCastLoweringContext
 
         switch (m_intermediateSourceLanguage)
         {
-            case SourceLanguage::HLSL:
+        case SourceLanguage::HLSL:
             {
                 // If the conversion can just be ignored for HLSL, just remove it
                 if (_canRemoveCastForHLSL(fromType, toType))
@@ -143,19 +137,19 @@ struct LValueCastLoweringContext
                 }
                 break;
             }
-            case SourceLanguage::C:
-            case SourceLanguage::CPP:
-            case SourceLanguage::CUDA:
+        case SourceLanguage::C:
+        case SourceLanguage::CPP:
+        case SourceLanguage::CUDA:
             {
-                // For languages with pointers, out parameter differences can *sometimes* just be sidestepped with 
-                // a reinterpret cast.
+                // For languages with pointers, out parameter differences can *sometimes* just be
+                // sidestepped with a reinterpret cast.
                 if (_canReinterpretCast(fromType, toType))
                 {
                     return;
                 }
                 break;
             }
-            default: break;
+        default: break;
         }
 
         // If we can't use the other mechanisms we are going to do a conversion
@@ -164,7 +158,7 @@ struct LValueCastLoweringContext
         //
         // With a special case for uses which are just out - where we don't need to
         // convert in.
-        
+
         // Okay we are going to replace the implicit casts with temporaries around call sites/uses.
         List<IRUse*> useSites;
         for (auto use = castInst->firstUse; use; use = use->nextUse)
@@ -176,7 +170,7 @@ struct LValueCastLoweringContext
         auto nameHintDecoration = castOperand->findDecoration<IRNameHintDecoration>();
 
         IRBuilder builder(m_module);
-        
+
         IRType* toValueType = as<IRPtrType>(toType)->getValueType();
         IRType* fromValueType = as<IRPtrType>(fromType)->getValueType();
 
@@ -194,12 +188,16 @@ struct LValueCastLoweringContext
             // If it's inout we convert via cast whats in the castOperand
             if (castInst->getOp() == kIROp_InOutImplicitCast && user->getOp() != kIROp_Store)
             {
-                builder.emitStore(tmpVar, builder.emitCast(toValueType, builder.emitLoad(castOperand)));
+                builder.emitStore(
+                    tmpVar,
+                    builder.emitCast(toValueType, builder.emitLoad(castOperand)));
             }
 
             // Convert the temporary back to the original location
             builder.setInsertAfter(user);
-            builder.emitStore(castOperand, builder.emitCast(fromValueType, builder.emitLoad(tmpVar)));
+            builder.emitStore(
+                castOperand,
+                builder.emitCast(fromValueType, builder.emitLoad(tmpVar)));
 
             // Go through all of the operands of the use inst relacing, with the temporary
             builder.replaceOperand(useSite, tmpVar);
@@ -209,9 +207,8 @@ struct LValueCastLoweringContext
         castInst->removeAndDeallocate();
     }
 
-    LValueCastLoweringContext(TargetProgram* target, IRModule* module):
-        m_targetProgram(target),
-        m_module(module)
+    LValueCastLoweringContext(TargetProgram* target, IRModule* module)
+        : m_targetProgram(target), m_module(module)
     {
         m_intermediateSourceLanguage = getIntermediateSourceLanguageForTarget(target);
     }
@@ -225,7 +222,7 @@ struct LValueCastLoweringContext
 };
 
 void lowerLValueCast(TargetProgram* target, IRModule* module)
-{ 
+{
     LValueCastLoweringContext context(target, module);
     context.processModule();
 }

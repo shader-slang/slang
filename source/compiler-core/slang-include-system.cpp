@@ -1,26 +1,31 @@
 // slang-include-system.cpp
 #include "slang-include-system.h"
 
+#include "../core/slang-file-system.h"
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
-
-#include "../core/slang-file-system.h"
-
-#include "slang-slice-allocator.h"
 #include "slang-artifact-impl.h"
 #include "slang-artifact-representation-impl.h"
+#include "slang-slice-allocator.h"
 
 namespace Slang
 {
 
-IncludeSystem::IncludeSystem(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager) :
-    m_searchDirectories(searchDirectories),
-    m_fileSystemExt(fileSystemExt),
-    m_sourceManager(sourceManager)
+IncludeSystem::IncludeSystem(
+    SearchDirectoryList* searchDirectories,
+    ISlangFileSystemExt* fileSystemExt,
+    SourceManager* sourceManager)
+    : m_searchDirectories(searchDirectories)
+    , m_fileSystemExt(fileSystemExt)
+    , m_sourceManager(sourceManager)
 {
 }
 
-SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& outPathInfo)
+SlangResult IncludeSystem::findFile(
+    SlangPathType fromPathType,
+    const String& fromPath,
+    const String& path,
+    PathInfo& outPathInfo)
 {
     String combinedPath;
 
@@ -33,7 +38,11 @@ SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fr
     {
         // Get relative path
         ComPtr<ISlangBlob> combinedPathBlob;
-        SLANG_RETURN_ON_FAIL(m_fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
+        SLANG_RETURN_ON_FAIL(m_fileSystemExt->calcCombinedPath(
+            fromPathType,
+            fromPath.begin(),
+            path.begin(),
+            combinedPathBlob.writeRef()));
         combinedPath = StringUtil::getString(combinedPathBlob);
         if (combinedPath.getLength() <= 0)
         {
@@ -51,7 +60,9 @@ SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fr
 
     // Get the uniqueIdentity
     ComPtr<ISlangBlob> uniqueIdentityBlob;
-    SLANG_RETURN_ON_FAIL(m_fileSystemExt->getFileUniqueIdentity(combinedPath.begin(), uniqueIdentityBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL(m_fileSystemExt->getFileUniqueIdentity(
+        combinedPath.begin(),
+        uniqueIdentityBlob.writeRef()));
 
     // If the rel path exists -> a uniqueIdentity MUST exists too
     String uniqueIdentity(StringUtil::getString(uniqueIdentityBlob));
@@ -68,14 +79,20 @@ SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fr
 String IncludeSystem::simplifyPath(const String& path)
 {
     ComPtr<ISlangBlob> simplifiedPath;
-    if (SLANG_FAILED(m_fileSystemExt->getPath(PathKind::Simplified, path.getBuffer(), simplifiedPath.writeRef())))
+    if (SLANG_FAILED(m_fileSystemExt->getPath(
+            PathKind::Simplified,
+            path.getBuffer(),
+            simplifiedPath.writeRef())))
     {
         return path;
     }
     return StringUtil::getString(simplifiedPath);
 }
 
-SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& pathIncludedFrom, PathInfo& outPathInfo)
+SlangResult IncludeSystem::findFile(
+    String const& pathToInclude,
+    String const& pathIncludedFrom,
+    PathInfo& outPathInfo)
 {
     outPathInfo.type = PathInfo::Type::Unknown;
 
@@ -84,12 +101,17 @@ SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& p
     {
         // We pass in "" as the from path, so ensure no from path is taken into account
         // and to allow easy identification that this is in effect absolute
-        return findFile(SLANG_PATH_TYPE_DIRECTORY, UnownedStringSlice::fromLiteral(""), pathToInclude, outPathInfo);
+        return findFile(
+            SLANG_PATH_TYPE_DIRECTORY,
+            UnownedStringSlice::fromLiteral(""),
+            pathToInclude,
+            outPathInfo);
     }
 
     // Try just relative to current path
     {
-        SlangResult res = findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, outPathInfo);
+        SlangResult res =
+            findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, outPathInfo);
         // It either succeeded or wasn't found, anything else is a failure passed back
         if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
         {
@@ -102,7 +124,8 @@ SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& p
     {
         for (auto& dir : sd->searchDirectories)
         {
-            SlangResult res = findFile(SLANG_PATH_TYPE_DIRECTORY, dir.path, pathToInclude, outPathInfo);
+            SlangResult res =
+                findFile(SLANG_PATH_TYPE_DIRECTORY, dir.path, pathToInclude, outPathInfo);
             if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
             {
                 return res;
@@ -113,7 +136,10 @@ SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& p
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>& outBlob, SourceFile*& outSourceFile)
+SlangResult IncludeSystem::loadFile(
+    const PathInfo& pathInfo,
+    ComPtr<ISlangBlob>& outBlob,
+    SourceFile*& outSourceFile)
 {
     if (m_sourceManager)
     {
@@ -124,7 +150,9 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
         if (!outSourceFile)
         {
             ComPtr<ISlangBlob> foundSourceBlob;
-            if (SLANG_FAILED(m_fileSystemExt->loadFile(pathInfo.foundPath.getBuffer(), foundSourceBlob.writeRef())))
+            if (SLANG_FAILED(m_fileSystemExt->loadFile(
+                    pathInfo.foundPath.getBuffer(),
+                    foundSourceBlob.writeRef())))
             {
                 return SLANG_E_CANNOT_OPEN;
             }
@@ -144,7 +172,9 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
             }
 
             ComPtr<ISlangBlob> foundSourceBlob;
-            if (SLANG_FAILED(m_fileSystemExt->loadFile(pathInfo.foundPath.getBuffer(), foundSourceBlob.writeRef())))
+            if (SLANG_FAILED(m_fileSystemExt->loadFile(
+                    pathInfo.foundPath.getBuffer(),
+                    foundSourceBlob.writeRef())))
             {
                 return SLANG_E_CANNOT_OPEN;
             }
@@ -163,7 +193,11 @@ SlangResult IncludeSystem::loadFile(const PathInfo& pathInfo, ComPtr<ISlangBlob>
     }
 }
 
-SlangResult IncludeSystem::findAndLoadFile(const String& pathToInclude, const String& pathIncludedFrom, PathInfo& outPathInfo, ComPtr<ISlangBlob>& outBlob)
+SlangResult IncludeSystem::findAndLoadFile(
+    const String& pathToInclude,
+    const String& pathIncludedFrom,
+    PathInfo& outPathInfo,
+    ComPtr<ISlangBlob>& outBlob)
 {
     SLANG_RETURN_ON_FAIL(findFile(pathToInclude, pathIncludedFrom, outPathInfo));
     SLANG_RETURN_ON_FAIL(loadFile(outPathInfo, outBlob));

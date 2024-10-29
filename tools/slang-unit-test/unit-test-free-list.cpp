@@ -1,14 +1,12 @@
 // unit-test-free-list.cpp
 
 #include "../../source/core/slang-free-list.h"
+#include "../../source/core/slang-list.h"
+#include "../../source/core/slang-random-generator.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-
-#include "../../source/core/slang-random-generator.h"
-#include "../../source/core/slang-list.h"
 
 using namespace Slang;
 
@@ -24,7 +22,7 @@ SLANG_UNIT_TEST(freeList)
     for (int i = 0; i < 1000; i++)
     {
         const int numAlloc = randGen.nextInt32UpTo(20);
-        
+
         for (int j = 0; j < numAlloc; j++)
         {
             int* ptr = (int*)freeList.allocate();
@@ -50,4 +48,3 @@ SLANG_UNIT_TEST(freeList)
         }
     }
 }
-

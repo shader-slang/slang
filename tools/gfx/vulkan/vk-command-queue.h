@@ -12,9 +12,7 @@ using namespace Slang;
 namespace vk
 {
 
-class CommandQueueImpl
-    : public ICommandQueue
-    , public ComObject
+class CommandQueueImpl : public ICommandQueue, public ComObject
 {
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
@@ -44,8 +42,8 @@ public:
 
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
-        GfxCount fenceCount, IFence** fences, uint64_t* waitValues) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    waitForFenceValuesOnDevice(GfxCount fenceCount, IFence** fences, uint64_t* waitValues) override;
 
     void queueSubmitImpl(
         uint32_t count,

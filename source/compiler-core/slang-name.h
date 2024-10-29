@@ -7,7 +7,8 @@
 
 #include "../core/slang-basic.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // The `Name` type is used to represent the name of a type, variable, etc.
 //
@@ -36,7 +37,7 @@ public:
 // (e.g., so that it can be printed).
 String getText(Name* name);
 
-/// Get the text as unowned string slice 
+/// Get the text as unowned string slice
 UnownedStringSlice getUnownedStringSliceText(Name* name);
 
 // Get a name as a C style string, or nullptr if name is nullptr
@@ -50,7 +51,7 @@ const char* getCstr(Name* name);
 struct RootNamePool
 {
     // The mapping from text strings to the corresponding name.
-    Dictionary<String, RefPtr<Name> > names;
+    Dictionary<String, RefPtr<Name>> names;
 };
 
 // A `NamePool` is effectively a way of storing a subset of the
@@ -74,10 +75,7 @@ struct NamePool
     // If the name does not exist, return nullptr
     Name* tryGetName(String const& text);
     // Set the parent name pool to use for lookup
-    void setRootNamePool(RootNamePool* rootNamePool)
-    {
-        this->rootPool = rootNamePool;
-    }
+    void setRootNamePool(RootNamePool* rootNamePool) { this->rootPool = rootNamePool; }
 
     //
 

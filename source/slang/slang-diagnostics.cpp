@@ -1,33 +1,33 @@
 // slang-diagnostics.cpp
 #include "slang-diagnostics.h"
 
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-char-util.h"
-
-#include "../compiler-core/slang-name.h"
 #include "../compiler-core/slang-core-diagnostics.h"
+#include "../compiler-core/slang-name.h"
+#include "../core/slang-char-util.h"
+#include "../core/slang-dictionary.h"
+#include "../core/slang-memory-arena.h"
+#include "../core/slang-string-util.h"
 namespace Slang
 {
 
 namespace Diagnostics
 {
-#define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, #name, messageFormat };
+#define DIAGNOSTIC(id, severity, name, messageFormat) \
+    const DiagnosticInfo name = {id, Severity::severity, #name, messageFormat};
 #include "slang-diagnostic-defs.h"
 #undef DIAGNOSTIC
-}
+} // namespace Diagnostics
 
-static const DiagnosticInfo* const kCompilerDiagnostics[] =
-{
-#define DIAGNOSTIC(id, severity, name, messageFormat) &Diagnostics::name, 
+static const DiagnosticInfo* const kCompilerDiagnostics[] = {
+#define DIAGNOSTIC(id, severity, name, messageFormat) &Diagnostics::name,
 #include "slang-diagnostic-defs.h"
 #undef DIAGNOSTIC
 };
 
 static DiagnosticsLookup* _newDiagnosticsLookup()
 {
-    DiagnosticsLookup* lookup = new DiagnosticsLookup(kCompilerDiagnostics, SLANG_COUNT_OF(kCompilerDiagnostics));
+    DiagnosticsLookup* lookup =
+        new DiagnosticsLookup(kCompilerDiagnostics, SLANG_COUNT_OF(kCompilerDiagnostics));
 
     // Add all the diagnostics in 'core'
     DiagnosticsLookup* coreLookup = getCoreDiagnosticsLookup();
@@ -61,14 +61,19 @@ const DiagnosticsLookup* getDiagnosticsLookup()
 }
 
 
-SlangResult overrideDiagnostic(DiagnosticSink* sink, DiagnosticSink* outDiagnostic, const UnownedStringSlice& identifier, Severity originalSeverity, Severity overrideSeverity)
+SlangResult overrideDiagnostic(
+    DiagnosticSink* sink,
+    DiagnosticSink* outDiagnostic,
+    const UnownedStringSlice& identifier,
+    Severity originalSeverity,
+    Severity overrideSeverity)
 {
     auto diagnosticsLookup = getDiagnosticsLookup();
 
     const DiagnosticInfo* diagnostic = nullptr;
     Int diagnosticId = -1;
 
-    // If it starts with a digit we assume it a number 
+    // If it starts with a digit we assume it a number
     if (identifier.getLength() > 0 && (CharUtil::isDigit(identifier[0]) || identifier[0] == '-'))
     {
         if (SLANG_FAILED(StringUtil::parseInt(identifier, diagnosticId)))
@@ -95,7 +100,8 @@ SlangResult overrideDiagnostic(DiagnosticSink* sink, DiagnosticSink* outDiagnost
     }
 
     // If we are only allowing certain original severities check it's the right type
-    if (diagnostic && originalSeverity != Severity::Disable && diagnostic->severity != originalSeverity)
+    if (diagnostic && originalSeverity != Severity::Disable &&
+        diagnostic->severity != originalSeverity)
     {
         // Strictly speaking the diagnostic name is known, but it's not the right severity
         // to be converted from, so it is an 'unknown name' in the context of severity...
@@ -110,14 +116,20 @@ SlangResult overrideDiagnostic(DiagnosticSink* sink, DiagnosticSink* outDiagnost
     return SLANG_OK;
 }
 
-SlangResult overrideDiagnostics(DiagnosticSink* sink, DiagnosticSink* outDiagnostic, const UnownedStringSlice& identifierList, Severity originalSeverity, Severity overrideSeverity)
+SlangResult overrideDiagnostics(
+    DiagnosticSink* sink,
+    DiagnosticSink* outDiagnostic,
+    const UnownedStringSlice& identifierList,
+    Severity originalSeverity,
+    Severity overrideSeverity)
 {
     List<UnownedStringSlice> slices;
     StringUtil::split(identifierList, ',', slices);
 
     for (const auto& slice : slices)
     {
-        SLANG_RETURN_ON_FAIL(overrideDiagnostic(sink, outDiagnostic, slice, originalSeverity, overrideSeverity));
+        SLANG_RETURN_ON_FAIL(
+            overrideDiagnostic(sink, outDiagnostic, slice, originalSeverity, overrideSeverity));
     }
     return SLANG_OK;
 }

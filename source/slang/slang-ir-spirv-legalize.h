@@ -1,8 +1,8 @@
 // slang-ir-spirv-legalize.h
 #pragma once
 #include "../core/slang-basic.h"
-#include "slang-ir-spirv-snippet.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-spirv-snippet.h"
 
 namespace Slang
 {
@@ -20,7 +20,9 @@ struct SPIRVEmitSharedContext
     TargetProgram* m_targetProgram;
     Dictionary<IRTargetIntrinsicDecoration*, RefPtr<SpvSnippet>> m_parsedSpvSnippets;
 
-    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints; // The entry-points that directly or transitively reference this global inst.
+    Dictionary<IRInst*, HashSet<IRFunc*>>
+        m_referencingEntryPoints; // The entry-points that directly or transitively reference this
+                                  // global inst.
 
     DiagnosticSink* m_sink;
     const SPIRVCoreGrammarInfo* m_grammarInfo;
@@ -29,18 +31,9 @@ struct SPIRVEmitSharedContext
     unsigned int m_spvVersion = 0x10000;
     bool m_useDemoteToHelperInvocationExtension = false;
 
-    bool isSpirv14OrLater()
-    {
-        return m_spvVersion >= 0x10400;
-    }
-    bool isSpirv15OrLater()
-    {
-        return m_spvVersion >= 0x10500;
-    }
-    bool isSpirv16OrLater()
-    {
-        return m_spvVersion >= 0x10600;
-    }
+    bool isSpirv14OrLater() { return m_spvVersion >= 0x10400; }
+    bool isSpirv15OrLater() { return m_spvVersion >= 0x10500; }
+    bool isSpirv16OrLater() { return m_spvVersion >= 0x10600; }
 
     void requireSpirvVersion(unsigned int version)
     {
@@ -48,11 +41,11 @@ struct SPIRVEmitSharedContext
     }
 
     SPIRVEmitSharedContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
-        : m_irModule(module),
-          m_targetProgram(program),
-          m_targetRequest(program->getTargetReq()),
-          m_sink(sink),
-          m_grammarInfo(&module->getSession()->getSPIRVCoreGrammarInfo())
+        : m_irModule(module)
+        , m_targetProgram(program)
+        , m_targetRequest(program->getTargetReq())
+        , m_sink(sink)
+        , m_grammarInfo(&module->getSession()->getSPIRVCoreGrammarInfo())
     {
         IRBuilder builder(module);
         builder.setInsertInto(module);
@@ -63,8 +56,8 @@ struct SPIRVEmitSharedContext
 
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
-    IRModule*               module,
+    IRModule* module,
     const List<IRFunc*>& entryPoints,
-    CodeGenContext*         codeGenContext);
+    CodeGenContext* codeGenContext);
 
-}
+} // namespace Slang

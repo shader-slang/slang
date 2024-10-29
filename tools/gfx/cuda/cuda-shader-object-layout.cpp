@@ -9,7 +9,10 @@ using namespace Slang;
 namespace cuda
 {
 
-ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::ISession* session, slang::TypeLayoutReflection* layout)
+ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(
+    RendererBase* renderer,
+    slang::ISession* session,
+    slang::TypeLayoutReflection* layout)
 {
     m_elementTypeLayout = _unwrapParameterGroups(layout, m_containerType);
 
@@ -41,7 +44,8 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::IS
         // linear search over the descriptor ranges for a specific binding range.
         //
         auto uniformOffset = m_elementTypeLayout->getDescriptorSetDescriptorRangeIndexOffset(
-            descriptorSetIndex, rangeIndexInDescriptorSet);
+            descriptorSetIndex,
+            rangeIndexInDescriptorSet);
 
         Index baseIndex = 0;
         Index subObjectIndex = 0;
@@ -79,7 +83,7 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::IS
         bindingRangeInfo.uniformOffset = uniformOffset;
         bindingRangeInfo.subObjectIndex = subObjectIndex;
         bindingRangeInfo.isSpecializable = m_elementTypeLayout->isBindingRangeSpecializable(r);
-                m_bindingRanges.add(bindingRangeInfo);
+        m_bindingRanges.add(bindingRangeInfo);
     }
 
     SlangInt subObjectRangeCount = m_elementTypeLayout->getSubObjectRangeCount();
@@ -100,8 +104,10 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::IS
         RefPtr<ShaderObjectLayoutImpl> subObjectLayout;
         if (slangBindingType != slang::BindingType::ExistentialValue)
         {
-            subObjectLayout =
-                new ShaderObjectLayoutImpl(renderer, session, slangLeafTypeLayout->getElementTypeLayout());
+            subObjectLayout = new ShaderObjectLayoutImpl(
+                renderer,
+                session,
+                slangLeafTypeLayout->getElementTypeLayout());
         }
 
         SubObjectRangeInfo subObjectRange;
@@ -111,14 +117,34 @@ ShaderObjectLayoutImpl::ShaderObjectLayoutImpl(RendererBase* renderer, slang::IS
     }
 }
 
-Index ShaderObjectLayoutImpl::getResourceCount() const { return m_resourceCount; }
-Index ShaderObjectLayoutImpl::getSubObjectCount() const { return m_subObjectCount; }
-List<SubObjectRangeInfo>& ShaderObjectLayoutImpl::getSubObjectRanges() { return subObjectRanges; }
-BindingRangeInfo ShaderObjectLayoutImpl::getBindingRange(Index index) { return m_bindingRanges[index]; }
-Index ShaderObjectLayoutImpl::getBindingRangeCount() const { return m_bindingRanges.getCount(); }
+Index ShaderObjectLayoutImpl::getResourceCount() const
+{
+    return m_resourceCount;
+}
+Index ShaderObjectLayoutImpl::getSubObjectCount() const
+{
+    return m_subObjectCount;
+}
+List<SubObjectRangeInfo>& ShaderObjectLayoutImpl::getSubObjectRanges()
+{
+    return subObjectRanges;
+}
+BindingRangeInfo ShaderObjectLayoutImpl::getBindingRange(Index index)
+{
+    return m_bindingRanges[index];
+}
+Index ShaderObjectLayoutImpl::getBindingRangeCount() const
+{
+    return m_bindingRanges.getCount();
+}
 
-RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(RendererBase* renderer, slang::ProgramLayout* inProgramLayout)
-    : ShaderObjectLayoutImpl(renderer, inProgramLayout->getSession(), inProgramLayout->getGlobalParamsTypeLayout())
+RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(
+    RendererBase* renderer,
+    slang::ProgramLayout* inProgramLayout)
+    : ShaderObjectLayoutImpl(
+          renderer,
+          inProgramLayout->getSession(),
+          inProgramLayout->getGlobalParamsTypeLayout())
     , programLayout(inProgramLayout)
 {
     for (UInt i = 0; i < programLayout->getEntryPointCount(); i++)
@@ -128,7 +154,6 @@ RootShaderObjectLayoutImpl::RootShaderObjectLayoutImpl(RendererBase* renderer, s
             programLayout->getSession(),
             programLayout->getEntryPointByIndex(i)->getTypeLayout()));
     }
-
 }
 
 int RootShaderObjectLayoutImpl::getKernelIndex(UnownedStringSlice kernelName)

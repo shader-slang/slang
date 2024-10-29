@@ -1,19 +1,25 @@
 #include "slang-rtti-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncs Impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncs Impls
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 struct ListFuncs
 {
-    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void ctorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
 
         // We don't care about the element type, as we can just initialize them all as List<Byte>
-        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+        // const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
         typedef List<Byte> Type;
 
         Type* dst = (Type*)inDst;
@@ -24,7 +30,12 @@ struct ListFuncs
         }
     }
 
-    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    static void copyArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        const void* inSrc,
+        Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
@@ -34,7 +45,8 @@ struct ListFuncs
         auto typeFuncs = typeMap->getFuncsForType(elementType);
         SLANG_ASSERT(typeFuncs.isValid());
 
-        // We need a type that we can get information from the list from - List<Byte> gives us the functions we need.
+        // We need a type that we can get information from the list from - List<Byte> gives us the
+        // functions we need.
         typedef List<Byte> Type;
 
         Type* dst = (Type*)inDst;
@@ -71,13 +83,22 @@ struct ListFuncs
             }
             else
             {
-                typeFuncs.copyArray(typeMap, elementType, dstList.getBuffer(), srcList.getBuffer(), srcCount);
+                typeFuncs.copyArray(
+                    typeMap,
+                    elementType,
+                    dstList.getBuffer(),
+                    srcList.getBuffer(),
+                    srcCount);
                 dstList.unsafeShrinkToCount(srcCount);
             }
         }
     }
 
-    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void dtorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
@@ -118,14 +139,18 @@ struct ListFuncs
 
 struct StructFuncs
 {
-    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void ctorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
 
         // We don't care about the element type, as we can just initialize them all as List<Byte>
-        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+        // const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
         typedef List<Byte> Type;
 
         Type* dst = (Type*)inDst;
@@ -135,7 +160,12 @@ struct StructFuncs
             new (dst + i) Type;
         }
     }
-    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    static void copyArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        const void* inSrc,
+        Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
@@ -145,7 +175,8 @@ struct StructFuncs
         auto typeFuncs = typeMap->getFuncsForType(elementType);
         SLANG_ASSERT(typeFuncs.isValid());
 
-        // We need a type that we can get information from the list from - List<Byte> gives us the functions we need.
+        // We need a type that we can get information from the list from - List<Byte> gives us the
+        // functions we need.
         typedef List<Byte> Type;
 
         Type* dst = (Type*)inDst;
@@ -182,13 +213,22 @@ struct StructFuncs
             }
             else
             {
-                typeFuncs.copyArray(typeMap, elementType, dstList.getBuffer(), srcList.getBuffer(), srcCount);
+                typeFuncs.copyArray(
+                    typeMap,
+                    elementType,
+                    dstList.getBuffer(),
+                    srcList.getBuffer(),
+                    srcCount);
                 dstList.unsafeShrinkToCount(srcCount);
             }
         }
     }
 
-    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void dtorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        Index count)
     {
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
@@ -229,17 +269,30 @@ struct StructFuncs
 
 struct StructArrayFuncs
 {
-    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void ctorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        Index count)
     {
         return RttiUtil::ctorArray(typeMap, rttiInfo, inDst, rttiInfo->m_size, count);
     }
 
-    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    static void copyArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        const void* inSrc,
+        Index count)
     {
         return RttiUtil::copyArray(typeMap, rttiInfo, inDst, inSrc, rttiInfo->m_size, count);
     }
 
-    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, Index count)
+    static void dtorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        Index count)
     {
         return RttiUtil::dtorArray(typeMap, rttiInfo, inDst, rttiInfo->m_size, count);
     }
@@ -256,33 +309,34 @@ struct StructArrayFuncs
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo) 
+RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
 {
     if (rttiInfo->isBuiltIn())
     {
         switch (rttiInfo->m_size)
         {
-            case 1: return GetRttiTypeFuncsForZeroPod<uint8_t>::getFuncs();
-            case 2: return GetRttiTypeFuncsForZeroPod<uint16_t>::getFuncs();
-            case 4: return GetRttiTypeFuncsForZeroPod<uint32_t>::getFuncs();
-            case 8: return GetRttiTypeFuncsForZeroPod<uint64_t>::getFuncs();
+        case 1: return GetRttiTypeFuncsForZeroPod<uint8_t>::getFuncs();
+        case 2: return GetRttiTypeFuncsForZeroPod<uint16_t>::getFuncs();
+        case 4: return GetRttiTypeFuncsForZeroPod<uint32_t>::getFuncs();
+        case 8: return GetRttiTypeFuncsForZeroPod<uint64_t>::getFuncs();
         }
         return RttiTypeFuncs::makeEmpty();
     }
 
     switch (rttiInfo->m_kind)
     {
-        case RttiInfo::Kind::String:                return GetRttiTypeFuncs<String>::getFuncs();
-        case RttiInfo::Kind::UnownedStringSlice:    return GetRttiTypeFuncs<UnownedStringSlice>::getFuncs();
-        case RttiInfo::Kind::List:                  return ListFuncs::getFuncs();
-        case RttiInfo::Kind::Struct:                return StructArrayFuncs::getFuncs();
-        default: break;
+    case RttiInfo::Kind::String: return GetRttiTypeFuncs<String>::getFuncs();
+    case RttiInfo::Kind::UnownedStringSlice:
+        return GetRttiTypeFuncs<UnownedStringSlice>::getFuncs();
+    case RttiInfo::Kind::List:   return ListFuncs::getFuncs();
+    case RttiInfo::Kind::Struct: return StructArrayFuncs::getFuncs();
+    default:                     break;
     }
 
     return RttiTypeFuncs::makeEmpty();
 }
 
-/* static */SlangResult RttiUtil::setInt(int64_t value, const RttiInfo* rttiInfo, void* dst)
+/* static */ SlangResult RttiUtil::setInt(int64_t value, const RttiInfo* rttiInfo, void* dst)
 {
     SLANG_ASSERT(rttiInfo->isIntegral());
 
@@ -290,33 +344,33 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     // Passing in rttiInfo allows for other more complex types to be econverted
     switch (rttiInfo->m_kind)
     {
-        case RttiInfo::Kind::I32:   *(int32_t*)dst = int32_t(value); break;
-        case RttiInfo::Kind::U32:   *(uint32_t*)dst = uint32_t(value); break;
-        case RttiInfo::Kind::I64:   *(int64_t*)dst = int64_t(value); break;
-        case RttiInfo::Kind::U64:   *(uint64_t*)dst = uint64_t(value); break;
-        default: return SLANG_FAIL;
+    case RttiInfo::Kind::I32: *(int32_t*)dst = int32_t(value); break;
+    case RttiInfo::Kind::U32: *(uint32_t*)dst = uint32_t(value); break;
+    case RttiInfo::Kind::I64: *(int64_t*)dst = int64_t(value); break;
+    case RttiInfo::Kind::U64: *(uint64_t*)dst = uint64_t(value); break;
+    default:                  return SLANG_FAIL;
     }
     return SLANG_OK;
 }
 
-/* static */int64_t RttiUtil::getInt64(const RttiInfo* rttiInfo, const void* src)
+/* static */ int64_t RttiUtil::getInt64(const RttiInfo* rttiInfo, const void* src)
 {
     SLANG_ASSERT(rttiInfo->isIntegral());
 
     switch (rttiInfo->m_kind)
     {
-        case RttiInfo::Kind::I32:   return *(const int32_t*)src;
-        case RttiInfo::Kind::U32:   return *(const uint32_t*)src;
-        case RttiInfo::Kind::I64:   return *(const int64_t*)src;
-        case RttiInfo::Kind::U64:   return *(const uint64_t*)src;
-        default: break;
+    case RttiInfo::Kind::I32: return *(const int32_t*)src;
+    case RttiInfo::Kind::U32: return *(const uint32_t*)src;
+    case RttiInfo::Kind::I64: return *(const int64_t*)src;
+    case RttiInfo::Kind::U64: return *(const uint64_t*)src;
+    default:                  break;
     }
 
     SLANG_ASSERT(!"Not integral!");
     return -1;
 }
 
-/* static */double RttiUtil::asDouble(const RttiInfo* rttiInfo, const void* src)
+/* static */ double RttiUtil::asDouble(const RttiInfo* rttiInfo, const void* src)
 {
     if (rttiInfo->isIntegral())
     {
@@ -326,9 +380,9 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     {
         switch (rttiInfo->m_kind)
         {
-            case RttiInfo::Kind::F32:   return *(const float*)src;
-            case RttiInfo::Kind::F64:   return *(const double*)src;
-            default: break;
+        case RttiInfo::Kind::F32: return *(const float*)src;
+        case RttiInfo::Kind::F64: return *(const double*)src;
+        default:                  break;
         }
     }
 
@@ -336,7 +390,7 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     return 0.0;
 }
 
-/* static */SlangResult RttiUtil::setFromDouble(double v, const RttiInfo* rttiInfo, void* dst)
+/* static */ SlangResult RttiUtil::setFromDouble(double v, const RttiInfo* rttiInfo, void* dst)
 {
     if (rttiInfo->isIntegral())
     {
@@ -346,16 +400,16 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     {
         switch (rttiInfo->m_kind)
         {
-            case RttiInfo::Kind::F32:   *(float*)dst = float(v); return SLANG_OK;
-            case RttiInfo::Kind::F64:   *(double*)dst = v; return SLANG_OK;
-            default: break;
+        case RttiInfo::Kind::F32: *(float*)dst = float(v); return SLANG_OK;
+        case RttiInfo::Kind::F64: *(double*)dst = v; return SLANG_OK;
+        default:                  break;
         }
     }
 
     return SLANG_FAIL;
 }
 
-/* static */bool RttiUtil::asBool(const RttiInfo* rttiInfo, const void* src)
+/* static */ bool RttiUtil::asBool(const RttiInfo* rttiInfo, const void* src)
 {
     if (rttiInfo->m_kind == RttiInfo::Kind::Bool)
     {
@@ -379,10 +433,10 @@ static int64_t _getIntDefaultValue(RttiDefaultValue value)
 {
     switch (value)
     {
-        default:
-        case RttiDefaultValue::Normal:      return 0;
-        case RttiDefaultValue::One:         return 1;
-        case RttiDefaultValue::MinusOne:    return -1;
+    default:
+    case RttiDefaultValue::Normal:   return 0;
+    case RttiDefaultValue::One:      return 1;
+    case RttiDefaultValue::MinusOne: return -1;
     }
 }
 
@@ -403,7 +457,8 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     {
         const auto& field = type->m_fields[i];
 
-        const RttiDefaultValue defaultValue = RttiDefaultValue(field.m_flags & uint8_t(RttiDefaultValue::Mask));
+        const RttiDefaultValue defaultValue =
+            RttiDefaultValue(field.m_flags & uint8_t(RttiDefaultValue::Mask));
 
         if (!RttiUtil::isDefault(defaultValue, field.m_type, base + field.m_offset))
         {
@@ -414,7 +469,10 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     return true;
 }
 
-/* static */bool RttiUtil::isDefault(RttiDefaultValue defaultValue, const RttiInfo* rttiInfo, const void* src)
+/* static */ bool RttiUtil::isDefault(
+    RttiDefaultValue defaultValue,
+    const RttiInfo* rttiInfo,
+    const void* src)
 {
     if (rttiInfo->isIntegral())
     {
@@ -429,52 +487,56 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
     switch (rttiInfo->m_kind)
     {
-        case RttiInfo::Kind::Invalid:       return true;
-        case RttiInfo::Kind::Bool:          return *(const bool*)src == (_getIntDefaultValue(defaultValue) != 0);
-        case RttiInfo::Kind::String:
+    case RttiInfo::Kind::Invalid: return true;
+    case RttiInfo::Kind::Bool:    return *(const bool*)src == (_getIntDefaultValue(defaultValue) != 0);
+    case RttiInfo::Kind::String:
         {
             return ((const String*)src)->getLength() == 0;
         }
-        case RttiInfo::Kind::UnownedStringSlice:
+    case RttiInfo::Kind::UnownedStringSlice:
         {
             return ((const UnownedStringSlice*)src)->getLength() == 0;
         }
-        case RttiInfo::Kind::Struct:
+    case RttiInfo::Kind::Struct:
         {
             return _isStructDefault(static_cast<const StructRttiInfo*>(rttiInfo), src);
         }
-        case RttiInfo::Kind::Enum:
+    case RttiInfo::Kind::Enum:
         {
             SLANG_ASSERT(!"Not implemented yet");
             return false;
         }
-        case RttiInfo::Kind::List:
+    case RttiInfo::Kind::List:
         {
             const auto& v = *(const List<Byte>*)src;
             return v.getCount() == 0;
         }
-        case RttiInfo::Kind::Dictionary:
+    case RttiInfo::Kind::Dictionary:
         {
             const auto& v = *(const Dictionary<Byte, Byte>*)src;
             return v.getCount() == 0;
         }
-        case RttiInfo::Kind::Other:
+    case RttiInfo::Kind::Other:
         {
             const OtherRttiInfo* otherRttiInfo = static_cast<const OtherRttiInfo*>(rttiInfo);
             return otherRttiInfo->m_isDefaultFunc && otherRttiInfo->m_isDefaultFunc(rttiInfo, src);
         }
-        default:
+    default:
         {
             return false;
         }
     }
 }
 
-/* static */SlangResult RttiUtil::setListCount(RttiTypeFuncsMap* typeMap, const RttiInfo* elementType, void* dst, Index count)
+/* static */ SlangResult RttiUtil::setListCount(
+    RttiTypeFuncsMap* typeMap,
+    const RttiInfo* elementType,
+    void* dst,
+    Index count)
 {
     // NOTE! The following only works because List<T> has capacity initialized members, and
     // setting the count if it is <= capacity just sets the count (ie things aren't released(!)).
-    
+
     List<Byte>& dstList = *(List<Byte>*)dst;
     const Index oldCount = dstList.getCount();
     if (oldCount == count)
@@ -512,34 +574,35 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     return SLANG_OK;
 }
 
-/* static */bool RttiUtil::canMemCpy(const RttiInfo* type)
+/* static */ bool RttiUtil::canMemCpy(const RttiInfo* type)
 {
     switch (type->m_kind)
     {
-        case RttiInfo::Kind::RefPtr:
-        case RttiInfo::Kind::String:
-        case RttiInfo::Kind::Invalid:
+    case RttiInfo::Kind::RefPtr:
+    case RttiInfo::Kind::String:
+    case RttiInfo::Kind::Invalid:
         {
             return false;
         }
-        case RttiInfo::Kind::UnownedStringSlice:
-        case RttiInfo::Kind::Ptr:
-        case RttiInfo::Kind::Enum:
+    case RttiInfo::Kind::UnownedStringSlice:
+    case RttiInfo::Kind::Ptr:
+    case RttiInfo::Kind::Enum:
         {
             return true;
         }
-        case RttiInfo::Kind::FixedArray:
+    case RttiInfo::Kind::FixedArray:
         {
-            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(type);
+            const FixedArrayRttiInfo* fixedArrayRttiInfo =
+                static_cast<const FixedArrayRttiInfo*>(type);
             return canMemCpy(fixedArrayRttiInfo->m_elementType);
         }
-        case RttiInfo::Kind::Other:
-        case RttiInfo::Kind::List:
-        case RttiInfo::Kind::Dictionary:
+    case RttiInfo::Kind::Other:
+    case RttiInfo::Kind::List:
+    case RttiInfo::Kind::Dictionary:
         {
             return false;
         }
-        case RttiInfo::Kind::Struct:
+    case RttiInfo::Kind::Struct:
         {
             const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(type);
 
@@ -558,51 +621,51 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                     }
                 }
                 structRttiInfo = structRttiInfo->m_super;
-            }
-            while (structRttiInfo);
+            } while (structRttiInfo);
 
             return true;
         }
-        default:
+    default:
         {
             return type->isBuiltIn();
         }
     }
 }
 
-/* static */bool RttiUtil::canZeroInit(const RttiInfo* type)
+/* static */ bool RttiUtil::canZeroInit(const RttiInfo* type)
 {
     switch (type->m_kind)
     {
-        case RttiInfo::Kind::Invalid:
+    case RttiInfo::Kind::Invalid:
         {
             return true;
         }
-        case RttiInfo::Kind::String:
+    case RttiInfo::Kind::String:
         {
             // As it stands we can zero init String, but if impl changes that might not
             // be true
             return true;
         }
-        case RttiInfo::Kind::UnownedStringSlice:
-        case RttiInfo::Kind::Ptr:
-        case RttiInfo::Kind::RefPtr:
-        case RttiInfo::Kind::Enum:
+    case RttiInfo::Kind::UnownedStringSlice:
+    case RttiInfo::Kind::Ptr:
+    case RttiInfo::Kind::RefPtr:
+    case RttiInfo::Kind::Enum:
         {
             return true;
         }
-        case RttiInfo::Kind::FixedArray:
+    case RttiInfo::Kind::FixedArray:
         {
-            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(type);
+            const FixedArrayRttiInfo* fixedArrayRttiInfo =
+                static_cast<const FixedArrayRttiInfo*>(type);
             return canZeroInit(fixedArrayRttiInfo->m_elementType);
         }
-        case RttiInfo::Kind::Other:
-        case RttiInfo::Kind::List:
-        case RttiInfo::Kind::Dictionary:
+    case RttiInfo::Kind::Other:
+    case RttiInfo::Kind::List:
+    case RttiInfo::Kind::Dictionary:
         {
             return false;
         }
-        case RttiInfo::Kind::Struct:
+    case RttiInfo::Kind::Struct:
         {
             const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(type);
 
@@ -621,49 +684,49 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                     }
                 }
                 structRttiInfo = structRttiInfo->m_super;
-            }
-            while (structRttiInfo);
+            } while (structRttiInfo);
 
             return true;
         }
-        default:
+    default:
         {
             return type->isBuiltIn();
         }
     }
 }
 
-/* static */bool RttiUtil::hasDtor(const RttiInfo* type)
+/* static */ bool RttiUtil::hasDtor(const RttiInfo* type)
 {
     switch (type->m_kind)
     {
-        case RttiInfo::Kind::Invalid:
+    case RttiInfo::Kind::Invalid:
         {
             return false;
         }
-        case RttiInfo::Kind::String:
-        case RttiInfo::Kind::RefPtr:
+    case RttiInfo::Kind::String:
+    case RttiInfo::Kind::RefPtr:
         {
             return true;
         }
-        case RttiInfo::Kind::UnownedStringSlice:
-        case RttiInfo::Kind::Ptr:
-        case RttiInfo::Kind::Enum:
+    case RttiInfo::Kind::UnownedStringSlice:
+    case RttiInfo::Kind::Ptr:
+    case RttiInfo::Kind::Enum:
         {
             return false;
         }
-        case RttiInfo::Kind::FixedArray:
+    case RttiInfo::Kind::FixedArray:
         {
-            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(type);
+            const FixedArrayRttiInfo* fixedArrayRttiInfo =
+                static_cast<const FixedArrayRttiInfo*>(type);
             return hasDtor(fixedArrayRttiInfo->m_elementType);
         }
-        case RttiInfo::Kind::Other:
-        case RttiInfo::Kind::List:
-        case RttiInfo::Kind::Dictionary:
+    case RttiInfo::Kind::Other:
+    case RttiInfo::Kind::List:
+    case RttiInfo::Kind::Dictionary:
         {
             return true;
         }
-        case RttiInfo::Kind::Struct:
+    case RttiInfo::Kind::Struct:
         {
             const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(type);
 
@@ -682,18 +745,22 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                     }
                 }
                 structRttiInfo = structRttiInfo->m_super;
-            }
-            while (structRttiInfo);
+            } while (structRttiInfo);
             return false;
         }
-        default:
+    default:
         {
             return !type->isBuiltIn();
         }
     }
 }
 
-/* static */void RttiUtil::ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
+/* static */ void RttiUtil::ctorArray(
+    RttiTypeFuncsMap* typeMap,
+    const RttiInfo* rttiInfo,
+    void* inDst,
+    ptrdiff_t stride,
+    Index count)
 {
     if (count <= 0)
     {
@@ -720,28 +787,39 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
     switch (rttiInfo->m_kind)
     {
-        case RttiInfo::Kind::FixedArray:
+    case RttiInfo::Kind::FixedArray:
         {
-            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(rttiInfo);
+            const FixedArrayRttiInfo* fixedArrayRttiInfo =
+                static_cast<const FixedArrayRttiInfo*>(rttiInfo);
 
             if (fixedArrayRttiInfo->m_size == stride)
             {
                 // It's contiguous do in one go
-                ctorArray(typeMap, fixedArrayRttiInfo->m_elementType, dst, fixedArrayRttiInfo->m_elementType->m_size, fixedArrayRttiInfo->m_elementCount * count);
+                ctorArray(
+                    typeMap,
+                    fixedArrayRttiInfo->m_elementType,
+                    dst,
+                    fixedArrayRttiInfo->m_elementType->m_size,
+                    fixedArrayRttiInfo->m_elementCount * count);
             }
             else
             {
                 // Do it in array runs
                 for (Index i = 0; i < count; ++i, dst += stride)
                 {
-                    ctorArray(typeMap, fixedArrayRttiInfo->m_elementType, dst, fixedArrayRttiInfo->m_elementType->m_size, fixedArrayRttiInfo->m_elementCount);
+                    ctorArray(
+                        typeMap,
+                        fixedArrayRttiInfo->m_elementType,
+                        dst,
+                        fixedArrayRttiInfo->m_elementType->m_size,
+                        fixedArrayRttiInfo->m_elementCount);
                 }
             }
             return;
         }
-        case RttiInfo::Kind::List:
-        case RttiInfo::Kind::Dictionary:
-        case RttiInfo::Kind::Other:
+    case RttiInfo::Kind::List:
+    case RttiInfo::Kind::Dictionary:
+    case RttiInfo::Kind::Other:
         {
             auto funcs = typeMap->getFuncsForType(rttiInfo);
             SLANG_ASSERT(funcs.isValid());
@@ -761,7 +839,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
             }
             return;
         }
-        case RttiInfo::Kind::Struct:
+    case RttiInfo::Kind::Struct:
         {
             const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(rttiInfo);
 
@@ -777,17 +855,22 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                     ctorArray(typeMap, field.m_type, dst + field.m_offset, stride, count);
                 }
                 structRttiInfo = structRttiInfo->m_super;
-            }
-            while(structRttiInfo);
+            } while (structRttiInfo);
 
             return;
         }
     }
-    
+
     SLANG_ASSERT(!"Unexpected");
 }
 
-/* static */void RttiUtil::copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, ptrdiff_t stride, Index count)
+/* static */ void RttiUtil::copyArray(
+    RttiTypeFuncsMap* typeMap,
+    const RttiInfo* rttiInfo,
+    void* inDst,
+    const void* inSrc,
+    ptrdiff_t stride,
+    Index count)
 {
     if (count <= 0)
     {
@@ -806,7 +889,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
         }
         else
         {
-            
+
             for (Index i = 0; i < count; ++i, dst += stride, src += stride)
             {
                 ::memcpy(dst, src, size);
@@ -817,9 +900,10 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
     switch (rttiInfo->m_kind)
     {
-        case RttiInfo::Kind::FixedArray:
+    case RttiInfo::Kind::FixedArray:
         {
-            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(rttiInfo);
+            const FixedArrayRttiInfo* fixedArrayRttiInfo =
+                static_cast<const FixedArrayRttiInfo*>(rttiInfo);
             const auto elementType = fixedArrayRttiInfo->m_elementType;
             const auto elementSize = elementType->m_size;
             const auto elementCount = fixedArrayRttiInfo->m_elementCount;
@@ -839,9 +923,9 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
             }
             return;
         }
-        case RttiInfo::Kind::List:
-        case RttiInfo::Kind::Dictionary:
-        case RttiInfo::Kind::Other:
+    case RttiInfo::Kind::List:
+    case RttiInfo::Kind::Dictionary:
+    case RttiInfo::Kind::Other:
         {
             auto funcs = typeMap->getFuncsForType(rttiInfo);
             SLANG_ASSERT(funcs.isValid());
@@ -860,7 +944,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
             }
             return;
         }
-        case RttiInfo::Kind::Struct:
+    case RttiInfo::Kind::Struct:
         {
             const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(rttiInfo);
 
@@ -873,11 +957,16 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                 for (Index i = 0; i < fieldCount; ++i)
                 {
                     const auto& field = fields[i];
-                    copyArray(typeMap, field.m_type, dst + field.m_offset, src + field.m_offset, stride, count);
+                    copyArray(
+                        typeMap,
+                        field.m_type,
+                        dst + field.m_offset,
+                        src + field.m_offset,
+                        stride,
+                        count);
                 }
                 structRttiInfo = structRttiInfo->m_super;
-            }
-            while (structRttiInfo);
+            } while (structRttiInfo);
 
             return;
         }
@@ -886,7 +975,12 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     SLANG_ASSERT(!"Unexpected");
 }
 
-/* static */void RttiUtil::dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
+/* static */ void RttiUtil::dtorArray(
+    RttiTypeFuncsMap* typeMap,
+    const RttiInfo* rttiInfo,
+    void* inDst,
+    ptrdiff_t stride,
+    Index count)
 {
     if (count <= 0 || !hasDtor(rttiInfo))
     {
@@ -898,9 +992,10 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
     switch (rttiInfo->m_kind)
     {
-        case RttiInfo::Kind::FixedArray:
+    case RttiInfo::Kind::FixedArray:
         {
-            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(rttiInfo);
+            const FixedArrayRttiInfo* fixedArrayRttiInfo =
+                static_cast<const FixedArrayRttiInfo*>(rttiInfo);
             const auto elementType = fixedArrayRttiInfo->m_elementType;
             const auto elementSize = elementType->m_size;
             const auto elementCount = fixedArrayRttiInfo->m_elementCount;
@@ -920,9 +1015,9 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
             }
             return;
         }
-        case RttiInfo::Kind::List:
-        case RttiInfo::Kind::Dictionary:
-        case RttiInfo::Kind::Other:
+    case RttiInfo::Kind::List:
+    case RttiInfo::Kind::Dictionary:
+    case RttiInfo::Kind::Other:
         {
             auto funcs = typeMap->getFuncsForType(rttiInfo);
             SLANG_ASSERT(funcs.isValid());
@@ -941,7 +1036,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
             }
             return;
         }
-        case RttiInfo::Kind::Struct:
+    case RttiInfo::Kind::Struct:
         {
             const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(rttiInfo);
 
@@ -957,8 +1052,7 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                     dtorArray(typeMap, field.m_type, dst + field.m_offset, stride, count);
                 }
                 structRttiInfo = structRttiInfo->m_super;
-            }
-            while (structRttiInfo);
+            } while (structRttiInfo);
 
             return;
         }

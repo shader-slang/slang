@@ -1,9 +1,8 @@
-#include "slang-ir-specialize-dispatch.h"
-
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
-#include "slang-ir.h"
+#include "slang-ir-specialize-dispatch.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -81,7 +80,8 @@ struct AssociatedTypeLookupSpecializationContext
             SLANG_ASSERT(resultWitnessTableIDDecoration);
             // Pack the resulting witness table ID into a `uint2`.
             auto uint2Type = builder.getVectorType(
-                builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
+                builder.getUIntType(),
+                builder.getIntValue(builder.getIntType(), 2));
             IRInst* uint2Args[] = {
                 resultWitnessTableIDDecoration->getSequentialIDOperand(),
                 builder.getIntValue(builder.getUIntType(), 0)};
@@ -131,9 +131,10 @@ struct AssociatedTypeLookupSpecializationContext
             IRBuilder builder(sharedContext->module);
             builder.setInsertBefore(inst);
             auto uint2Type = builder.getVectorType(
-                builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
+                builder.getUIntType(),
+                builder.getIntValue(builder.getIntType(), 2));
             auto zero = builder.getIntValue(builder.getUIntType(), 0);
-            IRInst* args[] = { zero, zero };
+            IRInst* args[] = {zero, zero};
             auto zeroUint2 = builder.emitMakeVector(uint2Type, 2, args);
             inst->replaceUsesWith(zeroUint2);
             return;
@@ -157,8 +158,7 @@ struct AssociatedTypeLookupSpecializationContext
         IRBuilder builder(sharedContext->module);
         builder.setInsertBefore(inst);
         auto witnessTableArg = inst->getWitnessTable();
-        auto callInst = builder.emitCallInst(
-            func->getResultType(), func, witnessTableArg);
+        auto callInst = builder.emitCallInst(func->getResultType(), func, witnessTableArg);
         inst->replaceUsesWith(callInst);
         inst->removeAndDeallocate();
     }
@@ -178,42 +178,50 @@ struct AssociatedTypeLookupSpecializationContext
 
     void processModule()
     {
-        // Replace all `lookup_interface_method():IRWitnessTable` with call to specialized functions.
-        workOnModule(sharedContext, [this](IRInst* inst)
-        {
-            if (inst->getOp() == kIROp_LookupWitness)
+        // Replace all `lookup_interface_method():IRWitnessTable` with call to specialized
+        // functions.
+        workOnModule(
+            sharedContext,
+            [this](IRInst* inst)
             {
-                processLookupInterfaceMethodInst(cast<IRLookupWitnessMethod>(inst));
-            }
-        });
+                if (inst->getOp() == kIROp_LookupWitness)
+                {
+                    processLookupInterfaceMethodInst(cast<IRLookupWitnessMethod>(inst));
+                }
+            });
 
         // Replace all direct uses of IRWitnessTables with its sequential ID.
-        workOnModule(sharedContext, [this](IRInst* inst)
-        {
-            if (inst->getOp() == kIROp_WitnessTable)
+        workOnModule(
+            sharedContext,
+            [this](IRInst* inst)
             {
-                auto seqId = inst->findDecoration<IRSequentialIDDecoration>();
-                if (!seqId)
-                    return;
-                // Insert code to pack sequential ID into an uint2 at all use sites.
-                traverseUses(inst, [&](IRUse* use)
+                if (inst->getOp() == kIROp_WitnessTable)
                 {
-                    if (as<IRCOMWitnessDecoration>(use->getUser()))
-                    {
+                    auto seqId = inst->findDecoration<IRSequentialIDDecoration>();
+                    if (!seqId)
                         return;
-                    }
-                    IRBuilder builder(sharedContext->module);
-                    builder.setInsertBefore(use->getUser());
-                    auto uint2Type = builder.getVectorType(
-                        builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
-                    IRInst* uint2Args[] = {
-                        seqId->getSequentialIDOperand(),
-                        builder.getIntValue(builder.getUIntType(), 0) };
-                    auto uint2seqID = builder.emitMakeVector(uint2Type, 2, uint2Args);
-                    builder.replaceOperand(use, uint2seqID);
-                });
-            }
-        });
+                    // Insert code to pack sequential ID into an uint2 at all use sites.
+                    traverseUses(
+                        inst,
+                        [&](IRUse* use)
+                        {
+                            if (as<IRCOMWitnessDecoration>(use->getUser()))
+                            {
+                                return;
+                            }
+                            IRBuilder builder(sharedContext->module);
+                            builder.setInsertBefore(use->getUser());
+                            auto uint2Type = builder.getVectorType(
+                                builder.getUIntType(),
+                                builder.getIntValue(builder.getIntType(), 2));
+                            IRInst* uint2Args[] = {
+                                seqId->getSequentialIDOperand(),
+                                builder.getIntValue(builder.getUIntType(), 0)};
+                            auto uint2seqID = builder.emitMakeVector(uint2Type, 2, uint2Args);
+                            builder.replaceOperand(use, uint2seqID);
+                        });
+                }
+            });
 
         // Replace all `IRWitnessTableType`s with `IRWitnessTableIDType`.
         for (auto globalInst : sharedContext->module->getGlobalInsts())
@@ -224,23 +232,27 @@ struct AssociatedTypeLookupSpecializationContext
                 builder.setInsertBefore(globalInst);
                 auto witnessTableIDType = builder.getWitnessTableIDType(
                     (IRType*)cast<IRWitnessTableType>(globalInst)->getConformanceType());
-                traverseUses(globalInst, [&](IRUse* use)
-                {
-                    if (use->getUser()->getOp() == kIROp_WitnessTable)
-                        return;
-                    builder.replaceOperand(use, witnessTableIDType);
-                });
+                traverseUses(
+                    globalInst,
+                    [&](IRUse* use)
+                    {
+                        if (use->getUser()->getOp() == kIROp_WitnessTable)
+                            return;
+                        builder.replaceOperand(use, witnessTableIDType);
+                    });
             }
         }
 
         // `GetSequentialID(WitnessTableIDOperand)` becomes just `WitnessTableIDOperand`.
-        workOnModule(sharedContext, [this](IRInst* inst)
-        {
-            if (inst->getOp() == kIROp_GetSequentialID)
+        workOnModule(
+            sharedContext,
+            [this](IRInst* inst)
             {
-                processGetSequentialIDInst(cast<IRGetSequentialID>(inst));
-            }
-        });
+                if (inst->getOp() == kIROp_GetSequentialID)
+                {
+                    processGetSequentialIDInst(cast<IRGetSequentialID>(inst));
+                }
+            });
     }
 };
 

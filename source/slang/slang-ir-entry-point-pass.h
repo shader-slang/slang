@@ -1,8 +1,8 @@
 // ir-entry-point-pass.h
 #pragma once
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -34,4 +34,4 @@ protected:
     EntryPointInfo m_entryPoint;
 };
 
-}
+} // namespace Slang

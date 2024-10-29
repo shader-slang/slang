@@ -98,6 +98,6 @@ Before we dive into actually _using_ Slang, let us step back and highlight some 
 
 * **Predictability**: Code should do what it appears to, consistently, across as many platforms as possible. Whenever possible the compiler should conform to programmer expectation, even in the presence of "undefined behavior." Tools and optimization passes should keep their behavior as predictable as possible; simple tools empower the user to do smart things.
 
-* **Limited Scope**: The Slang system is a language, compiler, and library. It is not an engine, not a renderer, and not a "framework." The Slang system explicitly does *not* assume responsibility for interacting with GPU APIs to load code, allocate resources, bind parameters, or kick off work. While a user *may* use the Slang runtime library in their application, they are not *required* to do so.
+* **Limited Scope**: The Slang system is a language, compiler, and module. It is not an engine, not a renderer, and not a "framework." The Slang system explicitly does *not* assume responsibility for interacting with GPU APIs to load code, allocate resources, bind parameters, or kick off work. While a user *may* use the Slang runtime library in their application, they are not *required* to do so.
 
 The ordering here is significant, with earlier goals generally being more important than later ones.

@@ -2,15 +2,15 @@
 #include "d3d12-pipeline-state.h"
 
 #ifdef GFX_NVAPI
-#    include "../nvapi/nvapi-include.h"
+#include "../nvapi/nvapi-include.h"
 #endif
 
 #include "../nvapi/nvapi-util.h"
 #include "d3d12-device.h"
 #include "d3d12-framebuffer.h"
+#include "d3d12-pipeline-state-stream.h"
 #include "d3d12-shader-program.h"
 #include "d3d12-vertex-layout.h"
-#include "d3d12-pipeline-state-stream.h"
 
 #include <climits>
 
@@ -61,7 +61,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
         auto inputLayoutImpl = (InputLayoutImpl*)desc.graphics.inputLayout;
 
         // A helper to fill common fields between graphics and mesh pipeline descs
-        const auto fillCommonGraphicsState = [&](auto& psoDesc){
+        const auto fillCommonGraphicsState = [&](auto& psoDesc)
+        {
             psoDesc.pRootSignature = programImpl->m_rootObjectLayout->m_rootSignature;
 
             psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.graphics.primitiveType);
@@ -73,7 +74,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 
                 if (framebufferLayout->m_hasDepthStencil)
                 {
-                    psoDesc.DSVFormat = D3DUtil::getMapFormat(framebufferLayout->m_depthStencil.format);
+                    psoDesc.DSVFormat =
+                        D3DUtil::getMapFormat(framebufferLayout->m_depthStencil.format);
                     psoDesc.SampleDesc.Count = framebufferLayout->m_depthStencil.sampleCount;
                 }
                 else
@@ -81,7 +83,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                     psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
                     if (framebufferLayout->m_renderTargets.getCount())
                     {
-                        psoDesc.SampleDesc.Count = framebufferLayout->m_renderTargets[0].sampleCount;
+                        psoDesc.SampleDesc.Count =
+                            framebufferLayout->m_renderTargets[0].sampleCount;
                     }
                 }
                 psoDesc.NumRenderTargets = numRenderTargets;
@@ -100,8 +103,9 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 rs.FillMode = D3DUtil::getFillMode(desc.graphics.rasterizer.fillMode);
                 rs.CullMode = D3DUtil::getCullMode(desc.graphics.rasterizer.cullMode);
                 rs.FrontCounterClockwise =
-                    desc.graphics.rasterizer.frontFace == gfx::FrontFaceMode::CounterClockwise ? TRUE
-                    : FALSE;
+                    desc.graphics.rasterizer.frontFace == gfx::FrontFaceMode::CounterClockwise
+                        ? TRUE
+                        : FALSE;
                 rs.DepthBias = desc.graphics.rasterizer.depthBias;
                 rs.DepthBiasClamp = desc.graphics.rasterizer.depthBiasClamp;
                 rs.SlopeScaledDepthBias = desc.graphics.rasterizer.slopeScaledDepthBias;
@@ -111,21 +115,24 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                     desc.graphics.rasterizer.antialiasedLineEnable ? TRUE : FALSE;
                 rs.ForcedSampleCount = desc.graphics.rasterizer.forcedSampleCount;
                 rs.ConservativeRaster = desc.graphics.rasterizer.enableConservativeRasterization
-                    ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON
-                    : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+                                            ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON
+                                            : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
             }
 
             {
                 D3D12_BLEND_DESC& blend = psoDesc.BlendState;
                 blend.IndependentBlendEnable = FALSE;
-                blend.AlphaToCoverageEnable = desc.graphics.blend.alphaToCoverageEnable ? TRUE : FALSE;
-                blend.RenderTarget[0].RenderTargetWriteMask = (uint8_t)RenderTargetWriteMask::EnableAll;
+                blend.AlphaToCoverageEnable =
+                    desc.graphics.blend.alphaToCoverageEnable ? TRUE : FALSE;
+                blend.RenderTarget[0].RenderTargetWriteMask =
+                    (uint8_t)RenderTargetWriteMask::EnableAll;
                 for (GfxIndex i = 0; i < desc.graphics.blend.targetCount; i++)
                 {
                     auto& d3dDesc = blend.RenderTarget[i];
                     d3dDesc.BlendEnable = desc.graphics.blend.targets[i].enableBlend ? TRUE : FALSE;
                     d3dDesc.BlendOp = D3DUtil::getBlendOp(desc.graphics.blend.targets[i].color.op);
-                    d3dDesc.BlendOpAlpha = D3DUtil::getBlendOp(desc.graphics.blend.targets[i].alpha.op);
+                    d3dDesc.BlendOpAlpha =
+                        D3DUtil::getBlendOp(desc.graphics.blend.targets[i].alpha.op);
                     d3dDesc.DestBlend =
                         D3DUtil::getBlendFactor(desc.graphics.blend.targets[i].color.dstFactor);
                     d3dDesc.DestBlendAlpha =
@@ -141,17 +148,17 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 for (GfxIndex i = 1; i < desc.graphics.blend.targetCount; i++)
                 {
                     if (memcmp(
-                        &desc.graphics.blend.targets[i],
-                        &desc.graphics.blend.targets[0],
-                        sizeof(desc.graphics.blend.targets[0])) != 0)
+                            &desc.graphics.blend.targets[i],
+                            &desc.graphics.blend.targets[0],
+                            sizeof(desc.graphics.blend.targets[0])) != 0)
                     {
                         blend.IndependentBlendEnable = TRUE;
                         break;
                     }
                 }
                 for (uint32_t i = (uint32_t)desc.graphics.blend.targetCount;
-                    i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
-                    ++i)
+                     i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
+                     ++i)
                 {
                     blend.RenderTarget[i] = blend.RenderTarget[0];
                 }
@@ -162,21 +169,21 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 
                 ds.DepthEnable = desc.graphics.depthStencil.depthTestEnable;
                 ds.DepthWriteMask = desc.graphics.depthStencil.depthWriteEnable
-                    ? D3D12_DEPTH_WRITE_MASK_ALL
-                    : D3D12_DEPTH_WRITE_MASK_ZERO;
+                                        ? D3D12_DEPTH_WRITE_MASK_ALL
+                                        : D3D12_DEPTH_WRITE_MASK_ZERO;
                 ds.DepthFunc = D3DUtil::getComparisonFunc(desc.graphics.depthStencil.depthFunc);
                 ds.StencilEnable = desc.graphics.depthStencil.stencilEnable;
                 ds.StencilReadMask = (UINT8)desc.graphics.depthStencil.stencilReadMask;
                 ds.StencilWriteMask = (UINT8)desc.graphics.depthStencil.stencilWriteMask;
-                ds.FrontFace = D3DUtil::translateStencilOpDesc(desc.graphics.depthStencil.frontFace);
+                ds.FrontFace =
+                    D3DUtil::translateStencilOpDesc(desc.graphics.depthStencil.frontFace);
                 ds.BackFace = D3DUtil::translateStencilOpDesc(desc.graphics.depthStencil.backFace);
             }
 
             psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.graphics.primitiveType);
-
         };
 
-        if(m_program->isMeshShaderProgram())
+        if (m_program->isMeshShaderProgram())
         {
             D3DX12_MESH_SHADER_PIPELINE_STATE_DESC meshDesc = {};
             for (auto& shaderBin : programImpl->m_shaders)
@@ -184,13 +191,13 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 switch (shaderBin.stage)
                 {
                 case SLANG_STAGE_FRAGMENT:
-                    meshDesc.PS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    meshDesc.PS = {shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount())};
                     break;
                 case SLANG_STAGE_AMPLIFICATION:
-                    meshDesc.AS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    meshDesc.AS = {shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount())};
                     break;
                 case SLANG_STAGE_MESH:
-                    meshDesc.MS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    meshDesc.MS = {shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount())};
                     break;
                 default:
                     getDebugCallback()->handleMessage(
@@ -213,10 +220,13 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
             else
             {
                 CD3DX12_PIPELINE_STATE_STREAM2 meshStateStream{meshDesc};
-                D3D12_PIPELINE_STATE_STREAM_DESC streamDesc{sizeof(meshStateStream), &meshStateStream};
+                D3D12_PIPELINE_STATE_STREAM_DESC streamDesc{
+                    sizeof(meshStateStream),
+                    &meshStateStream};
 
                 SLANG_RETURN_ON_FAIL(m_device->m_device5->CreatePipelineState(
-                    &streamDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
+                    &streamDesc,
+                    IID_PPV_ARGS(m_pipelineState.writeRef())));
             }
         }
         else
@@ -227,19 +237,29 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 switch (shaderBin.stage)
                 {
                 case SLANG_STAGE_VERTEX:
-                    graphicsDesc.VS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    graphicsDesc.VS = {
+                        shaderBin.code.getBuffer(),
+                        SIZE_T(shaderBin.code.getCount())};
                     break;
                 case SLANG_STAGE_FRAGMENT:
-                    graphicsDesc.PS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    graphicsDesc.PS = {
+                        shaderBin.code.getBuffer(),
+                        SIZE_T(shaderBin.code.getCount())};
                     break;
                 case SLANG_STAGE_DOMAIN:
-                    graphicsDesc.DS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    graphicsDesc.DS = {
+                        shaderBin.code.getBuffer(),
+                        SIZE_T(shaderBin.code.getCount())};
                     break;
                 case SLANG_STAGE_HULL:
-                    graphicsDesc.HS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    graphicsDesc.HS = {
+                        shaderBin.code.getBuffer(),
+                        SIZE_T(shaderBin.code.getCount())};
                     break;
                 case SLANG_STAGE_GEOMETRY:
-                    graphicsDesc.GS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+                    graphicsDesc.GS = {
+                        shaderBin.code.getBuffer(),
+                        SIZE_T(shaderBin.code.getCount())};
                     break;
                 default:
                     getDebugCallback()->handleMessage(
@@ -254,7 +274,7 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
             {
                 graphicsDesc.InputLayout = {
                     inputLayoutImpl->m_elements.getBuffer(),
-                    UINT(inputLayoutImpl->m_elements.getCount()) };
+                    UINT(inputLayoutImpl->m_elements.getCount())};
             }
 
             fillCommonGraphicsState(graphicsDesc);
@@ -271,7 +291,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
             else
             {
                 SLANG_RETURN_ON_FAIL(m_device->m_device->CreateGraphicsPipelineState(
-                    &graphicsDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
+                    &graphicsDesc,
+                    IID_PPV_ARGS(m_pipelineState.writeRef())));
             }
         }
     }
@@ -286,11 +307,11 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
             D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
             computeDesc.pRootSignature =
                 desc.compute.d3d12RootSignatureOverride
-                ? static_cast<ID3D12RootSignature*>(desc.compute.d3d12RootSignatureOverride)
-                : programImpl->m_rootObjectLayout->m_rootSignature;
+                    ? static_cast<ID3D12RootSignature*>(desc.compute.d3d12RootSignatureOverride)
+                    : programImpl->m_rootObjectLayout->m_rootSignature;
             computeDesc.CS = {
                 programImpl->m_shaders[0].code.getBuffer(),
-                SIZE_T(programImpl->m_shaders[0].code.getCount()) };
+                SIZE_T(programImpl->m_shaders[0].code.getCount())};
 
 #ifdef GFX_NVAPI
             if (m_device->m_nvapi)
@@ -307,7 +328,7 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 
                 // Put the pointer to the extension into an array - there can be multiple extensions
                 // enabled at once.
-                const NVAPI_D3D12_PSO_EXTENSION_DESC* extensions[] = { &extensionDesc };
+                const NVAPI_D3D12_PSO_EXTENSION_DESC* extensions[] = {&extensionDesc};
 
                 // Now create the PSO.
                 const NvAPI_Status nvapiStatus = NvAPI_D3D12_CreateComputePipelineState(
@@ -337,7 +358,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
                 else
                 {
                     SLANG_RETURN_ON_FAIL(m_device->m_device->CreateComputePipelineState(
-                        &computeDesc, IID_PPV_ARGS(m_pipelineState.writeRef())));
+                        &computeDesc,
+                        IID_PPV_ARGS(m_pipelineState.writeRef())));
                 }
             }
         }
@@ -350,7 +372,8 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 
 RayTracingPipelineStateImpl::RayTracingPipelineStateImpl(DeviceImpl* device)
     : m_device(device)
-{}
+{
+}
 
 void RayTracingPipelineStateImpl::init(const RayTracingPipelineStateDesc& inDesc)
 {
@@ -405,12 +428,16 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
     subObjects.add(pipelineConfigSubobject);
 
     auto compileShader = [&](slang::EntryPointLayout* entryPointInfo,
-        slang::IComponentType* component,
-        SlangInt entryPointIndex)
+                             slang::IComponentType* component,
+                             SlangInt entryPointIndex)
     {
         ComPtr<ISlangBlob> codeBlob;
-        auto compileResult = m_device->getEntryPointCodeFromShaderCache(component,
-            entryPointIndex, 0, codeBlob.writeRef(), diagnostics.writeRef());
+        auto compileResult = m_device->getEntryPointCodeFromShaderCache(
+            component,
+            entryPointIndex,
+            0,
+            codeBlob.writeRef(),
+            diagnostics.writeRef());
         if (diagnostics.get())
         {
             getDebugCallback()->handleMessage(
@@ -441,7 +468,9 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
         for (SlangUInt i = 0; i < programLayout->getEntryPointCount(); i++)
         {
             SLANG_RETURN_ON_FAIL(compileShader(
-                programLayout->getEntryPointByIndex(i), program->linkedProgram, (SlangInt)i));
+                programLayout->getEntryPointByIndex(i),
+                program->linkedProgram,
+                (SlangInt)i));
         }
     }
     else
@@ -458,8 +487,8 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
         auto& hitGroup = desc.rayTracing.hitGroups[i];
         D3D12_HIT_GROUP_DESC hitGroupDesc = {};
         hitGroupDesc.Type = hitGroup.intersectionEntryPoint.getLength() == 0
-            ? D3D12_HIT_GROUP_TYPE_TRIANGLES
-            : D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
+                                ? D3D12_HIT_GROUP_TYPE_TRIANGLES
+                                : D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
 
         if (hitGroup.anyHitEntryPoint.getLength())
         {
@@ -503,7 +532,8 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
     if (m_device->m_pipelineCreationAPIDispatcher)
     {
         m_device->m_pipelineCreationAPIDispatcher->beforeCreateRayTracingState(
-            m_device, slangGlobalScope);
+            m_device,
+            slangGlobalScope);
     }
 
     D3D12_STATE_OBJECT_DESC rtpsoDesc = {};
@@ -516,7 +546,8 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
     if (m_device->m_pipelineCreationAPIDispatcher)
     {
         m_device->m_pipelineCreationAPIDispatcher->afterCreateRayTracingState(
-            m_device, slangGlobalScope);
+            m_device,
+            slangGlobalScope);
     }
     return SLANG_OK;
 }

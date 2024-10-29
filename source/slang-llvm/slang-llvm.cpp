@@ -1,24 +1,21 @@
 
 #include "clang/Basic/Stack.h"
 #include "clang/Basic/TargetOptions.h"
+#include "clang/Basic/Version.h"
+#include "clang/CodeGen/CodeGenAction.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Config/config.h"
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/Options.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
+#include "clang/Frontend/FrontendAction.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/FrontendTool/Utils.h"
-
 #include "clang/Lex/PreprocessorOptions.h"
-
-#include "clang/Frontend/FrontendAction.h"
-#include "clang/CodeGen/CodeGenAction.h"
-#include "clang/Basic/Version.h"
-
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/LinkAllPasses.h"
@@ -36,59 +33,50 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/Timer.h"
-
 #include "llvm/Support/raw_ostream.h"
-
 #include "llvm/Target/TargetMachine.h"
 
 // Jit
 #include "llvm/ExecutionEngine/JITEventListener.h"
 #include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
-
+#include "llvm/ExecutionEngine/JITSymbol.h"
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
-
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
-
-#include "llvm/ExecutionEngine/JITSymbol.h"
-
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IRReader/IRReader.h"
 
 // Slang
 
-#include "slang.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
+#include "slang.h"
 
-#include <core/slang-list.h>
-#include <core/slang-string.h>
-
-#include <core/slang-hash.h>
-#include <core/slang-com-object.h>
-#include <core/slang-string-util.h>
-#include <core/slang-shared-library.h>
-
-#include <compiler-core/slang-downstream-compiler.h>
 #include <compiler-core/slang-artifact-associated-impl.h>
 #include <compiler-core/slang-artifact-desc-util.h>
+#include <compiler-core/slang-downstream-compiler.h>
 #include <compiler-core/slang-slice-allocator.h>
-
+#include <core/slang-com-object.h>
+#include <core/slang-hash.h>
+#include <core/slang-list.h>
+#include <core/slang-shared-library.h>
+#include <core/slang-string-util.h>
+#include <core/slang-string.h>
 #include <stdio.h>
 
 // We want to make math functions available to the JIT
 #if SLANG_GCC_FAMILY && __GNUC__ < 6
-#   include <cmath>
-#   define SLANG_LLVM_STD std::
+#include <cmath>
+#define SLANG_LLVM_STD std::
 #else
-#   include <math.h>
-#   define SLANG_LLVM_STD
+#include <math.h>
+#define SLANG_LLVM_STD
 #endif
 
 #if SLANG_OSX
 // For memset_pattern functions
 // https://www.unix.com/man-page/osx/3/memset_pattern16/
-#   include <string.h>
+#include <string.h>
 #endif
 
 #if SLANG_WINDOWS_FAMILY
@@ -97,21 +85,23 @@
 It's not clear if this function is needed for ARM WIN targets, but we'll assume it does for now.
 
 https://learn.microsoft.com/en-us/windows/win32/devnotes/-win32-chkstk
-https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/100775 
+https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/100775
 https://codywu2010.wordpress.com/2010/10/04/__chkstk-and-stack-overflow/
 */
 
-#   if SLANG_PROCESSOR_X86
+#if SLANG_PROCESSOR_X86
 extern "C" void /* __declspec(naked)*/ __cdecl _chkstk();
-#   else
+#else
 extern "C" void /* __declspec(naked)*/ __cdecl __chkstk();
-#   endif
+#endif
 #endif
 
 // Predeclare. We'll use this symbol to lookup timestamp, if we don't have a hash.
-extern "C" SLANG_DLL_EXPORT SlangResult createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCompiler** out);
+extern "C" SLANG_DLL_EXPORT SlangResult
+createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCompiler** out);
 
-namespace slang_llvm {
+namespace slang_llvm
+{
 
 using namespace clang;
 
@@ -134,15 +124,27 @@ public:
 
     // IDownstreamCompiler
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() SLANG_OVERRIDE { return m_desc; }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    compile(const CompileOptions& options, IArtifact** outArtifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL
+    canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE { SLANG_UNUSED(contents); SLANG_UNUSED(contentsSize); return SLANG_FAIL; }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
+        SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(contents);
+        SLANG_UNUSED(contentsSize);
+        return SLANG_FAIL;
+    }
 
-    LLVMDownstreamCompiler():
-        m_desc(SLANG_PASS_THROUGH_LLVM, SemanticVersion(LLVM_VERSION_MAJOR, LLVM_VERSION_MINOR, LLVM_VERSION_PATCH))
+    LLVMDownstreamCompiler()
+        : m_desc(
+              SLANG_PASS_THROUGH_LLVM,
+              SemanticVersion(LLVM_VERSION_MAJOR, LLVM_VERSION_MINOR, LLVM_VERSION_PATCH))
     {
     }
 
@@ -155,8 +157,8 @@ public:
 
 /* !!!!!!!!!!!!!!!!!!!!! LLVMJITSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* This implementation uses atomic ref counting to ensure the shared libraries lifetime can outlive the 
-LLVMDownstreamCompileResult and the compilation that created it */
+/* This implementation uses atomic ref counting to ensure the shared libraries lifetime can outlive
+the LLVMDownstreamCompileResult and the compilation that created it */
 class LLVMJITSharedLibrary : public ISlangSharedLibrary, public ComBaseObject
 {
 public:
@@ -167,10 +169,11 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
 
     // ISlangSharedLibrary impl
-    virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name)
+        SLANG_OVERRIDE;
 
-    LLVMJITSharedLibrary(std::unique_ptr<llvm::orc::LLJIT> jit) :
-        m_jit(std::move(jit))
+    LLVMJITSharedLibrary(std::unique_ptr<llvm::orc::LLJIT> jit)
+        : m_jit(std::move(jit))
     {
     }
 
@@ -183,8 +186,7 @@ protected:
 
 ISlangUnknown* LLVMJITSharedLibrary::getInterface(const SlangUUID& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() || 
-        guid == ISlangCastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangCastable::getTypeGuid() ||
         guid == ISlangSharedLibrary::getTypeGuid())
     {
         return static_cast<ISlangSharedLibrary*>(this);
@@ -223,8 +225,8 @@ static void _ensureSufficientStack() {}
 
 static void _llvmErrorHandler(void* userData, const std::string& message, bool genCrashDiag)
 {
-    //DiagnosticsEngine& diags = *static_cast<DiagnosticsEngine*>(userData);
-    //diags.Report(diag::err_fe_error_backend) << message;
+    // DiagnosticsEngine& diags = *static_cast<DiagnosticsEngine*>(userData);
+    // diags.Report(diag::err_fe_error_backend) << message;
 
     printf("Clang/LLVM fatal error: %s\n", message.c_str());
 
@@ -233,7 +235,7 @@ static void _llvmErrorHandler(void* userData, const std::string& message, bool g
     llvm::sys::RunInterruptHandlers();
 
     // We cannot recover from llvm errors.  (!)
-    // 
+    //
     // Returning nothing, will still cause LLVM to exit the process.
 }
 
@@ -243,19 +245,19 @@ static Slang::ArtifactDiagnostic::Severity _getSeverity(DiagnosticsEngine::Level
     typedef DiagnosticsEngine::Level Level;
     switch (level)
     {
-        default:
-        case Level::Ignored:
-        case Level::Note:
-        case Level::Remark:
+    default:
+    case Level::Ignored:
+    case Level::Note:
+    case Level::Remark:
         {
             return Severity::Info;
         }
-        case Level::Warning:
+    case Level::Warning:
         {
             return Severity::Warning;
         }
-        case Level::Error:
-        case Level::Fatal:
+    case Level::Error:
+    case Level::Fatal:
         {
             return Severity::Error;
         }
@@ -265,9 +267,8 @@ static Slang::ArtifactDiagnostic::Severity _getSeverity(DiagnosticsEngine::Level
 class BufferedDiagnosticConsumer : public clang::DiagnosticConsumer
 {
 public:
-
-    BufferedDiagnosticConsumer(IArtifactDiagnostics* diagnostics):
-        m_diagnostics(diagnostics)
+    BufferedDiagnosticConsumer(IArtifactDiagnostics* diagnostics)
+        : m_diagnostics(diagnostics)
     {
     }
 
@@ -286,7 +287,7 @@ public:
         // Work out what the location is
         auto& sourceManager = info.getSourceManager();
 
-        // Gets the file/line number 
+        // Gets the file/line number
         const bool useLineDirectives = true;
         const PresumedLoc presumedLoc = sourceManager.getPresumedLoc(location, useLineDirectives);
 
@@ -296,18 +297,22 @@ public:
         m_diagnostics->add(diagnostic);
     }
 
-    bool hasError() const { return m_diagnostics->getCountAtLeastSeverity(ArtifactDiagnostic::Severity::Error) > 0; }
+    bool hasError() const
+    {
+        return m_diagnostics->getCountAtLeastSeverity(ArtifactDiagnostic::Severity::Error) > 0;
+    }
 
     ComPtr<IArtifactDiagnostics> m_diagnostics;
 };
 
 /*
-* A question is how to make the prototypes available for these functions. They would need to be defined before the
-* the prelude - or potentially in the prelude.
-*
-* I could just define the prototypes in the prelude, and only impl, if needed. Here though I require that all the functions
-* implemented here, use C style names (ie unmanagled) to simplify lookup.
-*/
+ * A question is how to make the prototypes available for these functions. They would need to be
+ * defined before the the prelude - or potentially in the prelude.
+ *
+ * I could just define the prototypes in the prelude, and only impl, if needed. Here though I
+ * require that all the functions implemented here, use C style names (ie unmanagled) to simplify
+ * lookup.
+ */
 
 struct NameAndFunc
 {
@@ -319,7 +324,10 @@ struct NameAndFunc
 
 #define SLANG_LLVM_EXPAND(x) x
 
-#define SLANG_LLVM_FUNC(name, cppName, retType, paramTypes) NameAndFunc{ #name, (NameAndFunc::Func)static_cast<retType (*) paramTypes>(&SLANG_LLVM_EXPAND(cppName)) },
+#define SLANG_LLVM_FUNC(name, cppName, retType, paramTypes) \
+    NameAndFunc{                                            \
+        #name,                                              \
+        (NameAndFunc::Func) static_cast<retType(*) paramTypes>(&SLANG_LLVM_EXPAND(cppName))},
 
 // Implementations of maths functions available to JIT
 static float F32_frexp(float x, int* e)
@@ -350,15 +358,16 @@ static void bzero(void* dst, size_t size)
     ::memset(dst, 0, size);
 }
 
-} // OSXSpecific
+} // namespace OSXSpecific
 #endif
 
 #if SLANG_VC && SLANG_PTR_IS_32
 
-namespace WinSpecific {
+namespace WinSpecific
+{
 
-// NOTE! These are functions used in 32 bit windows to enable 64 bit maths. This set is probably *not* complete.
-// Check:
+// NOTE! These are functions used in 32 bit windows to enable 64 bit maths. This set is probably
+// *not* complete. Check:
 
 // https://source.winehq.org/source/dlls/ntdll/large_int.c
 
@@ -382,14 +391,17 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
     return a / b;
 }
 
-} // WinSpecific
+} // namespace WinSpecific
 
 #endif
 
-// These are only the functions that cannot be implemented with 'reasonable performance' in the prelude.
-// It is assumed that calling from JIT to C function whilst not super expensive, is an issue. 
+
+// These are only the functions that cannot be implemented with 'reasonable performance' in the
+// prelude. It is assumed that calling from JIT to C function whilst not super expensive, is an
+// issue.
 
 // name, cppName, retType, paramTypes
+// clang-format off
 #define SLANG_LLVM_FUNCS(x) \
     x(F64_ceil, ceil, double, (double)) \
     x(F64_floor, floor, double, (double)) \
@@ -476,19 +488,18 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
     \
     x(__bzero, OSXSpecific::bzero, void, (void*, size_t))
 #endif
+// clang-format on
 
-#if SLANG_WINDOWS_FAMILY 
-#   if SLANG_PROCESSOR_X86
-#       define SLANG_PLATFORM_FUNCS(x) \
-            x(_chkstk, _chkstk, void, ()) 
-#   else
-#       define SLANG_PLATFORM_FUNCS(x) \
-            x(__chkstk, __chkstk, void, ()) 
-#   endif
+#if SLANG_WINDOWS_FAMILY
+#if SLANG_PROCESSOR_X86
+#define SLANG_PLATFORM_FUNCS(x) x(_chkstk, _chkstk, void, ())
+#else
+#define SLANG_PLATFORM_FUNCS(x) x(__chkstk, __chkstk, void, ())
+#endif
 #endif
 
 #ifndef SLANG_PLATFORM_FUNCS
-#   define SLANG_PLATFORM_FUNCS(x)
+#define SLANG_PLATFORM_FUNCS(x)
 #endif
 
 static int _getOptimizationLevel(DownstreamCompileOptions::OptimizationLevel level)
@@ -496,11 +507,11 @@ static int _getOptimizationLevel(DownstreamCompileOptions::OptimizationLevel lev
     typedef DownstreamCompileOptions::OptimizationLevel OptimizationLevel;
     switch (level)
     {
-        case OptimizationLevel::None:     return 0;
-        default:
-        case OptimizationLevel::Default:  return 1;
-        case OptimizationLevel::High:     return 2;
-        case OptimizationLevel::Maximal:  return 3;
+    case OptimizationLevel::None:    return 0;
+    default:
+    case OptimizationLevel::Default: return 1;
+    case OptimizationLevel::High:    return 2;
+    case OptimizationLevel::Maximal: return 3;
     }
 }
 
@@ -524,7 +535,8 @@ static SlangResult _initLLVM()
 
     // Set an error handler, so that any LLVM backend diagnostics go through our
     // error handler.
-    //llvm::install_fatal_error_handler(_llvmErrorHandler, static_cast<void*>(&clang->getDiagnostics()));
+    // llvm::install_fatal_error_handler(_llvmErrorHandler,
+    // static_cast<void*>(&clang->getDiagnostics()));
     // NOTE! Can only be set once.
     llvm::install_fatal_error_handler(_llvmErrorHandler, nullptr);
 
@@ -537,7 +549,10 @@ bool LLVMDownstreamCompiler::canConvert(const ArtifactDesc& from, const Artifact
     return false;
 }
 
-SlangResult LLVMDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact)
+SlangResult LLVMDownstreamCompiler::convert(
+    IArtifact* from,
+    const ArtifactDesc& to,
+    IArtifact** outArtifact)
 {
     return SLANG_E_NOT_IMPLEMENTED;
 }
@@ -553,7 +568,9 @@ SlangResult LLVMDownstreamCompiler::getVersionString(slang::IBlob** outVersionSt
 
     {
         // If we don't have the commitHash, we use the library timestamp, to uniquely identify.
-        versionString << " " << SharedLibraryUtils::getSharedLibraryTimestamp((void*)createLLVMDownstreamCompiler_V4);
+        versionString << " "
+                      << SharedLibraryUtils::getSharedLibraryTimestamp(
+                             (void*)createLLVMDownstreamCompiler_V4);
     }
 
     *outVersionString = StringBlob::moveCreate(versionString).detach();
@@ -571,8 +588,7 @@ void* LLVMDownstreamCompiler::castAs(const Guid& guid)
 
 void* LLVMDownstreamCompiler::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
         guid == IDownstreamCompiler::getTypeGuid())
     {
         return static_cast<IDownstreamCompiler*>(this);
@@ -586,7 +602,9 @@ void* LLVMDownstreamCompiler::getObject(const Guid& guid)
     return nullptr;
 }
 
-SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
+SlangResult LLVMDownstreamCompiler::compile(
+    const CompileOptions& inOptions,
+    IArtifact** outArtifact)
 {
     if (!isVersionCompatible(inOptions))
     {
@@ -620,12 +638,13 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
 
     ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
 
-    
+
     // TODO(JS): We might just want this to talk directly to the listener.
-    // For now we just buffer up. 
+    // For now we just buffer up.
     BufferedDiagnosticConsumer diagsBuffer(diagnostics);
 
-    IntrusiveRefCntPtr<DiagnosticsEngine> diags = new DiagnosticsEngine(diagID, diagOpts, &diagsBuffer, false);
+    IntrusiveRefCntPtr<DiagnosticsEngine> diags =
+        new DiagnosticsEngine(diagID, diagOpts, &diagsBuffer, false);
 
     ComPtr<ISlangBlob> sourceBlob;
     SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
@@ -649,34 +668,35 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
 
     // EmitCodeGenOnly doesn't appear to actually emit anything
     // EmitLLVM outputs LLVM assembly
-    // EmitLLVMOnly doesn't 'emit' anything, but the IR that is produced is accessible, from the 'action'.
+    // EmitLLVMOnly doesn't 'emit' anything, but the IR that is produced is accessible, from the
+    // 'action'.
 
     action = frontend::ActionKind::EmitLLVMOnly;
 
-    //action = frontend::ActionKind::EmitBC;
-    //action = frontend::ActionKind::EmitLLVM;
-    // 
-    //action = frontend::ActionKind::EmitCodeGenOnly;
-    //action = frontend::ActionKind::EmitObj;
-    //action = frontend::ActionKind::EmitAssembly;
+    // action = frontend::ActionKind::EmitBC;
+    // action = frontend::ActionKind::EmitLLVM;
+    //
+    // action = frontend::ActionKind::EmitCodeGenOnly;
+    // action = frontend::ActionKind::EmitObj;
+    // action = frontend::ActionKind::EmitAssembly;
 
     Language language;
     LangStandard::Kind langStd;
     switch (options.sourceLanguage)
     {
-        case SLANG_SOURCE_LANGUAGE_CPP:
+    case SLANG_SOURCE_LANGUAGE_CPP:
         {
             language = Language::CXX;
             langStd = LangStandard::Kind::lang_cxx17;
             break;
         }
-        case SLANG_SOURCE_LANGUAGE_C:
+    case SLANG_SOURCE_LANGUAGE_C:
         {
             language = Language::C;
             langStd = LangStandard::Kind::lang_c17;
             break;
         }
-        default:
+    default:
         {
             return SLANG_E_NOT_AVAILABLE;
         }
@@ -689,10 +709,11 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
 
         // Add the source
         // TODO(JS): For the moment this kind of include does *NOT* show a input source filename
-        // not super surprising as one isn't set, but it's not clear how one would be set when the input is a memory buffer.
-        // For Slang usage, this probably isn't an issue, because it's *output* typically holds #line directives.
+        // not super surprising as one isn't set, but it's not clear how one would be set when the
+        // input is a memory buffer. For Slang usage, this probably isn't an issue, because it's
+        // *output* typically holds #line directives.
         {
-            
+
             FrontendInputFile inputFile(*sourceBuffer, inputKind);
             opts.Inputs.push_back(inputFile);
         }
@@ -715,8 +736,9 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
                 return SLANG_E_NOT_AVAILABLE;
             }
 
-            // TODO(JS): NOTE! The options do not support setting a *value* just that a macro is defined.
-            // So strictly speaking, we should probably have a warning/error if the value is not appropriate
+            // TODO(JS): NOTE! The options do not support setting a *value* just that a macro is
+            // defined. So strictly speaking, we should probably have a warning/error if the value
+            // is not appropriate
             opts.addMacroDef(define.nameWithSig.begin());
         }
     }
@@ -728,7 +750,7 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
 
         opts.Triple = LLVM_DEFAULT_TARGET_TRIPLE;
 
-        // A code model isn't set by default, "default" seems to fit the bill here 
+        // A code model isn't set by default, "default" seems to fit the bill here
         opts.CodeModel = "default";
 
         targetTriple = llvm::Triple(opts.Triple);
@@ -743,7 +765,12 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
             includes.push_back(includePath.begin());
         }
 
-        clang::CompilerInvocation::setLangDefaults(*opts, inputKind, targetTriple, includes, langStd);
+        clang::CompilerInvocation::setLangDefaults(
+            *opts,
+            inputKind,
+            targetTriple,
+            includes,
+            langStd);
 
         if (options.floatingPointMode == DownstreamCompileOptions::FloatingPointMode::Fast)
         {
@@ -754,13 +781,14 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
     {
         auto& opts = invocation.getHeaderSearchOpts();
 
-        // These only work if the resource directory is setup (or a virtual file system points to it)
+        // These only work if the resource directory is setup (or a virtual file system points to
+        // it)
         opts.UseBuiltinIncludes = true;
         opts.UseStandardSystemIncludes = true;
         opts.UseStandardCXXIncludes = true;
 
         /// Use libc++ instead of the default libstdc++.
-        //opts.UseLibcxx = true;
+        // opts.UseLibcxx = true;
     }
 
 
@@ -774,11 +802,11 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
         opts.CodeModel = invocation.getTargetOpts().CodeModel;
     }
 
-    //const llvm::opt::OptTable& opts = clang::driver::getDriverOptTable();
+    // const llvm::opt::OptTable& opts = clang::driver::getDriverOptTable();
 
     // TODO(JS): Need a way to find in system search paths, for now we just don't bother
     //
-    // The system search paths are for includes for compiler intrinsics it seems. 
+    // The system search paths are for includes for compiler intrinsics it seems.
     // Infer the builtin include path if unspecified.
 #if 0
     {
@@ -816,7 +844,7 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
     clang->createFileManager();
     clang->createSourceManager(clang->getFileManager());
 
-    
+
     std::unique_ptr<LLVMContext> llvmContext = std::make_unique<LLVMContext>();
 
     clang::CodeGenAction* codeGenAction = nullptr;
@@ -848,12 +876,13 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
         {
             diagnostics->requireErrorDiagnostic();
         }
-        
+
         if (!compileSucceeded || diagsBuffer.hasError())
         {
             diagnostics->setResult(SLANG_FAIL);
 
-            auto artifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
+            auto artifact = ArtifactUtil::createArtifact(
+                ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
             ArtifactUtil::addAssociated(artifact, diagnostics);
 
             *outArtifact = artifact.detach();
@@ -865,7 +894,7 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
 
     switch (action)
     {
-        case frontend::ActionKind::EmitLLVM:
+    case frontend::ActionKind::EmitLLVM:
         {
             // LLVM output is text, that must be zero terminated
             output.push_back(char(0));
@@ -879,7 +908,7 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
             module = llvm::parseIR(memoryBufferRef, err, *llvmContext);
             break;
         }
-        case frontend::ActionKind::EmitBC:
+    case frontend::ActionKind::EmitBC:
         {
             StringRef identifier;
             StringRef data(output.begin(), output.size());
@@ -890,7 +919,7 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
             module = llvm::parseIR(memoryBufferRef, err, *llvmContext);
             break;
         }
-        case frontend::ActionKind::EmitLLVMOnly:
+    case frontend::ActionKind::EmitLLVMOnly:
         {
             // Get the module produced by the action
             module = codeGenAction->takeModule();
@@ -900,14 +929,14 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
 
     switch (options.targetType)
     {
-        // TODO(JS): Shared library may not be appropriate, but as long as the 'shared library' is never accessed as a blob
-        // all is good.
-        case SLANG_SHADER_SHARED_LIBRARY:
+    // TODO(JS): Shared library may not be appropriate, but as long as the 'shared library' is
+    // never accessed as a blob all is good.
+    case SLANG_SHADER_SHARED_LIBRARY:
 
-        // TODO(JS):
-        // Hmm. What does this even mean?
-        // I guess the idea is it's 'SHADER' style, but is runnable on the host. 
-        case SLANG_SHADER_HOST_CALLABLE:
+    // TODO(JS):
+    // Hmm. What does this even mean?
+    // I guess the idea is it's 'SHADER' style, but is runnable on the host.
+    case SLANG_SHADER_HOST_CALLABLE:
         {
             // Try running something in the module on the JIT
             std::unique_ptr<llvm::orc::LLJIT> jit;
@@ -916,23 +945,26 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
 
                 LLJITBuilder jitBuilder;
 
-                Expected<std::unique_ptr< llvm::orc::LLJIT>> expectJit = jitBuilder.create();
+                Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = jitBuilder.create();
                 if (!expectJit)
                 {
                     /* JS: NOTE!
-                    
-                    It is worth saying there can be some odd issues around creating the JIT - if LLVM-C is linked against.
-                    
+
+                    It is worth saying there can be some odd issues around creating the JIT - if
+                    LLVM-C is linked against.
+
                     If it is then LLVM will likely startup saying LLVM-C isn't found.
-                    BUT if you have LLVM *installed* on your system (as is reasonable to do from a LLVM distro, then
-                    at startup it *MIGHT* find a LLVM-C dll in that installation (ie nothing to do with the version of LLVM
-                    linked with). This will likely lead to an odd error saying the 'triple can't be found' and that no
-                    targets are registered.
+                    BUT if you have LLVM *installed* on your system (as is reasonable to do from a
+                    LLVM distro, then at startup it *MIGHT* find a LLVM-C dll in that installation
+                    (ie nothing to do with the version of LLVM linked with). This will likely lead
+                    to an odd error saying the 'triple can't be found' and that no targets are
+                    registered.
 
-                    Also note that the behavior *may* be different with Debug/Release - because of how the linked resolves symbols
-                    that are multiply defined.
+                    Also note that the behavior *may* be different with Debug/Release - because of
+                    how the linked resolves symbols that are multiply defined.
 
-                    If there are problems creating the JIT, check that LLVM-C is not linked against (it should be disabled in the premake).
+                    If there are problems creating the JIT, check that LLVM-C is not linked against
+                    (it should be disabled in the premake).
                     */
 
                     auto err = expectJit.takeError();
@@ -950,12 +982,13 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
                     diagnostic.severity = ArtifactDiagnostic::Severity::Error;
                     diagnostic.stage = ArtifactDiagnostic::Stage::Link;
                     diagnostic.text = TerminatedCharSlice(buf.getBuffer(), buf.getLength());
-                    
+
                     // Add the error
                     diagnostics->add(diagnostic);
                     diagnostics->setResult(SLANG_FAIL);
 
-                    auto artifact = ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
+                    auto artifact = ArtifactUtil::createArtifact(
+                        ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
                     ArtifactUtil::addAssociated(artifact, diagnostics);
 
                     *outArtifact = artifact.detach();
@@ -974,7 +1007,8 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
                 const DataLayout& dl = jit->getDataLayout();
                 MangleAndInterner mangler(es, dl);
 
-                // The name of the lib must be unique. Should be here as we are only thing adding libs
+                // The name of the lib must be unique. Should be here as we are only thing adding
+                // libs
                 auto stdcLibExpected = es.createJITDylib("stdc");
 
                 if (stdcLibExpected)
@@ -984,28 +1018,36 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
                     // Add all the symbolmap
                     SymbolMap symbolMap;
 
-                    //symbolMap.insert(std::make_pair(mangler("sin"), JITEvaluatedSymbol::fromPointer(static_cast<double (*)(double)>(&sin))));
+                    // symbolMap.insert(std::make_pair(mangler("sin"),
+                    // JITEvaluatedSymbol::fromPointer(static_cast<double (*)(double)>(&sin))));
 
                     {
-                        static const NameAndFunc funcs[] =
-                        {
-                            SLANG_LLVM_FUNCS(SLANG_LLVM_FUNC)
-                            SLANG_PLATFORM_FUNCS(SLANG_LLVM_FUNC)
-                        };
+                        static const NameAndFunc funcs[] = {SLANG_LLVM_FUNCS(
+                            SLANG_LLVM_FUNC) SLANG_PLATFORM_FUNCS(SLANG_LLVM_FUNC)};
 
                         for (auto& func : funcs)
                         {
-                            symbolMap.insert(std::make_pair(mangler(func.name), JITEvaluatedSymbol::fromPointer(func.func)));
+                            symbolMap.insert(std::make_pair(
+                                mangler(func.name),
+                                JITEvaluatedSymbol::fromPointer(func.func)));
                         }
                     }
 
 #if SLANG_PTR_IS_32 && SLANG_VC
                     {
                         // https://docs.microsoft.com/en-us/windows/win32/devnotes/-win32-alldiv
-                        symbolMap.insert(std::make_pair(mangler("_alldiv"), JITEvaluatedSymbol::fromPointer(WinSpecific::_alldiv)));
-                        symbolMap.insert(std::make_pair(mangler("_allrem"), JITEvaluatedSymbol::fromPointer(WinSpecific::_allrem)));
-                        symbolMap.insert(std::make_pair(mangler("_aullrem"), JITEvaluatedSymbol::fromPointer(WinSpecific::_aullrem)));
-                        symbolMap.insert(std::make_pair(mangler("_aulldiv"), JITEvaluatedSymbol::fromPointer(WinSpecific::_aulldiv)));
+                        symbolMap.insert(std::make_pair(
+                            mangler("_alldiv"),
+                            JITEvaluatedSymbol::fromPointer(WinSpecific::_alldiv)));
+                        symbolMap.insert(std::make_pair(
+                            mangler("_allrem"),
+                            JITEvaluatedSymbol::fromPointer(WinSpecific::_allrem)));
+                        symbolMap.insert(std::make_pair(
+                            mangler("_aullrem"),
+                            JITEvaluatedSymbol::fromPointer(WinSpecific::_aullrem)));
+                        symbolMap.insert(std::make_pair(
+                            mangler("_aulldiv"),
+                            JITEvaluatedSymbol::fromPointer(WinSpecific::_aulldiv)));
                     }
 #endif
 
@@ -1034,7 +1076,7 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
             // Create the shared library
             ComPtr<ISlangSharedLibrary> sharedLibrary(new LLVMJITSharedLibrary(std::move(jit)));
 
-            // Work out the ArtifactDesc 
+            // Work out the ArtifactDesc
             const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
 
             auto artifact = ArtifactUtil::createArtifact(targetDesc);
@@ -1052,9 +1094,11 @@ SlangResult LLVMDownstreamCompiler::compile(const CompileOptions& inOptions, IAr
 
 } // namespace slang_llvm
 
-extern "C" SLANG_DLL_EXPORT SlangResult createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCompiler** out)
+extern "C" SLANG_DLL_EXPORT SlangResult
+createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCompiler** out)
 {
-    Slang::ComPtr<slang_llvm::LLVMDownstreamCompiler> compiler(new slang_llvm::LLVMDownstreamCompiler);
+    Slang::ComPtr<slang_llvm::LLVMDownstreamCompiler> compiler(
+        new slang_llvm::LLVMDownstreamCompiler);
 
     if (auto ptr = compiler->castAs(intfGuid))
     {

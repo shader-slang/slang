@@ -1,14 +1,13 @@
 // unit-test-translation-unit-import.cpp
 
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
+#include "slang-com-ptr.h"
 #include "slang.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-#include "slang-com-ptr.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
 
 using namespace Slang;
 
@@ -47,7 +46,11 @@ SLANG_UNIT_TEST(getTargetCode)
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
-    auto module = session->loadModuleFromSourceString("m", "m.slang", userSourceBody, diagnosticBlob.writeRef());
+    auto module = session->loadModuleFromSourceString(
+        "m",
+        "m.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
@@ -66,4 +69,3 @@ SLANG_UNIT_TEST(getTargetCode)
     SLANG_CHECK(resultStr.indexOf(toSlice("fragMain")) != -1);
     SLANG_CHECK(resultStr.indexOf(toSlice("vertMain")) != -1);
 }
-

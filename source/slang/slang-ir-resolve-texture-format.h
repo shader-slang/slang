@@ -2,5 +2,5 @@
 
 namespace Slang
 {
-    void resolveTextureFormat(IRModule* module);
+void resolveTextureFormat(IRModule* module);
 }

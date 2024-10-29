@@ -3,10 +3,8 @@
 
 namespace Slang
 {
-    class DiagnosticSink;
-    struct IRModule;
+class DiagnosticSink;
+struct IRModule;
 
-    void propagateConstExpr(
-        IRModule*       module,
-        DiagnosticSink* sink);
-}
+void propagateConstExpr(IRModule* module, DiagnosticSink* sink);
+} // namespace Slang

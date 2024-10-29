@@ -2,24 +2,26 @@
 
 #include "parse-diagnostic-util.h"
 
-#include "../../source/core/slang-hex-dump-util.h"
-#include "../../source/core/slang-type-text-util.h"
-
-#include "slang-com-helper.h"
-
-#include "../../source/core/slang-string-util.h"
+#include "../../source/compiler-core/slang-artifact-associated-impl.h"
+#include "../../source/compiler-core/slang-artifact-diagnostic-util.h"
+#include "../../source/compiler-core/slang-downstream-compiler.h"
 #include "../../source/core/slang-byte-encode-util.h"
 #include "../../source/core/slang-char-util.h"
-
-#include "../../source/compiler-core/slang-artifact-diagnostic-util.h"
-#include "../../source/compiler-core/slang-artifact-associated-impl.h"
-#include "../../source/compiler-core/slang-downstream-compiler.h"
+#include "../../source/core/slang-hex-dump-util.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-type-text-util.h"
+#include "slang-com-helper.h"
 
 using namespace Slang;
 
-/* static */SlangResult ParseDiagnosticUtil::parseGenericLine(SliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
+/* static */ SlangResult ParseDiagnosticUtil::parseGenericLine(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& line,
+    List<UnownedStringSlice>& lineSlices,
+    ArtifactDiagnostic& outDiagnostic)
 {
-    /* e:\git\somewhere\tests\diagnostics\syntax-error-intrinsic.slang(13): error C2018:  unknown character '0x40' */
+    /* e:\git\somewhere\tests\diagnostics\syntax-error-intrinsic.slang(13): error C2018:  unknown
+     * character '0x40' */
     if (lineSlices.getCount() < 3)
     {
         return SLANG_FAIL;
@@ -28,9 +30,11 @@ using namespace Slang;
     {
         const UnownedStringSlice severityAndCodeSlice = lineSlices[1].trim();
         // Get the code
-        outDiagnostic.code = allocator.allocate(StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1).trim());
+        outDiagnostic.code =
+            allocator.allocate(StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1).trim());
 
-        const UnownedStringSlice severitySlice = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 0);
+        const UnownedStringSlice severitySlice =
+            StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 0);
 
         outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
         if (severitySlice == UnownedStringSlice::fromLiteral("warning"))
@@ -44,25 +48,27 @@ using namespace Slang;
     }
 
     // Get the location info
-    SLANG_RETURN_ON_FAIL(ArtifactDiagnosticUtil::splitPathLocation(allocator, lineSlices[0], outDiagnostic));
+    SLANG_RETURN_ON_FAIL(
+        ArtifactDiagnosticUtil::splitPathLocation(allocator, lineSlices[0], outDiagnostic));
 
     outDiagnostic.text = allocator.allocate(lineSlices[2].begin(), line.end());
     return SLANG_OK;
 }
 
-static SlangResult _getSlangDiagnosticSeverity(const UnownedStringSlice& inText, ArtifactDiagnostic::Severity& outSeverity, Int& outCode)
+static SlangResult _getSlangDiagnosticSeverity(
+    const UnownedStringSlice& inText,
+    ArtifactDiagnostic::Severity& outSeverity,
+    Int& outCode)
 {
     UnownedStringSlice text(inText.trim());
 
-    static const UnownedStringSlice prefixes[] =
-    {
+    static const UnownedStringSlice prefixes[] = {
         UnownedStringSlice::fromLiteral("note"),
         UnownedStringSlice::fromLiteral("warning"),
         UnownedStringSlice::fromLiteral("error"),
         UnownedStringSlice::fromLiteral("fatal error"),
         UnownedStringSlice::fromLiteral("internal error"),
-        UnownedStringSlice::fromLiteral("unknown error")
-    };
+        UnownedStringSlice::fromLiteral("unknown error")};
 
     Int index = -1;
 
@@ -78,10 +84,10 @@ static SlangResult _getSlangDiagnosticSeverity(const UnownedStringSlice& inText,
 
     switch (index)
     {
-        case -1:    return SLANG_FAIL;
-        case 0:     outSeverity = ArtifactDiagnostic::Severity::Info; break;
-        case 1:     outSeverity = ArtifactDiagnostic::Severity::Warning; break;
-        default:    outSeverity = ArtifactDiagnostic::Severity::Error; break;
+    case -1: return SLANG_FAIL;
+    case 0:  outSeverity = ArtifactDiagnostic::Severity::Info; break;
+    case 1:  outSeverity = ArtifactDiagnostic::Severity::Warning; break;
+    default: outSeverity = ArtifactDiagnostic::Severity::Error; break;
     }
 
     outCode = 0;
@@ -98,12 +104,13 @@ static SlangResult _getSlangDiagnosticSeverity(const UnownedStringSlice& inText,
 static bool _isSlangDiagnostic(const UnownedStringSlice& line)
 {
     /*
-    tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
+    tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have
+    parameters
     */
 
     UnownedStringSlice initial = StringUtil::getAtInSplit(line, ':', 0);
 
-    // Handle if path has : 
+    // Handle if path has :
     const Index typeIndex = (initial.getLength() == 1 && CharUtil::isAlpha(initial[0])) ? 2 : 1;
     // Extract the type/code slice
     UnownedStringSlice typeSlice = StringUtil::getAtInSplit(line, ':', typeIndex);
@@ -113,10 +120,15 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     return SLANG_SUCCEEDED(_getSlangDiagnosticSeverity(typeSlice, type, code));
 }
 
-/* static */SlangResult ParseDiagnosticUtil::parseSlangLine(SliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
+/* static */ SlangResult ParseDiagnosticUtil::parseSlangLine(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& line,
+    List<UnownedStringSlice>& lineSlices,
+    ArtifactDiagnostic& outDiagnostic)
 {
     /*
-    tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
+    tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have
+    parameters
     */
 
     // Can be larger than 3, because might be : in the actual error text
@@ -125,7 +137,8 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
         return SLANG_FAIL;
     }
 
-    SLANG_RETURN_ON_FAIL(ArtifactDiagnosticUtil::splitPathLocation(allocator, lineSlices[0], outDiagnostic));
+    SLANG_RETURN_ON_FAIL(
+        ArtifactDiagnosticUtil::splitPathLocation(allocator, lineSlices[0], outDiagnostic));
     Int code;
     SLANG_RETURN_ON_FAIL(_getSlangDiagnosticSeverity(lineSlices[1], outDiagnostic.severity, code));
 
@@ -140,11 +153,16 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     return SLANG_OK;
 }
 
-/* static */ SlangResult ParseDiagnosticUtil::splitDiagnosticLine(const CompilerIdentity& compilerIdentity, const UnownedStringSlice& line, const UnownedStringSlice& linePrefix, List<UnownedStringSlice>& outSlices)
+/* static */ SlangResult ParseDiagnosticUtil::splitDiagnosticLine(
+    const CompilerIdentity& compilerIdentity,
+    const UnownedStringSlice& line,
+    const UnownedStringSlice& linePrefix,
+    List<UnownedStringSlice>& outSlices)
 {
     StringUtil::split(line, ':', outSlices);
 
-    // If we have a prefix (typically identifying the compiler), remove so same code can be used for output with prefixes and without
+    // If we have a prefix (typically identifying the compiler), remove so same code can be used for
+    // output with prefixes and without
     if (linePrefix.getLength())
     {
         SLANG_ASSERT(outSlices[0].startsWith(linePrefix));
@@ -154,10 +172,12 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     /*
     glslang: ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token
     dxc: tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression
-    fxc: tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected token '@'
-    Visual Studio 14.0: e:\git\somewhere\tests\diagnostics\syntax-error-intrinsic.slang(13): error C2018:  unknown character '0x40'
-    NVRTC 11.0: tests/diagnostics/syntax-error-intrinsic.slang(13): error : unrecognized token
-    tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
+    fxc: tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected
+    token '@' Visual Studio 14.0:
+    e:\git\somewhere\tests\diagnostics\syntax-error-intrinsic.slang(13): error C2018:  unknown
+    character '0x40' NVRTC 11.0: tests/diagnostics/syntax-error-intrinsic.slang(13): error :
+    unrecognized token tests/diagnostics/accessors.slang(11): error 31101: accessors other than
+    'set' must not have parameters
     */
 
     // The index where the path starts
@@ -171,7 +191,8 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
         if (pathStart.getLength() == 1 && CharUtil::isAlpha(pathStart[0]))
         {
             // Splice back together
-            outSlices[pathIndex] = UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
+            outSlices[pathIndex] =
+                UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
             outSlices.removeAt(pathIndex + 1);
         }
     }
@@ -179,7 +200,9 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     return SLANG_OK;
 }
 
-static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, SlangPassThrough& outDownstreamCompiler)
+static SlangResult _findDownstreamCompiler(
+    const UnownedStringSlice& slice,
+    SlangPassThrough& outDownstreamCompiler)
 {
     for (Index i = SLANG_PASS_THROUGH_NONE + 1; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
     {
@@ -195,14 +218,17 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
     return SLANG_FAIL;
 }
 
-/* static */SlangResult ParseDiagnosticUtil::identifyCompiler(const UnownedStringSlice& inText, CompilerIdentity& outIdentity)
+/* static */ SlangResult ParseDiagnosticUtil::identifyCompiler(
+    const UnownedStringSlice& inText,
+    CompilerIdentity& outIdentity)
 {
     outIdentity = CompilerIdentity();
 
-    // This might be overkill - we should be able to identify the compiler from the first line, of the diagnostics.
-    // Here, we go through each line trying to identify the compiler.
-    // For downstream compilers, the only way to identify unambiguously is via the compiler name prefix.
-    // For Slang we *assume* if there isn't such a prefix, and it 'looks like' a Slang diagnostic that it is
+    // This might be overkill - we should be able to identify the compiler from the first line, of
+    // the diagnostics. Here, we go through each line trying to identify the compiler. For
+    // downstream compilers, the only way to identify unambiguously is via the compiler name prefix.
+    // For Slang we *assume* if there isn't such a prefix, and it 'looks like' a Slang diagnostic
+    // that it is
 
     UnownedStringSlice text(inText), line;
     while (StringUtil::extractLine(text, line))
@@ -229,13 +255,14 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
     return SLANG_FAIL;
 }
 
-/* static */ParseDiagnosticUtil::LineParser ParseDiagnosticUtil::getLineParser(const CompilerIdentity& compilerIdentity)
+/* static */ ParseDiagnosticUtil::LineParser ParseDiagnosticUtil::getLineParser(
+    const CompilerIdentity& compilerIdentity)
 {
     switch (compilerIdentity.m_type)
     {
-        case CompilerIdentity::Slang:               return &parseSlangLine;
-        case CompilerIdentity::DownstreamCompiler:  return &parseGenericLine;
-        default: return nullptr;
+    case CompilerIdentity::Slang:              return &parseSlangLine;
+    case CompilerIdentity::DownstreamCompiler: return &parseGenericLine;
+    default:                                   return nullptr;
     }
 }
 
@@ -251,7 +278,9 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
     return true;
 }
 
-/* static */SlangResult ParseDiagnosticUtil::parseDiagnostics(const UnownedStringSlice& inText, IArtifactDiagnostics* diagnostics)
+/* static */ SlangResult ParseDiagnosticUtil::parseDiagnostics(
+    const UnownedStringSlice& inText,
+    IArtifactDiagnostics* diagnostics)
 {
     if (_isWhitespace(inText))
     {
@@ -276,7 +305,11 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
     return parseDiagnostics(inText, compilerIdentity, linePrefix, diagnostics);
 }
 
-/* static */SlangResult ParseDiagnosticUtil::parseDiagnostics(const UnownedStringSlice& inText, const CompilerIdentity& compilerIdentity, const UnownedStringSlice& linePrefix, IArtifactDiagnostics* diagnostics)
+/* static */ SlangResult ParseDiagnosticUtil::parseDiagnostics(
+    const UnownedStringSlice& inText,
+    const CompilerIdentity& compilerIdentity,
+    const UnownedStringSlice& linePrefix,
+    IArtifactDiagnostics* diagnostics)
 {
     auto lineParser = getLineParser(compilerIdentity);
     if (!lineParser)
@@ -296,13 +329,16 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
         if (linePrefix.getLength() > 0 && line.startsWith(linePrefix))
         {
             // Try with the line prefix
-            isValidSplit = SLANG_SUCCEEDED(splitDiagnosticLine(compilerIdentity, line, linePrefix, splitLine));
+            isValidSplit =
+                SLANG_SUCCEEDED(splitDiagnosticLine(compilerIdentity, line, linePrefix, splitLine));
         }
 
         if (!isValidSplit)
         {
-            // Try without the prefix, as some output output's only some lines with the prefix (GLSL for example)
-            isValidSplit = SLANG_SUCCEEDED(splitDiagnosticLine(compilerIdentity, line, UnownedStringSlice(), splitLine));
+            // Try without the prefix, as some output output's only some lines with the prefix (GLSL
+            // for example)
+            isValidSplit = SLANG_SUCCEEDED(
+                splitDiagnosticLine(compilerIdentity, line, UnownedStringSlice(), splitLine));
         }
 
         // If we don't have a valid split then just assume it's a note
@@ -316,7 +352,7 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
         diagnostic.severity = ArtifactDiagnostic::Severity::Error;
         diagnostic.stage = ArtifactDiagnostic::Stage::Compile;
         diagnostic.location.line = 0;
-        
+
         if (SLANG_SUCCEEDED(lineParser(allocator, line, splitLine, diagnostic)))
         {
             diagnostics->add(diagnostic);
@@ -324,7 +360,7 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
         else
         {
             // If couldn't parse, just add as a note
-             ArtifactDiagnosticUtil::maybeAddNote(line, diagnostics);
+            ArtifactDiagnosticUtil::maybeAddNote(line, diagnostics);
         }
     }
 
@@ -355,7 +391,9 @@ static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& l
     return (nextLine != toSlice("}"));
 }
 
-/* static */SlangResult ParseDiagnosticUtil::parseOutputInfo(const UnownedStringSlice& inText, OutputInfo& out)
+/* static */ SlangResult ParseDiagnosticUtil::parseOutputInfo(
+    const UnownedStringSlice& inText,
+    OutputInfo& out)
 {
     enum State
     {
@@ -368,7 +406,7 @@ static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& l
     UnownedStringSlice stdErrorPrefix = UnownedStringSlice::fromLiteral("standard error");
     UnownedStringSlice stdOutputPrefix = UnownedStringSlice::fromLiteral("standard output");
 
-    
+
     List<UnownedStringSlice> lines;
 
     State state = State::Normal;
@@ -378,12 +416,13 @@ static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& l
     {
         switch (state)
         {
-            case State::Normal:
+        case State::Normal:
             {
                 if (line.startsWith(resultCodePrefix))
                 {
                     // Split past the equal
-                    const UnownedStringSlice valueSlice = _getEquals(line.tail(resultCodePrefix.getLength()));
+                    const UnownedStringSlice valueSlice =
+                        _getEquals(line.tail(resultCodePrefix.getLength()));
                     Int value;
                     SLANG_RETURN_ON_FAIL(StringUtil::parseInt(valueSlice, value));
                     out.resultCode = int(value);
@@ -405,19 +444,21 @@ static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& l
                         // Clear the lines buffer
                         lines.clear();
 
-                        UnownedStringSlice valueSlice = _getEquals(line.tail(startsWith->getLength()));
+                        UnownedStringSlice valueSlice =
+                            _getEquals(line.tail(startsWith->getLength()));
                         if (!valueSlice.isChar('{'))
                         {
                             return SLANG_FAIL;
                         }
                         // Okay we now inside std out or std error, so update the state
-                        state = (startsWith == &stdErrorPrefix) ? State::InStdError : State::InStdOut;
+                        state =
+                            (startsWith == &stdErrorPrefix) ? State::InStdError : State::InStdOut;
                     }
                 }
                 break;
             }
-            case State::InStdError:
-            case State::InStdOut:
+        case State::InStdError:
+        case State::InStdOut:
             {
                 if (_isAtEnd(text, line))
                 {
@@ -440,7 +481,10 @@ static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& l
 }
 
 
-/* static */bool ParseDiagnosticUtil::areEqual(const UnownedStringSlice& a, const UnownedStringSlice& b, EqualityFlags flags)
+/* static */ bool ParseDiagnosticUtil::areEqual(
+    const UnownedStringSlice& a,
+    const UnownedStringSlice& b,
+    EqualityFlags flags)
 {
     auto diagsA = ArtifactDiagnostics::create();
     auto diagsB = ArtifactDiagnostics::create();
@@ -449,23 +493,22 @@ static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& l
     SlangResult resB = ParseDiagnosticUtil::parseDiagnostics(b, diagsB);
 
     /*
-        TODO(JS): In the past we needed special handling of the stdlib, when
-        in some builds the path contains the stdlib.
+        TODO(JS): In the past we needed special handling of the core module, when
+        in some builds the path contains the core module.
 
         For now we don't seem to need this, this is for future reference, if there
         is an issue with needing to specially handle this.
 
-       static const UnownedStringSlice stdLibNames[] =
+       static const UnownedStringSlice coreModuleNames[] =
         {
             UnownedStringSlice::fromLiteral("core.meta.slang"),
             UnownedStringSlice::fromLiteral("hlsl.meta.slang"),
-            UnownedStringSlice::fromLiteral("slang-stdlib.cpp"),
+            UnownedStringSlice::fromLiteral("slang-core-module.cpp"),
         };
         */
 
     // Must have both succeeded, and have the same amount of lines
-    if (SLANG_SUCCEEDED(resA) && SLANG_SUCCEEDED(resB) &&
-        diagsA->getCount() == diagsB->getCount())
+    if (SLANG_SUCCEEDED(resA) && SLANG_SUCCEEDED(resB) && diagsA->getCount() == diagsB->getCount())
     {
         const auto count = diagsA->getCount();
         for (Index i = 0; i < count; ++i)
@@ -490,6 +533,6 @@ static bool _isAtEnd(const UnownedStringSlice& text, const UnownedStringSlice& l
 
         return true;
     }
-    
+
     return false;
 }

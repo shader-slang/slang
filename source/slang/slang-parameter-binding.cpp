@@ -1,18 +1,16 @@
 // slang-parameter-binding.cpp
 #include "slang-parameter-binding.h"
 
-#include "slang-lookup.h"
-#include "slang-compiler.h"
-#include "slang-type-layout.h"
-#include "slang-ir-util.h"
-
 #include "../compiler-core/slang-artifact-desc-util.h"
-
+#include "slang-compiler.h"
 #include "slang-ir-string-hash.h"
-
+#include "slang-ir-util.h"
+#include "slang-lookup.h"
+#include "slang-type-layout.h"
 #include "slang.h"
 
-namespace Slang {
+namespace Slang
+{
 
 struct ParameterInfo;
 
@@ -43,8 +41,10 @@ static bool rangesOverlap(UsedRange const& x, UsedRange const& y)
     // If they don't overlap, then one must be earlier than the other,
     // and that one must therefore *end* before the other *begins*
 
-    if (x.end <= y.begin) return false;
-    if (y.end <= x.begin) return false;
+    if (x.end <= y.begin)
+        return false;
+    if (y.end <= x.begin)
+        return false;
 
     // Otherwise they must overlap
     return true;
@@ -105,7 +105,7 @@ struct UsedRanges
         // the array as we go.
         //
         Int rangeCount = ranges.getCount();
-        for(Int rr = 0; rr < rangeCount; ++rr)
+        for (Int rr = 0; rr < rangeCount; ++rr)
         {
             auto existingRange = ranges[rr];
 
@@ -122,7 +122,7 @@ struct UsedRanges
             // then our invariant will be trivially
             // true for the next iteration.
             //
-            if(!rangesOverlap(existingRange, range))
+            if (!rangesOverlap(existingRange, range))
             {
                 continue;
             }
@@ -134,8 +134,7 @@ struct UsedRanges
             // that we can use it for emitting diagnostics
             // about the overlap:
             //
-            if( existingRange.parameter
-                && existingRange.parameter != newParam)
+            if (existingRange.parameter && existingRange.parameter != newParam)
             {
                 // There was an overlap with a range that
                 // had a parameter specified, so we will
@@ -160,7 +159,7 @@ struct UsedRanges
             // because it comes strictly before `existingRange`, and our
             // invariant says there is no intersection with preceding ranges.
             //
-            if(range.begin < existingRange.begin)
+            if (range.begin < existingRange.begin)
             {
                 UsedRange prefix;
                 prefix.begin = range.begin;
@@ -183,7 +182,7 @@ struct UsedRanges
             // If the range would be empty, then of course we have nothing
             // left to do.
             //
-            if(range.begin >= range.end)
+            if (range.begin >= range.end)
                 break;
 
             // Otherwise, have can be sure that `range` now comes
@@ -198,7 +197,7 @@ struct UsedRanges
         // If the `range` we are left with is still non-empty,
         // then we should go ahead and add it.
         //
-        if(range.begin < range.end)
+        if (range.begin < range.end)
         {
             ranges.add(range);
         }
@@ -233,8 +232,8 @@ struct UsedRanges
         return Add(range);
     }
 
-        /// Finds the range that contains the index
-        /// Returns -1 if not found
+    /// Finds the range that contains the index
+    /// Returns -1 if not found
     Index findRangeContaining(UInt index) const
     {
         const auto rangeCount = ranges.getCount();
@@ -248,8 +247,8 @@ struct UsedRanges
         }
         return -1;
     }
-        /// Finds the range index that contains the range passed in.
-        /// Returns -1 if not found
+    /// Finds the range index that contains the range passed in.
+    /// Returns -1 if not found
     Index findRangeContaining(UInt index, UInt count) const
     {
         const auto start = index;
@@ -275,9 +274,8 @@ struct UsedRanges
             const auto count = size.getFiniteValue();
             if (count > 0)
             {
-                return (count == 1) ?
-                    findRangeContaining(index) :
-                    findRangeContaining(index, count);
+                return (count == 1) ? findRangeContaining(index)
+                                    : findRangeContaining(index, count);
             }
         }
         else
@@ -332,9 +330,9 @@ struct UsedRanges
 
 struct ParameterBindingInfo
 {
-    size_t              space = 0;
-    size_t              index = 0;
-    LayoutSize          count = 0;
+    size_t space = 0;
+    size_t index = 0;
+    LayoutSize count = 0;
 };
 
 struct ParameterBindingAndKindInfo : ParameterBindingInfo
@@ -360,7 +358,7 @@ struct ParameterInfo : RefObject
     // Layout info for the variable that represents this parameter
     RefPtr<VarLayout> varLayout;
 
-    ParameterBindingInfo    bindingInfo[kLayoutResourceKindCount];
+    ParameterBindingInfo bindingInfo[kLayoutResourceKindCount];
 };
 
 struct EntryPointParameterBindingContext
@@ -375,10 +373,10 @@ struct EntryPointParameterBindingContext
 struct SharedParameterBindingContext
 {
     SharedParameterBindingContext(
-        LayoutRulesFamilyImpl*  defaultLayoutRules,
-        ProgramLayout*          programLayout,
-        TargetProgram*          inTargetProgram,
-        DiagnosticSink*         sink)
+        LayoutRulesFamilyImpl* defaultLayoutRules,
+        ProgramLayout* programLayout,
+        TargetProgram* inTargetProgram,
+        DiagnosticSink* sink)
         : defaultLayoutRules(defaultLayoutRules)
         , programLayout(programLayout)
         , targetRequest(inTargetProgram->getTargetReq())
@@ -397,7 +395,7 @@ struct SharedParameterBindingContext
     // TODO: We should eventually strip this down to
     // just the subset of fields on the target that
     // can influence layout decisions.
-    TargetRequest*  targetRequest = nullptr;
+    TargetRequest* targetRequest = nullptr;
 
     TargetProgram* targetProgram = nullptr;
 
@@ -449,7 +447,7 @@ struct ParameterBindingContext
     Stage stage;
 
     // The entry point that is being processed right now.
-    EntryPointLayout*   entryPointLayout = nullptr;
+    EntryPointLayout* entryPointLayout = nullptr;
 
     TargetRequest* getTargetRequest() { return shared->getTargetRequest(); }
     TargetProgram* getTargetProgram() { return shared->getTargetProgram(); }
@@ -468,9 +466,9 @@ static DiagnosticSink* getSink(ParameterBindingContext* context)
 
 struct LayoutSemanticInfo
 {
-    LayoutResourceKind  kind; // the register kind
-    UInt                space;
-    UInt                index;
+    LayoutResourceKind kind; // the register kind
+    UInt space;
+    UInt index;
 
     // TODO: need to deal with component-granularity binding...
 };
@@ -493,7 +491,7 @@ bool splitNameAndIndex(
     // "SV_TARGET1" has an ExplicitIndex
     // "SV_TARGET" does not have an ExplicitIndex
     bool hasExplicitIndex = false;
-    while( nameEnd != nameBegin && isDigit(*(nameEnd - 1)) )
+    while (nameEnd != nameBegin && isDigit(*(nameEnd - 1)))
     {
         hasExplicitIndex = true;
         nameEnd--;
@@ -507,7 +505,7 @@ bool splitNameAndIndex(
 
 LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerClassName)
 {
-    switch( registerClassName.getLength() )
+    switch (registerClassName.getLength())
     {
     case 1:
         switch (*registerClassName.begin())
@@ -517,31 +515,28 @@ LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerC
         case 'u': return LayoutResourceKind::UnorderedAccess;
         case 's': return LayoutResourceKind::SamplerState;
 
-        default:
-            break;
+        default: break;
         }
         break;
 
     case 5:
-        if( registerClassName == toSlice("space") )
+        if (registerClassName == toSlice("space"))
         {
             return LayoutResourceKind::SubElementRegisterSpace;
         }
         break;
 
-    default:
-        break;
+    default: break;
     }
     return LayoutResourceKind::None;
 }
 
 LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
-    UnownedStringSlice  registerName,
-    SourceLoc           registerLoc,
-    UnownedStringSlice  spaceName,
-    SourceLoc           spaceLoc,
-    DiagnosticSink*     sink
-    )
+    UnownedStringSlice registerName,
+    SourceLoc registerLoc,
+    UnownedStringSlice spaceName,
+    SourceLoc spaceLoc,
+    DiagnosticSink* sink)
 {
     LayoutSemanticInfo info;
     info.space = 0;
@@ -566,7 +561,7 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     splitNameAndIndex(registerName, registerClassName, registerIndexDigits);
 
     LayoutResourceKind kind = findRegisterClassFromName(registerClassName);
-    if(kind == LayoutResourceKind::None)
+    if (kind == LayoutResourceKind::None)
     {
         sink->diagnose(registerLoc, Diagnostics::unknownRegisterClass, registerClassName);
         return info;
@@ -574,40 +569,40 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
 
     // For a `register` semantic, the register index is not optional (unlike
     // how it works for varying input/output semantics).
-    if( registerIndexDigits.getLength() == 0 )
+    if (registerIndexDigits.getLength() == 0)
     {
         sink->diagnose(registerLoc, Diagnostics::expectedARegisterIndex, registerClassName);
     }
 
     UInt index = 0;
-    for(auto c : registerIndexDigits)
+    for (auto c : registerIndexDigits)
     {
         SLANG_ASSERT(isDigit(c));
         index = index * 10 + (c - '0');
     }
 
     UInt space = 0;
-    if(spaceName.getLength() != 0)
+    if (spaceName.getLength() != 0)
     {
         UnownedStringSlice spaceSpelling;
         UnownedStringSlice spaceDigits;
         splitNameAndIndex(spaceName, spaceSpelling, spaceDigits);
 
-        if( kind == LayoutResourceKind::SubElementRegisterSpace)
+        if (kind == LayoutResourceKind::SubElementRegisterSpace)
         {
             sink->diagnose(spaceLoc, Diagnostics::unexpectedSpecifierAfterSpace, spaceName);
         }
-        else if( spaceSpelling != UnownedTerminatedStringSlice("space") )
+        else if (spaceSpelling != UnownedTerminatedStringSlice("space"))
         {
             sink->diagnose(spaceLoc, Diagnostics::expectedSpace, spaceSpelling);
         }
-        else if( spaceDigits.getLength() == 0 )
+        else if (spaceDigits.getLength() == 0)
         {
             sink->diagnose(spaceLoc, Diagnostics::expectedSpaceIndex);
         }
         else
         {
-            for(auto c : spaceDigits)
+            for (auto c : spaceDigits)
             {
                 SLANG_ASSERT(isDigit(c));
                 space = space * 10 + (c - '0');
@@ -616,20 +611,20 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     }
 
     info.kind = kind;
-    info.index = (int) index;
+    info.index = (int)index;
     info.space = space;
     return info;
 }
 
 static LayoutSemanticInfo _extractLayoutSemanticInfo(
-    ParameterBindingContext*    context,
-    HLSLLayoutSemantic*         semantic)
+    ParameterBindingContext* context,
+    HLSLLayoutSemantic* semantic)
 {
     Token const& registerToken = semantic->registerName;
 
     Token defaultSpaceToken;
     Token const* spaceToken = &defaultSpaceToken;
-    if( auto registerSemantic = as<HLSLRegisterSemantic>(semantic) )
+    if (auto registerSemantic = as<HLSLRegisterSemantic>(semantic))
     {
         spaceToken = &registerSemantic->spaceName;
     }
@@ -650,15 +645,14 @@ static LayoutSemanticInfo _extractLayoutSemanticInfo(
 // Given a GLSL `layout` modifier, we need to be able to check for
 // a particular sub-argument and extract its value if present.
 template<typename T>
-static bool findLayoutArg(
-    ModifiableSyntaxNode*    syntax,
-    UInt*                           outVal)
+static bool findLayoutArg(ModifiableSyntaxNode* syntax, UInt* outVal)
 {
-    for( auto modifier : syntax->getModifiersOfType<T>() )
+    for (auto modifier : syntax->getModifiersOfType<T>())
     {
-        if( modifier )
+        if (modifier)
         {
-            *outVal = (UInt) strtoull(String(modifier->valToken.getContent()).getBuffer(), nullptr, 10);
+            *outVal =
+                (UInt)strtoull(String(modifier->valToken.getContent()).getBuffer(), nullptr, 10);
             return true;
         }
     }
@@ -666,25 +660,23 @@ static bool findLayoutArg(
 }
 
 template<typename T>
-static bool findLayoutArg(
-    DeclRef<Decl>   declRef,
-    UInt*           outVal)
+static bool findLayoutArg(DeclRef<Decl> declRef, UInt* outVal)
 {
     return findLayoutArg<T>(declRef.getDecl(), outVal);
 }
 
-    /// Determine how to lay out a global variable that might be a shader parameter.
-    ///
-    /// Returns `nullptr` if the declaration does not represent a shader parameter.
+/// Determine how to lay out a global variable that might be a shader parameter.
+///
+/// Returns `nullptr` if the declaration does not represent a shader parameter.
 RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
-    ParameterBindingContext*    context,
-    VarDeclBase*                varDecl,
-    Type*                       type)
+    ParameterBindingContext* context,
+    VarDeclBase* varDecl,
+    Type* type)
 {
     auto layoutContext = context->layoutContext;
     auto rules = layoutContext.getRulesFamily();
 
-    if(varDecl->hasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type))
+    if (varDecl->hasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type))
     {
         return createTypeLayoutWith(
             layoutContext,
@@ -695,12 +687,9 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
-    if( varDecl->hasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type) )
+    if (varDecl->hasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type))
     {
-        return createTypeLayoutWith(
-            layoutContext,
-            rules->getPushConstantBufferRules(),
-            type);
+        return createTypeLayoutWith(layoutContext, rules->getPushConstantBufferRules(), type);
     }
 
     if (varDecl->hasModifier<SpecializationConstantAttribute>() ||
@@ -711,12 +700,10 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
         {
             // If the target doesn't support specialization constants, then we will
             // layout them as ordinary uniform data.
-            specializationConstantRule = rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet());
+            specializationConstantRule =
+                rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet());
         }
-        return createTypeLayoutWith(
-            layoutContext,
-            specializationConstantRule,
-            type);
+        return createTypeLayoutWith(layoutContext, specializationConstantRule, type);
     }
 
     // TODO(tfoley): there may be other cases that we need to handle here
@@ -733,31 +720,29 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
 struct EntryPointParameterState
 {
-    String*                             optSemanticName = nullptr;
-    int*                                ioSemanticIndex = nullptr;
-    EntryPointParameterDirectionMask    directionMask;
-    int                                 semanticSlotCount;
-    Stage                               stage = Stage::Unknown;
-    bool                                isSampleRate = false;
-    SourceLoc                           loc;
+    String* optSemanticName = nullptr;
+    int* ioSemanticIndex = nullptr;
+    EntryPointParameterDirectionMask directionMask;
+    int semanticSlotCount;
+    Stage stage = Stage::Unknown;
+    bool isSampleRate = false;
+    SourceLoc loc;
 };
 
 
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
-    ParameterBindingContext*        context,
-    Type*          type,
+    ParameterBindingContext* context,
+    Type* type,
     EntryPointParameterState const& state,
-    RefPtr<VarLayout>               varLayout);
+    RefPtr<VarLayout> varLayout);
 
-static RefPtr<VarLayout> _createVarLayout(
-    TypeLayout*             typeLayout,
-    DeclRef<VarDeclBase>    varDeclRef)
+static RefPtr<VarLayout> _createVarLayout(TypeLayout* typeLayout, DeclRef<VarDeclBase> varDeclRef)
 {
     RefPtr<VarLayout> varLayout = new VarLayout();
     varLayout->typeLayout = typeLayout;
     varLayout->varDecl = varDeclRef;
 
-    if(auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout)
+    if (auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout)
     {
         RefPtr<VarLayout> pendingVarLayout = new VarLayout();
         pendingVarLayout->varDecl = varDeclRef;
@@ -770,29 +755,27 @@ static RefPtr<VarLayout> _createVarLayout(
 
 // Collect a single declaration into our set of parameters
 static void collectGlobalScopeParameter(
-    ParameterBindingContext*    context,
-    ShaderParamInfo const&      shaderParamInfo,
-    SubstitutionSet             globalGenericSubst)
+    ParameterBindingContext* context,
+    ShaderParamInfo const& shaderParamInfo,
+    SubstitutionSet globalGenericSubst)
 {
     auto astBuilder = context->getASTBuilder();
 
     auto varDeclRef = shaderParamInfo.paramDeclRef;
 
     // We apply any substitutions for global generic parameters here.
-    auto type = as<Type>(getType(astBuilder, varDeclRef)->substitute(astBuilder, globalGenericSubst));
+    auto type =
+        as<Type>(getType(astBuilder, varDeclRef)->substitute(astBuilder, globalGenericSubst));
 
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute
     // the layout for that parameter's type.
-    auto typeLayout = getTypeLayoutForGlobalShaderParameter(
-        context,
-        varDeclRef.getDecl(),
-        type);
+    auto typeLayout = getTypeLayoutForGlobalShaderParameter(context, varDeclRef.getDecl(), type);
 
     // If we did not find appropriate layout rules, then it
     // must mean that this global variable is *not* a shader
     // parameter.
-    if(!typeLayout)
+    if (!typeLayout)
         return;
 
     // Now create a variable layout that we can use
@@ -816,9 +799,7 @@ static void collectGlobalScopeParameter(
     parameterInfo->varLayout = varLayout;
 }
 
-static UsedRangeSet* _getOrCreateUsedRangeSetForSpace(
-    ParameterBindingContext*    context,
-    UInt                        space)
+static UsedRangeSet* _getOrCreateUsedRangeSetForSpace(ParameterBindingContext* context, UInt space)
 {
     auto& globalSpaceUsedRangeSets = context->shared->globalSpaceUsedRangeSets;
 
@@ -830,9 +811,7 @@ static UsedRangeSet* _getOrCreateUsedRangeSetForSpace(
     return value;
 }
 
-static UsedRangeSet* _getUsedRangeSetForSpace(
-    ParameterBindingContext* context,
-    UInt                        space)
+static UsedRangeSet* _getUsedRangeSetForSpace(ParameterBindingContext* context, UInt space)
 {
     auto& globalSpaceUsedRangeSets = context->shared->globalSpaceUsedRangeSets;
 
@@ -847,34 +826,27 @@ static UsedRangeSet* _getUsedRangeSetForSpace(
 // has been used in at least one binding, and so it should not
 // be used by auto-generated bindings that need to claim entire
 // spaces.
-static VarLayout* markSpaceUsed(
-    ParameterBindingContext*    context,
-    VarLayout*                  varLayout,
-    UInt                        space)
+static VarLayout* markSpaceUsed(ParameterBindingContext* context, VarLayout* varLayout, UInt space)
 {
-    return context->shared->usedSpaces.Add(varLayout, space, space+1);
+    return context->shared->usedSpaces.Add(varLayout, space, space + 1);
 }
 
-static UInt allocateUnusedSpaces(
-    ParameterBindingContext*    context,
-    UInt                        count)
+static UInt allocateUnusedSpaces(ParameterBindingContext* context, UInt count)
 {
     return context->shared->usedSpaces.Allocate(nullptr, count);
 }
 
-static bool shouldDisableDiagnostic(
-    Decl*                   decl,
-    DiagnosticInfo const&   diagnosticInfo)
+static bool shouldDisableDiagnostic(Decl* decl, DiagnosticInfo const& diagnosticInfo)
 {
-    for( auto dd = decl; dd; dd = dd->parentDecl )
+    for (auto dd = decl; dd; dd = dd->parentDecl)
     {
-        for( auto modifier : dd->modifiers )
+        for (auto modifier : dd->modifiers)
         {
             auto allowAttr = as<AllowAttribute>(modifier);
-            if(!allowAttr)
+            if (!allowAttr)
                 continue;
 
-            if(allowAttr->diagnostic == &diagnosticInfo)
+            if (allowAttr->diagnostic == &diagnosticInfo)
                 return true;
         }
     }
@@ -882,25 +854,27 @@ static bool shouldDisableDiagnostic(
 }
 
 static void addExplicitParameterBinding(
-    ParameterBindingContext*    context,
-    RefPtr<ParameterInfo>       parameterInfo,
-    VarDeclBase*                varDecl,
-    LayoutSemanticInfo const&   semanticInfo,
-    LayoutSize                  count)
+    ParameterBindingContext* context,
+    RefPtr<ParameterInfo> parameterInfo,
+    VarDeclBase* varDecl,
+    LayoutSemanticInfo const& semanticInfo,
+    LayoutSize count)
 {
     auto kind = semanticInfo.kind;
 
     auto& bindingInfo = parameterInfo->bindingInfo[(int)kind];
-    if( bindingInfo.count != 0 )
+    if (bindingInfo.count != 0)
     {
         // We already have a binding here, so we want to
         // confirm that it matches the new one that is
         // incoming...
-        if( bindingInfo.count != count
-            || bindingInfo.index != semanticInfo.index
-            || bindingInfo.space != semanticInfo.space )
+        if (bindingInfo.count != count || bindingInfo.index != semanticInfo.index ||
+            bindingInfo.space != semanticInfo.space)
         {
-            getSink(context)->diagnose(varDecl, Diagnostics::conflictingExplicitBindingsForParameter, getReflectionName(varDecl));
+            getSink(context)->diagnose(
+                varDecl,
+                Diagnostics::conflictingExplicitBindingsForParameter,
+                getReflectionName(varDecl));
         }
 
         // TODO(tfoley): `register` semantics can technically be
@@ -913,14 +887,16 @@ static void addExplicitParameterBinding(
         bindingInfo.space = semanticInfo.space;
 
         VarLayout* overlappedVarLayout = nullptr;
-        if( kind == LayoutResourceKind::RegisterSpace || kind == LayoutResourceKind::SubElementRegisterSpace )
+        if (kind == LayoutResourceKind::RegisterSpace ||
+            kind == LayoutResourceKind::SubElementRegisterSpace)
         {
             // Parameter is being bound to an entire space, so we
             // need to mark the given space as used and report
             // an error if another parameter was already allocated
             // there.
             //
-            overlappedVarLayout = markSpaceUsed(context, parameterInfo->varLayout, semanticInfo.index);
+            overlappedVarLayout =
+                markSpaceUsed(context, parameterInfo->varLayout, semanticInfo.index);
         }
         else
         {
@@ -940,9 +916,11 @@ static void addExplicitParameterBinding(
 
         if (overlappedVarLayout)
         {
-            //legal if atomicUint
-            if(parameterInfo->varLayout->getVariable()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType
-                && overlappedVarLayout->getVariable()->getType()->astNodeType == ASTNodeType::GLSLAtomicUintType)
+            // legal if atomicUint
+            if (parameterInfo->varLayout->getVariable()->getType()->astNodeType ==
+                    ASTNodeType::GLSLAtomicUintType &&
+                overlappedVarLayout->getVariable()->getType()->astNodeType ==
+                    ASTNodeType::GLSLAtomicUintType)
             {
                 return;
             }
@@ -957,26 +935,31 @@ static void addExplicitParameterBinding(
             // the user because such overlapping bindings are likely
             // to indicate a programming error.
             //
-            if(shouldDisableDiagnostic(paramA, diagnosticInfo)
-                && shouldDisableDiagnostic(paramB, diagnosticInfo))
+            if (shouldDisableDiagnostic(paramA, diagnosticInfo) &&
+                shouldDisableDiagnostic(paramB, diagnosticInfo))
             {
             }
             else
             {
-                bool written = getSink(context)->diagnose(paramA, diagnosticInfo,
+                bool written = getSink(context)->diagnose(
+                    paramA,
+                    diagnosticInfo,
                     getReflectionName(paramA),
                     getReflectionName(paramB));
                 if (written)
-                    getSink(context)->diagnose(paramB, Diagnostics::seeDeclarationOf, getReflectionName(paramB));
+                    getSink(context)->diagnose(
+                        paramB,
+                        Diagnostics::seeDeclarationOf,
+                        getReflectionName(paramB));
             }
         }
     }
 }
 
 static void addExplicitParameterBindings_HLSL(
-    ParameterBindingContext*    context,
-    RefPtr<ParameterInfo>       parameterInfo,
-    RefPtr<VarLayout>           varLayout)
+    ParameterBindingContext* context,
+    RefPtr<ParameterInfo> parameterInfo,
+    RefPtr<VarLayout> varLayout)
 {
     // We only want to apply D3D `register` modifiers when compiling for
     // D3D and Metal targets.
@@ -995,7 +978,7 @@ static void addExplicitParameterBindings_HLSL(
     //
     // For now we do the filtering on target in a very direct fashion:
     //
-    if(!isD3DTarget(context->getTargetRequest()) && !isMetalTarget(context->getTargetRequest()))
+    if (!isD3DTarget(context->getTargetRequest()) && !isMetalTarget(context->getTargetRequest()))
         return;
 
     auto typeLayout = varLayout->typeLayout;
@@ -1003,7 +986,8 @@ static void addExplicitParameterBindings_HLSL(
 
     // If the declaration has explicit binding modifiers, then
     // here is where we want to extract and apply them...
-    if (auto inputAttachmentIndexLayoutAttribute = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
+    if (auto inputAttachmentIndexLayoutAttribute =
+            varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
     {
         LayoutSemanticInfo semanticInfo;
         semanticInfo.index = (UInt)inputAttachmentIndexLayoutAttribute->location;
@@ -1011,7 +995,12 @@ static void addExplicitParameterBindings_HLSL(
         semanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
 
         if (auto varDeclBase = varDecl.as<VarDeclBase>())
-            addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, 1);
+            addExplicitParameterBinding(
+                context,
+                parameterInfo,
+                varDeclBase.getDecl(),
+                semanticInfo,
+                1);
     }
 
     // Look for HLSL `register` or `packoffset` semantics.
@@ -1041,36 +1030,44 @@ static void addExplicitParameterBindings_HLSL(
         }
 
         if (auto varDeclBase = varDecl.as<VarDeclBase>())
-            addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
+            addExplicitParameterBinding(
+                context,
+                parameterInfo,
+                varDeclBase.getDecl(),
+                semanticInfo,
+                count);
     }
 }
 
 static void _maybeDiagnoseMissingVulkanLayoutModifier(
-    ParameterBindingContext*    context,
+    ParameterBindingContext* context,
     DeclRef<VarDeclBase> const& varDecl)
 {
     // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
     // but they *did* specify a `register` for D3D, then that is probably an
     // oversight on their part.
-    if( auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>() )
+    if (auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>())
     {
-        getSink(context)->diagnose(registerModifier, Diagnostics::registerModifierButNoVulkanLayout, varDecl.getName());
+        getSink(context)->diagnose(
+            registerModifier,
+            Diagnostics::registerModifierButNoVulkanLayout,
+            varDecl.getName());
     }
 }
 
 static void addExplicitParameterBindings_GLSL(
-    ParameterBindingContext*    context,
-    RefPtr<ParameterInfo>       parameterInfo,
-    RefPtr<VarLayout>           varLayout)
+    ParameterBindingContext* context,
+    RefPtr<ParameterInfo> parameterInfo,
+    RefPtr<VarLayout> varLayout)
 {
     // We only want to apply GLSL-style layout modifers
-    // when compiling for a Khronos-related target. 
+    // when compiling for a Khronos-related target.
     //
     // TODO: This should have some finer granularity
     // so that we are able to distinguish between
     // Vulkan and OpenGL as targets.
     //
-    if(!isKhronosTarget(context->getTargetRequest()))
+    if (!isKhronosTarget(context->getTargetRequest()))
         return;
 
     auto typeLayout = varLayout->typeLayout;
@@ -1082,7 +1079,7 @@ static void addExplicitParameterBindings_GLSL(
     // the index/offset/etc.
     //
 
-    enum 
+    enum
     {
         kResInfo = 0,
         kSubpassResInfo,
@@ -1101,12 +1098,14 @@ static void addExplicitParameterBindings_GLSL(
         }
     };
     ResAndSemanticInfo info[kMaxResCount] = {};
-    
-    if (auto foundInputAttachmentIndex = typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
+
+    if (auto foundInputAttachmentIndex =
+            typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
     {
         foundResInfo = foundInputAttachmentIndex;
         // Try to find `input_attachment_index`
-        if (auto glslAttachmentIndexAttr = varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
+        if (auto glslAttachmentIndexAttr =
+                varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
         {
             info[kSubpassResInfo].resInfo = foundResInfo;
             // Subpass fills semantic info of a descriptor and subpass
@@ -1115,7 +1114,8 @@ static void addExplicitParameterBindings_GLSL(
         }
     }
 
-    if(auto foundDescriptorTableSlot = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+    if (auto foundDescriptorTableSlot =
+            typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
     {
         foundResInfo = foundDescriptorTableSlot;
         // Try to find `binding` and `set`
@@ -1126,7 +1126,9 @@ static void addExplicitParameterBindings_GLSL(
             info[kResInfo].semanticInfo.space = glslBindingAttr->set;
         }
     }
-    else if(auto foundSubElementRegisterSpace = typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+    else if (
+        auto foundSubElementRegisterSpace =
+            typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
     {
         foundResInfo = foundSubElementRegisterSpace;
         // Try to find `set`
@@ -1135,13 +1137,19 @@ static void addExplicitParameterBindings_GLSL(
             info[kResInfo].resInfo = foundResInfo;
             if (attr->binding != 0)
             {
-                getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.getName(), attr->binding);
+                getSink(context)->diagnose(
+                    attr,
+                    Diagnostics::wholeSpaceParameterRequiresZeroBinding,
+                    varDecl.getName(),
+                    attr->binding);
             }
             info[kResInfo].semanticInfo.index = attr->set;
             info[kResInfo].semanticInfo.space = 0;
         }
     }
-    else if(auto foundSpecializationConstant = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
+    else if (
+        auto foundSpecializationConstant =
+            typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
     {
         info[kResInfo].resInfo = foundSpecializationConstant;
 
@@ -1165,12 +1173,17 @@ static void addExplicitParameterBindings_GLSL(
         auto count = resInfoItem->count;
         semanticInfo.kind = kind;
         hasABinding = true;
-        if(!varDeclBase)
+        if (!varDeclBase)
             break;
 
-        addExplicitParameterBinding(context, parameterInfo, varDeclBase.getDecl(), semanticInfo, count);
+        addExplicitParameterBinding(
+            context,
+            parameterInfo,
+            varDeclBase.getDecl(),
+            semanticInfo,
+            count);
     }
-    if(hasABinding)
+    if (hasABinding)
         return;
 
     auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
@@ -1190,7 +1203,7 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
-    
+
     const auto hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     if (hlslInfo.kind == LayoutResourceKind::None)
     {
@@ -1206,9 +1219,10 @@ static void addExplicitParameterBindings_GLSL(
         if (textureType->isCombined())
             return;
     }
-    
+
     // Can we map to a Vulkan kind in principal?
-    const HLSLToVulkanLayoutOptions::Kind vulkanKind = HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
+    const HLSLToVulkanLayoutOptions::Kind vulkanKind =
+        HLSLToVulkanLayoutOptions::getKind(hlslInfo.kind);
     if (vulkanKind == HLSLToVulkanLayoutOptions::Kind::Invalid)
     {
         // If we can't use inference, for the kind we'll use other mechanisms so we are done
@@ -1216,9 +1230,10 @@ static void addExplicitParameterBindings_GLSL(
     }
 
     // If inference is not enabled for this kind, we can issue a warning
-    if (hlslToVulkanLayoutOptions && !hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
+    if (hlslToVulkanLayoutOptions &&
+        !hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
-        if(!warnedMissingVulkanLayoutModifier)
+        if (!warnedMissingVulkanLayoutModifier)
         {
             _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
             warnedMissingVulkanLayoutModifier = true;
@@ -1227,12 +1242,13 @@ static void addExplicitParameterBindings_GLSL(
 
     if (warnedMissingVulkanLayoutModifier)
     {
-        // If we warn due to invalid bindings and user did not set how to interpret 'hlsl style bindings', we should map 
-        // `register` 1:1 with equivlent vulkan bindings.
-        if(!hlslToVulkanLayoutOptions
-            || hlslToVulkanLayoutOptions->getKindShiftEnabledFlags() == HLSLToVulkanLayoutOptions::KindFlag::None)
+        // If we warn due to invalid bindings and user did not set how to interpret 'hlsl style
+        // bindings', we should map `register` 1:1 with equivlent vulkan bindings.
+        if (!hlslToVulkanLayoutOptions || hlslToVulkanLayoutOptions->getKindShiftEnabledFlags() ==
+                                              HLSLToVulkanLayoutOptions::KindFlag::None)
         {
-            info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
+            info[kResInfo].resInfo =
+                typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
             info[kResInfo].resInfo->count = 1;
         }
         else
@@ -1251,14 +1267,19 @@ static void addExplicitParameterBindings_GLSL(
     info[kResInfo].semanticInfo.space = UInt(hlslInfo.space);
     const LayoutSize count = info[kResInfo].resInfo->count;
 
-    addExplicitParameterBinding(context, parameterInfo, as<VarDeclBase>(varDecl.getDecl()), info[kResInfo].semanticInfo, count);
+    addExplicitParameterBinding(
+        context,
+        parameterInfo,
+        as<VarDeclBase>(varDecl.getDecl()),
+        info[kResInfo].semanticInfo,
+        count);
 }
 
 // Given a single parameter, collect whatever information we have on
 // how it has been explicitly bound, which may come from multiple declarations
 void _generateParameterBindings(
-    ParameterBindingContext*    context,
-    RefPtr<ParameterInfo>       parameterInfo)
+    ParameterBindingContext* context,
+    RefPtr<ParameterInfo> parameterInfo)
 {
     // There must have been a declaration for the parameter.
     SLANG_RELEASE_ASSERT(parameterInfo->varLayout);
@@ -1282,9 +1303,9 @@ void _generateParameterBindings(
 
 // Generate the binding information for a shader parameter.
 static void completeBindingsForParameterImpl(
-    ParameterBindingContext*    context,
-    RefPtr<VarLayout>           firstVarLayout,
-    ParameterBindingInfo        bindingInfos[kLayoutResourceKindCount])
+    ParameterBindingContext* context,
+    RefPtr<VarLayout> firstVarLayout,
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount])
 {
     // For any resource kind used by the parameter
     // we need to update its layout information
@@ -1301,7 +1322,7 @@ static void completeBindingsForParameterImpl(
     // spaces.
     //
     UInt spacesToAllocateCount = 0;
-    for(auto typeRes : firstTypeLayout->resourceInfos)
+    for (auto typeRes : firstTypeLayout->resourceInfos)
     {
         auto kind = typeRes.kind;
 
@@ -1310,7 +1331,7 @@ static void completeBindingsForParameterImpl(
         // go into our contiguously allocated range.
         //
         auto& bindingInfo = bindingInfos[(int)kind];
-        if( bindingInfo.count != 0 )
+        if (bindingInfo.count != 0)
         {
             continue;
         }
@@ -1318,12 +1339,12 @@ static void completeBindingsForParameterImpl(
         // Now we inspect the kind of resource to figure out
         // its space requirements:
         //
-        switch( kind )
+        switch (kind)
         {
         default:
             // An unbounded-size array will need its own space.
             //
-            if( typeRes.count.isInfinite() )
+            if (typeRes.count.isInfinite())
             {
                 spacesToAllocateCount++;
             }
@@ -1361,7 +1382,7 @@ static void completeBindingsForParameterImpl(
     // contiguous spaces here.
     //
     UInt firstAllocatedSpace = 0;
-    if(spacesToAllocateCount)
+    if (spacesToAllocateCount)
     {
         firstAllocatedSpace = allocateUnusedSpaces(context, spacesToAllocateCount);
     }
@@ -1371,13 +1392,13 @@ static void completeBindingsForParameterImpl(
     //
     UInt currentAllocatedSpace = firstAllocatedSpace;
 
-    for(auto typeRes : firstTypeLayout->resourceInfos)
+    for (auto typeRes : firstTypeLayout->resourceInfos)
     {
         // Did we already apply some explicit binding information
         // for this resource kind?
         auto kind = typeRes.kind;
         auto& bindingInfo = bindingInfos[(int)kind];
-        if( bindingInfo.count != 0 )
+        if (bindingInfo.count != 0)
         {
             // If things have already been bound, our work is done.
             //
@@ -1396,7 +1417,7 @@ static void completeBindingsForParameterImpl(
         // all of the special cases above that affect the computation of
         // `spacesToAllocateCount`.
         //
-        switch( kind )
+        switch (kind)
         {
         case LayoutResourceKind::SubElementRegisterSpace:
             {
@@ -1456,7 +1477,7 @@ static void completeBindingsForParameterImpl(
         // number of `t` regisers in D3D), then we will go ahead
         // and assign a full space:
         //
-        if( count.isInfinite() )
+        if (count.isInfinite())
         {
             bindingInfo.count = count;
             bindingInfo.index = 0;
@@ -1473,44 +1494,43 @@ static void completeBindingsForParameterImpl(
             RefPtr<UsedRangeSet> usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
             bindingInfo.count = count;
-            bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(firstVarLayout, count.getFiniteValue());
+            bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(
+                firstVarLayout,
+                count.getFiniteValue());
             bindingInfo.space = space;
         }
     }
 }
 
 static void applyBindingInfoToParameter(
-    RefPtr<VarLayout>       varLayout,
-    ParameterBindingInfo    bindingInfos[kLayoutResourceKindCount])
+    RefPtr<VarLayout> varLayout,
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount])
 {
-    for(auto k = 0; k < kLayoutResourceKindCount; ++k)
+    for (auto k = 0; k < kLayoutResourceKindCount; ++k)
     {
         auto kind = LayoutResourceKind(k);
         auto& bindingInfo = bindingInfos[k];
 
         // skip resources we aren't consuming
-        if(bindingInfo.count == 0)
+        if (bindingInfo.count == 0)
             continue;
 
         // Add a record to the variable layout
         auto varRes = varLayout->AddResourceInfo(kind);
-        varRes->space = (int) bindingInfo.space;
-        varRes->index = (int) bindingInfo.index;
+        varRes->space = (int)bindingInfo.space;
+        varRes->index = (int)bindingInfo.index;
     }
 }
 
 // Generate the binding information for a shader parameter.
 static void completeBindingsForParameter(
-    ParameterBindingContext*    context,
-    RefPtr<ParameterInfo>       parameterInfo)
+    ParameterBindingContext* context,
+    RefPtr<ParameterInfo> parameterInfo)
 {
     auto varLayout = parameterInfo->varLayout;
     SLANG_RELEASE_ASSERT(varLayout);
 
-    completeBindingsForParameterImpl(
-        context,
-        varLayout,
-        parameterInfo->bindingInfo);
+    completeBindingsForParameterImpl(context, varLayout, parameterInfo->bindingInfo);
 
     // At this point we should have explicit binding locations chosen for
     // all the relevant resource kinds, so we can apply these to the
@@ -1520,46 +1540,43 @@ static void completeBindingsForParameter(
 }
 
 static void completeBindingsForParameter(
-    ParameterBindingContext*    context,
-    RefPtr<VarLayout>           varLayout)
+    ParameterBindingContext* context,
+    RefPtr<VarLayout> varLayout)
 {
     ParameterBindingInfo bindingInfos[kLayoutResourceKindCount];
-    completeBindingsForParameterImpl(
-        context,
-        varLayout,
-        bindingInfos);
+    completeBindingsForParameterImpl(context, varLayout, bindingInfos);
     applyBindingInfoToParameter(varLayout, bindingInfos);
 }
 
-    /// Allocate binding location for any "pending" data in a shader parameter.
-    ///
-    /// When a parameter contains interface-type fields (recursively), we might
-    /// not have included them in the base layout for the parameter, and instead
-    /// need to allocate space for them after all other shader parameters have
-    /// been laid out.
-    ///
-    /// This function should be called on the `pendingVarLayout` field of an
-    /// existing `VarLayout` to ensure that its pending data has been properly
-    /// assigned storage. It handles the case where the `pendingVarLayout`
-    /// field is null.
-    ///
+/// Allocate binding location for any "pending" data in a shader parameter.
+///
+/// When a parameter contains interface-type fields (recursively), we might
+/// not have included them in the base layout for the parameter, and instead
+/// need to allocate space for them after all other shader parameters have
+/// been laid out.
+///
+/// This function should be called on the `pendingVarLayout` field of an
+/// existing `VarLayout` to ensure that its pending data has been properly
+/// assigned storage. It handles the case where the `pendingVarLayout`
+/// field is null.
+///
 static void _allocateBindingsForPendingData(
-    ParameterBindingContext*    context,
-    RefPtr<VarLayout>           pendingVarLayout)
+    ParameterBindingContext* context,
+    RefPtr<VarLayout> pendingVarLayout)
 {
-    if(!pendingVarLayout) return;
+    if (!pendingVarLayout)
+        return;
 
     completeBindingsForParameter(context, pendingVarLayout);
 }
 
 struct SimpleSemanticInfo
 {
-    String  name;
-    int     index;
+    String name;
+    int index;
 };
 
-SimpleSemanticInfo decomposeSimpleSemantic(
-    HLSLSimpleSemantic* semantic)
+SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
 {
     auto composedName = semantic->name.getContent();
 
@@ -1567,10 +1584,10 @@ SimpleSemanticInfo decomposeSimpleSemantic(
     // at the end of the composed name
     UInt length = composedName.getLength();
     UInt indexLoc = length;
-    while( indexLoc > 0 )
+    while (indexLoc > 0)
     {
-        auto c = composedName[indexLoc-1];
-        if( c >= '0' && c <= '9' )
+        auto c = composedName[indexLoc - 1];
+        if (c >= '0' && c <= '9')
         {
             indexLoc--;
             continue;
@@ -1583,8 +1600,8 @@ SimpleSemanticInfo decomposeSimpleSemantic(
 
     SimpleSemanticInfo info;
 
-    // 
-    if( indexLoc == length )
+    //
+    if (indexLoc == length)
     {
         // No index suffix
         info.name = composedName;
@@ -1602,17 +1619,17 @@ SimpleSemanticInfo decomposeSimpleSemantic(
 }
 
 static RefPtr<TypeLayout> processSimpleEntryPointParameter(
-    ParameterBindingContext*        context,
-    Type*          type,
+    ParameterBindingContext* context,
+    Type* type,
     EntryPointParameterState const& inState,
-    RefPtr<VarLayout>               varLayout,
-    int                             semanticSlotCount = 1)
+    RefPtr<VarLayout> varLayout,
+    int semanticSlotCount = 1)
 {
     EntryPointParameterState state = inState;
     state.semanticSlotCount = semanticSlotCount;
 
-    auto optSemanticName    =  state.optSemanticName;
-    auto semanticIndex      = *state.ioSemanticIndex;
+    auto optSemanticName = state.optSemanticName;
+    auto semanticIndex = *state.ioSemanticIndex;
 
     String semanticName = optSemanticName ? *optSemanticName : "";
     String sn = semanticName.toLower();
@@ -1623,8 +1640,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     // under the assumption that *any* semantic with an `SV_`
     // or `NV_` prefix is a system value.
     //
-    if (sn.startsWith("sv_")
-        || sn.startsWith("nv_"))
+    if (sn.startsWith("sv_") || sn.startsWith("nv_"))
     {
         // Fragment shader color/render target outputs need to be handled
         // specially, because they are declared with an `SV`-prefixed
@@ -1635,17 +1651,16 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
         // with arbitrary semantics, and simply treat them as if
         // they were declared with `SV_Target`.
         //
-        if( (state.directionMask & kEntryPointParameterDirection_Output)
-            && (state.stage == Stage::Fragment)
-            && (sn == "sv_target") )
+        if ((state.directionMask & kEntryPointParameterDirection_Output) &&
+            (state.stage == Stage::Fragment) && (sn == "sv_target"))
         {
             // Note: For D3D shader models 5.0 and below, each `SV_Target<N>`
             // output conflicts with UAV register `u<N>`.
             //
-            if( isD3DTarget(context->getTargetRequest()) )
+            if (isD3DTarget(context->getTargetRequest()))
             {
                 auto version = context->getTargetProgram()->getOptionSet().getProfileVersion();
-                if( version <= ProfileVersion::DX_5_0 )
+                if (version <= ProfileVersion::DX_5_0)
                 {
                     // We will address the conflict here by claiming the corresponding
                     // `u` register.
@@ -1659,7 +1674,8 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
                     // overlapped layout errors get reported nicely.
                     //
                     auto usedResourceSet = _getOrCreateUsedRangeSetForSpace(context, 0);
-                    usedResourceSet->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)].Add(nullptr, semanticIndex, semanticIndex + semanticSlotCount);
+                    usedResourceSet->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)]
+                        .Add(nullptr, semanticIndex, semanticIndex + semanticSlotCount);
                 }
             }
 
@@ -1671,15 +1687,16 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
                 type,
                 kEntryPointParameterDirection_Output);
         }
-        else if (isSPIRV(context->getTargetRequest()->getTarget())
-             && (
-                    (state.directionMask & kEntryPointParameterDirection_Input && state.stage == Stage::Fragment)
-                    || (state.directionMask & kEntryPointParameterDirection_Output && state.stage == Stage::Vertex)
-                )
-            && sn == "sv_instanceid"
-            )
+        else if (
+            isSPIRV(context->getTargetRequest()->getTarget()) &&
+            ((state.directionMask & kEntryPointParameterDirection_Input &&
+              state.stage == Stage::Fragment) ||
+             (state.directionMask & kEntryPointParameterDirection_Output &&
+              state.stage == Stage::Vertex)) &&
+            sn == "sv_instanceid")
         {
-            // This fragment-shader-input/vertex-shader-output is effectively not a system semantic for SPIR-V,
+            // This fragment-shader-input/vertex-shader-output is effectively not a system semantic
+            // for SPIR-V,
             typeLayout = getSimpleVaryingParameterTypeLayout(
                 context->layoutContext,
                 type,
@@ -1696,10 +1713,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             // in particular should not be assigned `location`s on
             // GLSL-based targets.
             //
-            typeLayout = getSimpleVaryingParameterTypeLayout(
-                context->layoutContext,
-                type,
-                0);
+            typeLayout = getSimpleVaryingParameterTypeLayout(context->layoutContext, type, 0);
 
             // We need to compute whether an entry point consumes
             // any sample-rate inputs, and along with explicitly
@@ -1744,15 +1758,12 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
         // In this case we have a user-defined semantic, which means
         // an ordinary input and/or output varying parameter.
         //
-        typeLayout = getSimpleVaryingParameterTypeLayout(
-                context->layoutContext,
-                type,
-                state.directionMask);
+        typeLayout =
+            getSimpleVaryingParameterTypeLayout(context->layoutContext, type, state.directionMask);
     }
 
-    if (state.isSampleRate
-        && (state.directionMask & kEntryPointParameterDirection_Input)
-        && (context->stage == Stage::Fragment))
+    if (state.isSampleRate && (state.directionMask & kEntryPointParameterDirection_Input) &&
+        (context->stage == Stage::Fragment))
     {
         if (auto entryPointLayout = context->entryPointLayout)
         {
@@ -1766,24 +1777,24 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     return typeLayout;
 }
 
-    /// Compute layout information for an entry-point parameter `decl`.
-    ///
-    /// This function should be used for a top-level entry point varying
-    /// parameter or a field of a structure used for varying parameters,
-    /// but *not* for any recursive case that operates on a type without
-    /// an associated declaration (e.g., recursing on `X` when dealing
-    /// with a parameer of type `X[]`).
-    ///
-    /// This function is responsible for processing any atributes or
-    /// other modifiers on the declaration that should impact out layout
-    /// is computed.
-    ///
+/// Compute layout information for an entry-point parameter `decl`.
+///
+/// This function should be used for a top-level entry point varying
+/// parameter or a field of a structure used for varying parameters,
+/// but *not* for any recursive case that operates on a type without
+/// an associated declaration (e.g., recursing on `X` when dealing
+/// with a parameer of type `X[]`).
+///
+/// This function is responsible for processing any atributes or
+/// other modifiers on the declaration that should impact out layout
+/// is computed.
+///
 static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
-    ParameterBindingContext*        context,
-    Decl*                           decl,
-    Type*                    type,
+    ParameterBindingContext* context,
+    Decl* decl,
+    Type* type,
     EntryPointParameterState const& inState,
-    RefPtr<VarLayout>               varLayout)
+    RefPtr<VarLayout> varLayout)
 {
     // One of our responsibilities when recursing through varying
     // parameters is to compute the semantic name/index for each
@@ -1825,9 +1836,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     SimpleSemanticInfo semanticInfo;
     int semanticIndex = 0;
-    if( !state.optSemanticName )
+    if (!state.optSemanticName)
     {
-        if( auto semantic = decl->findModifier<HLSLSimpleSemantic>() )
+        if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
         {
             semanticInfo = decomposeSimpleSemantic(semantic);
             semanticIndex = semanticInfo.index;
@@ -1873,14 +1884,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     // `location`s in declaration order coincidentally matches
     // the `SV_Target` order.
     //
-    if( isKhronosTarget(context->getTargetRequest()) )
+    if (isKhronosTarget(context->getTargetRequest()))
     {
-        if( auto locationAttr = decl->findModifier<GLSLLocationAttribute>() )
+        if (auto locationAttr = decl->findModifier<GLSLLocationAttribute>())
         {
             int location = locationAttr->value;
 
             int index = 0;
-            if( auto indexAttr = decl->findModifier<GLSLIndexAttribute>() )
+            if (auto indexAttr = decl->findModifier<GLSLIndexAttribute>())
             {
                 index = indexAttr->value;
             }
@@ -1891,11 +1902,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
             // Once we've extracted the data from the attribute(s), we
             // need to apply it to the `varLayout` for the parameter/field `decl`.
             //
-            LayoutResourceKind kinds[] = { LayoutResourceKind::VaryingInput, LayoutResourceKind::VaryingOutput };
-            for( auto kind : kinds )
+            LayoutResourceKind kinds[] = {
+                LayoutResourceKind::VaryingInput,
+                LayoutResourceKind::VaryingOutput};
+            for (auto kind : kinds)
             {
                 auto typeResInfo = typeLayout->FindResourceInfo(kind);
-                if(!typeResInfo)
+                if (!typeResInfo)
                     continue;
 
                 auto varResInfo = varLayout->findOrAddResourceInfo(kind);
@@ -1927,9 +1940,12 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
                 varResInfo->space = index;
             }
         }
-        else if( auto indexAttr = decl->findModifier<GLSLIndexAttribute>() )
+        else if (auto indexAttr = decl->findModifier<GLSLIndexAttribute>())
         {
-            getSink(context)->diagnose(indexAttr, Diagnostics::vkIndexWithoutVkLocation, decl->getName());
+            getSink(context)->diagnose(
+                indexAttr,
+                Diagnostics::vkIndexWithoutVkLocation,
+                decl->getName());
         }
     }
 
@@ -1937,10 +1953,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
 }
 
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
-    ParameterBindingContext*        context,
-    Type*                    type,
+    ParameterBindingContext* context,
+    Type* type,
     EntryPointParameterState const& state,
-    RefPtr<VarLayout>               varLayout)
+    RefPtr<VarLayout> varLayout)
 {
     // Make sure to associate a stage with every
     // varying parameter (including sub-fields of
@@ -1950,14 +1966,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // decide when to emit things like the `flat`
     // interpolation modifier.
     //
-    if( varLayout )
+    if (varLayout)
     {
         varLayout->stage = state.stage;
     }
 
     // The default handling of varying parameters should not apply
     // to geometry shader output streams; they have their own special rules.
-    if( auto gsStreamType = as<HLSLStreamOutputType>(type) )
+    if (auto gsStreamType = as<HLSLStreamOutputType>(type))
     {
         //
 
@@ -1974,14 +1990,15 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         elementState.stage = state.stage;
         elementState.loc = state.loc;
 
-        auto elementTypeLayout = processEntryPointVaryingParameter(context, elementType, elementState, nullptr);
+        auto elementTypeLayout =
+            processEntryPointVaryingParameter(context, elementType, elementState, nullptr);
 
         RefPtr<StreamOutputTypeLayout> typeLayout = new StreamOutputTypeLayout();
         typeLayout->type = type;
         typeLayout->rules = elementTypeLayout->rules;
         typeLayout->elementTypeLayout = elementTypeLayout;
 
-        for(auto resInfo : elementTypeLayout->resourceInfos)
+        for (auto resInfo : elementTypeLayout->resourceInfos)
             typeLayout->addResourceUsage(resInfo);
 
         return typeLayout;
@@ -1991,13 +2008,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // "varying" input/output parameters, since they don't have the same
     // idea of previous/next stage as the rasterization shader types.
     //
-    if( state.directionMask & kEntryPointParameterDirection_Output )
+    if (state.directionMask & kEntryPointParameterDirection_Output)
     {
         // Note: we are silently treating `out` parameters as if they
         // were `in out` for this test, under the assumption that
         // an `out` parameter represents a write-only payload.
 
-        switch(state.stage)
+        switch (state.stage)
         {
         default:
             // Not a raytracing shader.
@@ -2006,7 +2023,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::Intersection:
         case Stage::RayGeneration:
             // Don't expect this case to have any `in out` parameters.
-            getSink(context)->diagnose(state.loc, Diagnostics::dontExpectOutParametersForStage, getStageName(state.stage));
+            getSink(context)->diagnose(
+                state.loc,
+                Diagnostics::dontExpectOutParametersForStage,
+                getStageName(state.stage));
             break;
 
         case Stage::AnyHit:
@@ -2016,22 +2036,19 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             return createTypeLayoutWith(
                 context->layoutContext,
                 context->getRulesFamily()->getRayPayloadParameterRules(),
-                type
-            );
+                type);
 
         case Stage::Callable:
             // `in out` or `out` parameter is payload
             return createTypeLayoutWith(
                 context->layoutContext,
                 context->getRulesFamily()->getCallablePayloadParameterRules(),
-                type
-            );
-
+                type);
         }
     }
     else
     {
-        switch(state.stage)
+        switch (state.stage)
         {
         default:
             // Not a raytracing shader.
@@ -2047,7 +2064,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // an `in` parameter as indicating a payload that the
             // programmer doesn't intend to write to.
             //
-            getSink(context)->diagnose(state.loc, Diagnostics::dontExpectInParametersForStage, getStageName(state.stage));
+            getSink(context)->diagnose(
+                state.loc,
+                Diagnostics::dontExpectInParametersForStage,
+                getStageName(state.stage));
             break;
 
         case Stage::AnyHit:
@@ -2056,15 +2076,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             return createTypeLayoutWith(
                 context->layoutContext,
                 context->getRulesFamily()->getHitAttributesParameterRules(),
-                type
-            );
+                type);
         }
     }
 
     // If there is an available semantic name and index,
     // then we should apply it to this parameter unconditionally
     // (that is, not just if it is a leaf parameter).
-    auto optSemanticName    =  state.optSemanticName;
+    auto optSemanticName = state.optSemanticName;
     if (optSemanticName && varLayout)
     {
         // Always store semantics in upper-case for
@@ -2074,7 +2093,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         String semanticName = *optSemanticName;
         String sn = semanticName.toUpper();
 
-        auto semanticIndex      = *state.ioSemanticIndex;
+        auto semanticIndex = *state.ioSemanticIndex;
 
         varLayout->semanticName = sn;
         varLayout->semanticIndex = semanticIndex;
@@ -2082,35 +2101,44 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
 
     // Scalar and vector types are treated as outputs directly
-    if(auto basicType = as<BasicExpressionType>(type))
+    if (auto basicType = as<BasicExpressionType>(type))
     {
         return processSimpleEntryPointParameter(context, basicType, state, varLayout);
     }
-    else if(auto vectorType = as<VectorExpressionType>(type))
+    else if (auto vectorType = as<VectorExpressionType>(type))
     {
         return processSimpleEntryPointParameter(context, vectorType, state, varLayout);
     }
     // A matrix is processed as if it was an array of rows
-    else if( auto matrixType = as<MatrixExpressionType>(type) )
+    else if (auto matrixType = as<MatrixExpressionType>(type))
     {
         auto rowCount = getIntVal(matrixType->getRowCount());
-        return processSimpleEntryPointParameter(context, matrixType, state, varLayout, (int) rowCount);
+        return processSimpleEntryPointParameter(
+            context,
+            matrixType,
+            state,
+            varLayout,
+            (int)rowCount);
     }
-    else if( auto arrayType = as<ArrayExpressionType>(type) )
+    else if (auto arrayType = as<ArrayExpressionType>(type))
     {
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
-        
-        auto elementCount = (UInt) getIntVal(arrayType->getElementCount());
+
+        auto elementCount = (UInt)getIntVal(arrayType->getElementCount());
         if (arrayType->isUnsized())
             elementCount = 0;
 
         // We use the first element to derive the layout for the element type
-        auto elementTypeLayout = processEntryPointVaryingParameter(context, arrayType->getElementType(), state, varLayout);
+        auto elementTypeLayout = processEntryPointVaryingParameter(
+            context,
+            arrayType->getElementType(),
+            state,
+            varLayout);
 
         // We still walk over subsequent elements to make sure they consume resources
         // as needed
-        for( UInt ii = 1; ii < elementCount; ++ii )
+        for (UInt ii = 1; ii < elementCount; ++ii)
         {
             processEntryPointVaryingParameter(context, arrayType->getElementType(), state, nullptr);
         }
@@ -2126,14 +2154,18 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
         return arrayTypeLayout;
     }
-    else if( auto meshOutputType = as<MeshOutputType>(type) )
+    else if (auto meshOutputType = as<MeshOutputType>(type))
     {
         // TODO: Ellie, revisit
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
 
         // We use the first element to derive the layout for the element type
-        auto elementTypeLayout = processEntryPointVaryingParameter(context, meshOutputType->getElementType(), state, varLayout);
+        auto elementTypeLayout = processEntryPointVaryingParameter(
+            context,
+            meshOutputType->getElementType(),
+            state,
+            varLayout);
 
         RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
         arrayTypeLayout->elementTypeLayout = elementTypeLayout;
@@ -2142,7 +2174,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // TODO: Ellie, this is probably not the right place to handle this
         // On GLSL the indices type is built in and as such doesn't consume
         // resources.
-        if(!isKhronosTarget(context->getTargetRequest()) || !as<IndicesType>(type))
+        if (!isKhronosTarget(context->getTargetRequest()) || !as<IndicesType>(type))
         {
             for (auto rr : elementTypeLayout->resourceInfos)
             {
@@ -2155,9 +2187,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
     else if (auto patchType = as<HLSLPatchType>(type))
     {
-        // Similar to the MeshOutput case, a `InputPatch` or `OutputPatch` type is just like an array.
+        // Similar to the MeshOutput case, a `InputPatch` or `OutputPatch` type is just like an
+        // array.
         //
-        auto elementTypeLayout = processEntryPointVaryingParameter(context, patchType->getElementType(), state, varLayout);
+        auto elementTypeLayout = processEntryPointVaryingParameter(
+            context,
+            patchType->getElementType(),
+            state,
+            varLayout);
 
         RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
         arrayTypeLayout->elementTypeLayout = elementTypeLayout;
@@ -2171,16 +2208,29 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         return arrayTypeLayout;
     }
     // Ignore a bunch of types that don't make sense here...
-    else if (const auto subpassType = as<SubpassInputType>(type)) { return nullptr;  }
-    else if (const auto textureType = as<TextureType>(type)) { return nullptr;  }
-    else if(const auto samplerStateType = as<SamplerStateType>(type)) { return nullptr;  }
-    else if(const auto constantBufferType = as<ConstantBufferType>(type)) { return nullptr;  }
+    else if (const auto subpassType = as<SubpassInputType>(type))
+    {
+        return nullptr;
+    }
+    else if (const auto textureType = as<TextureType>(type))
+    {
+        return nullptr;
+    }
+    else if (const auto samplerStateType = as<SamplerStateType>(type))
+    {
+        return nullptr;
+    }
+    else if (const auto constantBufferType = as<ConstantBufferType>(type))
+    {
+        return nullptr;
+    }
     else if (auto ptrType = as<PtrType>(type))
     {
         SLANG_ASSERT(ptrType->astNodeType == ASTNodeType::PtrType);
 
         // Work out the layout for the value/target type
-        auto valueTypeLayout = processEntryPointVaryingParameter(context, ptrType->getValueType(), state, varLayout);
+        auto valueTypeLayout =
+            processEntryPointVaryingParameter(context, ptrType->getValueType(), state, varLayout);
 
         RefPtr<PointerTypeLayout> ptrTypeLayout = new PointerTypeLayout();
         ptrTypeLayout->valueTypeLayout = valueTypeLayout;
@@ -2189,7 +2239,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
-    else if( auto declRefType = as<DeclRefType>(type) )
+    else if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->getDeclRef();
 
@@ -2215,7 +2265,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             //
             Decl* firstExplicit = nullptr;
             Decl* firstImplicit = nullptr;
-            for( auto field : getFields(context->getASTBuilder(), structDeclRef, MemberFilterStyle::Instance) )
+            for (auto field :
+                 getFields(context->getASTBuilder(), structDeclRef, MemberFilterStyle::Instance))
             {
                 RefPtr<VarLayout> fieldVarLayout = new VarLayout();
                 fieldVarLayout->varDecl = field;
@@ -2241,7 +2292,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 // in `fieldVarLayout` for every kind of resource
                 // consumed by `fieldTypeLayout`.
                 //
-                for(auto fieldTypeResInfo : fieldTypeLayout->resourceInfos)
+                for (auto fieldTypeResInfo : fieldTypeLayout->resourceInfos)
                 {
                     SLANG_RELEASE_ASSERT(fieldTypeResInfo.count != 0);
                     auto kind = fieldTypeResInfo.kind;
@@ -2249,9 +2300,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
 
                     auto fieldResInfo = fieldVarLayout->FindResourceInfo(kind);
-                    if( !fieldResInfo )
+                    if (!fieldResInfo)
                     {
-                        if(!firstImplicit) firstImplicit = field.getDecl();
+                        if (!firstImplicit)
+                            firstImplicit = field.getDecl();
 
                         // In the implicit-layout case, we assign the field
                         // the next available offset after the fields that
@@ -2263,21 +2315,26 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     }
                     else
                     {
-                        if(!firstExplicit) firstExplicit = field.getDecl();
+                        if (!firstExplicit)
+                            firstExplicit = field.getDecl();
 
                         // In the explicit case, the field already has offset
                         // information, and we just need to update the computed
                         // size of the `struct` type to account for the field.
                         //
                         auto fieldEndOffset = fieldResInfo->index + fieldTypeResInfo.count;
-                        structTypeResInfo->count = maximum(structTypeResInfo->count, fieldEndOffset);
+                        structTypeResInfo->count =
+                            maximum(structTypeResInfo->count, fieldEndOffset);
                     }
-
                 }
             }
-            if( firstImplicit && firstExplicit )
+            if (firstImplicit && firstExplicit)
             {
-                getSink(context)->diagnose(firstImplicit, Diagnostics::mixingImplicitAndExplicitBindingForVaryingParams, firstImplicit->getName(), firstExplicit->getName());
+                getSink(context)->diagnose(
+                    firstImplicit,
+                    Diagnostics::mixingImplicitAndExplicitBindingForVaryingParams,
+                    firstImplicit->getName(),
+                    firstExplicit->getName());
             }
 
             return structLayout;
@@ -2286,9 +2343,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         {
             auto& layoutContext = context->layoutContext;
 
-            if( auto concreteType = findGlobalGenericSpecializationArg(
-                layoutContext,
-                globalGenericParamDecl.getDecl()) )
+            if (auto concreteType = findGlobalGenericSpecializationArg(
+                    layoutContext,
+                    globalGenericParamDecl.getDecl()))
             {
                 // If we know what concrete type has been used to specialize
                 // the global generic type parameter, then we should use
@@ -2314,7 +2371,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 // to the generic type, since we can't know how many "slots"
                 // of varying input/output it would consume.
                 //
-                return createTypeLayoutForGlobalGenericTypeParam(layoutContext, type, globalGenericParamDecl.getDecl());
+                return createTypeLayoutForGlobalGenericTypeParam(
+                    layoutContext,
+                    type,
+                    globalGenericParamDecl.getDecl());
             }
         }
         else if (auto associatedTypeParam = declRef.as<AssocTypeDecl>())
@@ -2328,9 +2388,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             SLANG_UNEXPECTED("unhandled type kind");
         }
     }
-    
+
     // If we ran into an error in checking the user's code, then skip this parameter
-    else if( const auto errorType = as<ErrorType>(type) )
+    else if (const auto errorType = as<ErrorType>(type))
     {
         return nullptr;
     }
@@ -2339,17 +2399,17 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     UNREACHABLE_RETURN(nullptr);
 }
 
-    /// Compute the type layout for a parameter declared directly on an entry point.
+/// Compute the type layout for a parameter declared directly on an entry point.
 static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
-    ParameterBindingContext*        context,
-    DeclRef<VarDeclBase>            paramDeclRef,
-    RefPtr<VarLayout>               paramVarLayout,
-    EntryPointParameterState&       state)
+    ParameterBindingContext* context,
+    DeclRef<VarDeclBase> paramDeclRef,
+    RefPtr<VarLayout> paramVarLayout,
+    EntryPointParameterState& state)
 {
     auto paramType = getType(context->getASTBuilder(), paramDeclRef);
     SLANG_ASSERT(paramType);
 
-    if( paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>() )
+    if (paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>())
     {
         // An entry-point parameter that is explicitly marked `uniform` represents
         // a uniform shader parameter passed via the implicitly-defined
@@ -2357,7 +2417,8 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         //
         return createTypeLayoutWith(
             context->layoutContext,
-            context->getRulesFamily()->getConstantBufferRules(context->getTargetRequest()->getOptionSet()),
+            context->getRulesFamily()->getConstantBufferRules(
+                context->getTargetRequest()->getOptionSet()),
             paramType);
     }
     else
@@ -2372,23 +2433,23 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         state.directionMask = 0;
 
         // If it appears to be an input, process it as such.
-        if( paramDeclRef.getDecl()->hasModifier<InModifier>()
-            || paramDeclRef.getDecl()->hasModifier<InOutModifier>()
-            || !paramDeclRef.getDecl()->hasModifier<OutModifier>() )
+        if (paramDeclRef.getDecl()->hasModifier<InModifier>() ||
+            paramDeclRef.getDecl()->hasModifier<InOutModifier>() ||
+            !paramDeclRef.getDecl()->hasModifier<OutModifier>())
         {
             state.directionMask |= kEntryPointParameterDirection_Input;
         }
 
         // If it appears to be an output, process it as such.
-        if(paramDeclRef.getDecl()->hasModifier<OutModifier>()
-            || paramDeclRef.getDecl()->hasModifier<InOutModifier>())
+        if (paramDeclRef.getDecl()->hasModifier<OutModifier>() ||
+            paramDeclRef.getDecl()->hasModifier<InOutModifier>())
         {
             state.directionMask |= kEntryPointParameterDirection_Output;
         }
 
         // For the purposes of type layout, mesh shader outputs are always
         // treated as output only, despite missing an 'out' modifier
-        if(as<MeshOutputType>(paramDeclRef.getDecl()->getType()))
+        if (as<MeshOutputType>(paramDeclRef.getDecl()->getType()))
         {
             state.directionMask = kEntryPointParameterDirection_Output;
         }
@@ -2415,21 +2476,19 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
 //
 struct ScopeLayoutBuilder
 {
-    ParameterBindingContext*    m_context = nullptr;
-    TypeLayoutContext           m_layoutContext;
-    RefPtr<StructTypeLayout>    m_structLayout;
-    UniformLayoutInfo           m_structLayoutInfo;
+    ParameterBindingContext* m_context = nullptr;
+    TypeLayoutContext m_layoutContext;
+    RefPtr<StructTypeLayout> m_structLayout;
+    UniformLayoutInfo m_structLayoutInfo;
 
     // We need to compute a layout for any "pending" data inside
     // of the parameters being added to the scope, to facilitate
     // later allocating space for all the pending parameters after
     // the primary shader parameters.
     //
-    StructTypeLayoutBuilder     m_pendingDataTypeLayoutBuilder;
+    StructTypeLayoutBuilder m_pendingDataTypeLayoutBuilder;
 
-    void beginLayout(
-        ParameterBindingContext*    context,
-        TypeLayoutContext           layoutContext)
+    void beginLayout(ParameterBindingContext* context, TypeLayoutContext layoutContext)
     {
         m_context = context;
         m_layoutContext = layoutContext;
@@ -2442,32 +2501,27 @@ struct ScopeLayoutBuilder
     }
 
 
-    void beginLayout(
-        ParameterBindingContext* context)
+    void beginLayout(ParameterBindingContext* context)
     {
         beginLayout(context, context->layoutContext);
     }
 
-    void _addParameter(
-        RefPtr<VarLayout>   varLayout)
+    void _addParameter(RefPtr<VarLayout> varLayout)
     {
         // Does the parameter have any uniform data?
         auto layoutInfo = varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         LayoutSize uniformSize = layoutInfo ? layoutInfo->count : 0;
-        if( uniformSize != 0 )
+        if (uniformSize != 0)
         {
             // Make sure uniform fields get laid out properly...
 
-            UniformLayoutInfo fieldInfo(
-                uniformSize,
-                varLayout->typeLayout->uniformAlignment);
+            UniformLayoutInfo fieldInfo(uniformSize, varLayout->typeLayout->uniformAlignment);
 
             auto rules = m_layoutContext.rules;
-            LayoutSize uniformOffset = rules->AddStructField(
-                &m_structLayoutInfo,
-                fieldInfo);
+            LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
 
-            varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
+            varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
+                uniformOffset.getFiniteValue();
         }
 
         m_structLayout->fields.add(varLayout);
@@ -2475,8 +2529,7 @@ struct ScopeLayoutBuilder
         m_structLayout->mapVarToLayout.add(varLayout->varDecl.getDecl(), varLayout);
     }
 
-    void addParameter(
-        RefPtr<VarLayout> varLayout)
+    void addParameter(RefPtr<VarLayout> varLayout)
     {
         _addParameter(varLayout);
 
@@ -2487,14 +2540,15 @@ struct ScopeLayoutBuilder
         // `struct` layout logic in `type-layout.cpp`. If this gets any
         // more complicated we should see if there is a way to share it.
         //
-        if( auto fieldPendingDataTypeLayout = varLayout->typeLayout->pendingDataTypeLayout )
+        if (auto fieldPendingDataTypeLayout = varLayout->typeLayout->pendingDataTypeLayout)
         {
             auto rules = m_layoutContext.rules;
             m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, rules);
             auto varDeclBase = varLayout->varDecl.as<VarDeclBase>();
             if (!varDeclBase)
                 return;
-            auto fieldPendingDataVarLayout = m_pendingDataTypeLayoutBuilder.addField(varDeclBase, fieldPendingDataTypeLayout);
+            auto fieldPendingDataVarLayout =
+                m_pendingDataTypeLayoutBuilder.addField(varDeclBase, fieldPendingDataTypeLayout);
 
             m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
 
@@ -2502,8 +2556,7 @@ struct ScopeLayoutBuilder
         }
     }
 
-    void addParameter(
-        ParameterInfo* parameterInfo)
+    void addParameter(ParameterInfo* parameterInfo)
     {
         auto varLayout = parameterInfo->varLayout;
         SLANG_RELEASE_ASSERT(varLayout);
@@ -2515,7 +2568,7 @@ struct ScopeLayoutBuilder
         // logic, but we still need to construct a layout
         // that includes any pending data.
         //
-        if(auto fieldPendingVarLayout = varLayout->pendingVarLayout)
+        if (auto fieldPendingVarLayout = varLayout->pendingVarLayout)
         {
             auto fieldPendingTypeLayout = fieldPendingVarLayout->typeLayout;
 
@@ -2523,9 +2576,11 @@ struct ScopeLayoutBuilder
             m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, rules);
             m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
 
-            auto fieldUniformLayoutInfo = fieldPendingTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-            LayoutSize fieldUniformSize = fieldUniformLayoutInfo ? fieldUniformLayoutInfo->count : 0;
-            if( fieldUniformSize != 0 )
+            auto fieldUniformLayoutInfo =
+                fieldPendingTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+            LayoutSize fieldUniformSize =
+                fieldUniformLayoutInfo ? fieldUniformLayoutInfo->count : 0;
+            if (fieldUniformSize != 0)
             {
                 // Make sure uniform fields get laid out properly...
 
@@ -2537,12 +2592,12 @@ struct ScopeLayoutBuilder
                     m_pendingDataTypeLayoutBuilder.getStructLayoutInfo(),
                     fieldInfo);
 
-                fieldPendingVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset.getFiniteValue();
+                fieldPendingVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
+                    uniformOffset.getFiniteValue();
             }
 
             m_pendingDataTypeLayoutBuilder.getTypeLayout()->fields.add(fieldPendingVarLayout);
         }
-
     }
 
     RefPtr<VarLayout> endLayout(VarLayout* inVarLayout = nullptr)
@@ -2565,9 +2620,7 @@ struct ScopeLayoutBuilder
         // amount of uniform data), then we need to wrap up the layout
         // to reflect the constant buffer that will be generated.
         //
-        scopeTypeLayout = createConstantBufferTypeLayoutIfNeeded(
-            m_layoutContext,
-            scopeTypeLayout);
+        scopeTypeLayout = createConstantBufferTypeLayoutIfNeeded(m_layoutContext, scopeTypeLayout);
 
         // We now have a bunch of layout information, which we should
         // record into a suitable object that represents the scope
@@ -2579,7 +2632,7 @@ struct ScopeLayoutBuilder
 
         scopeVarLayout->typeLayout = scopeTypeLayout;
 
-        if( auto pendingTypeLayout = scopeTypeLayout->pendingDataTypeLayout )
+        if (auto pendingTypeLayout = scopeTypeLayout->pendingDataTypeLayout)
         {
             RefPtr<VarLayout> pendingVarLayout = new VarLayout();
             pendingVarLayout->typeLayout = pendingTypeLayout;
@@ -2597,12 +2650,11 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
 {
     typedef ScopeLayoutBuilder Super;
 
-        // Add a "simple" parameter that cannot have any user-defined
-        // register or binding modifiers, so that its layout computation
-        // can be simplified greatly.
-        //
-    void addSimpleParameter(
-        RefPtr<VarLayout> varLayout)
+    // Add a "simple" parameter that cannot have any user-defined
+    // register or binding modifiers, so that its layout computation
+    // can be simplified greatly.
+    //
+    void addSimpleParameter(RefPtr<VarLayout> varLayout)
     {
         // The main `addParameter` logic will deal with any ordinary/uniform data,
         // and with the "pending" part of the layout.
@@ -2625,13 +2677,14 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
         // scope.
         //
         UsedRanges usedRangeSet[kLayoutResourceKindCount];
-        for( auto paramVarLayout : m_structLayout->fields )
+        for (auto paramVarLayout : m_structLayout->fields)
         {
             auto paramTypeLayout = paramVarLayout->getTypeLayout();
             for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
             {
                 auto kind = paramTypeResInfo.kind;
-                if (kind == LayoutResourceKind::Uniform) continue;
+                if (kind == LayoutResourceKind::Uniform)
+                    continue;
 
                 // We will look for an explicit/existing binding in
                 // the parameter var layout, which would represent
@@ -2639,7 +2692,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                 // we don't find one.
                 //
                 auto paramResInfo = paramVarLayout->FindResourceInfo(kind);
-                if(!paramResInfo)
+                if (!paramResInfo)
                     continue;
 
                 // If we found an explicit binding, then we need
@@ -2655,24 +2708,27 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
         // unused ranges to all of those that didn't have ranges
         // explicitly bound.
         //
-        for( auto paramVarLayout : m_structLayout->fields )
+        for (auto paramVarLayout : m_structLayout->fields)
         {
             auto paramTypeLayout = paramVarLayout->getTypeLayout();
             for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
             {
                 auto kind = paramTypeResInfo.kind;
-                if (kind == LayoutResourceKind::Uniform) continue;
+                if (kind == LayoutResourceKind::Uniform)
+                    continue;
 
                 // We only care about parameters that are not already
                 // explicitly bound, so we will skip those that already
                 // have offset information for `kind`.
                 //
                 auto paramResInfo = paramVarLayout->FindResourceInfo(kind);
-                if(paramResInfo)
+                if (paramResInfo)
                     continue;
                 paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
 
-                paramResInfo->index = usedRangeSet[int(kind)].Allocate(paramVarLayout, paramTypeResInfo.count.getFiniteValue());
+                paramResInfo->index = usedRangeSet[int(kind)].Allocate(
+                    paramVarLayout,
+                    paramTypeResInfo.count.getFiniteValue());
             }
         }
         //
@@ -2680,17 +2736,19 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
         // the scope/aggregate, so that it includes the ranges consumed
         // by all of the parameters/fields.
         //
-        for( auto paramVarLayout : m_structLayout->fields )
+        for (auto paramVarLayout : m_structLayout->fields)
         {
             auto paramTypeLayout = paramVarLayout->getTypeLayout();
             for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
             {
                 auto kind = paramTypeResInfo.kind;
-                if (kind == LayoutResourceKind::Uniform) continue;
+                if (kind == LayoutResourceKind::Uniform)
+                    continue;
 
                 auto paramResInfo = paramVarLayout->FindResourceInfo(kind);
                 SLANG_ASSERT(paramResInfo);
-                if(!paramResInfo) continue;
+                if (!paramResInfo)
+                    continue;
 
                 auto startOffset = paramResInfo->index;
                 auto endOffset = startOffset + paramTypeResInfo.count;
@@ -2708,27 +2766,30 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
     }
 };
 
-    /// Helper routine to allocate a constant buffer binding if one is needed.
-    ///
-    /// This function primarily exists to encapsulate the logic for allocating
-    /// the resources required for a constant buffer in the appropriate
-    /// target-specific fashion.
-    ///
-static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
-    ParameterBindingContext*    context)
+/// Helper routine to allocate a constant buffer binding if one is needed.
+///
+/// This function primarily exists to encapsulate the logic for allocating
+/// the resources required for a constant buffer in the appropriate
+/// target-specific fashion.
+///
+static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindingContext* context)
 {
     UInt space = context->shared->defaultSpace;
     auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
                           ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
-                          ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions)
+                          ->GetObjectLayout(
+                              ShaderParameterKind::ConstantBuffer,
+                              context->layoutContext.objectLayoutOptions)
                           .getSimple();
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
     info.count = layoutInfo.size;
-    info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(nullptr, layoutInfo.size.getFiniteValue());
+    info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(
+        nullptr,
+        layoutInfo.size.getFiniteValue());
     info.space = space;
     return info;
 }
@@ -2736,19 +2797,22 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(
 static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     ParameterBindingContext* context,
     VarLayout* varLayout,
-    UInt space, 
+    UInt space,
     UInt index)
 {
     auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
-        ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
-        ->GetObjectLayout(ShaderParameterKind::ConstantBuffer, context->layoutContext.objectLayoutOptions)
-        .getSimple();
+                          ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
+                          ->GetObjectLayout(
+                              ShaderParameterKind::ConstantBuffer,
+                              context->layoutContext.objectLayoutOptions)
+                          .getSimple();
 
     const Index count = Index(layoutInfo.size.getFiniteValue());
 
-    auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
+    auto existingParam =
+        usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
     SLANG_UNUSED(existingParam);
     SLANG_ASSERT(existingParam == nullptr);
 
@@ -2760,14 +2824,13 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     return info;
 }
 
-    /// Remove resource usage from `typeLayout` that should only be stored per-entry-point.
-    ///
-    /// This is used when constructing the overall layout for an entry point, to make sure
-    /// that certain kinds of resource usage from the entry point don't "leak" into
-    /// the resource usage of the overall program.
-    ///
-static void removePerEntryPointParameterKinds(
-    TypeLayout* typeLayout)
+/// Remove resource usage from `typeLayout` that should only be stored per-entry-point.
+///
+/// This is used when constructing the overall layout for an entry point, to make sure
+/// that certain kinds of resource usage from the entry point don't "leak" into
+/// the resource usage of the overall program.
+///
+static void removePerEntryPointParameterKinds(TypeLayout* typeLayout)
 {
     typeLayout->removeResourceUsage(LayoutResourceKind::VaryingInput);
     typeLayout->removeResourceUsage(LayoutResourceKind::VaryingOutput);
@@ -2777,8 +2840,7 @@ static void removePerEntryPointParameterKinds(
     typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialTypeParam);
 }
 
-static void removePerEntryPointParameterKinds(
-    VarLayout* varLayout)
+static void removePerEntryPointParameterKinds(VarLayout* varLayout)
 {
     removePerEntryPointParameterKinds(varLayout->typeLayout);
 
@@ -2790,13 +2852,13 @@ static void removePerEntryPointParameterKinds(
     varLayout->removeResourceUsage(LayoutResourceKind::ExistentialTypeParam);
 }
 
-    /// Iterate over the parameters of an entry point to compute its requirements.
-    ///
+/// Iterate over the parameters of an entry point to compute its requirements.
+///
 static RefPtr<EntryPointLayout> collectEntryPointParameters(
-    ParameterBindingContext*                    context,
-    EntryPoint*                                 entryPoint,
-    String                                      entryPointNameOverride,
-    EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
+    ParameterBindingContext* context,
+    EntryPoint* entryPoint,
+    String entryPointNameOverride,
+    EntryPoint::EntryPointSpecializationInfo* specializationInfo)
 {
     auto astBuilder = context->getASTBuilder();
 
@@ -2819,7 +2881,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // which case we don't currently have access to its AST-level information,
     // and as a result we cannot collect parameter information from it.
     //
-    if( !entryPointFuncDeclRef )
+    if (!entryPointFuncDeclRef)
     {
         // TODO: figure out what fields we absolutely need to fill in.
 
@@ -2838,7 +2900,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // to the entry point with generic parameters filled in. We should
     // use that version if it is available.
     //
-    if(specializationInfo)
+    if (specializationInfo)
         entryPointFuncDeclRef = specializationInfo->specializedFuncDeclRef;
 
     auto entryPointType = DeclRefType::create(astBuilder, entryPointFuncDeclRef);
@@ -2872,7 +2934,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     //
     TypeLayoutContext layoutContext = context->layoutContext;
 
-    if(isKhronosTarget(context->getTargetRequest()))
+    if (isKhronosTarget(context->getTargetRequest()))
     {
         // For Vulkan/SPIR-V targets, there are various cases for
         // how parameters that would otherwise just be a `ConstantBuffer<...>`
@@ -2891,10 +2953,11 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
         // In the case of ray-tracing shaders, this means passing entry-point
         // `uniform` parameters via the "shader record."
         //
-        switch( entryPoint->getStage() )
+        switch (entryPoint->getStage())
         {
         default:
-            layoutContext = layoutContext.with(layoutContext.getRulesFamily()->getPushConstantBufferRules());
+            layoutContext =
+                layoutContext.with(layoutContext.getRulesFamily()->getPushConstantBufferRules());
             break;
 
         case Stage::AnyHit:
@@ -2903,7 +2966,8 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
         case Stage::Intersection:
         case Stage::Miss:
         case Stage::RayGeneration:
-            layoutContext = layoutContext.with(layoutContext.getRulesFamily()->getShaderRecordConstantBufferRules());
+            layoutContext = layoutContext.with(
+                layoutContext.getRulesFamily()->getShaderRecordConstantBufferRules());
             break;
         }
     }
@@ -2913,30 +2977,33 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     auto paramsStructLayout = scopeBuilder.m_structLayout;
     paramsStructLayout->type = entryPointType;
 
-    for( auto& shaderParamInfo : entryPoint->getShaderParams() )
+    for (auto& shaderParamInfo : entryPoint->getShaderParams())
     {
         auto paramDeclRef = shaderParamInfo.paramDeclRef;
 
         // Any generic specialization applied to the entry-point function
         // must also be applied to its parameters.
-        paramDeclRef = context->getASTBuilder()->getMemberDeclRef(entryPointFuncDeclRef, paramDeclRef.getDecl());
+        paramDeclRef = context->getASTBuilder()->getMemberDeclRef(
+            entryPointFuncDeclRef,
+            paramDeclRef.getDecl());
 
         // When computing layout for an entry-point parameter,
         // we want to make sure that the layout context has access
         // to the existential type arguments (if any) that were
         // provided for the entry-point existential type parameters (if any).
         //
-        if(specializationInfo)
+        if (specializationInfo)
         {
             auto& existentialSpecializationArgs = specializationInfo->existentialSpecializationArgs;
             auto genericSpecializationParamCount = entryPoint->getGenericSpecializationParamCount();
 
             context->layoutContext = context->layoutContext
-                .withSpecializationArgs(
-                    existentialSpecializationArgs.getBuffer(),
-                    existentialSpecializationArgs.getCount())
-                .withSpecializationArgsOffsetBy(
-                    shaderParamInfo.firstSpecializationParamIndex - genericSpecializationParamCount);
+                                         .withSpecializationArgs(
+                                             existentialSpecializationArgs.getBuffer(),
+                                             existentialSpecializationArgs.getCount())
+                                         .withSpecializationArgsOffsetBy(
+                                             shaderParamInfo.firstSpecializationParamIndex -
+                                             genericSpecializationParamCount);
         }
 
         // Any error messages we emit during the process should
@@ -2954,11 +3021,8 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
         paramVarLayout->varDecl = paramDeclRef;
         paramVarLayout->stage = state.stage;
 
-        auto paramTypeLayout = computeEntryPointParameterTypeLayout(
-            context,
-            paramDeclRef,
-            paramVarLayout,
-            state);
+        auto paramTypeLayout =
+            computeEntryPointParameterTypeLayout(context, paramDeclRef, paramVarLayout, state);
         paramVarLayout->typeLayout = paramTypeLayout;
 
         // We expect to always be able to compute a layout for
@@ -2967,7 +3031,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
         // when assertions are disabled.
         //
         SLANG_ASSERT(paramTypeLayout);
-        if(!paramTypeLayout)
+        if (!paramTypeLayout)
             continue;
 
         // Now that we've computed the layout to use for the parameter,
@@ -2987,7 +3051,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     auto resultType = getResultType(astBuilder, entryPointFuncDeclRef);
     SLANG_ASSERT(resultType);
 
-    if( !resultType->equals(astBuilder->getVoidType()) )
+    if (!resultType->equals(astBuilder->getVoidType()))
     {
         state.loc = entryPointFuncDeclRef.getLoc();
         state.directionMask = kEntryPointParameterDirection_Output;
@@ -3002,14 +3066,15 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             state,
             resultLayout);
 
-        if( resultTypeLayout )
+        if (resultTypeLayout)
         {
             resultLayout->typeLayout = resultTypeLayout;
 
             for (auto rr : resultTypeLayout->resourceInfos)
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
-                resultLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count.getFiniteValue();
+                resultLayout->findOrAddResourceInfo(rr.kind)->index =
+                    entryPointRes->count.getFiniteValue();
                 entryPointRes->count += rr.count;
             }
         }
@@ -3040,13 +3105,13 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     return entryPointLayout;
 }
 
-    /// Visitor used by `collectGlobalGenericArguments`
+/// Visitor used by `collectGlobalGenericArguments`
 struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
 {
-    CollectGlobalGenericArgumentsVisitor(
-        ParameterBindingContext*    context)
+    CollectGlobalGenericArgumentsVisitor(ParameterBindingContext* context)
         : m_context(context)
-    {}
+    {
+    }
 
     ParameterBindingContext* m_context;
 
@@ -3057,7 +3122,9 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
         entryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
-    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitEntryPoint(
+        EntryPoint* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(entryPoint);
         SLANG_UNUSED(specializationInfo);
@@ -3068,65 +3135,72 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
         SLANG_UNUSED(conformance);
     }
 
-    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
+        SLANG_OVERRIDE
     {
         SLANG_UNUSED(module);
 
-        if(!specializationInfo)
+        if (!specializationInfo)
             return;
 
-        for(auto& globalGenericArg : specializationInfo->genericArgs)
+        for (auto& globalGenericArg : specializationInfo->genericArgs)
         {
-            if(auto globalGenericTypeParamDecl = as<GlobalGenericParamDecl>(globalGenericArg.paramDecl))
+            if (auto globalGenericTypeParamDecl =
+                    as<GlobalGenericParamDecl>(globalGenericArg.paramDecl))
             {
-                m_context->shared->programLayout->globalGenericArgs.add(globalGenericTypeParamDecl, globalGenericArg.argVal);
+                m_context->shared->programLayout->globalGenericArgs.add(
+                    globalGenericTypeParamDecl,
+                    globalGenericArg.argVal);
             }
         }
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitComposite(
+        CompositeComponentType* composite,
+        CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(composite, specializationInfo);
     }
 
     void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
     {
-        specialized->getBaseComponentType()->acceptVisitor(this, specialized->getSpecializationInfo());
+        specialized->getBaseComponentType()->acceptVisitor(
+            this,
+            specialized->getSpecializationInfo());
     }
 };
 
-    /// Collect an ordered list of all the specialization arguments given for global generic specialization parameters in `program`.
-    ///
-    /// This information is used to accelerate the process of mapping a global generic type
-    /// to its definition during type layout.
-    ///
-static void collectGlobalGenericArguments(
-    ParameterBindingContext*    context,
-    ComponentType*              program)
+/// Collect an ordered list of all the specialization arguments given for global generic
+/// specialization parameters in `program`.
+///
+/// This information is used to accelerate the process of mapping a global generic type
+/// to its definition during type layout.
+///
+static void collectGlobalGenericArguments(ParameterBindingContext* context, ComponentType* program)
 {
     CollectGlobalGenericArgumentsVisitor visitor(context);
     program->acceptVisitor(&visitor, nullptr);
 }
 
-    /// Collect information about the (unspecialized) specialization parameters of `program` into `context`.
-    ///
-    /// This function computes the reflection/layout for for the specialization parameters, so
-    /// that they can be exposed to the API user.
-    ///
-static void collectSpecializationParams(
-    ParameterBindingContext*    context,
-    ComponentType*              program)
+/// Collect information about the (unspecialized) specialization parameters of `program` into
+/// `context`.
+///
+/// This function computes the reflection/layout for for the specialization parameters, so
+/// that they can be exposed to the API user.
+///
+static void collectSpecializationParams(ParameterBindingContext* context, ComponentType* program)
 {
     auto specializationParamCount = program->getSpecializationParamCount();
-    for(Index ii = 0; ii < specializationParamCount; ++ii)
+    for (Index ii = 0; ii < specializationParamCount; ++ii)
     {
         auto specializationParam = program->getSpecializationParam(ii);
-        switch(specializationParam.flavor)
+        switch (specializationParam.flavor)
         {
         case SpecializationParam::Flavor::GenericType:
         case SpecializationParam::Flavor::GenericValue:
             {
-                RefPtr<GenericSpecializationParamLayout> paramLayout = new GenericSpecializationParamLayout();
+                RefPtr<GenericSpecializationParamLayout> paramLayout =
+                    new GenericSpecializationParamLayout();
                 paramLayout->decl = as<Decl>(specializationParam.object);
                 context->shared->programLayout->specializationParams.add(paramLayout);
             }
@@ -3135,31 +3209,32 @@ static void collectSpecializationParams(
         case SpecializationParam::Flavor::ExistentialType:
         case SpecializationParam::Flavor::ExistentialValue:
             {
-                RefPtr<ExistentialSpecializationParamLayout> paramLayout = new ExistentialSpecializationParamLayout();
+                RefPtr<ExistentialSpecializationParamLayout> paramLayout =
+                    new ExistentialSpecializationParamLayout();
                 paramLayout->type = as<Type>(specializationParam.object);
                 context->shared->programLayout->specializationParams.add(paramLayout);
             }
             break;
 
-        default:
-            SLANG_UNEXPECTED("unhandled specialization parameter flavor");
-            break;
+        default: SLANG_UNEXPECTED("unhandled specialization parameter flavor"); break;
         }
     }
 }
 
-    /// Visitor used by `collectParameters()`
+/// Visitor used by `collectParameters()`
 struct CollectParametersVisitor : ComponentTypeVisitor
 {
-    CollectParametersVisitor(
-        ParameterBindingContext*    context)
+    CollectParametersVisitor(ParameterBindingContext* context)
         : m_context(context)
-    {}
+    {
+    }
 
     ParameterBindingContext* m_context;
     String m_currentEntryPointNameOverride;
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitComposite(
+        CompositeComponentType* composite,
+        CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         // The parameters of a composite component type can
         // be determined by just visiting its children in order.
@@ -3178,7 +3253,9 @@ struct CollectParametersVisitor : ComponentTypeVisitor
     }
 
 
-    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitEntryPoint(
+        EntryPoint* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         // An entry point is a leaf case.
         //
@@ -3197,7 +3274,10 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         auto context = &contextData;
         context->stage = entryPoint->getStage();
         collectEntryPointParameters(
-            context, entryPoint, m_currentEntryPointNameOverride, specializationInfo);
+            context,
+            entryPoint,
+            m_currentEntryPointNameOverride,
+            specializationInfo);
     }
 
     void visitRenamedEntryPoint(
@@ -3210,7 +3290,8 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         m_currentEntryPointNameOverride = lastNameOverride;
     }
 
-    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
+        SLANG_OVERRIDE
     {
         // A single module represents a leaf case for layout.
         //
@@ -3219,14 +3300,13 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         //
         auto paramCount = module->getShaderParamCount();
 
-       ExpandedSpecializationArg* specializationArgs = specializationInfo
-           ? specializationInfo->existentialArgs.getBuffer()
-           : nullptr;
+        ExpandedSpecializationArg* specializationArgs =
+            specializationInfo ? specializationInfo->existentialArgs.getBuffer() : nullptr;
 
-        for(Index pp = 0; pp < paramCount; ++pp)
+        for (Index pp = 0; pp < paramCount; ++pp)
         {
             auto shaderParamInfo = module->getShaderParam(pp);
-            if(specializationArgs)
+            if (specializationArgs)
             {
                 m_context->layoutContext = m_context->layoutContext.withSpecializationArgs(
                     specializationArgs,
@@ -3237,9 +3317,9 @@ struct CollectParametersVisitor : ComponentTypeVisitor
             collectGlobalScopeParameter(m_context, shaderParamInfo, SubstitutionSet());
         }
 
-        if( auto moduleDecl = module->getModuleDecl() )
+        if (auto moduleDecl = module->getModuleDecl())
         {
-            if( auto nvapiSlotModifier = moduleDecl->findModifier<NVAPISlotModifier>() )
+            if (auto nvapiSlotModifier = moduleDecl->findModifier<NVAPISlotModifier>())
             {
                 m_context->shared->nvapiSlotModifiers.add(nvapiSlotModifier);
             }
@@ -3252,14 +3332,12 @@ struct CollectParametersVisitor : ComponentTypeVisitor
     }
 };
 
-    /// Recursively collect the global shader parameters and entry points in `program`.
-    ///
-    /// This function is used to establish the global ordering of parameters and
-    /// entry points used for layout.
-    ///
-static void collectParameters(
-    ParameterBindingContext*            inContext,
-    ComponentType*                      program)
+/// Recursively collect the global shader parameters and entry points in `program`.
+///
+/// This function is used to establish the global ordering of parameters and
+/// entry points used for layout.
+///
+static void collectParameters(ParameterBindingContext* inContext, ComponentType* program)
 {
     // All of the parameters in translation units directly
     // referenced in the compile request are part of one
@@ -3275,10 +3353,8 @@ static void collectParameters(
     program->acceptVisitor(&visitor, nullptr);
 }
 
-    /// Emit a diagnostic about a uniform/ordinary parameter at global scope.
-void diagnoseGlobalUniform(
-    SharedParameterBindingContext*  sharedContext,
-    VarDeclBase*                    varDecl)
+/// Emit a diagnostic about a uniform/ordinary parameter at global scope.
+void diagnoseGlobalUniform(SharedParameterBindingContext* sharedContext, VarDeclBase* varDecl)
 {
     // This subroutine gets invoked if a shader parameter containing
     // "ordinary" data (sometimes just called "uniform" data) is present
@@ -3303,14 +3379,17 @@ void diagnoseGlobalUniform(
     // under the assumption that the programmer who added that modifier
     // knew what they were opting into.
     //
-    if(varDecl->hasModifier<HLSLUniformModifier>())
+    if (varDecl->hasModifier<HLSLUniformModifier>())
         return;
 
-    getSink(sharedContext)->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
+    getSink(sharedContext)
+        ->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
 }
 
 
-static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingContext* bindingContext, LayoutResourceKind kind)
+static int _calcTotalNumUsedRegistersForLayoutResourceKind(
+    ParameterBindingContext* bindingContext,
+    LayoutResourceKind kind)
 {
     int numUsed = 0;
     for (auto& [_, rangeSet] : bindingContext->shared->globalSpaceUsedRangeSets)
@@ -3334,71 +3413,75 @@ static bool _isPTXTarget(CodeGenTarget target)
 {
     switch (target)
     {
-        case CodeGenTarget::CUDASource:
-        case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PTX:
         {
             return true;
         }
-        default: return false;
+    default: return false;
     }
 }
 
-    /// Keep track of the running global counter for entry points and global parameters visited.
-    ///
-    /// Because of explicit `register` and `[[vk::binding(...)]]` support, parameter binding
-    /// needs to proceed in multiple passes, and each pass must both visit the things that
-    /// need layout (parameters and entry points) in the same order in each pass, and must
-    /// also be able to look up the side-band information that flows between passes.
-    ///
-    /// Currently the `ParameterBindingContext` keeps separate arrays for global shader
-    /// parameters and entry points, but in the global ordering for layout they can be
-    /// interleaved. There is also no simple tracking structure that relates a global
-    /// parameter or entry point to its index in those arrays. Instead, we just keep
-    /// running counters during our passes over the program so that we can easily
-    /// compute the linear index of each entry point and global parameter as it
-    /// is encountered.
-    ///
+/// Keep track of the running global counter for entry points and global parameters visited.
+///
+/// Because of explicit `register` and `[[vk::binding(...)]]` support, parameter binding
+/// needs to proceed in multiple passes, and each pass must both visit the things that
+/// need layout (parameters and entry points) in the same order in each pass, and must
+/// also be able to look up the side-band information that flows between passes.
+///
+/// Currently the `ParameterBindingContext` keeps separate arrays for global shader
+/// parameters and entry points, but in the global ordering for layout they can be
+/// interleaved. There is also no simple tracking structure that relates a global
+/// parameter or entry point to its index in those arrays. Instead, we just keep
+/// running counters during our passes over the program so that we can easily
+/// compute the linear index of each entry point and global parameter as it
+/// is encountered.
+///
 struct ParameterBindingVisitorCounters
 {
     Index entryPointCounter = 0;
     Index globalParamCounter = 0;
 };
 
-    /// Recursive routine to "complete" all binding for parameters and entry points in `componentType`.
-    ///
-    /// This includes allocation of as-yet-unused register/binding ranges to parameters (which
-    /// will then affect the ranges of registers/bindings that are available to subsequent
-    /// parameters), and imporantly *also* includes allocate of space to any "pending"
-    /// data for interface/existential type parameters/fields.
-    ///
+/// Recursive routine to "complete" all binding for parameters and entry points in `componentType`.
+///
+/// This includes allocation of as-yet-unused register/binding ranges to parameters (which
+/// will then affect the ranges of registers/bindings that are available to subsequent
+/// parameters), and imporantly *also* includes allocate of space to any "pending"
+/// data for interface/existential type parameters/fields.
+///
 static void _completeBindings(
-    ParameterBindingContext*            context,
-    ComponentType*                      componentType,
-    ParameterBindingVisitorCounters*    ioCounters);
+    ParameterBindingContext* context,
+    ComponentType* componentType,
+    ParameterBindingVisitorCounters* ioCounters);
 
-    /// A visitor used by `_completeBindings`.
-    ///
-    /// This visitor walks the structure of a `ComponentType` to ensure that
-    /// any shader parameters (and entry points) it contains that *don't*
-    /// have explicit bindings on them get allocated registers/bindings
-    /// as appropriate.
-    ///
-    /// The main complication of this visitor is how it handles the
-    /// `SpecializedComponentType` case, because a specialized component
-    /// type needs to be handled as an atomic unit that lays out the
-    /// same in all contexts.
-    ///
+/// A visitor used by `_completeBindings`.
+///
+/// This visitor walks the structure of a `ComponentType` to ensure that
+/// any shader parameters (and entry points) it contains that *don't*
+/// have explicit bindings on them get allocated registers/bindings
+/// as appropriate.
+///
+/// The main complication of this visitor is how it handles the
+/// `SpecializedComponentType` case, because a specialized component
+/// type needs to be handled as an atomic unit that lays out the
+/// same in all contexts.
+///
 struct CompleteBindingsVisitor : ComponentTypeVisitor
 {
-    CompleteBindingsVisitor(ParameterBindingContext* context, ParameterBindingVisitorCounters* counters)
-        : m_context(context)
-        , m_counters(counters)
-    {}
+    CompleteBindingsVisitor(
+        ParameterBindingContext* context,
+        ParameterBindingVisitorCounters* counters)
+        : m_context(context), m_counters(counters)
+    {
+    }
 
     ParameterBindingContext* m_context;
     ParameterBindingVisitorCounters* m_counters;
 
-    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitEntryPoint(
+        EntryPoint* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(entryPoint);
         SLANG_UNUSED(specializationInfo);
@@ -3408,7 +3491,8 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         // we don't actually make use of the parameters that were passed in.
         //
         auto globalEntryPointIndex = m_counters->entryPointCounter++;
-        auto globalEntryPointInfo = m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
+        auto globalEntryPointInfo =
+            m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
 
 
         // We mostly treat an entry point like a single shader parameter that
@@ -3424,7 +3508,8 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         renamedEntryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
-    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
+        SLANG_OVERRIDE
     {
         SLANG_UNUSED(specializationInfo);
         // A module is a leaf case: we just want to visit each parameter.
@@ -3434,7 +3519,7 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
     void visitLeafParams(ComponentType* componentType)
     {
         auto paramCount = componentType->getShaderParamCount();
-        for(Index ii = 0; ii < paramCount; ++ii)
+        for (Index ii = 0; ii < paramCount; ++ii)
         {
             auto globalParamIndex = m_counters->globalParamCounter++;
             auto globalParamInfo = m_context->shared->parameters[globalParamIndex];
@@ -3443,7 +3528,9 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         }
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitComposite(
+        CompositeComponentType* composite,
+        CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         // We just wnat to recurse on the children of the composite in order.
         visitChildren(composite, specializationInfo);
@@ -3479,78 +3566,85 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
     }
 };
 
-    /// A visitor used by `_completeBindings`.
-    ///
-    /// This visitor is used to follow up after the `CompleteBindingsVisitor`
-    /// any ensure that any "pending" data required by the parameters that
-    /// got laid out now gets a location.
-    ///
-    /// To make a concrete example:
-    ///
-    ///     Texture2D a;
-    ///     IThing    b;
-    ///     Texture2D c;
-    ///
-    /// If these parameters were laid out with `b` specialized to a type
-    /// that contains a single `Texture2D`, then the `CompleteBindingsVisitor`
-    /// would visit `a`, `b`, and then `c` in order. It would give `a` the
-    /// first register/binding available (say, `t0`). It would then make
-    /// a note that due to specialization, `b`, needs a `t` register as well,
-    /// but it *cannot* be allocated just yet, because doing so would change
-    /// the location of `c`, so it is marked as "pending." Then `c` would
-    /// be visited and get `t1`. As a result the registers given to `a`
-    /// and `c` are independent of how `b` gets specialized.
-    ///
-    /// Next, the `FlushPendingDataVisitor` comes through and applies to
-    /// the parameters again. For `a` there is no pending data, but for
-    /// `b` there is a pending request for a `t` register, so it gets allocated
-    /// now (getting `t2`). The `c` parameter then has no pending data, so
-    /// we are done.
-    ///
-    /// *When* the pending data gets flushed is then significant. In general,
-    /// the order in which modules get composed an specialized is signficaint.
-    /// The module above (let's call it `M`) has one specialization parameter
-    /// (for `b`), and if we want to compose it with another module `N` that
-    /// has no specialization parameters, we could compute either:
-    ///
-    ///     compose(specialize(M, SomeType), N)
-    ///
-    /// or:
-    ///
-    ///     specialize(compose(M,N), SomeType)
-    ///
-    /// In the first case, the "pending" data for `M` gets flushed right after `M`,
-    /// so that `specialize(M,SomeType)` can have a consistent layout
-    /// regardless of how it is used. In the second case, the pending data for
-    /// `M` only gets flushed after `N`'s parameters are allocated, thus guaranteeing
-    /// that the `compose(M,N)` part has a consistent layout regardless of what
-    /// type gets plugged in during specialization.
-    ///
-    /// There are trade-offs to be made by an application about which approach
-    /// to prefer, and the compiler supports either policy choice.
-    ///
+/// A visitor used by `_completeBindings`.
+///
+/// This visitor is used to follow up after the `CompleteBindingsVisitor`
+/// any ensure that any "pending" data required by the parameters that
+/// got laid out now gets a location.
+///
+/// To make a concrete example:
+///
+///     Texture2D a;
+///     IThing    b;
+///     Texture2D c;
+///
+/// If these parameters were laid out with `b` specialized to a type
+/// that contains a single `Texture2D`, then the `CompleteBindingsVisitor`
+/// would visit `a`, `b`, and then `c` in order. It would give `a` the
+/// first register/binding available (say, `t0`). It would then make
+/// a note that due to specialization, `b`, needs a `t` register as well,
+/// but it *cannot* be allocated just yet, because doing so would change
+/// the location of `c`, so it is marked as "pending." Then `c` would
+/// be visited and get `t1`. As a result the registers given to `a`
+/// and `c` are independent of how `b` gets specialized.
+///
+/// Next, the `FlushPendingDataVisitor` comes through and applies to
+/// the parameters again. For `a` there is no pending data, but for
+/// `b` there is a pending request for a `t` register, so it gets allocated
+/// now (getting `t2`). The `c` parameter then has no pending data, so
+/// we are done.
+///
+/// *When* the pending data gets flushed is then significant. In general,
+/// the order in which modules get composed an specialized is signficaint.
+/// The module above (let's call it `M`) has one specialization parameter
+/// (for `b`), and if we want to compose it with another module `N` that
+/// has no specialization parameters, we could compute either:
+///
+///     compose(specialize(M, SomeType), N)
+///
+/// or:
+///
+///     specialize(compose(M,N), SomeType)
+///
+/// In the first case, the "pending" data for `M` gets flushed right after `M`,
+/// so that `specialize(M,SomeType)` can have a consistent layout
+/// regardless of how it is used. In the second case, the pending data for
+/// `M` only gets flushed after `N`'s parameters are allocated, thus guaranteeing
+/// that the `compose(M,N)` part has a consistent layout regardless of what
+/// type gets plugged in during specialization.
+///
+/// There are trade-offs to be made by an application about which approach
+/// to prefer, and the compiler supports either policy choice.
+///
 struct FlushPendingDataVisitor : ComponentTypeVisitor
 {
-    FlushPendingDataVisitor(ParameterBindingContext* context, ParameterBindingVisitorCounters* counters)
-        : m_context(context)
-        , m_counters(counters)
-    {}
+    FlushPendingDataVisitor(
+        ParameterBindingContext* context,
+        ParameterBindingVisitorCounters* counters)
+        : m_context(context), m_counters(counters)
+    {
+    }
 
     ParameterBindingContext* m_context;
     ParameterBindingVisitorCounters* m_counters;
 
-    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitEntryPoint(
+        EntryPoint* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(entryPoint);
         SLANG_UNUSED(specializationInfo);
 
         auto globalEntryPointIndex = m_counters->entryPointCounter++;
-        auto globalEntryPointInfo = m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
+        auto globalEntryPointInfo =
+            m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
 
         // We need to allocate space for any "pending" data that
         // appeared in the entry-point parameter list.
         //
-        _allocateBindingsForPendingData(m_context, globalEntryPointInfo->parametersLayout->pendingVarLayout);
+        _allocateBindingsForPendingData(
+            m_context,
+            globalEntryPointInfo->parametersLayout->pendingVarLayout);
     }
 
     void visitRenamedEntryPoint(
@@ -3560,7 +3654,8 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         entryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
-    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
+        SLANG_OVERRIDE
     {
         SLANG_UNUSED(specializationInfo);
         visitLeafParams(module);
@@ -3572,7 +3667,7 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         // pending data in the parameters, in order.
         //
         auto paramCount = componentType->getShaderParamCount();
-        for(Index ii = 0; ii < paramCount; ++ii)
+        for (Index ii = 0; ii < paramCount; ++ii)
         {
             auto globalParamIndex = m_counters->globalParamCounter++;
             auto globalParamInfo = m_context->shared->parameters[globalParamIndex];
@@ -3582,7 +3677,9 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         }
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitComposite(
+        CompositeComponentType* composite,
+        CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(composite, specializationInfo);
     }
@@ -3605,7 +3702,7 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         // We will simply bump those counters by the number of
         // parameters and entry points contained under `specialized`,
         // which is luckily provided by the `ComponentType` API.
-        // 
+        //
         m_counters->globalParamCounter += specialized->getShaderParamCount();
         m_counters->entryPointCounter += specialized->getEntryPointCount();
     }
@@ -3617,9 +3714,9 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
 };
 
 static void _completeBindings(
-    ParameterBindingContext*            context,
-    ComponentType*                      componentType,
-    ParameterBindingVisitorCounters*    ioCounters)
+    ParameterBindingContext* context,
+    ComponentType* componentType,
+    ParameterBindingVisitorCounters* ioCounters)
 {
     ParameterBindingVisitorCounters savedCounters = *ioCounters;
 
@@ -3630,16 +3727,14 @@ static void _completeBindings(
     componentType->acceptVisitor(&flushVisitor, nullptr);
 }
 
-    /// "Complete" binding of parametesr in the given `program`.
-    ///
-    /// Completing binding involves both assigning registers/bindings
-    /// to an parameters that didn't get explicit locations, and then
-    /// also providing locations to any "pending" data that needed
-    /// space allocated (used for existential/interface type parameters).
-    ///
-static void _completeBindings(
-    ParameterBindingContext*    context,
-    ComponentType*              program)
+/// "Complete" binding of parametesr in the given `program`.
+///
+/// Completing binding involves both assigning registers/bindings
+/// to an parameters that didn't get explicit locations, and then
+/// also providing locations to any "pending" data that needed
+/// space allocated (used for existential/interface type parameters).
+///
+static void _completeBindings(ParameterBindingContext* context, ComponentType* program)
 {
     // The process of completing binding has a recursive structure,
     // so we will immediately delegate to a subroutine that handles
@@ -3679,15 +3774,15 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             //
             switch (resInfo.kind)
             {
-                case LayoutResourceKind::RegisterSpace:
-                case LayoutResourceKind::SubElementRegisterSpace:
-                case LayoutResourceKind::PushConstantBuffer:
-                    continue;
-                case LayoutResourceKind::Uniform:
+            case LayoutResourceKind::RegisterSpace:
+            case LayoutResourceKind::SubElementRegisterSpace:
+            case LayoutResourceKind::PushConstantBuffer:      continue;
+            case LayoutResourceKind::Uniform:
                 {
-                    // If it's uniform, but we have globals binding defined, we don't need a default space for it
-                    // as it will go in the global binding specified
-                    if (auto hlslToVulkanOptions = sharedContext.getTargetProgram()->getHLSLToVulkanLayoutOptions())
+                    // If it's uniform, but we have globals binding defined, we don't need a default
+                    // space for it as it will go in the global binding specified
+                    if (auto hlslToVulkanOptions =
+                            sharedContext.getTargetProgram()->getHLSLToVulkanLayoutOptions())
                     {
                         if (hlslToVulkanOptions->hasGlobalsBinding())
                         {
@@ -3697,8 +3792,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
                     break;
                 }
 
-                default:
-                    break;
+            default: break;
             }
 
             // Otherwise, we have a shader parameter that will need
@@ -3718,16 +3812,14 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
         {
             switch (resInfo.kind)
             {
-                default:
-                    break;
+            default: break;
 
-                case LayoutResourceKind::RegisterSpace:
-                case LayoutResourceKind::SubElementRegisterSpace:
-                case LayoutResourceKind::VaryingInput:
-                case LayoutResourceKind::VaryingOutput:
-                case LayoutResourceKind::HitAttributes:
-                case LayoutResourceKind::RayPayload:
-                    continue;
+            case LayoutResourceKind::RegisterSpace:
+            case LayoutResourceKind::SubElementRegisterSpace:
+            case LayoutResourceKind::VaryingInput:
+            case LayoutResourceKind::VaryingOutput:
+            case LayoutResourceKind::HitAttributes:
+            case LayoutResourceKind::RayPayload:              continue;
             }
 
             return true;
@@ -3765,7 +3857,7 @@ static void _maybeApplyHLSLToVulkanShifts(
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    
+
     SharedParameterBindingContext& sharedContext = *paramContext->shared;
 
     // We may need to finally do any shifting if we have HLSLToVulkanLayoutOptions
@@ -3781,11 +3873,13 @@ static void _maybeApplyHLSLToVulkanShifts(
         return;
     }
 
-    // If the user specified -fvk-b-shift for the default space but not -fvk-bind-global, we want to apply the shift
-    // to the global constant buffer.
+    // If the user specified -fvk-b-shift for the default space but not -fvk-bind-global, we want to
+    // apply the shift to the global constant buffer.
     if (!vulkanOptions->hasGlobalsBinding())
     {
-        auto globalCBufferShift = vulkanOptions->getShift(HLSLToVulkanLayoutOptions::Kind::ConstantBuffer, globalConstantBinding.space);
+        auto globalCBufferShift = vulkanOptions->getShift(
+            HLSLToVulkanLayoutOptions::Kind::ConstantBuffer,
+            globalConstantBinding.space);
         if (globalCBufferShift != HLSLToVulkanLayoutOptions::kInvalidShift)
         {
             globalConstantBinding.index += globalCBufferShift;
@@ -3822,13 +3916,14 @@ static void _maybeApplyHLSLToVulkanShifts(
                     SLANG_ASSERT(bindingInfo.space == resourceInfo.space);
                 }
 
-                // We should go looking for overlaps. 
+                // We should go looking for overlaps.
                 // In essence we need to look for HLSL kinds which have inferance.
                 // We assume all map to Descriptor, and look for descriptor overlaps
 
-                // We know there can't be a clash of HLSL layout kinds previously, otherwise that would have already produced an a warning.
-                // We also know the only change is either *all* of a set is shifted or none. 
-                // That means post a shift there still can't be clash between HLSL types.
+                // We know there can't be a clash of HLSL layout kinds previously, otherwise that
+                // would have already produced an a warning. We also know the only change is either
+                // *all* of a set is shifted or none. That means post a shift there still can't be
+                // clash between HLSL types.
 
                 // So clashes can only be between HLSL types and other bindings (regardless)
 
@@ -3848,7 +3943,8 @@ static void _maybeApplyHLSLToVulkanShifts(
 
                 if (auto resInfo = typeLayout->FindResourceInfo(resourceInfo.kind))
                 {
-                    const auto rangeIndex = usedRange.findRangeContaining(bindingInfo.index, resInfo->count);
+                    const auto rangeIndex =
+                        usedRange.findRangeContaining(bindingInfo.index, resInfo->count);
                     if (rangeIndex >= 0)
                     {
                         // We found a clash.
@@ -3868,7 +3964,12 @@ static void _maybeApplyHLSLToVulkanShifts(
                         _appendRange(clashRange.begin, LayoutSize(clashRange.end), clashRangeBuf);
 
                         // Report the clash.
-                        sink->diagnose(curVar, Diagnostics::conflictingVulkanInferredBindingForParameter, getReflectionName(clashingVarLayout->getVariable()), curRangeBuf, clashRangeBuf);
+                        sink->diagnose(
+                            curVar,
+                            Diagnostics::conflictingVulkanInferredBindingForParameter,
+                            getReflectionName(clashingVarLayout->getVariable()),
+                            curRangeBuf,
+                            clashRangeBuf);
                     }
                 }
             }
@@ -3876,9 +3977,7 @@ static void _maybeApplyHLSLToVulkanShifts(
     }
 }
 
-RefPtr<ProgramLayout> generateParameterBindings(
-    TargetProgram*  targetProgram,
-    DiagnosticSink* sink)
+RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_AST_BUILDER_RAII(targetProgram->getProgram()->getLinkage()->getASTBuilder());
 
@@ -3890,11 +3989,13 @@ RefPtr<ProgramLayout> generateParameterBindings(
 
     {
         auto& pool = programLayout->hashedStringLiteralPool;
-        program->enumerateIRModules([&](IRModule* module) { findGlobalHashedStringLiterals(module, pool); });
+        program->enumerateIRModules([&](IRModule* module)
+                                    { findGlobalHashedStringLiterals(module, pool); });
     }
 
     // Try to find rules based on the selected code-generation target
-    auto layoutContext = getInitialLayoutContextForTarget(targetReq, programLayout, slang::LayoutRules::Default);
+    auto layoutContext =
+        getInitialLayoutContextForTarget(targetReq, programLayout, slang::LayoutRules::Default);
 
     // If there was no target, or there are no rules for the target,
     // then bail out here.
@@ -3959,7 +4060,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // simplify this file by eliminating support for explicit
     // binding in the future)
     //
-    for( auto& parameter : sharedContext.parameters )
+    for (auto& parameter : sharedContext.parameters)
     {
         _generateParameterBindings(&context, parameter);
     }
@@ -3970,7 +4071,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // need to ensure that user-defined shader parameters do not
     // conflict with the location that will be used by NVAPI.
     //
-    if( isD3DTarget(targetReq) )
+    if (isD3DTarget(targetReq))
     {
         // Information about the NVAPI parameter was recorded
         // on the AST `ModuleDecl`s during earlier stages of
@@ -3981,7 +4082,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
         // at this point, and simply process all of the modifiers
         // we see.
         //
-        for( auto nvapiSlotModifier : sharedContext.nvapiSlotModifiers )
+        for (auto nvapiSlotModifier : sharedContext.nvapiSlotModifiers)
         {
             // For a given modifier, we start by parsing the semantic
             // strings that were specified, just as we would if they
@@ -4040,15 +4141,15 @@ RefPtr<ProgramLayout> generateParameterBindings(
         }
     }
 
-    // Global constant buffer binding. 
+    // Global constant buffer binding.
     // It's initially invalid. (kind = None).
     ParameterBindingAndKindInfo globalConstantBufferBinding;
 
-    // We define this variable early, such that we can create and use when specifying 
+    // We define this variable early, such that we can create and use when specifying
     // a HLSLToVulkan based binding. It can if setup be used on endLayout, called later
     RefPtr<VarLayout> globalScopeVarLayout;
 
-    // If we have a space/binding assigned for use for globals in Vulkan, 
+    // If we have a space/binding assigned for use for globals in Vulkan,
     // we can't use *that* as the default space, so we allocate if
     if (auto vulkanOptions = targetProgram->getHLSLToVulkanLayoutOptions())
     {
@@ -4063,7 +4164,11 @@ RefPtr<ProgramLayout> generateParameterBindings(
             markSpaceUsed(&context, nullptr, globalBinding.set);
 
             // Mark the use of this binding
-            globalConstantBufferBinding = _assignConstantBufferBinding(&context, globalScopeVarLayout, globalBinding.set, globalBinding.index);
+            globalConstantBufferBinding = _assignConstantBufferBinding(
+                &context,
+                globalScopeVarLayout,
+                globalBinding.set,
+                globalBinding.index);
         }
     }
 
@@ -4082,26 +4187,31 @@ RefPtr<ProgramLayout> generateParameterBindings(
     bool needDefaultConstantBuffer = false;
 
     // If we have already setup a global constant buffer binding, we don't need a default one
-    // 
-    // On a CPU target, it's okay to have global scope parameters that use Uniform resources (because on CPU
-    // all resources are 'Uniform')
+    //
+    // On a CPU target, it's okay to have global scope parameters that use Uniform resources
+    // (because on CPU all resources are 'Uniform')
     // TODO(JS): We'll just assume the same with CUDA target for now..
     if (globalConstantBufferBinding.kind == LayoutResourceKind::None &&
-        !_isCPUTarget(targetReq->getTarget()) && 
-        !_isPTXTarget(targetReq->getTarget()))
+        !_isCPUTarget(targetReq->getTarget()) && !_isPTXTarget(targetReq->getTarget()))
     {
-        for( auto& parameterInfo : sharedContext.parameters )
+        for (auto& parameterInfo : sharedContext.parameters)
         {
             auto varLayout = parameterInfo->varLayout;
             SLANG_RELEASE_ASSERT(varLayout);
 
             // Does the field have any uniform data?
-            if( varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform) )
+            if (varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
             {
                 needDefaultConstantBuffer = true;
-                if(varLayout->varDecl.getDecl()->hasModifier<GLSLBindingAttribute>() || varLayout->varDecl.getDecl()->hasModifier<GLSLLocationLayoutModifier>())
-                    sink->diagnose(varLayout->varDecl, Diagnostics::explicitUniformLocation, as<VarDecl>(varLayout->varDecl).getDecl()->getType());
-                diagnoseGlobalUniform(&sharedContext, as<VarDeclBase>(varLayout->varDecl.getDecl()));
+                if (varLayout->varDecl.getDecl()->hasModifier<GLSLBindingAttribute>() ||
+                    varLayout->varDecl.getDecl()->hasModifier<GLSLLocationLayoutModifier>())
+                    sink->diagnose(
+                        varLayout->varDecl,
+                        Diagnostics::explicitUniformLocation,
+                        as<VarDecl>(varLayout->varDecl).getDecl()->getType());
+                diagnoseGlobalUniform(
+                    &sharedContext,
+                    as<VarDeclBase>(varLayout->varDecl.getDecl()));
             }
         }
     }
@@ -4114,9 +4224,10 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // As a starting point, we will definitely need a "default" space if
     // we are creating a default constant buffer, since it should get
     // a binding in that "default" space.
-    
-    const bool needDefaultSpace = needDefaultConstantBuffer || _calcNeedsDefaultSpace(sharedContext);
-    
+
+    const bool needDefaultSpace =
+        needDefaultConstantBuffer || _calcNeedsDefaultSpace(sharedContext);
+
     // If we need a space for default bindings, then allocate it here.
     if (needDefaultSpace)
     {
@@ -4165,7 +4276,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     {
         globalConstantBufferBinding = _allocateConstantBufferBinding(&context);
     }
-     
+
     // Now that all of the explicit bindings have been dealt with
     // and we've also allocate any space/buffer that is required
     // for global-scope parameters, we will go through the
@@ -4185,17 +4296,17 @@ RefPtr<ProgramLayout> generateParameterBindings(
     //
     ScopeLayoutBuilder globalScopeLayoutBuilder;
     globalScopeLayoutBuilder.beginLayout(&context);
-    for( auto& parameterInfo : sharedContext.parameters )
+    for (auto& parameterInfo : sharedContext.parameters)
     {
         globalScopeLayoutBuilder.addParameter(parameterInfo);
     }
 
     globalScopeVarLayout = globalScopeLayoutBuilder.endLayout(globalScopeVarLayout);
 
-    if( globalConstantBufferBinding.count != 0 )
+    if (globalConstantBufferBinding.count != 0)
     {
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
-         
+
         cbInfo->space = globalConstantBufferBinding.space;
         cbInfo->index = globalConstantBufferBinding.index;
     }
@@ -4203,10 +4314,15 @@ RefPtr<ProgramLayout> generateParameterBindings(
     programLayout->parametersLayout = globalScopeVarLayout;
 
     {
-        const int numShaderRecordRegs = _calcTotalNumUsedRegistersForLayoutResourceKind(&context, LayoutResourceKind::ShaderRecord);
+        const int numShaderRecordRegs = _calcTotalNumUsedRegistersForLayoutResourceKind(
+            &context,
+            LayoutResourceKind::ShaderRecord);
         if (numShaderRecordRegs > 1)
         {
-           sink->diagnose(SourceLoc(), Diagnostics::tooManyShaderRecordConstantBuffers, numShaderRecordRegs);
+            sink->diagnose(
+                SourceLoc(),
+                Diagnostics::tooManyShaderRecordConstantBuffers,
+                numShaderRecordRegs);
         }
     }
 
@@ -4215,13 +4331,13 @@ RefPtr<ProgramLayout> generateParameterBindings(
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 {
-    if( !m_layout )
+    if (!m_layout)
     {
         m_layout = generateParameterBindings(this, sink);
         if (sink->getErrorCount() != 0)
             return nullptr;
 
-        if( m_layout )
+        if (m_layout)
         {
             m_irModuleForLayout = createIRModuleForLayout(sink);
         }
@@ -4230,8 +4346,8 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 }
 
 void generateParameterBindings(
-    ComponentType*  program,
-    TargetRequest*  targetReq,
+    ComponentType* program,
+    TargetRequest* targetReq,
     DiagnosticSink* sink)
 {
     program->getTargetProgram(targetReq)->getOrCreateLayout(sink);

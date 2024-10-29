@@ -21,7 +21,7 @@ public:
     ~SamplerStateImpl();
 
     Result init(DeviceImpl* device, const ISamplerState::Desc& desc);
-    
+
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 

@@ -3,7 +3,8 @@
 
 #include "../core/slang-blob.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SliceUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -20,7 +21,7 @@ namespace Slang {
     return list;
 }
 
-/* static */const char* SliceUtil::getTerminated(ISlangBlob* blob, TerminatedCharSlice& outSlice)
+/* static */ const char* SliceUtil::getTerminated(ISlangBlob* blob, TerminatedCharSlice& outSlice)
 {
     const auto size = blob->getBufferSize();
     if (size == 0)
@@ -29,7 +30,7 @@ namespace Slang {
         return outSlice.begin();
     }
 
-    // If there is a 0 at the end byte, we are zero terminated 
+    // If there is a 0 at the end byte, we are zero terminated
     const char* chars = (const char*)blob->getBufferPointer();
     if (chars[size - 1] == 0)
     {
@@ -51,7 +52,9 @@ namespace Slang {
     return nullptr;
 }
 
-/* static */TerminatedCharSlice SliceUtil::toTerminatedCharSlice(SliceAllocator& allocator, ISlangBlob* blob)
+/* static */ TerminatedCharSlice SliceUtil::toTerminatedCharSlice(
+    SliceAllocator& allocator,
+    ISlangBlob* blob)
 {
     TerminatedCharSlice slice;
     if (SliceUtil::getTerminated(blob, slice))
@@ -59,25 +62,29 @@ namespace Slang {
         return slice;
     }
     const auto size = blob->getBufferSize();
-    // We are out of options, we just have to allocate with zero termination which allocateString does
-    auto dst = allocator.getArena().allocateString((const char*)blob->getBufferPointer(), Count(size));
+    // We are out of options, we just have to allocate with zero termination which allocateString
+    // does
+    auto dst =
+        allocator.getArena().allocateString((const char*)blob->getBufferPointer(), Count(size));
     return TerminatedCharSlice(dst, Count(size));
 }
 
-/* static */TerminatedCharSlice SliceUtil::toTerminatedCharSlice(StringBuilder& storage, ISlangBlob* blob)
+/* static */ TerminatedCharSlice SliceUtil::toTerminatedCharSlice(
+    StringBuilder& storage,
+    ISlangBlob* blob)
 {
     TerminatedCharSlice slice;
     if (SliceUtil::getTerminated(blob, slice))
     {
         return slice;
     }
-    
+
     const auto size = blob->getBufferSize();
     auto chars = (const char*)blob->getBufferPointer();
 
     storage.clear();
     storage.append(UnownedStringSlice(chars, size));
-   
+
     return TerminatedCharSlice(storage.getBuffer(), Count(size));
 }
 

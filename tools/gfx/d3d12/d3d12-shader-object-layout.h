@@ -71,7 +71,8 @@ public:
 
         bool isRootParameter;
 
-        /// Is this binding range represent a specialization point, such as an existential value, or a `ParameterBlock<IFoo>`.
+        /// Is this binding range represent a specialization point, such as an existential value, or
+        /// a `ParameterBlock<IFoo>`.
         bool isSpecializable;
     };
 
@@ -129,7 +130,8 @@ public:
     public:
         Builder(RendererBase* renderer, slang::ISession* session)
             : m_renderer(renderer), m_session(session)
-        {}
+        {
+        }
 
         RendererBase* m_renderer;
         slang::ISession* m_session;
@@ -246,7 +248,8 @@ public:
             : Super::Builder(renderer, program->getSession())
             , m_program(program)
             , m_programLayout(programLayout)
-        {}
+        {
+        }
 
         Result build(RootShaderObjectLayoutImpl** outLayout);
 
@@ -277,7 +280,8 @@ public:
 
         RootSignatureDescBuilder(DeviceImpl* device)
             : m_device(device)
-        {}
+        {
+        }
 
         // We will use one descriptor set for the global scope and one additional
         // descriptor set for each `ParameterBlock` binding range in the shader object
@@ -289,7 +293,8 @@ public:
         D3D12_ROOT_SIGNATURE_DESC1 m_rootSignatureDesc = {};
 
         static Result translateDescriptorRangeType(
-            slang::BindingType c, D3D12_DESCRIPTOR_RANGE_TYPE* outType);
+            slang::BindingType c,
+            D3D12_DESCRIPTOR_RANGE_TYPE* outType);
 
         /// Stores offset information to apply to the reflected register/space for a descriptor
         /// range.
@@ -309,7 +314,7 @@ public:
             /// Note that the `D3D12_DESCRIPTOR_RANGE_TYPE` enumeration has
             /// values between 0 and 3, inclusive.
             ///
-            uint32_t offsetForRangeType[kRangeTypeCount] = { 0, 0, 0, 0 };
+            uint32_t offsetForRangeType[kRangeTypeCount] = {0, 0, 0, 0};
 
             uint32_t& operator[](D3D12_DESCRIPTOR_RANGE_TYPE type)
             {
@@ -327,8 +332,8 @@ public:
             {
                 if (varLayout)
                 {
-                    spaceOffset =
-                        (UINT)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
+                    spaceOffset = (UINT)varLayout->getOffset(
+                        SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
                     offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_CBV] =
                         (UINT)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
                     offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_SRV] =
@@ -358,9 +363,9 @@ public:
             BindingRegisterOffsetPair() {}
 
             BindingRegisterOffsetPair(slang::VariableLayoutReflection* varLayout)
-                : primary(varLayout)
-                , pending(varLayout->getPendingDataLayout())
-            {}
+                : primary(varLayout), pending(varLayout->getPendingDataLayout())
+            {
+            }
 
             void operator+=(BindingRegisterOffsetPair const& other)
             {
@@ -433,7 +438,8 @@ public:
             Index bindingRangeIndex);
 
         void addAsValue(
-            slang::VariableLayoutReflection* varLayout, Index physicalDescriptorSetIndex);
+            slang::VariableLayoutReflection* varLayout,
+            Index physicalDescriptorSetIndex);
 
         /// Add binding ranges and parameter blocks to the root signature.
         ///

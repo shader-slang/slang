@@ -5,8 +5,8 @@
 
 namespace Slang
 {
-    struct IRModule;
+struct IRModule;
 
-    // Legalize a load(IRUniformParameterGroupType) into a makeStruct(load(fieldAddr),...) for glsl.
-    void legalizeUniformBufferLoad(IRModule* module);
-}
+// Legalize a load(IRUniformParameterGroupType) into a makeStruct(load(fieldAddr),...) for glsl.
+void legalizeUniformBufferLoad(IRModule* module);
+} // namespace Slang

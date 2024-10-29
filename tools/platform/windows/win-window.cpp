@@ -83,10 +83,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             bool processed = false;
             if (window)
             {
-                window->events.mouseUp(MouseEventArgs{
-                    mx,
-                    my,
-                    0, getModifierState(wParam)});
+                window->events.mouseUp(MouseEventArgs{mx, my, 0, getModifierState(wParam)});
             }
         }
         break;
@@ -126,8 +123,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             if (window)
             {
-                KeyEventArgs keyEventArgs = {
-                    KeyCode::None, (wchar_t)(wParam), ButtonState::Enum::None, false};
+                KeyEventArgs keyEventArgs =
+                    {KeyCode::None, (wchar_t)(wParam), ButtonState::Enum::None, false};
                 window->events.keyPress(keyEventArgs);
                 if (keyEventArgs.cancelEvent)
                     useDefProc = false;
@@ -187,8 +184,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             return DefWindowProc(hWnd, message, wParam, lParam);
         }
         break;
-    default:
-        break;
+    default: break;
     }
     if (message == WM_DESTROY && hWnd == Win32AppContext::mainWindowHandle)
     {
@@ -221,9 +217,13 @@ void registerWindowClass()
     RegisterClassExW(&wcex);
 }
 
-void unregisterWindowClass() { UnregisterClassW(kWindowClassName, GetModuleHandle(NULL)); }
+void unregisterWindowClass()
+{
+    UnregisterClassW(kWindowClassName, GetModuleHandle(NULL));
+}
 
-HRESULT(WINAPI* getDpiForMonitor) (void* hmonitor, int dpiType, unsigned int* dpiX, unsigned int* dpiY);
+HRESULT(WINAPI* getDpiForMonitor)
+(void* hmonitor, int dpiType, unsigned int* dpiX, unsigned int* dpiY);
 
 void Application::init()
 {
@@ -272,9 +272,15 @@ void doEventsImpl(bool waitForEvents)
     } while (!Win32AppContext::isTerminated && hasMsg);
 }
 
-void Application::doEvents() { doEventsImpl(false); }
+void Application::doEvents()
+{
+    doEventsImpl(false);
+}
 
-void Application::quit() { Win32AppContext::isTerminated = true; }
+void Application::quit()
+{
+    Win32AppContext::isTerminated = true;
+}
 
 void Application::dispose()
 {
@@ -407,10 +413,7 @@ public:
     }
     virtual bool getFocused() override { return GetFocus() == handle; }
     virtual bool getVisible() override { return visible; }
-    virtual WindowHandle getNativeHandle() override
-    {
-        return WindowHandle::fromHwnd(handle);
-    }
+    virtual WindowHandle getNativeHandle() override { return WindowHandle::fromHwnd(handle); }
     virtual void setText(Slang::String text) override
     {
         SetWindowText(handle, text.toWString().begin());
@@ -442,9 +445,12 @@ public:
     }
 };
 
-Window* Application::createWindow(const WindowDesc& desc) { return new Win32PlatformWindow(desc); }
+Window* Application::createWindow(const WindowDesc& desc)
+{
+    return new Win32PlatformWindow(desc);
+}
 
 
-} // namespace gfx
+} // namespace platform
 
 #endif

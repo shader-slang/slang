@@ -1,7 +1,8 @@
 #include "slang-ir-deduplicate-generic-children.h"
-#include "slang-ir.h"
+
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -40,4 +41,4 @@ bool deduplicateGenericChildren(IRModule* module)
     return changed;
 }
 
-}
+} // namespace Slang

@@ -1,7 +1,7 @@
 // metal-query.cpp
 #include "metal-query.h"
 
-//#include "metal-util.h"
+// #include "metal-util.h"
 
 namespace gfx
 {
@@ -11,9 +11,7 @@ using namespace Slang;
 namespace metal
 {
 
-QueryPoolImpl::~QueryPoolImpl()
-{
-}
+QueryPoolImpl::~QueryPoolImpl() {}
 
 static MTL::CounterSet* findCounterSet(MTL::Device* device, QueryType queryType)
 {
@@ -26,7 +24,8 @@ static MTL::CounterSet* findCounterSet(MTL::Device* device, QueryType queryType)
 
     for (int i = 0; i < device->counterSets()->count(); ++i)
     {
-        MTL::CounterSet* counterSet = static_cast<MTL::CounterSet*>(device->counterSets()->object(i));
+        MTL::CounterSet* counterSet =
+            static_cast<MTL::CounterSet*>(device->counterSets()->object(i));
         for (int j = 0; j < counterSet->counters()->count(); ++j)
         {
             MTL::Counter* counter = static_cast<MTL::Counter*>(counterSet->counters()->object(j));
@@ -50,7 +49,8 @@ Result QueryPoolImpl::init(DeviceImpl* device, const IQueryPool::Desc& desc)
         return SLANG_E_NOT_AVAILABLE;
     }
 
-    NS::SharedPtr<MTL::CounterSampleBufferDescriptor> counterSampleBufferDesc = NS::TransferPtr(MTL::CounterSampleBufferDescriptor::alloc()->init());
+    NS::SharedPtr<MTL::CounterSampleBufferDescriptor> counterSampleBufferDesc =
+        NS::TransferPtr(MTL::CounterSampleBufferDescriptor::alloc()->init());
     counterSampleBufferDesc->setStorageMode(MTL::StorageModeShared);
     counterSampleBufferDesc->setSampleCount(m_desc.count);
     counterSampleBufferDesc->setCounterSet(counterSet);
@@ -58,7 +58,8 @@ Result QueryPoolImpl::init(DeviceImpl* device, const IQueryPool::Desc& desc)
     m_device->m_device->counterSets();
 
     NS::Error* error;
-    m_counterSampleBuffer = NS::TransferPtr(m_device->m_device->newCounterSampleBuffer(counterSampleBufferDesc.get(), &error));
+    m_counterSampleBuffer = NS::TransferPtr(
+        m_device->m_device->newCounterSampleBuffer(counterSampleBufferDesc.get(), &error));
 
     return m_counterSampleBuffer ? SLANG_OK : SLANG_FAIL;
 }

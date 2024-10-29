@@ -1,16 +1,15 @@
 // slang-ir-autodiff-rev.h
 #pragma once
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
 #include "slang-compiler.h"
-
-#include "slang-ir-autodiff.h"
 #include "slang-ir-autodiff-fwd.h"
-#include "slang-ir-autodiff-transcriber-base.h"
 #include "slang-ir-autodiff-propagate.h"
-#include "slang-ir-autodiff-unzip.h"
+#include "slang-ir-autodiff-transcriber-base.h"
 #include "slang-ir-autodiff-transpose.h"
+#include "slang-ir-autodiff-unzip.h"
+#include "slang-ir-autodiff.h"
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -32,8 +31,8 @@ struct ParameterBlockTransposeInfo
 
     // The value with which a primal specific parameter should be replaced in propagate func.
     OrderedDictionary<IRInst*, IRInst*> mapPrimalSpecificParamToReplacementInPropFunc;
-    // The insts added that is specific for propagate functions and should be removed
 
+    // The insts added that is specific for propagate functions and should be removed
     // from the future primal func.
     List<IRInst*> propagateFuncSpecificPrimalInsts;
 
@@ -60,9 +59,9 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     DiffUnzipPass* diffUnzipPass;
 
     // Allocate space for the passes.
-    DiffTransposePass               diffTransposePassStorage;
-    DiffPropagationPass             diffPropagationPassStorage;
-    DiffUnzipPass                   diffUnzipPassStorage;
+    DiffTransposePass diffTransposePassStorage;
+    DiffPropagationPass diffPropagationPassStorage;
+    DiffUnzipPass diffUnzipPassStorage;
 
     BackwardDiffTranscriberBase(
         FuncBodyTranscriptionTaskType taskType,
@@ -76,14 +75,18 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
         , diffTransposePass(&diffTransposePassStorage)
         , diffPropagationPass(&diffPropagationPassStorage)
         , diffUnzipPass(&diffUnzipPassStorage)
-    {}
+    {
+    }
 
     // Returns "dp<var-name>" to use as a name hint for parameters.
     // If no primal name is available, returns a blank string.
-    // 
+    //
     String makeDiffPairName(IRInst* origVar);
-        
-    IRFuncType* differentiateFunctionTypeImpl(IRBuilder* builder, IRFuncType* funcType, IRInst* intermediateType);
+
+    IRFuncType* differentiateFunctionTypeImpl(
+        IRBuilder* builder,
+        IRFuncType* funcType,
+        IRInst* intermediateType);
 
     IRType* transcribeParamTypeForPrimalFunc(IRBuilder* builder, IRType* paramType);
     IRType* transcribeParamTypeForPropagateFunc(IRBuilder* builder, IRType* paramType);
@@ -95,7 +98,9 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
     virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) = 0;
 
     // Get transcribed function name from original name.
-    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func) = 0;
+    virtual IRStringLit* getTranscribedFuncName(
+        IRBuilder* builder,
+        IRGlobalValueWithCode* func) = 0;
 
     // Splits and transpose the parameter block.
     // After this operation, the parameter block will contain parameters for both the future
@@ -107,22 +112,29 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
         IRFunc* diffFunc,
         SourceLoc primalLoc,
         bool isResultDifferentiable);
-    
+
     void writeBackDerivativeToInOutParams(ParameterBlockTransposeInfo& info, IRFunc* diffFunc);
-    
-    virtual InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType) override;
+
+    virtual InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
+        override;
 
     InstPair transcribeSpecialize(IRBuilder* builder, IRSpecialize* origSpecialize);
 
     SlangResult prepareFuncForBackwardDiff(IRFunc* func);
 
-    IRFunc* generateNewForwardDerivativeForFunc(IRBuilder* builder, IRFunc* originalFunc, IRFunc* diffPropagateFunc);
+    IRFunc* generateNewForwardDerivativeForFunc(
+        IRBuilder* builder,
+        IRFunc* originalFunc,
+        IRFunc* diffPropagateFunc);
 
     void transcribeFuncImpl(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffPropagateFunc);
 
     InstPair transcribeFuncHeaderImpl(IRBuilder* inBuilder, IRFunc* origFunc);
 
-    void addTranscribedFuncDecoration(IRBuilder& builder, IRFunc* origFunc, IRFunc* transcribedFunc);
+    void addTranscribedFuncDecoration(
+        IRBuilder& builder,
+        IRFunc* origFunc,
+        IRFunc* transcribedFunc);
 
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
 
@@ -139,15 +151,17 @@ struct BackwardDiffTranscriberBase : AutoDiffTranscriberBase
 
 struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
 {
-    BackwardDiffPrimalTranscriber(
-        AutoDiffSharedContext* shared,
-        DiagnosticSink* inSink)
-        : BackwardDiffTranscriberBase(
-              FuncBodyTranscriptionTaskType::BackwardPrimal, shared, inSink)
-    { }
+    BackwardDiffPrimalTranscriber(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
+        : BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType::BackwardPrimal, shared, inSink)
+    {
+    }
 
-    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
-    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) override;
+    virtual IRFuncType* differentiateFunctionType(
+        IRBuilder* builder,
+        IRInst* func,
+        IRFuncType* funcType) override;
+    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
+        override;
     virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) override
     {
         if (auto backDecor = originalFunc->findDecoration<IRBackwardDerivativePrimalDecoration>())
@@ -156,7 +170,8 @@ struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
         }
         return nullptr;
     }
-    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
+    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc)
+        override
     {
         builder->addBackwardDerivativePrimalDecoration(inst, diffFunc);
     }
@@ -164,7 +179,8 @@ struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
     {
         return kIROp_BackwardDerivativePrimalDecoration;
     }
-    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func) override
+    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func)
+        override
     {
         if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
         {
@@ -181,31 +197,36 @@ struct BackwardDiffPrimalTranscriber : BackwardDiffTranscriberBase
 
 struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
 {
-    BackwardDiffPropagateTranscriber(
-        AutoDiffSharedContext* shared,
-        DiagnosticSink* inSink)
+    BackwardDiffPropagateTranscriber(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
         : BackwardDiffTranscriberBase(
               FuncBodyTranscriptionTaskType::BackwardPropagate,
               shared,
               inSink)
-    { }
+    {
+    }
     void generateTrivialDiffFuncFromUserDefinedDerivative(
         IRBuilder* builder,
         IRFunc* primalFunc,
         IRFunc* diffPropFunc,
         IRUserDefinedBackwardDerivativeDecoration* udfDecor);
 
-    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
-    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) override;
+    virtual IRFuncType* differentiateFunctionType(
+        IRBuilder* builder,
+        IRInst* func,
+        IRFuncType* funcType) override;
+    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
+        override;
     virtual IRInst* findExistingDiffFunc(IRInst* originalFunc) override
     {
-        if (auto backDecor = originalFunc->findDecoration<IRBackwardDerivativePropagateDecoration>())
+        if (auto backDecor =
+                originalFunc->findDecoration<IRBackwardDerivativePropagateDecoration>())
         {
             return backDecor->getBackwardDerivativePropagateFunc();
         }
         return nullptr;
     }
-    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
+    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc)
+        override
     {
         builder->addBackwardDerivativePropagateDecoration(inst, diffFunc);
     }
@@ -213,7 +234,8 @@ struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
     {
         return kIROp_BackwardDerivativePropagateDecoration;
     }
-    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func) override
+    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func)
+        override
     {
         if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
         {
@@ -232,16 +254,18 @@ struct BackwardDiffPropagateTranscriber : BackwardDiffTranscriberBase
 // intermediate value input.
 struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
 {
-    BackwardDiffTranscriber(
-        AutoDiffSharedContext* shared,
-        DiagnosticSink* inSink)
-        : BackwardDiffTranscriberBase(
-              FuncBodyTranscriptionTaskType::Backward, shared, inSink)
-    { }
+    BackwardDiffTranscriber(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
+        : BackwardDiffTranscriberBase(FuncBodyTranscriptionTaskType::Backward, shared, inSink)
+    {
+    }
 
-    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
+    virtual IRFuncType* differentiateFunctionType(
+        IRBuilder* builder,
+        IRInst* func,
+        IRFuncType* funcType) override;
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
-    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc) override
+    virtual InstPair transcribeFunc(IRBuilder* builder, IRFunc* primalFunc, IRFunc* diffFunc)
+        override
     {
         // Don't need to do anything here, the body is generated in transcribeFuncHeader.
 
@@ -255,17 +279,20 @@ struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
         {
             return backDecor->getBackwardDerivativeFunc();
         }
-        if (auto backDecor = originalFunc->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
+        if (auto backDecor =
+                originalFunc->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
         {
             return backDecor->getBackwardDerivativeFunc();
         }
         return nullptr;
     }
-    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc) override
+    virtual void addExistingDiffFuncDecor(IRBuilder* builder, IRInst* inst, IRInst* diffFunc)
+        override
     {
         builder->addBackwardDerivativeDecoration(inst, diffFunc);
     }
-    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func) override
+    virtual IRStringLit* getTranscribedFuncName(IRBuilder* builder, IRGlobalValueWithCode* func)
+        override
     {
         if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
         {
@@ -280,4 +307,4 @@ struct BackwardDiffTranscriber : BackwardDiffTranscriberBase
     }
 };
 
-}
+} // namespace Slang

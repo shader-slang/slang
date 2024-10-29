@@ -29,7 +29,8 @@ public:
 
     VKBufferHandleRAII()
         : m_api(nullptr)
-    {}
+    {
+    }
 
     ~VKBufferHandleRAII()
     {
@@ -61,12 +62,12 @@ public:
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeResourceHandle(InteropHandle* outHandle) override;
+    getNativeResourceHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        map(MemoryRange* rangeToRead, void** outPointer) override;
+    map(MemoryRange* rangeToRead, void** outPointer) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override;
 

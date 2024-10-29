@@ -12,7 +12,7 @@
 // for any arguments.
 
 #ifndef DIAGNOSTIC
-#error Need to #define DIAGNOSTIC(...) before including 
+#error Need to #define DIAGNOSTIC(...) before including
 #define DIAGNOSTIC(id, severity, name, messageFormat) /* */
 #endif
 
@@ -29,7 +29,11 @@ DIAGNOSTIC(10003, Error, invalidDigitForBase, "invalid digit for base-$1 literal
 
 DIAGNOSTIC(10004, Error, endOfFileInLiteral, "end of file in literal")
 DIAGNOSTIC(10005, Error, newlineInLiteral, "newline in literal")
-DIAGNOSTIC(10010, Error, quoteCannotBeDelimiter, "'\"' encountered before '(' in raw string literal. '\"' cannot be a part of a delimiter.")
+DIAGNOSTIC(
+    10010,
+    Error,
+    quoteCannotBeDelimiter,
+    "'\"' encountered before '(' in raw string literal. '\"' cannot be a part of a delimiter.")
 
 DIAGNOSTIC(10011, Error, unexpectedEndOfInput, "unexpected end of input")
 

@@ -5,6 +5,7 @@
 #include "d3d12-buffer.h"
 #include "d3d12-fence.h"
 #include "d3d12-framebuffer.h"
+#include "d3d12-helper-functions.h"
 #include "d3d12-pipeline-state.h"
 #include "d3d12-query.h"
 #include "d3d12-render-pass.h"
@@ -16,22 +17,20 @@
 #include "d3d12-swap-chain.h"
 #include "d3d12-vertex-layout.h"
 
-#include "d3d12-helper-functions.h"
-
 #ifdef _DEBUG
-#    define ENABLE_DEBUG_LAYER 1
+#define ENABLE_DEBUG_LAYER 1
 #else
-#    define ENABLE_DEBUG_LAYER 0
+#define ENABLE_DEBUG_LAYER 0
 #endif
 
 #ifdef GFX_NVAPI
-#    include "../nvapi/nvapi-include.h"
+#include "../nvapi/nvapi-include.h"
 #endif
 
 #ifdef GFX_NV_AFTERMATH
-#   include "GFSDK_Aftermath.h"
-#   include "GFSDK_Aftermath_Defines.h"
-#   include "GFSDK_Aftermath_GpuCrashDump.h"
+#include "GFSDK_Aftermath.h"
+#include "GFSDK_Aftermath_Defines.h"
+#include "GFSDK_Aftermath_GpuCrashDump.h"
 #endif
 
 namespace gfx
@@ -45,9 +44,9 @@ static const uint32_t D3D_FEATURE_LEVEL_12_2 = 0xc200;
 
 
 #if GFX_NV_AFTERMATH
-/* static */const bool DeviceImpl::g_isAftermathEnabled = true;
+/* static */ const bool DeviceImpl::g_isAftermathEnabled = true;
 #else
-/* static */const bool DeviceImpl::g_isAftermathEnabled = false;
+/* static */ const bool DeviceImpl::g_isAftermathEnabled = false;
 #endif
 
 struct ShaderModelInfo
@@ -58,10 +57,16 @@ struct ShaderModelInfo
 };
 // List of shader models. Do not change oldest to newest order.
 static ShaderModelInfo kKnownShaderModels[] = {
-#define SHADER_MODEL_INFO_DXBC(major, minor) {D3D_SHADER_MODEL_##major##_##minor, SLANG_DXBC, "sm_" #major "_" #minor }
+#define SHADER_MODEL_INFO_DXBC(major, minor)                                    \
+    {                                                                           \
+        D3D_SHADER_MODEL_##major##_##minor, SLANG_DXBC, "sm_" #major "_" #minor \
+    }
     SHADER_MODEL_INFO_DXBC(5, 1),
 #undef SHADER_MODEL_INFO_DXBC
-#define SHADER_MODEL_INFO_DXIL(major, minor) {(D3D_SHADER_MODEL)0x##major##minor, SLANG_DXIL, "sm_" #major "_" #minor }
+#define SHADER_MODEL_INFO_DXIL(major, minor)                                    \
+    {                                                                           \
+        (D3D_SHADER_MODEL)0x##major##minor, SLANG_DXIL, "sm_" #major "_" #minor \
+    }
     SHADER_MODEL_INFO_DXIL(6, 0),
     SHADER_MODEL_INFO_DXIL(6, 1),
     SHADER_MODEL_INFO_DXIL(6, 2),
@@ -119,8 +124,7 @@ Result DeviceImpl::createBuffer(
         if (initialState != D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE)
             initialState = D3D12_RESOURCE_STATE_COMMON;
         break;
-    default:
-        return SLANG_FAIL;
+    default: return SLANG_FAIL;
     }
 
     // Create the resource.
@@ -166,8 +170,8 @@ Result DeviceImpl::createBuffer(
         if (memoryType == MemoryType::DeviceLocal)
         {
             auto encodeInfo = encodeResourceCommands();
-            encodeInfo.d3dCommandList->CopyBufferRegion(
-                resourceOut, 0, uploadResourceRef, 0, bufferSize);
+            encodeInfo.d3dCommandList
+                ->CopyBufferRegion(resourceOut, 0, uploadResourceRef, 0, bufferSize);
             submitResourceCommandsAndWait(encodeInfo);
         }
     }
@@ -269,7 +273,7 @@ Result DeviceImpl::captureTextureToSurface(
         ID3D12Resource* dxResource = stagingResource;
 
         UINT8* data;
-        D3D12_RANGE readRange = { 0, bufferSize };
+        D3D12_RANGE readRange = {0, bufferSize};
 
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
@@ -320,7 +324,7 @@ Result DeviceImpl::_createDevice(
     {
         IDXGIAdapter* dxgiAdapter = dxgiAdapters[i];
         if (SLANG_SUCCEEDED(
-            m_D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
+                m_D3D12CreateDevice(dxgiAdapter, featureLevel, IID_PPV_ARGS(device.writeRef()))))
         {
             adapter = dxgiAdapter;
             break;
@@ -357,7 +361,9 @@ Result DeviceImpl::_createDevice(
             D3D12_FEATURE_DATA_SHADER_MODEL featureShaderModel;
             featureShaderModel.HighestShaderModel = D3D_SHADER_MODEL_6_3;
             SLANG_SUCCEEDED(device->CheckFeatureSupport(
-                D3D12_FEATURE_SHADER_MODEL, &featureShaderModel, sizeof(featureShaderModel)));
+                D3D12_FEATURE_SHADER_MODEL,
+                &featureShaderModel,
+                sizeof(featureShaderModel)));
 
             if (featureShaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_3)
             {
@@ -373,7 +379,7 @@ Result DeviceImpl::_createDevice(
                 };
 
                 // We filter INFO messages because they are way too many
-                D3D12_MESSAGE_SEVERITY severities[] = { D3D12_MESSAGE_SEVERITY_INFO };
+                D3D12_MESSAGE_SEVERITY severities[] = {D3D12_MESSAGE_SEVERITY_INFO};
 
                 D3D12_INFO_QUEUE_FILTER infoQueueFilter = {};
                 infoQueueFilter.DenyList.NumSeverities = SLANG_COUNT_OF(severities);
@@ -392,23 +398,28 @@ Result DeviceImpl::_createDevice(
         if ((deviceCheckFlags & DeviceCheckFlag::UseDebug) && g_isAftermathEnabled)
         {
             // Initialize Nsight Aftermath for this device.
-            // This combination of flags is not necessarily appropraite for real world usage 
-            const uint32_t aftermathFlags =  
-                GFSDK_Aftermath_FeatureFlags_EnableMarkers |                // Enable event marker tracking.
-                GFSDK_Aftermath_FeatureFlags_CallStackCapturing |           // Enable automatic call stack event markers.
-                GFSDK_Aftermath_FeatureFlags_EnableResourceTracking |       // Enable tracking of resources.
-                GFSDK_Aftermath_FeatureFlags_GenerateShaderDebugInfo |      // Generate debug information for shaders.
-                GFSDK_Aftermath_FeatureFlags_EnableShaderErrorReporting;    // Enable additional runtime shader error reporting.
-            
+            // This combination of flags is not necessarily appropraite for real world usage
+            const uint32_t aftermathFlags =
+                GFSDK_Aftermath_FeatureFlags_EnableMarkers |      // Enable event marker tracking.
+                GFSDK_Aftermath_FeatureFlags_CallStackCapturing | // Enable automatic call stack
+                                                                  // event markers.
+                GFSDK_Aftermath_FeatureFlags_EnableResourceTracking |  // Enable tracking of
+                                                                       // resources.
+                GFSDK_Aftermath_FeatureFlags_GenerateShaderDebugInfo | // Generate debug information
+                                                                       // for shaders.
+                GFSDK_Aftermath_FeatureFlags_EnableShaderErrorReporting; // Enable additional
+                                                                         // runtime shader error
+                                                                         // reporting.
+
             auto initResult = GFSDK_Aftermath_DX12_Initialize(
                 GFSDK_Aftermath_Version_API,
                 aftermathFlags,
                 device);
-            
-            if ( initResult != GFSDK_Aftermath_Result_Success)
+
+            if (initResult != GFSDK_Aftermath_Result_Success)
             {
                 SLANG_ASSERT_FAILURE("Unable to initialize aftermath");
-                // Unable to initialize 
+                // Unable to initialize
                 return SLANG_FAIL;
             }
         }
@@ -456,7 +467,9 @@ Result DeviceImpl::initialize(const Desc& desc)
     if (SLANG_FAILED(SharedLibrary::load(libName, d3dModule)))
     {
         getDebugCallback()->handleMessage(
-            DebugMessageType::Error, DebugMessageSource::Layer, "error: failed load 'd3d12.dll'\n");
+            DebugMessageType::Error,
+            DebugMessageSource::Layer,
+            "error: failed load 'd3d12.dll'\n");
         return SLANG_FAIL;
     }
 
@@ -465,7 +478,7 @@ Result DeviceImpl::initialize(const Desc& desc)
     {
         StructType stype;
         memcpy(&stype, desc.extendedDescs[i], sizeof(stype));
-        switch (stype )
+        switch (stype)
         {
         case StructType::D3D12DeviceExtendedDesc:
             memcpy(&m_extendedDesc, desc.extendedDescs[i], sizeof(m_extendedDesc));
@@ -486,7 +499,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         m_info.bindingStyle = BindingStyle::DirectX;
         m_info.projectionStyle = ProjectionStyle::DirectX;
         m_info.apiName = "Direct3D 12";
-        static const float kIdentity[] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+        static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
         ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
     }
 
@@ -498,8 +511,9 @@ Result DeviceImpl::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    m_D3D12SerializeVersionedRootSignature =
-        (PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE)loadProc(d3dModule, "D3D12SerializeVersionedRootSignature");
+    m_D3D12SerializeVersionedRootSignature = (PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE)loadProc(
+        d3dModule,
+        "D3D12SerializeVersionedRootSignature");
     if (!m_D3D12SerializeVersionedRootSignature)
     {
         return SLANG_FAIL;
@@ -526,7 +540,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         {
             if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
             {
-#    if 0
+#if 0
                 // Can enable for extra validation. NOTE! That d3d12 warns if you do....
                 // D3D12 MESSAGE : Device Debug Layer Startup Options : GPU - Based Validation is enabled(disabled by default).
                 // This results in new validation not possible during API calls on the CPU, by creating patched shaders that have validation
@@ -539,7 +553,7 @@ Result DeviceImpl::initialize(const Desc& desc)
                 {
                     debug1->SetEnableGPUBasedValidation(true);
                 }
-#    endif
+#endif
             }
         }
     }
@@ -559,7 +573,8 @@ Result DeviceImpl::initialize(const Desc& desc)
         if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled())
         {
             combiner.add(
-                DeviceCheckFlag::UseDebug, ChangeType::OnOff); ///< First try debug then non debug
+                DeviceCheckFlag::UseDebug,
+                ChangeType::OnOff); ///< First try debug then non debug
         }
         else
         {
@@ -570,8 +585,7 @@ Result DeviceImpl::initialize(const Desc& desc)
             ChangeType::OnOff); ///< First try hardware, then reference
 
 
-        const D3D_FEATURE_LEVEL featureLevels[] =
-        {
+        const D3D_FEATURE_LEVEL featureLevels[] = {
             (D3D_FEATURE_LEVEL)D3D_FEATURE_LEVEL_12_2,
             D3D_FEATURE_LEVEL_12_1,
             D3D_FEATURE_LEVEL_12_0,
@@ -581,24 +595,23 @@ Result DeviceImpl::initialize(const Desc& desc)
             D3D_FEATURE_LEVEL_10_0,
             D3D_FEATURE_LEVEL_9_3,
             D3D_FEATURE_LEVEL_9_2,
-            D3D_FEATURE_LEVEL_9_1
-        };
+            D3D_FEATURE_LEVEL_9_1};
         for (auto featureLevel : featureLevels)
         {
             const int numCombinations = combiner.getNumCombinations();
             for (int i = 0; i < numCombinations; ++i)
             {
                 if (SLANG_SUCCEEDED(_createDevice(
-                    combiner.getCombination(i),
-                    desc.adapterLUID,
-                    featureLevel,
-                    m_deviceInfo)))
+                        combiner.getCombination(i),
+                        desc.adapterLUID,
+                        featureLevel,
+                        m_deviceInfo)))
                 {
                     goto succ;
                 }
             }
         }
-        succ:
+    succ:
         if (!m_deviceInfo.m_adapter)
         {
             // Couldn't find an adapter
@@ -669,9 +682,10 @@ Result DeviceImpl::initialize(const Desc& desc)
         SLANG_COMPILE_TIME_ASSERT(D3D_SHADER_MODEL_6_0 == 0x60);
 
         {
-            // CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL) can fail if the runtime/driver does not yet know the
-            // specified highest shader model. Therefore we assemble a list of shader models to check and
-            // walk it from highest to lowest to find the supported shader model.
+            // CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL) can fail if the runtime/driver does
+            // not yet know the specified highest shader model. Therefore we assemble a list of
+            // shader models to check and walk it from highest to lowest to find the supported
+            // shader model.
             Slang::ShortList<D3D_SHADER_MODEL> shaderModels;
             if (m_extendedDesc.highestShaderModel != 0)
                 shaderModels.add((D3D_SHADER_MODEL)m_extendedDesc.highestShaderModel);
@@ -680,12 +694,16 @@ Result DeviceImpl::initialize(const Desc& desc)
             for (D3D_SHADER_MODEL shaderModel : shaderModels)
             {
                 shaderModelData.HighestShaderModel = shaderModel;
-                if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData))))
+                if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
+                        D3D12_FEATURE_SHADER_MODEL,
+                        &shaderModelData,
+                        sizeof(shaderModelData))))
                     break;
             }
 
             // TODO: Currently warp causes a crash when using half, so disable for now
-            if (m_deviceInfo.m_isWarp == false && shaderModelData.HighestShaderModel >= D3D_SHADER_MODEL_6_2)
+            if (m_deviceInfo.m_isWarp == false &&
+                shaderModelData.HighestShaderModel >= D3D_SHADER_MODEL_6_2)
             {
                 // With sm_6_2 we have half
                 m_features.add("half");
@@ -694,7 +712,9 @@ Result DeviceImpl::initialize(const Desc& desc)
         {
             D3D12_FEATURE_DATA_D3D12_OPTIONS options;
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
-                D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
+                    D3D12_FEATURE_D3D12_OPTIONS,
+                    &options,
+                    sizeof(options))))
             {
                 // Check double precision support
                 if (options.DoublePrecisionFloatShaderOps)
@@ -728,7 +748,9 @@ Result DeviceImpl::initialize(const Desc& desc)
         {
             D3D12_FEATURE_DATA_D3D12_OPTIONS1 options;
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
-                D3D12_FEATURE_D3D12_OPTIONS1, &options, sizeof(options))))
+                    D3D12_FEATURE_D3D12_OPTIONS1,
+                    &options,
+                    sizeof(options))))
             {
                 // Check wave operations support
                 if (options.WaveOps)
@@ -738,7 +760,9 @@ Result DeviceImpl::initialize(const Desc& desc)
         {
             D3D12_FEATURE_DATA_D3D12_OPTIONS2 options;
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
-                D3D12_FEATURE_D3D12_OPTIONS2, &options, sizeof(options))))
+                    D3D12_FEATURE_D3D12_OPTIONS2,
+                    &options,
+                    sizeof(options))))
             {
                 // Check programmable sample positions support
                 switch (options.ProgrammableSamplePositionsTier)
@@ -750,15 +774,16 @@ Result DeviceImpl::initialize(const Desc& desc)
                 case D3D12_PROGRAMMABLE_SAMPLE_POSITIONS_TIER_1:
                     m_features.add("programmable-sample-positions-1");
                     break;
-                default:
-                    break;
+                default: break;
                 }
             }
         }
         {
             D3D12_FEATURE_DATA_D3D12_OPTIONS3 options;
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
-                D3D12_FEATURE_D3D12_OPTIONS3, &options, sizeof(options))))
+                    D3D12_FEATURE_D3D12_OPTIONS3,
+                    &options,
+                    sizeof(options))))
             {
                 // Check barycentrics support
                 if (options.BarycentricsSupported)
@@ -771,7 +796,9 @@ Result DeviceImpl::initialize(const Desc& desc)
         {
             D3D12_FEATURE_DATA_D3D12_OPTIONS5 options;
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
-                D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))))
+                    D3D12_FEATURE_D3D12_OPTIONS5,
+                    &options,
+                    sizeof(options))))
             {
                 if (options.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
                 {
@@ -787,7 +814,9 @@ Result DeviceImpl::initialize(const Desc& desc)
         {
             D3D12_FEATURE_DATA_D3D12_OPTIONS7 options;
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
-                D3D12_FEATURE_D3D12_OPTIONS7, &options, sizeof(options))))
+                    D3D12_FEATURE_D3D12_OPTIONS7,
+                    &options,
+                    sizeof(options))))
             {
                 if (options.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1)
                 {
@@ -825,9 +854,12 @@ Result DeviceImpl::initialize(const Desc& desc)
         limits.maxComputeThreadGroupSize[0] = D3D12_CS_THREAD_GROUP_MAX_X;
         limits.maxComputeThreadGroupSize[1] = D3D12_CS_THREAD_GROUP_MAX_Y;
         limits.maxComputeThreadGroupSize[2] = D3D12_CS_THREAD_GROUP_MAX_Z;
-        limits.maxComputeDispatchThreadGroups[0] = D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
-        limits.maxComputeDispatchThreadGroups[1] = D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
-        limits.maxComputeDispatchThreadGroups[2] = D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
+        limits.maxComputeDispatchThreadGroups[0] =
+            D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
+        limits.maxComputeDispatchThreadGroups[1] =
+            D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
+        limits.maxComputeDispatchThreadGroups[2] =
+            D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION;
 
         limits.maxViewports = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
         limits.maxViewportDimensions[0] = D3D12_VIEWPORT_BOUNDS_MAX;
@@ -859,14 +891,23 @@ Result DeviceImpl::initialize(const Desc& desc)
         D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
     m_cpuSamplerHeap = new D3D12GeneralExpandingDescriptorHeap();
     SLANG_RETURN_ON_FAIL(m_cpuSamplerHeap->init(
-        m_device, 2048, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
+        m_device,
+        2048,
+        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+        D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
 
     m_rtvAllocator = new D3D12GeneralExpandingDescriptorHeap();
     SLANG_RETURN_ON_FAIL(m_rtvAllocator->init(
-        m_device, 16 * 1024, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
+        m_device,
+        16 * 1024,
+        D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+        D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
     m_dsvAllocator = new D3D12GeneralExpandingDescriptorHeap();
     SLANG_RETURN_ON_FAIL(m_dsvAllocator->init(
-        m_device, 1024, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
+        m_device,
+        1024,
+        D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+        D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
 
     ComPtr<IDXGIDevice> dxgiDevice;
     if (m_deviceInfo.m_adapter)
@@ -914,7 +955,7 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.extendedDescs,
         compileTarget,
         profileName,
-        makeArray(slang::PreprocessorMacroDesc{ "__D3D12__", "1" }).getView()));
+        makeArray(slang::PreprocessorMacroDesc{"__D3D12__", "1"}).getView()));
 
     // Allocate a D3D12 "command signature" object that matches the behavior
     // of a D3D11-style `DrawInstancedIndirect` operation.
@@ -929,7 +970,9 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.NodeMask = 0;
 
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(
-            &desc, nullptr, IID_PPV_ARGS(drawIndirectCmdSignature.writeRef())));
+            &desc,
+            nullptr,
+            IID_PPV_ARGS(drawIndirectCmdSignature.writeRef())));
     }
 
     // Allocate a D3D12 "command signature" object that matches the behavior
@@ -945,7 +988,9 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.NodeMask = 0;
 
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(
-            &desc, nullptr, IID_PPV_ARGS(drawIndexedIndirectCmdSignature.writeRef())));
+            &desc,
+            nullptr,
+            IID_PPV_ARGS(drawIndexedIndirectCmdSignature.writeRef())));
     }
 
     // Allocate a D3D12 "command signature" object that matches the behavior
@@ -961,14 +1006,17 @@ Result DeviceImpl::initialize(const Desc& desc)
         desc.NodeMask = 0;
 
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(
-            &desc, nullptr, IID_PPV_ARGS(dispatchIndirectCmdSignature.writeRef())));
+            &desc,
+            nullptr,
+            IID_PPV_ARGS(dispatchIndirectCmdSignature.writeRef())));
     }
     m_isInitialized = true;
     return SLANG_OK;
 }
 
 Result DeviceImpl::createTransientResourceHeap(
-    const ITransientResourceHeap::Desc& desc, ITransientResourceHeap** outHeap)
+    const ITransientResourceHeap::Desc& desc,
+    ITransientResourceHeap** outHeap)
 {
     RefPtr<TransientResourceHeapImpl> heap;
     SLANG_RETURN_ON_FAIL(createTransientResourceHeapImpl(
@@ -990,7 +1038,9 @@ Result DeviceImpl::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQ
 }
 
 Result DeviceImpl::createSwapchain(
-    const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
+    const ISwapchain::Desc& desc,
+    WindowHandle window,
+    ISwapchain** outSwapchain)
 {
     RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(swapchain->init(this, desc, window));
@@ -1006,11 +1056,17 @@ SlangResult DeviceImpl::readTextureResource(
     Size* outPixelSize)
 {
     return captureTextureToSurface(
-        static_cast<TextureResourceImpl*>(resource), state, outBlob, outRowPitch, outPixelSize);
+        static_cast<TextureResourceImpl*>(resource),
+        state,
+        outBlob,
+        outRowPitch,
+        outPixelSize);
 }
 
 Result DeviceImpl::getTextureAllocationInfo(
-    const ITextureResource::Desc& desc, Size* outSize, Size* outAlignment)
+    const ITextureResource::Desc& desc,
+    Size* outSize,
+    Size* outAlignment)
 {
     TextureResource::Desc srcDesc = fixupTextureDesc(desc);
     D3D12_RESOURCE_DESC resourceDesc = {};
@@ -1069,7 +1125,7 @@ Result DeviceImpl::createTextureResource(
             clearValuePtr = &clearValue;
         }
         if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
-            D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0)
+                                   D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0)
         {
             clearValuePtr = nullptr;
         }
@@ -1194,8 +1250,8 @@ Result DeviceImpl::createTextureResource(
                     const uint8_t* srcRow = srcLayer;
                     uint8_t* dstRow = dstLayer;
                     int j = gfxIsCompressedFormat(descIn.format)
-                        ? 4
-                        : 1; // BC compressed formats are organized into 4x4 blocks
+                                ? 4
+                                : 1; // BC compressed formats are organized into 4x4 blocks
                     for (int k = 0; k < mipSize.height; k += j)
                     {
                         ::memcpy(dstRow, srcRow, (Size)mipRowSize);
@@ -1240,7 +1296,9 @@ Result DeviceImpl::createTextureResource(
         {
             D3D12BarrierSubmitter submitter(encodeInfo.d3dCommandList);
             texture->m_resource.transition(
-                D3D12_RESOURCE_STATE_COPY_DEST, texture->m_defaultState, submitter);
+                D3D12_RESOURCE_STATE_COPY_DEST,
+                texture->m_defaultState,
+                submitter);
         }
         submitResourceCommandsAndWait(encodeInfo);
     }
@@ -1250,7 +1308,9 @@ Result DeviceImpl::createTextureResource(
 }
 
 Result DeviceImpl::createTextureFromNativeHandle(
-    InteropHandle handle, const ITextureResource::Desc& srcDesc, ITextureResource** outResource)
+    InteropHandle handle,
+    const ITextureResource::Desc& srcDesc,
+    ITextureResource** outResource)
 {
     RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
 
@@ -1268,7 +1328,9 @@ Result DeviceImpl::createTextureFromNativeHandle(
 }
 
 Result DeviceImpl::createBufferResource(
-    const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
+    const IBufferResource::Desc& descIn,
+    const void* initData,
+    IBufferResource** outResource)
 {
     BufferResource::Desc srcDesc = fixupBufferDesc(descIn);
 
@@ -1294,7 +1356,9 @@ Result DeviceImpl::createBufferResource(
 }
 
 Result DeviceImpl::createBufferFromNativeHandle(
-    InteropHandle handle, const IBufferResource::Desc& srcDesc, IBufferResource** outResource)
+    InteropHandle handle,
+    const IBufferResource::Desc& srcDesc,
+    IBufferResource** outResource)
 {
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
 
@@ -1359,7 +1423,9 @@ Result DeviceImpl::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
 }
 
 Result DeviceImpl::createTextureView(
-    ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
+    ITextureResource* texture,
+    IResourceView::Desc const& desc,
+    IResourceView** outView)
 {
     auto resourceImpl = (TextureResourceImpl*)texture;
 
@@ -1370,242 +1436,246 @@ Result DeviceImpl::createTextureView(
     bool isMultiSample = resourceImpl ? resourceImpl->getDesc()->sampleDesc.numSamples > 1 : false;
     switch (desc.type)
     {
-    default:
-        return SLANG_FAIL;
+    default: return SLANG_FAIL;
 
     case IResourceView::Type::RenderTarget:
-    {
-        SLANG_RETURN_ON_FAIL(m_rtvAllocator->allocate(&viewImpl->m_descriptor));
-        viewImpl->m_allocator = m_rtvAllocator;
-        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-        rtvDesc.Format = D3DUtil::getMapFormat(desc.format);
-        switch (desc.renderTarget.shape)
         {
-        case IResource::Type::Texture1D:
-            rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE1DARRAY : D3D12_RTV_DIMENSION_TEXTURE1D;
-            if(isArray)
+            SLANG_RETURN_ON_FAIL(m_rtvAllocator->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_rtvAllocator;
+            D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+            rtvDesc.Format = D3DUtil::getMapFormat(desc.format);
+            switch (desc.renderTarget.shape)
             {
-                rtvDesc.Texture1DArray.MipSlice = desc.subresourceRange.mipLevel;
-                rtvDesc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-                rtvDesc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount;
-            }
-            else
-            {
-                rtvDesc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
-            }
-            
-            break;
-        case IResource::Type::Texture2D:
-            if (isMultiSample)
-            {
-                rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY
-                    : D3D12_RTV_DIMENSION_TEXTURE2DMS;
-                rtvDesc.Texture2DMSArray.ArraySize = desc.subresourceRange.layerCount;
-                rtvDesc.Texture2DMSArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-            }
-            else
-            {
-                rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY
-                    : D3D12_RTV_DIMENSION_TEXTURE2D;
-                if(isArray)
+            case IResource::Type::Texture1D:
+                rtvDesc.ViewDimension =
+                    isArray ? D3D12_RTV_DIMENSION_TEXTURE1DARRAY : D3D12_RTV_DIMENSION_TEXTURE1D;
+                if (isArray)
                 {
-                    rtvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
-                    rtvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
-                    rtvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-                    rtvDesc.Texture2DArray.PlaneSlice =
-                        resourceImpl ? D3DUtil::getPlaneSlice(
-                            D3DUtil::getMapFormat(resourceImpl->getDesc()->format),
-                            desc.subresourceRange.aspectMask)
-                        : 0;
+                    rtvDesc.Texture1DArray.MipSlice = desc.subresourceRange.mipLevel;
+                    rtvDesc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                    rtvDesc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount;
                 }
                 else
                 {
-                    rtvDesc.Texture2D.MipSlice = desc.subresourceRange.mipLevel;
-                    rtvDesc.Texture2D.PlaneSlice =
-                        resourceImpl ? D3DUtil::getPlaneSlice(
-                            D3DUtil::getMapFormat(resourceImpl->getDesc()->format),
-                            desc.subresourceRange.aspectMask)
-                        : 0;
+                    rtvDesc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
                 }
+
+                break;
+            case IResource::Type::Texture2D:
+                if (isMultiSample)
+                {
+                    rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY
+                                                    : D3D12_RTV_DIMENSION_TEXTURE2DMS;
+                    rtvDesc.Texture2DMSArray.ArraySize = desc.subresourceRange.layerCount;
+                    rtvDesc.Texture2DMSArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                }
+                else
+                {
+                    rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY
+                                                    : D3D12_RTV_DIMENSION_TEXTURE2D;
+                    if (isArray)
+                    {
+                        rtvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+                        rtvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
+                        rtvDesc.Texture2DArray.FirstArraySlice =
+                            desc.subresourceRange.baseArrayLayer;
+                        rtvDesc.Texture2DArray.PlaneSlice =
+                            resourceImpl
+                                ? D3DUtil::getPlaneSlice(
+                                      D3DUtil::getMapFormat(resourceImpl->getDesc()->format),
+                                      desc.subresourceRange.aspectMask)
+                                : 0;
+                    }
+                    else
+                    {
+                        rtvDesc.Texture2D.MipSlice = desc.subresourceRange.mipLevel;
+                        rtvDesc.Texture2D.PlaneSlice =
+                            resourceImpl
+                                ? D3DUtil::getPlaneSlice(
+                                      D3DUtil::getMapFormat(resourceImpl->getDesc()->format),
+                                      desc.subresourceRange.aspectMask)
+                                : 0;
+                    }
+                }
+                break;
+            case IResource::Type::TextureCube:
+                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+                rtvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+                rtvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
+                rtvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                rtvDesc.Texture2DArray.PlaneSlice =
+                    resourceImpl ? D3DUtil::getPlaneSlice(
+                                       D3DUtil::getMapFormat(resourceImpl->getDesc()->format),
+                                       desc.subresourceRange.aspectMask)
+                                 : 0;
+                break;
+            case IResource::Type::Texture3D:
+                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
+                rtvDesc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
+                rtvDesc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
+                rtvDesc.Texture3D.WSize =
+                    (desc.subresourceRange.layerCount == 0) ? -1 : desc.subresourceRange.layerCount;
+                break;
+            case IResource::Type::Buffer: rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_BUFFER; break;
+            default:                      return SLANG_FAIL;
             }
-            break;
-        case IResource::Type::TextureCube:
-            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-            rtvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
-            rtvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
-            rtvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-            rtvDesc.Texture2DArray.PlaneSlice =
-                resourceImpl
-                ? D3DUtil::getPlaneSlice(D3DUtil::getMapFormat(resourceImpl->getDesc()->format), desc.subresourceRange.aspectMask)
-                : 0;
-            break;
-        case IResource::Type::Texture3D:
-            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
-            rtvDesc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
-            rtvDesc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
-            rtvDesc.Texture3D.WSize = (desc.subresourceRange.layerCount == 0) ? -1 : desc.subresourceRange.layerCount;
-            break;
-        case IResource::Type::Buffer:
-            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_BUFFER;
-            break;
-        default:
-            return SLANG_FAIL;
+            m_device->CreateRenderTargetView(
+                resourceImpl ? resourceImpl->m_resource.getResource() : nullptr,
+                &rtvDesc,
+                viewImpl->m_descriptor.cpuHandle);
         }
-        m_device->CreateRenderTargetView(
-            resourceImpl ? resourceImpl->m_resource.getResource() : nullptr,
-            &rtvDesc,
-            viewImpl->m_descriptor.cpuHandle);
-    }
-    break;
+        break;
 
     case IResourceView::Type::DepthStencil:
-    {
-        SLANG_RETURN_ON_FAIL(m_dsvAllocator->allocate(&viewImpl->m_descriptor));
-        viewImpl->m_allocator = m_dsvAllocator;
-        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-        dsvDesc.Format = D3DUtil::getMapFormat(desc.format);
-        switch (desc.renderTarget.shape)
         {
-        case IResource::Type::Texture1D:
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE1D;
-            dsvDesc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
-            break;
-        case IResource::Type::Texture2D:
-            if (isMultiSample)
+            SLANG_RETURN_ON_FAIL(m_dsvAllocator->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_dsvAllocator;
+            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+            dsvDesc.Format = D3DUtil::getMapFormat(desc.format);
+            switch (desc.renderTarget.shape)
             {
-                dsvDesc.ViewDimension = isArray ? D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY
-                    : D3D12_DSV_DIMENSION_TEXTURE2DMS;
-                dsvDesc.Texture2DMSArray.ArraySize = desc.subresourceRange.layerCount;
-                dsvDesc.Texture2DMSArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-            }
-            else
-            {
-                dsvDesc.ViewDimension = isArray ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY
-                    : D3D12_DSV_DIMENSION_TEXTURE2D;
+            case IResource::Type::Texture1D:
+                dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE1D;
+                dsvDesc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
+                break;
+            case IResource::Type::Texture2D:
+                if (isMultiSample)
+                {
+                    dsvDesc.ViewDimension = isArray ? D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY
+                                                    : D3D12_DSV_DIMENSION_TEXTURE2DMS;
+                    dsvDesc.Texture2DMSArray.ArraySize = desc.subresourceRange.layerCount;
+                    dsvDesc.Texture2DMSArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                }
+                else
+                {
+                    dsvDesc.ViewDimension = isArray ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY
+                                                    : D3D12_DSV_DIMENSION_TEXTURE2D;
+                    dsvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+                    dsvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
+                    dsvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                }
+                break;
+            case IResource::Type::TextureCube:
+                dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
                 dsvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
                 dsvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
                 dsvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                break;
+            default: return SLANG_FAIL;
             }
-            break;
-        case IResource::Type::TextureCube:
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-            dsvDesc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
-            dsvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
-            dsvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-            break;
-        default:
-            return SLANG_FAIL;
+            m_device->CreateDepthStencilView(
+                resourceImpl ? resourceImpl->m_resource.getResource() : nullptr,
+                &dsvDesc,
+                viewImpl->m_descriptor.cpuHandle);
         }
-        m_device->CreateDepthStencilView(
-            resourceImpl ? resourceImpl->m_resource.getResource() : nullptr,
-            &dsvDesc,
-            viewImpl->m_descriptor.cpuHandle);
-    }
-    break;
+        break;
 
     case IResourceView::Type::UnorderedAccess:
-    {
-        // TODO: need to support the separate "counter resource" for the case
-        // of append/consume buffers with attached counters.
-
-        SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
-        viewImpl->m_allocator = m_cpuViewHeap;
-        D3D12_UNORDERED_ACCESS_VIEW_DESC d3d12desc = {};
-        auto& resourceDesc = *resourceImpl->getDesc();
-        d3d12desc.Format = gfxIsTypelessFormat(texture->getDesc()->format)
-            ? D3DUtil::getMapFormat(desc.format)
-            : D3DUtil::getMapFormat(texture->getDesc()->format);
-        switch (resourceImpl->getDesc()->type)
         {
-        case IResource::Type::Texture1D:
-            d3d12desc.ViewDimension = isArray
-                ? D3D12_UAV_DIMENSION_TEXTURE1DARRAY
-                : D3D12_UAV_DIMENSION_TEXTURE1D;
-            if(isArray)
+            // TODO: need to support the separate "counter resource" for the case
+            // of append/consume buffers with attached counters.
+
+            SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_cpuViewHeap;
+            D3D12_UNORDERED_ACCESS_VIEW_DESC d3d12desc = {};
+            auto& resourceDesc = *resourceImpl->getDesc();
+            d3d12desc.Format = gfxIsTypelessFormat(texture->getDesc()->format)
+                                   ? D3DUtil::getMapFormat(desc.format)
+                                   : D3DUtil::getMapFormat(texture->getDesc()->format);
+            switch (resourceImpl->getDesc()->type)
             {
-                d3d12desc.Texture1DArray.MipSlice = desc.subresourceRange.mipLevel;
-                d3d12desc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount == 0
-                    ? resourceDesc.arraySize
-                    : desc.subresourceRange.layerCount;
-                d3d12desc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-            }
-            else
-            {
-                d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
-            }
-            break;
-        case IResource::Type::Texture2D:
-            d3d12desc.ViewDimension = isArray
-                ? D3D12_UAV_DIMENSION_TEXTURE2DARRAY
-                : D3D12_UAV_DIMENSION_TEXTURE2D;
-            if(isArray)
-            {
+            case IResource::Type::Texture1D:
+                d3d12desc.ViewDimension =
+                    isArray ? D3D12_UAV_DIMENSION_TEXTURE1DARRAY : D3D12_UAV_DIMENSION_TEXTURE1D;
+                if (isArray)
+                {
+                    d3d12desc.Texture1DArray.MipSlice = desc.subresourceRange.mipLevel;
+                    d3d12desc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount == 0
+                                                             ? resourceDesc.arraySize
+                                                             : desc.subresourceRange.layerCount;
+                    d3d12desc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                }
+                else
+                {
+                    d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
+                }
+                break;
+            case IResource::Type::Texture2D:
+                d3d12desc.ViewDimension =
+                    isArray ? D3D12_UAV_DIMENSION_TEXTURE2DARRAY : D3D12_UAV_DIMENSION_TEXTURE2D;
+                if (isArray)
+                {
+                    d3d12desc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
+                    d3d12desc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount == 0
+                                                             ? resourceDesc.arraySize
+                                                             : desc.subresourceRange.layerCount;
+                    d3d12desc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                    d3d12desc.Texture2DArray.PlaneSlice =
+                        D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
+                }
+                else
+                {
+                    d3d12desc.Texture2D.MipSlice = desc.subresourceRange.mipLevel;
+                    d3d12desc.Texture2D.PlaneSlice =
+                        D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
+                }
+                break;
+            case IResource::Type::TextureCube:
+                d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
                 d3d12desc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
                 d3d12desc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount == 0
-                    ? resourceDesc.arraySize
-                    : desc.subresourceRange.layerCount;
+                                                         ? resourceDesc.arraySize
+                                                         : desc.subresourceRange.layerCount;
                 d3d12desc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
                 d3d12desc.Texture2DArray.PlaneSlice =
                     D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
+                break;
+            case IResource::Type::Texture3D:
+                d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+                d3d12desc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
+                d3d12desc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
+                d3d12desc.Texture3D.WSize =
+                    resourceDesc.size.depth >> desc.subresourceRange.mipLevel;
+                break;
+            default: return SLANG_FAIL;
             }
-            else
-            {
-                d3d12desc.Texture2D.MipSlice = desc.subresourceRange.mipLevel;
-                d3d12desc.Texture2D.PlaneSlice =
-                    D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
-            }
-            break;
-        case IResource::Type::TextureCube:
-            d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-            d3d12desc.Texture2DArray.MipSlice = desc.subresourceRange.mipLevel;
-            d3d12desc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount == 0
-                ? resourceDesc.arraySize
-                : desc.subresourceRange.layerCount;
-            d3d12desc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
-            d3d12desc.Texture2DArray.PlaneSlice =
-                D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
-            break;
-        case IResource::Type::Texture3D:
-            d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
-            d3d12desc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
-            d3d12desc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
-            d3d12desc.Texture3D.WSize = resourceDesc.size.depth >> desc.subresourceRange.mipLevel;
-            break;
-        default:
-            return SLANG_FAIL;
+            m_device->CreateUnorderedAccessView(
+                resourceImpl->m_resource,
+                nullptr,
+                &d3d12desc,
+                viewImpl->m_descriptor.cpuHandle);
         }
-        m_device->CreateUnorderedAccessView(
-            resourceImpl->m_resource, nullptr, &d3d12desc, viewImpl->m_descriptor.cpuHandle);
-    }
-    break;
+        break;
 
     case IResourceView::Type::ShaderResource:
-    {
-        SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
-        viewImpl->m_allocator = m_cpuViewHeap;
+        {
+            SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_cpuViewHeap;
 
-        // Need to construct the D3D12_SHADER_RESOURCE_VIEW_DESC because otherwise TextureCube
-        // is not accessed appropriately (rather than just passing nullptr to
-        // CreateShaderResourceView)
-        const D3D12_RESOURCE_DESC resourceDesc =
-            resourceImpl->m_resource.getResource()->GetDesc();
-        const DXGI_FORMAT pixelFormat = desc.format == Format::Unknown
-            ? resourceDesc.Format
-            : D3DUtil::getMapFormat(desc.format);
+            // Need to construct the D3D12_SHADER_RESOURCE_VIEW_DESC because otherwise TextureCube
+            // is not accessed appropriately (rather than just passing nullptr to
+            // CreateShaderResourceView)
+            const D3D12_RESOURCE_DESC resourceDesc =
+                resourceImpl->m_resource.getResource()->GetDesc();
+            const DXGI_FORMAT pixelFormat = desc.format == Format::Unknown
+                                                ? resourceDesc.Format
+                                                : D3DUtil::getMapFormat(desc.format);
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-        initSrvDesc(
-            resourceImpl->getType(),
-            *resourceImpl->getDesc(),
-            resourceDesc,
-            pixelFormat,
-            desc.subresourceRange,
-            srvDesc);
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+            initSrvDesc(
+                resourceImpl->getType(),
+                *resourceImpl->getDesc(),
+                resourceDesc,
+                pixelFormat,
+                desc.subresourceRange,
+                srvDesc);
 
-        m_device->CreateShaderResourceView(
-            resourceImpl->m_resource, &srvDesc, viewImpl->m_descriptor.cpuHandle);
-    }
-    break;
+            m_device->CreateShaderResourceView(
+                resourceImpl->m_resource,
+                &srvDesc,
+                viewImpl->m_descriptor.cpuHandle);
+        }
+        break;
     }
 
     returnComPtr(outView, viewImpl);
@@ -1677,7 +1747,7 @@ Result DeviceImpl::createBufferView(
     // Buffer view descriptors are created on demand.
     viewImpl->m_descriptor = {0};
     viewImpl->m_allocator = m_cpuViewHeap.get();
- 
+
     returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
@@ -1699,11 +1769,14 @@ Result DeviceImpl::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffe
             auto clearValue =
                 static_cast<TextureResourceImpl*>(
                     static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_resource.Ptr())
-                ->getDesc()
-                ->optimalClearValue;
+                    ->getDesc()
+                    ->optimalClearValue;
             if (clearValue)
             {
-                memcpy(&framebuffer->renderTargetClearValues[i], &clearValue->color, sizeof(ColorClearValue));
+                memcpy(
+                    &framebuffer->renderTargetClearValues[i],
+                    &clearValue->color,
+                    sizeof(ColorClearValue));
             }
         }
         else
@@ -1714,10 +1787,11 @@ Result DeviceImpl::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffe
     framebuffer->depthStencilView = static_cast<ResourceViewImpl*>(desc.depthStencilView);
     if (desc.depthStencilView)
     {
-        auto clearValue = static_cast<TextureResourceImpl*>(
-            static_cast<ResourceViewImpl*>(desc.depthStencilView)->m_resource.Ptr())
-            ->getDesc()
-            ->optimalClearValue;
+        auto clearValue =
+            static_cast<TextureResourceImpl*>(
+                static_cast<ResourceViewImpl*>(desc.depthStencilView)->m_resource.Ptr())
+                ->getDesc()
+                ->optimalClearValue;
 
         if (clearValue)
         {
@@ -1735,7 +1809,8 @@ Result DeviceImpl::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffe
 }
 
 Result DeviceImpl::createFramebufferLayout(
-    IFramebufferLayout::Desc const& desc, IFramebufferLayout** outLayout)
+    IFramebufferLayout::Desc const& desc,
+    IFramebufferLayout** outLayout)
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     layout->m_renderTargets.setCount(desc.renderTargetCount);
@@ -1758,7 +1833,8 @@ Result DeviceImpl::createFramebufferLayout(
 }
 
 Result DeviceImpl::createRenderPassLayout(
-    const IRenderPassLayout::Desc& desc, IRenderPassLayout** outRenderPassLayout)
+    const IRenderPassLayout::Desc& desc,
+    IRenderPassLayout** outRenderPassLayout)
 {
     RefPtr<RenderPassLayoutImpl> result = new RenderPassLayoutImpl();
     result->init(desc);
@@ -1824,10 +1900,16 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
     return SLANG_OK;
 }
 
-const gfx::DeviceInfo& DeviceImpl::getDeviceInfo() const { return m_info; }
+const gfx::DeviceInfo& DeviceImpl::getDeviceInfo() const
+{
+    return m_info;
+}
 
 Result DeviceImpl::readBufferResource(
-    IBufferResource* bufferIn, Offset offset, Size size, ISlangBlob** outBlob)
+    IBufferResource* bufferIn,
+    Offset offset,
+    Size size,
+    ISlangBlob** outBlob)
 {
 
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
@@ -1876,7 +1958,7 @@ Result DeviceImpl::readBufferResource(
     List<uint8_t> blobData;
     {
         UINT8* data;
-        D3D12_RANGE readRange = { 0, size };
+        D3D12_RANGE readRange = {0, size};
 
         SLANG_RETURN_ON_FAIL(
             stageBufRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
@@ -1893,7 +1975,9 @@ Result DeviceImpl::readBufferResource(
 }
 
 Result DeviceImpl::createProgram(
-    const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
+    const IShaderProgram::Desc& desc,
+    IShaderProgram** outProgram,
+    ISlangBlob** outDiagnosticBlob)
 {
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
     shaderProgram->init(desc);
@@ -1941,13 +2025,16 @@ Result DeviceImpl::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObj
 {
     RefPtr<ShaderObjectImpl> shaderObject;
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(
-        this, reinterpret_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
+        this,
+        reinterpret_cast<ShaderObjectLayoutImpl*>(layout),
+        shaderObject.writeRef()));
     returnComPtr(outObject, shaderObject);
     return SLANG_OK;
 }
 
 Result DeviceImpl::createMutableShaderObject(
-    ShaderObjectLayoutBase* layout, IShaderObject** outObject)
+    ShaderObjectLayoutBase* layout,
+    IShaderObject** outObject)
 {
     auto result = createShaderObject(layout, outObject);
     SLANG_RETURN_ON_FAIL(result);
@@ -1961,7 +2048,11 @@ Result DeviceImpl::createMutableRootShaderObject(IShaderProgram* program, IShade
     result->init(this);
     auto programImpl = static_cast<ShaderProgramImpl*>(program);
     result->resetImpl(
-        this, programImpl->m_rootObjectLayout, m_cpuViewHeap.Ptr(), m_cpuSamplerHeap.Ptr(), true);
+        this,
+        programImpl->m_rootObjectLayout,
+        m_cpuViewHeap.Ptr(),
+        m_cpuSamplerHeap.Ptr(),
+        true);
     returnComPtr(outObject, result);
     return SLANG_OK;
 }
@@ -1976,7 +2067,8 @@ Result DeviceImpl::createShaderTable(const IShaderTable::Desc& desc, IShaderTabl
 }
 
 Result DeviceImpl::createGraphicsPipelineState(
-    const GraphicsPipelineStateDesc& desc, IPipelineState** outState)
+    const GraphicsPipelineStateDesc& desc,
+    IPipelineState** outState)
 {
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
     pipelineStateImpl->init(desc);
@@ -1985,7 +2077,8 @@ Result DeviceImpl::createGraphicsPipelineState(
 }
 
 Result DeviceImpl::createComputePipelineState(
-    const ComputePipelineStateDesc& desc, IPipelineState** outState)
+    const ComputePipelineStateDesc& desc,
+    IPipelineState** outState)
 {
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
     pipelineStateImpl->init(desc);
@@ -2011,17 +2104,17 @@ void DeviceImpl::submitResourceCommandsAndWait(const DeviceImpl::ResourceCommand
 
 void DeviceImpl::processExperimentalFeaturesDesc(SharedLibrary::Handle d3dModule, void* inDesc)
 {
-    typedef HRESULT(WINAPI* PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)(
-        UINT      NumFeatures,
+    typedef HRESULT(WINAPI * PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)(
+        UINT NumFeatures,
         const IID* pIIDs,
         void* pConfigurationStructs,
-        UINT* pConfigurationStructSizes
-        );
+        UINT* pConfigurationStructSizes);
 
     D3D12ExperimentalFeaturesDesc desc = {};
     memcpy(&desc, inDesc, sizeof(desc));
-    auto enableExperimentalFeaturesFunc =
-        (PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)loadProc(d3dModule, "D3D12EnableExperimentalFeatures");
+    auto enableExperimentalFeaturesFunc = (PFN_D3D12_ENABLE_EXPERIMENTAL_FEATURES)loadProc(
+        d3dModule,
+        "D3D12EnableExperimentalFeatures");
     if (!enableExperimentalFeaturesFunc)
     {
         getDebugCallback()->handleMessage(
@@ -2031,7 +2124,11 @@ void DeviceImpl::processExperimentalFeaturesDesc(SharedLibrary::Handle d3dModule
             "not found.");
         return;
     }
-    if (!SLANG_SUCCEEDED(enableExperimentalFeaturesFunc(desc.numFeatures, (IID*)desc.featureIIDs, desc.configurationStructs, desc.configurationStructSizes)))
+    if (!SLANG_SUCCEEDED(enableExperimentalFeaturesFunc(
+            desc.numFeatures,
+            (IID*)desc.featureIIDs,
+            desc.configurationStructs,
+            desc.configurationStructSizes)))
     {
         getDebugCallback()->handleMessage(
             gfx::DebugMessageType::Warning,
@@ -2049,23 +2146,23 @@ Result DeviceImpl::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** ou
     case QueryType::AccelerationStructureCompactedSize:
     case QueryType::AccelerationStructureSerializedSize:
     case QueryType::AccelerationStructureCurrentSize:
-    {
-        RefPtr<PlainBufferProxyQueryPoolImpl> queryPoolImpl =
-            new PlainBufferProxyQueryPoolImpl();
-        uint32_t stride = 8;
-        if (desc.type == QueryType::AccelerationStructureSerializedSize)
-            stride = 16;
-        SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this, stride));
-        returnComPtr(outState, queryPoolImpl);
-        return SLANG_OK;
-    }
+        {
+            RefPtr<PlainBufferProxyQueryPoolImpl> queryPoolImpl =
+                new PlainBufferProxyQueryPoolImpl();
+            uint32_t stride = 8;
+            if (desc.type == QueryType::AccelerationStructureSerializedSize)
+                stride = 16;
+            SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this, stride));
+            returnComPtr(outState, queryPoolImpl);
+            return SLANG_OK;
+        }
     default:
-    {
-        RefPtr<QueryPoolImpl> queryPoolImpl = new QueryPoolImpl();
-        SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this));
-        returnComPtr(outState, queryPoolImpl);
-        return SLANG_OK;
-    }
+        {
+            RefPtr<QueryPoolImpl> queryPoolImpl = new QueryPoolImpl();
+            SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this));
+            returnComPtr(outState, queryPoolImpl);
+            return SLANG_OK;
+        }
     }
 }
 
@@ -2078,7 +2175,11 @@ Result DeviceImpl::createFence(const IFence::Desc& desc, IFence** outFence)
 }
 
 Result DeviceImpl::waitForFences(
-    GfxCount fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
+    GfxCount fenceCount,
+    IFence** fences,
+    uint64_t* fenceValues,
+    bool waitForAll,
+    uint64_t timeout)
 {
     ShortList<HANDLE> waitHandles;
     for (GfxCount i = 0; i < fenceCount; ++i)
@@ -2118,7 +2219,8 @@ Result DeviceImpl::getAccelerationStructurePrebuildInfo(
 }
 
 Result DeviceImpl::createAccelerationStructure(
-    const IAccelerationStructure::CreateDesc& desc, IAccelerationStructure** outAS)
+    const IAccelerationStructure::CreateDesc& desc,
+    IAccelerationStructure** outAS)
 {
 #if SLANG_GFX_HAS_DXR_SUPPORT
     RefPtr<AccelerationStructureImpl> result = new AccelerationStructureImpl();
@@ -2139,13 +2241,14 @@ Result DeviceImpl::createAccelerationStructure(
     returnComPtr(outAS, result);
     return SLANG_OK;
 #else
-    * outAS = nullptr;
+    *outAS = nullptr;
     return SLANG_FAIL;
 #endif
 }
 
 Result DeviceImpl::createRayTracingPipelineState(
-    const RayTracingPipelineStateDesc& inDesc, IPipelineState** outState)
+    const RayTracingPipelineStateDesc& inDesc,
+    IPipelineState** outState)
 {
     if (!m_device5)
     {
@@ -2203,7 +2306,10 @@ void* DeviceImpl::loadProc(SharedLibrary::Handle module, char const* name)
     return proc;
 }
 
-DeviceImpl::~DeviceImpl() { m_shaderObjectLayoutCache = decltype(m_shaderObjectLayoutCache)(); }
+DeviceImpl::~DeviceImpl()
+{
+    m_shaderObjectLayoutCache = decltype(m_shaderObjectLayoutCache)();
+}
 
 
 } // namespace d3d12

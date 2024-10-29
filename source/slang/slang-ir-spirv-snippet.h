@@ -95,9 +95,7 @@ struct SpvSnippet : public RefObject
                 case ASMType::FloatOrDouble:
                     result = combineHash(result, Slang::getHashCode(floatValues[i]));
                     break;
-                default:
-                    result = combineHash(result, Slang::getHashCode(intValues[i]));
-                    break;
+                default: result = combineHash(result, Slang::getHashCode(intValues[i])); break;
                 }
             }
             return result;
@@ -111,20 +109,16 @@ struct SpvSnippet : public RefObject
             case ASMType::Half:
             case ASMType::Float:
             case ASMType::Double:
-            case ASMType::FloatOrDouble:
-                return floatValues[0] == other.floatValues[0];
+            case ASMType::FloatOrDouble: return floatValues[0] == other.floatValues[0];
             case ASMType::Float2:
                 return floatValues[0] == other.floatValues[0] &&
                        floatValues[1] == other.floatValues[1];
-            case ASMType::Int:
-                return intValues[0] == other.intValues[0];
+            case ASMType::Int:    return intValues[0] == other.intValues[0];
             case ASMType::UInt:
-            case ASMType::UInt16:
-                return intValues[0] == other.intValues[0];
+            case ASMType::UInt16: return intValues[0] == other.intValues[0];
             case ASMType::UInt2:
                 return intValues[0] == other.intValues[0] && intValues[1] == other.intValues[1];
-            default:
-                return false;
+            default: return false;
             }
         }
     };
@@ -140,8 +134,10 @@ struct SpvSnippet : public RefObject
     List<ASMConstant> constants;
     SpvStorageClass resultStorageClass = SpvStorageClassMax;
 
-    static RefPtr<SpvSnippet> parse(const SPIRVCoreGrammarInfo& spirvGrammar, UnownedStringSlice definition);
+    static RefPtr<SpvSnippet> parse(
+        const SPIRVCoreGrammarInfo& spirvGrammar,
+        UnownedStringSlice definition);
 };
 
 
-}
+} // namespace Slang

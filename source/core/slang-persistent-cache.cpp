@@ -1,9 +1,9 @@
 #include "slang-persistent-cache.h"
 
+#include "../core/slang-blob.h"
 #include "../core/slang-io.h"
 #include "../core/slang-stream.h"
 #include "../core/slang-string-util.h"
-#include "../core/slang-blob.h"
 
 namespace Slang
 {
@@ -25,9 +25,7 @@ PersistentCache::PersistentCache(const Desc& desc)
     initialize();
 }
 
-PersistentCache::~PersistentCache()
-{
-}
+PersistentCache::~PersistentCache() {}
 
 SlangResult PersistentCache::clear()
 {
@@ -46,13 +44,14 @@ SlangResult PersistentCache::clear()
         const String& lockFileName;
 
         Visitor(const String& directory, const String& lockFileName)
-            : directory(directory)
-            , lockFileName(lockFileName)
-        {}
+            : directory(directory), lockFileName(lockFileName)
+        {
+        }
 
         void accept(Path::Type type, const UnownedStringSlice& fileName) SLANG_OVERRIDE
         {
-            String fullPath = Path::simplify(directory + "/" + fileName);;
+            String fullPath = Path::simplify(directory + "/" + fileName);
+            ;
             if (type == Path::Type::File && lockFileName != fullPath)
             {
                 Path::remove(fullPath);
@@ -106,7 +105,8 @@ SlangResult PersistentCache::readEntry(const Key& key, ISlangBlob** outData)
     }
 
     // Find the entry.
-    Index entryIndex = cacheIndex.findFirstIndex([&key] (const CacheEntry& entry) { return entry.key == key; });
+    Index entryIndex =
+        cacheIndex.findFirstIndex([&key](const CacheEntry& entry) { return entry.key == key; });
     if (entryIndex == -1)
     {
         return SLANG_E_NOT_FOUND;
@@ -171,7 +171,8 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
 
     // Write the cache entry.
     String entryFileName = getEntryFileName(key);
-    SLANG_RETURN_ON_FAIL(File::writeAllBytes(entryFileName, data->getBufferPointer(), data->getBufferSize()));
+    SLANG_RETURN_ON_FAIL(
+        File::writeAllBytes(entryFileName, data->getBufferPointer(), data->getBufferSize()));
 
     // Update the index.
     if (m_maxEntryCount > 0 && cacheIndex.getCount() >= m_maxEntryCount)
@@ -179,12 +180,12 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
         // Replace oldest entry.
         SLANG_ASSERT(oldestEntryIndex >= 0);
         File::remove(getEntryFileName(cacheIndex[oldestEntryIndex].key));
-        cacheIndex[oldestEntryIndex] = CacheEntry{ key, 0 };
+        cacheIndex[oldestEntryIndex] = CacheEntry{key, 0};
     }
     else
     {
         // Add new entry.
-        cacheIndex.add(CacheEntry{ key, 0 });
+        cacheIndex.add(CacheEntry{key, 0});
     }
 
     // Write the cache index.
@@ -265,7 +266,7 @@ SlangResult PersistentCache::readIndex(const String& fileName, CacheIndex& outIn
 
     outIndex.setCount(header.count);
     SLANG_RETURN_ON_FAIL(fs.readExactly(outIndex.getBuffer(), header.count * sizeof(CacheEntry)));
-    
+
     return SLANG_OK;
 }
 
@@ -286,4 +287,4 @@ SlangResult PersistentCache::writeIndex(const String& fileName, const CacheIndex
     return SLANG_OK;
 }
 
-}
+} // namespace Slang

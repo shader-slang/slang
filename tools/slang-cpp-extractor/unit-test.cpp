@@ -1,26 +1,23 @@
 #include "unit-test.h"
 
-
-#include "../../source/compiler-core/slang-name-convention-util.h"
-
-#include "../../source/core/slang-io.h"
-
-#include "../../source/compiler-core/slang-source-loc.h"
 #include "../../source/compiler-core/slang-lexer.h"
-
+#include "../../source/compiler-core/slang-name-convention-util.h"
+#include "../../source/compiler-core/slang-source-loc.h"
+#include "../../source/core/slang-io.h"
 #include "identifier-lookup.h"
 #include "node-tree.h"
-#include "parser.h"
 #include "options.h"
+#include "parser.h"
 
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
 
 
 struct TestState
 {
-    TestState():
-        m_slicePool(StringSlicePool::Style::Default)
+    TestState()
+        : m_slicePool(StringSlicePool::Style::Default)
     {
         m_identifierLookup.initDefault(UnownedStringSlice::fromLiteral("SLANG_"));
 
@@ -43,48 +40,47 @@ struct TestState
     IdentifierLookup m_identifierLookup;
 };
 
-static const char someSource[] =
-"class ISomeInterface\n"
-"{\n"
-"    public:\n"
-"    virtual int SLANG_MCALL someMethod(int a, int b) const = 0;\n"
-"    virtual float SLANG_MCALL anotherMethod(float a) = 0;\n"
-"};\n"
-"\n"
-"struct SomeStruct\n"
-"{\n"
-"    SomeStruct() = default;\n"
-"    SomeStruct(float v = 0.0f):b(v) {}\n"
-"    ~SomeStruct() {}\n"
-"    int a = 10; \n"
-"    float b; \n"
-"    int another[10];\n"
-"    const char* yetAnother = nullptr;\n"
-"};\n"
-"\n"
-"enum SomeEnum\n"
-"{\n"
-"    Value,\n"
-"    Another = 10,\n"
-"};\n"
-"\n"
-"typedef int (*SomeFunc)(int a);\n"
-"\n"
-"typedef SomeEnum AliasEnum;\n"
-"void someFunc(int a, float b) { }\n"
-"namespace Blah {\n"
-"int add(int a, int b) { return a + b; }\n"
-"unsigned add(unsigned a, unsigned b) { return a + b; }\n"
-"}\n";
+static const char someSource[] = "class ISomeInterface\n"
+                                 "{\n"
+                                 "    public:\n"
+                                 "    virtual int SLANG_MCALL someMethod(int a, int b) const = 0;\n"
+                                 "    virtual float SLANG_MCALL anotherMethod(float a) = 0;\n"
+                                 "};\n"
+                                 "\n"
+                                 "struct SomeStruct\n"
+                                 "{\n"
+                                 "    SomeStruct() = default;\n"
+                                 "    SomeStruct(float v = 0.0f):b(v) {}\n"
+                                 "    ~SomeStruct() {}\n"
+                                 "    int a = 10; \n"
+                                 "    float b; \n"
+                                 "    int another[10];\n"
+                                 "    const char* yetAnother = nullptr;\n"
+                                 "};\n"
+                                 "\n"
+                                 "enum SomeEnum\n"
+                                 "{\n"
+                                 "    Value,\n"
+                                 "    Another = 10,\n"
+                                 "};\n"
+                                 "\n"
+                                 "typedef int (*SomeFunc)(int a);\n"
+                                 "\n"
+                                 "typedef SomeEnum AliasEnum;\n"
+                                 "void someFunc(int a, float b) { }\n"
+                                 "namespace Blah {\n"
+                                 "int add(int a, int b) { return a + b; }\n"
+                                 "unsigned add(unsigned a, unsigned b) { return a + b; }\n"
+                                 "}\n";
 
 
-/* static */SlangResult UnitTestUtil::run()
+/* static */ SlangResult UnitTestUtil::run()
 {
     {
         TestState state;
 
         NodeTree tree(&state.m_slicePool, &state.m_namePool, &state.m_identifierLookup);
-        
+
         UnownedStringSlice contents = UnownedStringSlice::fromLiteral(someSource);
         PathInfo pathInfo = PathInfo::makeFromString("source.h");
 
@@ -95,9 +91,13 @@ static const char someSource[] =
 
         Parser parser(&tree, &state.m_sink);
 
-        
+
         {
-            const Node::Kind enableKinds[] = { Node::Kind::Enum, Node::Kind::EnumClass, Node::Kind::EnumCase, Node::Kind::TypeDef };
+            const Node::Kind enableKinds[] = {
+                Node::Kind::Enum,
+                Node::Kind::EnumClass,
+                Node::Kind::EnumCase,
+                Node::Kind::TypeDef};
             parser.setKindsEnabled(enableKinds, SLANG_COUNT_OF(enableKinds));
         }
 

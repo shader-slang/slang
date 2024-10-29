@@ -14,10 +14,11 @@ namespace Slang
 
 static bool isSameBlockOrTrivialBranch(IRBlock* target, IRBlock* scrutinee)
 {
-    if(target == scrutinee)
+    if (target == scrutinee)
         return true;
     const auto br = as<IRUnconditionalBranch>(scrutinee->getFirstOrdinaryInst());
-    return br && br->getTargetBlock() == target && br->getArgCount() == 0 && !scrutinee->hasMoreThanOneUse();
+    return br && br->getTargetBlock() == target && br->getArgCount() == 0 &&
+           !scrutinee->hasMoreThanOneUse();
 };
 
 static bool isSmallBlock(IRBlock* c)
@@ -28,8 +29,8 @@ static bool isSmallBlock(IRBlock* c)
     // - Negation
     // - Terminator
     Int n = 0;
-    for([[maybe_unused]] const auto i : c->getOrdinaryInsts())
-        if(++n > 4)
+    for ([[maybe_unused]] const auto i : c->getOrdinaryInsts())
+        if (++n > 4)
             return false;
     return true;
 }
@@ -55,13 +56,13 @@ static bool isSuitableForInversion(IRLoop* loop)
 
     // The first thing a loop does must be a conditional
     const auto branch = as<IRIfElse>(nextBlock->getTerminator());
-    if(!branch)
+    if (!branch)
         return false;
 
-    if(!isSmallBlock(nextBlock))
+    if (!isSmallBlock(nextBlock))
         return false;
 
-    if(!hasIrrelevantContinueBlock(loop))
+    if (!hasIrrelevantContinueBlock(loop))
         return false;
 
     const auto t = branch->getTrueBlock();
@@ -76,9 +77,9 @@ static bool isSuitableForInversion(IRLoop* loop)
     //
 
     // Do we break on the 'true' side?
-    if(isSameBlockOrTrivialBranch(breakBlock, t) && f == a)
+    if (isSameBlockOrTrivialBranch(breakBlock, t) && f == a)
     {
-        if(t != breakBlock)
+        if (t != breakBlock)
         {
             branch->trueBlock.set(breakBlock);
             t->removeAndDeallocate();
@@ -87,9 +88,9 @@ static bool isSuitableForInversion(IRLoop* loop)
     }
 
     // ... or the false side
-    if(isSameBlockOrTrivialBranch(breakBlock, f) && t == a)
+    if (isSameBlockOrTrivialBranch(breakBlock, f) && t == a)
     {
-        if(f != breakBlock)
+        if (f != breakBlock)
         {
             branch->falseBlock.set(breakBlock);
             f->removeAndDeallocate();
@@ -103,7 +104,7 @@ static bool isSuitableForInversion(IRLoop* loop)
 static IRParam* duplicateToParamWithDecorations(IRBuilder& builder, IRCloneEnv& cloneEnv, IRInst* i)
 {
     const auto p = builder.emitParam(i->getFullType());
-    for(const auto dec : i->getDecorations())
+    for (const auto dec : i->getDecorations())
         cloneDecoration(&cloneEnv, dec, p, builder.getModule());
     return p;
 }
@@ -146,8 +147,10 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     const auto c1Terminator = as<IRIfElse>(c1->getTerminator());
     SLANG_ASSERT(c1Terminator);
     const auto b = loop->getBreakBlock();
-    auto& c1dUse = c1Terminator->getTrueBlock() == b ? c1Terminator->falseBlock : c1Terminator->trueBlock;
-    auto& c1bUse = c1Terminator->getTrueBlock() == b ? c1Terminator->trueBlock : c1Terminator->falseBlock;
+    auto& c1dUse =
+        c1Terminator->getTrueBlock() == b ? c1Terminator->falseBlock : c1Terminator->trueBlock;
+    auto& c1bUse =
+        c1Terminator->getTrueBlock() == b ? c1Terminator->trueBlock : c1Terminator->falseBlock;
     const auto d = as<IRBlock>(c1dUse.get());
     SLANG_ASSERT(d);
 
@@ -169,48 +172,51 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     List<IRInst*> c1PostLoopParams;
     // c1LoopParams are values from c1 used within the loop itself
     List<IRInst*> c1LoopParams;
-    for(auto i : IRInstList<IRInst>(c1->getFirstInst(), c1->getLastInst()))
+    for (auto i : IRInstList<IRInst>(c1->getFirstInst(), c1->getLastInst()))
     {
         IRParam* postLoopParam = nullptr;
         IRParam* loopParam = nullptr;
-        traverseUses(i, [&](IRUse* u){
-            auto userBlock = u->getUser()->getParent();
-            if(domTree->dominates(b, userBlock))
+        traverseUses(
+            i,
+            [&](IRUse* u)
             {
-                // A new parameter to replace this 'i'
-                if(!postLoopParam)
+                auto userBlock = u->getUser()->getParent();
+                if (domTree->dominates(b, userBlock))
                 {
-                    postLoopParam = duplicateToParamWithDecorations(builder, cloneEnv, i);
-                    b->addParam(postLoopParam);
+                    // A new parameter to replace this 'i'
+                    if (!postLoopParam)
+                    {
+                        postLoopParam = duplicateToParamWithDecorations(builder, cloneEnv, i);
+                        b->addParam(postLoopParam);
+                    }
+                    u->set(postLoopParam);
                 }
-                u->set(postLoopParam);
-            }
-            else if(userBlock != c1)
-            {
-                // A new parameter to replace this 'i'
-                if(!loopParam)
+                else if (userBlock != c1)
                 {
-                    loopParam = duplicateToParamWithDecorations(builder, cloneEnv, i);
-                    d->addParam(loopParam);
+                    // A new parameter to replace this 'i'
+                    if (!loopParam)
+                    {
+                        loopParam = duplicateToParamWithDecorations(builder, cloneEnv, i);
+                        d->addParam(loopParam);
+                    }
+                    u->set(loopParam);
                 }
-                u->set(loopParam);
-            }
-        });
-        if(postLoopParam)
+            });
+        if (postLoopParam)
             c1PostLoopParams.add(i);
-        if(loopParam)
+        if (loopParam)
             c1LoopParams.add(i);
     }
 
-    // Create another break block b2 that will act as the new break block for the 
+    // Create another break block b2 that will act as the new break block for the
     // loop. The original break block b will become the merge point for the outer condition.
-    // 
+    //
     const auto b2 = builder.emitBlock();
     b2->insertBefore(b);
 
     // Create a copy of the parameters in b. b2 will simply pass these to b.
     List<IRInst*> b2Params;
-    for(auto p : b->getParams())
+    for (auto p : b->getParams())
     {
         auto q = duplicateToParamWithDecorations(builder, cloneEnv, p);
         b2Params.add(q);
@@ -224,24 +230,24 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     c1bUse.set(e1);
     c1Terminator->afterBlock.set(d);
 
-    // We'll rewrite existing breaks to jump to b2, but via an intermediate jump block to 
+    // We'll rewrite existing breaks to jump to b2, but via an intermediate jump block to
     // avoid a critical edge.
-    // 
-    traverseUses(b, [&](IRUse* u){
-        auto userBlock = u->getUser()->getParent();
-        // Restrict this to just those blocks within this loop
-        if(userBlock != e1
-            && userBlock != b2
-            && userBlock != s
-            && domTree->dominates(s, userBlock)
-            && !domTree->dominates(b, userBlock))
+    //
+    traverseUses(
+        b,
+        [&](IRUse* u)
         {
-            const auto jumpToB2Block = builder.emitBlock();
-            jumpToB2Block->insertAfter(userBlock);
-            builder.emitBranch(b2, c1PostLoopParams.getCount(), c1PostLoopParams.getBuffer());
-            u->set(jumpToB2Block);
-        }
-    });
+            auto userBlock = u->getUser()->getParent();
+            // Restrict this to just those blocks within this loop
+            if (userBlock != e1 && userBlock != b2 && userBlock != s &&
+                domTree->dominates(s, userBlock) && !domTree->dominates(b, userBlock))
+            {
+                const auto jumpToB2Block = builder.emitBlock();
+                jumpToB2Block->insertAfter(userBlock);
+                builder.emitBranch(b2, c1PostLoopParams.getCount(), c1PostLoopParams.getBuffer());
+                u->set(jumpToB2Block);
+            }
+        });
 
     // We now have
     // s: ...1 loop break=b next=c1
@@ -258,17 +264,18 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     const auto e2 = as<IRBlock>(cloneInst(&cloneEnv, &builder, e1));
     e2->insertAfter(c2);
     const auto c2Terminator = as<IRConditionalBranch>(c2->getTerminator());
-    auto& c2eUse = c2Terminator->getTrueBlock() == e1 ? c2Terminator->trueBlock : c2Terminator->falseBlock;
+    auto& c2eUse =
+        c2Terminator->getTrueBlock() == e1 ? c2Terminator->trueBlock : c2Terminator->falseBlock;
     c2eUse.set(e2);
     builder.setInsertAfter(c2Terminator);
     const auto newC2Terminator = builder.emitIfElse(
         c2Terminator->getCondition(),
         c2Terminator->getTrueBlock(),
         c2Terminator->getFalseBlock(),
-        b
-    );
+        b);
     c2Terminator->removeAndDeallocate();
-    // The cloned e2 will branch into b2 by default, rewrite it to branch to b, the correct merge point.
+    // The cloned e2 will branch into b2 by default, rewrite it to branch to b, the correct merge
+    // point.
     SLANG_ASSERT(cast<IRUnconditionalBranch>(e2->getTerminator())->getTargetBlock() == b2);
     cast<IRUnconditionalBranch>(e2->getTerminator())->block.set(b);
 
@@ -302,7 +309,7 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // any parameters the loop instruction passed to c1
     builder.setInsertInto(s);
     List<IRInst*> as;
-    for(UInt i = 0; i < loop->getArgCount(); ++i)
+    for (UInt i = 0; i < loop->getArgCount(); ++i)
         as.add(loop->getArg(i));
     builder.emitBranch(c2, as.getCount(), as.getBuffer());
     // We now have
@@ -317,7 +324,8 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // b: ...2
 
     // modify c2 to jump to the new loop
-    auto& c2dUse = newC2Terminator->getTrueBlock() == e2 ? newC2Terminator->falseBlock : newC2Terminator->trueBlock;
+    auto& c2dUse = newC2Terminator->getTrueBlock() == e2 ? newC2Terminator->falseBlock
+                                                         : newC2Terminator->trueBlock;
     c2dUse.set(l);
     // We now have
     // s: ...1, goto c2
@@ -349,11 +357,16 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // c1's instructions as cloned into c2
     builder.setInsertAfter(loop);
     List<IRInst*> loopEntryArgs;
-    for(const auto p : c1LoopParams)
+    for (const auto p : c1LoopParams)
         loopEntryArgs.add(cloneInst(&cloneEnv, &builder, p));
-    for(UInt i = 0; i < loop->getArgCount(); ++i)
+    for (UInt i = 0; i < loop->getArgCount(); ++i)
         loopEntryArgs.add(loop->getArg(i));
-    const auto newLoop = builder.emitLoop(d, b2, loop->getContinueBlock(), loopEntryArgs.getCount(), loopEntryArgs.getBuffer());
+    const auto newLoop = builder.emitLoop(
+        d,
+        b2,
+        loop->getContinueBlock(),
+        loopEntryArgs.getCount(),
+        loopEntryArgs.getBuffer());
     newLoop->sourceLoc = loop->sourceLoc;
     loop->transferDecorationsTo(newLoop);
     loop->removeAndDeallocate();
@@ -368,14 +381,20 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // paramters for instructions in the duplicated conditional block, then the
     // ones from the loop body.
     List<IRInst*> ps = c1LoopParams;
-    for(const auto p : c1->getParams())
+    for (const auto p : c1->getParams())
     {
         ps.add(p);
         const auto q = duplicateToParamWithDecorations(builder, cloneEnv, p);
         // Replace all uses, except for those in c1 and e1
         List<IRUse*> uses;
-        traverseUses(p, [&](IRUse* u){if(u->user->getParent() != c1 && u->user->getParent() != e1) uses.add(u);});
-        for(auto u : uses)
+        traverseUses(
+            p,
+            [&](IRUse* u)
+            {
+                if (u->user->getParent() != c1 && u->user->getParent() != e1)
+                    uses.add(u);
+            });
+        for (auto u : uses)
             u->set(q);
     }
     const auto e3 = builder.emitBlock();
@@ -394,21 +413,24 @@ static void invertLoop(IRBuilder& builder, IRLoop* loop)
     // e3: goto d
     // e1: goto b2
     // b2: goto b
-    // b: ...2 
+    // b: ...2
 }
 
 bool invertLoops(IRModule* module)
 {
     IRBuilder builder(module);
     List<IRLoop*> toInvert;
-    overAllBlocks(module, [&](auto b){
-        if(auto loop = as<IRLoop>(b->getTerminator()))
+    overAllBlocks(
+        module,
+        [&](auto b)
         {
-            if(isSuitableForInversion(loop))
-                toInvert.add(loop);
-        }
-    });
-    for(const auto loop : toInvert)
+            if (auto loop = as<IRLoop>(b->getTerminator()))
+            {
+                if (isSuitableForInversion(loop))
+                    toInvert.add(loop);
+            }
+        });
+    for (const auto loop : toInvert)
         invertLoop(builder, loop);
     return toInvert.getCount() > 0;
 }

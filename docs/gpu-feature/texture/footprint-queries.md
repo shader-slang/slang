@@ -28,7 +28,7 @@ Texture footprint queries are intended to solve this problem by providing applic
 
 # Slang Shader API
 
-Rather than exactly mirror the Vulkan GLSL extension or the NVAPI functions, Slang's standard library provides a single common interface that can map to either of those implementations.
+Rather than exactly mirror the Vulkan GLSL extension or the NVAPI functions, the Slang core module provides a single common interface that can map to either of those implementations.
 
 ## Basics
 
@@ -154,7 +154,7 @@ TextureFootprint3D Texture3D.queryFootprintFineBiasClamp(
 
 ## Footprint Types
 
-Footprint queries on 2D and 3D textures return values of type `TextureFootprint2D` and `TextureFootprint3D`, respectively, which are built-in `struct`s defined in the Slang standard library:
+Footprint queries on 2D and 3D textures return values of type `TextureFootprint2D` and `TextureFootprint3D`, respectively, which are built-in `struct`s defined in the Slang core module:
 
 ```
 struct TextureFootprint2D

@@ -1,10 +1,9 @@
 // debug-shader-object.cpp
 #include "debug-shader-object.h"
 
+#include "debug-helper-functions.h"
 #include "debug-resource-views.h"
 #include "debug-sampler-state.h"
-
-#include "debug-helper-functions.h"
 
 namespace gfx
 {
@@ -142,7 +141,9 @@ Result DebugShaderObject::setCombinedTextureSampler(
     m_resources[ShaderOffsetKey{offset}] = viewImpl;
     m_initializedBindingRanges.add(offset.bindingRangeIndex);
     return baseObject->setCombinedTextureSampler(
-        offset, getInnerObj(viewImpl), getInnerObj(sampler));
+        offset,
+        getInnerObj(viewImpl),
+        getInnerObj(sampler));
 }
 
 Result DebugShaderObject::setSpecializationArgs(
@@ -155,11 +156,13 @@ Result DebugShaderObject::setSpecializationArgs(
 }
 
 Result DebugShaderObject::getCurrentVersion(
-    ITransientResourceHeap* transientHeap, IShaderObject** outObject)
+    ITransientResourceHeap* transientHeap,
+    IShaderObject** outObject)
 {
     SLANG_GFX_API_FUNC;
     ComPtr<IShaderObject> innerObject;
-    SLANG_RETURN_ON_FAIL(baseObject->getCurrentVersion(getInnerObj(transientHeap), innerObject.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        baseObject->getCurrentVersion(getInnerObj(transientHeap), innerObject.writeRef()));
     RefPtr<DebugShaderObject> debugShaderObject = new DebugShaderObject();
     debugShaderObject->baseObject = innerObject;
     debugShaderObject->m_typeName = innerObject->getElementTypeLayout()->getName();

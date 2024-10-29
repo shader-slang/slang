@@ -8,28 +8,30 @@
 // libraries.
 //
 #ifdef _MSC_VER
-#pragma warning(disable: 4996)
+#pragma warning(disable : 4996)
 #endif
+#include "../../source/core/slang-dictionary.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-list.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-string.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-string.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-dictionary.h"
 
 // Utility to free pointers on scope exit
 struct ScopedMemory
 {
     ScopedMemory(void* ptr)
         : ptr(ptr)
-    {}
+    {
+    }
 
     ~ScopedMemory()
     {
-        if(ptr) free(ptr);
+        if (ptr)
+            free(ptr);
     }
 
     void* ptr;
@@ -40,11 +42,13 @@ struct ScopedFile
 {
     ScopedFile(FILE* file)
         : file(file)
-    {}
+    {
+    }
 
     ~ScopedFile()
     {
-        if(file) fclose(file);
+        if (file)
+            fclose(file);
     }
 
     FILE* file;
@@ -67,25 +71,25 @@ struct App
         // Options are currently all specified by position,
         // so the parsing logic is simplistic.
 
-        if( argc > 0 )
+        if (argc > 0)
         {
             appName = *argv++;
             argc--;
         }
 
-        if( argc > 0 )
+        if (argc > 0)
         {
             inputPath = *argv++;
             argc--;
         }
 
-        if( argc > 0 )
+        if (argc > 0)
         {
             outputPath = *argv++;
             argc--;
         }
 
-        if( !inputPath || (argc != 0) )
+        if (!inputPath || (argc != 0))
         {
             fprintf(stderr, "usage: %s inputPath [outputPath]\n", appName);
             exit(1);
@@ -126,8 +130,7 @@ struct App
             auto trimedLine = line.trimStart();
             if (trimedLine.startsWith("#include"))
             {
-                auto fileName =
-                    Slang::StringUtil::getAtInSplit(trimedLine, ' ', 1);
+                auto fileName = Slang::StringUtil::getAtInSplit(trimedLine, ' ', 1);
                 if (fileName[0] == '<')
                     goto normalProcess;
                 fileName = Slang::UnownedStringSlice(fileName.begin() + 1, fileName.end() - 1);
@@ -164,18 +167,10 @@ struct App
                 {
                 // The common C escape sequencs are handled directly.
                 //
-                case '"':
-                    fprintf(outputFile, "\\\"");
-                    break;
-                case '\n':
-                    fprintf(outputFile, "\\n");
-                    break;
-                case '\t':
-                    fprintf(outputFile, "\\t");
-                    break;
-                case '\\':
-                    fprintf(outputFile, "\\\\");
-                    break;
+                case '"':  fprintf(outputFile, "\\\""); break;
+                case '\n': fprintf(outputFile, "\\n"); break;
+                case '\t': fprintf(outputFile, "\\t"); break;
+                case '\\': fprintf(outputFile, "\\\\"); break;
                 default:
                     // For all other cases, we detect if the byte
                     // is in the printable ASCII range, and emit
@@ -210,16 +205,16 @@ struct App
 
         // We derive an output path simply by appending `.cpp` to the input
         // path, if not otherwise specified
-        char* defaultOutputPath = (char*) malloc(strlen(inputPath) + strlen(".cpp") + 1);
+        char* defaultOutputPath = (char*)malloc(strlen(inputPath) + strlen(".cpp") + 1);
         ScopedMemory outputPathCleanup(defaultOutputPath);
         strcpy(defaultOutputPath, inputPath);
         strcat(defaultOutputPath, ".cpp");
-        if(!outputPath)
+        if (!outputPath)
             outputPath = defaultOutputPath;
 
         FILE* outputFile = fopen(outputPath, "w");
         ScopedFile outputFileCleanup(outputFile);
-        if( !outputFile )
+        if (!outputFile)
         {
             fprintf(stderr, "%s: error: failed to open '%s' for reading\n", appName, outputPath);
             exit(1);
@@ -233,19 +228,19 @@ struct App
         // unconventional names.
         //
         char const* fileName = inputPath;
-        if(auto pos = strrchr(fileName, '\\'))
-            fileName = pos+1;
-        if(auto pos = strrchr(fileName, '/'))
-            fileName = pos+1;
+        if (auto pos = strrchr(fileName, '\\'))
+            fileName = pos + 1;
+        if (auto pos = strrchr(fileName, '/'))
+            fileName = pos + 1;
 
         // The variable name will start as a copy of the file
         // name, although we will immediately drop any extension
         // that comes after a `.` to trim the name further.
         //
-        char* variableName = (char*) malloc(strlen(fileName)+1);
+        char* variableName = (char*)malloc(strlen(fileName) + 1);
         ScopedMemory variableNameCleanup(variableName);
         strcpy(variableName, fileName);
-        if(auto pos = strchr(variableName, '.'))
+        if (auto pos = strchr(variableName, '.'))
             *pos = 0;
 
         // We will also replace any `-` in the file name with
@@ -253,12 +248,11 @@ struct App
         // tool will be compatible with our current naming
         // convention of using `-` as the separator in file names.
         //
-        for( auto cursor = variableName; *cursor; ++cursor)
+        for (auto cursor = variableName; *cursor; ++cursor)
         {
-            switch( *cursor )
+            switch (*cursor)
             {
-            default:
-                break;
+            default:  break;
             case '-': *cursor = '_';
             }
         }

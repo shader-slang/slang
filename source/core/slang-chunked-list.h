@@ -1,16 +1,15 @@
 #ifndef SLANG_CORE_CHUNKED_LIST_H
 #define SLANG_CORE_CHUNKED_LIST_H
 
-#include "../../include/slang.h"
-
 #include "slang-allocator.h"
 #include "slang-array-view.h"
 #include "slang-math.h"
+#include "slang.h"
 
 namespace Slang
 {
 // Items stored in a ChunkedList are guaranteed to have fixed address.
-template <typename T, uint32_t defaultChunkSize = 16, typename TAllocator = StandardAllocator>
+template<typename T, uint32_t defaultChunkSize = 16, typename TAllocator = StandardAllocator>
 class ChunkedList
 {
 private:
@@ -21,10 +20,7 @@ private:
         uint32_t size = 0;
         uint32_t capacity = defaultChunkSize;
         Chunk* next = nullptr;
-        T* begin()
-        {
-            return reinterpret_cast<T*>(this + 1);
-        }
+        T* begin() { return reinterpret_cast<T*>(this + 1); }
         T* end() { return begin() + size; }
     };
 
@@ -60,24 +56,26 @@ private:
 public:
     typedef ChunkedList<T, defaultChunkSize, TAllocator> ThisType;
     ChunkedList()
-        : m_lastChunk(&m_firstChunk)
-        , m_count(0)
-    {}
-    template <typename... Args> ChunkedList(const T& val, Args... args) { _init(val, args...); }
+        : m_lastChunk(&m_firstChunk), m_count(0)
+    {
+    }
+    template<typename... Args>
+    ChunkedList(const T& val, Args... args)
+    {
+        _init(val, args...);
+    }
     ChunkedList(const ThisType& list)
-        : m_lastChunk(&m_firstChunk)
-        , m_count(0)
+        : m_lastChunk(&m_firstChunk), m_count(0)
     {
         this->operator=(list);
     }
     ChunkedList(ThisType&& list)
-        : m_lastChunk(&m_firstChunk)
-        , m_count(0)
+        : m_lastChunk(&m_firstChunk), m_count(0)
     {
         this->operator=(static_cast<ThisType&&>(list));
     }
     ~ChunkedList() { _deallocateBuffer(); }
-    template <int _otherShortListSize, typename TOtherAllocator>
+    template<int _otherShortListSize, typename TOtherAllocator>
     ThisType& operator=(const ChunkedList<T, _otherShortListSize, TOtherAllocator>& list)
     {
         clearAndDeallocate();
@@ -213,7 +211,8 @@ public:
         return result;
     }
 
-    template <typename TContainer> T* addRange(const TContainer& list)
+    template<typename TContainer>
+    T* addRange(const TContainer& list)
     {
         Chunk* chunk = _maybeReserveForAdd((uint32_t)list.getCount());
         auto result = chunk->begin() + chunk->size;
@@ -235,7 +234,6 @@ public:
     }
 
 private:
-
     Index m_count = 0; ///< The amount of elements
     FirstChunk m_firstChunk;
     Chunk* m_lastChunk = &m_firstChunk;
@@ -262,7 +260,8 @@ private:
         return AllocateMethod<T, TAllocator>::deallocateArray(ptr, count);
     }
 
-    template <typename... Args> void _init(const T& val, Args... args)
+    template<typename... Args>
+    void _init(const T& val, Args... args)
     {
         add(val);
         _init(args...);

@@ -54,13 +54,10 @@ struct CollectGlobalUniformParametersContext
     {
         switch (key->getOp())
         {
-        case kIROp_GlobalParam:
-            return cast<IRGlobalParam>(key);
+        case kIROp_GlobalParam:     return cast<IRGlobalParam>(key);
         case kIROp_MakeExistential:
-        case kIROp_WrapExistential:
-            return as<IRGlobalParam>(key->getOperand(0));
-        default:
-            return nullptr;
+        case kIROp_WrapExistential: return as<IRGlobalParam>(key->getOperand(0));
+        default:                    return nullptr;
         }
     }
 
@@ -90,14 +87,16 @@ struct CollectGlobalUniformParametersContext
         // up just pacakged as a `struct`, *or* they might be packaged up in a
         // `ConstantBuffer<...>` or other parameter group that wraps that `struct`.
         //
-        IRParameterGroupTypeLayout* globalParameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(globalParamsTypeLayout);
-        if( globalParameterGroupTypeLayout )
+        IRParameterGroupTypeLayout* globalParameterGroupTypeLayout =
+            as<IRParameterGroupTypeLayout>(globalParamsTypeLayout);
+        if (globalParameterGroupTypeLayout)
         {
             // In the case where there is a wrapping `ConstantBuffer<...>`, we want to
             // get at the element type of that constant buffer, because it represents
             // the packaged-up `struct` that we want to produce.
             //
-            globalParamsTypeLayout = globalParameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
+            globalParamsTypeLayout =
+                globalParameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
         }
 
         // As a special case (in order to avoid disruption to any downstream passes),
@@ -114,7 +113,8 @@ struct CollectGlobalUniformParametersContext
         // step if want to start applying the packaging-up of global-scope parameters on
         // a per-module basis.
         //
-        if(!globalParameterGroupTypeLayout && !globalParamsTypeLayout->findSizeAttr(LayoutResourceKind::Uniform))
+        if (!globalParameterGroupTypeLayout &&
+            !globalParamsTypeLayout->findSizeAttr(LayoutResourceKind::Uniform))
             return;
 
         // We expect that the layout for the global-scope parameters is always
@@ -139,7 +139,9 @@ struct CollectGlobalUniformParametersContext
         // Note: the equivalent in fxc/dxc is the `$Globals` constant buffer.
         //
         auto wrapperStructType = builder->createStructType();
-        builder->addNameHintDecoration(wrapperStructType, UnownedTerminatedStringSlice("GlobalParams"));
+        builder->addNameHintDecoration(
+            wrapperStructType,
+            UnownedTerminatedStringSlice("GlobalParams"));
         builder->addBinaryInterfaceTypeDecoration(wrapperStructType);
 
         // If the computed layout used a bare `struct` type, then we will use
@@ -148,7 +150,7 @@ struct CollectGlobalUniformParametersContext
         // the type `ConstantBuffer<GlobalParams>`.
         //
         IRType* wrapperParamType = wrapperStructType;
-        if( globalParameterGroupTypeLayout )
+        if (globalParameterGroupTypeLayout)
         {
             auto wrapperParamGroupType = builder->getConstantBufferType(wrapperStructType);
             wrapperParamType = wrapperParamGroupType;
@@ -167,7 +169,7 @@ struct CollectGlobalUniformParametersContext
         // parameters that were present in the layout information (they are
         // represented as the fields of the global-scope `struct` layout).
         //
-        for( auto fieldLayoutAttr : globalParamsStructTypeLayout->getFieldLayoutAttrs() )
+        for (auto fieldLayoutAttr : globalParamsStructTypeLayout->getFieldLayoutAttrs())
         {
             // We expect the IR layout pass to have encoded field per-field
             // layout so that the "key" for the field is the corresponding
@@ -234,11 +236,11 @@ struct CollectGlobalUniformParametersContext
             // uses and work with that instead.
             //
             List<IRUse*> uses;
-            for(auto use = globalParam->firstUse; use; use = use->nextUse)
+            for (auto use = globalParam->firstUse; use; use = use->nextUse)
             {
                 uses.add(use);
             }
-            for( auto use : uses )
+            for (auto use : uses)
             {
                 auto user = use->user;
 
@@ -266,7 +268,7 @@ struct CollectGlobalUniformParametersContext
                 // markers on global parameters, that stop the entire parameter
                 // range for a module from being contiguous).
                 //
-                if(auto layoutAttr = as<IRStructFieldLayoutAttr>(user))
+                if (auto layoutAttr = as<IRStructFieldLayoutAttr>(user))
                 {
                     builder->replaceOperand(layoutAttr->getOperands(), fieldKey);
                     continue;
@@ -287,7 +289,7 @@ struct CollectGlobalUniformParametersContext
                 builder->setInsertBefore(user);
 
                 IRInst* value = nullptr;
-                if( globalParameterGroupTypeLayout )
+                if (globalParameterGroupTypeLayout)
                 {
                     // If the global parameters are being placed in a
                     // `ConstantBuffer<GlobalParams>`, then we need to
@@ -321,9 +323,7 @@ struct CollectGlobalUniformParametersContext
     }
 };
 
-void collectGlobalUniformParameters(
-    IRModule*       module,
-    IRVarLayout*    globalScopeVarLayout)
+void collectGlobalUniformParameters(IRModule* module, IRVarLayout* globalScopeVarLayout)
 {
     CollectGlobalUniformParametersContext context;
     context.module = module;
@@ -332,4 +332,4 @@ void collectGlobalUniformParameters(
     context.processModule();
 }
 
-}
+} // namespace Slang

@@ -3,12 +3,12 @@
 
 #include "source/core/slang-basic.h"
 #include "source/core/slang-random-generator.h"
-
 #include "source/core/slang-writer.h"
 
 #include <slang-rhi.h>
 
-namespace renderer_test {
+namespace renderer_test
+{
 
 using namespace rhi;
 
@@ -28,7 +28,10 @@ enum class ShaderInputType
 
 enum class InputTextureContent
 {
-    Zero, One, ChessBoard, Gradient
+    Zero,
+    One,
+    ChessBoard,
+    Gradient
 };
 
 enum InputTextureSampleCount
@@ -49,19 +52,19 @@ struct InputTextureDesc
     bool isDepthTexture = false;
     bool isRWTexture = false;
     int size = 4;
-    int mipMapCount = 0;            ///< 0 means the maximum number of mips will be bound
+    int mipMapCount = 0; ///< 0 means the maximum number of mips will be bound
 
     InputTextureSampleCount sampleCount = InputTextureSampleCount::One;
-    Format format = Format::R8G8B8A8_UNORM;            
+    Format format = Format::R8G8B8A8_UNORM;
 
     InputTextureContent content = InputTextureContent::One;
 };
 
 enum class InputBufferType
 {
-//    ConstantBuffer,
+    //    ConstantBuffer,
     StorageBuffer,
-//    RootConstantBuffer,
+    //    RootConstantBuffer,
 };
 
 struct InputBufferDesc
@@ -93,7 +96,7 @@ struct TextureData
             return slice;
         }
 
-        void* values = nullptr;           ///< Values of the type format
+        void* values = nullptr; ///< Values of the type format
         size_t valuesCount = 0;
     };
 
@@ -111,7 +114,7 @@ struct TextureData
         return dst;
     }
 
-        /// Set the size of the slice in count of format sized elements
+    /// Set the size of the slice in count of format sized elements
     void* setSliceCount(Slang::Index sliceIndex, size_t count)
     {
         auto& slice = m_slices[sliceIndex];
@@ -163,7 +166,8 @@ public:
     public:
         Val(ShaderInputType kind)
             : kind(kind)
-        {}
+        {
+        }
 
         ShaderInputType kind;
         bool isOutput = false;
@@ -175,7 +179,8 @@ public:
     public:
         TextureVal()
             : Val(ShaderInputType::Texture)
-        {}
+        {
+        }
 
         InputTextureDesc textureDesc;
     };
@@ -185,7 +190,8 @@ public:
     public:
         DataValBase(ShaderInputType kind)
             : Val(kind)
-        {}
+        {
+        }
 
         Slang::List<unsigned int> bufferData;
     };
@@ -195,7 +201,8 @@ public:
     public:
         BufferVal()
             : DataValBase(ShaderInputType::Buffer)
-        {}
+        {
+        }
 
         InputBufferDesc bufferDesc;
     };
@@ -205,7 +212,8 @@ public:
     public:
         DataVal()
             : DataValBase(ShaderInputType::UniformData)
-        {}
+        {
+        }
     };
 
     class SamplerVal : public Val
@@ -213,7 +221,8 @@ public:
     public:
         SamplerVal()
             : Val(ShaderInputType::Sampler)
-        {}
+        {
+        }
 
         InputSamplerDesc samplerDesc;
     };
@@ -223,7 +232,8 @@ public:
     public:
         CombinedTextureSamplerVal()
             : Val(ShaderInputType::CombinedTextureSampler)
-        {}
+        {
+        }
 
         Slang::RefPtr<TextureVal> textureVal;
         Slang::RefPtr<SamplerVal> samplerVal;
@@ -234,13 +244,14 @@ public:
     public:
         AccelerationStructureVal()
             : Val(ShaderInputType::AccelerationStructure)
-        {}
+        {
+        }
     };
 
     struct Field
     {
-        Slang::String   name;
-        ValPtr          val;
+        Slang::String name;
+        ValPtr val;
     };
     typedef Field Entry;
 
@@ -249,7 +260,8 @@ public:
     public:
         ParentVal(ShaderInputType kind)
             : Val(kind)
-        {}
+        {
+        }
 
         virtual void addField(Field const& field) = 0;
     };
@@ -259,7 +271,8 @@ public:
     public:
         AggVal(ShaderInputType kind = ShaderInputType::Aggregate)
             : ParentVal(kind)
-        {}
+        {
+        }
 
         Slang::List<Field> fields;
 
@@ -271,7 +284,8 @@ public:
     public:
         ObjectVal()
             : Val(ShaderInputType::Object)
-        {}
+        {
+        }
 
         Slang::String typeName;
         ValPtr contentVal;
@@ -284,7 +298,8 @@ public:
         Slang::List<Slang::String> typeArgs;
         SpecializeVal()
             : Val(ShaderInputType::Specialize)
-        {}
+        {
+        }
     };
 
     class ArrayVal : public ParentVal
@@ -292,7 +307,8 @@ public:
     public:
         ArrayVal()
             : ParentVal(ShaderInputType::Array)
-        {}
+        {
+        }
 
         Slang::List<ValPtr> vals;
 
@@ -318,14 +334,19 @@ public:
 
     void parse(Slang::RandomGenerator* rand, const char* source);
 
-        /// Writes a binding, if bindRoot is set, will try to honor the underlying type when outputting. If not will dump as uint32_t hex.
-    static SlangResult writeBinding(slang::TypeLayoutReflection* typeLayout, const void* data, size_t sizeInBytes, Slang::WriterHelper writer);
+    /// Writes a binding, if bindRoot is set, will try to honor the underlying type when outputting.
+    /// If not will dump as uint32_t hex.
+    static SlangResult writeBinding(
+        slang::TypeLayoutReflection* typeLayout,
+        const void* data,
+        size_t sizeInBytes,
+        Slang::WriterHelper writer);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);
 void generateTextureData(TextureData& output, const InputTextureDesc& desc);
 
 
-} // namespace render_test
+} // namespace renderer_test
 
 #endif

@@ -1,11 +1,12 @@
 // slang-ir-lower-generic-existential.cpp
 
 #include "slang-ir-lower-witness-lookup.h"
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
-#include "slang-ir-util.h"
+
 #include "slang-ir-clone.h"
 #include "slang-ir-generics-lowering-context.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -39,7 +40,7 @@ struct WitnessLookupLoweringContext
     {
         if (!type)
             return false;
-        
+
         InstHashSet processedSet(type->getModule());
         InstWorkList workList(type->getModule());
         workList.add(type);
@@ -49,7 +50,7 @@ struct WitnessLookupLoweringContext
             auto inst = workList[i];
             if (inst->getOp() == kIROp_AssociatedType)
                 return true;
-            
+
             for (UInt j = 0; j < inst->getOperandCount(); j++)
             {
                 if (!inst->getOperand(j))
@@ -85,7 +86,7 @@ struct WitnessLookupLoweringContext
         {
             return assocType;
         }
-        
+
         if (as<IRBasicType>(type))
             return (IRType*)type;
 
@@ -96,8 +97,7 @@ struct WitnessLookupLoweringContext
         case kIROp_MatrixType:
         case kIROp_StructType:
         case kIROp_ClassType:
-        case kIROp_InterfaceType:
-            return (IRType*)type;
+        case kIROp_InterfaceType: return (IRType*)type;
         default:
             {
                 List<IRInst*> translatedOperands;
@@ -127,7 +127,8 @@ struct WitnessLookupLoweringContext
         auto witnessTableOperand = lookupInst->getWitnessTable();
         auto witnessTableType = as<IRWitnessTableTypeBase>(witnessTableOperand->getDataType());
         SLANG_RELEASE_ASSERT(witnessTableType);
-        auto interfaceType = as<IRInterfaceType>(unwrapAttributedType(witnessTableType->getConformanceType()));
+        auto interfaceType =
+            as<IRInterfaceType>(unwrapAttributedType(witnessTableType->getConformanceType()));
         SLANG_RELEASE_ASSERT(interfaceType);
         if (interfaceType->findDecoration<IRComInterfaceDecoration>())
             return nullptr;
@@ -135,23 +136,26 @@ struct WitnessLookupLoweringContext
         SLANG_RELEASE_ASSERT(requirementType);
 
         // We only lower non-static function requirement lookups for now.
-        // Our front end will stick a StaticRequirementDecoration on the IRStructKey for static member requirements.
+        // Our front end will stick a StaticRequirementDecoration on the IRStructKey for static
+        // member requirements.
         if (lookupInst->getRequirementKey()->findDecoration<IRStaticRequirementDecoration>())
             return nullptr;
-        auto interfaceMethodFuncType = as<IRFuncType>(getResolvedInstForDecorations(requirementType));
+        auto interfaceMethodFuncType =
+            as<IRFuncType>(getResolvedInstForDecorations(requirementType));
         if (interfaceMethodFuncType)
         {
             // Detect cases that we currently does not support and exit.
-            
+
             // If this is a non static function requirement, we should
-            // make sure the first parameter is the interface type. If not, something has gone wrong.
+            // make sure the first parameter is the interface type. If not, something has gone
+            // wrong.
             if (interfaceMethodFuncType->getParamCount() == 0)
                 return nullptr;
             if (!as<IRThisType>(unwrapAttributedType(interfaceMethodFuncType->getParamType(0))))
                 return nullptr;
 
-            // The function has any associated type parameter, we currently can't lower it early in this pass.
-            // We will lower it in the catch all generic lowering pass.
+            // The function has any associated type parameter, we currently can't lower it early in
+            // this pass. We will lower it in the catch all generic lowering pass.
             for (UInt i = 1; i < interfaceMethodFuncType->getParamCount(); i++)
             {
                 if (hasAssocType(interfaceMethodFuncType->getParamType(i)))
@@ -159,8 +163,8 @@ struct WitnessLookupLoweringContext
             }
 
             // If return type is a composite type containing an assoc type, we won't lower it now.
-            // Supporting general use of assoc type is possible, but would require more complex logic
-            // in this pass to marshal things to and from existential types.
+            // Supporting general use of assoc type is possible, but would require more complex
+            // logic in this pass to marshal things to and from existential types.
             if (interfaceMethodFuncType->getResultType()->getOp() != kIROp_AssociatedType &&
                 hasAssocType(interfaceMethodFuncType->getResultType()))
                 return nullptr;
@@ -179,7 +183,8 @@ struct WitnessLookupLoweringContext
         IRFuncType* dispatchFuncType = nullptr;
         IRGeneric* parentGeneric = nullptr;
 
-        // If requirementType is a generic, we need to create a new generic that has the same parameters.
+        // If requirementType is a generic, we need to create a new generic that has the same
+        // parameters.
         if (auto genericRequirement = as<IRGeneric>(requirementType))
         {
             IRCloneEnv cloneEnv;
@@ -212,7 +217,7 @@ struct WitnessLookupLoweringContext
 
         // We need to inline this function if the requirement is differentiable,
         // so that the autodiff pass doesn't need to handle the dispatch function.
-        if (requirementKey->findDecoration<IRForwardDerivativeDecoration>()||
+        if (requirementKey->findDecoration<IRForwardDerivativeDecoration>() ||
             requirementKey->findDecoration<IRBackwardDerivativeDecoration>())
         {
             builder.addForceInlineDecoration(dispatchFunc);
@@ -243,7 +248,10 @@ struct WitnessLookupLoweringContext
         if (witnessTables.getCount() == 0)
         {
             // If there is no witness table, we should emit an error.
-            sink->diagnose(lookupInst, Diagnostics::noTypeConformancesFoundForInterface, interfaceType);
+            sink->diagnose(
+                lookupInst,
+                Diagnostics::noTypeConformancesFoundForInterface,
+                interfaceType);
             return nullptr;
         }
         else
@@ -273,17 +281,22 @@ struct WitnessLookupLoweringContext
                 }
                 auto args = params;
                 // Reinterpret the first arg into the concrete type.
-                args[0] = builder.emitReinterpret(witnessTable->getConcreteType(),
-                    builder.emitExtractExistentialValue(builder.emitExtractExistentialType(args[0]), args[0]));
-                
-                auto calleeFuncType = as<IRFuncType>(getResolvedInstForDecorations(entry)->getFullType());
+                args[0] = builder.emitReinterpret(
+                    witnessTable->getConcreteType(),
+                    builder.emitExtractExistentialValue(
+                        builder.emitExtractExistentialType(args[0]),
+                        args[0]));
+
+                auto calleeFuncType =
+                    as<IRFuncType>(getResolvedInstForDecorations(entry)->getFullType());
                 auto callReturnType = calleeFuncType->getResultType();
                 if (callReturnType->getParent() != module->getModuleInst())
                 {
-                    // the return type is dependent on generic parameter, use the type from dispatchFuncType instead.
+                    // the return type is dependent on generic parameter, use the type from
+                    // dispatchFuncType instead.
                     callReturnType = dispatchFuncType->getResultType();
                 }
-                
+
                 IRInst* ret = builder.emitCallInst(
                     callReturnType,
                     entry,
@@ -333,7 +346,9 @@ struct WitnessLookupLoweringContext
         builder.setInsertBefore(call);
         auto witnessTable = builder.emitExtractExistentialWitnessTable(initialExistentialObject);
         auto newExistentialObject = builder.emitMakeExistential(
-            initialExistentialObject->getDataType(), call->getOperand(1), witnessTable);
+            initialExistentialObject->getDataType(),
+            call->getOperand(1),
+            witnessTable);
         call->setOperand(1, newExistentialObject);
     }
 
@@ -351,7 +366,9 @@ struct WitnessLookupLoweringContext
 
         IRBuilder builder(lookupInst);
         builder.setInsertBefore(lookupInst);
-        traverseUses(lookupInst, [&](IRUse* use)
+        traverseUses(
+            lookupInst,
+            [&](IRUse* use)
             {
                 if (auto specialize = as<IRSpecialize>(use->getUser()))
                 {
@@ -369,7 +386,9 @@ struct WitnessLookupLoweringContext
                         dispatchFunc,
                         (UInt)args.getCount(),
                         args.getBuffer());
-                    traverseUses(specialize, [&](IRUse* specializeUse)
+                    traverseUses(
+                        specialize,
+                        [&](IRUse* specializeUse)
                         {
                             if (auto call = as<IRCall>(specializeUse->getUser()))
                             {
@@ -422,4 +441,4 @@ bool lowerWitnessLookup(IRModule* module, DiagnosticSink* sink)
     }
     return changed;
 }
-}
+} // namespace Slang

@@ -1,17 +1,19 @@
 // unit-test-process.cpp
 
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-process-util.h"
-
-#include "../../source/core/slang-io.h"
 #include "../../source/core/slang-http.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-random-generator.h"
-
+#include "../../source/core/slang-string-util.h"
 #include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
-static SlangResult _createProcess(UnitTestContext* context, const char* toolName, const List<String>* optArgs, RefPtr<Process>& outProcess)
+static SlangResult _createProcess(
+    UnitTestContext* context,
+    const char* toolName,
+    const List<String>* optArgs,
+    RefPtr<Process>& outProcess)
 {
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "test-process"));
@@ -34,7 +36,8 @@ static SlangResult _httpReflectTest(UnitTestContext* context)
     SLANG_RETURN_ON_FAIL(_createProcess(context, "http-reflect", nullptr, process));
 
     Stream* writeStream = process->getStream(StdStreamType::In);
-    RefPtr<BufferedReadStream> readStream( new BufferedReadStream(process->getStream(StdStreamType::Out)));
+    RefPtr<BufferedReadStream> readStream(
+        new BufferedReadStream(process->getStream(StdStreamType::Out)));
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
 
     RefPtr<RandomGenerator> rand = RandomGenerator::create(10000);
@@ -91,7 +94,8 @@ static SlangResult _httpReflectTest(UnitTestContext* context)
 static SlangResult _countTest(UnitTestContext* context, Index size, Index crashIndex = -1)
 {
     /* Here we are trying to test what happens if the server produces a large amount of data, and
-    we just wait for termination. Do we receive all of the data irrespective of how much there is? */
+    we just wait for termination. Do we receive all of the data irrespective of how much there is?
+  */
 
     List<String> args;
     {
@@ -147,7 +151,7 @@ static SlangResult _countTest(UnitTestContext* context, Index size, Index crashI
 
 static SlangResult _countTests(UnitTestContext* context)
 {
-    const Index sizes[] = { 1, 10, 1000, 1000, 10000, 100000 };
+    const Index sizes[] = {1, 10, 1000, 1000, 10000, 100000};
     for (auto size : sizes)
     {
         SLANG_RETURN_ON_FAIL(_countTest(context, size));

@@ -2,17 +2,20 @@
 
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
-#include "slang-ir.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
-IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext, IRFunc* dispatchFunc)
+IRFunc* specializeDispatchFunction(
+    SharedGenericsLoweringContext* sharedContext,
+    IRFunc* dispatchFunc)
 {
     auto witnessTableType = cast<IRFuncType>(dispatchFunc->getDataType())->getParamType(0);
     auto conformanceType = cast<IRWitnessTableTypeBase>(witnessTableType)->getConformanceType();
     // Collect all witness tables of `witnessTableType` in current module.
-    List<IRWitnessTable*> witnessTables = sharedContext->getWitnessTablesFromInterfaceType(conformanceType);
+    List<IRWitnessTable*> witnessTables =
+        sharedContext->getWitnessTablesFromInterfaceType(conformanceType);
 
     SLANG_ASSERT(dispatchFunc->getFirstBlock() == dispatchFunc->getLastBlock());
     auto block = dispatchFunc->getFirstBlock();
@@ -28,17 +31,10 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
     {
         switch (inst->getOp())
         {
-        case kIROp_Call:
-            callInst = cast<IRCall>(inst);
-            break;
-        case kIROp_LookupWitness:
-            lookupInst = cast<IRLookupWitnessMethod>(inst);
-            break;
-        case kIROp_Return:
-            returnInst = cast<IRReturn>(inst);
-            break;
-        default:
-            break;
+        case kIROp_Call:          callInst = cast<IRCall>(inst); break;
+        case kIROp_LookupWitness: lookupInst = cast<IRLookupWitnessMethod>(inst); break;
+        case kIROp_Return:        returnInst = cast<IRReturn>(inst); break;
+        default:                  break;
         }
     }
     SLANG_ASSERT(callInst && lookupInst && returnInst);
@@ -56,7 +52,8 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         paramTypes.add(paramInst->getFullType());
     }
 
-    // Modify the first paramter from IRWitnessTable to IRWitnessTableID representing the sequential ID.
+    // Modify the first paramter from IRWitnessTable to IRWitnessTableID representing the sequential
+    // ID.
     paramTypes[0] = builder->getWitnessTableIDType((IRType*)conformanceType);
 
     auto newDipsatchFuncType = builder->getFuncType(paramTypes, dispatchFunc->getResultType());
@@ -95,7 +92,10 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         auto seqIdDecoration = witnessTable->findDecoration<IRSequentialIDDecoration>();
         if (!seqIdDecoration)
         {
-            sharedContext->sink->diagnose(witnessTable->getConcreteType(), Diagnostics::typeCannotBeUsedInDynamicDispatch, witnessTable->getConcreteType());
+            sharedContext->sink->diagnose(
+                witnessTable->getConcreteType(),
+                Diagnostics::typeCannotBeUsedInDynamicDispatch,
+                witnessTable->getConcreteType());
         }
 
         if (i != witnessTables.getCount() - 1)
@@ -226,11 +226,12 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
             else
             {
                 auto witnessTableType = as<IRWitnessTableType>(inst->getDataType());
-                if (witnessTableType && witnessTableType->getConformanceType()->findDecoration<IRSpecializeDecoration>())
+                if (witnessTableType && witnessTableType->getConformanceType()
+                                            ->findDecoration<IRSpecializeDecoration>())
                 {
-                    // The interface is for specialization only, it would be an error if dynamic dispatch is used
-                    // through the interface.
-                    // Skip assigning ID for the witness table.
+                    // The interface is for specialization only, it would be an error if dynamic
+                    // dispatch is used through the interface. Skip assigning ID for the witness
+                    // table.
                     continue;
                 }
 
@@ -264,7 +265,8 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
             // Get a sequential ID for the witness table using the map from the Linkage.
             uint32_t seqID = 0;
             if (!linkage->mapMangledNameToRTTIObjectIndex.tryGetValue(
-                witnessTableMangledName, seqID))
+                    witnessTableMangledName,
+                    seqID))
             {
                 auto interfaceType =
                     cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();

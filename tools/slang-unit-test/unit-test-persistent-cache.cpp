@@ -1,18 +1,17 @@
 // unit-test-persistent-cache.cpp
+#include "../../source/core/slang-file-system.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-persistent-cache.h"
+#include "../../source/core/slang-process.h"
+#include "../../source/core/slang-random-generator.h"
 #include "tools/unit-test/slang-unit-test.h"
 
-#include "../../source/core/slang-persistent-cache.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-random-generator.h"
-#include "../../source/core/slang-process.h"
-
-#include <chrono>
-#include <thread>
 #include <atomic>
-#include <mutex>
+#include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <mutex>
+#include <thread>
 
 using namespace Slang;
 
@@ -28,19 +27,17 @@ inline ComPtr<ISlangBlob> createRandomBlob(size_t size)
 
 inline bool isBlobEqual(ISlangBlob* a, ISlangBlob* b)
 {
-    return
-        a->getBufferSize() == b->getBufferSize() &&
-        ::memcmp(a->getBufferPointer(), b->getBufferPointer(), a->getBufferSize()) == 0;
+    return a->getBufferSize() == b->getBufferSize() &&
+           ::memcmp(a->getBufferPointer(), b->getBufferPointer(), a->getBufferSize()) == 0;
 }
 
 class Barrier
 {
 public:
     Barrier(size_t threadCount, std::function<void()> completionFunc = nullptr)
-        : m_threadCount(threadCount)
-        , m_waitCount(threadCount)
-        , m_completionFunc(completionFunc)
-    {}
+        : m_threadCount(threadCount), m_waitCount(threadCount), m_completionFunc(completionFunc)
+    {
+    }
 
     Barrier(const Barrier& barrier) = delete;
     Barrier& operator=(const Barrier& barrier) = delete;
@@ -53,14 +50,15 @@ public:
 
         if (--m_waitCount == 0)
         {
-            if (m_completionFunc) m_completionFunc();
+            if (m_completionFunc)
+                m_completionFunc();
             ++m_generation;
             m_waitCount = m_threadCount;
             m_condition.notify_all();
         }
         else
         {
-            m_condition.wait(lock, [this, generation] () { return generation != m_generation; });
+            m_condition.wait(lock, [this, generation]() { return generation != m_generation; });
         }
     }
 
@@ -87,7 +85,9 @@ struct PersistentCacheTest
     PersistentCacheTest(Count maxEntryCount = 0)
     {
         osFileSystem = OSFileSystem::getMutableSingleton();
-        cacheDirectory = Path::simplify(Path::getParentDirectory(Path::getExecutablePath()) + "/persistent-cache-test" + String(Process::getId()));
+        cacheDirectory = Path::simplify(
+            Path::getParentDirectory(Path::getExecutablePath()) + "/persistent-cache-test" +
+            String(Process::getId()));
 
         removeCacheFiles();
 
@@ -153,16 +153,10 @@ struct PersistentCacheTest
     }
 
     // Get the absolute filename for a cache entry file.
-    String getEntryFileName(const Entry& entry)
-    {
-        return cache->getEntryFileName(entry.key);
-    }
+    String getEntryFileName(const Entry& entry) { return cache->getEntryFileName(entry.key); }
 
     // Get the absolute filename of the cache index file.
-    String getIndexFilename()
-    {
-        return cache->m_indexFileName;
-    }
+    String getIndexFilename() { return cache->m_indexFileName; }
 };
 
 } // namespace Slang
@@ -174,7 +168,10 @@ struct PersistentCacheTest
 // - resetting stats
 struct BasicTest : public PersistentCacheTest
 {
-    BasicTest() : PersistentCacheTest() {}
+    BasicTest()
+        : PersistentCacheTest()
+    {
+    }
 
     void run()
     {
@@ -189,7 +186,7 @@ struct BasicTest : public PersistentCacheTest
         {
             auto data = createRandomBlob(i * 1024);
             auto key = SHA1::compute(data->getBufferPointer(), data->getBufferSize());
-            entries.add(Entry{ key, data });
+            entries.add(Entry{key, data});
         }
 
         for (size_t i = 0; i < 10; ++i)
@@ -251,7 +248,10 @@ struct BasicTest : public PersistentCacheTest
 // Tests the least-recently-used cache eviction policy.
 struct EvictionTest : public PersistentCacheTest
 {
-    EvictionTest() : PersistentCacheTest(3) {}
+    EvictionTest()
+        : PersistentCacheTest(3)
+    {
+    }
 
     void run()
     {
@@ -261,7 +261,7 @@ struct EvictionTest : public PersistentCacheTest
         {
             auto data = createRandomBlob(4096);
             auto key = SHA1::compute(data->getBufferPointer(), data->getBufferSize());
-            entries.add(Entry{ key, data });
+            entries.add(Entry{key, data});
         }
 
         writeEntry(entries[0]);
@@ -335,8 +335,8 @@ struct CorruptionTest : public PersistentCacheTest
         {
             auto data = createRandomBlob(4096);
             auto key = SHA1::compute(data->getBufferPointer(), data->getBufferSize());
-            entries.add(Entry{ key, data });
-        }        
+            entries.add(Entry{key, data});
+        }
 
         // Test behavior when a cached entry file is removed externally before reading.
         writeEntry(entries[0]);
@@ -372,17 +372,18 @@ struct CorruptionTest : public PersistentCacheTest
 
         // Test different corruptions of the index file.
         testIndexCorruption(
-            [this]()
-            {
-                osFileSystem->remove(getIndexFilename().getBuffer());
-            },
+            [this]() { osFileSystem->remove(getIndexFilename().getBuffer()); },
             SLANG_E_NOT_FOUND);
 
         testIndexCorruption(
             [this]()
             {
                 FileStream fs;
-                fs.init(getIndexFilename(), FileMode::Open, FileAccess::ReadWrite, FileShare::ReadWrite);
+                fs.init(
+                    getIndexFilename(),
+                    FileMode::Open,
+                    FileAccess::ReadWrite,
+                    FileShare::ReadWrite);
                 fs.write("x", 1);
             },
             SLANG_E_INTERNAL_FAIL);
@@ -391,7 +392,11 @@ struct CorruptionTest : public PersistentCacheTest
             [this]()
             {
                 FileStream fs;
-                fs.init(getIndexFilename(), FileMode::Open, FileAccess::ReadWrite, FileShare::ReadWrite);
+                fs.init(
+                    getIndexFilename(),
+                    FileMode::Open,
+                    FileAccess::ReadWrite,
+                    FileShare::ReadWrite);
                 fs.seek(SeekOrigin::Start, 4);
                 uint32_t version = 0xffffffff;
                 fs.write(&version, sizeof(version));
@@ -402,7 +407,11 @@ struct CorruptionTest : public PersistentCacheTest
             [this]()
             {
                 FileStream fs;
-                fs.init(getIndexFilename(), FileMode::Open, FileAccess::ReadWrite, FileShare::ReadWrite);
+                fs.init(
+                    getIndexFilename(),
+                    FileMode::Open,
+                    FileAccess::ReadWrite,
+                    FileShare::ReadWrite);
                 fs.seek(SeekOrigin::Start, 8);
                 uint32_t count = 0x7fffffff;
                 fs.write(&count, sizeof(count));
@@ -413,7 +422,11 @@ struct CorruptionTest : public PersistentCacheTest
             [this]()
             {
                 FileStream fs;
-                fs.init(getIndexFilename(), FileMode::Open, FileAccess::ReadWrite, FileShare::ReadWrite);
+                fs.init(
+                    getIndexFilename(),
+                    FileMode::Open,
+                    FileAccess::ReadWrite,
+                    FileShare::ReadWrite);
                 fs.seek(SeekOrigin::Start, 8);
                 uint32_t count = 0;
                 fs.write(&count, sizeof(count));
@@ -424,7 +437,11 @@ struct CorruptionTest : public PersistentCacheTest
             [this]()
             {
                 FileStream fs;
-                fs.init(getIndexFilename(), FileMode::Open, FileAccess::ReadWrite, FileShare::ReadWrite);
+                fs.init(
+                    getIndexFilename(),
+                    FileMode::Open,
+                    FileAccess::ReadWrite,
+                    FileShare::ReadWrite);
                 fs.seek(SeekOrigin::End, 0);
                 fs.write("x", 1);
             },
@@ -432,11 +449,13 @@ struct CorruptionTest : public PersistentCacheTest
     }
 };
 
-#undef ENABLE_LOGGING 
+#undef ENABLE_LOGGING
 #undef ENABLE_WRITE_TEST
 
 #ifdef ENABLE_LOGGING
-#define LOG(fmt, ...) printf(fmt, ##__VA_ARGS__); fflush(stdout);
+#define LOG(fmt, ...)           \
+    printf(fmt, ##__VA_ARGS__); \
+    fflush(stdout);
 #else
 #define LOG(fmt, ...)
 #endif
@@ -475,10 +494,13 @@ struct StressTest : public PersistentCacheTest
     std::atomic<uint32_t> readSuccess{0};
     std::thread threads[kThreadCount];
 
-    Barrier *read_barrier;
-    Barrier *write_barrier;
+    Barrier* read_barrier;
+    Barrier* write_barrier;
 
-    StressTest() : PersistentCacheTest(kEntryCount - kEntryShortageCount) {}
+    StressTest()
+        : PersistentCacheTest(kEntryCount - kEntryShortageCount)
+    {
+    }
 
     void run()
     {
@@ -488,20 +510,16 @@ struct StressTest : public PersistentCacheTest
             size_t size = rng.nextInt32InRange(256, 64 * 1024);
             auto data = createRandomBlob(size);
             auto key = SHA1::compute(data->getBufferPointer(), data->getBufferSize());
-            entries.add(Entry{ key, data });
+            entries.add(Entry{key, data});
         }
 
         auto startTime = std::chrono::high_resolution_clock::now();
 
-        Barrier read_barrier_(
-            kThreadCount,
-            []()
-            {
-                LOG("Read synchronized\n");
-            });
+        Barrier read_barrier_(kThreadCount, []() { LOG("Read synchronized\n"); });
         Barrier write_barrier_(
             kThreadCount,
-            [this](){
+            [this]()
+            {
                 LOG("Write synchronized\n");
 #ifndef ENABLE_WRITE_TEST
                 SLANG_CHECK(readSuccess == kEntryCount - kEntryShortageCount);
@@ -523,12 +541,16 @@ struct StressTest : public PersistentCacheTest
                     while (true)
                     {
                         // Write to cache.
-                        size_t startIndex = (iteration * kEntryCount + (threadIndex * kBatchCount)) % (kEntryCount * 2);
+                        size_t startIndex =
+                            (iteration * kEntryCount + (threadIndex * kBatchCount)) %
+                            (kEntryCount * 2);
                         for (size_t i = 0; i < kBatchCount; ++i)
                         {
                             const Entry& entry = entries[startIndex + i];
 #ifdef ENABLE_WRITE_TEST
-                            osFileSystem->saveFileBlob(getEntryFileName(entry).getBuffer(), entry.data);
+                            osFileSystem->saveFileBlob(
+                                getEntryFileName(entry).getBuffer(),
+                                entry.data);
 #else
                             writeEntry(entry);
 #endif
@@ -536,7 +558,9 @@ struct StressTest : public PersistentCacheTest
                             bytesWritten.fetch_add((uint32_t)entry.data->getBufferSize());
                         }
 
-                        LOG("Thread %u: ended writing (iteration=%u)\n", threadIndex, iteration.load());
+                        LOG("Thread %u: ended writing (iteration=%u)\n",
+                            threadIndex,
+                            iteration.load());
 
                         // Synchronize.
                         read_barrier->wait();
@@ -555,7 +579,9 @@ struct StressTest : public PersistentCacheTest
                             entriesRead.fetch_add(1);
                         }
 
-                        LOG("Thread %u: ended reading (iteration=%u)\n", threadIndex, iteration.load());
+                        LOG("Thread %u: ended reading (iteration=%u)\n",
+                            threadIndex,
+                            iteration.load());
 
                         // Synchronize.
                         write_barrier->wait();
@@ -577,7 +603,8 @@ struct StressTest : public PersistentCacheTest
 
         auto endTime = std::chrono::high_resolution_clock::now();
         auto duration = endTime - startTime;
-        auto seconds = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() / 1000.0;
+        auto seconds =
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() / 1000.0;
 
         LOG("Total time: %.3fs\n", seconds);
         LOG("Total bytes written: %d\n", bytesWritten.load());
