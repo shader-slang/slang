@@ -4425,25 +4425,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DownstreamModuleImportDecoration:
            {
                requireSPIRVCapability(SpvCapabilityLinkage);
-               auto name = decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-               emitInst(getSection(SpvLogicalSectionID::Annotations),
+               auto name =
+                   decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+               emitInst(
+                   getSection(SpvLogicalSectionID::Annotations),
                    decoration,
                    SpvOpDecorate,
                    dstID,
-                   SpvDecorationLinkageAttributes, name, SpvLinkageTypeImport);
+                   SpvDecorationLinkageAttributes,
+                   name,
+                   SpvLinkageTypeImport);
                break;
-           }
-        case kIROp_DownstreamModuleExportDecoration:
-           {
-               requireSPIRVCapability(SpvCapabilityLinkage);
-               auto name = decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-               emitInst(getSection(SpvLogicalSectionID::Annotations),
-                   decoration,
-                   SpvOpDecorate,
-                   dstID,
-                   SpvDecorationLinkageAttributes, name, SpvLinkageTypeExport);
-                break;
-            }
+           }        
             // ...
         }
 
