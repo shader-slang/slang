@@ -25,3 +25,13 @@ runs:
       run: |
         npm install -g prettier@3.3.3
         echo "$(npm bin -g)" >> $GITHUB_PATH
+
+    - name: install shfmt
+      shell: bash
+      run: |
+        tmpdir=$(mktemp -d)
+        curl -L -H "Authorization: token ${{github.token}}" \
+          -o "$tmpdir/shfmt" \
+          https://github.com/mvdan/sh/releases/download/v3.10.0/shfmt_v3.10.0_linux_amd64
+        chmod +x "$tmpdir/shfmt"
+        echo "$tmpdir" >> $GITHUB_PATH
