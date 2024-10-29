@@ -2536,7 +2536,7 @@ __generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:
 vector<TElement,4> __texture_gather_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
-    constexpr vector<float, Shape.dimensions+isArray> location,
+    vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset,
     int component)
 {
@@ -2557,8 +2557,9 @@ vector<TElement,4> __texture_gather_offset(
         __intrinsic_asm "$0.gather($1, $2, $3, metal::component($4))";
     case spirv:
         return spirv_asm {
+            OpCapability ImageGatherExtended;
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component ConstOffset $offset;
+            result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component Offset $offset;
         };
     case wgsl:
         if (isShadow == 1)
@@ -2606,7 +2607,8 @@ vector<TElement,4> __texture_gather_offset(
         __intrinsic_asm "textureGatherOffset($0, $1, $2, $3)";
     case spirv:
         return spirv_asm {
-            result:$$vector<TElement,4> = OpImageGather $sampler $location $component ConstOffset $offset;
+            OpCapability ImageGatherExtended;
+            result:$$vector<TElement,4> = OpImageGather $sampler $location $component Offset $offset;
         };
     }
 }
