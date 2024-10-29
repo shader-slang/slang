@@ -63,7 +63,7 @@ The astute reader may have noticed that the default Slang HLSL prelude *does* co
 #endif
 ```
 
-This means that the *downstream* compiler (such as DXC and FXC) must be able to handle this include. Include paths can be specified for downstream compilers via the [-X mechanism](command-line-slangc.md#downstream-arguments). So for example...
+This means that the *downstream* compiler (such as DXC and FXC) must be able to handle this include. Include paths can be specified for downstream compilers via the [-X mechanism](user-guide/08-compiling.md#downstream-arguments). So for example...
 
 ```
 -Xfxc -IpathTo/nvapi -Xdxc -IpathTo/nvapi

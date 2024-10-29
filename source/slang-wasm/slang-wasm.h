@@ -1,9 +1,9 @@
 #pragma once
 
 #include <emscripten/val.h>
+#include <slang-com-ptr.h>
 #include <slang.h>
 #include <unordered_map>
-#include <slang-com-ptr.h>
 
 namespace Slang
 {
