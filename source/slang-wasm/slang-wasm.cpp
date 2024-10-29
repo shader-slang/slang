@@ -4,7 +4,6 @@
 #include "../core/slang-exception.h"
 #include "../slang/slang-language-server.h"
 
-#include <slang-com-ptr.h>
 #include <slang.h>
 #include <string>
 #include <vector>
