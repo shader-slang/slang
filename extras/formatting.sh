@@ -165,6 +165,7 @@ cpp_formatting() {
     " |& track_progress ${#files[@]}
 
     for file in "${files[@]}"; do
+      # Fail if any of the diffs have contents
       if [ -s "$tmpdir/$file" ]; then
         cat "$tmpdir/$file"
         exit_code=1
