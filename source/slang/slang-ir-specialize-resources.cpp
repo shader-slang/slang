@@ -1315,6 +1315,7 @@ bool isIllegalGLSLParameterType(IRType* type)
         switch (texType->getAccess())
         {
         case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        case SLANG_RESOURCE_ACCESS_WRITE:
         case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: return true;
         default:                                   break;
         }
