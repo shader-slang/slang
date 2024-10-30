@@ -20,7 +20,7 @@ EOF
 #
 # Some helper functions
 #
-msg(){
+msg() {
   printf "%s\n" "$1" >&2
 }
 
@@ -62,13 +62,35 @@ extra_arguments=()
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
-  -h | --help) help; exit ;;
-  --repo) repo=$2; shift;;
-  --branch) branch=$2; shift;;
-  --source-dir) source_dir=$2; shift;;
-  --config) config=$2; shift;;
-  --install-prefix) install_prefix=$2; shift;;
-  --) shift; extra_arguments+=("$@"); break;;
+  -h | --help)
+    help
+    exit
+    ;;
+  --repo)
+    repo=$2
+    shift
+    ;;
+  --branch)
+    branch=$2
+    shift
+    ;;
+  --source-dir)
+    source_dir=$2
+    shift
+    ;;
+  --config)
+    config=$2
+    shift
+    ;;
+  --install-prefix)
+    install_prefix=$2
+    shift
+    ;;
+  --)
+    shift
+    extra_arguments+=("$@")
+    break
+    ;;
   *)
     msg "Unknown parameter passed: $1"
     help >&2
