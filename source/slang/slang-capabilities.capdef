@@ -1757,11 +1757,11 @@ alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_sha
 alias memorybarrier = sm_5_0_version;
 /// Capabilities required to use sm_4_0 texture operations
 /// [Compound]
-alias texture_sm_4_0 = sm_4_0_version | GL_ARB_sparse_texture_clamp + GL_EXT_texture_query_lod
+alias texture_sm_4_0 = sm_4_0_version
                      ;
 /// Capabilities required to use sm_4_1 texture operations
 /// [Compound]
-alias texture_sm_4_1 = sm_4_1_version | GL_ARB_sparse_texture_clamp + GL_EXT_texture_query_lod
+alias texture_sm_4_1 = sm_4_1_version
                      ;
 /// Capabilities required to use sm_4_1 samplerless texture operations
 /// [Compound]
