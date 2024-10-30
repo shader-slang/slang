@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         os: [linux, macos, windows]
-        config: [release]
+        config: [releaseWithDebugInfo]
         platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
@@ -57,7 +57,7 @@ jobs:
         run: |
           cmake --workflow --preset generators --fresh
           mkdir build-platform-generators
-          cmake --install build --config Release --component generators --prefix build-platform-generators
+          cmake --install build --config $cmake_config --component generators --prefix build-platform-generators
 
       - name: Change dev tools to host arch (windows)
         uses: ilammy/msvc-dev-cmd@v1
@@ -80,8 +80,8 @@ jobs:
 
       - name: Build Slang
         run: |
-          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" ]]; then
-              echo "Please see ci.yml for the steps to make debug builds work on Windows" >&2
+          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
+              echo "Please see ci.yml for the steps to make non-release builds work on Windows" >&2
               exit 1
           fi
 
@@ -169,8 +169,8 @@ jobs:
             mkdir ./ttmp
             unzip "${base}.zip" -d ./ttmp
 
-            /bin/cp -rf build/Release/bin/* ./ttmp/bin/
-            /bin/cp -rf build/Release/lib/* ./ttmp/lib/
+            /bin/cp -rf build/$cmake_config/bin/* ./ttmp/bin/
+            /bin/cp -rf build/$cmake_config/lib/* ./ttmp/lib/
             rm ${base}.zip
             rm ${base}.tar.gz
             cd ./ttmp
