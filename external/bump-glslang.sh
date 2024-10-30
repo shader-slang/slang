@@ -35,7 +35,7 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-if [ $help ]; then
+if [ "$help" ]; then
   me=$(basename "$0")
   cat <<EOF
 $me: Update external/glslang and dependencies
@@ -62,27 +62,24 @@ EOF
   exit
 fi
 
-big_msg()
-{
+big_msg() {
   echo
   echo "################################################################"
   echo "$1"
   echo "################################################################"
 }
 
-require_bin()
-{
-  if ! command -v "$1" &> /dev/null
-  then
-      echo "This script needs $1, but it isn't in \$PATH"
-      missing_bin=1
+require_bin() {
+  if ! command -v "$1" &>/dev/null; then
+    echo "This script needs $1, but it isn't in \$PATH"
+    missing_bin=1
   fi
 }
 require_bin "jq"
 require_bin "git"
 require_bin "python"
 require_bin "cmake"
-if [ $missing_bin ]; then
+if [ "$missing_bin" ]; then
   exit 1
 fi
 
@@ -100,13 +97,13 @@ if ! test -f "$glslang/.git"; then
   exit 1
 fi
 
-known_good_commit(){
+known_good_commit() {
   jq <"$glslang/known_good.json" \
     ".commits | .[] | select(.name == \"$1\") | .commit" \
     --raw-output
 }
 
-bump_dep(){
+bump_dep() {
   commit=$(known_good_commit "$2")
   big_msg "Fetching $commit from origin in $1"
   git -C "$1" fetch origin "$commit"
@@ -116,7 +113,7 @@ bump_dep(){
 
 declare -A old_ref
 declare -A new_ref
-merge_dep(){
+merge_dep() {
   name=$1
   dir=$2
   up=$3
@@ -180,14 +177,15 @@ rm -f "$spirv_tools_generated/*.{inc,h}"
 cp --target-directory "$spirv_tools_generated" "$build"/*.{inc,h}
 set +x
 
-if [ $do_commit ]; then
+if [ "$do_commit" ]; then
   big_msg "Committing changes"
-  msg=$(cat <<EOF
+  msg=$(
+    cat <<EOF
 external/glslang: ${old_ref["glslang"]} -> ${new_ref["glslang"]} 
 
 external/spirv-tools: ${old_ref["spirv-tools"]} -> ${new_ref["spirv-tools"]}"
 EOF
-)
+  )
 
   git commit \
     --message "$msg" \

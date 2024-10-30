@@ -74,6 +74,8 @@ require_bin "gersemi" "0.17"
 require_bin "xargs" "3"
 require_bin "diff" "2"
 require_bin "clang-format" "17" "18"
+require_bin "prettier" "3"
+require_bin "shfmt" "3"
 
 if [ "$missing_bin" ]; then
   exit 1
@@ -82,6 +84,8 @@ fi
 exit_code=0
 
 cmake_formatting() {
+  echo "Formatting CMake files..."
+
   readarray -t files < <(git ls-files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
 
   common_args=(
@@ -99,7 +103,9 @@ cmake_formatting() {
 }
 
 cpp_formatting() {
-  readarray -t files < <(git ls-files '*.cpp' '*.hpp' '*.c' '*.h')
+  echo "Formatting cpp files..."
+
+  readarray -t files < <(git ls-files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
 
   if [ "$check_only" -eq 1 ]; then
     local tmpdir
@@ -123,7 +129,38 @@ cpp_formatting() {
   fi
 }
 
+yaml_json_formatting() {
+  echo "Formatting yaml and json files..."
+
+  readarray -t files < <(git ls-files "*.yaml" "*.yml" "*.json" ':!external/**')
+
+  if [ "$check_only" -eq 1 ]; then
+    prettier --check "${files[@]}" || exit_code=1
+  else
+    prettier --write "${files[@]}" | grep -v '(unchanged)' || :
+  fi
+}
+
+sh_formatting() {
+  echo "Formatting sh files..."
+
+  readarray -t files < <(git ls-files "*.sh")
+
+  common_args=(
+    # default 8 is way too wide
+    --indent 2
+  )
+
+  if [ "$check_only" -eq 1 ]; then
+    shfmt "${common_args[@]}" --diff "${files[@]}" || exit_code=1
+  else
+    shfmt "${common_args[@]}" --write "${files[@]}"
+  fi
+}
+
 cmake_formatting
 cpp_formatting
+yaml_json_formatting
+sh_formatting
 
 exit $exit_code

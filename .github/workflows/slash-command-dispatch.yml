@@ -13,7 +13,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           reaction-token: ${{ secrets.SLANGBOT_PAT }}
           issue-type: pull-request
-          commands: | 
+          commands: |
             format
 
       - name: Edit comment with error message

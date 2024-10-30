@@ -4,17 +4,17 @@ on:
   push:
     branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENCE"
+      - "CONTRIBUTION.md"
+      - "README.md"
   pull_request:
     branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENCE"
+      - "CONTRIBUTION.md"
+      - "README.md"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -25,8 +25,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
-          fetch-depth: '0'
+          submodules: "recursive"
+          fetch-depth: "0"
       - name: Common setup
         uses: ./.github/actions/common-setup
         with:
@@ -41,8 +41,8 @@ jobs:
           cmake --workflow --preset release
       - uses: actions/checkout@v3
         with:
-          repository: 'shader-slang/MDL-SDK'
-          path: 'external/MDL-SDK'
+          repository: "shader-slang/MDL-SDK"
+          path: "external/MDL-SDK"
       - name: Run benchmark
         run: |
           cd tools/benchmark

@@ -7,30 +7,30 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENCE"
+      - "CONTRIBUTION.md"
+      - "README.md"
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
     strategy:
       matrix:
         os: [linux, macos, windows]
-        config: [release]
+        config: [releaseWithDebugInfo]
         platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
-          - {os: linux, runs-on: ubuntu-20.04, compiler: gcc}
-          - {os: windows, runs-on: windows-latest, compiler: cl}
-          - {os: macos, runs-on: macos-latest, compiler: clang}
+          - { os: linux, runs-on: ubuntu-20.04, compiler: gcc }
+          - { os: windows, runs-on: windows-latest, compiler: cl }
+          - { os: macos, runs-on: macos-latest, compiler: clang }
 
-          - {build-slang-llvm: false}
-          - {os: linux, platform: x86_64, build-slang-llvm: true}
-          - {os: windows, platform: x86_64, build-slang-llvm: true}
-          - {os: macos, platform: aarch64, build-slang-llvm: true}
+          - { build-slang-llvm: false }
+          - { os: linux, platform: x86_64, build-slang-llvm: true }
+          - { os: windows, platform: x86_64, build-slang-llvm: true }
+          - { os: macos, platform: aarch64, build-slang-llvm: true }
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.image || '' }}
@@ -42,8 +42,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
-          fetch-depth: '0'
+          submodules: "recursive"
+          fetch-depth: "0"
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
@@ -80,8 +80,8 @@ jobs:
 
       - name: Build Slang
         run: |
-          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" ]]; then
-              echo "Please see ci.yml for the steps to make debug builds work on Windows" >&2
+          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
+              echo "Please see ci.yml for the steps to make non-release builds work on Windows" >&2
               exit 1
           fi
 
@@ -169,8 +169,8 @@ jobs:
             mkdir ./ttmp
             unzip "${base}.zip" -d ./ttmp
 
-            /bin/cp -rf build/Release/bin/* ./ttmp/bin/
-            /bin/cp -rf build/Release/lib/* ./ttmp/lib/
+            /bin/cp -rf build/$cmake_config/bin/* ./ttmp/bin/
+            /bin/cp -rf build/$cmake_config/lib/* ./ttmp/lib/
             rm ${base}.zip
             rm ${base}.tar.gz
             cd ./ttmp
@@ -211,4 +211,3 @@ jobs:
           & ".\build_reference.ps1"
         env:
           GITHUB_TOKEN: ${{ secrets.UPDATE_STDLIB_REFERENCE_PAT }}
-
