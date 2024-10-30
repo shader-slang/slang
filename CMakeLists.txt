@@ -338,3 +338,27 @@ install(DIRECTORY "${slang_SOURCE_DIR}/docs/" DESTINATION share/doc/slang)
 install(DIRECTORY "${slang_SOURCE_DIR}/include" DESTINATION .)
 
 include(CPack)
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file("${PROJECT_NAME}ConfigVersion.cmake"
+                                 VERSION ${PROJECT_VERSION}
+                                 COMPATIBILITY SameMajorVersion)
+
+configure_package_config_file(
+    "${PROJECT_SOURCE_DIR}/cmake/SlangConfig.cmake.in"
+    "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+    INSTALL_DESTINATION
+      cmake
+)
+
+install(TARGETS slang EXPORT SlangExportTarget)
+
+install(EXPORT SlangExportTarget
+    FILE ${PROJECT_NAME}Targets.cmake
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION cmake)
+
+install(FILES 
+  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+  DESTINATION cmake)
