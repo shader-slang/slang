@@ -70,7 +70,7 @@ require_bin() {
   local version
 
   if ! command -v "$name" &>/dev/null; then
-    echo "This script needs $name, but it isn't in \$PATH"
+    echo "This script needs $name, but it isn't in \$PATH" >&2
     missing_bin=1
     return
   fi
@@ -79,14 +79,14 @@ require_bin() {
     version=$("$name" --version | grep -oP "\d+\.\d+\.?\d*" | head -n1)
 
     if ! printf '%s\n%s\n' "$min_version" "$version" | sort -V -C; then
-      echo "$name version $version is too old. Version $min_version or newer is required."
+      echo "$name version $version is too old. Version $min_version or newer is required." >&2
       missing_bin=1
       return
     fi
 
     if [ -n "$max_version" ]; then
       if ! printf '%s\n%s\n' "$version" "$max_version" | sort -V -C; then
-        echo "$name version $version is too new. Version less than $max_version is required."
+        echo "$name version $version is too new. Version less than $max_version is required." >&2
         missing_bin=1
         return
       fi
@@ -109,7 +109,7 @@ fi
 exit_code=0
 
 cmake_formatting() {
-  echo "Formatting CMake files..."
+  echo "Formatting CMake files..." >&2
 
   readarray -t files < <(git ls-files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
 
@@ -127,21 +127,42 @@ cmake_formatting() {
   fi
 }
 
+track_progress() {
+  # Don't output the progress bar if stderr isn't a terminal, just eat all the input
+  [ -t 2 ] || {
+    cat >/dev/null
+    return
+  }
+
+  local total=$1
+  local current=0
+
+  while IFS= read -r _; do
+    ((current++)) || :
+    percent=$((current * 100 / total))
+    printf '\rProgress: [%-50s] %d%%' "$(printf '#%.0s' $(seq 1 $((percent / 2))))" "$percent" >&2
+  done
+  echo >&2
+}
+
 cpp_formatting() {
-  echo "Formatting cpp files..."
+  echo "Formatting cpp files..." >&2
 
   readarray -t files < <(git ls-files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
+
+  # The progress reporting is a bit sneaky, we use `--verbose` with xargs which
+  # prints a line to stderr for each command, and we simply count these...
 
   if [ "$check_only" -eq 1 ]; then
     local tmpdir
     tmpdir=$(mktemp -d)
     trap 'rm -rf "$tmpdir"' EXIT
 
-    printf '%s\n' "${files[@]}" | xargs -P "$(nproc)" -I{} bash -c "
+    printf '%s\n' "${files[@]}" | xargs --verbose -P "$(nproc)" -I{} bash -c "
       mkdir -p \"\$(dirname \"$tmpdir/{}\")\"
-      diff -u --color=always --label \"{}\" --label \"{}\" \"{}\" <(clang-format \"{}\") > \"$tmpdir/{}\" 
+      diff -u --color=always --label \"{}\" --label \"{}\" \"{}\" <(clang-format \"{}\") > \"$tmpdir/{}\"
       :
-    "
+    " |& track_progress ${#files[@]}
 
     for file in "${files[@]}"; do
       if [ -s "$tmpdir/$file" ]; then
@@ -150,12 +171,13 @@ cpp_formatting() {
       fi
     done
   else
-    printf '%s\n' "${files[@]}" | xargs -n1 -P "$(nproc)" clang-format -i
+    printf '%s\n' "${files[@]}" | xargs --verbose -n1 -P "$(nproc)" clang-format -i |&
+      track_progress ${#files[@]}
   fi
 }
 
 yaml_json_formatting() {
-  echo "Formatting yaml and json files..."
+  echo "Formatting yaml and json files..." >&2
 
   readarray -t files < <(git ls-files "*.yaml" "*.yml" "*.json" ':!external/**')
 
@@ -170,12 +192,12 @@ yaml_json_formatting() {
       fi
     done
   else
-    prettier --write "${files[@]}" | grep -v '(unchanged)' || :
+    prettier --write "${files[@]}" | grep -v '(unchanged)' >&2 || :
   fi
 }
 
 sh_formatting() {
-  echo "Formatting sh files..."
+  echo "Formatting sh files..." >&2
 
   readarray -t files < <(git ls-files "*.sh")
 
@@ -191,9 +213,9 @@ sh_formatting() {
   fi
 }
 
-((run_all || run_cmake)) && cmake_formatting
-((run_all || run_cpp)) && cpp_formatting
-((run_all || run_yaml)) && yaml_json_formatting
 ((run_all || run_sh)) && sh_formatting
+((run_all || run_cmake)) && cmake_formatting
+((run_all || run_yaml)) && yaml_json_formatting
+((run_all || run_cpp)) && cpp_formatting
 
 exit $exit_code
