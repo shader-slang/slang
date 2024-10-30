@@ -20,5 +20,5 @@ WTexture2D writeOnlyTexture;
 [shader("compute")]
 void computeMain()
 {
-    writeOnlyTexture[int2(0,0)] = float4(0.2, 0.3, 0.4, 1.0);
+    writeOnlyTexture.Store(int2(0,0), float4(0.2, 0.3, 0.4, 1.0));
 }
