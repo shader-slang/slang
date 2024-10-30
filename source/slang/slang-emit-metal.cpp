@@ -125,6 +125,8 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     {
     case SLANG_RESOURCE_ACCESS_READ: m_writer->emit("access::sample"); break;
 
+    case SLANG_RESOURCE_ACCESS_WRITE: m_writer->emit("access::write"); break;
+
     case SLANG_RESOURCE_ACCESS_READ_WRITE:
     case SLANG_RESOURCE_ACCESS_APPEND:
     case SLANG_RESOURCE_ACCESS_CONSUME:

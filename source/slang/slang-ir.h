@@ -1437,8 +1437,9 @@ struct IRResourceTypeBase : IRType
             case kCoreModule_ResourceAccessReadWrite: return SLANG_RESOURCE_ACCESS_READ_WRITE;
             case kCoreModule_ResourceAccessRasterizerOrdered:
                 return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-            case kCoreModule_ResourceAccessFeedback: return SLANG_RESOURCE_ACCESS_FEEDBACK;
-            default:                                 break;
+            case kCoreModule_ResourceAccessFeedback:  return SLANG_RESOURCE_ACCESS_FEEDBACK;
+            case kCoreModule_ResourceAccessWriteOnly: return SLANG_RESOURCE_ACCESS_WRITE;
+            default:                                  break;
             }
         }
         return SLANG_RESOURCE_ACCESS_UNKNOWN;
