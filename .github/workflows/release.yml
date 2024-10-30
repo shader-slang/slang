@@ -57,7 +57,7 @@ jobs:
         run: |
           cmake --workflow --preset generators --fresh
           mkdir build-platform-generators
-          cmake --install build --config $cmake_config --component generators --prefix build-platform-generators
+          cmake --install build --config Release --component generators --prefix build-platform-generators
 
       - name: Change dev tools to host arch (windows)
         uses: ilammy/msvc-dev-cmd@v1
