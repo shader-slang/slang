@@ -135,7 +135,15 @@ yaml_json_formatting() {
   readarray -t files < <(git ls-files "*.yaml" "*.yml" "*.json" ':!external/**')
 
   if [ "$check_only" -eq 1 ]; then
-    prettier --check "${files[@]}" || exit_code=1
+    for file in "${files[@]}"; do
+      if ! output=$(prettier "$file" 2>/dev/null); then
+        continue
+      fi
+      if ! diff -q "$file" <(echo "$output") >/dev/null 2>&1; then
+        diff --color -u --label "$file" --label "$file" "$file" <(echo "$output")
+        exit_code=1
+      fi
+    done
   else
     prettier --write "${files[@]}" | grep -v '(unchanged)' || :
   fi
