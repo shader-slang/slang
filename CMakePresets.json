@@ -131,9 +131,7 @@
     {
       "name": "releaseWithDebugInfo",
       "inherits": "base",
-      "configurations": [
-        "RelWithDebInfo"
-      ],
+      "configurations": ["RelWithDebInfo"],
       "packageDirectory": "dist-releaseWithDebugInfo"
     },
     {
