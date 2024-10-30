@@ -4,17 +4,17 @@ on:
   push:
     branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENCE"
+      - "CONTRIBUTION.md"
+      - "README.md"
   pull_request:
     branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENCE"
+      - "CONTRIBUTION.md"
+      - "README.md"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -87,8 +87,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
-          fetch-depth: '0'
+          submodules: "recursive"
+          fetch-depth: "0"
       - name: Setup
         uses: ./.github/actions/common-setup
         with:

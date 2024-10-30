@@ -96,25 +96,19 @@
       "name": "emscripten",
       "configurePreset": "emscripten",
       "configuration": "Release",
-      "targets": [
-        "slang-wasm"
-      ]
+      "targets": ["slang-wasm"]
     },
     {
       "name": "generators",
       "inherits": "release",
       "configurePreset": "generators",
-      "targets": [
-        "all-generators"
-      ]
+      "targets": ["all-generators"]
     },
     {
       "name": "slang-llvm",
       "inherits": "release",
       "configurePreset": "slang-llvm",
-      "targets": [
-        "slang-llvm"
-      ]
+      "targets": ["slang-llvm"]
     }
   ],
   "packagePresets": [
@@ -122,9 +116,7 @@
       "name": "base",
       "hidden": true,
       "configurePreset": "default",
-      "generators": [
-        "ZIP"
-      ],
+      "generators": ["ZIP"],
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang",
         "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
@@ -133,9 +125,7 @@
     {
       "name": "release",
       "inherits": "base",
-      "configurations": [
-        "Release"
-      ],
+      "configurations": ["Release"],
       "packageDirectory": "dist-release"
     },
     {
@@ -149,9 +139,7 @@
     {
       "name": "debug",
       "inherits": "base",
-      "configurations": [
-        "Debug"
-      ],
+      "configurations": ["Debug"],
       "packageDirectory": "dist-debug"
     },
     {
