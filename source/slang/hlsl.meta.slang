@@ -3631,12 +3631,107 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
     __intrinsic_op($(kIROp_ImageStore))
     static void __metalImageStore(This val, vector<uint, Shape.dimensions+isArray> location, T value);
 
+    [ForceInline]
+    void Store(vector<uint, Shape.dimensions+isArray> location, T newValue)
+    {
+        __target_switch
+        {
+            case cpp:
+            case hlsl:
+                __intrinsic_asm ".operator[]";
+            case glsl:
+                __glslImageStore(location, newValue);
+            case cuda:
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "surf1DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "surf2DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "surf3DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "surf1Dwrite$C<$T0>($2, $0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+            case spirv:
+                return spirv_asm
+                {
+                    OpImageWrite $this $location __convertTexel(newValue);
+                };
+            case metal:
+                if (isArray != 0)
+                {
+                    // last arg will be replaced with the split off array index
+                    __metalImageStoreArray(this, __vectorReshape<Shape.dimensions>(location), newValue, location[Shape.dimensions + isArray - 1]);
+                }
+                else
+                {
+                    __metalImageStore(this, location, newValue);
+                }
+        case wgsl:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
+                || Shape.flavor == $(SLANG_TEXTURE_2D)
+                || Shape.flavor == $(SLANG_TEXTURE_3D)
+                , "WGSL doesn't supports textureStore for Cube texture.");
+            static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
+                , "WGSL supports textureStore for texture_store_2d_array but not for array of 1D, 3D or Cube.");
+
+            // WGSL requires the value type to be always `vec4`
+            if (isArray == 1)
+            {
+                if (T is int32_t   || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($V2)";
+                if (T is int32_t2  || T is int16_t2  || T is int8_t2)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($2, 0, 1))";
+                if (T is int32_t3  || T is int16_t3  || T is int8_t3)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($2, 1))";
+                if (T is uint32_t  || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 0, 0, 1))";
+                if (T is uint32_t2 || T is uint16_t2 || T is uint8_t2) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 0, 1))";
+                if (T is uint32_t3 || T is uint16_t3 || T is uint8_t3) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 1))";
+                if (T is half)   __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 0, 0, 1))";
+                if (T is half2)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 0, 1))";
+                if (T is half3)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 1))";
+                if (T is float)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 0, 0, 1))";
+                if (T is float2) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 0, 1))";
+                if (T is float3) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 1))";
+                __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), $2)";
+            }
+            if (T is int32_t   || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 0, 0, 1))";
+            if (T is int32_t2  || T is int16_t2 || T is int8_t2)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 0, 1))";
+            if (T is int32_t3  || T is int16_t3 || T is int8_t3)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 1))";
+            if (T is uint32_t  || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 0, 0, 1))";
+            if (T is uint32_t2 || T is uint16_t2 || T is uint8_t2) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 0, 1))";
+            if (T is uint32_t3 || T is uint16_t3 || T is uint8_t3) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 1))";
+            if (T is half)   __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 0, 0, 1))";
+            if (T is half2)  __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 0, 1))";
+            if (T is half3)  __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 1))";
+            if (T is float)  __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 0, 0, 1))";
+            if (T is float2) __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 0, 1))";
+            if (T is float3) __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 1))";
+            __intrinsic_asm "textureStore($0, $1, $2)";
+        }
+    }
+
+    ${{{{
+        if (access != kCoreModule_ResourceAccessWriteOnly)
+        {
+    }}}}
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
-        ${{{{
-            if (access != kCoreModule_ResourceAccessWriteOnly)
-            {
-        }}}}
         [__readNone]
         [ForceInline]
         [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
@@ -3655,119 +3750,24 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     return Load(location);
             }
         }
-        ${{{{
-            } // if (access != kCoreModule_ResourceAccessWriteOnly)
-        }}}}
 
         [nonmutating]
         [ForceInline]
         [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         set(T newValue)
         {
-            __target_switch
-            {
-                case cpp:
-                case hlsl:
-                    __intrinsic_asm ".operator[]";
-                case glsl:
-                    __glslImageStore(location, newValue);
-                case cuda:
-                    if (isArray != 0)
-                    {
-                        switch(Shape.flavor)
-                        {
-                        case $(SLANG_TEXTURE_1D):
-                            __intrinsic_asm "surf1DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
-                        case $(SLANG_TEXTURE_2D):
-                            __intrinsic_asm "surf2DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
-                        case $(SLANG_TEXTURE_3D):
-                            __intrinsic_asm "surf3DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)";
-                        default:
-                            __intrinsic_asm "<invalid intrinsic>";
-                        }
-                    }
-                    else
-                    {
-                        switch(Shape.flavor)
-                        {
-                        case $(SLANG_TEXTURE_1D):
-                            __intrinsic_asm "surf1Dwrite$C<$T0>($2, $0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
-                        case $(SLANG_TEXTURE_2D):
-                            __intrinsic_asm "surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
-                        case $(SLANG_TEXTURE_3D):
-                            __intrinsic_asm "surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
-                        default:
-                            __intrinsic_asm "<invalid intrinsic>";
-                        }
-                    }
-                case spirv:
-                    return spirv_asm
-                    {
-                        OpImageWrite $this $location __convertTexel(newValue);
-                    };
-                case metal:
-                    if (isArray != 0)
-                    {
-                        // last arg will be replaced with the split off array index
-                        __metalImageStoreArray(this, __vectorReshape<Shape.dimensions>(location), newValue, location[Shape.dimensions + isArray - 1]);
-                    }
-                    else
-                    {
-                        __metalImageStore(this, location, newValue);
-                    }
-            case wgsl:
-                static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
-                    || Shape.flavor == $(SLANG_TEXTURE_2D)
-                    || Shape.flavor == $(SLANG_TEXTURE_3D)
-                    , "WGSL doesn't supports textureStore for Cube texture.");
-                static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
-                    , "WGSL supports textureStore for texture_store_2d_array but not for array of 1D, 3D or Cube.");
-
-                // WGSL requires the value type to be always `vec4`
-                if (isArray == 1)
-                {
-                    if (T is int32_t   || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($2, 0, 0, 1))";
-                    if (T is int32_t2  || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($2, 0, 1))";
-                    if (T is int32_t3  || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<i32>($2, 1))";
-                    if (T is uint32_t  || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 0, 0, 1))";
-                    if (T is uint32_t2 || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 0, 1))";
-                    if (T is uint32_t3 || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<u32>($2, 1))";
-                    if (T is half)   __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 0, 0, 1))";
-                    if (T is half2)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 0, 1))";
-                    if (T is half3)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f16>($2, 1))";
-                    if (T is float)  __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 0, 0, 1))";
-                    if (T is float2) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 0, 1))";
-                    if (T is float3) __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), vec4<f32>($2, 1))";
-                    __intrinsic_asm "textureStore($0, ($1).xy, i32(($1).z), $2)";
-                }
-                if (T is int32_t   || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 0, 0, 1))";
-                if (T is int32_t2  || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 0, 1))";
-                if (T is int32_t3  || T is int16_t  || T is int8_t)  __intrinsic_asm "textureStore($0, $1, vec4<i32>($2, 1))";
-                if (T is uint32_t  || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 0, 0, 1))";
-                if (T is uint32_t2 || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 0, 1))";
-                if (T is uint32_t3 || T is uint16_t || T is uint8_t) __intrinsic_asm "textureStore($0, $1, vec4<u32>($2, 1))";
-                if (T is half)   __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 0, 0, 1))";
-                if (T is half2)  __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 0, 1))";
-                if (T is half3)  __intrinsic_asm "textureStore($0, $1, vec4<f16>($2, 1))";
-                if (T is float)  __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 0, 0, 1))";
-                if (T is float2) __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 0, 1))";
-                if (T is float3) __intrinsic_asm "textureStore($0, $1, vec4<f32>($2, 1))";
-                __intrinsic_asm "textureStore($0, $1, $2)";
-            }
+            Store(location, newValue);
         }
 
-        ${{{{
-            if (access != kCoreModule_ResourceAccessWriteOnly)
-            {
-        }}}}
         // If a 'Texture[location]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location)'.
         // This allows call's to stay aware that the input is from a 'Texture'.
         __intrinsic_op($(kIROp_ImageSubscript)) 
         ref;
-        ${{{{
-            }  // if (access != kCoreModule_ResourceAccessWriteOnly)
-        }}}}
     }
+    ${{{{
+        } // if (access != kCoreModule_ResourceAccessWriteOnly)
+    }}}}
+
 }
 
 ${{{{
