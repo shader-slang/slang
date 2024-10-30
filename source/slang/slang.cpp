@@ -1986,7 +1986,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
-    case CodeGenTarget::WGSL: atoms.add(CapabilityName::wgsl); break;
+    case CodeGenTarget::WGSL:              atoms.add(CapabilityName::wgsl); break;
 
     default: break;
     }
