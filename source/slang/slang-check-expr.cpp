@@ -2073,7 +2073,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         if (auto floatLitExpr = typeCastOperand.as<FloatingPointLiteralExpr>())
         {
             // When explicitly casting from float type to integer type, let's fold it as an integer
-	    // value.
+            // value.
             const IntegerLiteralValue value = IntegerLiteralValue(floatLitExpr.getExpr()->value);
             val = m_astBuilder->getIntVal(substType, value);
         }
