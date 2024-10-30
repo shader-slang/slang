@@ -405,6 +405,7 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             switch (texType->getAccess())
             {
+            case SLANG_RESOURCE_ACCESS_WRITE:
             case SLANG_RESOURCE_ACCESS_READ_WRITE: m_writer->emit("texture_storage"); break;
             default:                               m_writer->emit("texture"); break;
             }
@@ -442,7 +443,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                     m_writer->emit(getWgslImageFormat(texType));
                     m_writer->emit(", read_write");
                     break;
-
+                case SLANG_RESOURCE_ACCESS_WRITE:
+                    m_writer->emit(getWgslImageFormat(texType));
+                    m_writer->emit(", write");
+                    break;
                 default:
                     if (auto vecElemType = as<IRVectorType>(elemType))
                         emitSimpleType(vecElemType->getElementType());

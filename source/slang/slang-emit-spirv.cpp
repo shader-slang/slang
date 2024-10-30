@@ -2068,6 +2068,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case SlangResourceAccess::SLANG_RESOURCE_ACCESS_READ_WRITE:
         case SlangResourceAccess::SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        case SlangResourceAccess::SLANG_RESOURCE_ACCESS_WRITE:
             sampled = ImageOpConstants::readWriteImage;
             break;
         case SlangResourceAccess::SLANG_RESOURCE_ACCESS_NONE:
