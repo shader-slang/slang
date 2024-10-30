@@ -34,8 +34,7 @@
       "description": "Options specific for MSVC",
       "cacheVariables": {
         "CMAKE_C_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP",
-        "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP",
-        "CMAKE_DEFAULT_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_CXX_FLAGS_INIT": "-D_ITERATOR_DEBUG_LEVEL=0 /MP"
       }
     },
     {
@@ -131,9 +130,7 @@
     {
       "name": "releaseWithDebugInfo",
       "inherits": "base",
-      "configurations": [
-        "RelWithDebInfo"
-      ],
+      "configurations": ["RelWithDebInfo"],
       "packageDirectory": "dist-releaseWithDebugInfo"
     },
     {
