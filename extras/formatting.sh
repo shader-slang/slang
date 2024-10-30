@@ -7,12 +7,33 @@ source_dir="$(dirname "$script_dir")"
 
 check_only=0
 no_version_check=0
+run_cpp=0
+run_yaml=0
+run_sh=0
+run_cmake=0
+run_all=1
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
   -h | --help) help=1 ;;
   --check-only) check_only=1 ;;
   --no-version-check) no_version_check=1 ;;
+  --cpp)
+    run_cpp=1
+    run_all=0
+    ;;
+  --yaml)
+    run_yaml=1
+    run_all=0
+    ;;
+  --sh)
+    run_sh=1
+    run_all=0
+    ;;
+  --cmake)
+    run_cmake=1
+    run_all=0
+    ;;
   --source)
     source_dir="$2"
     shift
@@ -26,12 +47,16 @@ if [ "$help" ]; then
   cat <<EOF
 $me: Format or check formatting of files in this repo
 
-Usage: $me [--check-only] [--no-version-check] [--source <path>]
+Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [--sh] [--cmake]
 
 Options:
     --check-only       Check formatting without modifying files
     --no-version-check Skip version compatibility checks
-    --source           Path to source directory to format (defaults to parent of script directory)
+    --source          Path to source directory to format (defaults to parent of script directory)
+    --cpp             Format only C++ files
+    --yaml            Format only YAML/JSON files
+    --sh              Format only shell script files
+    --cmake           Format only CMake files
 EOF
   exit 0
 fi
@@ -166,9 +191,9 @@ sh_formatting() {
   fi
 }
 
-cmake_formatting
-cpp_formatting
-yaml_json_formatting
-sh_formatting
+((run_all || run_cmake)) && cmake_formatting
+((run_all || run_cpp)) && cpp_formatting
+((run_all || run_yaml)) && yaml_json_formatting
+((run_all || run_sh)) && sh_formatting
 
 exit $exit_code
