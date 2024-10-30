@@ -102,7 +102,7 @@ void TextureTypeInfo::writeFuncBody(
         if (spirvDefault.getLength() && spirvCombined.getLength())
         {
             sb << i << "case spirv:\n";
-            sb << i << "if (access == " << kCoreModule_ResourceAccessReadWrite << ")\n";
+            sb << i << "if (access == " << kCoreModule_ResourceAccessReadWrite << " || access == " << kCoreModule_ResourceAccessWriteOnly  << ")\n";
             sb << i << "return spirv_asm\n";
             {
                 BraceScope spirvRWScope{i, sb, ";\n"};

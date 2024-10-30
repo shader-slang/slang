@@ -41,8 +41,9 @@ enum class SamplerStateFlavor : uint8_t
 
 const int kCoreModule_ResourceAccessReadOnly = 0;
 const int kCoreModule_ResourceAccessReadWrite = 1;
-const int kCoreModule_ResourceAccessRasterizerOrdered = 2;
-const int kCoreModule_ResourceAccessFeedback = 3;
+const int kCoreModule_ResourceAccessWriteOnly = 2;
+const int kCoreModule_ResourceAccessRasterizerOrdered = 3;
+const int kCoreModule_ResourceAccessFeedback = 4;
 
 const int kCoreModule_ShapeIndex1D = 0;
 const int kCoreModule_ShapeIndex2D = 1;

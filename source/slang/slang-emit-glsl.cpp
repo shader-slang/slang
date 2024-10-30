@@ -1500,6 +1500,7 @@ void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* var
     {
         switch (resourceType->getAccess())
         {
+        case SLANG_RESOURCE_ACCESS_WRITE:
         case SLANG_RESOURCE_ACCESS_READ_WRITE:
         case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
             {
@@ -2939,6 +2940,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
         switch (texType->getAccess())
         {
+        case SLANG_RESOURCE_ACCESS_WRITE:
         case SLANG_RESOURCE_ACCESS_READ_WRITE:
         case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
             _emitGLSLTextureOrTextureSamplerType(texType, "image");

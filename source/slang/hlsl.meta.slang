@@ -3444,6 +3444,10 @@ ${{{{
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 {
+    ${{{{
+        if (access != kCoreModule_ResourceAccessWriteOnly)
+        {
+    }}}}
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
@@ -3610,6 +3614,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         }
     }
 
+    ${{{{
+        } // if (access != kCoreModule_ResourceAccessWriteOnly)
+    }}}}
     [require(glsl, texture_sm_4_1)]
     void __glslImageStore(vector<int, Shape.dimensions+isArray> location, T value)
     {
@@ -3626,6 +3633,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
+        ${{{{
+            if (access != kCoreModule_ResourceAccessWriteOnly)
+            {
+        }}}}
         [__readNone]
         [ForceInline]
         [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
@@ -3644,6 +3655,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     return Load(location);
             }
         }
+        ${{{{
+            } // if (access != kCoreModule_ResourceAccessWriteOnly)
+        }}}}
 
         [nonmutating]
         [ForceInline]
@@ -3742,10 +3756,17 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             }
         }
 
+        ${{{{
+            if (access != kCoreModule_ResourceAccessWriteOnly)
+            {
+        }}}}
         // If a 'Texture[location]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location)'.
         // This allows call's to stay aware that the input is from a 'Texture'.
         __intrinsic_op($(kIROp_ImageSubscript)) 
         ref;
+        ${{{{
+            }  // if (access != kCoreModule_ResourceAccessWriteOnly)
+        }}}}
     }
 }
 
@@ -3978,7 +3999,8 @@ extension _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
 ${{{{
     const char* shapeTypeNames[] = {"1D", "2D", "3D", "Cube"};
-    const char* accessPrefix[] = {"", "RW", "RasterizerOrdered", "Feedback"};
+    const char* accessPrefix[] = {"", "RW", "W", "RasterizerOrdered", "Feedback"};
+    const char* accessDocumentation[] = {"read-only", "read-write", "write-only", "rasterizer-ordered", "feedback"};
     const char* arrayPostFix[] = {"", "Array"};
     const char* msPostFix[] = {"", "MS"};
     for (int shape = 0; shape < 4; shape++)
@@ -4013,6 +4035,11 @@ ${{{{
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
 }}}}
 /// @category texture_types
+/// Represents a handle to a $(accessDocumentation[access])$(isMS?", multisampled": "") $(shapeTypeNames[shape]) $(isCombined?"combined texture-sampler": "texture")$(isArray?" array":"").
+/// @param T The texel type of the texture.
+/// @param sampleCount The number of samples in the texture, when the texture is multisampled.
+/// @param format The storage format of the texture.
+/// @see Please refer to `_Texture` for more information about texture types.
 typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }

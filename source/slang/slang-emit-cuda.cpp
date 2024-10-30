@@ -130,6 +130,8 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(
             return SLANG_OK;
         }
     case SLANG_RESOURCE_ACCESS_READ_WRITE:
+    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+    case SLANG_RESOURCE_ACCESS_WRITE:
         {
             outName << "CUsurfObject";
             return SLANG_OK;

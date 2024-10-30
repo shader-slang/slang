@@ -278,6 +278,8 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 
     case SLANG_RESOURCE_ACCESS_READ_WRITE: m_writer->emit("RW"); break;
 
+    case SLANG_RESOURCE_ACCESS_WRITE:      m_writer->emit("RW"); break;
+
     case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: m_writer->emit("RasterizerOrdered"); break;
 
     case SLANG_RESOURCE_ACCESS_APPEND: m_writer->emit("Append"); break;
