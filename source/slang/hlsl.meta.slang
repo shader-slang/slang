@@ -9616,12 +9616,12 @@ T length(T x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 T lerp(T x, T y, T s)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "mix";
+    case wgsl: __intrinsic_asm "mix";
     case metal: __intrinsic_asm "mix";
     case hlsl: __intrinsic_asm "lerp";
     case spirv: return spirv_asm {
@@ -9634,12 +9634,12 @@ T lerp(T x, T y, T s)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "mix";
+    case wgsl: __intrinsic_asm "mix";
     case metal: __intrinsic_asm "mix";
     case hlsl: __intrinsic_asm "lerp";
     case spirv: return spirv_asm {
@@ -9652,7 +9652,6 @@ vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 {
     __target_switch
