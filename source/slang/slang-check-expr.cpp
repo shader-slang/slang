@@ -2076,8 +2076,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             {
                 // When explicitly casting from float type to integer type, let's fold it as
                 // an integer value.
-                const IntegerLiteralValue value
-                    = IntegerLiteralValue(floatLitExpr.getExpr()->value);
+                const IntegerLiteralValue value =
+                    IntegerLiteralValue(floatLitExpr.getExpr()->value);
                 val = m_astBuilder->getIntVal(substType, value);
             }
         }
