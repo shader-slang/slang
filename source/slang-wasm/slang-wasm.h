@@ -38,6 +38,23 @@ private:
     std::unordered_map<std::string, SlangCompileTarget> m_compileTargetMap;
 };
 
+class HashedString
+{
+public:
+    std::string getString(uint32_t hash)
+    {
+        return m_hashedStrings[(int)hash];
+    }
+
+    void insertString(int hash, const std::string& str)
+    {
+        m_hashedStrings[hash] = str;
+    }
+private:
+
+    std::unordered_map<int, std::string> m_hashedStrings;
+};
+
 CompileTargets* getCompileTargets();
 
 class ComponentType
@@ -57,6 +74,7 @@ public:
 
     slang::IComponentType* interface() const { return m_interface; }
 
+    HashedString* loadStrings();
     virtual ~ComponentType() = default;
 
 private:

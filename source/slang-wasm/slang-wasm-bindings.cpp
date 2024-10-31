@@ -42,7 +42,8 @@ EMSCRIPTEN_BINDINGS(slang)
         .function("getEntryPointCode", &slang::wgsl::ComponentType::getEntryPointCode)
         .function("getEntryPointCodeBlob", &slang::wgsl::ComponentType::getEntryPointCodeBlob)
         .function("getTargetCodeBlob", &slang::wgsl::ComponentType::getTargetCodeBlob)
-        .function("getTargetCode", &slang::wgsl::ComponentType::getTargetCode);
+        .function("getTargetCode", &slang::wgsl::ComponentType::getTargetCode)
+        .function("loadStrings", &slang::wgsl::ComponentType::loadStrings, return_value_policy::take_ownership());
 
     class_<slang::wgsl::Module, base<slang::wgsl::ComponentType>>("Module")
         .function(
@@ -214,4 +215,7 @@ EMSCRIPTEN_BINDINGS(slang)
         "createLanguageServer",
         &slang::wgsl::lsp::createLanguageServer,
         return_value_policy::take_ownership());
-}
+
+    class_<slang::wgsl::HashedString>("HashedString")
+        .function("getString", &slang::wgsl::HashedString::getString);
+};
