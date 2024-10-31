@@ -2068,7 +2068,20 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             return nullptr;
         if (!isValidCompileTimeConstantType(substType))
             return nullptr;
-        auto val = tryConstantFoldExpr(typeCastOperand, kind, circularityInfo);
+
+        IntVal* val = tryConstantFoldExpr(typeCastOperand, kind, circularityInfo);
+        if (!val)
+        {
+            if (auto floatLitExpr = typeCastOperand.as<FloatingPointLiteralExpr>())
+            {
+                // When explicitly casting from float type to integer type, let's fold it as
+                // an integer value.
+                const IntegerLiteralValue value =
+                    IntegerLiteralValue(floatLitExpr.getExpr()->value);
+                val = m_astBuilder->getIntVal(substType, value);
+            }
+        }
+
         if (val)
         {
             if (!expr.getExpr()->type)
