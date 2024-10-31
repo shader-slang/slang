@@ -98,6 +98,11 @@ if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
     set(SLANG_RHI_BUILD_TESTS OFF)
     set(SLANG_RHI_BUILD_EXAMPLES OFF)
+
+    # Not disabling these break tests (issue #5474)
+    set(SLANG_RHI_FETCH_DXC OFF)
+    set(SLANG_RHI_FETCH_AGILITY_SDK OFF)
+
     if(SLANG_ENABLE_DX_ON_VK)
         set(SLANG_RHI_HAS_D3D12 ON)
     endif()
