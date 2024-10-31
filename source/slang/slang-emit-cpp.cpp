@@ -130,6 +130,7 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(
     switch (texType->getAccess())
     {
     case SLANG_RESOURCE_ACCESS_READ:           break;
+    case SLANG_RESOURCE_ACCESS_WRITE:          outName << "RW"; break;
     case SLANG_RESOURCE_ACCESS_READ_WRITE:     outName << "RW"; break;
     case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: outName << "RasterizerOrdered"; break;
     case SLANG_RESOURCE_ACCESS_APPEND:         outName << "Append"; break;

@@ -1984,7 +1984,9 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly: atoms.add(CapabilityName::metal); break;
 
-    case CodeGenTarget::WGSL: atoms.add(CapabilityName::wgsl); break;
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
+    case CodeGenTarget::WGSL:              atoms.add(CapabilityName::wgsl); break;
 
     default: break;
     }

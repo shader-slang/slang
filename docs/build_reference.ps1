@@ -33,13 +33,23 @@ Remove-Item -Path ".\stdlib-reference\attributes" -Recurse -Force
 git describe --tags | Out-File -FilePath ".\stdlib-reference\_includes\version.inc" -Encoding ASCII
 
 cd stdlib-reference
-& ../../build/Release/bin/slangc -compile-core-module -doc
-Move-Item -Path ".\toc.html" -Destination ".\_includes\stdlib-reference-toc.html" -Force
-git config user.email "bot@shader-slang.com"
-git config user.name "Stdlib Reference Bot"
-git add .
-git commit -m "Update the core module reference"
-git push
+$slangPaths = @(
+    "../../build/RelWithDebInfo/bin/slangc.exe",
+    "../../build/Release/bin/slangc.exe",
+    "../../build/Debug/bin/slangc.exe"
+)
+$slangExe = $slangPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($slangExe) {
+    & $slangExe -compile-core-module -doc
+    Move-Item -Path ".\toc.html" -Destination ".\_includes\stdlib-reference-toc.html" -Force
+    git config user.email "bot@shader-slang.com"
+    git config user.name "Stdlib Reference Bot"
+    git add .
+    git commit -m "Update the core module reference"
+    git push
+} else {
+    Write-Error "Could not find slangc executable in RelWithDebInfo or Release directories"
+}
 cd ../
 
 # For local debugging only.
