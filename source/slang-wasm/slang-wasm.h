@@ -41,17 +41,10 @@ private:
 class HashedString
 {
 public:
-    std::string getString(uint32_t hash)
-    {
-        return m_hashedStrings[(int)hash];
-    }
+    std::string getString(uint32_t hash) { return m_hashedStrings[(int)hash]; }
+    void insertString(int hash, const std::string& str) { m_hashedStrings[hash] = str; }
 
-    void insertString(int hash, const std::string& str)
-    {
-        m_hashedStrings[hash] = str;
-    }
 private:
-
     std::unordered_map<int, std::string> m_hashedStrings;
 };
 

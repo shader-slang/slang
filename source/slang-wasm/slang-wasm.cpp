@@ -363,7 +363,7 @@ HashedString* ComponentType::loadStrings()
     }
 
     size_t stringSize = 0;
-    HashedString* hashedStrings  = new HashedString();
+    HashedString* hashedStrings = new HashedString();
     for (SlangUInt ii = 0; ii < hashedStringCount; ++ii)
     {
         // For each string we can fetch its bytes from the Slang

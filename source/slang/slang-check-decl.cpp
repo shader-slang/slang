@@ -12168,8 +12168,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
 
 DeclVisibility getDeclVisibility(Decl* decl)
 {
-    if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl) ||
-        as<GenericTypeConstraintDecl>(decl) || as<GenericTypePackParamDecl>(decl))
+    if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl) ||
+        as<GenericTypeConstraintDecl>(decl))
     {
         auto genericDecl = as<GenericDecl>(decl->parentDecl);
         if (!genericDecl)
