@@ -344,6 +344,48 @@ emscripten::val ComponentType::getTargetCodeBlob(int targetIndex)
     return emscripten::val(emscripten::typed_memory_view(kernelBlob->getBufferSize(), ptr));
 }
 
+HashedString* ComponentType::loadStrings()
+{
+    slang::ProgramLayout* slangReflection = interface()->getLayout();
+    if (!slangReflection)
+    {
+        g_error.type = std::string("USER");
+        g_error.message = std::string("Failed to get reflection data");
+        return nullptr;
+    }
+
+    SlangUInt hashedStringCount = slangReflection->getHashedStringCount();
+    if (hashedStringCount == 0)
+    {
+        g_error.type = std::string("USER");
+        g_error.message = std::string("Warn: No reflection data found");
+        return nullptr;
+    }
+
+    size_t stringSize = 0;
+    HashedString* hashedStrings = new HashedString();
+    for (SlangUInt ii = 0; ii < hashedStringCount; ++ii)
+    {
+        // For each string we can fetch its bytes from the Slang
+        // reflection data.
+        //
+        size_t stringSize = 0;
+        char const* stringData = slangReflection->getHashedString(ii, &stringSize);
+
+        // Then we can compute the hash code for that string using
+        // another Slang API function.
+        //
+        // Note: the exact hashing algorithm that Slang uses for
+        // string literals is not currently documented, and may
+        // change in future releases of the compiler.
+        //
+        int hash = spComputeStringHash(stringData, stringSize);
+
+        hashedStrings->insertString(hash, std::string(stringData));
+    }
+    return hashedStrings;
+}
+
 namespace lsp
 {
 Position translate(Slang::LanguageServerProtocol::Position p)
