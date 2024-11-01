@@ -7,7 +7,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -emit-spirv-via-glsl -Xslang -matrix-layout-column-major
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -Xslang -matrix-layout-column-major
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-mtl -compute -shaderobj -Xslang -matrix-layout-column-major
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 // This data is in column major layout order.... 
 //TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 10.0  0.0 1.0 0.0 20.0  0.0 0.0 1.0 30.0  0.0 0.0 0.0 1.0]):name matrixBuffer
