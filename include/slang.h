@@ -713,6 +713,7 @@ typedef uint32_t SlangSizeT;
         SLANG_TARGET_FLAG_DUMP_IR = 1 << 9,
 
         /* When set, will generate SPIRV directly rather than via glslang. */
+        // This flag will be deprecated, use CompilerOption instead.
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
     constexpr static SlangTargetFlags kDefaultTargetFlags =
@@ -845,6 +846,13 @@ typedef uint32_t SlangSizeT;
                                              or may involve severe space-vs-speed tradeoffs */
     };
 
+    enum SlangEmitSpirvMethod
+    {
+        SLANG_EMIT_SPIRV_DEFAULT = 0,
+        SLANG_EMIT_SPIRV_VIA_GLSL,
+        SLANG_EMIT_SPIRV_DIRECTLY,
+    };
+
     // All compiler option names supported by Slang.
     namespace slang
     {
@@ -914,8 +922,8 @@ typedef uint32_t SlangSizeT;
         GLSLForceScalarLayout,   // bool
         EnableEffectAnnotations, // bool
 
-        EmitSpirvViaGLSL,     // bool
-        EmitSpirvDirectly,    // bool
+        EmitSpirvViaGLSL,     // bool (will be deprecated)
+        EmitSpirvDirectly,    // bool (will be deprecated)
         SPIRVCoreGrammarJSON, // stringValue0: json path
         IncompleteLibrary,    // bool, when set, will not issue an error when the linked program has
                               // unresolved extern function symbols.
@@ -991,6 +999,10 @@ typedef uint32_t SlangSizeT;
                                  // precompiled modules if it is up-to-date with its source.
         EmbedDownstreamIR,       // bool
         ForceDXLayout,           // bool
+
+        // Add this new option to the end of the list to avoid breaking ABI as much as possible.
+        // Setting of EmitSpirvDirectly or EmitSpirvViaGLSL will turn into this option internally.
+        EmitSpirvMethod, // enum SlangEmitSpirvMethod
         CountOf,
     };
 

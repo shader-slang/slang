@@ -117,10 +117,18 @@ int HelloWorldExample::createComputePipelineFromShader()
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = slangGlobalSession->findProfile("spirv_1_5");
-    targetDesc.flags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+    targetDesc.flags = 0;
+
 
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
+
+    std::vector<slang::CompilerOptionEntry> options;
+    options.push_back(
+        {slang::CompilerOptionName::EmitSpirvDirectly,
+         {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}});
+    sessionDesc.compilerOptionEntries = options.data();
+    sessionDesc.compilerOptionEntryCount = options.size();
 
     ComPtr<slang::ISession> session;
     RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, session.writeRef()));

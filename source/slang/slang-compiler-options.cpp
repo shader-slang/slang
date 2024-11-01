@@ -18,6 +18,22 @@ void CompilerOptionSet::load(uint32_t count, slang::CompilerOptionEntry* entries
             value.stringValue2 = entries[i].value.stringValue1;
         }
         add(entries[i].name, value);
+
+        // When we see option EmitSpirvDirectly or EmitSpirvViaGLSL, we will need to
+        // translate them to EmitSpirvMethod.
+        if (entries[i].name == slang::CompilerOptionName::EmitSpirvDirectly && value.intValue)
+        {
+            set(slang::CompilerOptionName::EmitSpirvMethod, SLANG_EMIT_SPIRV_DIRECTLY);
+        }
+        else if (entries[i].name == slang::CompilerOptionName::EmitSpirvViaGLSL && value.intValue)
+        {
+            SlangEmitSpirvMethod current =
+                getEnumOption<SlangEmitSpirvMethod>(slang::CompilerOptionName::EmitSpirvMethod);
+            if (current != SLANG_EMIT_SPIRV_DEFAULT)
+            {
+                set(CompilerOptionName::EmitSpirvMethod, SLANG_EMIT_SPIRV_VIA_GLSL);
+            }
+        }
     }
 }
 
@@ -181,10 +197,10 @@ SlangTargetFlags CompilerOptionSet::getTargetFlags()
         result |= SLANG_TARGET_FLAG_DUMP_IR;
     if (getBoolOption(CompilerOptionName::GenerateWholeProgram))
         result |= SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM;
-    if (!getBoolOption(CompilerOptionName::EmitSpirvViaGLSL))
-        result |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
     if (getBoolOption(CompilerOptionName::ParameterBlocksUseRegisterSpaces))
         result |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
+    if (shouldEmitSPIRVDirectly())
+        result |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
     return result;
 }
 
@@ -193,10 +209,19 @@ void CompilerOptionSet::setTargetFlags(SlangTargetFlags flags)
     set(CompilerOptionName::DumpIr, (flags & SLANG_TARGET_FLAG_DUMP_IR) != 0);
     set(CompilerOptionName::GenerateWholeProgram,
         (flags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0);
+
     if ((flags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0)
-        set(CompilerOptionName::EmitSpirvViaGLSL, false);
+        set(CompilerOptionName::EmitSpirvMethod, SLANG_EMIT_SPIRV_DIRECTLY);
     else
-        set(CompilerOptionName::EmitSpirvViaGLSL, true);
+    {
+        // We allow to set this flag only when users are not setting the
+        // the spirv emit method via CompilerOptionName.
+        SlangEmitSpirvMethod current =
+            getEnumOption<SlangEmitSpirvMethod>(CompilerOptionName::EmitSpirvMethod);
+        if (current != SLANG_EMIT_SPIRV_DIRECTLY)
+            set(CompilerOptionName::EmitSpirvMethod, SLANG_EMIT_SPIRV_VIA_GLSL);
+    }
+
     set(CompilerOptionName::ParameterBlocksUseRegisterSpaces,
         (flags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES) != 0);
 }
@@ -210,7 +235,7 @@ void CompilerOptionSet::addTargetFlags(SlangTargetFlags flags)
         set(CompilerOptionName::GenerateWholeProgram, true);
 
     if ((flags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0)
-        set(CompilerOptionName::EmitSpirvDirectly, true);
+        set(CompilerOptionName::EmitSpirvMethod, SLANG_EMIT_SPIRV_DIRECTLY);
 
     if ((flags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES) != 0)
         set(CompilerOptionName::ParameterBlocksUseRegisterSpaces, true);
