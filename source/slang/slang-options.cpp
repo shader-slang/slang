@@ -2728,7 +2728,20 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::EmitSpirvViaGLSL:
         case OptionKind::EmitSpirvDirectly:
             {
-                getCurrentTarget()->optionSet.add(optionKind, true);
+                SlangEmitSpirvMethod selectMethod = (optionKind == OptionKind::EmitSpirvViaGLSL)
+                                                        ? SLANG_EMIT_SPIRV_VIA_GLSL
+                                                        : SLANG_EMIT_SPIRV_DIRECTLY;
+
+                SlangEmitSpirvMethod currentMethod =
+                    getCurrentTarget()->optionSet.getEnumOption<SlangEmitSpirvMethod>(
+                        OptionKind::EmitSpirvMethod);
+                // When both flag turns on, spirv-direcly mode will always take higher priority.
+                // By default (value 0), spirv-via-glsl mode is used, and any input flag can
+                // override the default value.
+                if (selectMethod > currentMethod)
+                {
+                    getCurrentTarget()->optionSet.set(OptionKind::EmitSpirvMethod, selectMethod);
+                }
             }
             break;
         case OptionKind::SPIRVCoreGrammarJSON:
