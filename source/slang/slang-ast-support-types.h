@@ -127,10 +127,10 @@ enum : ConversionCost
 
     // Same-size size unsigned->signed conversions are potentially lossy, but they are commonly
     // allowed silently.
-    kConversionCost_SameSizeUnsignedToSignedConversion = 250,
+    kConversionCost_SameSizeUnsignedToSignedConversion = 300,
 
     // Conversion from signed->unsigned integer of same or greater size
-    kConversionCost_SignedToUnsignedConversion = 300,
+    kConversionCost_SignedToUnsignedConversion = 250,
 
     // Cost of converting an integer to a floating-point type
     kConversionCost_IntegerToFloatConversion = 400,
