@@ -334,9 +334,10 @@ struct CompilerOptionSet
 
     bool shouldEmitSPIRVDirectly()
     {
-        if (getBoolOption(CompilerOptionName::EmitSpirvViaGLSL))
-            return false;
-        return true;
+        SlangEmitSpirvMethod emitSpvMethod =
+            getEnumOption<SlangEmitSpirvMethod>(CompilerOptionName::EmitSpirvMethod);
+
+        return (emitSpvMethod != SlangEmitSpirvMethod::SLANG_EMIT_SPIRV_VIA_GLSL);
     }
 
     bool shouldUseScalarLayout()
