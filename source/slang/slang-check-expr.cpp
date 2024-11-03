@@ -2038,6 +2038,12 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         else if (auto enumRef = declRef.as<EnumCaseDecl>())
         {
+            auto enumTypeDecl = enumRef.getParent().getDecl();
+            if (enumTypeDecl && !enumTypeDecl->checkState.isBeingChecked())
+            {
+                ensureDecl(enumRef.getParent(), DeclCheckState::DefinitionChecked);
+            }
+
             // The cases in an `enum` declaration can also be used as constant expressions,
             if (auto tagExpr = getTagExpr(m_astBuilder, enumRef))
             {

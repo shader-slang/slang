@@ -6602,6 +6602,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
     {
         if (!isAssociatedTypeDecl(requiredMemberDecl.getDecl()))
             continue;
+        ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredMemberDecl.getDecl());
@@ -6623,6 +6624,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
             continue;
         if (requiredMemberDecl.as<DerivativeRequirementDecl>())
             continue;
+        ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredMemberDecl.getDecl());
