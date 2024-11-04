@@ -382,7 +382,7 @@ void LegalizeWGSLEntryPointContext::processInst(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_Call: legalizeCall(static_cast<IRCall*>(inst)); break;
+    case kIROp_Call:   legalizeCall(static_cast<IRCall*>(inst)); break;
     case kIROp_Switch: legalizeSwitch(as<IRSwitch>(inst)); break;
     default:
         for (auto child : inst->getModifiableChildren())
