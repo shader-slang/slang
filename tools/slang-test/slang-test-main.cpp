@@ -3564,7 +3564,7 @@ TestResult doRenderComparisonTestRun(
     String output = outputBuilder.produceString();
 
     *outOutput = output;
-     
+
     // Always fail if the compilation produced a failure.
     if (exeRes.resultCode != 0)
     {
