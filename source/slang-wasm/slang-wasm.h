@@ -50,6 +50,59 @@ private:
 
 CompileTargets* getCompileTargets();
 
+
+class TypeLayoutReflection
+{
+private:
+    slang::TypeLayoutReflection* m_interface;
+public:
+    TypeLayoutReflection(slang::TypeLayoutReflection* interface)
+        : m_interface(interface)
+    {
+    }
+
+    BindingType getDescriptorSetDescriptorRangeType(unsigned int setIndex, unsigned int rangeIndex);
+
+    slang::TypeLayoutReflection* interface() const { return m_interface; }
+};
+
+class VariableLayoutReflection
+{
+private:
+    slang::VariableLayoutReflection* m_internal;
+public:
+    VariableLayoutReflection(slang::VariableLayoutReflection* interface)
+        : m_internal(interface)
+    {
+    }
+
+    std::string getName();
+    slang::wgsl::TypeLayoutReflection* getTypeLayout();
+    unsigned int getBindingIndex();
+
+    slang::VariableLayoutReflection* interface() const { return m_internal; }
+
+};
+
+
+class ProgramLayout
+{
+private:
+    slang::ProgramLayout* m_internal;
+public:
+    ProgramLayout(slang::ProgramLayout* interface)
+        : m_internal(interface)
+    {
+    }
+    
+    unsigned int getParameterCount();
+    slang::wgsl::VariableLayoutReflection* getParameterByIndex(unsigned int index);
+
+    slang::wgsl::TypeLayoutReflection* getGlobalParamsTypeLayout();
+
+    slang::ProgramLayout* interface() const { return m_internal; }
+};
+
 class ComponentType
 {
 public:
@@ -64,6 +117,8 @@ public:
     emscripten::val getEntryPointCodeBlob(int entryPointIndex, int targetIndex);
     std::string getTargetCode(int targetIndex);
     emscripten::val getTargetCodeBlob(int targetIndex);
+
+    slang::wgsl::ProgramLayout* getLayout(unsigned int targetIndex);
 
     slang::IComponentType* interface() const { return m_interface; }
 

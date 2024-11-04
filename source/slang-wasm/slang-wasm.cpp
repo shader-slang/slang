@@ -386,6 +386,47 @@ HashedString* ComponentType::loadStrings()
     return hashedStrings;
 }
 
+ProgramLayout* ComponentType::getLayout(unsigned int targetIndex)
+{
+    return new ProgramLayout(interface()->getLayout(targetIndex));
+}
+
+unsigned int ProgramLayout::getParameterCount()
+{
+    return m_internal->getParameterCount();
+}
+
+VariableLayoutReflection* ProgramLayout::getParameterByIndex(unsigned int index)
+{
+    return new VariableLayoutReflection(m_internal->getParameterByIndex(index));
+}
+
+TypeLayoutReflection* ProgramLayout::getGlobalParamsTypeLayout()
+{
+    return new TypeLayoutReflection(m_internal->getGlobalParamsTypeLayout());
+}
+
+BindingType TypeLayoutReflection::getDescriptorSetDescriptorRangeType(unsigned int setIndex, unsigned int rangeIndex)
+{
+    return m_interface->getDescriptorSetDescriptorRangeType(setIndex, rangeIndex);
+}
+
+std::string VariableLayoutReflection::getName()
+{
+    return m_internal->getName();
+}
+
+TypeLayoutReflection* VariableLayoutReflection::getTypeLayout()
+{
+    return new TypeLayoutReflection(m_internal->getTypeLayout());
+}
+
+unsigned int VariableLayoutReflection::getBindingIndex()
+{
+    return m_internal->getBindingIndex();
+}
+
+
 namespace lsp
 {
 Position translate(Slang::LanguageServerProtocol::Position p)

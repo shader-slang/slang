@@ -43,10 +43,32 @@ EMSCRIPTEN_BINDINGS(slang)
         .function("getEntryPointCodeBlob", &slang::wgsl::ComponentType::getEntryPointCodeBlob)
         .function("getTargetCodeBlob", &slang::wgsl::ComponentType::getTargetCodeBlob)
         .function("getTargetCode", &slang::wgsl::ComponentType::getTargetCode)
+        .function("getLayout", &slang::wgsl::ComponentType::getLayout, return_value_policy::take_ownership())
         .function(
             "loadStrings",
             &slang::wgsl::ComponentType::loadStrings,
             return_value_policy::take_ownership());
+
+    class_<slang::wgsl::TypeLayoutReflection>("TypeLayoutReflection")
+        .function("getDescriptorSetDescriptorRangeType", &slang::wgsl::TypeLayoutReflection::getDescriptorSetDescriptorRangeType);
+    
+    class_<slang::wgsl::VariableLayoutReflection>("VariableLayoutReflection")
+        .function("getName", &slang::wgsl::VariableLayoutReflection::getName)
+        .function("getTypeLayout", &slang::wgsl::VariableLayoutReflection::getTypeLayout, return_value_policy::take_ownership())
+        .function("getBindingIndex", &slang::wgsl::VariableLayoutReflection::getBindingIndex);
+    
+    class_<slang::wgsl::ProgramLayout>("ProgramLayout")
+        .function("getParameterCount", &slang::wgsl::ProgramLayout::getParameterCount)
+        .function("getParameterByIndex", &slang::wgsl::ProgramLayout::getParameterByIndex, return_value_policy::take_ownership())
+        .function("getGlobalParamsTypeLayout", &slang::wgsl::ProgramLayout::getGlobalParamsTypeLayout, return_value_policy::take_ownership());
+    
+    enum_<slang::BindingType>("BindingType")
+        .value("Unknown", slang::BindingType::Unknown)
+        .value("Texture", slang::BindingType::Texture)
+        .value("ConstantBuffer", slang::BindingType::ConstantBuffer)
+        .value("MutableRawBuffer", slang::BindingType::MutableRawBuffer)
+        .value("MutableTypedBuffer", slang::BindingType::MutableTypedBuffer)
+        .value("MutableTexture", slang::BindingType::MutableTexture);
 
     class_<slang::wgsl::Module, base<slang::wgsl::ComponentType>>("Module")
         .function(
