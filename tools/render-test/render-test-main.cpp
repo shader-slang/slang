@@ -76,13 +76,6 @@ struct ShaderOutputPlan
     List<Item> items;
 };
 
-enum class PipelineType
-{
-    Graphics,
-    Compute,
-    RayTracing,
-};
-
 class RenderTestApp
 {
 public:
@@ -95,12 +88,9 @@ public:
         IDevice* device,
         const Options& options,
         const ShaderCompilerUtil::Input& input);
-    void runCompute(IComputePassEncoder* encoder);
-    void renderFrame(IRenderPassEncoder* encoder);
-    void renderFrameMesh(IRenderPassEncoder* encoder);
     void finalize();
 
-    Result applyBinding(PipelineType pipelineType, IPassEncoder* encoder);
+    Result applyBinding(IShaderObject* rootObject);
     void setProjectionMatrix(IShaderObject* rootObject);
     Result writeBindingOutput(const String& fileName);
 
@@ -123,7 +113,6 @@ protected:
 
     IDevice* m_device;
     ComPtr<ICommandQueue> m_queue;
-    ComPtr<ITransientResourceHeap> m_transientHeap;
     ComPtr<IInputLayout> m_inputLayout;
     ComPtr<IBuffer> m_vertexBuffer;
     ComPtr<IShaderProgram> m_shaderProgram;
@@ -394,13 +383,14 @@ struct AssignValsFromLayoutContext
         }
 
         ComPtr<IShaderObject> shaderObject;
-        device->createShaderObject2(
+        device->createShaderObject(
             slangSession,
             slangType,
             ShaderObjectContainerType::None,
             shaderObject.writeRef());
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
+        shaderObject->finalize();
         dstCursor.setObject(shaderObject);
         return SLANG_OK;
     }
@@ -507,48 +497,21 @@ SlangResult _assignVarsFromLayout(
     return context.assign(rootCursor, layout.rootVal);
 }
 
-Result RenderTestApp::applyBinding(PipelineType pipelineType, IPassEncoder* encoder)
+Result RenderTestApp::applyBinding(IShaderObject* rootObject)
 {
     auto slangReflection = (slang::ProgramLayout*)spGetReflection(
         m_compilationOutput.output.getRequestForReflection());
     ComPtr<slang::ISession> slangSession;
     m_compilationOutput.output.m_requestForKernels->getSession(slangSession.writeRef());
 
-    switch (pipelineType)
-    {
-    case PipelineType::Compute:
-        {
-            IComputePassEncoder* computeEncoder = static_cast<IComputePassEncoder*>(encoder);
-            auto rootObject = computeEncoder->bindPipeline(m_pipeline);
-            SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
-                m_device,
-                slangSession,
-                rootObject,
-                m_compilationOutput.layout,
-                m_outputPlan,
-                slangReflection,
-                m_topLevelAccelerationStructure));
-        }
-        break;
-    case PipelineType::Graphics:
-        {
-            IRenderPassEncoder* renderEncoder = static_cast<IRenderPassEncoder*>(encoder);
-            auto rootObject = renderEncoder->bindPipeline(m_pipeline);
-            SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
-                m_device,
-                slangSession,
-                rootObject,
-                m_compilationOutput.layout,
-                m_outputPlan,
-                slangReflection,
-                m_topLevelAccelerationStructure));
-            setProjectionMatrix(rootObject);
-        }
-        break;
-    default:
-        throw "unknown pipeline type";
-    }
-    return SLANG_OK;
+    return _assignVarsFromLayout(
+        m_device,
+        slangSession,
+        rootObject,
+        m_compilationOutput.layout,
+        m_outputPlan,
+        slangReflection,
+        m_topLevelAccelerationStructure);
 }
 
 SlangResult RenderTestApp::initialize(
@@ -688,11 +651,6 @@ Result RenderTestApp::_initializeShaders(
 
 void RenderTestApp::_initializeRenderPass()
 {
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096 * 1024;
-    m_transientHeap = m_device->createTransientResourceHeap(transientHeapDesc);
-    SLANG_ASSERT(m_transientHeap);
-
     m_queue = m_device->getQueue(QueueType::Graphics);
     SLANG_ASSERT(m_queue);
 
@@ -783,21 +741,18 @@ void RenderTestApp::_initializeAccelerationStructure()
 
         compactedSizeQuery->reset();
 
-        auto commandBuffer = m_transientHeap->createCommandBuffer();
-        auto passEncoder = commandBuffer->beginRayTracingPass();
+        auto encoder = m_queue->createCommandEncoder();
         AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
         compactedSizeQueryDesc.queryPool = compactedSizeQuery;
         compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-        passEncoder->buildAccelerationStructure(
+        encoder->buildAccelerationStructure(
             buildDesc,
             draftAS,
             nullptr,
             scratchBuffer,
             1,
             &compactedSizeQueryDesc);
-        passEncoder->end();
-        commandBuffer->close();
-        m_queue->submit(commandBuffer);
+        m_queue->submit(encoder->finish());
         m_queue->waitOnHost();
 
         uint64_t compactedSize = 0;
@@ -808,15 +763,12 @@ void RenderTestApp::_initializeAccelerationStructure()
             finalDesc,
             m_bottomLevelAccelerationStructure.writeRef());
 
-        commandBuffer = m_transientHeap->createCommandBuffer();
-        passEncoder = commandBuffer->beginRayTracingPass();
-        passEncoder->copyAccelerationStructure(
+        encoder = m_queue->createCommandEncoder();
+        encoder->copyAccelerationStructure(
             m_bottomLevelAccelerationStructure,
             draftAS,
             AccelerationStructureCopyMode::Compact);
-        passEncoder->end();
-        commandBuffer->close();
-        m_queue->submit(commandBuffer);
+        m_queue->submit(encoder->finish());
         m_queue->waitOnHost();
     }
 
@@ -881,18 +833,15 @@ void RenderTestApp::_initializeAccelerationStructure()
             createDesc,
             m_topLevelAccelerationStructure.writeRef());
 
-        auto commandBuffer = m_transientHeap->createCommandBuffer();
-        auto passEncoder = commandBuffer->beginRayTracingPass();
-        passEncoder->buildAccelerationStructure(
+        auto encoder = m_queue->createCommandEncoder();
+        encoder->buildAccelerationStructure(
             buildDesc,
             m_topLevelAccelerationStructure,
             nullptr,
             scratchBuffer,
             0,
             nullptr);
-        passEncoder->end();
-        commandBuffer->close();
-        m_queue->submit(commandBuffer);
+        m_queue->submit(encoder->finish());
         m_queue->waitOnHost();
     }
 }
@@ -904,36 +853,6 @@ void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
         .getField("Uniforms")
         .getDereferenced()
         .setData(info.identityProjectionMatrix, sizeof(float) * 16);
-}
-
-void RenderTestApp::renderFrameMesh(IRenderPassEncoder* encoder)
-{
-    auto pipelineType = PipelineType::Graphics;
-    applyBinding(pipelineType, encoder);
-    encoder->drawMeshTasks(
-        m_options.computeDispatchSize[0],
-        m_options.computeDispatchSize[1],
-        m_options.computeDispatchSize[2]);
-}
-
-void RenderTestApp::renderFrame(IRenderPassEncoder* encoder)
-{
-    auto pipelineType = PipelineType::Graphics;
-    applyBinding(pipelineType, encoder);
-
-    encoder->setVertexBuffer(0, m_vertexBuffer);
-
-    encoder->draw(3);
-}
-
-void RenderTestApp::runCompute(IComputePassEncoder* encoder)
-{
-    auto pipelineType = PipelineType::Compute;
-    applyBinding(pipelineType, encoder);
-    encoder->dispatchCompute(
-        m_options.computeDispatchSize[0],
-        m_options.computeDispatchSize[1],
-        m_options.computeDispatchSize[2]);
 }
 
 void RenderTestApp::finalize()
@@ -1002,15 +921,31 @@ Result RenderTestApp::writeScreen(const String& filename)
 
 Result RenderTestApp::update()
 {
-    auto commandBuffer = m_transientHeap->createCommandBuffer();
+    auto encoder = m_queue->createCommandEncoder();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
-        auto passEncoder = commandBuffer->beginComputePass();
-        runCompute(passEncoder);
-        passEncoder->end();
+        auto rootObject = m_device->createRootShaderObject(m_pipeline);
+        applyBinding(rootObject);
+        rootObject->finalize();
+
+        encoder->beginComputePass();
+        ComputeState state;
+        state.pipeline = static_cast<IComputePipeline*>(m_pipeline.get());
+        state.rootObject = rootObject;
+        encoder->setComputeState(state);
+        encoder->dispatchCompute(
+            m_options.computeDispatchSize[0],
+            m_options.computeDispatchSize[1],
+            m_options.computeDispatchSize[2]);
+        encoder->endComputePass();
     }
     else
     {
+        auto rootObject = m_device->createRootShaderObject(m_pipeline);
+        applyBinding(rootObject);
+        setProjectionMatrix(rootObject);
+        rootObject->finalize();
+
         RenderPassColorAttachment colorAttachment = {};
         colorAttachment.view = m_colorBufferView;
         colorAttachment.loadOp = LoadOp::Clear;
@@ -1024,23 +959,38 @@ Result RenderTestApp::update()
         renderPass.colorAttachmentCount = 1;
         renderPass.depthStencilAttachment = &depthStencilAttachment;
 
-        auto passEncoder = commandBuffer->beginRenderPass(renderPass);
-        rhi::Viewport viewport = {};
-        viewport.maxZ = 1.0f;
-        viewport.extentX = (float)gWindowWidth;
-        viewport.extentY = (float)gWindowHeight;
-        passEncoder->setViewportAndScissor(viewport);
+        encoder->beginRenderPass(renderPass);
+
+        RenderState state;
+        state.pipeline = static_cast<IRenderPipeline*>(m_pipeline.get());
+        state.rootObject = rootObject;
+        state.viewports[0] = Viewport((float)gWindowWidth, (float)gWindowHeight);
+        state.viewportCount = 1;
+        state.scissorRects[0] = ScissorRect(gWindowWidth, gWindowHeight);
+        state.scissorRectCount = 1;
+
         if (m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute ||
             m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute)
-            renderFrameMesh(passEncoder);
+        {
+            encoder->setRenderState(state);
+            encoder->drawMeshTasks(
+                m_options.computeDispatchSize[0],
+                m_options.computeDispatchSize[1],
+                m_options.computeDispatchSize[2]);
+        }
         else
-            renderFrame(passEncoder);
-        passEncoder->end();
+        {
+            state.vertexBuffers[0] = m_vertexBuffer;
+            state.vertexBufferCount = 1;
+            encoder->setRenderState(state);
+            DrawArguments args;
+            args.vertexCount = 3;
+            encoder->draw(args);
+        }
+        encoder->endRenderPass();
     }
-    commandBuffer->close();
-
     m_startTicks = Process::getClockTick();
-    m_queue->submit(commandBuffer);
+    m_queue->submit(encoder->finish());
     m_queue->waitOnHost();
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
