@@ -878,8 +878,29 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 case BaseType::Float:
                     {
-                        m_writer->emit(litInst->value.floatVal);
-                        m_writer->emit("f");
+                        IRConstant::FloatKind kind = litInst->getFloatKind();
+                        switch (kind)
+                        {
+                        case IRConstant::FloatKind::Nan:
+                            {
+                                m_writer->emit("(0.0 / 0.0)");
+                                break;
+                            }
+                        case IRConstant::FloatKind::PositiveInfinity:
+                            {
+                                m_writer->emit("(1.0 / 0.0)");
+                                break;
+                            }
+                        case IRConstant::FloatKind::NegativeInfinity:
+                            {
+                                m_writer->emit("(-1.0 / 0.0)");
+                                break;
+                            }
+                        default:
+                            m_writer->emit(litInst->value.floatVal);
+                            m_writer->emit("f");
+                            break;
+                        }
                     }
                     break;
 
