@@ -51,6 +51,7 @@ struct LegalizeWGSLEntryPointContext
         String* optionalSemanticIndex,
         IRInst* parentVar);
     void legalizeCall(IRCall* call);
+    void legalizeSwitch(IRSwitch* switchInst);
     void processInst(IRInst* inst);
 };
 
@@ -349,11 +350,40 @@ void LegalizeWGSLEntryPointContext::legalizeCall(IRCall* call)
     }
 }
 
+void LegalizeWGSLEntryPointContext::legalizeSwitch(IRSwitch* switchInst)
+{
+    // WGSL Requires all switch statements to contain a default case.
+    // If the switch statement does not contain a default case, we will add one.
+    if (switchInst->getDefaultLabel() != switchInst->getBreakLabel())
+        return;
+    IRBuilder builder(switchInst);
+    auto defaultBlock = builder.createBlock();
+    builder.setInsertInto(defaultBlock);
+    builder.emitBranch(switchInst->getBreakLabel());
+    defaultBlock->insertBefore(switchInst->getBreakLabel());
+    List<IRInst*> cases;
+    for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+    {
+        cases.add(switchInst->getCaseValue(i));
+        cases.add(switchInst->getCaseLabel(i));
+    }
+    builder.setInsertBefore(switchInst);
+    auto newSwitch = builder.emitSwitch(
+        switchInst->getCondition(),
+        switchInst->getBreakLabel(),
+        defaultBlock,
+        (UInt)cases.getCount(),
+        cases.getBuffer());
+    switchInst->transferDecorationsTo(newSwitch);
+    switchInst->removeAndDeallocate();
+}
+
 void LegalizeWGSLEntryPointContext::processInst(IRInst* inst)
 {
     switch (inst->getOp())
     {
     case kIROp_Call: legalizeCall(static_cast<IRCall*>(inst)); break;
+    case kIROp_Switch: legalizeSwitch(as<IRSwitch>(inst)); break;
     default:
         for (auto child : inst->getModifiableChildren())
             processInst(child);
