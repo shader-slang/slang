@@ -497,6 +497,34 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     }
 }
 
+static bool isStaticConst(IRInst* inst)
+{
+    if (inst->getParent()->getOp() == kIROp_Module)
+    {
+        return true;
+    }
+    switch (inst->getOp())
+    {
+    case kIROp_MakeVector:
+    case kIROp_swizzle:
+    case kIROp_swizzleSet:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_CastFloatToInt:
+    case kIROp_CastIntToFloat:
+    case kIROp_BitCast:
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (!isStaticConst(inst->getOperand(i)))
+                    return false;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
     switch (varDecl->getOp())
@@ -505,14 +533,10 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     case kIROp_GlobalVar:
     case kIROp_Var:         m_writer->emit("var"); break;
     default:
-        if (as<IRModuleInst>(varDecl->getParent()))
-        {
+        if (isStaticConst(varDecl))
             m_writer->emit("const");
-        }
         else
-        {
             m_writer->emit("var");
-        }
         break;
     }
 
@@ -1126,6 +1150,27 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
         break;
+
+    case kIROp_GetStringHash:
+        {
+            auto getStringHashInst = as<IRGetStringHash>(inst);
+            auto stringLit = getStringHashInst->getStringLit();
+
+            if (stringLit)
+            {
+                auto slice = stringLit->getStringSlice();
+                emitType(inst->getDataType());
+                m_writer->emit("(");
+                m_writer->emit((int)getStableHashCode32(slice.begin(), slice.getLength()).hash);
+                m_writer->emit(")");
+            }
+            else
+            {
+                // Couldn't handle
+                diagnoseUnhandledInst(inst);
+            }
+            return true;
+        }
     }
 
     return false;
