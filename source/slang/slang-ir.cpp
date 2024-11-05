@@ -4162,6 +4162,17 @@ IRInst* IRBuilder::emitMakeVectorFromScalar(IRType* type, IRInst* scalarValue)
     return emitIntrinsicInst(type, kIROp_MakeVectorFromScalar, 1, &scalarValue);
 }
 
+IRInst* IRBuilder::emitMakeCompositeFromScalar(IRType* type, IRInst* scalarValue)
+{
+    switch (type->getOp())
+    {
+    case kIROp_VectorType: return emitMakeVectorFromScalar(type, scalarValue);
+    case kIROp_MatrixType: return emitMakeMatrixFromScalar(type, scalarValue);
+    case kIROp_ArrayType:  return emitMakeArrayFromElement(type, scalarValue);
+    default:               SLANG_UNEXPECTED("unhandled composite type"); UNREACHABLE_RETURN(nullptr);
+    }
+}
+
 IRInst* IRBuilder::emitMatrixReshape(IRType* type, IRInst* inst)
 {
     return emitIntrinsicInst(type, kIROp_MatrixReshape, 1, &inst);
