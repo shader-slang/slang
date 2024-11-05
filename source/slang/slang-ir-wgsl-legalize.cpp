@@ -154,6 +154,13 @@ WGSLSystemValueInfo LegalizeWGSLEntryPointContext::getSystemValueInfo(
         }
         break;
 
+    case SystemValueSemanticName::GroupIndex:
+        {
+            result.wgslSystemValueName = toSlice("local_invocation_index");
+            result.permittedTypes.add(builder.getUIntType());
+        }
+        break;
+
     default:
         {
             m_sink->diagnose(
