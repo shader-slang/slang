@@ -1001,6 +1001,33 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
     }
 }
 
+bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
+{
+    bool result = CLikeSourceEmitter::shouldFoldInstIntoUseSites(inst);
+    if (result)
+    {
+        // If inst is a matrix, and is used in a component-wise multiply,
+        // we need to not fold it.
+        if (as<IRMatrixType>(inst->getDataType()))
+        {
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user->getOp() == kIROp_Mul)
+                {
+                    if (as<IRMatrixType>(user->getOperand(0)->getDataType()) &&
+                        as<IRMatrixType>(user->getOperand(1)->getDataType()))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return result;
+}
+
+
 bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -1169,6 +1196,51 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 // Couldn't handle
                 diagnoseUnhandledInst(inst);
             }
+            return true;
+        }
+
+    case kIROp_Mul:
+        {
+            if (!as<IRMatrixType>(inst->getOperand(0)->getDataType()) ||
+                !as<IRMatrixType>(inst->getOperand(1)->getDataType()))
+            {
+                return false;
+            }
+            // Mul(m1, m2) should be translated to component-wise multiplication in WGSL.
+            auto matrixType = as<IRMatrixType>(inst->getDataType());
+            auto rowCount = getIntVal(matrixType->getRowCount());
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            for (IRIntegerValue i = 0; i < rowCount; i++)
+            {
+                if (i != 0)
+                {
+                    m_writer->emit(", ");
+                }
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::Postfix));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("] * ");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::Postfix));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("]");
+            }
+            m_writer->emit(")");
+
+            return true;
+        }
+
+    case kIROp_Select:
+        {
+            auto prec = getInfo(EmitOp::Conditional);
+            m_writer->emit("select(");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
             return true;
         }
     }
