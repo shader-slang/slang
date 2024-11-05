@@ -80,9 +80,12 @@ struct OptionalTypeLoweringContext
         case kIROp_NativePtrType:
         case kIROp_NativeStringType:
         case kIROp_PtrType:
-        case kIROp_ClassType:        return true;
-        case kIROp_InterfaceType:    return isComInterfaceType((IRType*)type);
-        default:                     return false;
+        case kIROp_ClassType:
+            return true;
+        case kIROp_InterfaceType:
+            return isComInterfaceType((IRType*)type);
+        default:
+            return false;
         }
     }
 
@@ -240,12 +243,23 @@ struct OptionalTypeLoweringContext
     {
         switch (inst->getOp())
         {
-        case kIROp_MakeOptionalValue: processMakeOptionalValue((IRMakeOptionalValue*)inst); break;
-        case kIROp_MakeOptionalNone:  processMakeOptionalNone((IRMakeOptionalNone*)inst); break;
-        case kIROp_OptionalHasValue:  processGetOptionalHasValue((IROptionalHasValue*)inst); break;
-        case kIROp_GetOptionalValue:  processGetOptionalValue((IRGetOptionalValue*)inst); break;
-        case kIROp_OptionalType:      processOptionalType((IROptionalType*)inst); break;
-        default:                      break;
+        case kIROp_MakeOptionalValue:
+            processMakeOptionalValue((IRMakeOptionalValue*)inst);
+            break;
+        case kIROp_MakeOptionalNone:
+            processMakeOptionalNone((IRMakeOptionalNone*)inst);
+            break;
+        case kIROp_OptionalHasValue:
+            processGetOptionalHasValue((IROptionalHasValue*)inst);
+            break;
+        case kIROp_GetOptionalValue:
+            processGetOptionalValue((IRGetOptionalValue*)inst);
+            break;
+        case kIROp_OptionalType:
+            processOptionalType((IROptionalType*)inst);
+            break;
+        default:
+            break;
         }
     }
 

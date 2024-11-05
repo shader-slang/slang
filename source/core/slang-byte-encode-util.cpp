@@ -210,20 +210,31 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
 #if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
     switch (numBytesRemaining)
     {
-    case 2:  value = *(const uint16_t*)in; break;
-    case 3:  value = (uint32_t(in[2]) << 16) | (uint32_t(in[1]) << 8) | uint32_t(in[0]); break;
-    case 4:  value = *(const uint32_t*)in; break;
-    default: break;
+    case 2:
+        value = *(const uint16_t*)in;
+        break;
+    case 3:
+        value = (uint32_t(in[2]) << 16) | (uint32_t(in[1]) << 8) | uint32_t(in[0]);
+        break;
+    case 4:
+        value = *(const uint32_t*)in;
+        break;
+    default:
+        break;
     }
 #else
     // This works on all cpus although slower
     value = in[0];
     switch (numBytesRemaining)
     {
-    case 4: value |= uint32_t(in[3]) << 24; /* fall thru */
-    case 3: value |= uint32_t(in[2]) << 16; /* fall thru */
-    case 2: value |= uint32_t(in[1]) << 8;  /* fall thru */
-    case 1: break;
+    case 4:
+        value |= uint32_t(in[3]) << 24; /* fall thru */
+    case 3:
+        value |= uint32_t(in[2]) << 16; /* fall thru */
+    case 2:
+        value |= uint32_t(in[1]) << 8; /* fall thru */
+    case 1:
+        break;
     }
 #endif
     return value;

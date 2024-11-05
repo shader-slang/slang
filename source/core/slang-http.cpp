@@ -247,9 +247,12 @@ SlangResult HTTPPacketConnection::update()
 {
     switch (m_readState)
     {
-    case ReadState::Closed: return SLANG_OK;
-    case ReadState::Error:  return m_readResult;
-    default:                break;
+    case ReadState::Closed:
+        return SLANG_OK;
+    case ReadState::Error:
+        return m_readResult;
+    default:
+        break;
     }
 
     SLANG_RETURN_ON_FAIL(_updateReadResult(m_readStream->update()));
@@ -287,7 +290,8 @@ SlangResult HTTPPacketConnection::update()
             _handleContent();
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     return m_readResult;

@@ -510,12 +510,17 @@ LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerC
     case 1:
         switch (*registerClassName.begin())
         {
-        case 'b': return LayoutResourceKind::ConstantBuffer;
-        case 't': return LayoutResourceKind::ShaderResource;
-        case 'u': return LayoutResourceKind::UnorderedAccess;
-        case 's': return LayoutResourceKind::SamplerState;
+        case 'b':
+            return LayoutResourceKind::ConstantBuffer;
+        case 't':
+            return LayoutResourceKind::ShaderResource;
+        case 'u':
+            return LayoutResourceKind::UnorderedAccess;
+        case 's':
+            return LayoutResourceKind::SamplerState;
 
-        default: break;
+        default:
+            break;
         }
         break;
 
@@ -526,7 +531,8 @@ LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerC
         }
         break;
 
-    default: break;
+    default:
+        break;
     }
     return LayoutResourceKind::None;
 }
@@ -3216,7 +3222,9 @@ static void collectSpecializationParams(ParameterBindingContext* context, Compon
             }
             break;
 
-        default: SLANG_UNEXPECTED("unhandled specialization parameter flavor"); break;
+        default:
+            SLANG_UNEXPECTED("unhandled specialization parameter flavor");
+            break;
         }
     }
 }
@@ -3418,7 +3426,8 @@ static bool _isPTXTarget(CodeGenTarget target)
         {
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -3776,7 +3785,8 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             {
             case LayoutResourceKind::RegisterSpace:
             case LayoutResourceKind::SubElementRegisterSpace:
-            case LayoutResourceKind::PushConstantBuffer:      continue;
+            case LayoutResourceKind::PushConstantBuffer:
+                continue;
             case LayoutResourceKind::Uniform:
                 {
                     // If it's uniform, but we have globals binding defined, we don't need a default
@@ -3792,7 +3802,8 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
                     break;
                 }
 
-            default: break;
+            default:
+                break;
             }
 
             // Otherwise, we have a shader parameter that will need
@@ -3812,14 +3823,16 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
         {
             switch (resInfo.kind)
             {
-            default: break;
+            default:
+                break;
 
             case LayoutResourceKind::RegisterSpace:
             case LayoutResourceKind::SubElementRegisterSpace:
             case LayoutResourceKind::VaryingInput:
             case LayoutResourceKind::VaryingOutput:
             case LayoutResourceKind::HitAttributes:
-            case LayoutResourceKind::RayPayload:              continue;
+            case LayoutResourceKind::RayPayload:
+                continue;
             }
 
             return true;

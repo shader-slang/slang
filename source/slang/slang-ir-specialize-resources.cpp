@@ -935,7 +935,8 @@ struct ResourceOutputSpecializationPass
                         }
                         return;
                     }
-                default: return;
+                default:
+                    return;
                 };
             });
         if (failedResult(recursiveSpecializationResult))
@@ -1016,7 +1017,9 @@ struct ResourceOutputSpecializationPass
             //
             switch (oldParamInfo.oldArgMode)
             {
-            default: SLANG_UNEXPECTED("unhandled case"); break;
+            default:
+                SLANG_UNEXPECTED("unhandled case");
+                break;
 
             case ParamInfo::OldArgMode::Keep:
                 // If the parameter was not specialized away, then
@@ -1316,8 +1319,10 @@ bool isIllegalGLSLParameterType(IRType* type)
         {
         case SLANG_RESOURCE_ACCESS_READ_WRITE:
         case SLANG_RESOURCE_ACCESS_WRITE:
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: return true;
-        default:                                   break;
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            return true;
+        default:
+            break;
         }
     }
     if (as<IRSubpassInputType>(type))

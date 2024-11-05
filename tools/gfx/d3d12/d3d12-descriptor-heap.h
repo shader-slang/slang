@@ -399,31 +399,44 @@ struct DescriptorHeapReference
     {
         switch (type)
         {
-        case Type::Linear:           return ptr.linearHeap->getCpuHandle(index);
-        case Type::General:          return ptr.generalHeap->getCpuHandle(index);
-        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->getCpuHandle(index);
-        case Type::ExpandingLinear:  return ptr.linearExpandingHeap->getCpuHandle(index);
-        default:                     return D3D12_CPU_DESCRIPTOR_HANDLE();
+        case Type::Linear:
+            return ptr.linearHeap->getCpuHandle(index);
+        case Type::General:
+            return ptr.generalHeap->getCpuHandle(index);
+        case Type::ExpandingGeneral:
+            return ptr.generalExpandingHeap->getCpuHandle(index);
+        case Type::ExpandingLinear:
+            return ptr.linearExpandingHeap->getCpuHandle(index);
+        default:
+            return D3D12_CPU_DESCRIPTOR_HANDLE();
         }
     }
     D3D12_GPU_DESCRIPTOR_HANDLE getGpuHandle(int index) const
     {
         switch (type)
         {
-        case Type::Linear:           return ptr.linearHeap->getGpuHandle(index);
-        case Type::General:          return ptr.generalHeap->getGpuHandle(index);
-        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->getGpuHandle(index);
-        default:                     return D3D12_GPU_DESCRIPTOR_HANDLE();
+        case Type::Linear:
+            return ptr.linearHeap->getGpuHandle(index);
+        case Type::General:
+            return ptr.generalHeap->getGpuHandle(index);
+        case Type::ExpandingGeneral:
+            return ptr.generalExpandingHeap->getGpuHandle(index);
+        default:
+            return D3D12_GPU_DESCRIPTOR_HANDLE();
         }
     }
     int allocate(int numDescriptors)
     {
         switch (type)
         {
-        case Type::Linear:           return ptr.linearHeap->allocate(numDescriptors);
-        case Type::General:          return ptr.generalHeap->allocate(numDescriptors);
-        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->allocate(numDescriptors);
-        default:                     return ptr.linearExpandingHeap->allocate(numDescriptors);
+        case Type::Linear:
+            return ptr.linearHeap->allocate(numDescriptors);
+        case Type::General:
+            return ptr.generalHeap->allocate(numDescriptors);
+        case Type::ExpandingGeneral:
+            return ptr.generalExpandingHeap->allocate(numDescriptors);
+        default:
+            return ptr.linearExpandingHeap->allocate(numDescriptors);
         }
     }
     void free(int index, int count)
@@ -431,19 +444,27 @@ struct DescriptorHeapReference
         switch (type)
         {
         default:
-        case Type::Linear:           SLANG_ASSERT(!"Linear heap does not support free()."); break;
-        case Type::General:          return ptr.generalHeap->free(index, count);
-        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->free(index, count);
+        case Type::Linear:
+            SLANG_ASSERT(!"Linear heap does not support free().");
+            break;
+        case Type::General:
+            return ptr.generalHeap->free(index, count);
+        case Type::ExpandingGeneral:
+            return ptr.generalExpandingHeap->free(index, count);
         }
     }
     void freeIfSupported(int index, int count)
     {
         switch (type)
         {
-        case Type::Linear:           return;
-        case Type::General:          return ptr.generalHeap->free(index, count);
-        case Type::ExpandingGeneral: return ptr.generalExpandingHeap->free(index, count);
-        default:                     break;
+        case Type::Linear:
+            return;
+        case Type::General:
+            return ptr.generalHeap->free(index, count);
+        case Type::ExpandingGeneral:
+            return ptr.generalExpandingHeap->free(index, count);
+        default:
+            break;
         }
     }
 };

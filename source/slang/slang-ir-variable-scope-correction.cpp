@@ -254,7 +254,8 @@ bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
     {
     case kIROp_VectorType:
     case kIROp_MatrixType:
-    case kIROp_StructType: return true;
+    case kIROp_StructType:
+        return true;
     case kIROp_ArrayType:
         {
             if (auto arrayType = as<IRArrayTypeBase>(type))
@@ -262,8 +263,10 @@ bool VariableScopeCorrectionContext::_isStorableType(IRType* type)
             else
                 return false;
         }
-    case kIROp_UnsizedArrayType: return false;
-    default:                     return false;
+    case kIROp_UnsizedArrayType:
+        return false;
+    default:
+        return false;
     }
 }
 

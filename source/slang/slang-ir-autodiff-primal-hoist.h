@@ -162,12 +162,18 @@ struct HoistResult
     {
         switch (mode)
         {
-        case Mode::Store:     instToStore = target; break;
-        case Mode::Recompute: instToRecompute = target; break;
+        case Mode::Store:
+            instToStore = target;
+            break;
+        case Mode::Recompute:
+            instToRecompute = target;
+            break;
         case Mode::Invert:
             SLANG_UNEXPECTED("Wrong constructor for HoistResult::Mode::Invert");
             break;
-        default: SLANG_UNEXPECTED("Unhandled hoist mode"); break;
+        default:
+            SLANG_UNEXPECTED("Unhandled hoist mode");
+            break;
         }
     }
 

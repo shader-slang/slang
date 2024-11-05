@@ -35,8 +35,10 @@ TextureAspect getTextureAspect(Format format)
     switch (format)
     {
     case Format::D16_UNORM:
-    case Format::D32_FLOAT: return TextureAspect::Depth;
-    default:                return TextureAspect::Color;
+    case Format::D32_FLOAT:
+        return TextureAspect::Depth;
+    default:
+        return TextureAspect::Color;
     }
 }
 
@@ -56,88 +58,151 @@ RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format)
 {
     switch (format)
     {
-    case Format::R32G32B32A32_TYPELESS: return new ValidationTextureFormat<uint32_t>(4);
-    case Format::R32G32B32_TYPELESS:    return new ValidationTextureFormat<uint32_t>(3);
-    case Format::R32G32_TYPELESS:       return new ValidationTextureFormat<uint32_t>(2);
-    case Format::R32_TYPELESS:          return new ValidationTextureFormat<uint32_t>(1);
+    case Format::R32G32B32A32_TYPELESS:
+        return new ValidationTextureFormat<uint32_t>(4);
+    case Format::R32G32B32_TYPELESS:
+        return new ValidationTextureFormat<uint32_t>(3);
+    case Format::R32G32_TYPELESS:
+        return new ValidationTextureFormat<uint32_t>(2);
+    case Format::R32_TYPELESS:
+        return new ValidationTextureFormat<uint32_t>(1);
 
-    case Format::R16G16B16A16_TYPELESS: return new ValidationTextureFormat<uint16_t>(4);
-    case Format::R16G16_TYPELESS:       return new ValidationTextureFormat<uint16_t>(2);
-    case Format::R16_TYPELESS:          return new ValidationTextureFormat<uint16_t>(1);
+    case Format::R16G16B16A16_TYPELESS:
+        return new ValidationTextureFormat<uint16_t>(4);
+    case Format::R16G16_TYPELESS:
+        return new ValidationTextureFormat<uint16_t>(2);
+    case Format::R16_TYPELESS:
+        return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::R8G8B8A8_TYPELESS: return new ValidationTextureFormat<uint8_t>(4);
-    case Format::R8G8_TYPELESS:     return new ValidationTextureFormat<uint8_t>(2);
-    case Format::R8_TYPELESS:       return new ValidationTextureFormat<uint8_t>(1);
-    case Format::B8G8R8A8_TYPELESS: return new ValidationTextureFormat<uint8_t>(4);
+    case Format::R8G8B8A8_TYPELESS:
+        return new ValidationTextureFormat<uint8_t>(4);
+    case Format::R8G8_TYPELESS:
+        return new ValidationTextureFormat<uint8_t>(2);
+    case Format::R8_TYPELESS:
+        return new ValidationTextureFormat<uint8_t>(1);
+    case Format::B8G8R8A8_TYPELESS:
+        return new ValidationTextureFormat<uint8_t>(4);
 
-    case Format::R32G32B32A32_FLOAT: return new ValidationTextureFormat<float>(4);
-    case Format::R32G32B32_FLOAT:    return new ValidationTextureFormat<float>(3);
-    case Format::R32G32_FLOAT:       return new ValidationTextureFormat<float>(2);
-    case Format::R32_FLOAT:          return new ValidationTextureFormat<float>(1);
+    case Format::R32G32B32A32_FLOAT:
+        return new ValidationTextureFormat<float>(4);
+    case Format::R32G32B32_FLOAT:
+        return new ValidationTextureFormat<float>(3);
+    case Format::R32G32_FLOAT:
+        return new ValidationTextureFormat<float>(2);
+    case Format::R32_FLOAT:
+        return new ValidationTextureFormat<float>(1);
 
-    case Format::R16G16B16A16_FLOAT: return new ValidationTextureFormat<uint16_t>(4);
-    case Format::R16G16_FLOAT:       return new ValidationTextureFormat<uint16_t>(2);
-    case Format::R16_FLOAT:          return new ValidationTextureFormat<uint16_t>(1);
+    case Format::R16G16B16A16_FLOAT:
+        return new ValidationTextureFormat<uint16_t>(4);
+    case Format::R16G16_FLOAT:
+        return new ValidationTextureFormat<uint16_t>(2);
+    case Format::R16_FLOAT:
+        return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::R64_UINT: return new ValidationTextureFormat<uint64_t>(1);
+    case Format::R64_UINT:
+        return new ValidationTextureFormat<uint64_t>(1);
 
-    case Format::R32G32B32A32_UINT: return new ValidationTextureFormat<uint32_t>(4);
-    case Format::R32G32B32_UINT:    return new ValidationTextureFormat<uint32_t>(3);
-    case Format::R32G32_UINT:       return new ValidationTextureFormat<uint32_t>(2);
-    case Format::R32_UINT:          return new ValidationTextureFormat<uint32_t>(1);
+    case Format::R32G32B32A32_UINT:
+        return new ValidationTextureFormat<uint32_t>(4);
+    case Format::R32G32B32_UINT:
+        return new ValidationTextureFormat<uint32_t>(3);
+    case Format::R32G32_UINT:
+        return new ValidationTextureFormat<uint32_t>(2);
+    case Format::R32_UINT:
+        return new ValidationTextureFormat<uint32_t>(1);
 
-    case Format::R16G16B16A16_UINT: return new ValidationTextureFormat<uint16_t>(4);
-    case Format::R16G16_UINT:       return new ValidationTextureFormat<uint16_t>(2);
-    case Format::R16_UINT:          return new ValidationTextureFormat<uint16_t>(1);
+    case Format::R16G16B16A16_UINT:
+        return new ValidationTextureFormat<uint16_t>(4);
+    case Format::R16G16_UINT:
+        return new ValidationTextureFormat<uint16_t>(2);
+    case Format::R16_UINT:
+        return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::R8G8B8A8_UINT: return new ValidationTextureFormat<uint8_t>(4);
-    case Format::R8G8_UINT:     return new ValidationTextureFormat<uint8_t>(2);
-    case Format::R8_UINT:       return new ValidationTextureFormat<uint8_t>(1);
+    case Format::R8G8B8A8_UINT:
+        return new ValidationTextureFormat<uint8_t>(4);
+    case Format::R8G8_UINT:
+        return new ValidationTextureFormat<uint8_t>(2);
+    case Format::R8_UINT:
+        return new ValidationTextureFormat<uint8_t>(1);
 
-    case Format::R64_SINT: return new ValidationTextureFormat<int64_t>(1);
+    case Format::R64_SINT:
+        return new ValidationTextureFormat<int64_t>(1);
 
-    case Format::R32G32B32A32_SINT: return new ValidationTextureFormat<int32_t>(4);
-    case Format::R32G32B32_SINT:    return new ValidationTextureFormat<int32_t>(3);
-    case Format::R32G32_SINT:       return new ValidationTextureFormat<int32_t>(2);
-    case Format::R32_SINT:          return new ValidationTextureFormat<int32_t>(1);
+    case Format::R32G32B32A32_SINT:
+        return new ValidationTextureFormat<int32_t>(4);
+    case Format::R32G32B32_SINT:
+        return new ValidationTextureFormat<int32_t>(3);
+    case Format::R32G32_SINT:
+        return new ValidationTextureFormat<int32_t>(2);
+    case Format::R32_SINT:
+        return new ValidationTextureFormat<int32_t>(1);
 
-    case Format::R16G16B16A16_SINT: return new ValidationTextureFormat<int16_t>(4);
-    case Format::R16G16_SINT:       return new ValidationTextureFormat<int16_t>(2);
-    case Format::R16_SINT:          return new ValidationTextureFormat<int16_t>(1);
+    case Format::R16G16B16A16_SINT:
+        return new ValidationTextureFormat<int16_t>(4);
+    case Format::R16G16_SINT:
+        return new ValidationTextureFormat<int16_t>(2);
+    case Format::R16_SINT:
+        return new ValidationTextureFormat<int16_t>(1);
 
-    case Format::R8G8B8A8_SINT: return new ValidationTextureFormat<int8_t>(4);
-    case Format::R8G8_SINT:     return new ValidationTextureFormat<int8_t>(2);
-    case Format::R8_SINT:       return new ValidationTextureFormat<int8_t>(1);
+    case Format::R8G8B8A8_SINT:
+        return new ValidationTextureFormat<int8_t>(4);
+    case Format::R8G8_SINT:
+        return new ValidationTextureFormat<int8_t>(2);
+    case Format::R8_SINT:
+        return new ValidationTextureFormat<int8_t>(1);
 
-    case Format::R16G16B16A16_UNORM: return new ValidationTextureFormat<uint16_t>(4);
-    case Format::R16G16_UNORM:       return new ValidationTextureFormat<uint16_t>(2);
-    case Format::R16_UNORM:          return new ValidationTextureFormat<uint16_t>(1);
+    case Format::R16G16B16A16_UNORM:
+        return new ValidationTextureFormat<uint16_t>(4);
+    case Format::R16G16_UNORM:
+        return new ValidationTextureFormat<uint16_t>(2);
+    case Format::R16_UNORM:
+        return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::R8G8B8A8_UNORM:      return new ValidationTextureFormat<uint8_t>(4);
-    case Format::R8G8B8A8_UNORM_SRGB: return new ValidationTextureFormat<uint8_t>(4);
-    case Format::R8G8_UNORM:          return new ValidationTextureFormat<uint8_t>(2);
-    case Format::R8_UNORM:            return new ValidationTextureFormat<uint8_t>(1);
-    case Format::B8G8R8A8_UNORM:      return new ValidationTextureFormat<uint8_t>(4);
-    case Format::B8G8R8A8_UNORM_SRGB: return new ValidationTextureFormat<uint8_t>(4);
-    case Format::B8G8R8X8_UNORM:      return new ValidationTextureFormat<uint8_t>(3);
-    case Format::B8G8R8X8_UNORM_SRGB: return new ValidationTextureFormat<uint8_t>(3);
+    case Format::R8G8B8A8_UNORM:
+        return new ValidationTextureFormat<uint8_t>(4);
+    case Format::R8G8B8A8_UNORM_SRGB:
+        return new ValidationTextureFormat<uint8_t>(4);
+    case Format::R8G8_UNORM:
+        return new ValidationTextureFormat<uint8_t>(2);
+    case Format::R8_UNORM:
+        return new ValidationTextureFormat<uint8_t>(1);
+    case Format::B8G8R8A8_UNORM:
+        return new ValidationTextureFormat<uint8_t>(4);
+    case Format::B8G8R8A8_UNORM_SRGB:
+        return new ValidationTextureFormat<uint8_t>(4);
+    case Format::B8G8R8X8_UNORM:
+        return new ValidationTextureFormat<uint8_t>(3);
+    case Format::B8G8R8X8_UNORM_SRGB:
+        return new ValidationTextureFormat<uint8_t>(3);
 
-    case Format::R16G16B16A16_SNORM: return new ValidationTextureFormat<int16_t>(4);
-    case Format::R16G16_SNORM:       return new ValidationTextureFormat<int16_t>(2);
-    case Format::R16_SNORM:          return new ValidationTextureFormat<int16_t>(1);
+    case Format::R16G16B16A16_SNORM:
+        return new ValidationTextureFormat<int16_t>(4);
+    case Format::R16G16_SNORM:
+        return new ValidationTextureFormat<int16_t>(2);
+    case Format::R16_SNORM:
+        return new ValidationTextureFormat<int16_t>(1);
 
-    case Format::R8G8B8A8_SNORM: return new ValidationTextureFormat<int8_t>(4);
-    case Format::R8G8_SNORM:     return new ValidationTextureFormat<int8_t>(2);
-    case Format::R8_SNORM:       return new ValidationTextureFormat<int8_t>(1);
+    case Format::R8G8B8A8_SNORM:
+        return new ValidationTextureFormat<int8_t>(4);
+    case Format::R8G8_SNORM:
+        return new ValidationTextureFormat<int8_t>(2);
+    case Format::R8_SNORM:
+        return new ValidationTextureFormat<int8_t>(1);
 
-    case Format::D32_FLOAT: return new ValidationTextureFormat<float>(1);
-    case Format::D16_UNORM: return new ValidationTextureFormat<uint16_t>(1);
+    case Format::D32_FLOAT:
+        return new ValidationTextureFormat<float>(1);
+    case Format::D16_UNORM:
+        return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::B4G4R4A4_UNORM: return new PackedValidationTextureFormat<uint16_t>(4, 4, 4, 4);
-    case Format::B5G6R5_UNORM:   return new PackedValidationTextureFormat<uint16_t>(5, 6, 5, 0);
-    case Format::B5G5R5A1_UNORM: return new PackedValidationTextureFormat<uint16_t>(5, 5, 5, 1);
+    case Format::B4G4R4A4_UNORM:
+        return new PackedValidationTextureFormat<uint16_t>(4, 4, 4, 4);
+    case Format::B5G6R5_UNORM:
+        return new PackedValidationTextureFormat<uint16_t>(5, 6, 5, 0);
+    case Format::B5G5R5A1_UNORM:
+        return new PackedValidationTextureFormat<uint16_t>(5, 5, 5, 1);
 
-    case Format::R9G9B9E5_SHAREDEXP: return new ValidationTextureFormat<uint32_t>(1);
+    case Format::R9G9B9E5_SHAREDEXP:
+        return new ValidationTextureFormat<uint32_t>(1);
     case Format::R10G10B10A2_TYPELESS:
         return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
     case Format::R10G10B10A2_UNORM:
@@ -162,7 +227,8 @@ RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format)
         //                     BC6H_SF16,
         //                     BC7_UNORM,
         //                     BC7_UNORM_SRGB,
-    default: return nullptr;
+    default:
+        return nullptr;
     }
 }
 

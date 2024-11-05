@@ -55,10 +55,13 @@ StageType translateStage(SlangStage slangStage)
 {
     switch (slangStage)
     {
-    default: SLANG_ASSERT(!"unhandled case"); return gfx::StageType::Unknown;
+    default:
+        SLANG_ASSERT(!"unhandled case");
+        return gfx::StageType::Unknown;
 
-#define CASE(FROM, TO) \
-    case SLANG_STAGE_##FROM: return gfx::StageType::TO
+#define CASE(FROM, TO)       \
+    case SLANG_STAGE_##FROM: \
+        return gfx::StageType::TO
 
         CASE(VERTEX, Vertex);
         CASE(HULL, Hull);
@@ -152,22 +155,37 @@ StageType mapStage(SlangStage stage)
 {
     switch (stage)
     {
-    default: return StageType::Unknown;
+    default:
+        return StageType::Unknown;
 
-    case SLANG_STAGE_AMPLIFICATION:  return gfx::StageType::Amplification;
-    case SLANG_STAGE_ANY_HIT:        return gfx::StageType::AnyHit;
-    case SLANG_STAGE_CALLABLE:       return gfx::StageType::Callable;
-    case SLANG_STAGE_CLOSEST_HIT:    return gfx::StageType::ClosestHit;
-    case SLANG_STAGE_COMPUTE:        return gfx::StageType::Compute;
-    case SLANG_STAGE_DOMAIN:         return gfx::StageType::Domain;
-    case SLANG_STAGE_FRAGMENT:       return gfx::StageType::Fragment;
-    case SLANG_STAGE_GEOMETRY:       return gfx::StageType::Geometry;
-    case SLANG_STAGE_HULL:           return gfx::StageType::Hull;
-    case SLANG_STAGE_INTERSECTION:   return gfx::StageType::Intersection;
-    case SLANG_STAGE_MESH:           return gfx::StageType::Mesh;
-    case SLANG_STAGE_MISS:           return gfx::StageType::Miss;
-    case SLANG_STAGE_RAY_GENERATION: return gfx::StageType::RayGeneration;
-    case SLANG_STAGE_VERTEX:         return gfx::StageType::Vertex;
+    case SLANG_STAGE_AMPLIFICATION:
+        return gfx::StageType::Amplification;
+    case SLANG_STAGE_ANY_HIT:
+        return gfx::StageType::AnyHit;
+    case SLANG_STAGE_CALLABLE:
+        return gfx::StageType::Callable;
+    case SLANG_STAGE_CLOSEST_HIT:
+        return gfx::StageType::ClosestHit;
+    case SLANG_STAGE_COMPUTE:
+        return gfx::StageType::Compute;
+    case SLANG_STAGE_DOMAIN:
+        return gfx::StageType::Domain;
+    case SLANG_STAGE_FRAGMENT:
+        return gfx::StageType::Fragment;
+    case SLANG_STAGE_GEOMETRY:
+        return gfx::StageType::Geometry;
+    case SLANG_STAGE_HULL:
+        return gfx::StageType::Hull;
+    case SLANG_STAGE_INTERSECTION:
+        return gfx::StageType::Intersection;
+    case SLANG_STAGE_MESH:
+        return gfx::StageType::Mesh;
+    case SLANG_STAGE_MISS:
+        return gfx::StageType::Miss;
+    case SLANG_STAGE_RAY_GENERATION:
+        return gfx::StageType::RayGeneration;
+    case SLANG_STAGE_VERTEX:
+        return gfx::StageType::Vertex;
     }
 }
 
@@ -246,7 +264,8 @@ bool _doesValueFitInExistentialPayload(
         // We want to ignore any ordinary/uniform data usage, since that
         // was already checked above.
         //
-        case slang::ParameterCategory::Uniform: break;
+        case slang::ParameterCategory::Uniform:
+            break;
 
         // Any other kind of data consumed means the value cannot possibly fit.
         default:
@@ -603,7 +622,8 @@ Result RendererBase::createProgram2(
                 return SLANG_FAIL;
             break;
         }
-    default: SLANG_RELEASE_ASSERT(false);
+    default:
+        SLANG_RELEASE_ASSERT(false);
     }
 
     Slang::List<ComPtr<slang::IComponentType>> componentTypes;
@@ -764,7 +784,8 @@ Result RendererBase::getShaderObjectLayout(
     case ShaderObjectContainerType::Array:
         type = session->getContainerType(type, slang::ContainerType::UnsizedArray);
         break;
-    default: break;
+    default:
+        break;
     }
 
     auto typeLayout = session->getTypeLayout(type);
@@ -851,7 +872,8 @@ ShaderComponentID ShaderCache::getComponentId(slang::TypeReflection* type)
         }
         // TODO: collect specialization arguments and append them to `key`.
         SLANG_UNIMPLEMENTED_X("specialized type");
-    default: break;
+    default:
+        break;
     }
     key.updateHash();
     return getComponentId(key);
@@ -1013,9 +1035,13 @@ ResourceViewBase* SimpleShaderObjectData::getResourceView(
 
     switch (bindingType)
     {
-    case slang::BindingType::RawBuffer:        return m_structuredBufferView.Ptr();
-    case slang::BindingType::MutableRawBuffer: return m_rwStructuredBufferView.Ptr();
-    default:                                   SLANG_ASSERT(false && "Invalid binding type."); return nullptr;
+    case slang::BindingType::RawBuffer:
+        return m_structuredBufferView.Ptr();
+    case slang::BindingType::MutableRawBuffer:
+        return m_rwStructuredBufferView.Ptr();
+    default:
+        SLANG_ASSERT(false && "Invalid binding type.");
+        return nullptr;
     }
 }
 
@@ -1258,7 +1284,8 @@ Result RendererBase::maybeSpecializePipeline(
                         specializedPipelineComPtr.writeRef()));
                     break;
                 }
-            default: break;
+            default:
+                break;
             }
             specializedPipelineState =
                 static_cast<PipelineStateBase*>(specializedPipelineComPtr.get());
@@ -1395,8 +1422,10 @@ bool isDepthFormat(Format format)
     {
     case Format::D16_UNORM:
     case Format::D32_FLOAT:
-    case Format::D32_FLOAT_S8_UINT: return true;
-    default:                        return false;
+    case Format::D32_FLOAT_S8_UINT:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -1404,8 +1433,10 @@ bool isStencilFormat(Format format)
 {
     switch (format)
     {
-    case Format::D32_FLOAT_S8_UINT: return true;
-    default:                        return false;
+    case Format::D32_FLOAT_S8_UINT:
+        return true;
+    default:
+        return false;
     }
 }
 

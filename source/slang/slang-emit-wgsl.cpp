@@ -26,6 +26,39 @@
 namespace Slang
 {
 
+// In WGSL, expression of "1.0/0.0" is not allowed, it will report compile error,
+// so to construct infinity or nan, we have to assign the float literal to a variable
+// and then use it to bypass the compile error.
+static const char* kWGSLBuiltinPreludeGetInfinity = R"(
+fn _slang_getInfinity(positive: bool) -> f32
+{
+    let a = select(f32(-1.0), f32(1.0), positive);
+    let b = f32(0.0);
+    return a / b;
+}
+)";
+
+static const char* kWGSLBuiltinPreludeGetNan = R"(
+fn _slang_getNan() -> f32
+{
+    let a = f32(0.0);
+    let b = f32(0.0);
+    return a / b;
+}
+)";
+
+void WGSLSourceEmitter::ensurePrelude(const char* preludeText)
+{
+    IRStringLit* stringLit;
+    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
+    {
+        IRBuilder builder(m_irModule);
+        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
+        m_builtinPreludes[preludeText] = stringLit;
+    }
+    m_requiredPreludes.add(stringLit);
+}
+
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     const SwitchRegion::Case* const currentCase,
     const bool isDefault)
@@ -114,8 +147,12 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
     switch (stage)
     {
 
-    case Stage::Fragment: m_writer->emit("@fragment\n"); break;
-    case Stage::Vertex:   m_writer->emit("@vertex\n"); break;
+    case Stage::Fragment:
+        m_writer->emit("@fragment\n");
+        break;
+    case Stage::Vertex:
+        m_writer->emit("@vertex\n");
+        break;
 
     case Stage::Compute:
         {
@@ -137,7 +174,8 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
         }
         break;
 
-    default: SLANG_ABORT_COMPILATION("unsupported stage.");
+    default:
+        SLANG_ABORT_COMPILATION("unsupported stage.");
     }
 }
 
@@ -231,15 +269,25 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
 {
     switch (addressSpace)
     {
-    case AddressSpace::Uniform: m_writer->emit("uniform"); break;
+    case AddressSpace::Uniform:
+        m_writer->emit("uniform");
+        break;
 
-    case AddressSpace::StorageBuffer: m_writer->emit("storage"); break;
+    case AddressSpace::StorageBuffer:
+        m_writer->emit("storage");
+        break;
 
-    case AddressSpace::Generic: m_writer->emit("function"); break;
+    case AddressSpace::Generic:
+        m_writer->emit("function");
+        break;
 
-    case AddressSpace::ThreadLocal: m_writer->emit("private"); break;
+    case AddressSpace::ThreadLocal:
+        m_writer->emit("private");
+        break;
 
-    case AddressSpace::GroupShared: m_writer->emit("workgroup"); break;
+    case AddressSpace::GroupShared:
+        m_writer->emit("workgroup");
+        break;
     }
 }
 
@@ -252,22 +300,38 @@ static const char* getWgslImageFormat(IRTextureTypeBase* type)
         type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
     switch (imageFormat)
     {
-    case ImageFormat::rgba8:       return "rgba8unorm";
-    case ImageFormat::rgba8_snorm: return "rgba8snorm";
-    case ImageFormat::rgba8ui:     return "rgba8uint";
-    case ImageFormat::rgba8i:      return "rgba8sint";
-    case ImageFormat::rgba16ui:    return "rgba16uint";
-    case ImageFormat::rgba16i:     return "rgba16sint";
-    case ImageFormat::rgba16f:     return "rgba16float";
-    case ImageFormat::r32ui:       return "r32uint";
-    case ImageFormat::r32i:        return "r32sint";
-    case ImageFormat::r32f:        return "r32float";
-    case ImageFormat::rg32ui:      return "rg32uint";
-    case ImageFormat::rg32i:       return "rg32sint";
-    case ImageFormat::rg32f:       return "rg32float";
-    case ImageFormat::rgba32ui:    return "rgba32uint";
-    case ImageFormat::rgba32i:     return "rgba32sint";
-    case ImageFormat::rgba32f:     return "rgba32float";
+    case ImageFormat::rgba8:
+        return "rgba8unorm";
+    case ImageFormat::rgba8_snorm:
+        return "rgba8snorm";
+    case ImageFormat::rgba8ui:
+        return "rgba8uint";
+    case ImageFormat::rgba8i:
+        return "rgba8sint";
+    case ImageFormat::rgba16ui:
+        return "rgba16uint";
+    case ImageFormat::rgba16i:
+        return "rgba16sint";
+    case ImageFormat::rgba16f:
+        return "rgba16float";
+    case ImageFormat::r32ui:
+        return "r32uint";
+    case ImageFormat::r32i:
+        return "r32sint";
+    case ImageFormat::r32f:
+        return "r32float";
+    case ImageFormat::rg32ui:
+        return "rg32uint";
+    case ImageFormat::rg32i:
+        return "rg32sint";
+    case ImageFormat::rg32f:
+        return "rg32float";
+    case ImageFormat::rgba32ui:
+        return "rgba32uint";
+    case ImageFormat::rgba32i:
+        return "rgba32sint";
+    case ImageFormat::rgba32f:
+        return "rgba32float";
     case ImageFormat::unknown:
         // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
         return "rgba32float";
@@ -317,7 +381,9 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
 
-    case kIROp_FloatType: m_writer->emit("f32"); break;
+    case kIROp_FloatType:
+        m_writer->emit("f32");
+        break;
     case kIROp_DoubleType:
         // There is no "f64" type in WGSL
         SLANG_UNEXPECTED("'double' type emitted");
@@ -331,20 +397,34 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_f16ExtensionEnabled = true;
         m_writer->emit("f16");
         break;
-    case kIROp_BoolType: m_writer->emit("bool"); break;
-    case kIROp_IntType:  m_writer->emit("i32"); break;
-    case kIROp_UIntType: m_writer->emit("u32"); break;
+    case kIROp_BoolType:
+        m_writer->emit("bool");
+        break;
+    case kIROp_IntType:
+        m_writer->emit("i32");
+        break;
+    case kIROp_UIntType:
+        m_writer->emit("u32");
+        break;
     case kIROp_UInt64Type:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
     case kIROp_Int16Type:
-    case kIROp_UInt16Type:  SLANG_UNEXPECTED("16 bit integer value emitted"); return;
+    case kIROp_UInt16Type:
+        SLANG_UNEXPECTED("16 bit integer value emitted");
+        return;
     case kIROp_Int64Type:
-    case kIROp_IntPtrType:  m_writer->emit("i64"); return;
-    case kIROp_UIntPtrType: m_writer->emit("u64"); return;
-    case kIROp_StructType:  m_writer->emit(getName(type)); return;
+    case kIROp_IntPtrType:
+        m_writer->emit("i64");
+        return;
+    case kIROp_UIntPtrType:
+        m_writer->emit("u64");
+        return;
+    case kIROp_StructType:
+        m_writer->emit(getName(type));
+        return;
 
     case kIROp_VectorType:
         {
@@ -406,8 +486,12 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             switch (texType->getAccess())
             {
             case SLANG_RESOURCE_ACCESS_WRITE:
-            case SLANG_RESOURCE_ACCESS_READ_WRITE: m_writer->emit("texture_storage"); break;
-            default:                               m_writer->emit("texture"); break;
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+                m_writer->emit("texture_storage");
+                break;
+            default:
+                m_writer->emit("texture");
+                break;
             }
 
             if (texType->isShadow())
@@ -422,10 +506,18 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
             switch (texType->GetBaseShape())
             {
-            case SLANG_TEXTURE_1D:   m_writer->emit("_1d"); break;
-            case SLANG_TEXTURE_2D:   m_writer->emit("_2d"); break;
-            case SLANG_TEXTURE_3D:   m_writer->emit("_3d"); break;
-            case SLANG_TEXTURE_CUBE: m_writer->emit("_cube"); break;
+            case SLANG_TEXTURE_1D:
+                m_writer->emit("_1d");
+                break;
+            case SLANG_TEXTURE_2D:
+                m_writer->emit("_2d");
+                break;
+            case SLANG_TEXTURE_3D:
+                m_writer->emit("_3d");
+                break;
+            case SLANG_TEXTURE_CUBE:
+                m_writer->emit("_cube");
+                break;
             }
 
             if (texType->isArray())
@@ -467,7 +559,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -497,22 +590,48 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     }
 }
 
+static bool isStaticConst(IRInst* inst)
+{
+    if (inst->getParent()->getOp() == kIROp_Module)
+    {
+        return true;
+    }
+    switch (inst->getOp())
+    {
+    case kIROp_MakeVector:
+    case kIROp_swizzle:
+    case kIROp_swizzleSet:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_CastFloatToInt:
+    case kIROp_CastIntToFloat:
+    case kIROp_BitCast:
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (!isStaticConst(inst->getOperand(i)))
+                    return false;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
     switch (varDecl->getOp())
     {
     case kIROp_GlobalParam:
     case kIROp_GlobalVar:
-    case kIROp_Var:         m_writer->emit("var"); break;
+    case kIROp_Var:
+        m_writer->emit("var");
+        break;
     default:
-        if (as<IRModuleInst>(varDecl->getParent()))
-        {
+        if (isStaticConst(varDecl))
             m_writer->emit("const");
-        }
         else
-        {
             m_writer->emit("var");
-        }
         break;
     }
 
@@ -563,8 +682,12 @@ void WGSLSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     {
     case kIROp_ArrayType:
     case kIROp_AttributedType:
-    case kIROp_UnsizedArrayType: emitSimpleTypeAndDeclarator(type, declarator); break;
-    default:                     CLikeSourceEmitter::_emitType(type, declarator); break;
+    case kIROp_UnsizedArrayType:
+        emitSimpleTypeAndDeclarator(type, declarator);
+        break;
+    default:
+        CLikeSourceEmitter::_emitType(type, declarator);
+        break;
     }
 }
 
@@ -641,7 +764,9 @@ void WGSLSourceEmitter::emitDeclaratorImpl(DeclaratorInfo* declarator)
         }
         break;
 
-    default: SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor"); break;
+    default:
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor");
+        break;
     }
 }
 
@@ -786,8 +911,32 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 case BaseType::Float:
                     {
-                        m_writer->emit(litInst->value.floatVal);
-                        m_writer->emit("f");
+                        IRConstant::FloatKind kind = litInst->getFloatKind();
+                        switch (kind)
+                        {
+                        case IRConstant::FloatKind::Nan:
+                            {
+                                ensurePrelude(kWGSLBuiltinPreludeGetNan);
+                                m_writer->emit("_slang_getNan()");
+                                break;
+                            }
+                        case IRConstant::FloatKind::PositiveInfinity:
+                            {
+                                ensurePrelude(kWGSLBuiltinPreludeGetInfinity);
+                                m_writer->emit("_slang_getInfinity(true)");
+                                break;
+                            }
+                        case IRConstant::FloatKind::NegativeInfinity:
+                            {
+                                ensurePrelude(kWGSLBuiltinPreludeGetInfinity);
+                                m_writer->emit("_slang_getInfinity(false)");
+                                break;
+                            }
+                        default:
+                            m_writer->emit(litInst->value.floatVal);
+                            m_writer->emit("f");
+                            break;
+                        }
                     }
                     break;
 
@@ -814,7 +963,9 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
         }
         break;
 
-    default: SLANG_UNIMPLEMENTED_X("val case for emit"); break;
+    default:
+        SLANG_UNIMPLEMENTED_X("val case for emit");
+        break;
     }
 }
 
@@ -827,7 +978,8 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    default: return false;
+    default:
+        return false;
     case kIROp_AtomicLoad:
         {
             emitInstResultDecl(inst);
@@ -976,6 +1128,33 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
         emitOperand(inst, getInfo(EmitOp::General));
     }
 }
+
+bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
+{
+    bool result = CLikeSourceEmitter::shouldFoldInstIntoUseSites(inst);
+    if (result)
+    {
+        // If inst is a matrix, and is used in a component-wise multiply,
+        // we need to not fold it.
+        if (as<IRMatrixType>(inst->getDataType()))
+        {
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user->getOp() == kIROp_Mul)
+                {
+                    if (as<IRMatrixType>(user->getOperand(0)->getDataType()) &&
+                        as<IRMatrixType>(user->getOperand(1)->getDataType()))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return result;
+}
+
 
 bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
@@ -1163,6 +1342,71 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
         break;
+
+    case kIROp_GetStringHash:
+        {
+            auto getStringHashInst = as<IRGetStringHash>(inst);
+            auto stringLit = getStringHashInst->getStringLit();
+
+            if (stringLit)
+            {
+                auto slice = stringLit->getStringSlice();
+                emitType(inst->getDataType());
+                m_writer->emit("(");
+                m_writer->emit((int)getStableHashCode32(slice.begin(), slice.getLength()).hash);
+                m_writer->emit(")");
+            }
+            else
+            {
+                // Couldn't handle
+                diagnoseUnhandledInst(inst);
+            }
+            return true;
+        }
+
+    case kIROp_Mul:
+        {
+            if (!as<IRMatrixType>(inst->getOperand(0)->getDataType()) ||
+                !as<IRMatrixType>(inst->getOperand(1)->getDataType()))
+            {
+                return false;
+            }
+            // Mul(m1, m2) should be translated to component-wise multiplication in WGSL.
+            auto matrixType = as<IRMatrixType>(inst->getDataType());
+            auto rowCount = getIntVal(matrixType->getRowCount());
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            for (IRIntegerValue i = 0; i < rowCount; i++)
+            {
+                if (i != 0)
+                {
+                    m_writer->emit(", ");
+                }
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::Postfix));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("] * ");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::Postfix));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("]");
+            }
+            m_writer->emit(")");
+
+            return true;
+        }
+
+    case kIROp_Select:
+        {
+            m_writer->emit("select(");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     }
 
     return false;

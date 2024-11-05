@@ -208,9 +208,15 @@ SlangResult GlslangDownstreamCompiler::compile(
 
     switch (options.sourceLanguage)
     {
-    case SLANG_SOURCE_LANGUAGE_GLSL:  request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV; break;
-    case SLANG_SOURCE_LANGUAGE_SPIRV: request.action = GLSLANG_ACTION_OPTIMIZE_SPIRV; break;
-    default:                          SLANG_ASSERT(!"Can only handle GLSL or SPIR-V as input."); return SLANG_FAIL;
+    case SLANG_SOURCE_LANGUAGE_GLSL:
+        request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
+        break;
+    case SLANG_SOURCE_LANGUAGE_SPIRV:
+        request.action = GLSLANG_ACTION_OPTIMIZE_SPIRV;
+        break;
+    default:
+        SLANG_ASSERT(!"Can only handle GLSL or SPIR-V as input.");
+        return SLANG_FAIL;
     }
 
     request.sourcePath = sourcePath.getBuffer();

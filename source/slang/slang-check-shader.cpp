@@ -470,8 +470,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     case Stage::Geometry:
     case Stage::Mesh:
     case Stage::Hull:
-    case Stage::Domain:     canHaveVaryingInput = true; break;
-    default:                break;
+    case Stage::Domain:
+        canHaveVaryingInput = true;
+        break;
+    default:
+        break;
     }
 
     for (const auto& param : entryPointFuncDecl->getParameters())
@@ -1241,7 +1244,8 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
             }
             break;
 
-        default: SLANG_UNEXPECTED("unhandled specialization parameter flavor");
+        default:
+            SLANG_UNEXPECTED("unhandled specialization parameter flavor");
         }
     }
 

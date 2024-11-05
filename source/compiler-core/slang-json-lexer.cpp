@@ -147,7 +147,8 @@ JSONTokenType JSONLexer::advance()
 
         switch (c)
         {
-        case 0: return _setToken(JSONTokenType::EndOfFile, cursor - 1);
+        case 0:
+            return _setToken(JSONTokenType::EndOfFile, cursor - 1);
         case '"':
             {
                 cursor = _lexString(cursor);
@@ -190,12 +191,18 @@ JSONTokenType JSONLexer::advance()
                 cursor = _lexWhitespace(cursor);
                 break;
             }
-        case ':': return _setToken(JSONTokenType::Colon, cursor);
-        case ',': return _setToken(JSONTokenType::Comma, cursor);
-        case '[': return _setToken(JSONTokenType::LBracket, cursor);
-        case ']': return _setToken(JSONTokenType::RBracket, cursor);
-        case '{': return _setToken(JSONTokenType::LBrace, cursor);
-        case '}': return _setToken(JSONTokenType::RBrace, cursor);
+        case ':':
+            return _setToken(JSONTokenType::Colon, cursor);
+        case ',':
+            return _setToken(JSONTokenType::Comma, cursor);
+        case '[':
+            return _setToken(JSONTokenType::LBracket, cursor);
+        case ']':
+            return _setToken(JSONTokenType::RBracket, cursor);
+        case '{':
+            return _setToken(JSONTokenType::LBrace, cursor);
+        case '}':
+            return _setToken(JSONTokenType::RBrace, cursor);
 
         case '-':
         case '0':
@@ -398,7 +405,8 @@ const char* JSONLexer::_lexString(const char* cursor)
                 }
             }
         // Somewhat surprisingly it appears it's valid to have \r\n inside of quotes.
-        default: break;
+        default:
+            break;
         }
     }
 }
@@ -445,7 +453,8 @@ const char* JSONLexer::_lexBlockComment(const char* cursor)
                 }
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 }
@@ -481,21 +490,36 @@ UnownedStringSlice getJSONTokenAsText(JSONTokenType type)
 {
     switch (type)
     {
-    case JSONTokenType::Invalid:        return UnownedStringSlice::fromLiteral("invalid");
-    case JSONTokenType::IntegerLiteral: return UnownedStringSlice::fromLiteral("integer literal");
-    case JSONTokenType::FloatLiteral:   return UnownedStringSlice::fromLiteral("float literal");
-    case JSONTokenType::StringLiteral:  return UnownedStringSlice::fromLiteral("string literal");
-    case JSONTokenType::LBracket:       return UnownedStringSlice::fromLiteral("[");
-    case JSONTokenType::RBracket:       return UnownedStringSlice::fromLiteral("]");
-    case JSONTokenType::LBrace:         return UnownedStringSlice::fromLiteral("{");
-    case JSONTokenType::RBrace:         return UnownedStringSlice::fromLiteral("}");
-    case JSONTokenType::Comma:          return UnownedStringSlice::fromLiteral(",");
-    case JSONTokenType::Colon:          return UnownedStringSlice::fromLiteral(":");
-    case JSONTokenType::True:           return UnownedStringSlice::fromLiteral("true");
-    case JSONTokenType::False:          return UnownedStringSlice::fromLiteral("false");
-    case JSONTokenType::Null:           return UnownedStringSlice::fromLiteral("null");
-    case JSONTokenType::EndOfFile:      return UnownedStringSlice::fromLiteral("end of file");
-    default:                            break;
+    case JSONTokenType::Invalid:
+        return UnownedStringSlice::fromLiteral("invalid");
+    case JSONTokenType::IntegerLiteral:
+        return UnownedStringSlice::fromLiteral("integer literal");
+    case JSONTokenType::FloatLiteral:
+        return UnownedStringSlice::fromLiteral("float literal");
+    case JSONTokenType::StringLiteral:
+        return UnownedStringSlice::fromLiteral("string literal");
+    case JSONTokenType::LBracket:
+        return UnownedStringSlice::fromLiteral("[");
+    case JSONTokenType::RBracket:
+        return UnownedStringSlice::fromLiteral("]");
+    case JSONTokenType::LBrace:
+        return UnownedStringSlice::fromLiteral("{");
+    case JSONTokenType::RBrace:
+        return UnownedStringSlice::fromLiteral("}");
+    case JSONTokenType::Comma:
+        return UnownedStringSlice::fromLiteral(",");
+    case JSONTokenType::Colon:
+        return UnownedStringSlice::fromLiteral(":");
+    case JSONTokenType::True:
+        return UnownedStringSlice::fromLiteral("true");
+    case JSONTokenType::False:
+        return UnownedStringSlice::fromLiteral("false");
+    case JSONTokenType::Null:
+        return UnownedStringSlice::fromLiteral("null");
+    case JSONTokenType::EndOfFile:
+        return UnownedStringSlice::fromLiteral("end of file");
+    default:
+        break;
     }
     SLANG_UNEXPECTED("JSONTokenType not known");
 }

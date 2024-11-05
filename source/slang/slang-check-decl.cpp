@@ -648,8 +648,11 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             auto& operand = val->m_operands[i];
             switch (operand.kind)
             {
-            case ValNodeOperandKind::ValNode: dispatchIfNotNull(val->getOperand(i)); break;
-            default:                          break;
+            case ValNodeOperandKind::ValNode:
+                dispatchIfNotNull(val->getOperand(i));
+                break;
+            default:
+                break;
             }
         }
         return;
@@ -1122,7 +1125,8 @@ bool SemanticsVisitor::isUsableAsStaticMember(LookupResultItem const& item)
             // TODO: Are there any other cases that need special-case
             // handling here?
 
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -1548,71 +1552,119 @@ ImageFormat inferImageFormatFromTextureType(
             case BaseType::UInt:
                 switch (vectorWidth)
                 {
-                case 1: format = ImageFormat::r32ui; break;
-                case 2: format = ImageFormat::rg32ui; break;
-                case 4: format = ImageFormat::rgba32ui; break;
+                case 1:
+                    format = ImageFormat::r32ui;
+                    break;
+                case 2:
+                    format = ImageFormat::rg32ui;
+                    break;
+                case 4:
+                    format = ImageFormat::rgba32ui;
+                    break;
                 }
                 break;
             case BaseType::Int:
                 switch (vectorWidth)
                 {
-                case 1: format = ImageFormat::r32i; break;
-                case 2: format = ImageFormat::rg32i; break;
-                case 4: format = ImageFormat::rgba32i; break;
+                case 1:
+                    format = ImageFormat::r32i;
+                    break;
+                case 2:
+                    format = ImageFormat::rg32i;
+                    break;
+                case 4:
+                    format = ImageFormat::rgba32i;
+                    break;
                 }
                 break;
             case BaseType::UInt16:
                 switch (vectorWidth)
                 {
-                case 1: format = ImageFormat::r16ui; break;
-                case 2: format = ImageFormat::rg16ui; break;
-                case 4: format = ImageFormat::rgba16ui; break;
+                case 1:
+                    format = ImageFormat::r16ui;
+                    break;
+                case 2:
+                    format = ImageFormat::rg16ui;
+                    break;
+                case 4:
+                    format = ImageFormat::rgba16ui;
+                    break;
                 }
                 break;
             case BaseType::Int16:
                 switch (vectorWidth)
                 {
-                case 1: format = ImageFormat::r16i; break;
-                case 2: format = ImageFormat::rg16i; break;
-                case 4: format = ImageFormat::rgba16i; break;
+                case 1:
+                    format = ImageFormat::r16i;
+                    break;
+                case 2:
+                    format = ImageFormat::rg16i;
+                    break;
+                case 4:
+                    format = ImageFormat::rgba16i;
+                    break;
                 }
                 break;
             case BaseType::UInt8:
                 switch (vectorWidth)
                 {
-                case 1: format = ImageFormat::r8ui; break;
-                case 2: format = ImageFormat::rg8ui; break;
-                case 4: format = ImageFormat::rgba8ui; break;
+                case 1:
+                    format = ImageFormat::r8ui;
+                    break;
+                case 2:
+                    format = ImageFormat::rg8ui;
+                    break;
+                case 4:
+                    format = ImageFormat::rgba8ui;
+                    break;
                 }
                 break;
             case BaseType::Int8:
                 switch (vectorWidth)
                 {
-                case 1: format = ImageFormat::r8i; break;
-                case 2: format = ImageFormat::rg8i; break;
-                case 4: format = ImageFormat::rgba8i; break;
+                case 1:
+                    format = ImageFormat::r8i;
+                    break;
+                case 2:
+                    format = ImageFormat::rg8i;
+                    break;
+                case 4:
+                    format = ImageFormat::rgba8i;
+                    break;
                 }
                 break;
             case BaseType::Int64:
                 switch (vectorWidth)
                 {
-                case 1:  format = ImageFormat::r64i; break;
-                default: break;
+                case 1:
+                    format = ImageFormat::r64i;
+                    break;
+                default:
+                    break;
                 }
                 break;
             case BaseType::UInt64:
                 switch (vectorWidth)
                 {
-                case 1:  format = ImageFormat::r64ui; break;
-                default: break;
+                case 1:
+                    format = ImageFormat::r64ui;
+                    break;
+                default:
+                    break;
                 }
                 break;
             case BaseType::Half:
                 switch (vectorWidth)
                 {
-                case 1: format = ImageFormat::r16f; break;
-                case 2: format = ImageFormat::rg16f; break;
-                case 4: format = ImageFormat::rgba16f; break;
+                case 1:
+                    format = ImageFormat::r16f;
+                    break;
+                case 2:
+                    format = ImageFormat::rg16f;
+                    break;
+                case 4:
+                    format = ImageFormat::rgba16f;
+                    break;
                 }
                 break;
             }
@@ -1836,7 +1888,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             case BaseType::UInt16:
             case BaseType::UInt:
             case BaseType::UInt64:
-            case BaseType::UIntPtr: break;
+            case BaseType::UIntPtr:
+                break;
             default:
                 getSink()->diagnose(varDecl, Diagnostics::staticConstRequirementMustBeIntOrBool);
                 break;
@@ -2362,10 +2415,17 @@ void addVisibilityModifier(ASTBuilder* builder, Decl* decl, DeclVisibility vis)
 {
     switch (vis)
     {
-    case DeclVisibility::Public:   addModifier(decl, builder->create<PublicModifier>()); break;
-    case DeclVisibility::Internal: addModifier(decl, builder->create<InternalModifier>()); break;
-    case DeclVisibility::Private:  addModifier(decl, builder->create<PrivateModifier>()); break;
-    default:                       break;
+    case DeclVisibility::Public:
+        addModifier(decl, builder->create<PublicModifier>());
+        break;
+    case DeclVisibility::Internal:
+        addModifier(decl, builder->create<InternalModifier>());
+        break;
+    case DeclVisibility::Private:
+        addModifier(decl, builder->create<PrivateModifier>());
+        break;
+    default:
+        break;
     }
 }
 
@@ -5981,20 +6041,47 @@ bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(
     auto intrinsicOpModifier = getASTBuilder()->create<IntrinsicOpModifier>();
     switch (requirementKind)
     {
-    case BuiltinRequirementKind::And:                intrinsicOpModifier->op = kIROp_And; break;
-    case BuiltinRequirementKind::Or:                 intrinsicOpModifier->op = kIROp_Or; break;
-    case BuiltinRequirementKind::Not:                intrinsicOpModifier->op = kIROp_Not; break;
-    case BuiltinRequirementKind::BitAnd:             intrinsicOpModifier->op = kIROp_BitAnd; break;
-    case BuiltinRequirementKind::BitNot:             intrinsicOpModifier->op = kIROp_BitNot; break;
-    case BuiltinRequirementKind::BitOr:              intrinsicOpModifier->op = kIROp_BitOr; break;
-    case BuiltinRequirementKind::BitXor:             intrinsicOpModifier->op = kIROp_BitXor; break;
-    case BuiltinRequirementKind::Shl:                intrinsicOpModifier->op = kIROp_Lsh; break;
-    case BuiltinRequirementKind::Shr:                intrinsicOpModifier->op = kIROp_Rsh; break;
-    case BuiltinRequirementKind::Equals:             intrinsicOpModifier->op = kIROp_Eql; break;
-    case BuiltinRequirementKind::LessThan:           intrinsicOpModifier->op = kIROp_Less; break;
-    case BuiltinRequirementKind::LessThanOrEquals:   intrinsicOpModifier->op = kIROp_Leq; break;
-    case BuiltinRequirementKind::InitLogicalFromInt: intrinsicOpModifier->op = kIROp_IntCast; break;
-    default:                                         SLANG_UNEXPECTED("unknown builtin requirement kind.");
+    case BuiltinRequirementKind::And:
+        intrinsicOpModifier->op = kIROp_And;
+        break;
+    case BuiltinRequirementKind::Or:
+        intrinsicOpModifier->op = kIROp_Or;
+        break;
+    case BuiltinRequirementKind::Not:
+        intrinsicOpModifier->op = kIROp_Not;
+        break;
+    case BuiltinRequirementKind::BitAnd:
+        intrinsicOpModifier->op = kIROp_BitAnd;
+        break;
+    case BuiltinRequirementKind::BitNot:
+        intrinsicOpModifier->op = kIROp_BitNot;
+        break;
+    case BuiltinRequirementKind::BitOr:
+        intrinsicOpModifier->op = kIROp_BitOr;
+        break;
+    case BuiltinRequirementKind::BitXor:
+        intrinsicOpModifier->op = kIROp_BitXor;
+        break;
+    case BuiltinRequirementKind::Shl:
+        intrinsicOpModifier->op = kIROp_Lsh;
+        break;
+    case BuiltinRequirementKind::Shr:
+        intrinsicOpModifier->op = kIROp_Rsh;
+        break;
+    case BuiltinRequirementKind::Equals:
+        intrinsicOpModifier->op = kIROp_Eql;
+        break;
+    case BuiltinRequirementKind::LessThan:
+        intrinsicOpModifier->op = kIROp_Less;
+        break;
+    case BuiltinRequirementKind::LessThanOrEquals:
+        intrinsicOpModifier->op = kIROp_Leq;
+        break;
+    case BuiltinRequirementKind::InitLogicalFromInt:
+        intrinsicOpModifier->op = kIROp_IntCast;
+        break;
+    default:
+        SLANG_UNEXPECTED("unknown builtin requirement kind.");
     }
     synFunc->loc = context->parentDecl->closingSourceLoc;
     synFunc->nameAndLoc.loc = synFunc->loc;
@@ -6157,7 +6244,9 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
                 }
                 break;
             }
-        default: SLANG_UNIMPLEMENTED_X("unhandled synthesis pattern"); break;
+        default:
+            SLANG_UNIMPLEMENTED_X("unhandled synthesis pattern");
+            break;
         }
 
         // Invoke the method for the field and assign the value to resultVar.
@@ -7335,7 +7424,8 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
 #endif
         return value >= std::numeric_limits<int64_t>::min() &&
                value <= std::numeric_limits<int64_t>::max();
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -8949,7 +9039,8 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
         case ParameterDirection::kParameterDirection_ConstRef:
             addModifier(param, m_astBuilder->create<ConstRefModifier>());
             break;
-        default: break;
+        default:
+            break;
         }
         decl->members.add(param);
         param->parentDecl = decl;
@@ -10519,7 +10610,8 @@ FunctionDifferentiableLevel SharedSemanticsContext::_getFuncDifferentiableLevelI
                 return _getFuncDifferentiableLevelImpl(assocFunc, recurseLimit - 1);
             }
             break;
-        default: break;
+        default:
+            break;
         }
     }
     if (auto builtinReq = func->findModifier<BuiltinRequirementModifier>())
@@ -10528,8 +10620,10 @@ FunctionDifferentiableLevel SharedSemanticsContext::_getFuncDifferentiableLevelI
         {
         case BuiltinRequirementKind::DAddFunc:
         case BuiltinRequirementKind::DMulFunc:
-        case BuiltinRequirementKind::DZeroFunc: return FunctionDifferentiableLevel::Backward;
-        default:                                break;
+        case BuiltinRequirementKind::DZeroFunc:
+            return FunctionDifferentiableLevel::Backward;
+        default:
+            break;
         }
     }
     return diffLevel;
@@ -10608,15 +10702,21 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
     case DeclCheckState::ModifiersChecked:
         SemanticsDeclModifiersVisitor(shared).dispatch(decl);
         break;
-    case DeclCheckState::ScopesWired: SemanticsDeclScopeWiringVisitor(shared).dispatch(decl); break;
+    case DeclCheckState::ScopesWired:
+        SemanticsDeclScopeWiringVisitor(shared).dispatch(decl);
+        break;
 
-    case DeclCheckState::SignatureChecked: SemanticsDeclHeaderVisitor(shared).dispatch(decl); break;
+    case DeclCheckState::SignatureChecked:
+        SemanticsDeclHeaderVisitor(shared).dispatch(decl);
+        break;
 
     case DeclCheckState::ReadyForReference:
         SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
         break;
 
-    case DeclCheckState::ReadyForLookup: SemanticsDeclBasesVisitor(shared).dispatch(decl); break;
+    case DeclCheckState::ReadyForLookup:
+        SemanticsDeclBasesVisitor(shared).dispatch(decl);
+        break;
 
     case DeclCheckState::ReadyForConformances:
         SemanticsDeclConformancesVisitor(shared).dispatch(decl);
@@ -10631,7 +10731,9 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
         SemanticsDeclAttributesVisitor(shared).dispatch(decl);
         break;
 
-    case DeclCheckState::DefinitionChecked: SemanticsDeclBodyVisitor(shared).dispatch(decl); break;
+    case DeclCheckState::DefinitionChecked:
+        SemanticsDeclBodyVisitor(shared).dispatch(decl);
+        break;
 
     case DeclCheckState::CapabilityChecked:
         if (!shared.getOptionSet().getBoolOption(CompilerOptionName::IgnoreCapabilities))

@@ -138,10 +138,17 @@ void Artifact::clear(IArtifact::ContainedKind kind)
 {
     switch (kind)
     {
-    case ContainedKind::Associated:     m_associated.clear(); break;
-    case ContainedKind::Representation: m_representations.clear(); break;
-    case ContainedKind::Children:       m_children.clear(); break;
-    default:                            break;
+    case ContainedKind::Associated:
+        m_associated.clear();
+        break;
+    case ContainedKind::Representation:
+        m_representations.clear();
+        break;
+    case ContainedKind::Children:
+        m_children.clear();
+        break;
+    default:
+        break;
     }
 }
 
@@ -149,10 +156,17 @@ void Artifact::removeAt(ContainedKind kind, Index i)
 {
     switch (kind)
     {
-    case ContainedKind::Associated:     m_associated.removeAt(i); break;
-    case ContainedKind::Representation: m_representations.removeAt(i); break;
-    case ContainedKind::Children:       m_children.removeAt(i); break;
-    default:                            break;
+    case ContainedKind::Associated:
+        m_associated.removeAt(i);
+        break;
+    case ContainedKind::Representation:
+        m_representations.removeAt(i);
+        break;
+    case ContainedKind::Children:
+        m_children.removeAt(i);
+        break;
+    default:
+        break;
     }
 }
 
@@ -217,7 +231,8 @@ void* Artifact::findRepresentation(ContainedKind kind, const Guid& guid)
 {
     switch (kind)
     {
-    case ContainedKind::Associated: return _findRepresentation(_getRawView(m_associated), guid);
+    case ContainedKind::Associated:
+        return _findRepresentation(_getRawView(m_associated), guid);
     case ContainedKind::Representation:
         return _findRepresentation(_getRawView(m_representations), guid);
     case ContainedKind::Children:

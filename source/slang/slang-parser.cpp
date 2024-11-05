@@ -347,11 +347,18 @@ static TokenType SkipBalancedToken(TokenReader* reader)
     TokenType tokenType = reader->advanceToken().type;
     switch (tokenType)
     {
-    default: break;
+    default:
+        break;
 
-    case TokenType::LParent:  tokenType = SkipToMatchingToken(reader, TokenType::RParent); break;
-    case TokenType::LBrace:   tokenType = SkipToMatchingToken(reader, TokenType::RBrace); break;
-    case TokenType::LBracket: tokenType = SkipToMatchingToken(reader, TokenType::RBracket); break;
+    case TokenType::LParent:
+        tokenType = SkipToMatchingToken(reader, TokenType::RParent);
+        break;
+    case TokenType::LBrace:
+        tokenType = SkipToMatchingToken(reader, TokenType::RBrace);
+        break;
+    case TokenType::LBracket:
+        tokenType = SkipToMatchingToken(reader, TokenType::RBracket);
+        break;
     }
     return tokenType;
 }
@@ -381,9 +388,11 @@ static bool IsClosingToken(TokenType tokenType)
     case TokenType::EndOfFile:
     case TokenType::RBracket:
     case TokenType::RParent:
-    case TokenType::RBrace:    return true;
+    case TokenType::RBrace:
+        return true;
 
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -458,24 +467,42 @@ static bool TryRecover(
     {
         switch (recoverBefore[ii])
         {
-        default: break;
+        default:
+            break;
 
-        case TokenType::EndOfFile: lookingForEOF = true; break;
-        case TokenType::RBrace:    lookingForRCurly = true; break;
-        case TokenType::RParent:   lookingForRParen = true; break;
-        case TokenType::RBracket:  lookingForRSquare = true; break;
+        case TokenType::EndOfFile:
+            lookingForEOF = true;
+            break;
+        case TokenType::RBrace:
+            lookingForRCurly = true;
+            break;
+        case TokenType::RParent:
+            lookingForRParen = true;
+            break;
+        case TokenType::RBracket:
+            lookingForRSquare = true;
+            break;
         }
     }
     for (int ii = 0; ii < recoverAfterCount; ++ii)
     {
         switch (recoverAfter[ii])
         {
-        default: break;
+        default:
+            break;
 
-        case TokenType::EndOfFile: lookingForEOF = true; break;
-        case TokenType::RBrace:    lookingForRCurly = true; break;
-        case TokenType::RParent:   lookingForRParen = true; break;
-        case TokenType::RBracket:  lookingForRSquare = true; break;
+        case TokenType::EndOfFile:
+            lookingForEOF = true;
+            break;
+        case TokenType::RBrace:
+            lookingForRCurly = true;
+            break;
+        case TokenType::RParent:
+            lookingForRParen = true;
+            break;
+        case TokenType::RBracket:
+            lookingForRSquare = true;
+            break;
         }
     }
 
@@ -587,8 +614,10 @@ Token Parser::readTokenImpl(TokenType expected, bool forceSkippingToClosingToken
         {
         case TokenType::RBrace:
         case TokenType::RParent:
-        case TokenType::RBracket: break;
-        default:                  return tokenReader.peekToken();
+        case TokenType::RBracket:
+            break;
+        default:
+            return tokenReader.peekToken();
         }
     }
 
@@ -1193,7 +1222,9 @@ static Modifiers ParseModifiers(Parser* parser)
 
         // HLSL uses `[attributeName]` style for its modifiers, which closely
         // matches the C++ `[[attributeName]]` style.
-        case TokenType::LBracket: ParseSquareBracketAttributes(parser, &modifierLink); break;
+        case TokenType::LBracket:
+            ParseSquareBracketAttributes(parser, &modifierLink);
+            break;
         }
     }
 }
@@ -1351,8 +1382,11 @@ static NameLoc ParseDeclName(Parser* parser)
 
         // Note(tfoley): A bit of a hack:
         case TokenType::Comma:
-        case TokenType::OpAssign: break;
-        case TokenType::LParent:  parser->ReadToken(TokenType::RParent); break;
+        case TokenType::OpAssign:
+            break;
+        case TokenType::LParent:
+            parser->ReadToken(TokenType::RParent);
+            break;
 
         // Note(tfoley): Even more of a hack!
         case TokenType::QuestionMark:
@@ -1488,8 +1522,11 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
             case TokenType::Colon:
             case TokenType::Comma:
             case TokenType::OpGreater:
-            case TokenType::OpAssign:  break;
-            default:                   isTypeParam = false; break;
+            case TokenType::OpAssign:
+                break;
+            default:
+                isTypeParam = false;
+                break;
             }
         }
 
@@ -1966,7 +2003,8 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
                 continue;
             }
 
-        case TokenType::LParent: break;
+        case TokenType::LParent:
+            break;
 
         case TokenType::OpLess:
             {
@@ -2012,7 +2050,8 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
                 }
             }
             break;
-        default: break;
+        default:
+            break;
         }
 
         break;
@@ -2116,7 +2155,9 @@ static void UnwrapDeclarator(
             }
             break;
 
-        default: SLANG_UNREACHABLE("all cases handled"); break;
+        default:
+            SLANG_UNREACHABLE("all cases handled");
+            break;
         }
     }
 }
@@ -2690,7 +2731,9 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     {
         switch (peekTokenType(parser))
         {
-        case TokenType::OpLess: typeExpr = parseGenericApp(parser, typeExpr); break;
+        case TokenType::OpLess:
+            typeExpr = parseGenericApp(parser, typeExpr);
+            break;
         case TokenType::Scope:
             {
                 auto opToken = parser->ReadToken(TokenType::Scope);
@@ -2703,7 +2746,8 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
                 typeExpr = parseMemberType(parser, typeExpr, opToken.loc);
                 break;
             }
-        default: shouldLoop = false;
+        default:
+            shouldLoop = false;
         }
     }
 
@@ -3891,14 +3935,16 @@ static bool _peekModernStyleVarDecl(Parser* parser)
 
     switch (peekTokenType(parser, 1))
     {
-    default: return false;
+    default:
+        return false;
 
     case TokenType::Colon:
     case TokenType::Comma:
     case TokenType::RParent:
     case TokenType::RBrace:
     case TokenType::RBracket:
-    case TokenType::LBrace:   return true;
+    case TokenType::LBrace:
+        return true;
     }
 }
 
@@ -4263,8 +4309,10 @@ static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
     case ASTNodeType::IncludeDecl:
     case ASTNodeType::ImplementingDecl:
     case ASTNodeType::ModuleDeclarationDecl:
-    case ASTNodeType::AssocTypeDecl:          return true;
-    default:                                  return false;
+    case ASTNodeType::AssocTypeDecl:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -4292,8 +4340,10 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::ClassDecl:
         case ASTNodeType::EnumDecl:
         case ASTNodeType::GenericDecl:
-        case ASTNodeType::ConstructorDecl: return true;
-        default:                           return false;
+        case ASTNodeType::ConstructorDecl:
+            return true;
+        default:
+            return false;
         }
     case ASTNodeType::StructDecl:
     case ASTNodeType::ClassDecl:
@@ -4312,8 +4362,10 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::EnumDecl:
         case ASTNodeType::EnumCaseDecl:
         case ASTNodeType::GenericDecl:
-        case ASTNodeType::ConstructorDecl: return true;
-        default:                           return false;
+        case ASTNodeType::ConstructorDecl:
+            return true;
+        default:
+            return false;
         }
     case ASTNodeType::InterfaceDecl:
         switch (declType)
@@ -4325,15 +4377,19 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::VarDecl:
         case ASTNodeType::LetDecl:
         case ASTNodeType::GenericDecl:
-        case ASTNodeType::ConstructorDecl: return true;
-        default:                           return false;
+        case ASTNodeType::ConstructorDecl:
+            return true;
+        default:
+            return false;
         }
     case ASTNodeType::GLSLInterfaceBlockDecl:
         switch (declType)
         {
         case ASTNodeType::VarDecl:
-        case ASTNodeType::LetDecl: return true;
-        default:                   return false;
+        case ASTNodeType::LetDecl:
+            return true;
+        default:
+            return false;
         }
     case ASTNodeType::ConstructorDecl:
     case ASTNodeType::AccessorDecl:
@@ -4350,8 +4406,10 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::StructDecl:
         case ASTNodeType::ClassDecl:
         case ASTNodeType::EnumDecl:
-        case ASTNodeType::GenericDecl:   return true;
-        default:                         return false;
+        case ASTNodeType::GenericDecl:
+            return true;
+        default:
+            return false;
         }
     case ASTNodeType::SubscriptDecl:
     case ASTNodeType::PropertyDecl:
@@ -4360,8 +4418,10 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::AccessorDecl:
         case ASTNodeType::GetterDecl:
         case ASTNodeType::SetterDecl:
-        case ASTNodeType::RefAccessorDecl: return true;
-        default:                           return false;
+        case ASTNodeType::RefAccessorDecl:
+            return true;
+        default:
+            return false;
         }
     case ASTNodeType::ModuleDecl:
     case ASTNodeType::FileDecl:
@@ -4392,8 +4452,10 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::EnumDecl:
         case ASTNodeType::InterfaceDecl:
         case ASTNodeType::GLSLInterfaceBlockDecl:
-        case ASTNodeType::ExtensionDecl:          return true;
-        default:                                  return false;
+        case ASTNodeType::ExtensionDecl:
+            return true;
+        default:
+            return false;
         }
     case ASTNodeType::GenericDecl:
         switch (declType)
@@ -4407,8 +4469,10 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::TypeAliasDecl:
         case ASTNodeType::TypeDefDecl:
         case ASTNodeType::ExtensionDecl:
-        case ASTNodeType::SubscriptDecl:   return true;
-        default:                           return false;
+        case ASTNodeType::SubscriptDecl:
+            return true;
+        default:
+            return false;
         }
     case ASTNodeType::VarDecl:
     case ASTNodeType::LetDecl:
@@ -4419,8 +4483,10 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
     case ASTNodeType::IncludeDecl:
     case ASTNodeType::ImplementingDecl:
     case ASTNodeType::ModuleDeclarationDecl:
-    case ASTNodeType::AssocTypeDecl:         return true;
-    default:                                 return true;
+    case ASTNodeType::AssocTypeDecl:
+        return true;
+    default:
+        return true;
     }
 }
 
@@ -4738,7 +4804,9 @@ static DeclBase* ParseDeclWithModifiers(
         }
         break;
     // If nothing else matched, we try to parse an "ordinary" declarator-based declaration
-    default: decl = ParseDeclaratorDecl(parser, containerDecl, modifiers); break;
+    default:
+        decl = ParseDeclaratorDecl(parser, containerDecl, modifiers);
+        break;
     }
 
     if (decl)
@@ -6072,8 +6140,10 @@ Precedence GetOpLevel(Parser* parser, const Token& token)
 {
     switch (token.type)
     {
-    case TokenType::QuestionMark: return Precedence::TernaryConditional;
-    case TokenType::Comma:        return Precedence::Comma;
+    case TokenType::QuestionMark:
+        return Precedence::TernaryConditional;
+    case TokenType::Comma:
+        return Precedence::Comma;
     case TokenType::OpAssign:
     case TokenType::OpMulAssign:
     case TokenType::OpDivAssign:
@@ -6084,14 +6154,21 @@ Precedence GetOpLevel(Parser* parser, const Token& token)
     case TokenType::OpShrAssign:
     case TokenType::OpOrAssign:
     case TokenType::OpAndAssign:
-    case TokenType::OpXorAssign:  return Precedence::Assignment;
-    case TokenType::OpOr:         return Precedence::LogicalOr;
-    case TokenType::OpAnd:        return Precedence::LogicalAnd;
-    case TokenType::OpBitOr:      return Precedence::BitOr;
-    case TokenType::OpBitXor:     return Precedence::BitXor;
-    case TokenType::OpBitAnd:     return Precedence::BitAnd;
+    case TokenType::OpXorAssign:
+        return Precedence::Assignment;
+    case TokenType::OpOr:
+        return Precedence::LogicalOr;
+    case TokenType::OpAnd:
+        return Precedence::LogicalAnd;
+    case TokenType::OpBitOr:
+        return Precedence::BitOr;
+    case TokenType::OpBitXor:
+        return Precedence::BitXor;
+    case TokenType::OpBitAnd:
+        return Precedence::BitAnd;
     case TokenType::OpEql:
-    case TokenType::OpNeq:        return Precedence::EqualityComparison;
+    case TokenType::OpNeq:
+        return Precedence::EqualityComparison;
     case TokenType::OpGreater:
     case TokenType::OpGeq:
         // Don't allow these ops inside a generic argument
@@ -6099,18 +6176,22 @@ Precedence GetOpLevel(Parser* parser, const Token& token)
             return Precedence::Invalid;
         ; // fall-thru
     case TokenType::OpLeq:
-    case TokenType::OpLess: return Precedence::RelationalComparison;
+    case TokenType::OpLess:
+        return Precedence::RelationalComparison;
     case TokenType::OpRsh:
         // Don't allow this op inside a generic argument
         if (parser->genericDepth > 0)
             return Precedence::Invalid;
         ; // fall-thru
-    case TokenType::OpLsh: return Precedence::BitShift;
+    case TokenType::OpLsh:
+        return Precedence::BitShift;
     case TokenType::OpAdd:
-    case TokenType::OpSub: return Precedence::Additive;
+    case TokenType::OpSub:
+        return Precedence::Additive;
     case TokenType::OpMul:
     case TokenType::OpDiv:
-    case TokenType::OpMod: return Precedence::Multiplicative;
+    case TokenType::OpMod:
+        return Precedence::Multiplicative;
     default:
         {
             const auto content = token.getContent();
@@ -6133,7 +6214,9 @@ static Expr* parseOperator(Parser* parser)
         opToken.setContent(UnownedStringSlice::fromLiteral("?:"));
         break;
 
-    default: opToken = parser->ReadToken(); break;
+    default:
+        opToken = parser->ReadToken();
+        break;
     }
 
     auto opExpr = parser->astBuilder->create<VarExpr>();
@@ -6485,7 +6568,8 @@ static FloatFixKind _fixFloatLiteralValue(
                 }
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -6688,7 +6772,8 @@ static bool _isCast(Parser* parser, Expr* expr)
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     // We'll assume it's not a cast
@@ -6863,15 +6948,23 @@ static Expr* parseAtomicExpr(Parser* parser)
                     switch (*suffixCursor++)
                     {
                     case 'l':
-                    case 'L': lCount++; break;
+                    case 'L':
+                        lCount++;
+                        break;
 
                     case 'u':
-                    case 'U': uCount++; break;
+                    case 'U':
+                        uCount++;
+                        break;
 
                     case 'z':
-                    case 'Z': zCount++; break;
+                    case 'Z':
+                        zCount++;
+                        break;
 
-                    default: unknownCount++; break;
+                    default:
+                        unknownCount++;
+                        break;
                     }
                 }
 
@@ -6955,15 +7048,23 @@ static Expr* parseAtomicExpr(Parser* parser)
                     switch (*suffixCursor++)
                     {
                     case 'f':
-                    case 'F': fCount++; break;
+                    case 'F':
+                        fCount++;
+                        break;
 
                     case 'l':
-                    case 'L': lCount++; break;
+                    case 'L':
+                        lCount++;
+                        break;
 
                     case 'h':
-                    case 'H': hCount++; break;
+                    case 'H':
+                        hCount++;
+                        break;
 
-                    default: unknownCount++; break;
+                    default:
+                        unknownCount++;
+                        break;
                     }
                 }
 
@@ -7156,7 +7257,8 @@ static Expr* parsePostfixExpr(Parser* parser)
         auto nextTokenType = peekTokenType(parser);
         switch (nextTokenType)
         {
-        default: return expr;
+        default:
+            return expr;
 
         // Postfix increment/decrement
         case TokenType::OpInc:
@@ -7276,9 +7378,12 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
 {
     switch (tokenType)
     {
-    case TokenType::OpBitNot: return ~value;
-    case TokenType::OpAdd:    return value;
-    case TokenType::OpSub:    return -value;
+    case TokenType::OpBitNot:
+        return ~value;
+    case TokenType::OpAdd:
+        return value;
+    case TokenType::OpSub:
+        return -value;
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
@@ -7291,8 +7396,10 @@ static IRFloatingPointValue _foldFloatPrefixOp(TokenType tokenType, IRFloatingPo
 {
     switch (tokenType)
     {
-    case TokenType::OpAdd: return value;
-    case TokenType::OpSub: return -value;
+    case TokenType::OpAdd:
+        return value;
+    case TokenType::OpSub:
+        return -value;
     default:
         {
             SLANG_ASSERT(!"Unexpected op");

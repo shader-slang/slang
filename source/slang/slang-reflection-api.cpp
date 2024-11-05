@@ -217,7 +217,8 @@ static SlangParameterCategory maybeRemapParameterCategory(
 
             // TODO: implement more helpers here
 
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -658,8 +659,9 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
     {
         switch (basicType->getBaseType())
         {
-#define CASE(BASE, TAG) \
-    case BaseType::BASE: return SLANG_SCALAR_TYPE_##TAG
+#define CASE(BASE, TAG)  \
+    case BaseType::BASE: \
+        return SLANG_SCALAR_TYPE_##TAG
 
             CASE(Void, VOID);
             CASE(Bool, BOOL);
@@ -1308,7 +1310,8 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
         switch (category)
         {
         // We store the stride explicitly for the uniform case
-        case SLANG_PARAMETER_CATEGORY_UNIFORM: return arrayTypeLayout->uniformStride;
+        case SLANG_PARAMETER_CATEGORY_UNIFORM:
+            return arrayTypeLayout->uniformStride;
 
         // For most other cases (resource registers), the "stride"
         // of an array is simply the number of resources (if any)
@@ -1325,7 +1328,8 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
         // An important special case, though, is Vulkan descriptor-table slots,
         // where an entire array will use a single `binding`, so that the
         // effective stride is zero:
-        case SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT: return 0;
+        case SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT:
+            return 0;
         }
     }
     else if (auto vectorTypeLayout = as<VectorTypeLayout>(typeLayout))
@@ -1667,7 +1671,8 @@ SlangBindingType _calcResourceBindingType(Type* type)
 
         switch (SlangResourceShape(shape))
         {
-        default: return SlangBindingType(SLANG_BINDING_TYPE_TEXTURE | mutableFlag);
+        default:
+            return SlangBindingType(SLANG_BINDING_TYPE_TEXTURE | mutableFlag);
 
         case SLANG_TEXTURE_BUFFER:
             return SlangBindingType(SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag);
@@ -1754,8 +1759,9 @@ SlangBindingType _calcBindingType(LayoutResourceKind kind)
         // directly to a `BindingType` because there is only
         // one case of types that have that resource kind.
 
-#define CASE(FROM, TO) \
-    case LayoutResourceKind::FROM: return SLANG_BINDING_TYPE_##TO
+#define CASE(FROM, TO)             \
+    case LayoutResourceKind::FROM: \
+        return SLANG_BINDING_TYPE_##TO
 
         CASE(ConstantBuffer, CONSTANT_BUFFER);
         CASE(SamplerState, SAMPLER);
@@ -1779,9 +1785,11 @@ SlangBindingType _calcBindingType(Slang::TypeLayout* typeLayout, LayoutResourceK
     //
     switch (kind)
     {
-    default: break;
+    default:
+        break;
 
-    case LayoutResourceKind::PushConstantBuffer: return SLANG_BINDING_TYPE_PUSH_CONSTANT;
+    case LayoutResourceKind::PushConstantBuffer:
+        return SLANG_BINDING_TYPE_PUSH_CONSTANT;
     }
 
     // If the type or type layout implies a specific binding type
@@ -1959,7 +1967,8 @@ struct ExtendedTypeLayoutContext
                     kind = resInfo.kind;
                     switch (kind)
                     {
-                    default: continue;
+                    default:
+                        continue;
 
                     case LayoutResourceKind::ConstantBuffer:
                     case LayoutResourceKind::PushConstantBuffer:
@@ -1972,7 +1981,8 @@ struct ExtendedTypeLayoutContext
                         // Note: the only case where a parameter group should
                         // reflect as consuming `Uniform` storage is on CPU/CUDA,
                         // where that will be the only resource it contains.
-                    case LayoutResourceKind::Uniform: break;
+                    case LayoutResourceKind::Uniform:
+                        break;
                     }
 
                     bindingType = _calcBindingType(typeLayout, kind);
@@ -2067,7 +2077,8 @@ struct ExtendedTypeLayoutContext
                     // leak through that is measured in descriptor sets.
                     //
                 case LayoutResourceKind::SubElementRegisterSpace:
-                case LayoutResourceKind::None:                    break;
+                case LayoutResourceKind::None:
+                    break;
 
                 default:
                     {
@@ -2080,9 +2091,11 @@ struct ExtendedTypeLayoutContext
                         {
                             switch (resInfo.kind)
                             {
-                            case LayoutResourceKind::SubElementRegisterSpace: continue;
+                            case LayoutResourceKind::SubElementRegisterSpace:
+                                continue;
 
-                            default: break;
+                            default:
+                                break;
                             }
 
                             TypeLayout::ExtendedInfo::DescriptorRangeInfo descriptorRange;
@@ -2110,7 +2123,8 @@ struct ExtendedTypeLayoutContext
                     //
                 case LayoutResourceKind::SubElementRegisterSpace:
                 case LayoutResourceKind::Uniform:
-                case LayoutResourceKind::None:                    break;
+                case LayoutResourceKind::None:
+                    break;
 
                 default:
                     {
@@ -2207,7 +2221,9 @@ struct ExtendedTypeLayoutContext
                 case LayoutResourceKind::DescriptorTableSlot:
                 case LayoutResourceKind::Uniform:
                 case LayoutResourceKind::ConstantBuffer: // for metal
-                case LayoutResourceKind::MetalArgumentBufferElement: resInfo = info; break;
+                case LayoutResourceKind::MetalArgumentBufferElement:
+                    resInfo = info;
+                    break;
                 }
             }
             SLANG_ASSERT(resInfo.kind != LayoutResourceKind::None);
@@ -2384,7 +2400,8 @@ struct ExtendedTypeLayoutContext
                 case LayoutResourceKind::HitAttributes:
                 case LayoutResourceKind::RayPayload:
                 case LayoutResourceKind::ExistentialTypeParam:
-                case LayoutResourceKind::ExistentialObjectParam:  continue;
+                case LayoutResourceKind::ExistentialObjectParam:
+                    continue;
                 }
 
                 // We will prefer to use a binding type derived from the specific
@@ -3056,20 +3073,41 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(
     Modifier* modifier = nullptr;
     switch (modifierID)
     {
-    case SLANG_MODIFIER_SHARED:  modifier = var->findModifier<HLSLEffectSharedModifier>(); break;
-    case SLANG_MODIFIER_CONST:   modifier = var->findModifier<ConstModifier>(); break;
-    case SLANG_MODIFIER_NO_DIFF: modifier = var->findModifier<NoDiffModifier>(); break;
-    case SLANG_MODIFIER_STATIC:  modifier = var->findModifier<HLSLStaticModifier>(); break;
-    case SLANG_MODIFIER_EXPORT:  modifier = var->findModifier<HLSLExportModifier>(); break;
-    case SLANG_MODIFIER_EXTERN:  modifier = var->findModifier<ExternModifier>(); break;
+    case SLANG_MODIFIER_SHARED:
+        modifier = var->findModifier<HLSLEffectSharedModifier>();
+        break;
+    case SLANG_MODIFIER_CONST:
+        modifier = var->findModifier<ConstModifier>();
+        break;
+    case SLANG_MODIFIER_NO_DIFF:
+        modifier = var->findModifier<NoDiffModifier>();
+        break;
+    case SLANG_MODIFIER_STATIC:
+        modifier = var->findModifier<HLSLStaticModifier>();
+        break;
+    case SLANG_MODIFIER_EXPORT:
+        modifier = var->findModifier<HLSLExportModifier>();
+        break;
+    case SLANG_MODIFIER_EXTERN:
+        modifier = var->findModifier<ExternModifier>();
+        break;
     case SLANG_MODIFIER_DIFFERENTIABLE:
         modifier = var->findModifier<DifferentiableAttribute>();
         break;
-    case SLANG_MODIFIER_MUTATING: modifier = var->findModifier<MutatingAttribute>(); break;
-    case SLANG_MODIFIER_IN:       modifier = var->findModifier<InModifier>(); break;
-    case SLANG_MODIFIER_OUT:      modifier = var->findModifier<OutModifier>(); break;
-    case SLANG_MODIFIER_INOUT:    modifier = var->findModifier<InOutModifier>(); break;
-    default:                      return nullptr;
+    case SLANG_MODIFIER_MUTATING:
+        modifier = var->findModifier<MutatingAttribute>();
+        break;
+    case SLANG_MODIFIER_IN:
+        modifier = var->findModifier<InModifier>();
+        break;
+    case SLANG_MODIFIER_OUT:
+        modifier = var->findModifier<OutModifier>();
+        break;
+    case SLANG_MODIFIER_INOUT:
+        modifier = var->findModifier<InOutModifier>();
+        break;
+    default:
+        return nullptr;
     }
 
     return (SlangReflectionModifier*)modifier;

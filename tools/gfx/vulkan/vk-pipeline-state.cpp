@@ -343,9 +343,13 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
 
     switch (desc.type)
     {
-    case PipelineType::Compute:  return createVKComputePipelineState();
-    case PipelineType::Graphics: return createVKGraphicsPipelineState();
-    default:                     SLANG_UNREACHABLE("Unknown pipeline type."); return SLANG_FAIL;
+    case PipelineType::Compute:
+        return createVKComputePipelineState();
+    case PipelineType::Graphics:
+        return createVKGraphicsPipelineState();
+    default:
+        SLANG_UNREACHABLE("Unknown pipeline type.");
+        return SLANG_FAIL;
     }
 }
 SLANG_NO_THROW Result SLANG_MCALL PipelineStateImpl::getNativeHandle(InteropHandle* outHandle)
@@ -493,8 +497,11 @@ Result RayTracingPipelineStateImpl::ensureAPIPipelineStateCreated()
 
     switch (desc.type)
     {
-    case PipelineType::RayTracing: return createVKRayTracingPipelineState();
-    default:                       SLANG_UNREACHABLE("Unknown pipeline type."); return SLANG_FAIL;
+    case PipelineType::RayTracing:
+        return createVKRayTracingPipelineState();
+    default:
+        SLANG_UNREACHABLE("Unknown pipeline type.");
+        return SLANG_FAIL;
     }
 }
 Result RayTracingPipelineStateImpl::getNativeHandle(InteropHandle* outHandle)

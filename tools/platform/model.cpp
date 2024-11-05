@@ -117,7 +117,8 @@ ComPtr<ITextureResource> loadTextureImage(IDevice* device, char const* path)
     Format format;
     switch (channelCount)
     {
-    default: return nullptr;
+    default:
+        return nullptr;
 
     case 4:
         format = Format::R8G8B8A8_UNORM;

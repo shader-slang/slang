@@ -243,7 +243,8 @@ SLANG_FORCE_INLINE bool IRSerialData::Inst::operator==(const ThisType& rhs) cons
             {
                 return m_payload.m_int64 == rhs.m_payload.m_int64;
             }
-        default: break;
+        default:
+            break;
         }
     }
 

@@ -850,7 +850,8 @@ Result ShaderObjectImpl::bindRootArguments(BindingContext* context, uint32_t& in
         case IResourceView::Type::UnorderedAccess:
             context->submitter->setRootUAV(index, m_rootArguments[i]);
             break;
-        default: continue;
+        default:
+            continue;
         }
         index++;
     }

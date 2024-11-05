@@ -273,7 +273,8 @@ ShaderObjectImpl::setObject(ShaderOffset const& offset, IShaderObject* object)
         break;
     case slang::BindingType::ExistentialValue:
     case slang::BindingType::RawBuffer:
-    case slang::BindingType::MutableRawBuffer: break;
+    case slang::BindingType::MutableRawBuffer:
+        break;
     }
     return SLANG_OK;
 }

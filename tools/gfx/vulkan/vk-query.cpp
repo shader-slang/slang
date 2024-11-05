@@ -19,7 +19,9 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
     createInfo.queryCount = (uint32_t)desc.count;
     switch (desc.type)
     {
-    case QueryType::Timestamp: createInfo.queryType = VK_QUERY_TYPE_TIMESTAMP; break;
+    case QueryType::Timestamp:
+        createInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+        break;
     case QueryType::AccelerationStructureCompactedSize:
         createInfo.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
         break;
@@ -29,7 +31,8 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
     case QueryType::AccelerationStructureCurrentSize:
         // Vulkan does not support CurrentSize query, will not create actual pools here.
         return SLANG_OK;
-    default: return SLANG_E_INVALID_ARG;
+    default:
+        return SLANG_E_INVALID_ARG;
     }
     SLANG_VK_RETURN_ON_FAIL(
         m_device->m_api.vkCreateQueryPool(m_device->m_api.m_device, &createInfo, nullptr, &m_pool));

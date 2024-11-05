@@ -75,21 +75,36 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
 {
     switch (type)
     {
-    case SLANG_SCALAR_TYPE_INT32:   return BaseType::Int;
-    case SLANG_SCALAR_TYPE_UINT32:  return BaseType::UInt;
-    case SLANG_SCALAR_TYPE_INT16:   return BaseType::Int16;
-    case SLANG_SCALAR_TYPE_UINT16:  return BaseType::UInt16;
-    case SLANG_SCALAR_TYPE_INT64:   return BaseType::Int64;
-    case SLANG_SCALAR_TYPE_INTPTR:  return BaseType::IntPtr;
-    case SLANG_SCALAR_TYPE_UINT64:  return BaseType::UInt64;
-    case SLANG_SCALAR_TYPE_UINTPTR: return BaseType::UIntPtr;
-    case SLANG_SCALAR_TYPE_INT8:    return BaseType::Int8;
-    case SLANG_SCALAR_TYPE_UINT8:   return BaseType::UInt8;
-    case SLANG_SCALAR_TYPE_FLOAT16: return BaseType::Half;
-    case SLANG_SCALAR_TYPE_FLOAT32: return BaseType::Float;
-    case SLANG_SCALAR_TYPE_FLOAT64: return BaseType::Double;
-    case SLANG_SCALAR_TYPE_BOOL:    return BaseType::Bool;
-    default:                        return BaseType::Void;
+    case SLANG_SCALAR_TYPE_INT32:
+        return BaseType::Int;
+    case SLANG_SCALAR_TYPE_UINT32:
+        return BaseType::UInt;
+    case SLANG_SCALAR_TYPE_INT16:
+        return BaseType::Int16;
+    case SLANG_SCALAR_TYPE_UINT16:
+        return BaseType::UInt16;
+    case SLANG_SCALAR_TYPE_INT64:
+        return BaseType::Int64;
+    case SLANG_SCALAR_TYPE_INTPTR:
+        return BaseType::IntPtr;
+    case SLANG_SCALAR_TYPE_UINT64:
+        return BaseType::UInt64;
+    case SLANG_SCALAR_TYPE_UINTPTR:
+        return BaseType::UIntPtr;
+    case SLANG_SCALAR_TYPE_INT8:
+        return BaseType::Int8;
+    case SLANG_SCALAR_TYPE_UINT8:
+        return BaseType::UInt8;
+    case SLANG_SCALAR_TYPE_FLOAT16:
+        return BaseType::Half;
+    case SLANG_SCALAR_TYPE_FLOAT32:
+        return BaseType::Float;
+    case SLANG_SCALAR_TYPE_FLOAT64:
+        return BaseType::Double;
+    case SLANG_SCALAR_TYPE_BOOL:
+        return BaseType::Bool;
+    default:
+        return BaseType::Void;
     }
 }
 
@@ -459,7 +474,8 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                                     }
                                     break;
                                 }
-                            default: break;
+                            default:
+                                break;
                             }
                         }
 
@@ -676,7 +692,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             switch (argType->getOp())
             {
 #define CASE(OP, STR) \
-    case kIROp_##OP: str = #STR; break
+    case kIROp_##OP:  \
+        str = #STR;   \
+        break
 
                 CASE(Int8Type, I8);
                 CASE(Int16Type, I16);
@@ -692,7 +710,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
 #undef CASE
 
-            default: SLANG_UNEXPECTED("unexpected type in intrinsic definition"); break;
+            default:
+                SLANG_UNEXPECTED("unexpected type in intrinsic definition");
+                break;
             }
             m_writer->emit(str);
         }
@@ -777,7 +797,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 switch (arg->getDataType()->getOp())
                 {
                 case kIROp_TypeKind:
-                case kIROp_TypeType: m_emitter->emitType((IRType*)arg); break;
+                case kIROp_TypeType:
+                    m_emitter->emitType((IRType*)arg);
+                    break;
                 default:
                     m_emitter->emitOperand(
                         m_intrinsicInst->getOperand((UInt)(1 + argIndex)),
@@ -789,7 +811,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             cursor++;
             break;
         }
-    default: SLANG_UNEXPECTED("bad format in intrinsic definition"); break;
+    default:
+        SLANG_UNEXPECTED("bad format in intrinsic definition");
+        break;
     }
 
     // Return the cursor position. Will be next character after characters processed

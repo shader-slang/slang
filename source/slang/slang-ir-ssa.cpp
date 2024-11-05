@@ -116,9 +116,11 @@ bool allUsesLeadToLoads(IRInst* inst)
         auto user = u->getUser();
         switch (user->getOp())
         {
-        default: return false;
+        default:
+            return false;
 
-        case kIROp_Load: break;
+        case kIROp_Load:
+            break;
 
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
@@ -279,12 +281,15 @@ IRVar* asPromotableVarAccessChain(ConstructSSAContext* context, IRInst* value)
 {
     switch (value->getOp())
     {
-    case kIROp_Var: return asPromotableVar(context, value);
+    case kIROp_Var:
+        return asPromotableVar(context, value);
 
     case kIROp_FieldAddress:
-    case kIROp_GetElementPtr: return asPromotableVarAccessChain(context, value->getOperand(0));
+    case kIROp_GetElementPtr:
+        return asPromotableVarAccessChain(context, value->getOperand(0));
 
-    default: return nullptr;
+    default:
+        return nullptr;
     }
 }
 
@@ -303,9 +308,12 @@ IRInst* applyAccessChain(
 {
     switch (accessChain->getOp())
     {
-    default: SLANG_UNEXPECTED("unexpected op along access chain"); UNREACHABLE_RETURN(leafVarValue);
+    default:
+        SLANG_UNEXPECTED("unexpected op along access chain");
+        UNREACHABLE_RETURN(leafVarValue);
 
-    case kIROp_Var: return leafVarValue;
+    case kIROp_Var:
+        return leafVarValue;
 
     case kIROp_FieldAddress:
         {
@@ -1214,7 +1222,8 @@ bool constructSSA(IRModule* module, IRInst* globalVal)
     switch (globalVal->getOp())
     {
     case kIROp_Func:
-    case kIROp_GlobalVar: return constructSSA(module, (IRGlobalValueWithCode*)globalVal);
+    case kIROp_GlobalVar:
+        return constructSSA(module, (IRGlobalValueWithCode*)globalVal);
 
     case kIROp_Generic:
         {
@@ -1236,7 +1245,8 @@ bool constructSSA(IRModule* module, IRInst* globalVal)
             return constructSSA(module, returnVal);
         }
 
-    default: break;
+    default:
+        break;
     }
     return false;
 }
@@ -1259,7 +1269,8 @@ bool constructSSA(IRInst* globalVal)
     case kIROp_GlobalVar:
         return constructSSA(globalVal->getModule(), (IRGlobalValueWithCode*)globalVal);
 
-    default: break;
+    default:
+        break;
     }
     return false;
 }

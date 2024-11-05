@@ -111,8 +111,10 @@ struct ResultTypeLoweringContext
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
-        case kIROp_UIntPtrType: break;
-        default:                SLANG_ASSERT_FAILURE("error type is not lowered to an integer type.");
+        case kIROp_UIntPtrType:
+            break;
+        default:
+            SLANG_ASSERT_FAILURE("error type is not lowered to an integer type.");
         }
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
@@ -247,13 +249,26 @@ struct ResultTypeLoweringContext
     {
         switch (inst->getOp())
         {
-        case kIROp_MakeResultValue: processMakeResultValue((IRMakeResultValue*)inst); break;
-        case kIROp_MakeResultError: processMakeResultError((IRMakeResultError*)inst); break;
-        case kIROp_GetResultError:  processGetResultError((IRGetResultError*)inst); break;
-        case kIROp_GetResultValue:  processGetResultValue((IRGetResultValue*)inst); break;
-        case kIROp_IsResultError:   processIsResultError((IRIsResultError*)inst); break;
-        case kIROp_ResultType:      processResultType((IRResultType*)inst); break;
-        default:                    break;
+        case kIROp_MakeResultValue:
+            processMakeResultValue((IRMakeResultValue*)inst);
+            break;
+        case kIROp_MakeResultError:
+            processMakeResultError((IRMakeResultError*)inst);
+            break;
+        case kIROp_GetResultError:
+            processGetResultError((IRGetResultError*)inst);
+            break;
+        case kIROp_GetResultValue:
+            processGetResultValue((IRGetResultValue*)inst);
+            break;
+        case kIROp_IsResultError:
+            processIsResultError((IRIsResultError*)inst);
+            break;
+        case kIROp_ResultType:
+            processResultType((IRResultType*)inst);
+            break;
+        default:
+            break;
         }
     }
 

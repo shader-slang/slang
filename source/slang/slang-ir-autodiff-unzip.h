@@ -675,9 +675,11 @@ struct DiffUnzipPass
                         diffCaseArgs.getBuffer()));
             }
 
-        case kIROp_loop: return splitLoop(primalBuilder, diffBuilder, as<IRLoop>(branchInst));
+        case kIROp_loop:
+            return splitLoop(primalBuilder, diffBuilder, as<IRLoop>(branchInst));
 
-        default: SLANG_UNEXPECTED("Unhandled instruction");
+        default:
+            SLANG_UNEXPECTED("Unhandled instruction");
         }
     }
 
@@ -685,29 +687,36 @@ struct DiffUnzipPass
     {
         switch (inst->getOp())
         {
-        case kIROp_Call: return splitCall(primalBuilder, diffBuilder, as<IRCall>(inst));
+        case kIROp_Call:
+            return splitCall(primalBuilder, diffBuilder, as<IRCall>(inst));
 
-        case kIROp_Var: return splitVar(primalBuilder, diffBuilder, as<IRVar>(inst));
+        case kIROp_Var:
+            return splitVar(primalBuilder, diffBuilder, as<IRVar>(inst));
 
         case kIROp_MakeDifferentialPair:
             return splitMakePair(primalBuilder, diffBuilder, as<IRMakeDifferentialPair>(inst));
 
-        case kIROp_Load: return splitLoad(primalBuilder, diffBuilder, as<IRLoad>(inst));
+        case kIROp_Load:
+            return splitLoad(primalBuilder, diffBuilder, as<IRLoad>(inst));
 
-        case kIROp_Store: return splitStore(primalBuilder, diffBuilder, as<IRStore>(inst));
+        case kIROp_Store:
+            return splitStore(primalBuilder, diffBuilder, as<IRStore>(inst));
 
-        case kIROp_Return: return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
+        case kIROp_Return:
+            return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
 
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:
         case kIROp_ifElse:
         case kIROp_Switch:
-        case kIROp_loop:                return splitControlFlow(primalBuilder, diffBuilder, inst);
+        case kIROp_loop:
+            return splitControlFlow(primalBuilder, diffBuilder, inst);
 
         case kIROp_Unreachable:
             return InstPair(primalBuilder->emitUnreachable(), diffBuilder->emitUnreachable());
 
-        default: SLANG_ASSERT_FAILURE("Unhandled mixed diff inst");
+        default:
+            SLANG_ASSERT_FAILURE("Unhandled mixed diff inst");
         }
     }
 

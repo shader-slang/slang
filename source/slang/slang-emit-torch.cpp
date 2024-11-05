@@ -25,15 +25,33 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
 
     switch (instType->getOp())
     {
-    case kIROp_FloatType:  m_writer->emit("kFloat32"); break;
-    case kIROp_HalfType:   m_writer->emit("kFloat16"); break;
-    case kIROp_DoubleType: m_writer->emit("kFloat64"); break;
-    case kIROp_UInt8Type:  m_writer->emit("kUInt8"); break;
-    case kIROp_Int8Type:   m_writer->emit("kInt8"); break;
-    case kIROp_Int16Type:  m_writer->emit("kInt16"); break;
-    case kIROp_IntType:    m_writer->emit("kInt32"); break;
-    case kIROp_Int64Type:  m_writer->emit("kInt64"); break;
-    case kIROp_BoolType:   m_writer->emit("kBool"); break;
+    case kIROp_FloatType:
+        m_writer->emit("kFloat32");
+        break;
+    case kIROp_HalfType:
+        m_writer->emit("kFloat16");
+        break;
+    case kIROp_DoubleType:
+        m_writer->emit("kFloat64");
+        break;
+    case kIROp_UInt8Type:
+        m_writer->emit("kUInt8");
+        break;
+    case kIROp_Int8Type:
+        m_writer->emit("kInt8");
+        break;
+    case kIROp_Int16Type:
+        m_writer->emit("kInt16");
+        break;
+    case kIROp_IntType:
+        m_writer->emit("kInt32");
+        break;
+    case kIROp_Int64Type:
+        m_writer->emit("kInt64");
+        break;
+    case kIROp_BoolType:
+        m_writer->emit("kBool");
+        break;
     default:
         SLANG_UNEXPECTED((std::string("unknown scalar type in allocTorchTensor: ") +
                           std::string(getIROpInfo(type->getOp()).name))
@@ -46,7 +64,8 @@ bool TorchCppSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    default: return false;
+    default:
+        return false;
     case kIROp_CudaKernelLaunch:
         {
             m_writer->emit("AT_CUDA_CHECK(cudaLaunchKernel(");
@@ -173,7 +192,8 @@ SlangResult TorchCppSourceEmitter::calcTypeName(
 {
     switch (type->getOp())
     {
-    default: return Super::calcTypeName(type, target, out);
+    default:
+        return Super::calcTypeName(type, target, out);
     case kIROp_TensorViewType:
         {
             out << "TensorView";

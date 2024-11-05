@@ -7,7 +7,8 @@ Result gfx::ShaderCursor::getDereferenced(ShaderCursor& outCursor) const
 {
     switch (m_typeLayout->getKind())
     {
-    default: return SLANG_E_INVALID_ARG;
+    default:
+        return SLANG_E_INVALID_ARG;
 
     case slang::TypeReflection::Kind::ConstantBuffer:
     case slang::TypeReflection::Kind::ParameterBlock:
@@ -351,11 +352,14 @@ Result ShaderCursor::followPath(const char* path, ShaderCursor& ioCursor)
             {
                 switch (_peek(rest))
                 {
-                default: _get(rest); continue;
+                default:
+                    _get(rest);
+                    continue;
 
                 case -1:
                 case '.':
-                case '[': break;
+                case '[':
+                    break;
                 }
                 break;
             }

@@ -31,9 +31,12 @@ struct EliminateMultiLevelBreakContext
         {
             switch (headerInst->getOp())
             {
-            case kIROp_loop:   return as<IRLoop>(headerInst)->getBreakBlock();
-            case kIROp_Switch: return as<IRSwitch>(headerInst)->getBreakLabel();
-            default:           SLANG_UNREACHABLE("Unknown breakable inst");
+            case kIROp_loop:
+                return as<IRLoop>(headerInst)->getBreakBlock();
+            case kIROp_Switch:
+                return as<IRSwitch>(headerInst)->getBreakLabel();
+            default:
+                SLANG_UNREACHABLE("Unknown breakable inst");
             }
         }
 
@@ -47,7 +50,8 @@ struct EliminateMultiLevelBreakContext
             case kIROp_Switch:
                 builder->replaceOperand(&(as<IRSwitch>(headerInst)->breakLabel), block);
                 break;
-            default: SLANG_UNREACHABLE("Unknown breakable inst");
+            default:
+                SLANG_UNREACHABLE("Unknown breakable inst");
             }
         }
 
@@ -115,7 +119,8 @@ struct EliminateMultiLevelBreakContext
                         }
                         continue;
                     }
-                default: break;
+                default:
+                    break;
                 }
                 for (auto succ : block->getSuccessors())
                 {
@@ -149,7 +154,8 @@ struct EliminateMultiLevelBreakContext
                         regions.add(regionInfo);
                     }
                     break;
-                default: break;
+                default:
+                    break;
                 }
             }
             for (auto& l : regions)

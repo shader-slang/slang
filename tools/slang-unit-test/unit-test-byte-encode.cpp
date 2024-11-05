@@ -94,10 +94,18 @@ SLANG_UNIT_TEST(byteEncode)
             uint32_t mask;
             switch (v)
             {
-            case 0: mask = 0xffffffff; break;
-            case 1: mask = 0x00ffffff; break;
-            case 2: mask = 0x0000ffff; break;
-            case 3: mask = 0x000000ff; break;
+            case 0:
+                mask = 0xffffffff;
+                break;
+            case 1:
+                mask = 0x00ffffff;
+                break;
+            case 2:
+                mask = 0x0000ffff;
+                break;
+            case 3:
+                mask = 0x000000ff;
+                break;
             }
 
             initialBuffer[i] = randGen.nextInt32() & mask;

@@ -39,7 +39,8 @@ struct GenericTypeLoweringContext
 
         switch (inst->getOp())
         {
-        default: break;
+        default:
+            break;
         case kIROp_StructField:
             {
                 // Translate the struct field type.

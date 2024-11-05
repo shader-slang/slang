@@ -325,8 +325,12 @@ void calcRequiredLoweringPassSet(
 {
     switch (inst->getOp())
     {
-    case kIROp_ResultType:   result.resultType = true; break;
-    case kIROp_OptionalType: result.optionalType = true; break;
+    case kIROp_ResultType:
+        result.resultType = true;
+        break;
+    case kIROp_OptionalType:
+        result.optionalType = true;
+        break;
     case kIROp_TextureType:
         if (!isKhronosTarget(codeGenContext->getTargetReq()))
         {
@@ -354,20 +358,28 @@ void calcRequiredLoweringPassSet(
         result.existentialTypeLayout = true;
         break;
     case kIROp_GetRegisterIndex:
-    case kIROp_GetRegisterSpace:               result.bindingQuery = true; break;
+    case kIROp_GetRegisterSpace:
+        result.bindingQuery = true;
+        break;
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
-    case kIROp_MakeDifferentialPairUserCode:   result.autodiff = true; break;
+    case kIROp_MakeDifferentialPairUserCode:
+        result.autodiff = true;
+        break;
     case kIROp_VerticesType:
     case kIROp_IndicesType:
-    case kIROp_PrimitivesType:                 result.meshOutput = true; break;
+    case kIROp_PrimitivesType:
+        result.meshOutput = true;
+        break;
     case kIROp_CreateExistentialObject:
     case kIROp_MakeExistential:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
-    case kIROp_LookupWitness:                  result.generics = true; break;
+    case kIROp_LookupWitness:
+        result.generics = true;
+        break;
     case kIROp_Specialize:
         {
             auto specInst = as<IRSpecialize>(inst);
@@ -375,27 +387,41 @@ void calcRequiredLoweringPassSet(
                 result.generics = true;
         }
         break;
-    case kIROp_Reinterpret:              result.reinterpret = true; break;
-    case kIROp_BitCast:                  result.bitcast = true; break;
-    case kIROp_AutoPyBindCudaDecoration: result.derivativePyBindWrapper = true; break;
+    case kIROp_Reinterpret:
+        result.reinterpret = true;
+        break;
+    case kIROp_BitCast:
+        result.bitcast = true;
+        break;
+    case kIROp_AutoPyBindCudaDecoration:
+        result.derivativePyBindWrapper = true;
+        break;
     case kIROp_Param:
         if (as<IRFuncType>(inst->getDataType()))
             result.higherOrderFunc = true;
         break;
     case kIROp_GlobalInputDecoration:
     case kIROp_GlobalOutputDecoration:
-    case kIROp_GetWorkGroupSize:       result.glslGlobalVar = true; break;
+    case kIROp_GetWorkGroupSize:
+        result.glslGlobalVar = true;
+        break;
     case kIROp_BindExistentialSlotsDecoration:
         result.bindExistential = true;
         result.generics = true;
         result.existentialTypeLayout = true;
         break;
-    case kIROp_GLSLShaderStorageBufferType: result.glslSSBO = true; break;
+    case kIROp_GLSLShaderStorageBufferType:
+        result.glslSSBO = true;
+        break;
     case kIROp_ByteAddressBufferLoad:
     case kIROp_ByteAddressBufferStore:
     case kIROp_HLSLRWByteAddressBufferType:
-    case kIROp_HLSLByteAddressBufferType:   result.byteAddressBuffer = true; break;
-    case kIROp_DynamicResourceType:         result.dynamicResource = true; break;
+    case kIROp_HLSLByteAddressBufferType:
+        result.byteAddressBuffer = true;
+        break;
+    case kIROp_DynamicResourceType:
+        result.dynamicResource = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -616,8 +642,10 @@ Result linkAndOptimizeIR(
         CollectEntryPointUniformParamsOptions passOptions;
         switch (target)
         {
-        case CodeGenTarget::HostCPPSource: break;
-        case CodeGenTarget::CUDASource:    collectOptiXEntryPointUniformParams(irModule);
+        case CodeGenTarget::HostCPPSource:
+            break;
+        case CodeGenTarget::CUDASource:
+            collectOptiXEntryPointUniformParams(irModule);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
 #endif
@@ -627,7 +655,8 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::CPPSource:
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
-        default: collectEntryPointUniformParams(irModule, passOptions);
+        default:
+            collectEntryPointUniformParams(irModule, passOptions);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "ENTRY POINT UNIFORMS COLLECTED");
 #endif
@@ -638,7 +667,8 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
-    default: moveEntryPointUniformParamsToGlobalScope(irModule);
+    default:
+        moveEntryPointUniformParamsToGlobalScope(irModule);
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "ENTRY POINT UNIFORMS MOVED");
 #endif
@@ -646,7 +676,8 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CUDASource:    break;
+    case CodeGenTarget::CUDASource:
+        break;
     }
 
     if (requiredLoweringPassSet.optionalType)
@@ -655,9 +686,12 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
-    case CodeGenTarget::PyTorchCppBinding: break;
+    case CodeGenTarget::PyTorchCppBinding:
+        break;
 
-    default: removeTorchAndCUDAEntryPoints(irModule); break;
+    default:
+        removeTorchAndCUDAEntryPoints(irModule);
+        break;
     }
 
     switch (target)
@@ -670,7 +704,8 @@ Result linkAndOptimizeIR(
             generateDllExportFuncs(irModule, sink);
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     // Lower `Result<T,E>` types into ordinary struct types.
@@ -724,7 +759,8 @@ Result linkAndOptimizeIR(
                 generateDerivativeWrappers(irModule, sink);
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (requiredLoweringPassSet.autodiff)
@@ -833,7 +869,8 @@ Result linkAndOptimizeIR(
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
         break;
-    default: break;
+    default:
+        break;
     }
 
     if (codeGenContext->removeAvailableInDownstreamIR)
@@ -1089,7 +1126,8 @@ Result linkAndOptimizeIR(
         }
         break;
 
-    default: break;
+    default:
+        break;
     }
 
     // For all targets, we translate load/store operations
@@ -1107,7 +1145,8 @@ Result linkAndOptimizeIR(
         //
         switch (target)
         {
-        default: break;
+        default:
+            break;
 
         case CodeGenTarget::GLSL:
         case CodeGenTarget::SPIRV:
@@ -1182,7 +1221,8 @@ Result linkAndOptimizeIR(
             }
             break;
 
-        default: break;
+        default:
+            break;
         }
 
         legalizeByteAddressBufferOps(
@@ -1211,14 +1251,17 @@ Result linkAndOptimizeIR(
         }
         break;
 
-    default: break;
+    default:
+        break;
     }
 
     switch (target)
     {
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
-    case CodeGenTarget::WGSL:  resolveTextureFormat(irModule); break;
+    case CodeGenTarget::WGSL:
+        resolveTextureFormat(irModule);
+        break;
     }
 
     // For GLSL only, we will need to perform "legalization" of
@@ -1285,7 +1328,8 @@ Result linkAndOptimizeIR(
         }
         break;
 
-    default: break;
+    default:
+        break;
     }
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
@@ -1309,7 +1353,8 @@ Result linkAndOptimizeIR(
             legalizeImageSubscript(targetRequest, irModule, sink);
         }
         break;
-    default: break;
+    default:
+        break;
     }
 
     // Legalize constant buffer loads.
@@ -1323,13 +1368,17 @@ Result linkAndOptimizeIR(
             legalizeDispatchMeshPayloadForGLSL(irModule);
         }
         break;
-    default: break;
+    default:
+        break;
     }
 
     switch (target)
     {
-    default:                  break;
-    case CodeGenTarget::GLSL: moveGlobalVarInitializationToEntryPoints(irModule); break;
+    default:
+        break;
+    case CodeGenTarget::GLSL:
+        moveGlobalVarInitializationToEntryPoints(irModule);
+        break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
@@ -1675,10 +1724,13 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
                 sourceEmitter = new WGSLSourceEmitter(desc);
                 break;
             }
-        default: break;
+        default:
+            break;
         }
         break;
-    case CodeGenTarget::PyTorchCppBinding: sourceEmitter = new TorchCppSourceEmitter(desc); break;
+    case CodeGenTarget::PyTorchCppBinding:
+        sourceEmitter = new TorchCppSourceEmitter(desc);
+        break;
     }
 
     if (!sourceEmitter)
@@ -1700,7 +1752,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
         switch (sourceLanguage)
         {
-        default: break;
+        default:
+            break;
 
         case SourceLanguage::CPP:
         case SourceLanguage::C:
@@ -1758,7 +1811,9 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     switch (target)
     {
-    case CodeGenTarget::PyTorchCppBinding: sourceWriter.emit(get_slang_torch_prelude()); break;
+    case CodeGenTarget::PyTorchCppBinding:
+        sourceWriter.emit(get_slang_torch_prelude());
+        break;
     default:
         if (isHeterogeneousTarget(target))
         {
@@ -1903,7 +1958,9 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             downstreamOptions.optimizationLevel =
                 DownstreamCompileOptions::OptimizationLevel::Maximal;
             break;
-        default: SLANG_ASSERT(!"Unhandled optimization level"); break;
+        default:
+            SLANG_ASSERT(!"Unhandled optimization level");
+            break;
         }
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
         if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
