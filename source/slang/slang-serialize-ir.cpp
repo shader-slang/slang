@@ -470,7 +470,8 @@ Result _writeInstArrayChunk(
 
             return SLANG_OK;
         }
-    default: break;
+    default:
+        break;
     }
     return SLANG_FAIL;
 }

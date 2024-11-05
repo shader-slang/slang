@@ -109,7 +109,8 @@ static bool _needsMarkdownEscape(const UnownedStringSlice& text)
             {
                 return true;
             }
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -125,12 +126,23 @@ void _appendEscapedMarkdown(const UnownedStringSlice& text, StringBuilder& ioBuf
         {
             switch (c)
             {
-            case '<': ioBuf << "&lt;"; break;
-            case '>': ioBuf << "&gt;"; break;
-            case '&': ioBuf << "&amp;"; break;
-            case '[': ioBuf << "\\["; break;
-            case ']': ioBuf << "\\]"; break;
-            default:  ioBuf << c;
+            case '<':
+                ioBuf << "&lt;";
+                break;
+            case '>':
+                ioBuf << "&gt;";
+                break;
+            case '&':
+                ioBuf << "&amp;";
+                break;
+            case '[':
+                ioBuf << "\\[";
+                break;
+            case ']':
+                ioBuf << "\\]";
+                break;
+            default:
+                ioBuf << c;
             }
         }
     }

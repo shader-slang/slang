@@ -1407,12 +1407,18 @@ struct IRResourceTypeBase : IRType
     {
         switch (getOperand(1)->getOp())
         {
-        case kIROp_TextureShape1DType:     return SLANG_TEXTURE_1D;
-        case kIROp_TextureShape2DType:     return SLANG_TEXTURE_2D;
-        case kIROp_TextureShape3DType:     return SLANG_TEXTURE_3D;
-        case kIROp_TextureShapeCubeType:   return SLANG_TEXTURE_CUBE;
-        case kIROp_TextureShapeBufferType: return SLANG_TEXTURE_BUFFER;
-        default:                           return SLANG_RESOURCE_NONE;
+        case kIROp_TextureShape1DType:
+            return SLANG_TEXTURE_1D;
+        case kIROp_TextureShape2DType:
+            return SLANG_TEXTURE_2D;
+        case kIROp_TextureShape3DType:
+            return SLANG_TEXTURE_3D;
+        case kIROp_TextureShapeCubeType:
+            return SLANG_TEXTURE_CUBE;
+        case kIROp_TextureShapeBufferType:
+            return SLANG_TEXTURE_BUFFER;
+        default:
+            return SLANG_RESOURCE_NONE;
         }
     }
     bool isFeedback() { return getIntVal(getAccessInst()) == kCoreModule_ResourceAccessFeedback; }
@@ -1433,13 +1439,18 @@ struct IRResourceTypeBase : IRType
         {
             switch (getIntVal(constVal))
             {
-            case kCoreModule_ResourceAccessReadOnly:  return SLANG_RESOURCE_ACCESS_READ;
-            case kCoreModule_ResourceAccessReadWrite: return SLANG_RESOURCE_ACCESS_READ_WRITE;
+            case kCoreModule_ResourceAccessReadOnly:
+                return SLANG_RESOURCE_ACCESS_READ;
+            case kCoreModule_ResourceAccessReadWrite:
+                return SLANG_RESOURCE_ACCESS_READ_WRITE;
             case kCoreModule_ResourceAccessRasterizerOrdered:
                 return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-            case kCoreModule_ResourceAccessFeedback:  return SLANG_RESOURCE_ACCESS_FEEDBACK;
-            case kCoreModule_ResourceAccessWriteOnly: return SLANG_RESOURCE_ACCESS_WRITE;
-            default:                                  break;
+            case kCoreModule_ResourceAccessFeedback:
+                return SLANG_RESOURCE_ACCESS_FEEDBACK;
+            case kCoreModule_ResourceAccessWriteOnly:
+                return SLANG_RESOURCE_ACCESS_WRITE;
+            default:
+                break;
             }
         }
         return SLANG_RESOURCE_ACCESS_UNKNOWN;

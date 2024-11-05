@@ -91,7 +91,8 @@ static SlangResult _asResult(nvrtcResult res)
         {
             return SLANG_E_INTERNAL_FAIL;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 }
 
@@ -806,7 +807,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
 
     switch (options.floatingPointMode)
     {
-    case FloatingPointMode::Default: break;
+    case FloatingPointMode::Default:
+        break;
     case FloatingPointMode::Precise:
         {
             break;

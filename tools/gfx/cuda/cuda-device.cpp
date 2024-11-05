@@ -275,31 +275,47 @@ Result DeviceImpl::getCUDAFormat(Format format, CUarray_format* outFormat)
     case Format::R32G32B32_FLOAT:
     case Format::R32G32_FLOAT:
     case Format::R32_FLOAT:
-    case Format::D32_FLOAT:          *outFormat = CU_AD_FORMAT_FLOAT; return SLANG_OK;
+    case Format::D32_FLOAT:
+        *outFormat = CU_AD_FORMAT_FLOAT;
+        return SLANG_OK;
     case Format::R16G16B16A16_FLOAT:
     case Format::R16G16_FLOAT:
-    case Format::R16_FLOAT:          *outFormat = CU_AD_FORMAT_HALF; return SLANG_OK;
+    case Format::R16_FLOAT:
+        *outFormat = CU_AD_FORMAT_HALF;
+        return SLANG_OK;
     case Format::R32G32B32A32_UINT:
     case Format::R32G32B32_UINT:
     case Format::R32G32_UINT:
-    case Format::R32_UINT:           *outFormat = CU_AD_FORMAT_UNSIGNED_INT32; return SLANG_OK;
+    case Format::R32_UINT:
+        *outFormat = CU_AD_FORMAT_UNSIGNED_INT32;
+        return SLANG_OK;
     case Format::R16G16B16A16_UINT:
     case Format::R16G16_UINT:
-    case Format::R16_UINT:           *outFormat = CU_AD_FORMAT_UNSIGNED_INT16; return SLANG_OK;
+    case Format::R16_UINT:
+        *outFormat = CU_AD_FORMAT_UNSIGNED_INT16;
+        return SLANG_OK;
     case Format::R8G8B8A8_UINT:
     case Format::R8G8_UINT:
     case Format::R8_UINT:
-    case Format::R8G8B8A8_UNORM:     *outFormat = CU_AD_FORMAT_UNSIGNED_INT8; return SLANG_OK;
+    case Format::R8G8B8A8_UNORM:
+        *outFormat = CU_AD_FORMAT_UNSIGNED_INT8;
+        return SLANG_OK;
     case Format::R32G32B32A32_SINT:
     case Format::R32G32B32_SINT:
     case Format::R32G32_SINT:
-    case Format::R32_SINT:           *outFormat = CU_AD_FORMAT_SIGNED_INT32; return SLANG_OK;
+    case Format::R32_SINT:
+        *outFormat = CU_AD_FORMAT_SIGNED_INT32;
+        return SLANG_OK;
     case Format::R16G16B16A16_SINT:
     case Format::R16G16_SINT:
-    case Format::R16_SINT:           *outFormat = CU_AD_FORMAT_SIGNED_INT16; return SLANG_OK;
+    case Format::R16_SINT:
+        *outFormat = CU_AD_FORMAT_SIGNED_INT16;
+        return SLANG_OK;
     case Format::R8G8B8A8_SINT:
     case Format::R8G8_SINT:
-    case Format::R8_SINT:            *outFormat = CU_AD_FORMAT_SIGNED_INT8; return SLANG_OK;
+    case Format::R8_SINT:
+        *outFormat = CU_AD_FORMAT_SIGNED_INT8;
+        return SLANG_OK;
     default:
         SLANG_ASSERT(!"Only support R32_FLOAT/R8G8B8A8_UNORM formats for now");
         return SLANG_FAIL;
@@ -341,11 +357,16 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createTextureResource(
         depth = 0;
         break;
 
-    case IResource::Type::Texture2D: depth = 0; break;
+    case IResource::Type::Texture2D:
+        depth = 0;
+        break;
 
-    case IResource::Type::Texture3D: break;
+    case IResource::Type::Texture3D:
+        break;
 
-    case IResource::Type::TextureCube: depth = 1; break;
+    case IResource::Type::TextureCube:
+        depth = 1;
+        break;
     }
 
     {
@@ -771,7 +792,8 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createBufferFromSharedHandle(
     case InteropHandleAPI::Vulkan:
         externalMemoryHandleDesc.type = CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32;
         break;
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
     externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
     externalMemoryHandleDesc.size = desc.sizeInBytes;
@@ -834,7 +856,8 @@ SLANG_NO_THROW Result SLANG_MCALL DeviceImpl::createTextureFromSharedHandle(
     case InteropHandleAPI::Vulkan:
         externalMemoryHandleDesc.type = CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32;
         break;
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
     externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
     externalMemoryHandleDesc.size = size;

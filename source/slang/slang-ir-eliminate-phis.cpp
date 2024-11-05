@@ -99,10 +99,12 @@ struct PhiEliminationContext
         {
             switch (inst->getOp())
             {
-            default: continue;
+            default:
+                continue;
 
             case kIROp_Func:
-            case kIROp_GlobalVar: break;
+            case kIROp_GlobalVar:
+                break;
             }
 
             auto code = (IRGlobalValueWithCode*)inst;
@@ -157,7 +159,8 @@ struct PhiEliminationContext
 
             switch (inst->getOp())
             {
-            case kIROp_Param: continue;
+            case kIROp_Param:
+                continue;
             case kIROp_UpdateElement:
                 {
                     auto updateInst = as<IRUpdateElement>(inst);
@@ -179,7 +182,8 @@ struct PhiEliminationContext
                     builder.emitStore(elementAddr, updateInst->getElementValue());
                 }
                 break;
-            default: break;
+            default:
+                break;
             }
         }
     }
@@ -967,8 +971,10 @@ struct PhiEliminationContext
         switch (addr->getOp())
         {
         case kIROp_Var:
-        case kIROp_Param: break;
-        default:          return false;
+        case kIROp_Param:
+            break;
+        default:
+            return false;
         }
         for (auto inst = load; inst; inst = inst->getNextInst())
         {

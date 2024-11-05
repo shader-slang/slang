@@ -127,8 +127,10 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     case CodeGenTarget::DXIL:
         tp.getOptionSet().add(CompilerOptionName::Profile, Profile::RawEnum::DX_Lib_6_6);
         break;
-    case CodeGenTarget::SPIRV: break;
-    default:                   return SLANG_FAIL;
+    case CodeGenTarget::SPIRV:
+        break;
+    default:
+        return SLANG_FAIL;
     }
 
     tp.getOptionSet().add(CompilerOptionName::EmbedDownstreamIR, true);

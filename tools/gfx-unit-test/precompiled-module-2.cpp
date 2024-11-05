@@ -42,9 +42,14 @@ static Slang::Result precompileProgram(
         SlangCompileTarget target;
         switch (device->getDeviceInfo().deviceType)
         {
-        case gfx::DeviceType::DirectX12: target = SLANG_DXIL; break;
-        case gfx::DeviceType::Vulkan:    target = SLANG_SPIRV; break;
-        default:                         return SLANG_FAIL;
+        case gfx::DeviceType::DirectX12:
+            target = SLANG_DXIL;
+            break;
+        case gfx::DeviceType::Vulkan:
+            target = SLANG_SPIRV;
+            break;
+        default:
+            return SLANG_FAIL;
         }
 
         ComPtr<slang::IModulePrecompileService_Experimental> precompileService;

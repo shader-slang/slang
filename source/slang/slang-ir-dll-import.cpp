@@ -198,7 +198,8 @@ struct DllImportContext
                     processFunc(as<IRFunc>(childFunc), dllImportDecoration);
                 }
                 break;
-            default: break;
+            default:
+                break;
             }
         }
     }

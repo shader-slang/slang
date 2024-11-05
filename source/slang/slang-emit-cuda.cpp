@@ -51,30 +51,48 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
 {
     switch (op)
     {
-    case kIROp_VoidType: return UnownedStringSlice("void");
-    case kIROp_BoolType: return UnownedStringSlice("bool");
+    case kIROp_VoidType:
+        return UnownedStringSlice("void");
+    case kIROp_BoolType:
+        return UnownedStringSlice("bool");
 
-    case kIROp_Int8Type:  return UnownedStringSlice("char");
-    case kIROp_Int16Type: return UnownedStringSlice("short");
-    case kIROp_IntType:   return UnownedStringSlice("int");
-    case kIROp_Int64Type: return UnownedStringSlice("longlong");
+    case kIROp_Int8Type:
+        return UnownedStringSlice("char");
+    case kIROp_Int16Type:
+        return UnownedStringSlice("short");
+    case kIROp_IntType:
+        return UnownedStringSlice("int");
+    case kIROp_Int64Type:
+        return UnownedStringSlice("longlong");
 
-    case kIROp_UInt8Type:  return UnownedStringSlice("uchar");
-    case kIROp_UInt16Type: return UnownedStringSlice("ushort");
-    case kIROp_UIntType:   return UnownedStringSlice("uint");
-    case kIROp_UInt64Type: return UnownedStringSlice("ulonglong");
+    case kIROp_UInt8Type:
+        return UnownedStringSlice("uchar");
+    case kIROp_UInt16Type:
+        return UnownedStringSlice("ushort");
+    case kIROp_UIntType:
+        return UnownedStringSlice("uint");
+    case kIROp_UInt64Type:
+        return UnownedStringSlice("ulonglong");
 #if SLANG_PTR_IS_64
-    case kIROp_IntPtrType:  return UnownedStringSlice("int64_t");
-    case kIROp_UIntPtrType: return UnownedStringSlice("uint64_t");
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("int64_t");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("uint64_t");
 #else
-    case kIROp_IntPtrType:  return UnownedStringSlice("int");
-    case kIROp_UIntPtrType: return UnownedStringSlice("uint");
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("int");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("uint");
 #endif
-    case kIROp_HalfType: return UnownedStringSlice("__half");
+    case kIROp_HalfType:
+        return UnownedStringSlice("__half");
 
-    case kIROp_FloatType:  return UnownedStringSlice("float");
-    case kIROp_DoubleType: return UnownedStringSlice("double");
-    default:               return UnownedStringSlice();
+    case kIROp_FloatType:
+        return UnownedStringSlice("float");
+    case kIROp_DoubleType:
+        return UnownedStringSlice("double");
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -83,23 +101,36 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
 {
     switch (op)
     {
-    case kIROp_BoolType: return UnownedStringSlice("bool");
+    case kIROp_BoolType:
+        return UnownedStringSlice("bool");
 
-    case kIROp_Int8Type:  return UnownedStringSlice("char");
-    case kIROp_Int16Type: return UnownedStringSlice("short");
-    case kIROp_IntType:   return UnownedStringSlice("int");
-    case kIROp_Int64Type: return UnownedStringSlice("longlong");
+    case kIROp_Int8Type:
+        return UnownedStringSlice("char");
+    case kIROp_Int16Type:
+        return UnownedStringSlice("short");
+    case kIROp_IntType:
+        return UnownedStringSlice("int");
+    case kIROp_Int64Type:
+        return UnownedStringSlice("longlong");
 
-    case kIROp_UInt8Type:  return UnownedStringSlice("uchar");
-    case kIROp_UInt16Type: return UnownedStringSlice("ushort");
-    case kIROp_UIntType:   return UnownedStringSlice("uint");
-    case kIROp_UInt64Type: return UnownedStringSlice("ulonglong");
+    case kIROp_UInt8Type:
+        return UnownedStringSlice("uchar");
+    case kIROp_UInt16Type:
+        return UnownedStringSlice("ushort");
+    case kIROp_UIntType:
+        return UnownedStringSlice("uint");
+    case kIROp_UInt64Type:
+        return UnownedStringSlice("ulonglong");
 
-    case kIROp_HalfType: return UnownedStringSlice("__half");
+    case kIROp_HalfType:
+        return UnownedStringSlice("__half");
 
-    case kIROp_FloatType:  return UnownedStringSlice("float");
-    case kIROp_DoubleType: return UnownedStringSlice("double");
-    default:               return UnownedStringSlice();
+    case kIROp_FloatType:
+        return UnownedStringSlice("float");
+    case kIROp_DoubleType:
+        return UnownedStringSlice("double");
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -136,7 +167,8 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(
             outName << "CUsurfObject";
             return SLANG_OK;
         }
-    default: break;
+    default:
+        break;
     }
     return SLANG_FAIL;
 }
@@ -190,9 +222,14 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 
             switch (type->getOp())
             {
-            case kIROp_SamplerStateType:           out << "SamplerState"; return SLANG_OK;
-            case kIROp_SamplerComparisonStateType: out << "SamplerComparisonState"; return SLANG_OK;
-            default:                               break;
+            case kIROp_SamplerStateType:
+                out << "SamplerState";
+                return SLANG_OK;
+            case kIROp_SamplerComparisonStateType:
+                out << "SamplerComparisonState";
+                return SLANG_OK;
+            default:
+                break;
             }
 
             break;
@@ -210,7 +247,8 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
                 break;
             }
 
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -293,10 +331,13 @@ String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* ent
     auto stage = entryPointDecor->getProfile().getStage();
     switch (stage)
     {
-    default: break;
+    default:
+        break;
 
-#define CASE(STAGE, PREFIX) \
-    case Stage::STAGE: globalSymbolName = #PREFIX + funcName; break
+#define CASE(STAGE, PREFIX)                    \
+    case Stage::STAGE:                         \
+        globalSymbolName = #PREFIX + funcName; \
+        break
 
         // Optix 7 Guide, Section 6.1 (Program input)
         //
@@ -654,7 +695,8 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", -1);\n");
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -876,7 +918,8 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-    default: break;
+    default:
+        break;
     }
 
     return Super::tryEmitInstExprImpl(inst, inOuterPrec);
@@ -915,7 +958,9 @@ void CUDASourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(as<IRIntLit>(vectorType->getElementCount())->getValue());
             break;
         }
-    default: m_writer->emit(_getTypeName(type)); break;
+    default:
+        m_writer->emit(_getTypeName(type));
+        break;
     }
 }
 

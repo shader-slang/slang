@@ -1224,7 +1224,8 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     switch (modifierType)
     {
         // Allowed only on parameters and global variables.
-    case ASTNodeType::InModifier: return modifierType;
+    case ASTNodeType::InModifier:
+        return modifierType;
     case ASTNodeType::OutModifier:
     case ASTNodeType::RefModifier:
     case ASTNodeType::ConstRefModifier:
@@ -1270,28 +1271,34 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLEffectSharedModifier:
     case ASTNodeType::HLSLVolatileModifier:
     case ASTNodeType::GLSLPrecisionModifier:
-    case ASTNodeType::HLSLGroupSharedModifier:                 return modifierType;
+    case ASTNodeType::HLSLGroupSharedModifier:
+        return modifierType;
 
     case ASTNodeType::HLSLStaticModifier:
     case ASTNodeType::ActualGlobalModifier:
-    case ASTNodeType::HLSLUniformModifier:  return ASTNodeType::HLSLStaticModifier;
+    case ASTNodeType::HLSLUniformModifier:
+        return ASTNodeType::HLSLStaticModifier;
 
     case ASTNodeType::HLSLNoInterpolationModifier:
     case ASTNodeType::HLSLNoPerspectiveModifier:
     case ASTNodeType::HLSLLinearModifier:
     case ASTNodeType::HLSLSampleModifier:
     case ASTNodeType::HLSLCentroidModifier:
-    case ASTNodeType::PerVertexModifier:           return ASTNodeType::InterpolationModeModifier;
+    case ASTNodeType::PerVertexModifier:
+        return ASTNodeType::InterpolationModeModifier;
 
     case ASTNodeType::PrefixModifier:
-    case ASTNodeType::PostfixModifier: return ASTNodeType::PrefixModifier;
+    case ASTNodeType::PostfixModifier:
+        return ASTNodeType::PrefixModifier;
 
     case ASTNodeType::BuiltinModifier:
     case ASTNodeType::PublicModifier:
     case ASTNodeType::PrivateModifier:
-    case ASTNodeType::InternalModifier: return ASTNodeType::VisibilityModifier;
+    case ASTNodeType::InternalModifier:
+        return ASTNodeType::VisibilityModifier;
 
-    default: return ASTNodeType::NodeBase;
+    default:
+        return ASTNodeType::NodeBase;
     }
 }
 
@@ -1381,7 +1388,8 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::SpecializedForTargetModifier:
     case ASTNodeType::InlineModifier:
     case ASTNodeType::PrefixModifier:
-    case ASTNodeType::PostfixModifier:              return as<CallableDecl>(decl);
+    case ASTNodeType::PostfixModifier:
+        return as<CallableDecl>(decl);
 
     case ASTNodeType::BuiltinModifier:
     case ASTNodeType::PublicModifier:
@@ -1394,12 +1402,14 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
                as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
                as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl);
 
-    case ASTNodeType::ExportedModifier: return as<ImportDecl>(decl);
+    case ASTNodeType::ExportedModifier:
+        return as<ImportDecl>(decl);
 
     case ASTNodeType::ConstModifier:
     case ASTNodeType::HLSLStaticModifier:
     case ASTNodeType::ConstExprModifier:
-    case ASTNodeType::PreciseModifier:    return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
+    case ASTNodeType::PreciseModifier:
+        return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
 
     case ASTNodeType::ActualGlobalModifier:
     case ASTNodeType::MatrixLayoutModifier:
@@ -1419,7 +1429,8 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         if (!as<VarDeclBase>(decl))
             return false;
         return isGlobalDecl(decl) || isEffectivelyStatic(decl);
-    default: return true;
+    default:
+        return true;
     }
 }
 
@@ -1568,10 +1579,18 @@ Modifier* SemanticsVisitor::checkModifier(
         {
             switch (packOffsetModifier->componentMask.getContent()[0])
             {
-            case 'x': uniformOffset += 0; break;
-            case 'y': uniformOffset += 4; break;
-            case 'z': uniformOffset += 8; break;
-            case 'w': uniformOffset += 12; break;
+            case 'x':
+                uniformOffset += 0;
+                break;
+            case 'y':
+                uniformOffset += 4;
+                break;
+            case 'z':
+                uniformOffset += 8;
+                break;
+            case 'w':
+                uniformOffset += 12;
+                break;
             default:
                 getSink()->diagnose(
                     packOffsetModifier,

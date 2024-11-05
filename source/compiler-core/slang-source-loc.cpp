@@ -18,13 +18,15 @@ const String PathInfo::getMostUniqueIdentity() const
 {
     switch (type)
     {
-    case Type::Normal: return uniqueIdentity;
+    case Type::Normal:
+        return uniqueIdentity;
     case Type::FoundPath:
     case Type::FromString:
         {
             return foundPath;
         }
-    default: return "";
+    default:
+        return "";
     }
 }
 
@@ -69,7 +71,8 @@ bool PathInfo::operator==(const ThisType& rhs) const
             // Only have a found path
             return foundPath == rhs.foundPath;
         }
-    default: break;
+    default:
+        break;
     }
 
     return false;
@@ -79,10 +82,18 @@ void PathInfo::appendDisplayName(StringBuilder& out) const
 {
     switch (type)
     {
-    case Type::TokenPaste:  out << "[Token Paste]"; break;
-    case Type::TypeParse:   out << "[Type Parse]"; break;
-    case Type::Unknown:     out << "[Unknown]"; break;
-    case Type::CommandLine: out << "[Command Line]"; break;
+    case Type::TokenPaste:
+        out << "[Token Paste]";
+        break;
+    case Type::TypeParse:
+        out << "[Type Parse]";
+        break;
+    case Type::Unknown:
+        out << "[Unknown]";
+        break;
+    case Type::CommandLine:
+        out << "[Command Line]";
+        break;
     case Type::Normal:
     case Type::FromString:
     case Type::FoundPath:
@@ -93,7 +104,8 @@ void PathInfo::appendDisplayName(StringBuilder& out) const
                 out);
             break;
         }
-    default: break;
+    default:
+        break;
     }
 }
 

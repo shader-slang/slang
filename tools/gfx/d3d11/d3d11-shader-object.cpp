@@ -478,7 +478,8 @@ Result ShaderObjectImpl::bindAsValue(
             }
             break;
 
-        default: break;
+        default:
+            break;
         }
     }
 

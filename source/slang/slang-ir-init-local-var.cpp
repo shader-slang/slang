@@ -32,7 +32,8 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                             initialized = true;
                         break;
                     case kIROp_GetElementPtr:
-                    case kIROp_FieldAddress:  continue;
+                    case kIROp_FieldAddress:
+                        continue;
                     default:
                         if (userSet.contains(nextInst))
                         {

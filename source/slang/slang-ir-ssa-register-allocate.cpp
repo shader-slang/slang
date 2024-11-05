@@ -46,7 +46,8 @@ struct RegisterAllocateContext
             if (inst0 == inst1->getOperand(0))
                 return true;
             break;
-        default: break;
+        default:
+            break;
         }
 
         // If insts have the same name, prefer to coalesce them.
@@ -301,8 +302,10 @@ struct RegisterAllocateContext
             if (allocateForCompositeTypeOnly && !isCompositeType(inst->getFullType()))
                 return false;
             return true;
-        case kIROp_UpdateElement: return true;
-        default:                  return false;
+        case kIROp_UpdateElement:
+            return true;
+        default:
+            return false;
         }
     }
     bool needProcessing(IRGlobalValueWithCode* func)

@@ -57,7 +57,9 @@ void buildEntryPointReferenceGraph(
         switch (inst->getOp())
         {
         case kIROp_GlobalParam:
-        case kIROp_SPIRVAsmOperandBuiltinVar: registerEntryPointReference(entryPoint, inst); break;
+        case kIROp_SPIRVAsmOperandBuiltinVar:
+            registerEntryPointReference(entryPoint, inst);
+            break;
         case kIROp_Block:
         case kIROp_SPIRVAsm:
             for (auto child : inst->getChildren())
@@ -85,7 +87,9 @@ void buildEntryPointReferenceGraph(
             {
             case kIROp_GlobalParam:
             case kIROp_GlobalVar:
-            case kIROp_SPIRVAsmOperandBuiltinVar: addToWorkList({entryPoint, operand}); break;
+            case kIROp_SPIRVAsmOperandBuiltinVar:
+                addToWorkList({entryPoint, operand});
+                break;
             }
         }
     };

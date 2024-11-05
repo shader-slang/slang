@@ -173,7 +173,8 @@ void legalizeStore(
             }
         }
         break;
-    default: break;
+    default:
+        break;
     }
 }
 void legalizeImageSubscript(TargetRequest* target, IRModule* module, DiagnosticSink* sink)

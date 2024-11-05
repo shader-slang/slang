@@ -32,9 +32,6 @@ AccessModifierOffset: -4
 
 # Switch statements
 IndentCaseBlocks: true
-AllowShortCaseLabelsOnASingleLine: true
-AlignConsecutiveShortCaseStatements:
-  Enabled: true
 
 # Templates
 SpaceAfterTemplateKeyword: false

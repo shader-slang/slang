@@ -274,7 +274,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 sizeDimCount = 3;
                 break;
 
-            default: assert(!"unexpected"); break;
+            default:
+                assert(!"unexpected");
+                break;
             }
 
             if (isArray)
@@ -352,7 +354,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                         cc = 3;
                         break;
 
-                    default: SLANG_UNEXPECTED("unhandled resource shape"); break;
+                    default:
+                        SLANG_UNEXPECTED("unhandled resource shape");
+                        break;
                     }
 
                     if (isArray)
@@ -429,7 +433,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 };
                 switch (baseShape)
                 {
-                case SLANG_TEXTURE_1D: extractSizeComponent(0, "width"); break;
+                case SLANG_TEXTURE_1D:
+                    extractSizeComponent(0, "width");
+                    break;
 
                 case SLANG_TEXTURE_2D:
                 case SLANG_TEXTURE_CUBE:
@@ -443,7 +449,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                     extractSizeComponent(2, "depth");
                     break;
 
-                default: assert(!"unexpected"); break;
+                default:
+                    assert(!"unexpected");
+                    break;
                 }
 
                 if (isArray)

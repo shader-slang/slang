@@ -10,13 +10,20 @@ static const char* _getSignalTypeAsText(SignalType type)
 {
     switch (type)
     {
-    case SignalType::AssertFailure:    return "assert failure";
-    case SignalType::Unimplemented:    return "unimplemented";
-    case SignalType::Unreachable:      return "hit unreachable code";
-    case SignalType::Unexpected:       return "unexpected";
-    case SignalType::InvalidOperation: return "invalid operation";
-    case SignalType::AbortCompilation: return "abort compilation";
-    default:                           return "unhandled";
+    case SignalType::AssertFailure:
+        return "assert failure";
+    case SignalType::Unimplemented:
+        return "unimplemented";
+    case SignalType::Unreachable:
+        return "hit unreachable code";
+    case SignalType::Unexpected:
+        return "unexpected";
+    case SignalType::InvalidOperation:
+        return "invalid operation";
+    case SignalType::AbortCompilation:
+        return "abort compilation";
+    default:
+        return "unhandled";
     }
 }
 
@@ -50,9 +57,12 @@ String _getMessage(SignalType type, char const* message)
 #if SLANG_HAS_EXCEPTIONS
     switch (type)
     {
-    case SignalType::InvalidOperation: throw InvalidOperationException(_getMessage(type, message));
-    case SignalType::AbortCompilation: throw AbortCompilationException(_getMessage(type, message));
-    default:                           throw InternalError(_getMessage(type, message));
+    case SignalType::InvalidOperation:
+        throw InvalidOperationException(_getMessage(type, message));
+    case SignalType::AbortCompilation:
+        throw AbortCompilationException(_getMessage(type, message));
+    default:
+        throw InternalError(_getMessage(type, message));
     }
 #else
     // Attempt to drop out into the debugger. If a debugger isn't attached this will likely crash -

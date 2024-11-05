@@ -433,7 +433,9 @@ struct InputStreamStack
             case TokenType::NewLine:
             case TokenType::WhiteSpace:
             case TokenType::BlockComment:
-            case TokenType::LineComment:  readToken(); break;
+            case TokenType::LineComment:
+                readToken();
+                break;
             }
         }
     }
@@ -516,11 +518,13 @@ private:
             Token token = m_lexer.lexToken();
             switch (token.type)
             {
-            default: return token;
+            default:
+                return token;
 
             case TokenType::WhiteSpace:
             case TokenType::BlockComment:
-            case TokenType::LineComment:  break;
+            case TokenType::LineComment:
+                break;
             }
         }
     }
@@ -1230,7 +1234,8 @@ MacroInvocation::Arg ExpansionInputStream::_parseMacroArg(MacroInvocation* macro
             nestingDepth++;
             break;
 
-        default: break;
+        default:
+            break;
         }
 
         // Add the token and continue parsing.
@@ -1273,7 +1278,8 @@ void ExpansionInputStream::_parseMacroArgs(MacroDefinition* macro, MacroInvocati
         switch (m_inputStreams.peekTokenType())
         {
         case TokenType::RParent:
-        case TokenType::EndOfFile: return;
+        case TokenType::EndOfFile:
+            return;
         }
     }
 
@@ -2058,7 +2064,9 @@ void MacroInvocation::_initCurrentOpStream()
     //
     switch (op.opcode)
     {
-    default: SLANG_UNEXPECTED("unhandled macro opcode case"); break;
+    default:
+        SLANG_UNEXPECTED("unhandled macro opcode case");
+        break;
 
     case MacroDefinition::Opcode::RawSpan:
         {
@@ -2326,9 +2334,11 @@ static bool IsEndOfLine(PreprocessorDirectiveContext* context)
     switch (inputStream->peekRawTokenType())
     {
     case TokenType::EndOfFile:
-    case TokenType::NewLine:   return true;
+    case TokenType::NewLine:
+        return true;
 
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -2541,9 +2551,12 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
     switch (token.type)
     {
     // handle prefix unary ops
-    case TokenType::OpSub:    return -ParseAndEvaluateUnaryExpression(context);
-    case TokenType::OpNot:    return !ParseAndEvaluateUnaryExpression(context);
-    case TokenType::OpBitNot: return ~ParseAndEvaluateUnaryExpression(context);
+    case TokenType::OpSub:
+        return -ParseAndEvaluateUnaryExpression(context);
+    case TokenType::OpNot:
+        return !ParseAndEvaluateUnaryExpression(context);
+    case TokenType::OpBitNot:
+        return ~ParseAndEvaluateUnaryExpression(context);
 
     // handle parenthized sub-expression
     case TokenType::LParent:
@@ -2560,7 +2573,8 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
             return value;
         }
 
-    case TokenType::IntegerLiteral: return stringToInt(token.getContent());
+    case TokenType::IntegerLiteral:
+        return stringToInt(token.getContent());
 
     case TokenType::Identifier:
         {
@@ -2683,29 +2697,47 @@ static int GetInfixOpPrecedence(Token const& opToken)
         // cause us to stop parsing an expression
         return -1;
 
-    case TokenType::OpMul: return 10;
-    case TokenType::OpDiv: return 10;
-    case TokenType::OpMod: return 10;
+    case TokenType::OpMul:
+        return 10;
+    case TokenType::OpDiv:
+        return 10;
+    case TokenType::OpMod:
+        return 10;
 
-    case TokenType::OpAdd: return 9;
-    case TokenType::OpSub: return 9;
+    case TokenType::OpAdd:
+        return 9;
+    case TokenType::OpSub:
+        return 9;
 
-    case TokenType::OpLsh: return 8;
-    case TokenType::OpRsh: return 8;
+    case TokenType::OpLsh:
+        return 8;
+    case TokenType::OpRsh:
+        return 8;
 
-    case TokenType::OpLess:    return 7;
-    case TokenType::OpGreater: return 7;
-    case TokenType::OpLeq:     return 7;
-    case TokenType::OpGeq:     return 7;
+    case TokenType::OpLess:
+        return 7;
+    case TokenType::OpGreater:
+        return 7;
+    case TokenType::OpLeq:
+        return 7;
+    case TokenType::OpGeq:
+        return 7;
 
-    case TokenType::OpEql: return 6;
-    case TokenType::OpNeq: return 6;
+    case TokenType::OpEql:
+        return 6;
+    case TokenType::OpNeq:
+        return 6;
 
-    case TokenType::OpBitAnd: return 5;
-    case TokenType::OpBitOr:  return 4;
-    case TokenType::OpBitXor: return 3;
-    case TokenType::OpAnd:    return 2;
-    case TokenType::OpOr:     return 1;
+    case TokenType::OpBitAnd:
+        return 5;
+    case TokenType::OpBitOr:
+        return 4;
+    case TokenType::OpBitXor:
+        return 3;
+    case TokenType::OpAnd:
+        return 2;
+    case TokenType::OpOr:
+        return 1;
     }
 };
 
@@ -2724,7 +2756,8 @@ static PreprocessorExpressionValue EvaluateInfixOp(
         return 0;
         break;
 
-    case TokenType::OpMul: return left * right;
+    case TokenType::OpMul:
+        return left * right;
     case TokenType::OpDiv:
         {
             if (right == 0)
@@ -2753,21 +2786,36 @@ static PreprocessorExpressionValue EvaluateInfixOp(
             }
             return left % right;
         }
-    case TokenType::OpAdd:     return left + right;
-    case TokenType::OpSub:     return left - right;
-    case TokenType::OpLsh:     return left << right;
-    case TokenType::OpRsh:     return left >> right;
-    case TokenType::OpLess:    return left < right ? 1 : 0;
-    case TokenType::OpGreater: return left > right ? 1 : 0;
-    case TokenType::OpLeq:     return left <= right ? 1 : 0;
-    case TokenType::OpGeq:     return left >= right ? 1 : 0;
-    case TokenType::OpEql:     return left == right ? 1 : 0;
-    case TokenType::OpNeq:     return left != right ? 1 : 0;
-    case TokenType::OpBitAnd:  return left & right;
-    case TokenType::OpBitOr:   return left | right;
-    case TokenType::OpBitXor:  return left ^ right;
-    case TokenType::OpAnd:     return left && right;
-    case TokenType::OpOr:      return left || right;
+    case TokenType::OpAdd:
+        return left + right;
+    case TokenType::OpSub:
+        return left - right;
+    case TokenType::OpLsh:
+        return left << right;
+    case TokenType::OpRsh:
+        return left >> right;
+    case TokenType::OpLess:
+        return left < right ? 1 : 0;
+    case TokenType::OpGreater:
+        return left > right ? 1 : 0;
+    case TokenType::OpLeq:
+        return left <= right ? 1 : 0;
+    case TokenType::OpGeq:
+        return left >= right ? 1 : 0;
+    case TokenType::OpEql:
+        return left == right ? 1 : 0;
+    case TokenType::OpNeq:
+        return left != right ? 1 : 0;
+    case TokenType::OpBitAnd:
+        return left & right;
+    case TokenType::OpBitOr:
+        return left | right;
+    case TokenType::OpBitXor:
+        return left ^ right;
+    case TokenType::OpAnd:
+        return left && right;
+    case TokenType::OpOr:
+        return left || right;
     }
 }
 
@@ -2935,11 +2983,16 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
 
     switch (conditional->state)
     {
-    case Conditional::State::Before: conditional->state = Conditional::State::During; break;
+    case Conditional::State::Before:
+        conditional->state = Conditional::State::During;
+        break;
 
-    case Conditional::State::During: conditional->state = Conditional::State::After; break;
+    case Conditional::State::During:
+        conditional->state = Conditional::State::After;
+        break;
 
-    default: break;
+    default:
+        break;
     }
 
     updateLexerFlagsForConditionals(inputFile);
@@ -3302,7 +3355,8 @@ static void _parseMacroOps(
 
             break;
 
-        case TokenType::EndOfFile: break;
+        case TokenType::EndOfFile:
+            break;
         }
 
         if (spanBeginIndex != spanEndIndex ||
@@ -3657,7 +3711,9 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
 
     switch (PeekTokenType(context))
     {
-    case TokenType::IntegerLiteral: line = stringToInt(AdvanceToken(context).getContent()); break;
+    case TokenType::IntegerLiteral:
+        line = stringToInt(AdvanceToken(context).getContent());
+        break;
 
     case TokenType::EndOfFile:
     case TokenType::NewLine:
@@ -3673,7 +3729,9 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
             return;
         }
         [[fallthrough]];
-    default: _diagnoseInvalidLineDirective(context); return;
+    default:
+        _diagnoseInvalidLineDirective(context);
+        return;
     }
 
     auto sourceManager = context->m_preprocessor->getSourceManager();
@@ -3682,9 +3740,13 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     switch (PeekTokenType(context))
     {
     case TokenType::EndOfFile:
-    case TokenType::NewLine:   file = sourceManager->getPathInfo(directiveLoc).foundPath; break;
+    case TokenType::NewLine:
+        file = sourceManager->getPathInfo(directiveLoc).foundPath;
+        break;
 
-    case TokenType::StringLiteral: file = getStringLiteralTokenValue(AdvanceToken(context)); break;
+    case TokenType::StringLiteral:
+        file = getStringLiteralTokenValue(AdvanceToken(context));
+        break;
 
     case TokenType::IntegerLiteral:
         // Note(tfoley): GLSL allows the "source string" to be indicated by an integer
@@ -3927,9 +3989,11 @@ static void HandleDirective(PreprocessorDirectiveContext* context)
     switch (directiveTokenType)
     {
     case TokenType::EndOfFile:
-    case TokenType::NewLine:   return;
+    case TokenType::NewLine:
+        return;
 
-    default: break;
+    default:
+        break;
     }
 
     // Otherwise the directive name had better be an identifier
@@ -4132,7 +4196,9 @@ static TokenList ReadAllTokens(Preprocessor* preprocessor)
 
         switch (token.type)
         {
-        default: tokens.add(token); break;
+        default:
+            tokens.add(token);
+            break;
 
         case TokenType::EndOfFile:
             // Note: we include the EOF token in the list,
@@ -4144,7 +4210,8 @@ static TokenList ReadAllTokens(Preprocessor* preprocessor)
         case TokenType::NewLine:
         case TokenType::LineComment:
         case TokenType::BlockComment:
-        case TokenType::Invalid:      break;
+        case TokenType::Invalid:
+            break;
         }
     }
 }

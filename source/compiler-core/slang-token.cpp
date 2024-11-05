@@ -10,10 +10,13 @@ char const* TokenTypeToString(TokenType type)
 {
     switch (type)
     {
-    default: SLANG_ASSERT(!"unexpected"); return "<uknown>";
+    default:
+        SLANG_ASSERT(!"unexpected");
+        return "<uknown>";
 
 #define TOKEN(NAME, DESC) \
-    case TokenType::NAME: return DESC;
+    case TokenType::NAME: \
+        return DESC;
 #include "slang-token-defs.h"
     }
 }

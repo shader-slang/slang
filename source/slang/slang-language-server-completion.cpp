@@ -244,11 +244,15 @@ CompletionResult CompletionContext::gatherFileAndModuleCompletionItems(
                             {
                                 switch (ch)
                                 {
-                                case '-': nameSB.appendChar('_'); break;
+                                case '-':
+                                    nameSB.appendChar('_');
+                                    break;
                                 case '.':
                                     // Ignore any file items that contains a "."
                                     return;
-                                default: nameSB.appendChar(ch); break;
+                                default:
+                                    nameSB.appendChar(ch);
+                                    break;
                                 }
                             }
                             else
@@ -535,7 +539,8 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
         useCommitChars = (commitCharacterBehavior == CommitCharacterBehavior::All);
         addKeywords = true;
         break;
-    default: return result;
+    default:
+        return result;
     }
     HashSet<String> deduplicateSet;
     for (Index i = 0;

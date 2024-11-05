@@ -356,17 +356,23 @@ CapabilitySet Profile::getCapabilityName()
     List<CapabilityName> result;
     switch (getVersion())
     {
-#define PROFILE_VERSION(TAG, NAME) \
-    case ProfileVersion::TAG: result.add(CapabilityName::TAG); break;
+#define PROFILE_VERSION(TAG, NAME)       \
+    case ProfileVersion::TAG:            \
+        result.add(CapabilityName::TAG); \
+        break;
 #include "slang-profile-defs.h"
-    default: break;
+    default:
+        break;
     }
     switch (getStage())
     {
-#define PROFILE_STAGE(TAG, NAME, VAL) \
-    case Stage::TAG: result.add(CapabilityName::NAME); break;
+#define PROFILE_STAGE(TAG, NAME, VAL)     \
+    case Stage::TAG:                      \
+        result.add(CapabilityName::NAME); \
+        break;
 #include "slang-profile-defs.h"
-    default: break;
+    default:
+        break;
     }
 
     CapabilitySet resultSet = CapabilitySet(result);
@@ -379,10 +385,12 @@ char const* Profile::getName()
 {
     switch (raw)
     {
-    default: return "unknown";
+    default:
+        return "unknown";
 
 #define PROFILE(TAG, NAME, STAGE, VERSION) \
-    case Profile::TAG: return #NAME;
+    case Profile::TAG:                     \
+        return #NAME;
 #define PROFILE_ALIAS(TAG, DEF, NAME) /* empty */
 #include "slang-profile-defs.h"
     }
@@ -430,21 +438,37 @@ Stage getStageFromAtom(CapabilityAtom atom)
 {
     switch (atom)
     {
-    case CapabilityAtom::vertex:         return Stage::Vertex;
-    case CapabilityAtom::hull:           return Stage::Hull;
-    case CapabilityAtom::domain:         return Stage::Domain;
-    case CapabilityAtom::geometry:       return Stage::Geometry;
-    case CapabilityAtom::fragment:       return Stage::Fragment;
-    case CapabilityAtom::compute:        return Stage::Compute;
-    case CapabilityAtom::_mesh:          return Stage::Mesh;
-    case CapabilityAtom::_amplification: return Stage::Amplification;
-    case CapabilityAtom::_anyhit:        return Stage::AnyHit;
-    case CapabilityAtom::_closesthit:    return Stage::ClosestHit;
-    case CapabilityAtom::_intersection:  return Stage::Intersection;
-    case CapabilityAtom::_raygen:        return Stage::RayGeneration;
-    case CapabilityAtom::_miss:          return Stage::Miss;
-    case CapabilityAtom::_callable:      return Stage::Callable;
-    default:                             SLANG_UNEXPECTED("unknown stage atom"); UNREACHABLE_RETURN(Stage::Unknown);
+    case CapabilityAtom::vertex:
+        return Stage::Vertex;
+    case CapabilityAtom::hull:
+        return Stage::Hull;
+    case CapabilityAtom::domain:
+        return Stage::Domain;
+    case CapabilityAtom::geometry:
+        return Stage::Geometry;
+    case CapabilityAtom::fragment:
+        return Stage::Fragment;
+    case CapabilityAtom::compute:
+        return Stage::Compute;
+    case CapabilityAtom::_mesh:
+        return Stage::Mesh;
+    case CapabilityAtom::_amplification:
+        return Stage::Amplification;
+    case CapabilityAtom::_anyhit:
+        return Stage::AnyHit;
+    case CapabilityAtom::_closesthit:
+        return Stage::ClosestHit;
+    case CapabilityAtom::_intersection:
+        return Stage::Intersection;
+    case CapabilityAtom::_raygen:
+        return Stage::RayGeneration;
+    case CapabilityAtom::_miss:
+        return Stage::Miss;
+    case CapabilityAtom::_callable:
+        return Stage::Callable;
+    default:
+        SLANG_UNEXPECTED("unknown stage atom");
+        UNREACHABLE_RETURN(Stage::Unknown);
     }
 }
 
@@ -504,7 +528,8 @@ SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode com
         {
             return SourceLanguage::Metal;
         }
-    default: break;
+    default:
+        break;
     }
     SLANG_ASSERT(!"Unknown compiler");
     return SourceLanguage::Unknown;
@@ -569,7 +594,8 @@ PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
         {
             return PassThroughMode::Tint;
         }
-    default: break;
+    default:
+        break;
     }
 
     SLANG_ASSERT(!"Unhandled target");
@@ -640,7 +666,8 @@ void trackGLSLTargetCaps(GLSLExtensionTracker* extensionTracker, CapabilitySet c
         {
             switch (asAtom(atom))
             {
-            default: break;
+            default:
+                break;
 
             case CapabilityAtom::glsl_spirv_1_0:
                 extensionTracker->requireSPIRVVersion(SemanticVersion(1, 0));
@@ -810,8 +837,10 @@ String GetHLSLProfileName(Profile profile)
         // both the stage and shader model, which need to be
         // used when compiling a single entry point.
         //
-#define CASE(NAME, PREFIX) \
-    case Stage::NAME: stagePrefix = #PREFIX; break
+#define CASE(NAME, PREFIX)     \
+    case Stage::NAME:          \
+        stagePrefix = #PREFIX; \
+        break
         CASE(Vertex, vs);
         CASE(Hull, hs);
         CASE(Domain, ds);
@@ -826,8 +855,10 @@ String GetHLSLProfileName(Profile profile)
     char const* versionSuffix = nullptr;
     switch (profile.getVersion())
     {
-#define CASE(TAG, SUFFIX) \
-    case ProfileVersion::TAG: versionSuffix = #SUFFIX; break
+#define CASE(TAG, SUFFIX)        \
+    case ProfileVersion::TAG:    \
+        versionSuffix = #SUFFIX; \
+        break
         CASE(DX_4_0, _4_0);
         CASE(DX_4_1, _4_1);
         CASE(DX_5_0, _5_0);
@@ -842,7 +873,8 @@ String GetHLSLProfileName(Profile profile)
         CASE(DX_6_7, _6_7);
 #undef CASE
 
-    default: return "unknown";
+    default:
+        return "unknown";
     }
 
     String result;
@@ -934,8 +966,10 @@ String CodeGenContext::calcSourcePathForEntryPoints()
 
     switch (numSourceFiles)
     {
-    case 0: return "unknown";
-    case 1: return _getDisplayPath(sink, sourceFiles[0]);
+    case 0:
+        return "unknown";
+    case 1:
+        return _getDisplayPath(sink, sourceFiles[0]);
     default:
         {
             StringBuilder builder;
@@ -982,9 +1016,12 @@ static Severity _getDiagnosticSeverity(ArtifactDiagnostic::Severity severity)
 {
     switch (severity)
     {
-    case ArtifactDiagnostic::Severity::Warning: return Severity::Warning;
-    case ArtifactDiagnostic::Severity::Info:    return Severity::Note;
-    default:                                    return Severity::Error;
+    case ArtifactDiagnostic::Severity::Warning:
+        return Severity::Warning;
+    case ArtifactDiagnostic::Severity::Info:
+        return Severity::Note;
+    default:
+        return Severity::Error;
     }
 }
 
@@ -1002,7 +1039,8 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
         {
             return new GLSLExtensionTracker;
         }
-    default: return nullptr;
+    default:
+        return nullptr;
     }
 }
 
@@ -1021,13 +1059,20 @@ static CodeGenTarget _getDefaultSourceForTarget(CodeGenTarget target)
         {
             return CodeGenTarget::HostCPPSource;
         }
-    case CodeGenTarget::PTX:        return CodeGenTarget::CUDASource;
-    case CodeGenTarget::DXBytecode: return CodeGenTarget::HLSL;
-    case CodeGenTarget::DXIL:       return CodeGenTarget::HLSL;
-    case CodeGenTarget::SPIRV:      return CodeGenTarget::GLSL;
-    case CodeGenTarget::MetalLib:   return CodeGenTarget::Metal;
-    case CodeGenTarget::WGSLSPIRV:  return CodeGenTarget::WGSL;
-    default:                        break;
+    case CodeGenTarget::PTX:
+        return CodeGenTarget::CUDASource;
+    case CodeGenTarget::DXBytecode:
+        return CodeGenTarget::HLSL;
+    case CodeGenTarget::DXIL:
+        return CodeGenTarget::HLSL;
+    case CodeGenTarget::SPIRV:
+        return CodeGenTarget::GLSL;
+    case CodeGenTarget::MetalLib:
+        return CodeGenTarget::Metal;
+    case CodeGenTarget::WGSLSPIRV:
+        return CodeGenTarget::WGSL;
+    default:
+        break;
     }
     return CodeGenTarget::Unknown;
 }
@@ -1528,7 +1573,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         case OptimizationLevel::Maximal:
             options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Maximal;
             break;
-        default: SLANG_ASSERT(!"Unhandled optimization level"); break;
+        default:
+            SLANG_ASSERT(!"Unhandled optimization level");
+            break;
         }
 
         switch (getTargetProgram()->getOptionSet().getEnumOption<DebugInfoLevel>(
@@ -1547,7 +1594,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         case DebugInfoLevel::Maximal:
             options.debugInfoType = DownstreamCompileOptions::DebugInfoType::Maximal;
             break;
-        default: SLANG_ASSERT(!"Unhandled debug level"); break;
+        default:
+            SLANG_ASSERT(!"Unhandled debug level");
+            break;
         }
 
         switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointMode>(
@@ -1562,7 +1611,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         case FloatingPointMode::Fast:
             options.floatingPointMode = DownstreamCompileOptions::FloatingPointMode::Fast;
             break;
-        default: SLANG_ASSERT(!"Unhandled floating point mode");
+        default:
+            SLANG_ASSERT(!"Unhandled floating point mode");
         }
 
         {
@@ -1587,7 +1637,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 auto stage = getEntryPoint(ee)->getStage();
                 switch (stage)
                 {
-                default: break;
+                default:
+                    break;
 
                 case Stage::Compute:
                     options.pipelineType = DownstreamCompileOptions::PipelineType::Compute;
@@ -1707,11 +1758,16 @@ static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {
     switch (target)
     {
-    case CodeGenTarget::DXBytecodeAssembly: return CodeGenTarget::DXBytecode;
-    case CodeGenTarget::DXILAssembly:       return CodeGenTarget::DXIL;
-    case CodeGenTarget::SPIRVAssembly:      return CodeGenTarget::SPIRV;
-    case CodeGenTarget::WGSLSPIRVAssembly:  return CodeGenTarget::WGSLSPIRV;
-    default:                                return CodeGenTarget::None;
+    case CodeGenTarget::DXBytecodeAssembly:
+        return CodeGenTarget::DXBytecode;
+    case CodeGenTarget::DXILAssembly:
+        return CodeGenTarget::DXIL;
+    case CodeGenTarget::SPIRVAssembly:
+        return CodeGenTarget::SPIRV;
+    case CodeGenTarget::WGSLSPIRVAssembly:
+        return CodeGenTarget::WGSLSPIRV;
+    default:
+        return CodeGenTarget::None;
     }
 }
 
@@ -1768,7 +1824,8 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
         return SLANG_OK;
 
-    default: break;
+    default:
+        break;
     }
 
     return SLANG_FAIL;
@@ -1834,9 +1891,12 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
         return SLANG_OK;
 
         // Note(tfoley): We currently hit this case when compiling the core module
-    case CodeGenTarget::Unknown: return SLANG_OK;
+    case CodeGenTarget::Unknown:
+        return SLANG_OK;
 
-    default: SLANG_UNEXPECTED("unhandled code generation target"); break;
+    default:
+        SLANG_UNEXPECTED("unhandled code generation target");
+        break;
     }
     return SLANG_FAIL;
 }
@@ -2274,9 +2334,13 @@ static void _escapeDependencyString(const char* string, StringBuilder& outBuilde
         case '#':
         case '[':
         case ']':
-        case '\\': outBuilder.appendChar('\\'); break;
+        case '\\':
+            outBuilder.appendChar('\\');
+            break;
 
-        case '$': outBuilder.appendChar('$'); break;
+        case '$':
+            outBuilder.appendChar('$');
+            break;
         }
 
         outBuilder.appendChar(c);

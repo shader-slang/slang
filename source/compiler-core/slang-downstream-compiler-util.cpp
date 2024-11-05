@@ -336,7 +336,8 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
             compiler = findCompiler(set, MatchType::Newest, desc);
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     set->setDefaultCompiler(sourceLanguage, compiler);

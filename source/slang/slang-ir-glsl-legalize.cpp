@@ -222,7 +222,8 @@ static void leafAddressesImpl(List<IRInst*>& ret, const ScalarizedVal& v)
     switch (v.flavor)
     {
     case ScalarizedVal::Flavor::none:
-    case ScalarizedVal::Flavor::value: break;
+    case ScalarizedVal::Flavor::value:
+        break;
 
     case ScalarizedVal::Flavor::address:
         {
@@ -630,7 +631,9 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         switch (context->getStage())
         {
-        default: name = "gl_PrimitiveID"; break;
+        default:
+            name = "gl_PrimitiveID";
+            break;
 
         case Stage::Geometry:
             // GLSL makes a confusing design choice here.
@@ -662,9 +665,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         switch (context->getStage())
         {
-        case Stage::Geometry: context->requireGLSLVersion(ProfileVersion::GLSL_150); break;
+        case Stage::Geometry:
+            context->requireGLSLVersion(ProfileVersion::GLSL_150);
+            break;
 
-        case Stage::Fragment: context->requireGLSLVersion(ProfileVersion::GLSL_430); break;
+        case Stage::Fragment:
+            context->requireGLSLVersion(ProfileVersion::GLSL_430);
+            break;
 
         default:
             context->requireGLSLVersion(ProfileVersion::GLSL_450);
@@ -924,7 +931,8 @@ void createVarLayoutForLegalizedGlobalParam(
         case GLSLSystemValueKind::PositionInput:
             builder->addGLPositionInputDecoration(globalParam);
             break;
-        default: break;
+        default:
+            break;
         }
     }
 }
@@ -1603,10 +1611,17 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
         switch (type->getOp())
         {
             using F = GlobalVaryingDeclarator::Flavor;
-        case kIROp_VerticesType:   arrayDeclarator.flavor = F::meshOutputVertices; break;
-        case kIROp_IndicesType:    arrayDeclarator.flavor = F::meshOutputIndices; break;
-        case kIROp_PrimitivesType: arrayDeclarator.flavor = F::meshOutputPrimitives; break;
-        default:                   SLANG_UNEXPECTED("Unhandled mesh output type");
+        case kIROp_VerticesType:
+            arrayDeclarator.flavor = F::meshOutputVertices;
+            break;
+        case kIROp_IndicesType:
+            arrayDeclarator.flavor = F::meshOutputIndices;
+            break;
+        case kIROp_PrimitivesType:
+            arrayDeclarator.flavor = F::meshOutputPrimitives;
+            break;
+        default:
+            SLANG_UNEXPECTED("Unhandled mesh output type");
         }
         arrayDeclarator.elementCount = meshOutputType->getMaxElementCount();
         arrayDeclarator.next = declarator;
@@ -1862,7 +1877,9 @@ ScalarizedVal extractField(
             return es[fieldIndex].val;
         }
 
-    default: SLANG_UNEXPECTED("unimplemented"); UNREACHABLE_RETURN(ScalarizedVal());
+    default:
+        SLANG_UNEXPECTED("unimplemented");
+        UNREACHABLE_RETURN(ScalarizedVal());
     }
 }
 
@@ -1926,7 +1943,9 @@ ScalarizedVal adaptType(
             return adaptType(builder, element, toType, fromType);
         }
         break;
-    default: SLANG_UNEXPECTED("unimplemented"); UNREACHABLE_RETURN(ScalarizedVal());
+    default:
+        SLANG_UNEXPECTED("unimplemented");
+        UNREACHABLE_RETURN(ScalarizedVal());
     }
 }
 
@@ -2001,7 +2020,9 @@ void assign(
                     break;
                 }
 
-            default: SLANG_UNEXPECTED("unimplemented"); break;
+            default:
+                SLANG_UNEXPECTED("unimplemented");
+                break;
             }
             break;
         }
@@ -2101,7 +2122,9 @@ ScalarizedVal getSubscriptVal(
             return ScalarizedVal::typeAdapter(resultAdapter);
         }
 
-    default: SLANG_UNEXPECTED("unimplemented"); UNREACHABLE_RETURN(ScalarizedVal());
+    default:
+        SLANG_UNEXPECTED("unimplemented");
+        UNREACHABLE_RETURN(ScalarizedVal());
     }
 }
 
@@ -2180,7 +2203,8 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
 {
     switch (val.flavor)
     {
-    case ScalarizedVal::Flavor::value: return val.irValue;
+    case ScalarizedVal::Flavor::value:
+        return val.irValue;
 
     case ScalarizedVal::Flavor::address:
         {
@@ -2219,7 +2243,9 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
         }
         break;
 
-    default: SLANG_UNEXPECTED("unimplemented"); break;
+    default:
+        SLANG_UNEXPECTED("unimplemented");
+        break;
     }
 }
 
@@ -2372,7 +2398,8 @@ static void legalizeMeshOutputParam(
         break;
     case ScalarizedVal::Flavor::value:
     case ScalarizedVal::Flavor::address:
-    case ScalarizedVal::Flavor::typeAdapter: break;
+    case ScalarizedVal::Flavor::typeAdapter:
+        break;
     }
 
     //
@@ -2698,8 +2725,11 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
     {
         switch (decoration->getOp())
         {
-        case kIROp_InterpolationModeDecoration: continue;
-        default:                                cloneDecoration(decoration, arrayInst); break;
+        case kIROp_InterpolationModeDecoration:
+            continue;
+        default:
+            cloneDecoration(decoration, arrayInst);
+            break;
         }
     }
     return arrayInst;
@@ -2992,7 +3022,8 @@ void legalizeEntryPointParameterForGLSL(
     //
     switch (stage)
     {
-    default: break;
+    default:
+        break;
 
     case Stage::AnyHit:
     case Stage::Callable:
@@ -3064,9 +3095,11 @@ void legalizeEntryPointParameterForGLSL(
 
             switch (terminatorInst->getOp())
             {
-            default: continue;
+            default:
+                continue;
 
-            case kIROp_Return: break;
+            case kIROp_Return:
+                break;
             }
 
             // We dont' re-use `builder` here because we don't want to
@@ -3163,7 +3196,8 @@ void legalizeEntryPointParameterForGLSL(
                         }
                         break;
                     }
-                default: break;
+                default:
+                    break;
                 }
                 continue;
             }
@@ -3301,7 +3335,8 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
                 decor->setOperand(0, location);
                 hitObjectAttributeCounter++;
                 goto assignRayPayloadHitObjectAttributeLocations_end;
-            default: break;
+            default:
+                break;
             }
         }
     assignRayPayloadHitObjectAttributeLocations_end:;
@@ -3592,14 +3627,29 @@ void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersi
         {
             switch (spirvVersion.m_minor)
             {
-            case 0:  atom = CapabilityName::_spirv_1_0; break;
-            case 1:  atom = CapabilityName::_spirv_1_1; break;
-            case 2:  atom = CapabilityName::_spirv_1_2; break;
-            case 3:  atom = CapabilityName::_spirv_1_3; break;
-            case 4:  atom = CapabilityName::_spirv_1_4; break;
-            case 5:  atom = CapabilityName::_spirv_1_5; break;
-            case 6:  atom = CapabilityName::_spirv_1_6; break;
-            default: SLANG_UNEXPECTED("Unknown SPIRV version");
+            case 0:
+                atom = CapabilityName::_spirv_1_0;
+                break;
+            case 1:
+                atom = CapabilityName::_spirv_1_1;
+                break;
+            case 2:
+                atom = CapabilityName::_spirv_1_2;
+                break;
+            case 3:
+                atom = CapabilityName::_spirv_1_3;
+                break;
+            case 4:
+                atom = CapabilityName::_spirv_1_4;
+                break;
+            case 5:
+                atom = CapabilityName::_spirv_1_5;
+                break;
+            case 6:
+                atom = CapabilityName::_spirv_1_6;
+                break;
+            default:
+                SLANG_UNEXPECTED("Unknown SPIRV version");
             }
             break;
         }

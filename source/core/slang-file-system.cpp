@@ -225,9 +225,14 @@ SlangResult OSFileSystem::enumeratePathContents(
             SlangPathType pathType;
             switch (type)
             {
-            case Path::Type::File:      pathType = SLANG_PATH_TYPE_FILE; break;
-            case Path::Type::Directory: pathType = SLANG_PATH_TYPE_DIRECTORY; break;
-            default:                    return;
+            case Path::Type::File:
+                pathType = SLANG_PATH_TYPE_FILE;
+                break;
+            case Path::Type::Directory:
+                pathType = SLANG_PATH_TYPE_DIRECTORY;
+                break;
+            default:
+                return;
             }
 
             m_callback(pathType, m_buffer.getBuffer(), m_userData);
@@ -298,9 +303,12 @@ SlangResult OSFileSystem::createDirectory(const char* path)
     }
     switch (res)
     {
-    case SLANG_E_CANNOT_OPEN: return CompressedResult::CannotOpen;
-    case SLANG_E_NOT_FOUND:   return CompressedResult::NotFound;
-    default:                  return CompressedResult::Fail;
+    case SLANG_E_CANNOT_OPEN:
+        return CompressedResult::CannotOpen;
+    case SLANG_E_NOT_FOUND:
+        return CompressedResult::NotFound;
+    default:
+        return CompressedResult::Fail;
     }
 }
 
@@ -377,7 +385,8 @@ void CacheFileSystem::setInnerFileSystem(
                                                    : UniqueIdentityMode::SimplifyPathAndHash;
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (pathStyle == PathStyle::Default)
@@ -779,9 +788,12 @@ SlangResult CacheFileSystem::getPath(PathKind kind, const char* path, ISlangBlob
 {
     switch (kind)
     {
-    case PathKind::Simplified: return _getSimplifiedPath(path, outPath);
-    case PathKind::Canonical:  return _getCanonicalPath(path, outPath);
-    default:                   break;
+    case PathKind::Simplified:
+        return _getSimplifiedPath(path, outPath);
+    case PathKind::Canonical:
+        return _getCanonicalPath(path, outPath);
+    default:
+        break;
     }
 
     if (m_fileSystemExt)
@@ -813,7 +825,8 @@ SlangResult CacheFileSystem::_getSimplifiedPath(const char* path, ISlangBlob** o
             *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
             return SLANG_OK;
         }
-    default: return SLANG_E_NOT_IMPLEMENTED;
+    default:
+        return SLANG_E_NOT_IMPLEMENTED;
     }
 }
 

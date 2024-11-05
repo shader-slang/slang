@@ -315,22 +315,30 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     {
         switch (rttiInfo->m_size)
         {
-        case 1: return GetRttiTypeFuncsForZeroPod<uint8_t>::getFuncs();
-        case 2: return GetRttiTypeFuncsForZeroPod<uint16_t>::getFuncs();
-        case 4: return GetRttiTypeFuncsForZeroPod<uint32_t>::getFuncs();
-        case 8: return GetRttiTypeFuncsForZeroPod<uint64_t>::getFuncs();
+        case 1:
+            return GetRttiTypeFuncsForZeroPod<uint8_t>::getFuncs();
+        case 2:
+            return GetRttiTypeFuncsForZeroPod<uint16_t>::getFuncs();
+        case 4:
+            return GetRttiTypeFuncsForZeroPod<uint32_t>::getFuncs();
+        case 8:
+            return GetRttiTypeFuncsForZeroPod<uint64_t>::getFuncs();
         }
         return RttiTypeFuncs::makeEmpty();
     }
 
     switch (rttiInfo->m_kind)
     {
-    case RttiInfo::Kind::String: return GetRttiTypeFuncs<String>::getFuncs();
+    case RttiInfo::Kind::String:
+        return GetRttiTypeFuncs<String>::getFuncs();
     case RttiInfo::Kind::UnownedStringSlice:
         return GetRttiTypeFuncs<UnownedStringSlice>::getFuncs();
-    case RttiInfo::Kind::List:   return ListFuncs::getFuncs();
-    case RttiInfo::Kind::Struct: return StructArrayFuncs::getFuncs();
-    default:                     break;
+    case RttiInfo::Kind::List:
+        return ListFuncs::getFuncs();
+    case RttiInfo::Kind::Struct:
+        return StructArrayFuncs::getFuncs();
+    default:
+        break;
     }
 
     return RttiTypeFuncs::makeEmpty();
@@ -344,11 +352,20 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     // Passing in rttiInfo allows for other more complex types to be econverted
     switch (rttiInfo->m_kind)
     {
-    case RttiInfo::Kind::I32: *(int32_t*)dst = int32_t(value); break;
-    case RttiInfo::Kind::U32: *(uint32_t*)dst = uint32_t(value); break;
-    case RttiInfo::Kind::I64: *(int64_t*)dst = int64_t(value); break;
-    case RttiInfo::Kind::U64: *(uint64_t*)dst = uint64_t(value); break;
-    default:                  return SLANG_FAIL;
+    case RttiInfo::Kind::I32:
+        *(int32_t*)dst = int32_t(value);
+        break;
+    case RttiInfo::Kind::U32:
+        *(uint32_t*)dst = uint32_t(value);
+        break;
+    case RttiInfo::Kind::I64:
+        *(int64_t*)dst = int64_t(value);
+        break;
+    case RttiInfo::Kind::U64:
+        *(uint64_t*)dst = uint64_t(value);
+        break;
+    default:
+        return SLANG_FAIL;
     }
     return SLANG_OK;
 }
@@ -359,11 +376,16 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
 
     switch (rttiInfo->m_kind)
     {
-    case RttiInfo::Kind::I32: return *(const int32_t*)src;
-    case RttiInfo::Kind::U32: return *(const uint32_t*)src;
-    case RttiInfo::Kind::I64: return *(const int64_t*)src;
-    case RttiInfo::Kind::U64: return *(const uint64_t*)src;
-    default:                  break;
+    case RttiInfo::Kind::I32:
+        return *(const int32_t*)src;
+    case RttiInfo::Kind::U32:
+        return *(const uint32_t*)src;
+    case RttiInfo::Kind::I64:
+        return *(const int64_t*)src;
+    case RttiInfo::Kind::U64:
+        return *(const uint64_t*)src;
+    default:
+        break;
     }
 
     SLANG_ASSERT(!"Not integral!");
@@ -380,9 +402,12 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     {
         switch (rttiInfo->m_kind)
         {
-        case RttiInfo::Kind::F32: return *(const float*)src;
-        case RttiInfo::Kind::F64: return *(const double*)src;
-        default:                  break;
+        case RttiInfo::Kind::F32:
+            return *(const float*)src;
+        case RttiInfo::Kind::F64:
+            return *(const double*)src;
+        default:
+            break;
         }
     }
 
@@ -400,9 +425,14 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     {
         switch (rttiInfo->m_kind)
         {
-        case RttiInfo::Kind::F32: *(float*)dst = float(v); return SLANG_OK;
-        case RttiInfo::Kind::F64: *(double*)dst = v; return SLANG_OK;
-        default:                  break;
+        case RttiInfo::Kind::F32:
+            *(float*)dst = float(v);
+            return SLANG_OK;
+        case RttiInfo::Kind::F64:
+            *(double*)dst = v;
+            return SLANG_OK;
+        default:
+            break;
         }
     }
 
@@ -434,9 +464,12 @@ static int64_t _getIntDefaultValue(RttiDefaultValue value)
     switch (value)
     {
     default:
-    case RttiDefaultValue::Normal:   return 0;
-    case RttiDefaultValue::One:      return 1;
-    case RttiDefaultValue::MinusOne: return -1;
+    case RttiDefaultValue::Normal:
+        return 0;
+    case RttiDefaultValue::One:
+        return 1;
+    case RttiDefaultValue::MinusOne:
+        return -1;
     }
 }
 
@@ -487,8 +520,10 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
     switch (rttiInfo->m_kind)
     {
-    case RttiInfo::Kind::Invalid: return true;
-    case RttiInfo::Kind::Bool:    return *(const bool*)src == (_getIntDefaultValue(defaultValue) != 0);
+    case RttiInfo::Kind::Invalid:
+        return true;
+    case RttiInfo::Kind::Bool:
+        return *(const bool*)src == (_getIntDefaultValue(defaultValue) != 0);
     case RttiInfo::Kind::String:
         {
             return ((const String*)src)->getLength() == 0;

@@ -101,12 +101,24 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 
     switch (texType->GetBaseShape())
     {
-    case SLANG_TEXTURE_1D:     m_writer->emit("1d"); break;
-    case SLANG_TEXTURE_2D:     m_writer->emit("2d"); break;
-    case SLANG_TEXTURE_3D:     m_writer->emit("3d"); break;
-    case SLANG_TEXTURE_CUBE:   m_writer->emit("cube"); break;
-    case SLANG_TEXTURE_BUFFER: m_writer->emit("_buffer"); break;
-    default:                   SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape"); break;
+    case SLANG_TEXTURE_1D:
+        m_writer->emit("1d");
+        break;
+    case SLANG_TEXTURE_2D:
+        m_writer->emit("2d");
+        break;
+    case SLANG_TEXTURE_3D:
+        m_writer->emit("3d");
+        break;
+    case SLANG_TEXTURE_CUBE:
+        m_writer->emit("cube");
+        break;
+    case SLANG_TEXTURE_BUFFER:
+        m_writer->emit("_buffer");
+        break;
+    default:
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+        break;
     }
 
     if (texType->isMultisample())
@@ -123,15 +135,21 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 
     switch (texType->getAccess())
     {
-    case SLANG_RESOURCE_ACCESS_READ: m_writer->emit("access::sample"); break;
+    case SLANG_RESOURCE_ACCESS_READ:
+        m_writer->emit("access::sample");
+        break;
 
-    case SLANG_RESOURCE_ACCESS_WRITE: m_writer->emit("access::write"); break;
+    case SLANG_RESOURCE_ACCESS_WRITE:
+        m_writer->emit("access::write");
+        break;
 
     case SLANG_RESOURCE_ACCESS_READ_WRITE:
     case SLANG_RESOURCE_ACCESS_APPEND:
     case SLANG_RESOURCE_ACCESS_CONSUME:
     case SLANG_RESOURCE_ACCESS_FEEDBACK:
-    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: m_writer->emit("access::read_write"); break;
+    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        m_writer->emit("access::read_write");
+        break;
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
         break;
@@ -181,8 +199,12 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
                 m_writer->emit(")]]");
             }
             break;
-        case LayoutResourceKind::VaryingInput: m_writer->emit(" [[stage_in]]"); break;
-        case LayoutResourceKind::MetalPayload: m_writer->emit(" [[payload]]"); break;
+        case LayoutResourceKind::VaryingInput:
+            m_writer->emit(" [[stage_in]]");
+            break;
+        case LayoutResourceKind::MetalPayload:
+            m_writer->emit(" [[payload]]");
+            break;
         }
     }
     if (!maybeEmitSystemSemantic(param))
@@ -207,12 +229,23 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
 
     switch (stage)
     {
-    case Stage::Fragment:      m_writer->emit("[[fragment]] "); break;
-    case Stage::Vertex:        m_writer->emit("[[vertex]] "); break;
-    case Stage::Compute:       m_writer->emit("[[kernel]] "); break;
-    case Stage::Mesh:          m_writer->emit("[[mesh]] "); break;
-    case Stage::Amplification: m_writer->emit("[[object]] "); break;
-    default:                   SLANG_ABORT_COMPILATION("unsupported stage.");
+    case Stage::Fragment:
+        m_writer->emit("[[fragment]] ");
+        break;
+    case Stage::Vertex:
+        m_writer->emit("[[vertex]] ");
+        break;
+    case Stage::Compute:
+        m_writer->emit("[[kernel]] ");
+        break;
+    case Stage::Mesh:
+        m_writer->emit("[[mesh]] ");
+        break;
+    case Stage::Amplification:
+        m_writer->emit("[[object]] ");
+        break;
+    default:
+        SLANG_ABORT_COMPILATION("unsupported stage.");
     }
 
     switch (stage)
@@ -225,7 +258,8 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -246,8 +280,12 @@ void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
     auto memoryOrder = (IRMemoryOrder)getIntVal(inst);
     switch (memoryOrder)
     {
-    case kIRMemoryOrder_Relaxed: m_writer->emit("memory_order_relaxed"); break;
-    default:                     m_writer->emit("memory_order_seq_cst"); break;
+    case kIRMemoryOrder_Relaxed:
+        m_writer->emit("memory_order_relaxed");
+        break;
+    default:
+        m_writer->emit("memory_order_seq_cst");
+        break;
     }
 }
 
@@ -375,7 +413,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     };
     switch (inst->getOp())
     {
-    case kIROp_discard: m_writer->emit("discard_fragment();\n"); return true;
+    case kIROp_discard:
+        m_writer->emit("discard_fragment();\n");
+        return true;
     case kIROp_MetalAtomicCast:
         {
             auto oldValName = getName(inst);
@@ -870,7 +910,8 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             }
             return true;
         }
-    default: break;
+    default:
+        break;
     }
     // Not handled
     return false;
@@ -980,12 +1021,14 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     m_writer->emit("(-1.0 / 0.0)");
                     return;
                 }
-            default: break;
+            default:
+                break;
             }
             break;
         }
 
-    default: break;
+    default:
+        break;
     }
 
     Super::emitSimpleValueImpl(inst);
@@ -1013,13 +1056,27 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
-    case kIROp_Int64Type:   m_writer->emit("long"); return;
-    case kIROp_UInt64Type:  m_writer->emit("ulong"); return;
-    case kIROp_Int16Type:   m_writer->emit("short"); return;
-    case kIROp_UInt16Type:  m_writer->emit("ushort"); return;
-    case kIROp_IntPtrType:  m_writer->emit("long"); return;
-    case kIROp_UIntPtrType: m_writer->emit("ulong"); return;
-    case kIROp_StructType:  m_writer->emit(getName(type)); return;
+    case kIROp_Int64Type:
+        m_writer->emit("long");
+        return;
+    case kIROp_UInt64Type:
+        m_writer->emit("ulong");
+        return;
+    case kIROp_Int16Type:
+        m_writer->emit("short");
+        return;
+    case kIROp_UInt16Type:
+        m_writer->emit("ushort");
+        return;
+    case kIROp_IntPtrType:
+        m_writer->emit("long");
+        return;
+    case kIROp_UIntPtrType:
+        m_writer->emit("ulong");
+        return;
+    case kIROp_StructType:
+        m_writer->emit(getName(type));
+        return;
 
     case kIROp_VectorType:
         {
@@ -1120,7 +1177,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (auto texType = as<IRTextureType>(type))
@@ -1158,7 +1216,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_RaytracingAccelerationStructureType:
             m_writer->emit("acceleration_structure<instancing>");
             break;
-        default: SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type"); break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+            break;
         }
         return;
     }
@@ -1175,9 +1235,15 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(", metal::topology::");
         switch (meshType->getTopology()->getValue())
         {
-        case 1: m_writer->emit("point"); break;
-        case 2: m_writer->emit("line"); break;
-        case 3: m_writer->emit("triangle"); break;
+        case 1:
+            m_writer->emit("point");
+            break;
+        case 2:
+            m_writer->emit("line");
+            break;
+        case 3:
+            m_writer->emit("triangle");
+            break;
         }
         m_writer->emit(">");
         return;
@@ -1228,7 +1294,9 @@ void MetalSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         emitSimpleType(type);
         emitDeclarator(declarator);
         break;
-    default: Super::_emitType(type, declarator); break;
+    default:
+        Super::_emitType(type, declarator);
+        break;
     }
 }
 
@@ -1350,7 +1418,8 @@ static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode
     switch (mode)
     {
     case IRInterpolationMode::PerVertex:
-    case IRInterpolationMode::NoInterpolation: return UnownedStringSlice::fromLiteral("[[flat]]");
+    case IRInterpolationMode::NoInterpolation:
+        return UnownedStringSlice::fromLiteral("[[flat]]");
     case IRInterpolationMode::NoPerspective:
         return UnownedStringSlice::fromLiteral("[[center_no_perspective]]");
     case IRInterpolationMode::Linear:
@@ -1359,7 +1428,8 @@ static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode
         return UnownedStringSlice::fromLiteral("[[sample_perspective]]");
     case IRInterpolationMode::Centroid:
         return UnownedStringSlice::fromLiteral("[[center_perspective]]");
-    default: return UnownedStringSlice();
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -1410,12 +1480,23 @@ void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(
 
     switch (addressSpace)
     {
-    case AddressSpace::GroupShared:     m_writer->emit("threadgroup "); break;
-    case AddressSpace::Uniform:         m_writer->emit("constant "); break;
-    case AddressSpace::Global:          m_writer->emit("device "); break;
-    case AddressSpace::ThreadLocal:     m_writer->emit("thread "); break;
-    case AddressSpace::MetalObjectData: m_writer->emit("object_data "); break;
-    default:                            break;
+    case AddressSpace::GroupShared:
+        m_writer->emit("threadgroup ");
+        break;
+    case AddressSpace::Uniform:
+        m_writer->emit("constant ");
+        break;
+    case AddressSpace::Global:
+        m_writer->emit("device ");
+        break;
+    case AddressSpace::ThreadLocal:
+        m_writer->emit("thread ");
+        break;
+    case AddressSpace::MetalObjectData:
+        m_writer->emit("object_data ");
+        break;
+    default:
+        break;
     }
 }
 

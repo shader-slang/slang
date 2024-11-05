@@ -21,8 +21,10 @@ static bool isMetaOp(IRInst* inst)
     case kIROp_IsFloat:
     case kIROp_IsVector:
     case kIROp_GetNaturalStride:
-    case kIROp_TypeEquals:       return true;
-    default:                     break;
+    case kIROp_TypeEquals:
+        return true;
+    default:
+        break;
     }
 
     return false;
@@ -65,8 +67,10 @@ static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, i
         {
         case kIROp_VerticesType:
         case kIROp_IndicesType:
-        case kIROp_PrimitivesType: return Never;
-        default:                   break;
+        case kIROp_PrimitivesType:
+            return Never;
+        default:
+            break;
         }
 
         return AsOut;
@@ -87,7 +91,8 @@ static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, i
         case Stage::Geometry:
             // Second parameter is the triangle stream
             return (index == 1) ? Never : AsInOut;
-        default: break;
+        default:
+            break;
         }
 
         return AsInOut;
@@ -105,8 +110,10 @@ static bool isAliasable(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
-    case kIROp_InOutImplicitCast: return true;
-    default:                      break;
+    case kIROp_InOutImplicitCast:
+        return true;
+    default:
+        break;
     }
 
     return false;
@@ -122,8 +129,10 @@ static bool isDifferentiableFunc(IRInst* func)
         case kIROp_ForwardDifferentiableDecoration:
         case kIROp_BackwardDerivativeDecoration:
         case kIROp_BackwardDifferentiableDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration: return true;
-        default:                                            break;
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            return true;
+        default:
+            break;
         }
     }
 
@@ -288,7 +297,8 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
     case kIROp_Store:
     case kIROp_SwizzledStore:
     case kIROp_SPIRVAsm:
-    case kIROp_AtomicStore:   return Store;
+    case kIROp_AtomicStore:
+        return Store;
 
     case kIROp_SPIRVAsmOperandInst:
         // For SPIRV asm instructions, need to check out the entire
@@ -302,7 +312,8 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
 
     // Miscellaenous cases
     case kIROp_ManagedPtrAttach:
-    case kIROp_Unmodified:       return Store;
+    case kIROp_Unmodified:
+        return Store;
 
     default:
         // Default case is that if the instruction is a pointer, it
@@ -331,9 +342,12 @@ static void collectInstructionByUsage(
     InstructionUsageType usage = getInstructionUsageType(user, inst);
     switch (usage)
     {
-    case Load:        return loads.add(user);
-    case Store:       return stores.add(user);
-    case StoreParent: return stores.add(user->getParent());
+    case Load:
+        return loads.add(user);
+    case Store:
+        return stores.add(user);
+    case StoreParent:
+        return stores.add(user->getParent());
     }
 }
 

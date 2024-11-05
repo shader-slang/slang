@@ -25,7 +25,8 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
         heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
         m_queryType = D3D12_QUERY_TYPE_TIMESTAMP;
         break;
-    default: return SLANG_E_INVALID_ARG;
+    default:
+        return SLANG_E_INVALID_ARG;
     }
 
     // Create query heap.

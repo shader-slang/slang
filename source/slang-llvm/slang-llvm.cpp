@@ -507,11 +507,15 @@ static int _getOptimizationLevel(DownstreamCompileOptions::OptimizationLevel lev
     typedef DownstreamCompileOptions::OptimizationLevel OptimizationLevel;
     switch (level)
     {
-    case OptimizationLevel::None:    return 0;
+    case OptimizationLevel::None:
+        return 0;
     default:
-    case OptimizationLevel::Default: return 1;
-    case OptimizationLevel::High:    return 2;
-    case OptimizationLevel::Maximal: return 3;
+    case OptimizationLevel::Default:
+        return 1;
+    case OptimizationLevel::High:
+        return 2;
+    case OptimizationLevel::Maximal:
+        return 3;
     }
 }
 

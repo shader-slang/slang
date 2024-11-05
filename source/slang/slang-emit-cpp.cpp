@@ -74,32 +74,48 @@ static const char s_xyzwNames[] = "xyzw";
 {
     switch (op)
     {
-    case kIROp_VoidType: return UnownedStringSlice("void");
-    case kIROp_BoolType: return UnownedStringSlice("bool");
+    case kIROp_VoidType:
+        return UnownedStringSlice("void");
+    case kIROp_BoolType:
+        return UnownedStringSlice("bool");
 
-    case kIROp_Int8Type:   return UnownedStringSlice("int8_t");
-    case kIROp_Int16Type:  return UnownedStringSlice("int16_t");
-    case kIROp_IntType:    return UnownedStringSlice("int32_t");
-    case kIROp_Int64Type:  return UnownedStringSlice("int64_t");
-    case kIROp_IntPtrType: return UnownedStringSlice("intptr_t");
+    case kIROp_Int8Type:
+        return UnownedStringSlice("int8_t");
+    case kIROp_Int16Type:
+        return UnownedStringSlice("int16_t");
+    case kIROp_IntType:
+        return UnownedStringSlice("int32_t");
+    case kIROp_Int64Type:
+        return UnownedStringSlice("int64_t");
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("intptr_t");
 
-    case kIROp_UInt8Type:  return UnownedStringSlice("uint8_t");
-    case kIROp_UInt16Type: return UnownedStringSlice("uint16_t");
-    case kIROp_UIntType:   return UnownedStringSlice("uint32_t");
-    case kIROp_UInt64Type: return UnownedStringSlice("uint64_t");
+    case kIROp_UInt8Type:
+        return UnownedStringSlice("uint8_t");
+    case kIROp_UInt16Type:
+        return UnownedStringSlice("uint16_t");
+    case kIROp_UIntType:
+        return UnownedStringSlice("uint32_t");
+    case kIROp_UInt64Type:
+        return UnownedStringSlice("uint64_t");
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uintptr_t");
 
         // Not clear just yet how we should handle half... we want all processing as float
         // probly, but when reading/writing to memory converting
 
-    case kIROp_HalfType: return UnownedStringSlice("half");
+    case kIROp_HalfType:
+        return UnownedStringSlice("half");
 
-    case kIROp_FloatType:  return UnownedStringSlice("float");
-    case kIROp_DoubleType: return UnownedStringSlice("double");
-    case kIROp_CharType:   return UnownedStringSlice("char");
+    case kIROp_FloatType:
+        return UnownedStringSlice("float");
+    case kIROp_DoubleType:
+        return UnownedStringSlice("double");
+    case kIROp_CharType:
+        return UnownedStringSlice("char");
 
-    default: return UnownedStringSlice();
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -129,13 +145,26 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(
 {
     switch (texType->getAccess())
     {
-    case SLANG_RESOURCE_ACCESS_READ:           break;
-    case SLANG_RESOURCE_ACCESS_WRITE:          outName << "RW"; break;
-    case SLANG_RESOURCE_ACCESS_READ_WRITE:     outName << "RW"; break;
-    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: outName << "RasterizerOrdered"; break;
-    case SLANG_RESOURCE_ACCESS_APPEND:         outName << "Append"; break;
-    case SLANG_RESOURCE_ACCESS_CONSUME:        outName << "Consume"; break;
-    case SLANG_RESOURCE_ACCESS_FEEDBACK:       outName << "Feedback"; break;
+    case SLANG_RESOURCE_ACCESS_READ:
+        break;
+    case SLANG_RESOURCE_ACCESS_WRITE:
+        outName << "RW";
+        break;
+    case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        outName << "RW";
+        break;
+    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        outName << "RasterizerOrdered";
+        break;
+    case SLANG_RESOURCE_ACCESS_APPEND:
+        outName << "Append";
+        break;
+    case SLANG_RESOURCE_ACCESS_CONSUME:
+        outName << "Consume";
+        break;
+    case SLANG_RESOURCE_ACCESS_FEEDBACK:
+        outName << "Feedback";
+        break;
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
         return SLANG_FAIL;
@@ -143,11 +172,21 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(
 
     switch (texType->GetBaseShape())
     {
-    case SLANG_TEXTURE_1D:     outName << "Texture1D"; break;
-    case SLANG_TEXTURE_2D:     outName << "Texture2D"; break;
-    case SLANG_TEXTURE_3D:     outName << "Texture3D"; break;
-    case SLANG_TEXTURE_CUBE:   outName << "TextureCube"; break;
-    case SLANG_TEXTURE_BUFFER: outName << "Buffer"; break;
+    case SLANG_TEXTURE_1D:
+        outName << "Texture1D";
+        break;
+    case SLANG_TEXTURE_2D:
+        outName << "Texture2D";
+        break;
+    case SLANG_TEXTURE_3D:
+        outName << "Texture3D";
+        break;
+    case SLANG_TEXTURE_CUBE:
+        outName << "TextureCube";
+        break;
+    case SLANG_TEXTURE_BUFFER:
+        outName << "Buffer";
+        break;
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
         return SLANG_FAIL;
@@ -170,14 +209,16 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
 {
     switch (op)
     {
-    case kIROp_HLSLStructuredBufferType: return UnownedStringSlice::fromLiteral("StructuredBuffer");
+    case kIROp_HLSLStructuredBufferType:
+        return UnownedStringSlice::fromLiteral("StructuredBuffer");
     case kIROp_HLSLRWStructuredBufferType:
         return UnownedStringSlice::fromLiteral("RWStructuredBuffer");
     case kIROp_HLSLRWByteAddressBufferType:
         return UnownedStringSlice::fromLiteral("RWByteAddressBuffer");
     case kIROp_HLSLByteAddressBufferType:
         return UnownedStringSlice::fromLiteral("ByteAddressBuffer");
-    case kIROp_SamplerStateType: return UnownedStringSlice::fromLiteral("SamplerState");
+    case kIROp_SamplerStateType:
+        return UnownedStringSlice::fromLiteral("SamplerState");
     case kIROp_SamplerComparisonStateType:
         return UnownedStringSlice::fromLiteral("SamplerComparisonState");
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
@@ -191,7 +232,8 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
     case kIROp_RaytracingAccelerationStructureType:
         return UnownedStringSlice::fromLiteral("RaytracingAccelerationStructure");
 
-    default: return UnownedStringSlice();
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -444,7 +486,8 @@ void CPPSourceEmitter::useType(IRType* type)
             type = static_cast<IRPtrTypeBase*>(type)->getValueType();
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     switch (type->getOp())
@@ -893,7 +936,8 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(
             m_writer->emit(")]\n");
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     m_writer->emit("SLANG_PRELUDE_EXPORT\n");
@@ -916,7 +960,8 @@ bool isPublicOrExportedFunc(IRFunc* func)
             {
                 return true;
             }
-        default: break;
+        default:
+            break;
         }
     }
     return false;
@@ -1069,7 +1114,9 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
     switch (type->getOp())
     {
-    default: CLikeSourceEmitter::_emitType(type, declarator); break;
+    default:
+        CLikeSourceEmitter::_emitType(type, declarator);
+        break;
     case kIROp_VectorType:
     case kIROp_MatrixType:
         {
@@ -1278,7 +1325,8 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(");\n");
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -1587,10 +1635,17 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             {
                 switch (basicType->getOp())
                 {
-                case kIROp_HalfType:   m_writer->emit("F16_fmod("); break;
-                case kIROp_FloatType:  m_writer->emit("F32_fmod("); break;
-                case kIROp_DoubleType: m_writer->emit("F64_fmod("); break;
-                default:               return false;
+                case kIROp_HalfType:
+                    m_writer->emit("F16_fmod(");
+                    break;
+                case kIROp_FloatType:
+                    m_writer->emit("F32_fmod(");
+                    break;
+                case kIROp_DoubleType:
+                    m_writer->emit("F64_fmod(");
+                    break;
+                default:
+                    return false;
                 }
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(", ");
@@ -1803,8 +1858,10 @@ bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
             case kIROp_IntCast:
             case kIROp_FloatCast:
             case kIROp_CastIntToFloat:
-            case kIROp_CastFloatToInt: return false;
-            default:                   break;
+            case kIROp_CastFloatToInt:
+                return false;
+            default:
+                break;
             }
         }
         switch (inst->getOp())
@@ -1814,8 +1871,10 @@ bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_CastIntToFloat:
-        case kIROp_CastFloatToInt: return false;
-        default:                   break;
+        case kIROp_CastFloatToInt:
+            return false;
+        default:
+            break;
         }
     }
     return true;
@@ -1913,8 +1972,12 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec
     switch (inst->getOp())
     {
     case kIROp_Var:
-    case kIROp_GlobalVar: emitVarExpr(inst, outerPrec); break;
-    default:              m_writer->emit(getName(inst)); break;
+    case kIROp_GlobalVar:
+        emitVarExpr(inst, outerPrec);
+        break;
+    default:
+        m_writer->emit(getName(inst));
+        break;
     }
 }
 
@@ -1928,7 +1991,8 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec
         {
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -2125,8 +2189,11 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
                 {
                 case kIROp_Func:
                 case kIROp_StructType:
-                case kIROp_InterfaceType: emitForwardDeclaration(action.inst); break;
-                default:                  break;
+                case kIROp_InterfaceType:
+                    emitForwardDeclaration(action.inst);
+                    break;
+                default:
+                    break;
                 }
             }
             break;

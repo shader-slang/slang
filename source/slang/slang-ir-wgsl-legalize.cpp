@@ -51,6 +51,8 @@ struct LegalizeWGSLEntryPointContext
         String* optionalSemanticIndex,
         IRInst* parentVar);
     void legalizeCall(IRCall* call);
+    void legalizeSwitch(IRSwitch* switchInst);
+    void legalizeBinaryOp(IRInst* inst);
     void processInst(IRInst* inst);
 };
 
@@ -328,8 +330,10 @@ void LegalizeWGSLEntryPointContext::legalizeCall(IRCall* call)
         switch (arg->getOp())
         {
         case kIROp_Var:
-        case kIROp_Param: continue;
-        default:          break;
+        case kIROp_Param:
+            continue;
+        default:
+            break;
         }
 
         // Create a local variable to hold the input argument.
@@ -349,11 +353,105 @@ void LegalizeWGSLEntryPointContext::legalizeCall(IRCall* call)
     }
 }
 
+void LegalizeWGSLEntryPointContext::legalizeSwitch(IRSwitch* switchInst)
+{
+    // WGSL Requires all switch statements to contain a default case.
+    // If the switch statement does not contain a default case, we will add one.
+    if (switchInst->getDefaultLabel() != switchInst->getBreakLabel())
+        return;
+    IRBuilder builder(switchInst);
+    auto defaultBlock = builder.createBlock();
+    builder.setInsertInto(defaultBlock);
+    builder.emitBranch(switchInst->getBreakLabel());
+    defaultBlock->insertBefore(switchInst->getBreakLabel());
+    List<IRInst*> cases;
+    for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+    {
+        cases.add(switchInst->getCaseValue(i));
+        cases.add(switchInst->getCaseLabel(i));
+    }
+    builder.setInsertBefore(switchInst);
+    auto newSwitch = builder.emitSwitch(
+        switchInst->getCondition(),
+        switchInst->getBreakLabel(),
+        defaultBlock,
+        (UInt)cases.getCount(),
+        cases.getBuffer());
+    switchInst->transferDecorationsTo(newSwitch);
+    switchInst->removeAndDeallocate();
+}
+
+void LegalizeWGSLEntryPointContext::legalizeBinaryOp(IRInst* inst)
+{
+    auto isVectorOrMatrix = [](IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_VectorType:
+        case kIROp_MatrixType:
+            return true;
+        default:
+            return false;
+        }
+    };
+    if (isVectorOrMatrix(inst->getOperand(0)->getDataType()) &&
+        as<IRBasicType>(inst->getOperand(1)->getDataType()))
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto newRhs = builder.emitMakeCompositeFromScalar(
+            inst->getOperand(0)->getDataType(),
+            inst->getOperand(1));
+        builder.replaceOperand(inst->getOperands() + 1, newRhs);
+    }
+    else if (
+        as<IRBasicType>(inst->getOperand(0)->getDataType()) &&
+        isVectorOrMatrix(inst->getOperand(1)->getDataType()))
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto newLhs = builder.emitMakeCompositeFromScalar(
+            inst->getOperand(1)->getDataType(),
+            inst->getOperand(0));
+        builder.replaceOperand(inst->getOperands(), newLhs);
+    }
+}
+
 void LegalizeWGSLEntryPointContext::processInst(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_Call: legalizeCall(static_cast<IRCall*>(inst)); break;
+    case kIROp_Call:
+        legalizeCall(static_cast<IRCall*>(inst));
+        break;
+    case kIROp_Switch:
+        legalizeSwitch(as<IRSwitch>(inst));
+        break;
+
+    // For all binary operators, make sure both side of the operator have the same type
+    // (vector-ness and matrix-ness).
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_FRem:
+    case kIROp_IRem:
+    case kIROp_And:
+    case kIROp_Or:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Greater:
+    case kIROp_Less:
+    case kIROp_Geq:
+    case kIROp_Leq:
+        legalizeBinaryOp(inst);
+        break;
+
     default:
         for (auto child : inst->getModifiableChildren())
             processInst(child);

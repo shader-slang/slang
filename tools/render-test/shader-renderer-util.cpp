@@ -28,14 +28,17 @@ inline int calcMaxDimension(Extents size, TextureType type)
 {
     switch (type)
     {
-    case TextureType::Texture1D: return size.width;
-    case TextureType::Texture3D: return Math::Max(Math::Max(size.width, size.height), size.depth);
+    case TextureType::Texture1D:
+        return size.width;
+    case TextureType::Texture3D:
+        return Math::Max(Math::Max(size.width, size.height), size.depth);
     case TextureType::TextureCube: // fallthru
     case TextureType::Texture2D:
         {
             return Math::Max(size.width, size.height);
         }
-    default: return 0;
+    default:
+        return 0;
     }
 }
 
@@ -77,9 +80,14 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     textureDesc.usage = TextureUsage::CopyDestination | TextureUsage::CopySource;
     switch (defaultState)
     {
-    case ResourceState::ShaderResource:  textureDesc.usage |= TextureUsage::ShaderResource; break;
-    case ResourceState::UnorderedAccess: textureDesc.usage |= TextureUsage::UnorderedAccess; break;
-    default:                             return SLANG_FAIL;
+    case ResourceState::ShaderResource:
+        textureDesc.usage |= TextureUsage::ShaderResource;
+        break;
+    case ResourceState::UnorderedAccess:
+        textureDesc.usage |= TextureUsage::UnorderedAccess;
+        break;
+    default:
+        return SLANG_FAIL;
     }
     textureDesc.defaultState = defaultState;
 

@@ -369,12 +369,24 @@ List<Token> TokenizeText(const String& fileName, const String& text)
         {
         case '\\':
         case '\"':
-        case '\'': tokenBuilder.append(nextChar); break;
-        case 't':  tokenBuilder.append('\t'); break;
-        case 's':  tokenBuilder.append(' '); break;
-        case 'n':  tokenBuilder.append('\n'); break;
-        case 'r':  tokenBuilder.append('\r'); break;
-        case 'b':  tokenBuilder.append('\b'); break;
+        case '\'':
+            tokenBuilder.append(nextChar);
+            break;
+        case 't':
+            tokenBuilder.append('\t');
+            break;
+        case 's':
+            tokenBuilder.append(' ');
+            break;
+        case 'n':
+            tokenBuilder.append('\n');
+            break;
+        case 'r':
+            tokenBuilder.append('\r');
+            break;
+        case 'b':
+            tokenBuilder.append('\b');
+            break;
         }
     };
     while (pos <= text.getLength())

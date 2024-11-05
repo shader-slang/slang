@@ -202,12 +202,14 @@ static void _addFile(
             cmdLine.addArg("/Ox");
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     switch (options.floatingPointMode)
     {
-    case FloatingPointMode::Default: break;
+    case FloatingPointMode::Default:
+        break;
     case FloatingPointMode::Precise:
         {
             // precise is default behavior, VS also has 'strict'
@@ -253,7 +255,8 @@ static void _addFile(
             cmdLine.addPrefixPathArg("/Fe", modulePath, ".exe");
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     // Object file specify it's location - needed if we are out
