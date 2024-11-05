@@ -139,8 +139,10 @@ struct SCCPContext
         case kIROp_CastFloatToInt:
         case kIROp_IntCast:
         case kIROp_FloatCast:
-        case kIROp_Select:         return true;
-        default:                   return false;
+        case kIROp_Select:
+            return true;
+        default:
+            return false;
         }
     }
 
@@ -236,7 +238,8 @@ struct SCCPContext
             // values of aggregate types (e.g., a `makeArray` or `makeStruct`
             // where all the operands are constant is itself a constant).
 
-        default: break;
+        default:
+            break;
         }
 
         // Look up in the dictionary and just return the value we get from it.
@@ -274,12 +277,15 @@ struct SCCPContext
     IRBuilder* getBuilder() { return &builderStorage; }
 
     // LatticeVal constant evaluation methods.
-#define SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v)                      \
-    switch (v.flavor)                                            \
-    {                                                            \
-    case LatticeVal::Flavor::None: return LatticeVal::getNone(); \
-    case LatticeVal::Flavor::Any:  return LatticeVal::getAny();  \
-    default:                       break;                                              \
+#define SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v) \
+    switch (v.flavor)                       \
+    {                                       \
+    case LatticeVal::Flavor::None:          \
+        return LatticeVal::getNone();       \
+    case LatticeVal::Flavor::Any:           \
+        return LatticeVal::getAny();        \
+    default:                                \
+        break;                              \
     }
 
     LatticeVal evalCast(IRType* type, LatticeVal v0)
@@ -316,7 +322,8 @@ struct SCCPContext
                     resultVal = getBuilder()->getIntValue(type, (IRIntegerValue)intVal);
                 }
                 break;
-            default: return LatticeVal::getAny();
+            default:
+                return LatticeVal::getAny();
             }
             break;
         case kIROp_FloatType:
@@ -335,7 +342,8 @@ struct SCCPContext
                     type,
                     (IRFloatingPointValue)irConstant->value.intVal);
                 break;
-            default: return LatticeVal::getAny();
+            default:
+                return LatticeVal::getAny();
             }
             break;
         case kIROp_BoolType:
@@ -350,7 +358,8 @@ struct SCCPContext
                     resultVal = getBuilder()->getBoolValue(irConstant->value.intVal != 0);
                 }
                 break;
-            default: return LatticeVal::getAny();
+            default:
+                return LatticeVal::getAny();
             }
         }
         if (!resultVal)
@@ -382,7 +391,9 @@ struct SCCPContext
             resultVal = getBuilder()->getFloatValue(type, (IRFloatingPointValue)0.0);
             break;
 
-        case kIROp_BoolType: resultVal = getBuilder()->getBoolValue(false); break;
+        case kIROp_BoolType:
+            resultVal = getBuilder()->getBoolValue(false);
+            break;
         }
         if (!resultVal)
             return LatticeVal::getAny();
@@ -425,7 +436,8 @@ struct SCCPContext
                 type,
                 floatFunc(c0->value.floatVal, c1->value.floatVal));
             break;
-        default: break;
+        default:
+            break;
         }
         if (!resultVal)
             return LatticeVal::getAny();
@@ -460,7 +472,8 @@ struct SCCPContext
             resultVal =
                 getBuilder()->getIntValue(type, intFunc(c0->value.intVal, c1->value.intVal));
             break;
-        default: break;
+        default:
+            break;
         }
         if (!resultVal)
             return LatticeVal::getAny();
@@ -488,7 +501,8 @@ struct SCCPContext
         case kIROp_BoolType:
             resultVal = getBuilder()->getIntValue(type, intFunc(c0->value.intVal));
             break;
-        default: break;
+        default:
+            break;
         }
         if (!resultVal)
             return LatticeVal::getAny();
@@ -529,7 +543,8 @@ struct SCCPContext
             resultVal =
                 getBuilder()->getBoolValue(floatFunc(c0->value.floatVal, c1->value.floatVal));
             break;
-        default: break;
+        default:
+            break;
         }
         if (!resultVal)
             return LatticeVal::getAny();
@@ -741,7 +756,8 @@ struct SCCPContext
         case kIROp_HalfType:
             resultVal = getBuilder()->getFloatValue(type, -c0->value.floatVal);
             break;
-        default: break;
+        default:
+            break;
         }
         if (!resultVal)
             return LatticeVal::getAny();
@@ -814,7 +830,8 @@ struct SCCPContext
         case kIROp_DoubleType:
             resultVal = getBuilder()->getFloatValue(type, Int64AsDouble(sourceValueBits));
             break;
-        default: break;
+        default:
+            break;
         }
         if (!resultVal)
             return LatticeVal::getAny();
@@ -842,7 +859,8 @@ struct SCCPContext
         case kIROp_IntLit:
         case kIROp_FloatLit:
         case kIROp_StringLit:
-        case kIROp_BoolLit:   return LatticeVal::getConstant(inst);
+        case kIROp_BoolLit:
+            return LatticeVal::getConstant(inst);
 
         // We might also want to special-case certain
         // instructions where we shouldn't bother trying to
@@ -853,8 +871,10 @@ struct SCCPContext
         case kIROp_ByteAddressBufferStore:
         case kIROp_Alloca:
         case kIROp_Store:
-        case kIROp_Load:                   return LatticeVal::getAny();
-        default:                           break;
+        case kIROp_Load:
+            return LatticeVal::getAny();
+        default:
+            break;
         }
 
         // TODO: We should now look up the lattice values for
@@ -904,11 +924,14 @@ struct SCCPContext
         case kIROp_CastFloatToInt:
             switch (inst->getOperandCount())
             {
-            case 1: return evalCast(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
+            case 1:
+                return evalCast(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
 
-            default: return LatticeVal::getAny();
+            default:
+                return LatticeVal::getAny();
             }
-        case kIROp_DefaultConstruct: return evalDefaultConstruct(inst->getDataType());
+        case kIROp_DefaultConstruct:
+            return evalDefaultConstruct(inst->getDataType());
         case kIROp_Add:
             return evalAdd(
                 inst->getDataType(),
@@ -1003,7 +1026,8 @@ struct SCCPContext
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
-        case kIROp_Not: return evalNot(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
+        case kIROp_Not:
+            return evalNot(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_BitAnd:
             return evalBitAnd(
                 inst->getDataType(),
@@ -1023,7 +1047,8 @@ struct SCCPContext
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_BitCast:
             return evalBitCast(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
-        case kIROp_Neg: return evalNeg(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
+        case kIROp_Neg:
+            return evalNeg(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Lsh:
             return evalLsh(
                 inst->getDataType(),
@@ -1039,7 +1064,8 @@ struct SCCPContext
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)),
                 getLatticeVal(inst->getOperand(2)));
-        default: break;
+        default:
+            break;
         }
 
         // A safe default is to assume that every instruction not
@@ -1328,7 +1354,9 @@ struct SCCPContext
             case kIROp_StructType:
             case kIROp_ClassType:
             case kIROp_InterfaceType:
-            case kIROp_WitnessTable:  changed |= applyOnScope(child); break;
+            case kIROp_WitnessTable:
+                changed |= applyOnScope(child);
+                break;
             }
         }
         return changed;
@@ -1759,7 +1787,8 @@ static bool applySparseConditionalConstantPropagationRec(
         {
         case kIROp_Func:
         case kIROp_Block:
-        case kIROp_Generic: break;
+        case kIROp_Generic:
+            break;
         default:
             // Skip other op codes.
             continue;

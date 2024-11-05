@@ -381,7 +381,8 @@ String Path::combine(const String& path1, const String& path2, const String& pat
             return element[1] == ':' && ((firstChar >= 'a' && firstChar <= 'z') ||
                                          (firstChar >= 'A' && firstChar <= 'Z'));
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -783,7 +784,8 @@ SlangResult Path::remove(const String& path)
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     return SLANG_FAIL;
@@ -1025,13 +1027,15 @@ static SlangResult _calcExectuablePath(char* outPath, size_t* ioSize)
     uint32_t size = uint32_t(*ioSize);
     switch (_NSGetExecutablePath(outPath, &size))
     {
-    case 0: return SLANG_OK;
+    case 0:
+        return SLANG_OK;
     case -1:
         {
             *ioSize = size;
             return SLANG_E_BUFFER_TOO_SMALL;
         }
-    default: break;
+    default:
+        break;
     }
     return SLANG_FAIL;
 #else

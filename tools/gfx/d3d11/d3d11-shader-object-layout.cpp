@@ -90,7 +90,8 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             m_samplerRanges.add(r);
             break;
 
-        case slang::BindingType::CombinedTextureSampler: break;
+        case slang::BindingType::CombinedTextureSampler:
+            break;
         case slang::BindingType::MutableTexture:
         case slang::BindingType::MutableTypedBuffer:
             bindingRangeInfo.baseIndex = m_uavCount;
@@ -98,9 +99,11 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             m_uavRanges.add(r);
             break;
 
-        case slang::BindingType::VaryingInput: break;
+        case slang::BindingType::VaryingInput:
+            break;
 
-        case slang::BindingType::VaryingOutput: break;
+        case slang::BindingType::VaryingOutput:
+            break;
 
         default:
             bindingRangeInfo.baseIndex = m_srvCount;

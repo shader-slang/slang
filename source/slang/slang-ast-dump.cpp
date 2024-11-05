@@ -431,8 +431,12 @@ struct ASTDumpContext
         const char* name = nullptr;
         switch (kind)
         {
-        case FeedbackType::Kind::MinMip:        name = "MinMip"; break;
-        case FeedbackType::Kind::MipRegionUsed: name = "MipRegionUsed"; break;
+        case FeedbackType::Kind::MinMip:
+            name = "MinMip";
+            break;
+        case FeedbackType::Kind::MipRegionUsed:
+            name = "MipRegionUsed";
+            break;
         }
 
         m_buf << "FeedbackType::Kind{" << name << "}";
@@ -444,9 +448,15 @@ struct ASTDumpContext
     {
         switch (flavor)
         {
-        case SamplerStateFlavor::SamplerState:           m_writer->emit("sampler"); break;
-        case SamplerStateFlavor::SamplerComparisonState: m_writer->emit("samplerComparison"); break;
-        default:                                         m_writer->emit("unknown"); break;
+        case SamplerStateFlavor::SamplerState:
+            m_writer->emit("sampler");
+            break;
+        case SamplerStateFlavor::SamplerComparisonState:
+            m_writer->emit("samplerComparison");
+            break;
+        default:
+            m_writer->emit("unknown");
+            break;
         }
     }
 
@@ -595,9 +605,15 @@ struct ASTDumpContext
     {
         switch (operand.kind)
         {
-        case ValNodeOperandKind::ConstantValue: dump(operand.values.intOperand); break;
-        case ValNodeOperandKind::ValNode:       dump(operand.values.nodeOperand); break;
-        case ValNodeOperandKind::ASTNode:       dump(operand.values.nodeOperand); break;
+        case ValNodeOperandKind::ConstantValue:
+            dump(operand.values.intOperand);
+            break;
+        case ValNodeOperandKind::ValNode:
+            dump(operand.values.nodeOperand);
+            break;
+        case ValNodeOperandKind::ASTNode:
+            dump(operand.values.nodeOperand);
+            break;
         }
     }
 
@@ -622,14 +638,27 @@ struct ASTDumpContext
     {
         switch (operand.flavor)
         {
-        case SPIRVAsmOperand::Id:                  m_writer->emit("%"); break;
-        case SPIRVAsmOperand::ResultMarker:        m_writer->emit("result"); break;
+        case SPIRVAsmOperand::Id:
+            m_writer->emit("%");
+            break;
+        case SPIRVAsmOperand::ResultMarker:
+            m_writer->emit("result");
+            break;
         case SPIRVAsmOperand::Literal:
-        case SPIRVAsmOperand::NamedValue:          break;
-        case SPIRVAsmOperand::SlangValue:          m_writer->emit("$"); break;
-        case SPIRVAsmOperand::SlangValueAddr:      m_writer->emit("&"); break;
-        case SPIRVAsmOperand::SlangType:           m_writer->emit("$$"); break;
-        case SPIRVAsmOperand::SlangImmediateValue: m_writer->emit("!"); break;
+        case SPIRVAsmOperand::NamedValue:
+            break;
+        case SPIRVAsmOperand::SlangValue:
+            m_writer->emit("$");
+            break;
+        case SPIRVAsmOperand::SlangValueAddr:
+            m_writer->emit("&");
+            break;
+        case SPIRVAsmOperand::SlangType:
+            m_writer->emit("$$");
+            break;
+        case SPIRVAsmOperand::SlangImmediateValue:
+            m_writer->emit("!");
+            break;
         case SPIRVAsmOperand::RayPayloadFromLocation:
             m_writer->emit("__rayPayloadFromLocation");
             break;
@@ -639,8 +668,11 @@ struct ASTDumpContext
         case SPIRVAsmOperand::RayCallableFromLocation:
             m_writer->emit("__rayCallableFromLocation");
             break;
-        case SPIRVAsmOperand::BuiltinVar: m_writer->emit("builtin"); break;
-        default:                          SLANG_UNREACHABLE("Unhandled case in ast dump for SPIRVAsmOperand");
+        case SPIRVAsmOperand::BuiltinVar:
+            m_writer->emit("builtin");
+            break;
+        default:
+            SLANG_UNREACHABLE("Unhandled case in ast dump for SPIRVAsmOperand");
         }
         if (operand.expr)
             dump(operand.expr);

@@ -270,8 +270,10 @@ static void emitReflectionVarBindingInfoJSON(
         writer << "\"kind\": \"";
         switch (category)
         {
-#define CASE(NAME, KIND) \
-    case SLANG_PARAMETER_CATEGORY_##NAME: writer.write(toSlice(#KIND)); break
+#define CASE(NAME, KIND)                  \
+    case SLANG_PARAMETER_CATEGORY_##NAME: \
+        writer.write(toSlice(#KIND));     \
+        break
             CASE(CONSTANT_BUFFER, constantBuffer);
             CASE(SHADER_RESOURCE, shaderResource);
             CASE(UNORDERED_ACCESS, unorderedAccess);
@@ -332,14 +334,27 @@ static void emitReflectionVarBindingInfoJSON(
         char const* stageName = "UNKNOWN";
         switch (stage)
         {
-        case SLANG_STAGE_VERTEX:   stageName = "vertex"; break;
-        case SLANG_STAGE_HULL:     stageName = "hull"; break;
-        case SLANG_STAGE_DOMAIN:   stageName = "domain"; break;
-        case SLANG_STAGE_GEOMETRY: stageName = "geometry"; break;
-        case SLANG_STAGE_FRAGMENT: stageName = "fragment"; break;
-        case SLANG_STAGE_COMPUTE:  stageName = "compute"; break;
+        case SLANG_STAGE_VERTEX:
+            stageName = "vertex";
+            break;
+        case SLANG_STAGE_HULL:
+            stageName = "hull";
+            break;
+        case SLANG_STAGE_DOMAIN:
+            stageName = "domain";
+            break;
+        case SLANG_STAGE_GEOMETRY:
+            stageName = "geometry";
+            break;
+        case SLANG_STAGE_FRAGMENT:
+            stageName = "fragment";
+            break;
+        case SLANG_STAGE_COMPUTE:
+            stageName = "compute";
+            break;
 
-        default: break;
+        default:
+            break;
         }
 
         writer << "\"stage\": \"" << stageName << "\"";
@@ -584,8 +599,10 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         assert(!"unhandled case");
         break;
 
-#define CASE(SHAPE, NAME) \
-    case SLANG_##SHAPE: writer.write(toSlice(#NAME)); break
+#define CASE(SHAPE, NAME)             \
+    case SLANG_##SHAPE:               \
+        writer.write(toSlice(#NAME)); \
+        break
         CASE(TEXTURE_1D, texture1D);
         CASE(TEXTURE_2D, texture2D);
         CASE(TEXTURE_3D, texture3D);
@@ -623,13 +640,26 @@ static void emitReflectionResourceTypeBaseInfoJSON(
             assert(!"unhandled case");
             break;
 
-        case SLANG_RESOURCE_ACCESS_READ:           break;
-        case SLANG_RESOURCE_ACCESS_WRITE:          writer << "write"; break;
-        case SLANG_RESOURCE_ACCESS_READ_WRITE:     writer << "readWrite"; break;
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: writer << "rasterOrdered"; break;
-        case SLANG_RESOURCE_ACCESS_APPEND:         writer << "append"; break;
-        case SLANG_RESOURCE_ACCESS_CONSUME:        writer << "consume"; break;
-        case SLANG_RESOURCE_ACCESS_FEEDBACK:       writer << "feedback"; break;
+        case SLANG_RESOURCE_ACCESS_READ:
+            break;
+        case SLANG_RESOURCE_ACCESS_WRITE:
+            writer << "write";
+            break;
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            writer << "readWrite";
+            break;
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            writer << "rasterOrdered";
+            break;
+        case SLANG_RESOURCE_ACCESS_APPEND:
+            writer << "append";
+            break;
+        case SLANG_RESOURCE_ACCESS_CONSUME:
+            writer << "consume";
+            break;
+        case SLANG_RESOURCE_ACCESS_FEEDBACK:
+            writer << "feedback";
+            break;
         }
         writer << "\"";
     }
@@ -657,7 +687,8 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
             auto shape = type->getResourceShape();
             switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
             {
-            default: break;
+            default:
+                break;
 
             case SLANG_STRUCTURED_BUFFER:
                 if (auto resultType = type->getResourceResultType())
@@ -802,7 +833,9 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer.maybeComma();
         writer << "\"kind\": \"DynamicResource\"";
         break;
-    default: assert(!"unhandled case"); break;
+    default:
+        assert(!"unhandled case");
+        break;
     }
     emitUserAttributes(writer, type);
 }
@@ -870,7 +903,9 @@ static void emitReflectionTypeLayoutInfoJSON(
 {
     switch (typeLayout->getKind())
     {
-    default: emitReflectionTypeInfoJSON(writer, typeLayout->getType()); break;
+    default:
+        emitReflectionTypeInfoJSON(writer, typeLayout->getType());
+        break;
 
     case slang::TypeReflection::Kind::Pointer:
         {
@@ -1164,13 +1199,26 @@ static void emitReflectionEntryPointJSON(
 
     switch (entryPoint->getStage())
     {
-    case SLANG_STAGE_VERTEX:   writer << ",\n\"stage:\": \"vertex\""; break;
-    case SLANG_STAGE_HULL:     writer << ",\n\"stage:\": \"hull\""; break;
-    case SLANG_STAGE_DOMAIN:   writer << ",\n\"stage:\": \"domain\""; break;
-    case SLANG_STAGE_GEOMETRY: writer << ",\n\"stage:\": \"geometry\""; break;
-    case SLANG_STAGE_FRAGMENT: writer << ",\n\"stage:\": \"fragment\""; break;
-    case SLANG_STAGE_COMPUTE:  writer << ",\n\"stage:\": \"compute\""; break;
-    default:                   break;
+    case SLANG_STAGE_VERTEX:
+        writer << ",\n\"stage:\": \"vertex\"";
+        break;
+    case SLANG_STAGE_HULL:
+        writer << ",\n\"stage:\": \"hull\"";
+        break;
+    case SLANG_STAGE_DOMAIN:
+        writer << ",\n\"stage:\": \"domain\"";
+        break;
+    case SLANG_STAGE_GEOMETRY:
+        writer << ",\n\"stage:\": \"geometry\"";
+        break;
+    case SLANG_STAGE_FRAGMENT:
+        writer << ",\n\"stage:\": \"fragment\"";
+        break;
+    case SLANG_STAGE_COMPUTE:
+        writer << ",\n\"stage:\": \"compute\"";
+        break;
+    default:
+        break;
     }
 
     auto parameterCount = entryPoint->getParameterCount();

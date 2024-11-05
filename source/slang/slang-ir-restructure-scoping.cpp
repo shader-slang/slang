@@ -142,13 +142,16 @@ IRInst* getDefaultInitVal(IRBuilder* builder, IRType* type)
 {
     switch (type->getOp())
     {
-    default: return nullptr;
+    default:
+        return nullptr;
 
-    case kIROp_BoolType: return builder->getBoolValue(false);
+    case kIROp_BoolType:
+        return builder->getBoolValue(false);
 
     case kIROp_IntType:
     case kIROp_UIntType:
-    case kIROp_UInt64Type: return builder->getIntValue(type, 0);
+    case kIROp_UInt64Type:
+        return builder->getIntValue(type, 0);
 
     case kIROp_HalfType:
     case kIROp_FloatType:

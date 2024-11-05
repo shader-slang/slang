@@ -586,8 +586,10 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     case kIROp_Less:
     case kIROp_Leq:
     case kIROp_Greater:
-    case kIROp_Geq:     break;
-    default:            return;
+    case kIROp_Geq:
+        break;
+    default:
+        return;
     }
 
     ConstantIntVal* stepSize = nullptr;

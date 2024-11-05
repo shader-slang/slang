@@ -439,7 +439,8 @@ public:
             case slang::TypeReflection::Kind::ParameterBlock:
                 typeLayout = typeLayout->getElementTypeLayout();
                 continue;
-            default: return typeLayout;
+            default:
+                return typeLayout;
             }
         }
     }
@@ -1009,8 +1010,10 @@ public:
         {
             switch (type)
             {
-            case PipelineType::Compute:  return static_cast<ShaderProgramBase*>(compute.program);
-            case PipelineType::Graphics: return static_cast<ShaderProgramBase*>(graphics.program);
+            case PipelineType::Compute:
+                return static_cast<ShaderProgramBase*>(compute.program);
+            case PipelineType::Graphics:
+                return static_cast<ShaderProgramBase*>(graphics.program);
             case PipelineType::RayTracing:
                 return static_cast<ShaderProgramBase*>(rayTracing.program);
             }

@@ -109,15 +109,33 @@ static void _appendFixedArray(const FixedArrayRttiInfo* inFixedArray, StringBuil
 {
     switch (info->m_kind)
     {
-    case RttiInfo::Kind::I32:                out << "int32_t"; break;
-    case RttiInfo::Kind::U32:                out << "uint32_t"; break;
-    case RttiInfo::Kind::I64:                out << "int64_t"; break;
-    case RttiInfo::Kind::U64:                out << "uint64_t"; break;
-    case RttiInfo::Kind::F32:                out << "float"; break;
-    case RttiInfo::Kind::F64:                out << "double"; break;
-    case RttiInfo::Kind::Bool:               out << "bool"; break;
-    case RttiInfo::Kind::String:             out << "String"; break;
-    case RttiInfo::Kind::UnownedStringSlice: out << "UnownedStringSlice"; break;
+    case RttiInfo::Kind::I32:
+        out << "int32_t";
+        break;
+    case RttiInfo::Kind::U32:
+        out << "uint32_t";
+        break;
+    case RttiInfo::Kind::I64:
+        out << "int64_t";
+        break;
+    case RttiInfo::Kind::U64:
+        out << "uint64_t";
+        break;
+    case RttiInfo::Kind::F32:
+        out << "float";
+        break;
+    case RttiInfo::Kind::F64:
+        out << "double";
+        break;
+    case RttiInfo::Kind::Bool:
+        out << "bool";
+        break;
+    case RttiInfo::Kind::String:
+        out << "String";
+        break;
+    case RttiInfo::Kind::UnownedStringSlice:
+        out << "UnownedStringSlice";
+        break;
     case RttiInfo::Kind::Ptr:
         {
             const PtrRttiInfo* ptrRttiInfo = static_cast<const PtrRttiInfo*>(info);

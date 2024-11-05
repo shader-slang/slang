@@ -59,11 +59,17 @@ struct ByteAddressBufferLegalizationContext
     {
         switch (inst->getOp())
         {
-        case kIROp_ByteAddressBufferLoad: processLoad(inst); break;
+        case kIROp_ByteAddressBufferLoad:
+            processLoad(inst);
+            break;
 
-        case kIROp_ByteAddressBufferStore: processStore(inst); break;
+        case kIROp_ByteAddressBufferStore:
+            processStore(inst);
+            break;
 
-        case kIROp_GetEquivalentStructuredBuffer: processGetEquivalentStructuredBuffer(inst); break;
+        case kIROp_GetEquivalentStructuredBuffer:
+            processGetEquivalentStructuredBuffer(inst);
+            break;
         }
 
         for (IRInst* child : inst->getModifiableChildren())
@@ -759,18 +765,30 @@ struct ByteAddressBufferLegalizationContext
                 IRInst* mask = nullptr;
                 switch (sizeAlignment.size)
                 {
-                case 1:  mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFF); break;
-                case 2:  mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFFFF); break;
-                default: SLANG_ASSERT(!"Unexpected size"); break;
+                case 1:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFF);
+                    break;
+                case 2:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFFFF);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    break;
                 }
                 auto shift = m_builder.emitShr(m_builder.getUIntType(), val, shiftAmount);
                 auto masked = m_builder.emitBitAnd(m_builder.getUIntType(), shift, mask);
                 IRInst* casted = nullptr;
                 switch (sizeAlignment.size)
                 {
-                case 1:  casted = m_builder.emitCast(m_builder.getUInt8Type(), masked); break;
-                case 2:  casted = m_builder.emitCast(m_builder.getUInt16Type(), masked); break;
-                default: SLANG_ASSERT(!"Unexpected size"); break;
+                case 1:
+                    casted = m_builder.emitCast(m_builder.getUInt8Type(), masked);
+                    break;
+                case 2:
+                    casted = m_builder.emitCast(m_builder.getUInt16Type(), masked);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    break;
                 }
                 return m_builder.emitBitCast(type, casted);
             }
@@ -831,13 +849,16 @@ struct ByteAddressBufferLegalizationContext
             //
             return BaseType::UInt;
         case kIROp_Int8Type:
-        case kIROp_UInt8Type:  return BaseType::UInt8;
+        case kIROp_UInt8Type:
+            return BaseType::UInt8;
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
-        case kIROp_HalfType:   return BaseType::UInt16;
+        case kIROp_HalfType:
+            return BaseType::UInt16;
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-        case kIROp_DoubleType: return BaseType::UInt64;
+        case kIROp_DoubleType:
+            return BaseType::UInt64;
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
         case kIROp_RawPointerType:
@@ -976,7 +997,8 @@ struct ByteAddressBufferLegalizationContext
                     dest,
                     as<IRMemoryQualifierSetDecoration>(decoration)->getMemoryQualifierBit());
                 break;
-            default: break;
+            default:
+                break;
             }
         }
     }
@@ -1064,7 +1086,8 @@ struct ByteAddressBufferLegalizationContext
                     arrayType->getElementCount());
             }
 
-        default: return nullptr;
+        default:
+            return nullptr;
         }
     }
 
@@ -1411,9 +1434,15 @@ struct ByteAddressBufferLegalizationContext
                 IRInst* mask = nullptr;
                 switch (sizeAlignment.size)
                 {
-                case 1:  mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFF); break;
-                case 2:  mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFFFF); break;
-                default: SLANG_ASSERT(!"Unexpected size"); return SLANG_FAIL;
+                case 1:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFF);
+                    break;
+                case 2:
+                    mask = m_builder.getIntValue(m_builder.getUIntType(), 0xFFFF);
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unexpected size");
+                    return SLANG_FAIL;
                 }
                 mask = m_builder.emitShl(m_builder.getUIntType(), mask, shiftAmount);
                 mask = m_builder.emitBitNot(m_builder.getUIntType(), mask);

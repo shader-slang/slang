@@ -636,11 +636,13 @@ static bool _canModifierBeAddedDuringCoercion(Val* modifier)
 {
     switch (modifier->astNodeType)
     {
-    default: return false;
+    default:
+        return false;
 
     case ASTNodeType::UNormModifierVal:
     case ASTNodeType::SNormModifierVal:
-    case ASTNodeType::NoDiffModifierVal: return true;
+    case ASTNodeType::NoDiffModifierVal:
+        return true;
     }
 }
 
@@ -653,11 +655,13 @@ static bool _canModifierBeDroppedDuringCoercion(Val* modifier)
 {
     switch (modifier->astNodeType)
     {
-    default: return false;
+    default:
+        return false;
 
     case ASTNodeType::UNormModifierVal:
     case ASTNodeType::SNormModifierVal:
-    case ASTNodeType::NoDiffModifierVal: return true;
+    case ASTNodeType::NoDiffModifierVal:
+        return true;
     }
 }
 
@@ -672,8 +676,10 @@ static bool isSigned(Type* t)
     case BaseType::Int16:
     case BaseType::Int:
     case BaseType::Int64:
-    case BaseType::IntPtr: return true;
-    default:               return false;
+    case BaseType::IntPtr:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -686,13 +692,17 @@ int getTypeBitSize(Type* t)
     switch (basicType->getBaseType())
     {
     case BaseType::Int8:
-    case BaseType::UInt8:  return 8;
+    case BaseType::UInt8:
+        return 8;
     case BaseType::Int16:
-    case BaseType::UInt16: return 16;
+    case BaseType::UInt16:
+        return 16;
     case BaseType::Int:
-    case BaseType::UInt:   return 32;
+    case BaseType::UInt:
+        return 32;
     case BaseType::Int64:
-    case BaseType::UInt64: return 64;
+    case BaseType::UInt64:
+        return 64;
     case BaseType::IntPtr:
     case BaseType::UIntPtr:
 #if SLANG_PTR_IS_32
@@ -700,7 +710,8 @@ int getTypeBitSize(Type* t)
 #else
         return 64;
 #endif
-    default: return 0;
+    default:
+        return 0;
     }
 }
 

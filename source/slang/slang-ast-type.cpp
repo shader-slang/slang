@@ -436,12 +436,22 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
     switch (addrSpace)
     {
     case AddressSpace::Generic:
-    case AddressSpace::UserPointer: break;
-    case AddressSpace::GroupShared: out << toSlice(", groupshared"); break;
-    case AddressSpace::Global:      out << toSlice(", global"); break;
-    case AddressSpace::ThreadLocal: out << toSlice(", threadlocal"); break;
-    case AddressSpace::Uniform:     out << toSlice(", uniform"); break;
-    default:                        break;
+    case AddressSpace::UserPointer:
+        break;
+    case AddressSpace::GroupShared:
+        out << toSlice(", groupshared");
+        break;
+    case AddressSpace::Global:
+        out << toSlice(", global");
+        break;
+    case AddressSpace::ThreadLocal:
+        out << toSlice(", threadlocal");
+        break;
+    case AddressSpace::Uniform:
+        out << toSlice(", uniform");
+        break;
+    default:
+        break;
     }
 }
 
@@ -1130,13 +1140,18 @@ SlangResourceAccess ResourceType::getAccess()
     {
         switch (constIntVal->getValue())
         {
-        case kCoreModule_ResourceAccessReadOnly:  return SLANG_RESOURCE_ACCESS_READ;
-        case kCoreModule_ResourceAccessReadWrite: return SLANG_RESOURCE_ACCESS_READ_WRITE;
-        case kCoreModule_ResourceAccessWriteOnly: return SLANG_RESOURCE_ACCESS_WRITE;
+        case kCoreModule_ResourceAccessReadOnly:
+            return SLANG_RESOURCE_ACCESS_READ;
+        case kCoreModule_ResourceAccessReadWrite:
+            return SLANG_RESOURCE_ACCESS_READ_WRITE;
+        case kCoreModule_ResourceAccessWriteOnly:
+            return SLANG_RESOURCE_ACCESS_WRITE;
         case kCoreModule_ResourceAccessRasterizerOrdered:
             return SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
-        case kCoreModule_ResourceAccessFeedback: return SLANG_RESOURCE_ACCESS_FEEDBACK;
-        default:                                 break;
+        case kCoreModule_ResourceAccessFeedback:
+            return SLANG_RESOURCE_ACCESS_FEEDBACK;
+        default:
+            break;
         }
     }
     return SLANG_RESOURCE_ACCESS_NONE;
@@ -1166,14 +1181,20 @@ void ResourceType::_toTextOverride(StringBuilder& out)
         auto access = getAccess();
         switch (access)
         {
-        case SLANG_RESOURCE_ACCESS_READ: break;
+        case SLANG_RESOURCE_ACCESS_READ:
+            break;
         case SLANG_RESOURCE_ACCESS_READ_WRITE:
             resultSB << "RW";
             ;
             break;
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: resultSB << "RasterizerOrdered"; break;
-        case SLANG_RESOURCE_ACCESS_FEEDBACK:       resultSB << "Feedback"; break;
-        default:                                   return false;
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            resultSB << "RasterizerOrdered";
+            break;
+        case SLANG_RESOURCE_ACCESS_FEEDBACK:
+            resultSB << "Feedback";
+            break;
+        default:
+            return false;
         }
         auto combined = as<ConstantIntVal>(_getGenericTypeArg(this, 7));
         auto shapeVal = _getGenericTypeArg(this, 1);
@@ -1193,10 +1214,18 @@ void ResourceType::_toTextOverride(StringBuilder& out)
         }
         switch (shape)
         {
-        case SLANG_TEXTURE_1D:   resultSB << "1D"; break;
-        case SLANG_TEXTURE_2D:   resultSB << "2D"; break;
-        case SLANG_TEXTURE_3D:   resultSB << "3D"; break;
-        case SLANG_TEXTURE_CUBE: resultSB << "Cube"; break;
+        case SLANG_TEXTURE_1D:
+            resultSB << "1D";
+            break;
+        case SLANG_TEXTURE_2D:
+            resultSB << "2D";
+            break;
+        case SLANG_TEXTURE_3D:
+            resultSB << "3D";
+            break;
+        case SLANG_TEXTURE_CUBE:
+            resultSB << "Cube";
+            break;
         }
         auto isArrayVal = as<ConstantIntVal>(_getGenericTypeArg(this, 2));
         if (!isArrayVal)

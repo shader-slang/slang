@@ -81,7 +81,8 @@ ranges.
             return comment.startsWith(UnownedStringSlice::fromLiteral("///<")) ? comment.tail(4)
                                                                                : comment;
         }
-    default: break;
+    default:
+        break;
     }
     return comment;
 }
@@ -121,18 +122,28 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
     switch (type)
     {
     default:
-    case MarkupType::None:                return 0;
-    case MarkupType::BlockBefore:         return MarkupFlag::Before | MarkupFlag::IsBlock;
-    case MarkupType::BlockAfter:          return MarkupFlag::After | MarkupFlag::IsBlock;
-    case MarkupType::OrdinaryBlockBefore: return MarkupFlag::Before | MarkupFlag::IsBlock;
+    case MarkupType::None:
+        return 0;
+    case MarkupType::BlockBefore:
+        return MarkupFlag::Before | MarkupFlag::IsBlock;
+    case MarkupType::BlockAfter:
+        return MarkupFlag::After | MarkupFlag::IsBlock;
+    case MarkupType::OrdinaryBlockBefore:
+        return MarkupFlag::Before | MarkupFlag::IsBlock;
 
-    case MarkupType::LineBangBefore:     return MarkupFlag::Before | MarkupFlag::IsMultiToken;
-    case MarkupType::LineSlashBefore:    return MarkupFlag::Before | MarkupFlag::IsMultiToken;
-    case MarkupType::OrdinaryLineBefore: return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+    case MarkupType::LineBangBefore:
+        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+    case MarkupType::LineSlashBefore:
+        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+    case MarkupType::OrdinaryLineBefore:
+        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
 
-    case MarkupType::LineBangAfter:     return MarkupFlag::After | MarkupFlag::IsMultiToken;
-    case MarkupType::LineSlashAfter:    return MarkupFlag::After | MarkupFlag::IsMultiToken;
-    case MarkupType::OrdinaryLineAfter: return MarkupFlag::After | MarkupFlag::IsMultiToken;
+    case MarkupType::LineBangAfter:
+        return MarkupFlag::After | MarkupFlag::IsMultiToken;
+    case MarkupType::LineSlashAfter:
+        return MarkupFlag::After | MarkupFlag::IsMultiToken;
+    case MarkupType::OrdinaryLineAfter:
+        return MarkupFlag::After | MarkupFlag::IsMultiToken;
     }
 }
 
@@ -175,7 +186,8 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
                                                                : MarkupType::OrdinaryLineAfter;
             break;
         }
-    default: break;
+    default:
+        break;
     }
     return MarkupType::None;
 }
@@ -346,7 +358,8 @@ SlangResult DocMarkupExtractor::_extractMarkup(
 
             break;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     return SLANG_OK;
@@ -475,7 +488,8 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 

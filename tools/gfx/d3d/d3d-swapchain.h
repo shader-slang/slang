@@ -26,8 +26,10 @@ public:
         // Return fail on non-supported platforms.
         switch (window.type)
         {
-        case WindowHandle::Type::Win32Handle: break;
-        default:                              return SLANG_FAIL;
+        case WindowHandle::Type::Win32Handle:
+            break;
+        default:
+            return SLANG_FAIL;
         }
 
         m_desc = desc;

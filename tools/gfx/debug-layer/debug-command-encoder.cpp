@@ -351,7 +351,8 @@ void DebugResourceCommandEncoderImpl::clearResourceView(
     {
     case IResourceView::Type::DepthStencil:
     case IResourceView::Type::RenderTarget:
-    case IResourceView::Type::UnorderedAccess: break;
+    case IResourceView::Type::UnorderedAccess:
+        break;
     default:
         GFX_DIAGNOSE_ERROR_FORMAT(
             "Resource view %lld cannot be cleared. Only DepthStencil, "

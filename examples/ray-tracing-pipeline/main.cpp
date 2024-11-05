@@ -255,11 +255,20 @@ struct RayTracing : public WindowedAppBase
     {
         switch (key)
         {
-        default:                   break;
-        case platform::KeyCode::W: wPressed = state; break;
-        case platform::KeyCode::A: aPressed = state; break;
-        case platform::KeyCode::S: sPressed = state; break;
-        case platform::KeyCode::D: dPressed = state; break;
+        default:
+            break;
+        case platform::KeyCode::W:
+            wPressed = state;
+            break;
+        case platform::KeyCode::A:
+            aPressed = state;
+            break;
+        case platform::KeyCode::S:
+            sPressed = state;
+            break;
+        case platform::KeyCode::D:
+            dPressed = state;
+            break;
         }
     }
     void onKeyDown(platform::KeyEventArgs args) { setKeyState(args.key, true); }

@@ -68,7 +68,8 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     {
         switch (baseType)
         {
-        case BaseType::Void: return SimpleLayoutInfo();
+        case BaseType::Void:
+            return SimpleLayoutInfo();
 
         // Note: By convention, a `bool` in a constant buffer is stored as an `int.
         // This default may eventually change, at which point this logic will need
@@ -77,32 +78,44 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         // TODO: We should probably warn in this case, since storing a `bool` in
         // a constant buffer seems like a Bad Idea anyway.
         //
-        case BaseType::Bool: return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
+        case BaseType::Bool:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
 
 
-        case BaseType::Int8:  return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
-        case BaseType::Int16: return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
-        case BaseType::Int:   return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
-        case BaseType::Int64: return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case BaseType::Int8:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
+        case BaseType::Int16:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
+        case BaseType::Int:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
+        case BaseType::Int64:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         case BaseType::IntPtr:
             return SimpleLayoutInfo(
                 LayoutResourceKind::Uniform,
                 sizeof(intptr_t),
                 sizeof(intptr_t));
 
-        case BaseType::UInt8:  return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
-        case BaseType::UInt16: return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
-        case BaseType::UInt:   return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
-        case BaseType::UInt64: return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case BaseType::UInt8:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
+        case BaseType::UInt16:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
+        case BaseType::UInt:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
+        case BaseType::UInt64:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         case BaseType::UIntPtr:
             return SimpleLayoutInfo(
                 LayoutResourceKind::Uniform,
                 sizeof(intptr_t),
                 sizeof(intptr_t));
 
-        case BaseType::Half:   return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
-        case BaseType::Float:  return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
-        case BaseType::Double: return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case BaseType::Half:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
+        case BaseType::Float:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
+        case BaseType::Double:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
 
         default:
             SLANG_UNEXPECTED("uhandled scalar type");
@@ -437,7 +450,8 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
             }
 
         // This always returns a layout where the size is the same as the alignment.
-        default: return Super::GetScalarLayout(baseType);
+        default:
+            return Super::GetScalarLayout(baseType);
         }
     }
 
@@ -527,7 +541,8 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
                     SLANG_ALIGN_OF(uint8_t));
             }
 
-        default: return Super::GetScalarLayout(baseType);
+        default:
+            return Super::GetScalarLayout(baseType);
         }
     }
 
@@ -761,15 +776,18 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
 {
     switch (kind)
     {
-    case ShaderParameterKind::SubpassInput: return LayoutResourceKind::InputAttachmentIndex;
+    case ShaderParameterKind::SubpassInput:
+        return LayoutResourceKind::InputAttachmentIndex;
 
-    case ShaderParameterKind::ConstantBuffer: return LayoutResourceKind::ConstantBuffer;
+    case ShaderParameterKind::ConstantBuffer:
+        return LayoutResourceKind::ConstantBuffer;
 
     case ShaderParameterKind::TextureUniformBuffer:
     case ShaderParameterKind::StructuredBuffer:
     case ShaderParameterKind::RawBuffer:
     case ShaderParameterKind::Buffer:
-    case ShaderParameterKind::Texture:              return LayoutResourceKind::ShaderResource;
+    case ShaderParameterKind::Texture:
+        return LayoutResourceKind::ShaderResource;
 
     case ShaderParameterKind::MutableStructuredBuffer:
     case ShaderParameterKind::MutableRawBuffer:
@@ -778,8 +796,10 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
     case ShaderParameterKind::AppendConsumeStructuredBuffer:
         return LayoutResourceKind::UnorderedAccess;
 
-    case ShaderParameterKind::SamplerState: return LayoutResourceKind::SamplerState;
-    default:                                return LayoutResourceKind::None;
+    case ShaderParameterKind::SamplerState:
+        return LayoutResourceKind::SamplerState;
+    default:
+        return LayoutResourceKind::None;
     }
 }
 
@@ -821,7 +841,8 @@ struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
         case ShaderParameterKind::SubpassInput:
             return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, slotCount);
-        default: break;
+        default:
+            break;
         }
         return SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, slotCount);
     }
@@ -2075,15 +2096,18 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::DXBytecodeAssembly:
     case CodeGenTarget::DXIL:
-    case CodeGenTarget::DXILAssembly:       return &kHLSLLayoutRulesFamilyImpl;
+    case CodeGenTarget::DXILAssembly:
+        return &kHLSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
-    case CodeGenTarget::SPIRVAssembly: return &kGLSLLayoutRulesFamilyImpl;
+    case CodeGenTarget::SPIRVAssembly:
+        return &kGLSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::WGSL:
     case CodeGenTarget::WGSLSPIRV:
-    case CodeGenTarget::WGSLSPIRVAssembly: return &kWGSLLayoutRulesFamilyImpl;
+    case CodeGenTarget::WGSLSPIRVAssembly:
+        return &kWGSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
@@ -2105,7 +2129,8 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
         }
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
-    case CodeGenTarget::MetalLibAssembly: return &kMetalLayoutRulesFamilyImpl;
+    case CodeGenTarget::MetalLibAssembly:
+        return &kMetalLayoutRulesFamilyImpl;
 
     case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
@@ -2114,7 +2139,8 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
         }
 
 
-    default: return nullptr;
+    default:
+        return nullptr;
     }
 }
 
@@ -2129,7 +2155,9 @@ TypeLayoutContext getInitialLayoutContextForTarget(
     switch (rules)
     {
     case slang::LayoutRules::Default:
-    default:                          rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq); break;
+    default:
+        rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
+        break;
     case slang::LayoutRules::MetalArgumentBufferTier2:
         rulesFamily = &kCPULayoutRulesFamilyImpl;
         break;
@@ -2194,9 +2222,11 @@ bool IsResourceKind(LayoutResourceKind kind)
     switch (kind)
     {
     case LayoutResourceKind::None:
-    case LayoutResourceKind::Uniform: return false;
+    case LayoutResourceKind::Uniform:
+        return false;
 
-    default: return true;
+    default:
+        return true;
     }
 }
 
@@ -2312,9 +2342,11 @@ bool isD3DTarget(TargetRequest* targetReq)
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::DXBytecodeAssembly:
     case CodeGenTarget::DXIL:
-    case CodeGenTarget::DXILAssembly:       return true;
+    case CodeGenTarget::DXILAssembly:
+        return true;
 
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -2322,11 +2354,13 @@ bool isMetalTarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
     {
-    default: return false;
+    default:
+        return false;
 
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
-    case CodeGenTarget::MetalLibAssembly: return true;
+    case CodeGenTarget::MetalLibAssembly:
+        return true;
     }
 }
 
@@ -2334,11 +2368,13 @@ bool isKhronosTarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
     {
-    default: return false;
+    default:
+        return false;
 
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
-    case CodeGenTarget::SPIRVAssembly: return true;
+    case CodeGenTarget::SPIRVAssembly:
+        return true;
     }
 }
 
@@ -2352,10 +2388,12 @@ bool isCUDATarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
     {
-    default: return false;
+    default:
+        return false;
 
     case CodeGenTarget::CUDASource:
-    case CodeGenTarget::PTX:        return true;
+    case CodeGenTarget::PTX:
+        return true;
     }
 }
 
@@ -2418,7 +2456,8 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         {
             return SourceLanguage::CUDA;
         }
-    default: break;
+    default:
+        break;
     }
 
     return SourceLanguage::Unknown;
@@ -3642,9 +3681,11 @@ bool doesResourceRequireAdjustmentForArrayOfStructs(LayoutResourceKind kind)
     case LayoutResourceKind::ConstantBuffer:
     case LayoutResourceKind::ShaderResource:
     case LayoutResourceKind::UnorderedAccess:
-    case LayoutResourceKind::SamplerState:    return true;
+    case LayoutResourceKind::SamplerState:
+        return true;
 
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -4423,18 +4464,26 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         {
             switch (textureType->getAccess())
             {
-            default: kind = ShaderParameterKind::MutableTextureSampler; break;
+            default:
+                kind = ShaderParameterKind::MutableTextureSampler;
+                break;
 
-            case SLANG_RESOURCE_ACCESS_READ: kind = ShaderParameterKind::TextureSampler; break;
+            case SLANG_RESOURCE_ACCESS_READ:
+                kind = ShaderParameterKind::TextureSampler;
+                break;
             }
         }
         else
         {
             switch (textureType->getAccess())
             {
-            default: kind = ShaderParameterKind::MutableTexture; break;
+            default:
+                kind = ShaderParameterKind::MutableTexture;
+                break;
 
-            case SLANG_RESOURCE_ACCESS_READ: kind = ShaderParameterKind::Texture; break;
+            case SLANG_RESOURCE_ACCESS_READ:
+                kind = ShaderParameterKind::Texture;
+                break;
             }
         }
         auto objLayout = rules->GetObjectLayout(kind, context.objectLayoutOptions);
@@ -4447,9 +4496,13 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         ShaderParameterKind kind;
         switch (imageType->getAccess())
         {
-        default: kind = ShaderParameterKind::MutableImage; break;
+        default:
+            kind = ShaderParameterKind::MutableImage;
+            break;
 
-        case SLANG_RESOURCE_ACCESS_READ: kind = ShaderParameterKind::Image; break;
+        case SLANG_RESOURCE_ACCESS_READ:
+            kind = ShaderParameterKind::Image;
+            break;
         }
 
         return createSimpleTypeLayout(

@@ -2143,7 +2143,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::NoHLSLPackConstantBufferElements:
         case OptionKind::LoopInversion:
         case OptionKind::UnscopedEnum:
-        case OptionKind::PreserveParameters:               linkage->m_optionSet.set(optionKind, true); break;
+        case OptionKind::PreserveParameters:
+            linkage->m_optionSet.set(optionKind, true);
+            break;
         case OptionKind::MatrixLayoutRow:
         case OptionKind::MatrixLayoutColumn:
             linkage->m_optionSet.setMatrixLayoutMode(
@@ -2172,7 +2174,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
                 break;
             }
-        case OptionKind::CompileCoreModule: m_compileCoreModule = true; break;
+        case OptionKind::CompileCoreModule:
+            m_compileCoreModule = true;
+            break;
         case OptionKind::ArchiveType:
             {
                 SLANG_RETURN_ON_FAIL(_expectValue(m_archiveType));
@@ -2268,7 +2272,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_compileRequest->setDefaultModuleName(moduleName.value.getBuffer());
                 break;
             }
-        case OptionKind::LoadRepro: SLANG_RETURN_ON_FAIL(_parseLoadRepro(arg)); break;
+        case OptionKind::LoadRepro:
+            SLANG_RETURN_ON_FAIL(_parseLoadRepro(arg));
+            break;
         case OptionKind::LoadReproDirectory:
             {
                 CommandLineArg reproDirectory;
@@ -2312,12 +2318,18 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
                 break;
             }
-        case OptionKind::ReproFileSystem: SLANG_RETURN_ON_FAIL(_parseReproFileSystem(arg)); break;
-        case OptionKind::SerialIr:        m_frontEndReq->useSerialIRBottleneck = true; break;
+        case OptionKind::ReproFileSystem:
+            SLANG_RETURN_ON_FAIL(_parseReproFileSystem(arg));
+            break;
+        case OptionKind::SerialIr:
+            m_frontEndReq->useSerialIRBottleneck = true;
+            break;
         case OptionKind::VerbosePaths:
             m_requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
             break;
-        case OptionKind::DumpWarningDiagnostics: _dumpDiagnostics(Severity::Warning); break;
+        case OptionKind::DumpWarningDiagnostics:
+            _dumpDiagnostics(Severity::Warning);
+            break;
         case OptionKind::WarningsAsErrors:
             {
                 CommandLineArg operand;
@@ -2358,7 +2370,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Severity::Warning));
                 break;
             }
-        case OptionKind::VerifyDebugSerialIr: m_frontEndReq->verifyDebugSerialization = true; break;
+        case OptionKind::VerifyDebugSerialIr:
+            m_frontEndReq->verifyDebugSerialization = true;
+            break;
         case OptionKind::IrCompression:
             {
                 CommandLineArg name;
@@ -2443,7 +2457,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     (int)bindingSet);
                 break;
             }
-        case OptionKind::Profile: SLANG_RETURN_ON_FAIL(_parseProfile(arg)); break;
+        case OptionKind::Profile:
+            SLANG_RETURN_ON_FAIL(_parseProfile(arg));
+            break;
         case OptionKind::Capability:
             {
                 // The `-capability` option is similar to `-profile` but does not set the actual
@@ -2692,7 +2708,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_compileRequest->setOptimizationLevel(level);
                 break;
             }
-        case OptionKind::DebugInformation: SLANG_RETURN_ON_FAIL(_parseDebugInformation(arg)); break;
+        case OptionKind::DebugInformation:
+            SLANG_RETURN_ON_FAIL(_parseDebugInformation(arg));
+            break;
         case OptionKind::FileSystem:
             {
                 typedef TypeTextUtil::FileSystemType FileSystemType;
@@ -2701,7 +2719,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
                 switch (value)
                 {
-                case FileSystemType::Default: m_compileRequest->setFileSystem(nullptr); break;
+                case FileSystemType::Default:
+                    m_compileRequest->setFileSystem(nullptr);
+                    break;
                 case FileSystemType::LoadFile:
                     m_compileRequest->setFileSystem(OSFileSystem::getLoadSingleton());
                     break;
@@ -2711,13 +2731,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
                 break;
             }
-        case OptionKind::ReferenceModule: SLANG_RETURN_ON_FAIL(_parseReferenceModule(arg)); break;
+        case OptionKind::ReferenceModule:
+            SLANG_RETURN_ON_FAIL(_parseReferenceModule(arg));
+            break;
         case OptionKind::Version:
             {
                 m_sink->diagnoseRaw(Severity::Note, m_session->getBuildTagString());
                 break;
             }
-        case OptionKind::HelpStyle: SLANG_RETURN_ON_FAIL(_expectValue(m_helpStyle)); break;
+        case OptionKind::HelpStyle:
+            SLANG_RETURN_ON_FAIL(_expectValue(m_helpStyle));
+            break;
         case OptionKind::Help:
             {
                 SLANG_RETURN_ON_FAIL(_parseHelp(arg));
@@ -3447,7 +3471,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::DXIL:
                     case CodeGenTarget::MetalLib:
                     case CodeGenTarget::MetalLibAssembly:
-                    case CodeGenTarget::Metal:               rawOutput.isWholeProgram = true; break;
+                    case CodeGenTarget::Metal:
+                        rawOutput.isWholeProgram = true;
+                        break;
                     case CodeGenTarget::SPIRV:
                     case CodeGenTarget::SPIRVAssembly:
                         if (getCurrentTarget()->optionSet.shouldEmitSPIRVDirectly())

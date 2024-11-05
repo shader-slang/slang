@@ -238,11 +238,20 @@ IRInst* extractMultiByteValueAtOffset(
         uint32_t bitMask = 0;
         switch (size)
         {
-        case 1:  bitMask = 0xFF; break;
-        case 2:  bitMask = 0xFFFFF; break;
-        case 3:  bitMask = 0xFFFFFF; break;
-        case 4:  bitMask = 0xFFFFFFFF; break;
-        default: break;
+        case 1:
+            bitMask = 0xFF;
+            break;
+        case 2:
+            bitMask = 0xFFFFF;
+            break;
+        case 3:
+            bitMask = 0xFFFFFF;
+            break;
+        case 4:
+            bitMask = 0xFFFFFFFF;
+            break;
+        default:
+            break;
         }
         if (leaf.valueSize != size)
         {

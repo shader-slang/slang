@@ -279,7 +279,8 @@ struct DumpVisitor : public RiffContainer::Visitor
                     SLANG_RETURN_ON_FAIL(stream->write(trailing, remainingSize));
                 }
             }
-        default: break;
+        default:
+            break;
         }
 
         // Next
@@ -411,7 +412,8 @@ SlangResult RiffContainer::Chunk::visit(Visitor* visitor)
             SLANG_RETURN_ON_FAIL(visitor->leaveList(list));
             return SLANG_OK;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 }
 
@@ -438,7 +440,8 @@ SlangResult RiffContainer::Chunk::visitPreOrder(VisitorCallback callback, void* 
             }
             return SLANG_OK;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 }
 
@@ -465,7 +468,8 @@ SlangResult RiffContainer::Chunk::visitPostOrder(VisitorCallback callback, void*
             SLANG_RETURN_ON_FAIL(callback(this, data));
             return SLANG_OK;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 }
 
@@ -473,9 +477,12 @@ size_t RiffContainer::Chunk::calcPayloadSize()
 {
     switch (m_kind)
     {
-    case Kind::Data: return static_cast<DataChunk*>(this)->calcPayloadSize();
-    case Kind::List: return static_cast<ListChunk*>(this)->calcPayloadSize();
-    default:         return 0;
+    case Kind::Data:
+        return static_cast<DataChunk*>(this)->calcPayloadSize();
+    case Kind::List:
+        return static_cast<ListChunk*>(this)->calcPayloadSize();
+    default:
+        return 0;
     }
 }
 

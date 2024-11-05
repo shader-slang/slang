@@ -57,10 +57,17 @@ void getBufferHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum
     IDevice::Desc deviceDesc = {};
     switch (api)
     {
-    case Slang::RenderApiFlag::D3D11:  deviceDesc.deviceType = gfx::DeviceType::DirectX11; break;
-    case Slang::RenderApiFlag::D3D12:  deviceDesc.deviceType = gfx::DeviceType::DirectX12; break;
-    case Slang::RenderApiFlag::Vulkan: deviceDesc.deviceType = gfx::DeviceType::Vulkan; break;
-    default:                           SLANG_IGNORE_TEST;
+    case Slang::RenderApiFlag::D3D11:
+        deviceDesc.deviceType = gfx::DeviceType::DirectX11;
+        break;
+    case Slang::RenderApiFlag::D3D12:
+        deviceDesc.deviceType = gfx::DeviceType::DirectX12;
+        break;
+    case Slang::RenderApiFlag::Vulkan:
+        deviceDesc.deviceType = gfx::DeviceType::Vulkan;
+        break;
+    default:
+        SLANG_IGNORE_TEST;
     }
     deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
     const char* searchPaths[] = {"", "../../tools/gfx-unit-test", "tools/gfx-unit-test"};

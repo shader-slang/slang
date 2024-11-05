@@ -598,7 +598,8 @@ breakLabel:;
                         tryLookUpRequirementWitness(astBuilder, thisTypeWitness, requirementKey);
                     switch (requirementWitness.getFlavor())
                     {
-                    default: break;
+                    default:
+                        break;
 
                     case RequirementWitness::Flavor::val:
                         {
@@ -1321,17 +1322,34 @@ Val* TypeCastIntVal::tryFoldImpl(
     {
         switch (baseType->getBaseType())
         {
-        case BaseType::Int:     resultValue = (int)resultValue; return true;
-        case BaseType::UInt:    resultValue = (unsigned int)resultValue; return true;
+        case BaseType::Int:
+            resultValue = (int)resultValue;
+            return true;
+        case BaseType::UInt:
+            resultValue = (unsigned int)resultValue;
+            return true;
         case BaseType::Int64:
-        case BaseType::IntPtr:  resultValue = (Int64)resultValue; return true;
+        case BaseType::IntPtr:
+            resultValue = (Int64)resultValue;
+            return true;
         case BaseType::UInt64:
-        case BaseType::UIntPtr: resultValue = (UInt64)resultValue; return true;
-        case BaseType::Int16:   resultValue = (int16_t)resultValue; return true;
-        case BaseType::UInt16:  resultValue = (uint16_t)resultValue; return true;
-        case BaseType::Int8:    resultValue = (int8_t)resultValue; return true;
-        case BaseType::UInt8:   resultValue = (uint8_t)resultValue; return true;
-        default:                return false;
+        case BaseType::UIntPtr:
+            resultValue = (UInt64)resultValue;
+            return true;
+        case BaseType::Int16:
+            resultValue = (int16_t)resultValue;
+            return true;
+        case BaseType::UInt16:
+            resultValue = (uint16_t)resultValue;
+            return true;
+        case BaseType::Int8:
+            resultValue = (int8_t)resultValue;
+            return true;
+        case BaseType::UInt8:
+            resultValue = (uint8_t)resultValue;
+            return true;
+        default:
+            return false;
         }
     };
     if (auto c = as<ConstantIntVal>(base))
@@ -1789,8 +1807,11 @@ Val* WitnessLookupIntVal::tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* 
     auto witnessEntry = tryLookUpRequirementWitness(astBuilder, witness, key);
     switch (witnessEntry.getFlavor())
     {
-    case RequirementWitness::Flavor::val: return witnessEntry.getVal(); break;
-    default:                              break;
+    case RequirementWitness::Flavor::val:
+        return witnessEntry.getVal();
+        break;
+    default:
+        break;
     }
     return nullptr;
 }

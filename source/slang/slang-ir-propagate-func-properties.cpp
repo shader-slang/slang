@@ -24,8 +24,10 @@ static bool isResourceLoad(IROp op)
     case kIROp_ByteAddressBufferLoad:
     case kIROp_StructuredBufferLoadStatus:
     case kIROp_RWStructuredBufferLoad:
-    case kIROp_RWStructuredBufferLoadStatus: return true;
-    default:                                 return false;
+    case kIROp_RWStructuredBufferLoadStatus:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -42,8 +44,10 @@ static bool isKnownOpCodeWithSideEffect(IROp op)
     case kIROp_Param:
     case kIROp_Unreachable:
     case kIROp_Store:
-    case kIROp_SwizzledStore:       return true;
-    default:                        return false;
+    case kIROp_SwizzledStore:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -57,7 +61,8 @@ public:
         {
             switch (decoration->getOp())
             {
-            case kIROp_ReadNoneDecoration: return true;
+            case kIROp_ReadNoneDecoration:
+                return true;
             }
         }
         return false;
@@ -70,7 +75,8 @@ public:
             switch (decoration->getOp())
             {
             case kIROp_ReadNoneDecoration:
-            case kIROp_TargetIntrinsicDecoration: return false;
+            case kIROp_TargetIntrinsicDecoration:
+                return false;
             }
         }
         return true;
@@ -258,7 +264,8 @@ public:
             {
             case kIROp_ReadNoneDecoration:
             case kIROp_NoSideEffectDecoration:
-            case kIROp_TargetIntrinsicDecoration: return false;
+            case kIROp_TargetIntrinsicDecoration:
+                return false;
             }
         }
         return true;
@@ -271,7 +278,8 @@ public:
             switch (decoration->getOp())
             {
             case kIROp_ReadNoneDecoration:
-            case kIROp_NoSideEffectDecoration: return true;
+            case kIROp_NoSideEffectDecoration:
+                return true;
             }
         }
         return false;

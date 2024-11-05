@@ -674,7 +674,8 @@ Result ShaderObjectImpl::bindAsValue(
             break;
 #endif
 
-        default: break;
+        default:
+            break;
         }
     }
 

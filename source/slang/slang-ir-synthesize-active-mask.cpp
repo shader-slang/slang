@@ -1064,7 +1064,8 @@ struct SynthesizeActiveMaskForFunctionContext
             // so we can elect to simply do nothing.
             //
         case kIROp_MissingReturn:
-        case kIROp_Unreachable:   break;
+        case kIROp_Unreachable:
+            break;
 
         case kIROp_unconditionalBranch:
             {

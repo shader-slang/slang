@@ -132,10 +132,18 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(
             m_writer->emit(" : register(");
             switch (kind)
             {
-            case LayoutResourceKind::ConstantBuffer:  m_writer->emit("b"); break;
-            case LayoutResourceKind::ShaderResource:  m_writer->emit("t"); break;
-            case LayoutResourceKind::UnorderedAccess: m_writer->emit("u"); break;
-            case LayoutResourceKind::SamplerState:    m_writer->emit("s"); break;
+            case LayoutResourceKind::ConstantBuffer:
+                m_writer->emit("b");
+                break;
+            case LayoutResourceKind::ShaderResource:
+                m_writer->emit("t");
+                break;
+            case LayoutResourceKind::UnorderedAccess:
+                m_writer->emit("u");
+                break;
+            case LayoutResourceKind::SamplerState:
+                m_writer->emit("s");
+                break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
                 break;
@@ -164,9 +172,11 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantics(
 
     switch (getSourceLanguage())
     {
-    default: return;
+    default:
+        return;
 
-    case SourceLanguage::HLSL: break;
+    case SourceLanguage::HLSL:
+        break;
     }
 
     for (auto rr : layout->getOffsetAttrs())
@@ -274,19 +284,32 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 {
     switch (texType->getAccess())
     {
-    case SLANG_RESOURCE_ACCESS_READ: break;
+    case SLANG_RESOURCE_ACCESS_READ:
+        break;
 
-    case SLANG_RESOURCE_ACCESS_READ_WRITE: m_writer->emit("RW"); break;
+    case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        m_writer->emit("RW");
+        break;
 
-    case SLANG_RESOURCE_ACCESS_WRITE: m_writer->emit("RW"); break;
+    case SLANG_RESOURCE_ACCESS_WRITE:
+        m_writer->emit("RW");
+        break;
 
-    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: m_writer->emit("RasterizerOrdered"); break;
+    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        m_writer->emit("RasterizerOrdered");
+        break;
 
-    case SLANG_RESOURCE_ACCESS_APPEND: m_writer->emit("Append"); break;
+    case SLANG_RESOURCE_ACCESS_APPEND:
+        m_writer->emit("Append");
+        break;
 
-    case SLANG_RESOURCE_ACCESS_CONSUME: m_writer->emit("Consume"); break;
+    case SLANG_RESOURCE_ACCESS_CONSUME:
+        m_writer->emit("Consume");
+        break;
 
-    case SLANG_RESOURCE_ACCESS_FEEDBACK: m_writer->emit("Feedback"); break;
+    case SLANG_RESOURCE_ACCESS_FEEDBACK:
+        m_writer->emit("Feedback");
+        break;
 
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
@@ -295,12 +318,24 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 
     switch (texType->GetBaseShape())
     {
-    case SLANG_TEXTURE_1D:     m_writer->emit("Texture1D"); break;
-    case SLANG_TEXTURE_2D:     m_writer->emit("Texture2D"); break;
-    case SLANG_TEXTURE_3D:     m_writer->emit("Texture3D"); break;
-    case SLANG_TEXTURE_CUBE:   m_writer->emit("TextureCube"); break;
-    case SLANG_TEXTURE_BUFFER: m_writer->emit("Buffer"); break;
-    default:                   SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape"); break;
+    case SLANG_TEXTURE_1D:
+        m_writer->emit("Texture1D");
+        break;
+    case SLANG_TEXTURE_2D:
+        m_writer->emit("Texture2D");
+        break;
+    case SLANG_TEXTURE_3D:
+        m_writer->emit("Texture3D");
+        break;
+    case SLANG_TEXTURE_CUBE:
+        m_writer->emit("TextureCube");
+        break;
+    case SLANG_TEXTURE_BUFFER:
+        m_writer->emit("Buffer");
+        break;
+    default:
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+        break;
     }
 
     if (texType->isMultisample())
@@ -506,7 +541,8 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
             break;
         }
     // TODO: There are other stages that will need this kind of handling.
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -698,7 +734,8 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(");");
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -753,7 +790,9 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto toType = extractBaseType(inst->getDataType());
             switch (toType)
             {
-            default: diagnoseUnhandledInst(inst); break;
+            default:
+                diagnoseUnhandledInst(inst);
+                break;
 
             case BaseType::Int8:
             case BaseType::Int16:
@@ -774,7 +813,9 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 emitType(inst->getDataType());
                 m_writer->emit(")");
                 break;
-            case BaseType::Half: m_writer->emit("asfloat16"); break;
+            case BaseType::Half:
+                m_writer->emit("asfloat16");
+                break;
             case BaseType::Float:
                 // Note: at present HLSL only supports
                 // reinterpreting integer bits as a `float`.
@@ -799,13 +840,17 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
             switch (fromType)
             {
-            default: diagnoseUnhandledInst(inst); break;
+            default:
+                diagnoseUnhandledInst(inst);
+                break;
 
             case BaseType::UInt:
             case BaseType::Int:
-            case BaseType::Bool:   break;
+            case BaseType::Bool:
+                break;
             case BaseType::UInt16:
-            case BaseType::Int16:  break;
+            case BaseType::Int16:
+                break;
             case BaseType::Float:
                 m_writer->emit("asuint(");
                 closeCount++;
@@ -955,7 +1000,8 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
         break;
-    default: break;
+    default:
+        break;
     }
     // Not handled
     return false;
@@ -978,7 +1024,8 @@ void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
             m_writer->emit(elementCount);
             return;
 
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -997,9 +1044,14 @@ void HLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
 {
     switch (decl->getMode())
     {
-    case kIRLoopControl_Unroll: m_writer->emit("[unroll]\n"); break;
-    case kIRLoopControl_Loop:   m_writer->emit("[loop]\n"); break;
-    default:                    break;
+    case kIRLoopControl_Unroll:
+        m_writer->emit("[unroll]\n");
+        break;
+    case kIRLoopControl_Loop:
+        m_writer->emit("[loop]\n");
+        break;
+    default:
+        break;
     }
 }
 
@@ -1057,9 +1109,12 @@ void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     switch (decoration->getOp())
     {
-    case kIROp_NoInlineDecoration: m_writer->emit("[noinline]\n"); break;
+    case kIROp_NoInlineDecoration:
+        m_writer->emit("[noinline]\n");
+        break;
 
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -1089,12 +1144,14 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     m_writer->emit("(-1.0 / 0.0)");
                     return;
                 }
-            default: break;
+            default:
+                break;
             }
             break;
         }
 
-    default: break;
+    default:
+        break;
     }
 
     Super::emitSimpleValueImpl(inst);
@@ -1122,13 +1179,23 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
 #if SLANG_PTR_IS_64
-    case kIROp_IntPtrType:  m_writer->emit("int64_t"); return;
-    case kIROp_UIntPtrType: m_writer->emit("uint64_t"); return;
+    case kIROp_IntPtrType:
+        m_writer->emit("int64_t");
+        return;
+    case kIROp_UIntPtrType:
+        m_writer->emit("uint64_t");
+        return;
 #else
-    case kIROp_IntPtrType:  m_writer->emit("int"); return;
-    case kIROp_UIntPtrType: m_writer->emit("uint"); return;
+    case kIROp_IntPtrType:
+        m_writer->emit("int");
+        return;
+    case kIROp_UIntPtrType:
+        m_writer->emit("uint");
+        return;
 #endif
-    case kIROp_StructType: m_writer->emit(getName(type)); return;
+    case kIROp_StructType:
+        m_writer->emit(getName(type));
+        return;
 
     case kIROp_VectorType:
         {
@@ -1146,8 +1213,12 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             {
             case kIROp_IntType:
             case kIROp_UIntType:
-            case kIROp_FloatType: canUseSugar = true; break;
-            default:              canUseSugar = false; break;
+            case kIROp_FloatType:
+                canUseSugar = true;
+                break;
+            default:
+                canUseSugar = false;
+                break;
             }
             if (!as<IRIntLit>(matType->getRowCount()) || !as<IRIntLit>(matType->getColumnCount()))
                 canUseSugar = false;
@@ -1177,8 +1248,12 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
             switch (samplerStateType->getOp())
             {
-            case kIROp_SamplerStateType:           m_writer->emit("SamplerState"); break;
-            case kIROp_SamplerComparisonStateType: m_writer->emit("SamplerComparisonState"); break;
+            case kIROp_SamplerStateType:
+                m_writer->emit("SamplerState");
+                break;
+            case kIROp_SamplerComparisonStateType:
+                m_writer->emit("SamplerComparisonState");
+                break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
@@ -1213,7 +1288,8 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
             return;
         }
-    default: break;
+    default:
+        break;
     }
 
     // TODO: Ideally the following should be data-driven,
@@ -1238,12 +1314,18 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     {
         switch (structuredBufferType->getOp())
         {
-        case kIROp_HLSLStructuredBufferType:   m_writer->emit("StructuredBuffer"); break;
-        case kIROp_HLSLRWStructuredBufferType: m_writer->emit("RWStructuredBuffer"); break;
+        case kIROp_HLSLStructuredBufferType:
+            m_writer->emit("StructuredBuffer");
+            break;
+        case kIROp_HLSLRWStructuredBufferType:
+            m_writer->emit("RWStructuredBuffer");
+            break;
         case kIROp_HLSLRasterizerOrderedStructuredBufferType:
             m_writer->emit("RasterizerOrderedStructuredBuffer");
             break;
-        case kIROp_HLSLAppendStructuredBufferType: m_writer->emit("AppendStructuredBuffer"); break;
+        case kIROp_HLSLAppendStructuredBufferType:
+            m_writer->emit("AppendStructuredBuffer");
+            break;
         case kIROp_HLSLConsumeStructuredBufferType:
             m_writer->emit("ConsumeStructuredBuffer");
             break;
@@ -1263,15 +1345,21 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     {
         switch (type->getOp())
         {
-        case kIROp_HLSLByteAddressBufferType:   m_writer->emit("ByteAddressBuffer"); break;
-        case kIROp_HLSLRWByteAddressBufferType: m_writer->emit("RWByteAddressBuffer"); break;
+        case kIROp_HLSLByteAddressBufferType:
+            m_writer->emit("ByteAddressBuffer");
+            break;
+        case kIROp_HLSLRWByteAddressBufferType:
+            m_writer->emit("RWByteAddressBuffer");
+            break;
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
             m_writer->emit("RasterizerOrderedByteAddressBuffer");
             break;
         case kIROp_RaytracingAccelerationStructureType:
             m_writer->emit("RaytracingAccelerationStructure");
             break;
-        default: SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type"); break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+            break;
         }
 
         return;
@@ -1342,10 +1430,17 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
             {
                 switch (packOffsetDecoration->getComponentOffset()->getValue())
                 {
-                case 0: break;
-                case 1: m_writer->emit(".y"); break;
-                case 2: m_writer->emit(".z"); break;
-                case 3: m_writer->emit(".w"); break;
+                case 0:
+                    break;
+                case 1:
+                    m_writer->emit(".y");
+                    break;
+                case 2:
+                    m_writer->emit(".z");
+                    break;
+                case 3:
+                    m_writer->emit(".w");
+                    break;
                 }
             }
             m_writer->emit(")");
@@ -1407,10 +1502,16 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 {
     switch (attr->getOp())
     {
-    default: Super::_emitPrefixTypeAttr(attr); break;
+    default:
+        Super::_emitPrefixTypeAttr(attr);
+        break;
 
-    case kIROp_UNormAttr: m_writer->emit("unorm "); break;
-    case kIROp_SNormAttr: m_writer->emit("snorm "); break;
+    case kIROp_UNormAttr:
+        m_writer->emit("unorm ");
+        break;
+    case kIROp_SNormAttr:
+        m_writer->emit("snorm ");
+        break;
     }
 }
 
@@ -1426,12 +1527,24 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     {
         switch (decor->getOp())
         {
-        case kIROp_TriangleInputPrimitiveTypeDecoration:    m_writer->emit("triangle "); break;
-        case kIROp_PointInputPrimitiveTypeDecoration:       m_writer->emit("point "); break;
-        case kIROp_LineInputPrimitiveTypeDecoration:        m_writer->emit("line "); break;
-        case kIROp_LineAdjInputPrimitiveTypeDecoration:     m_writer->emit("lineadj "); break;
-        case kIROp_TriangleAdjInputPrimitiveTypeDecoration: m_writer->emit("triangleadj "); break;
-        default:                                            SLANG_ASSERT(!"Unknown primitive type"); break;
+        case kIROp_TriangleInputPrimitiveTypeDecoration:
+            m_writer->emit("triangle ");
+            break;
+        case kIROp_PointInputPrimitiveTypeDecoration:
+            m_writer->emit("point ");
+            break;
+        case kIROp_LineInputPrimitiveTypeDecoration:
+            m_writer->emit("line ");
+            break;
+        case kIROp_LineAdjInputPrimitiveTypeDecoration:
+            m_writer->emit("lineadj ");
+            break;
+        case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
+            m_writer->emit("triangleadj ");
+            break;
+        default:
+            SLANG_ASSERT(!"Unknown primitive type");
+            break;
         }
     }
 
@@ -1447,10 +1560,14 @@ static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode
         return UnownedStringSlice::fromLiteral("nointerpolation");
     case IRInterpolationMode::NoPerspective:
         return UnownedStringSlice::fromLiteral("noperspective");
-    case IRInterpolationMode::Linear:   return UnownedStringSlice::fromLiteral("linear");
-    case IRInterpolationMode::Sample:   return UnownedStringSlice::fromLiteral("sample");
-    case IRInterpolationMode::Centroid: return UnownedStringSlice::fromLiteral("centroid");
-    default:                            return UnownedStringSlice();
+    case IRInterpolationMode::Linear:
+        return UnownedStringSlice::fromLiteral("linear");
+    case IRInterpolationMode::Sample:
+        return UnownedStringSlice::fromLiteral("sample");
+    case IRInterpolationMode::Centroid:
+        return UnownedStringSlice::fromLiteral("centroid");
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -1532,9 +1649,14 @@ void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* type)
     {
         switch (matrixLayout)
         {
-        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR: m_writer->emit("column_major "); break;
-        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:    m_writer->emit("row_major "); break;
-        default:                               break;
+        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+            m_writer->emit("column_major ");
+            break;
+        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+            m_writer->emit("row_major ");
+            break;
+        default:
+            break;
         }
     }
 }
@@ -1604,7 +1726,9 @@ void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest*)
     switch (getTargetProgram()->getOptionSet().getMatrixLayoutMode())
     {
     case kMatrixLayoutMode_RowMajor:
-    default:                         m_writer->emit("#pragma pack_matrix(row_major)\n"); break;
+    default:
+        m_writer->emit("#pragma pack_matrix(row_major)\n");
+        break;
     case kMatrixLayoutMode_ColumnMajor:
         m_writer->emit("#pragma pack_matrix(column_major)\n");
         break;

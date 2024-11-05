@@ -940,7 +940,8 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                     break;
                 }
 
-            default: break;
+            default:
+                break;
             }
 
             // Make sure the access is through the alias (as opposed to some other part of the
@@ -960,7 +961,8 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                         _addAccessInst(cur);
                         break;
                     }
-                default: break;
+                default:
+                    break;
                 }
             }
         }
@@ -1084,7 +1086,9 @@ bool LivenessContext::_isAccessTerminator(IRTerminatorInst* terminator)
         case kIROp_CastIntToPtr:
         case kIROp_CastPtrToInt:
         case kIROp_CastPtrToBool:
-        case kIROp_PtrCast:        val = val->getOperand(0); break;
+        case kIROp_PtrCast:
+            val = val->getOperand(0);
+            break;
         }
 
         // If it *is* the root it's an access

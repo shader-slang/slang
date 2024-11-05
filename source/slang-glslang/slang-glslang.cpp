@@ -104,11 +104,18 @@ struct SPIRVOptimizationDiagnostic
         {
         case SPV_MSG_FATAL:
         case SPV_MSG_INTERNAL_ERROR:
-        case SPV_MSG_ERROR:          out << "error: "; break;
-        case SPV_MSG_WARNING:        out << "warning: "; break;
+        case SPV_MSG_ERROR:
+            out << "error: ";
+            break;
+        case SPV_MSG_WARNING:
+            out << "warning: ";
+            break;
         case SPV_MSG_INFO:
-        case SPV_MSG_DEBUG:          out << "info: "; break;
-        default:                     break;
+        case SPV_MSG_DEBUG:
+            out << "info: ";
+            break;
+        default:
+            break;
         }
         if (source.length())
         {
@@ -149,7 +156,8 @@ static void validationMessageConsumer(
     case SPV_MSG_INFO:
         std::cout << "info: line " << position.index << ": " << message << std::endl;
         break;
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -560,13 +568,20 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
 
     switch (ver)
     {
-    case 0x100: return SPV_ENV_UNIVERSAL_1_0;
-    case 0x101: return SPV_ENV_UNIVERSAL_1_1;
-    case 0x102: return SPV_ENV_UNIVERSAL_1_2;
-    case 0x103: return SPV_ENV_UNIVERSAL_1_3;
-    case 0x104: return SPV_ENV_UNIVERSAL_1_4;
-    case 0x105: return SPV_ENV_UNIVERSAL_1_5;
-    case 0x106: return SPV_ENV_UNIVERSAL_1_6;
+    case 0x100:
+        return SPV_ENV_UNIVERSAL_1_0;
+    case 0x101:
+        return SPV_ENV_UNIVERSAL_1_1;
+    case 0x102:
+        return SPV_ENV_UNIVERSAL_1_2;
+    case 0x103:
+        return SPV_ENV_UNIVERSAL_1_3;
+    case 0x104:
+        return SPV_ENV_UNIVERSAL_1_4;
+    case 0x105:
+        return SPV_ENV_UNIVERSAL_1_5;
+    case 0x106:
+        return SPV_ENV_UNIVERSAL_1_6;
     default:
         {
             if (ver > 0x106)
@@ -589,8 +604,10 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
     EShLanguage glslangStage;
     switch (request.slangStage)
     {
-#define CASE(SP, GL) \
-    case SLANG_STAGE_##SP: glslangStage = EShLang##GL; break
+#define CASE(SP, GL)                \
+    case SLANG_STAGE_##SP:          \
+        glslangStage = EShLang##GL; \
+        break
         CASE(VERTEX, Vertex);
         CASE(FRAGMENT, Fragment);
         CASE(GEOMETRY, Geometry);
@@ -609,7 +626,9 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
         CASE(AMPLIFICATION, Task);
 #undef CASE
 
-    default: dumpDiagnostics(request, "internal error: stage unsupported by glslang\n"); return 1;
+    default:
+        dumpDiagnostics(request, "internal error: stage unsupported by glslang\n");
+        return 1;
     }
 
     spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_2;
@@ -838,13 +857,21 @@ static int _compile(const glslang_CompileRequest_1_2& request)
     int result = 0;
     switch (request.action)
     {
-    default: result = 1; break;
+    default:
+        result = 1;
+        break;
 
-    case GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV: result = glslang_compileGLSLToSPIRV(request); break;
+    case GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV:
+        result = glslang_compileGLSLToSPIRV(request);
+        break;
 
-    case GLSLANG_ACTION_DISSASSEMBLE_SPIRV: result = glslang_dissassembleSPIRV(request); break;
+    case GLSLANG_ACTION_DISSASSEMBLE_SPIRV:
+        result = glslang_dissassembleSPIRV(request);
+        break;
 
-    case GLSLANG_ACTION_OPTIMIZE_SPIRV: result = spirv_Optimize_1_2(request); break;
+    case GLSLANG_ACTION_OPTIMIZE_SPIRV:
+        result = spirv_Optimize_1_2(request);
+        break;
     }
 
     return result;

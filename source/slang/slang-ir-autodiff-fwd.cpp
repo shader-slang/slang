@@ -592,7 +592,8 @@ static bool _isDifferentiableFunc(IRInst* func)
         case kIROp_ForwardDifferentiableDecoration:
         case kIROp_BackwardDerivativeDecoration:
         case kIROp_BackwardDifferentiableDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration: return true;
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            return true;
         }
     }
     return false;
@@ -1000,8 +1001,10 @@ InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
     switch (origInst->getOp())
     {
     case kIROp_FloatLit:
-    case kIROp_IntLit:   return InstPair(origInst, nullptr);
-    case kIROp_VoidLit:  return InstPair(origInst, origInst);
+    case kIROp_IntLit:
+        return InstPair(origInst, nullptr);
+    case kIROp_VoidLit:
+        return InstPair(origInst, origInst);
     }
 
     getSink()->diagnose(
@@ -1869,20 +1872,26 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     // Handle common SSA-style operations
     switch (origInst->getOp())
     {
-    case kIROp_Param: return transcribeParam(builder, as<IRParam>(origInst));
+    case kIROp_Param:
+        return transcribeParam(builder, as<IRParam>(origInst));
 
-    case kIROp_Var: return transcribeVar(builder, as<IRVar>(origInst));
+    case kIROp_Var:
+        return transcribeVar(builder, as<IRVar>(origInst));
 
-    case kIROp_Load: return transcribeLoad(builder, as<IRLoad>(origInst));
+    case kIROp_Load:
+        return transcribeLoad(builder, as<IRLoad>(origInst));
 
-    case kIROp_Store: return transcribeStore(builder, as<IRStore>(origInst));
+    case kIROp_Store:
+        return transcribeStore(builder, as<IRStore>(origInst));
 
-    case kIROp_Return: return transcribeReturn(builder, as<IRReturn>(origInst));
+    case kIROp_Return:
+        return transcribeReturn(builder, as<IRReturn>(origInst));
 
     case kIROp_Add:
     case kIROp_Mul:
     case kIROp_Sub:
-    case kIROp_Div: return transcribeBinaryArith(builder, origInst);
+    case kIROp_Div:
+        return transcribeBinaryArith(builder, origInst);
 
     case kIROp_Less:
     case kIROp_Greater:
@@ -1891,9 +1900,11 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_Geq:
     case kIROp_Leq:
     case kIROp_Eql:
-    case kIROp_Neq:     return transcribeBinaryLogic(builder, origInst);
+    case kIROp_Neq:
+        return transcribeBinaryLogic(builder, origInst);
 
-    case kIROp_Select: return transcribeSelect(builder, origInst);
+    case kIROp_Select:
+        return transcribeSelect(builder, origInst);
 
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
@@ -1905,40 +1916,54 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeTuple:
-    case kIROp_MakeValuePack:        return transcribeConstruct(builder, origInst);
-    case kIROp_MakeStruct:           return transcribeMakeStruct(builder, origInst);
+    case kIROp_MakeValuePack:
+        return transcribeConstruct(builder, origInst);
+    case kIROp_MakeStruct:
+        return transcribeMakeStruct(builder, origInst);
 
     case kIROp_LookupWitness:
         return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
 
-    case kIROp_Call: return transcribeCall(builder, as<IRCall>(origInst));
+    case kIROp_Call:
+        return transcribeCall(builder, as<IRCall>(origInst));
 
-    case kIROp_swizzle: return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
+    case kIROp_swizzle:
+        return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
 
-    case kIROp_Neg: return transcribeByPassthrough(builder, origInst);
+    case kIROp_Neg:
+        return transcribeByPassthrough(builder, origInst);
 
-    case kIROp_UpdateElement: return transcribeUpdateElement(builder, origInst);
+    case kIROp_UpdateElement:
+        return transcribeUpdateElement(builder, origInst);
 
     case kIROp_unconditionalBranch:
-    case kIROp_loop:                return transcribeControlFlow(builder, origInst);
+    case kIROp_loop:
+        return transcribeControlFlow(builder, origInst);
 
     case kIROp_FloatLit:
     case kIROp_IntLit:
-    case kIROp_VoidLit:  return transcribeConst(builder, origInst);
+    case kIROp_VoidLit:
+        return transcribeConst(builder, origInst);
 
-    case kIROp_Specialize: return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
+    case kIROp_Specialize:
+        return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
 
     case kIROp_FieldExtract:
-    case kIROp_FieldAddress: return transcribeFieldExtract(builder, origInst);
+    case kIROp_FieldAddress:
+        return transcribeFieldExtract(builder, origInst);
 
     case kIROp_GetElement:
-    case kIROp_GetElementPtr: return transcribeGetElement(builder, origInst);
+    case kIROp_GetElementPtr:
+        return transcribeGetElement(builder, origInst);
 
-    case kIROp_GetTupleElement: return transcribeGetTupleElement(builder, origInst);
+    case kIROp_GetTupleElement:
+        return transcribeGetTupleElement(builder, origInst);
 
-    case kIROp_ifElse: return transcribeIfElse(builder, as<IRIfElse>(origInst));
+    case kIROp_ifElse:
+        return transcribeIfElse(builder, as<IRIfElse>(origInst));
 
-    case kIROp_Switch: return transcribeSwitch(builder, as<IRSwitch>(origInst));
+    case kIROp_Switch:
+        return transcribeSwitch(builder, as<IRSwitch>(origInst));
 
     case kIROp_MakeDifferentialPairUserCode:
         return transcribeMakeDifferentialPair(
@@ -1949,9 +1974,11 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DifferentialPairGetDifferentialUserCode:
         return transcribeDifferentialPairGetElement(builder, origInst);
 
-    case kIROp_ExtractExistentialValue: return transcribeSingleOperandInst(builder, origInst);
+    case kIROp_ExtractExistentialValue:
+        return transcribeSingleOperandInst(builder, origInst);
 
-    case kIROp_PackAnyValue: return transcribeSingleOperandInst(builder, origInst);
+    case kIROp_PackAnyValue:
+        return transcribeSingleOperandInst(builder, origInst);
 
     case kIROp_MakeExistential:
         return transcribeMakeExistential(builder, as<IRMakeExistential>(origInst));
@@ -1973,11 +2000,14 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_ExtractExistentialWitnessTable:
         return transcribeExtractExistentialWitnessTable(builder, origInst);
 
-    case kIROp_WrapExistential: return transcribeWrapExistential(builder, origInst);
+    case kIROp_WrapExistential:
+        return transcribeWrapExistential(builder, origInst);
 
-    case kIROp_DefaultConstruct: return transcribeDefaultConstruct(builder, origInst);
+    case kIROp_DefaultConstruct:
+        return transcribeDefaultConstruct(builder, origInst);
 
-    case kIROp_undefined: return transcribeUndefined(builder, origInst);
+    case kIROp_undefined:
+        return transcribeUndefined(builder, origInst);
 
     case kIROp_Reinterpret:
         return transcribeReinterpret(builder, origInst);
@@ -2057,9 +2087,11 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         // used by other differentiable instructions. Therefore, we'll create another
         // existential object but with a dzero() for it's value.
         //
-    case kIROp_CreateExistentialObject: return transcribeNonDiffInst(builder, origInst);
+    case kIROp_CreateExistentialObject:
+        return transcribeNonDiffInst(builder, origInst);
 
-    case kIROp_StructKey: return InstPair(origInst, nullptr);
+    case kIROp_StructKey:
+        return InstPair(origInst, nullptr);
 
     case kIROp_Unreachable:
         {

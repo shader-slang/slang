@@ -236,9 +236,11 @@ struct BindingQueryLoweringContext : public WorkListPass
             SLANG_UNEXPECTED("unhandled binding query instruction type");
             UNREACHABLE_RETURN(query);
 
-        case kIROp_GetRegisterIndex: return opaqueValueInfo.registerIndex;
+        case kIROp_GetRegisterIndex:
+            return opaqueValueInfo.registerIndex;
 
-        case kIROp_GetRegisterSpace: return opaqueValueInfo.registerSpace;
+        case kIROp_GetRegisterSpace:
+            return opaqueValueInfo.registerSpace;
         }
     }
 
@@ -309,7 +311,8 @@ struct BindingQueryLoweringContext : public WorkListPass
                     {
                         switch (offsetAttr->getResourceKind())
                         {
-                        default: break;
+                        default:
+                            break;
 
                         case LayoutResourceKind::ShaderResource:
                         case LayoutResourceKind::UnorderedAccess:

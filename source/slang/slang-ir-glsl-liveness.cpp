@@ -39,9 +39,12 @@ struct GLSLLivenessContext
     {
         switch (op)
         {
-        case kIROp_LiveRangeStart: return Kind::Start;
-        case kIROp_LiveRangeEnd:   return Kind::End;
-        default:                   break;
+        case kIROp_LiveRangeStart:
+            return Kind::Start;
+        case kIROp_LiveRangeEnd:
+            return Kind::End;
+        default:
+            break;
         }
         SLANG_UNREACHABLE("Invalid op");
     }

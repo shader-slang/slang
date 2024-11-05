@@ -28,18 +28,27 @@ D3D11_BIND_FLAG calcResourceFlag(ResourceState state)
 {
     switch (state)
     {
-    case ResourceState::VertexBuffer:           return D3D11_BIND_VERTEX_BUFFER;
-    case ResourceState::IndexBuffer:            return D3D11_BIND_INDEX_BUFFER;
-    case ResourceState::ConstantBuffer:         return D3D11_BIND_CONSTANT_BUFFER;
-    case ResourceState::StreamOutput:           return D3D11_BIND_STREAM_OUTPUT;
-    case ResourceState::RenderTarget:           return D3D11_BIND_RENDER_TARGET;
+    case ResourceState::VertexBuffer:
+        return D3D11_BIND_VERTEX_BUFFER;
+    case ResourceState::IndexBuffer:
+        return D3D11_BIND_INDEX_BUFFER;
+    case ResourceState::ConstantBuffer:
+        return D3D11_BIND_CONSTANT_BUFFER;
+    case ResourceState::StreamOutput:
+        return D3D11_BIND_STREAM_OUTPUT;
+    case ResourceState::RenderTarget:
+        return D3D11_BIND_RENDER_TARGET;
     case ResourceState::DepthRead:
-    case ResourceState::DepthWrite:             return D3D11_BIND_DEPTH_STENCIL;
-    case ResourceState::UnorderedAccess:        return D3D11_BIND_UNORDERED_ACCESS;
+    case ResourceState::DepthWrite:
+        return D3D11_BIND_DEPTH_STENCIL;
+    case ResourceState::UnorderedAccess:
+        return D3D11_BIND_UNORDERED_ACCESS;
     case ResourceState::ShaderResource:
     case ResourceState::PixelShaderResource:
-    case ResourceState::NonPixelShaderResource: return D3D11_BIND_SHADER_RESOURCE;
-    default:                                    return D3D11_BIND_FLAG(0);
+    case ResourceState::NonPixelShaderResource:
+        return D3D11_BIND_SHADER_RESOURCE;
+    default:
+        return D3D11_BIND_FLAG(0);
     }
 }
 
@@ -59,10 +68,15 @@ int _calcResourceAccessFlags(MemoryType memType)
 {
     switch (memType)
     {
-    case MemoryType::DeviceLocal: return 0;
-    case MemoryType::ReadBack:    return D3D11_CPU_ACCESS_READ;
-    case MemoryType::Upload:      return D3D11_CPU_ACCESS_WRITE;
-    default:                      assert(!"Invalid flags"); return 0;
+    case MemoryType::DeviceLocal:
+        return 0;
+    case MemoryType::ReadBack:
+        return D3D11_CPU_ACCESS_READ;
+    case MemoryType::Upload:
+        return D3D11_CPU_ACCESS_WRITE;
+    default:
+        assert(!"Invalid flags");
+        return 0;
     }
 }
 
@@ -70,10 +84,12 @@ D3D11_FILTER_TYPE translateFilterMode(TextureFilteringMode mode)
 {
     switch (mode)
     {
-    default: return D3D11_FILTER_TYPE(0);
+    default:
+        return D3D11_FILTER_TYPE(0);
 
-#define CASE(SRC, DST) \
-    case TextureFilteringMode::SRC: return D3D11_FILTER_TYPE_##DST
+#define CASE(SRC, DST)              \
+    case TextureFilteringMode::SRC: \
+        return D3D11_FILTER_TYPE_##DST
 
         CASE(Point, POINT);
         CASE(Linear, LINEAR);
@@ -86,10 +102,12 @@ D3D11_FILTER_REDUCTION_TYPE translateFilterReduction(TextureReductionOp op)
 {
     switch (op)
     {
-    default: return D3D11_FILTER_REDUCTION_TYPE(0);
+    default:
+        return D3D11_FILTER_REDUCTION_TYPE(0);
 
-#define CASE(SRC, DST) \
-    case TextureReductionOp::SRC: return D3D11_FILTER_REDUCTION_TYPE_##DST
+#define CASE(SRC, DST)            \
+    case TextureReductionOp::SRC: \
+        return D3D11_FILTER_REDUCTION_TYPE_##DST
 
         CASE(Average, STANDARD);
         CASE(Comparison, COMPARISON);
@@ -104,10 +122,12 @@ D3D11_TEXTURE_ADDRESS_MODE translateAddressingMode(TextureAddressingMode mode)
 {
     switch (mode)
     {
-    default: return D3D11_TEXTURE_ADDRESS_MODE(0);
+    default:
+        return D3D11_TEXTURE_ADDRESS_MODE(0);
 
-#define CASE(SRC, DST) \
-    case TextureAddressingMode::SRC: return D3D11_TEXTURE_ADDRESS_##DST
+#define CASE(SRC, DST)               \
+    case TextureAddressingMode::SRC: \
+        return D3D11_TEXTURE_ADDRESS_##DST
 
         CASE(Wrap, WRAP);
         CASE(ClampToEdge, CLAMP);
@@ -127,8 +147,9 @@ D3D11_COMPARISON_FUNC translateComparisonFunc(ComparisonFunc func)
         // TODO: need to report failures
         return D3D11_COMPARISON_ALWAYS;
 
-#define CASE(FROM, TO) \
-    case ComparisonFunc::FROM: return D3D11_COMPARISON_##TO
+#define CASE(FROM, TO)         \
+    case ComparisonFunc::FROM: \
+        return D3D11_COMPARISON_##TO
 
         CASE(Never, NEVER);
         CASE(Less, LESS);
@@ -150,8 +171,9 @@ D3D11_STENCIL_OP translateStencilOp(StencilOp op)
         // TODO: need to report failures
         return D3D11_STENCIL_OP_KEEP;
 
-#define CASE(FROM, TO) \
-    case StencilOp::FROM: return D3D11_STENCIL_OP_##TO
+#define CASE(FROM, TO)    \
+    case StencilOp::FROM: \
+        return D3D11_STENCIL_OP_##TO
 
         CASE(Keep, KEEP);
         CASE(Zero, ZERO);
@@ -173,8 +195,10 @@ D3D11_FILL_MODE translateFillMode(FillMode mode)
         // TODO: need to report failures
         return D3D11_FILL_SOLID;
 
-    case FillMode::Solid:     return D3D11_FILL_SOLID;
-    case FillMode::Wireframe: return D3D11_FILL_WIREFRAME;
+    case FillMode::Solid:
+        return D3D11_FILL_SOLID;
+    case FillMode::Wireframe:
+        return D3D11_FILL_WIREFRAME;
     }
 }
 
@@ -186,9 +210,12 @@ D3D11_CULL_MODE translateCullMode(CullMode mode)
         // TODO: need to report failures
         return D3D11_CULL_NONE;
 
-    case CullMode::None:  return D3D11_CULL_NONE;
-    case CullMode::Back:  return D3D11_CULL_BACK;
-    case CullMode::Front: return D3D11_CULL_FRONT;
+    case CullMode::None:
+        return D3D11_CULL_NONE;
+    case CullMode::Back:
+        return D3D11_CULL_BACK;
+    case CullMode::Front:
+        return D3D11_CULL_FRONT;
     }
 }
 
@@ -208,10 +235,13 @@ D3D11_BLEND_OP translateBlendOp(BlendOp op)
 {
     switch (op)
     {
-    default: assert(!"unimplemented"); return (D3D11_BLEND_OP)-1;
+    default:
+        assert(!"unimplemented");
+        return (D3D11_BLEND_OP)-1;
 
-#define CASE(FROM, TO) \
-    case BlendOp::FROM: return D3D11_BLEND_OP_##TO
+#define CASE(FROM, TO)  \
+    case BlendOp::FROM: \
+        return D3D11_BLEND_OP_##TO
         CASE(Add, ADD);
         CASE(Subtract, SUBTRACT);
         CASE(ReverseSubtract, REV_SUBTRACT);
@@ -225,10 +255,13 @@ D3D11_BLEND translateBlendFactor(BlendFactor factor)
 {
     switch (factor)
     {
-    default: assert(!"unimplemented"); return (D3D11_BLEND)-1;
+    default:
+        assert(!"unimplemented");
+        return (D3D11_BLEND)-1;
 
-#define CASE(FROM, TO) \
-    case BlendFactor::FROM: return D3D11_BLEND_##TO
+#define CASE(FROM, TO)      \
+    case BlendFactor::FROM: \
+        return D3D11_BLEND_##TO
         CASE(Zero, ZERO);
         CASE(One, ONE);
         CASE(SrcColor, SRC_COLOR);
@@ -293,7 +326,8 @@ void initSrvDesc(
         case IResource::Type::Texture3D:
             descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
             break;
-        default: assert(!"Unknown dimension");
+        default:
+            assert(!"Unknown dimension");
         }
 
         descOut.Texture2D.MipLevels = textureDesc.numMipLevels;
@@ -334,7 +368,8 @@ void initSrvDesc(
             descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
             break;
 
-        default: assert(!"Unknown dimension");
+        default:
+            assert(!"Unknown dimension");
         }
 
         descOut.Texture2DArray.ArraySize = std::max(textureDesc.size.depth, arraySize);

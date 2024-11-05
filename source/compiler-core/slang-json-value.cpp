@@ -66,15 +66,19 @@ bool JSONValue::asBool() const
 {
     switch (type)
     {
-    case JSONValue::Type::True: return true;
+    case JSONValue::Type::True:
+        return true;
     case JSONValue::Type::False:
     case JSONValue::Type::Null:
         {
             return false;
         }
-    case JSONValue::Type::IntegerValue: return intValue != 0;
-    case JSONValue::Type::FloatValue:   return floatValue != 0;
-    default:                            break;
+    case JSONValue::Type::IntegerValue:
+        return intValue != 0;
+    case JSONValue::Type::FloatValue:
+        return floatValue != 0;
+    default:
+        break;
     }
 
     if (isLexeme(type))
@@ -93,14 +97,18 @@ int64_t JSONValue::asInteger() const
 {
     switch (type)
     {
-    case JSONValue::Type::True: return 1;
+    case JSONValue::Type::True:
+        return 1;
     case JSONValue::Type::False:
     case JSONValue::Type::Null:
         {
             return 0;
         }
-    case JSONValue::Type::IntegerValue: return intValue;
-    case JSONValue::Type::FloatValue:   return int64_t(floatValue); break;
+    case JSONValue::Type::IntegerValue:
+        return intValue;
+    case JSONValue::Type::FloatValue:
+        return int64_t(floatValue);
+        break;
     }
 
     if (isLexeme(type))
@@ -119,15 +127,19 @@ double JSONValue::asFloat() const
 {
     switch (type)
     {
-    case JSONValue::Type::True: return 1.0;
+    case JSONValue::Type::True:
+        return 1.0;
     case JSONValue::Type::False:
     case JSONValue::Type::Null:
         {
             return 0.0;
         }
-    case JSONValue::Type::IntegerValue: return double(intValue);
-    case JSONValue::Type::FloatValue:   return floatValue;
-    default:                            break;
+    case JSONValue::Type::IntegerValue:
+        return double(intValue);
+    case JSONValue::Type::FloatValue:
+        return floatValue;
+    default:
+        break;
     }
 
     if (isLexeme(type))
@@ -261,8 +273,10 @@ bool PersistentJSONValue::operator==(const ThisType& rhs) const
             // The type is all that needs to be checked
             return true;
         }
-    case Type::IntegerValue: return intValue == rhs.intValue;
-    case Type::FloatValue:   return floatValue == rhs.floatValue;
+    case Type::IntegerValue:
+        return intValue == rhs.intValue;
+    case Type::FloatValue:
+        return floatValue == rhs.floatValue;
     case Type::StringRepresentation:
         {
             if (stringRep == rhs.stringRep)
@@ -273,7 +287,8 @@ bool PersistentJSONValue::operator==(const ThisType& rhs) const
             auto rhsSlice = StringRepresentation::asSlice(rhs.stringRep);
             return thisSlice == rhsSlice;
         }
-    default: break;
+    default:
+        break;
     }
 
     SLANG_ASSERT(!"Not valid Persistent type");
@@ -577,7 +592,8 @@ UnownedStringSlice JSONContainer::getString(const JSONValue& in)
         {
             return UnownedStringSlice();
         }
-    default: break;
+    default:
+        break;
     }
 
     SLANG_ASSERT(!"Not a string type");
@@ -635,9 +651,12 @@ bool JSONContainer::asBool(const JSONValue& value)
 {
     switch (value.type)
     {
-    case JSONValue::Type::IntegerLexeme: return asInteger(value) != 0;
-    case JSONValue::Type::FloatLexeme:   return asFloat(value) != 0.0;
-    default:                             return value.asBool();
+    case JSONValue::Type::IntegerLexeme:
+        return asInteger(value) != 0;
+    case JSONValue::Type::FloatLexeme:
+        return asFloat(value) != 0.0;
+    default:
+        return value.asBool();
     }
 }
 
@@ -665,7 +684,8 @@ JSONValue JSONContainer::asValue(const JSONValue& inValue)
             value.type = JSONValue::Type::FloatValue;
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     return value;
@@ -711,7 +731,8 @@ void JSONContainer::clearSourceManagerDependency(JSONValue* ioValues, Index valu
                 }
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -734,8 +755,10 @@ int64_t JSONContainer::asInteger(const JSONValue& value)
             SLANG_ASSERT(!"Couldn't convert int");
             return 0;
         }
-    case JSONValue::Type::FloatLexeme: return int64_t(asFloat(value));
-    default:                           return value.asInteger();
+    case JSONValue::Type::FloatLexeme:
+        return int64_t(asFloat(value));
+    default:
+        return value.asInteger();
     }
 }
 
@@ -743,7 +766,8 @@ double JSONContainer::asFloat(const JSONValue& value)
 {
     switch (value.type)
     {
-    case JSONValue::Type::IntegerLexeme: return double(asInteger(value));
+    case JSONValue::Type::IntegerLexeme:
+        return double(asInteger(value));
     case JSONValue::Type::FloatLexeme:
         {
             UnownedStringSlice slice = getLexeme(value);
@@ -755,7 +779,8 @@ double JSONContainer::asFloat(const JSONValue& value)
             SLANG_ASSERT(!"Couldn't convert double");
             return 0.0;
         }
-    default: return value.asFloat();
+    default:
+        return value.asFloat();
     }
 }
 
@@ -963,7 +988,8 @@ void JSONContainer::_destroyRange(Index rangeIndex)
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     range.type = Range::Type::Destroyed;
@@ -1148,15 +1174,18 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
         {
         default:
         // Invalid are never equal
-        case JSONValue::Type::Invalid: return false;
+        case JSONValue::Type::Invalid:
+            return false;
         case JSONValue::Type::True:
         case JSONValue::Type::False:
         case JSONValue::Type::Null:
             {
                 return true;
             }
-        case JSONValue::Type::IntegerLexeme: return asInteger(a) == asInteger(b);
-        case JSONValue::Type::FloatLexeme:   return asFloat(a) == asFloat(b);
+        case JSONValue::Type::IntegerLexeme:
+            return asInteger(a) == asInteger(b);
+        case JSONValue::Type::FloatLexeme:
+            return asFloat(a) == asFloat(b);
         case JSONValue::Type::StringLexeme:
             {
                 // If the lexemes are equal they are equal
@@ -1165,9 +1194,12 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
                 // Else we want to decode the string to be sure if they are equal.
                 return lexemeA == lexemeB || getStringKey(a) == getStringKey(b);
             }
-        case JSONValue::Type::IntegerValue: return a.intValue == b.intValue;
-        case JSONValue::Type::FloatValue:   return a.floatValue == b.floatValue;
-        case JSONValue::Type::StringValue:  return a.stringKey == b.stringKey;
+        case JSONValue::Type::IntegerValue:
+            return a.intValue == b.intValue;
+        case JSONValue::Type::FloatValue:
+            return a.floatValue == b.floatValue;
+        case JSONValue::Type::StringValue:
+            return a.stringKey == b.stringKey;
         case JSONValue::Type::StringRepresentation:
             {
                 return a.stringRep == b.stringRep || StringRepresentation::asSlice(a.stringRep) ==
@@ -1208,10 +1240,14 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
     {
         switch (kind)
         {
-        case JSONValue::Kind::String:  return getStringKey(a) == getStringKey(b);
-        case JSONValue::Kind::Integer: return asInteger(a) == asInteger(b);
-        case JSONValue::Kind::Float:   return asFloat(a) == asFloat(b);
-        default:                       break;
+        case JSONValue::Kind::String:
+            return getStringKey(a) == getStringKey(b);
+        case JSONValue::Kind::Integer:
+            return asInteger(a) == asInteger(b);
+        case JSONValue::Kind::Float:
+            return asFloat(a) == asFloat(b);
+        default:
+            break;
         }
     }
 
@@ -1224,9 +1260,12 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
 
     switch (value.type)
     {
-    case Type::True:  return listener->addBoolValue(true, value.loc);
-    case Type::False: return listener->addBoolValue(false, value.loc);
-    case Type::Null:  return listener->addNullValue(value.loc);
+    case Type::True:
+        return listener->addBoolValue(true, value.loc);
+    case Type::False:
+        return listener->addBoolValue(false, value.loc);
+    case Type::Null:
+        return listener->addNullValue(value.loc);
 
     case Type::StringLexeme:
         return listener->addLexemeValue(JSONTokenType::StringLiteral, getLexeme(value), value.loc);
@@ -1235,8 +1274,10 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
     case Type::FloatLexeme:
         return listener->addLexemeValue(JSONTokenType::FloatLiteral, getLexeme(value), value.loc);
 
-    case Type::IntegerValue: return listener->addIntegerValue(value.intValue, value.loc);
-    case Type::FloatValue:   return listener->addFloatValue(value.floatValue, value.loc);
+    case Type::IntegerValue:
+        return listener->addIntegerValue(value.intValue, value.loc);
+    case Type::FloatValue:
+        return listener->addFloatValue(value.floatValue, value.loc);
     case Type::StringValue:
         {
             const auto slice = getStringFromKey(value.stringKey);
@@ -1471,9 +1512,12 @@ void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& v
 {
     switch (type)
     {
-    case JSONTokenType::True:  return _add(JSONValue::makeBool(true, loc));
-    case JSONTokenType::False: return _add(JSONValue::makeBool(false, loc));
-    case JSONTokenType::Null:  return _add(JSONValue::makeNull(loc));
+    case JSONTokenType::True:
+        return _add(JSONValue::makeBool(true, loc));
+    case JSONTokenType::False:
+        return _add(JSONValue::makeBool(false, loc));
+    case JSONTokenType::Null:
+        return _add(JSONValue::makeNull(loc));
 
     case JSONTokenType::IntegerLiteral:
         {

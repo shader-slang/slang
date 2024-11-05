@@ -45,9 +45,11 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
         //
         switch (entryPointDecoration->getProfile().getStage())
         {
-        default: break;
+        default:
+            break;
 
-        case Stage::Compute: return;
+        case Stage::Compute:
+            return;
         }
 
         // We expect all entry points to have explicit layout information attached.

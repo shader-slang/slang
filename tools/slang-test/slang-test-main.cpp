@@ -190,9 +190,12 @@ void skipHorizontalSpace(char const** ioCursor)
         switch (*cursor)
         {
         case ' ':
-        case '\t': cursor++; continue;
+        case '\t':
+            cursor++;
+            continue;
 
-        default: break;
+        default:
+            break;
         }
 
         break;
@@ -208,7 +211,9 @@ void skipToEndOfLine(char const** ioCursor)
         int c = *cursor;
         switch (c)
         {
-        default: cursor++; continue;
+        default:
+            cursor++;
+            continue;
 
         case '\r':
         case '\n':
@@ -221,7 +226,9 @@ void skipToEndOfLine(char const** ioCursor)
                 }
             }
             [[fallthrough]];
-        case 0: *ioCursor = cursor; return;
+        case 0:
+            *ioCursor = cursor;
+            return;
         }
     }
 }
@@ -256,7 +263,8 @@ static bool _isEndOfLineOrParens(char c)
         {
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -409,14 +417,18 @@ static SlangResult _gatherTestOptions(
     {
         switch (*cursor)
         {
-        default: cursor++; continue;
+        default:
+            cursor++;
+            continue;
 
         case '(':
-        case ':': break;
+        case ':':
+            break;
 
         case 0:
         case '\r':
-        case '\n': return SLANG_FAIL;
+        case '\n':
+            return SLANG_FAIL;
         }
 
         break;
@@ -456,7 +468,8 @@ static SlangResult _gatherTestOptions(
             *ioCursor = cursor;
             return SLANG_OK;
 
-        default: break;
+        default:
+            break;
         }
 
         // Let's try to read one option
@@ -1408,7 +1421,8 @@ ToolReturnCode spawnAndWait(
                 spawnAndWaitTestServer(context, finalSpawnType, testPath, cmdLine, outExeRes);
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (SLANG_FAILED(spawnResult))
@@ -1540,9 +1554,12 @@ TestResult asTestResult(ToolReturnCode code)
 {
     switch (code)
     {
-    case ToolReturnCode::Success: return TestResult::Pass;
-    case ToolReturnCode::Ignored: return TestResult::Ignored;
-    default:                      return TestResult::Fail;
+    case ToolReturnCode::Success:
+        return TestResult::Pass;
+    case ToolReturnCode::Ignored:
+        return TestResult::Ignored;
+    default:
+        return TestResult::Fail;
     }
 }
 
@@ -1630,7 +1647,8 @@ static bool _areResultsEqual(TestOptions::Type type, const String& a, const Stri
     {
     case TestOptions::Type::Diagnostic:
         return _areDiagnosticsEqual(a.getUnownedSlice(), b.getUnownedSlice());
-    case TestOptions::Type::Normal: return a == b;
+    case TestOptions::Type::Normal:
+        return a == b;
     default:
         {
             SLANG_ASSERT(!"Unknown test type");
@@ -4005,7 +4023,8 @@ static void _calcSynthesizedTests(
                     {
                         isCrossCompile = false;
                     }
-                default: break;
+                default:
+                    break;
                 }
 
                 if (!isCrossCompile)
@@ -4424,7 +4443,9 @@ void runTestsInDirectory(TestContext* context, String directoryPath)
     switch (context->options.defaultSpawnType)
     {
     case SpawnType::UseFullyIsolatedTestServer:
-    case SpawnType::UseTestServer:              useMultiThread = true; break;
+    case SpawnType::UseTestServer:
+        useMultiThread = true;
+        break;
     }
     if (context->options.serverCount == 1)
     {
@@ -4472,9 +4493,12 @@ static TestResult _asTestResult(ToolReturnCode retCode)
 {
     switch (retCode)
     {
-    default:                      return TestResult::Fail;
-    case ToolReturnCode::Success: return TestResult::Pass;
-    case ToolReturnCode::Ignored: return TestResult::Ignored;
+    default:
+        return TestResult::Fail;
+    case ToolReturnCode::Success:
+        return TestResult::Pass;
+    case ToolReturnCode::Ignored:
+        return TestResult::Ignored;
     }
 }
 

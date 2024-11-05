@@ -141,26 +141,56 @@ void emitBaseType(ManglingContext* context, BaseType baseType)
 {
     switch (baseType)
     {
-    case BaseType::Void:    emitRaw(context, "V"); break;
-    case BaseType::Bool:    emitRaw(context, "b"); break;
-    case BaseType::Int8:    emitRaw(context, "c"); break;
-    case BaseType::Int16:   emitRaw(context, "s"); break;
-    case BaseType::Int:     emitRaw(context, "i"); break;
-    case BaseType::Int64:   emitRaw(context, "I"); break;
-    case BaseType::UInt8:   emitRaw(context, "C"); break;
-    case BaseType::UInt16:  emitRaw(context, "S"); break;
-    case BaseType::UInt:    emitRaw(context, "u"); break;
-    case BaseType::UInt64:  emitRaw(context, "U"); break;
-    case BaseType::Half:    emitRaw(context, "h"); break;
-    case BaseType::Float:   emitRaw(context, "f"); break;
-    case BaseType::Double:  emitRaw(context, "d"); break;
-    case BaseType::UIntPtr: emitRaw(context, "up"); break;
+    case BaseType::Void:
+        emitRaw(context, "V");
+        break;
+    case BaseType::Bool:
+        emitRaw(context, "b");
+        break;
+    case BaseType::Int8:
+        emitRaw(context, "c");
+        break;
+    case BaseType::Int16:
+        emitRaw(context, "s");
+        break;
+    case BaseType::Int:
+        emitRaw(context, "i");
+        break;
+    case BaseType::Int64:
+        emitRaw(context, "I");
+        break;
+    case BaseType::UInt8:
+        emitRaw(context, "C");
+        break;
+    case BaseType::UInt16:
+        emitRaw(context, "S");
+        break;
+    case BaseType::UInt:
+        emitRaw(context, "u");
+        break;
+    case BaseType::UInt64:
+        emitRaw(context, "U");
+        break;
+    case BaseType::Half:
+        emitRaw(context, "h");
+        break;
+    case BaseType::Float:
+        emitRaw(context, "f");
+        break;
+    case BaseType::Double:
+        emitRaw(context, "d");
+        break;
+    case BaseType::UIntPtr:
+        emitRaw(context, "up");
+        break;
     case BaseType::IntPtr:
         emitRaw(context, "ip");
         break;
         break;
 
-    default: SLANG_UNEXPECTED("unimplemented case in base type mangling"); break;
+    default:
+        SLANG_UNEXPECTED("unimplemented case in base type mangling");
+        break;
     }
 }
 
@@ -567,11 +597,21 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             ParameterDirection paramDirection = getParameterDirection(paramDeclRef.getDecl());
             switch (paramDirection)
             {
-            case kParameterDirection_Ref:      emitRaw(context, "r_"); break;
-            case kParameterDirection_ConstRef: emitRaw(context, "c_"); break;
-            case kParameterDirection_Out:      emitRaw(context, "o_"); break;
-            case kParameterDirection_InOut:    emitRaw(context, "io_"); break;
-            case kParameterDirection_In:       emitRaw(context, "i_"); break;
+            case kParameterDirection_Ref:
+                emitRaw(context, "r_");
+                break;
+            case kParameterDirection_ConstRef:
+                emitRaw(context, "c_");
+                break;
+            case kParameterDirection_Out:
+                emitRaw(context, "o_");
+                break;
+            case kParameterDirection_InOut:
+                emitRaw(context, "io_");
+                break;
+            case kParameterDirection_In:
+                emitRaw(context, "i_");
+                break;
             default:
                 StringBuilder errMsg;
                 errMsg << "Unknown parameter direction: " << paramDirection;

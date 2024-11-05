@@ -48,7 +48,8 @@ struct DllExportContext
                     candidates.add(Candidate{as<IRFunc>(childFunc), dllExportDecoration});
                 }
                 break;
-            default: break;
+            default:
+                break;
             }
         }
 

@@ -12,10 +12,14 @@ namespace Slang
 {
     switch (res)
     {
-    case SLANG_OK:              return ToolReturnCode::Success;
-    case SLANG_E_INTERNAL_FAIL: return ToolReturnCode::CompilationFailed;
-    case SLANG_FAIL:            return ToolReturnCode::Failed;
-    case SLANG_E_NOT_AVAILABLE: return ToolReturnCode::Ignored;
+    case SLANG_OK:
+        return ToolReturnCode::Success;
+    case SLANG_E_INTERNAL_FAIL:
+        return ToolReturnCode::CompilationFailed;
+    case SLANG_FAIL:
+        return ToolReturnCode::Failed;
+    case SLANG_E_NOT_AVAILABLE:
+        return ToolReturnCode::Ignored;
     default:
         {
             return (SLANG_SUCCEEDED(res)) ? ToolReturnCode::Success : ToolReturnCode::Failed;

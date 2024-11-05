@@ -289,7 +289,8 @@ SlangResult ZipFileSystemImpl::_copyToAndInitWriter(mz_zip_archive& outWriter)
             return SLANG_OK;
         }
 
-    default: break;
+    default:
+        break;
     }
     return SLANG_FAIL;
 }
@@ -316,7 +317,8 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                     _initReadWrite(m_archive);
                     break;
                 }
-            default: break;
+            default:
+                break;
             }
             break;
         }
@@ -412,7 +414,8 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                     }
                     break;
                 }
-            default: break;
+            default:
+                break;
             }
         }
     }
@@ -581,7 +584,8 @@ SlangResult ZipFileSystemImpl::getPath(PathKind pathKind, const char* path, ISla
             *outPath = StringUtil::createStringBlob(Path::simplify(path)).detach();
             return SLANG_OK;
         }
-    default: break;
+    default:
+        break;
     }
 
     return SLANG_E_NOT_AVAILABLE;
@@ -856,9 +860,15 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
 {
     switch (style.m_type)
     {
-    case CompressionStyle::Type::BestSpeed:       m_compressionLevel = MZ_BEST_SPEED; break;
-    case CompressionStyle::Type::BestCompression: m_compressionLevel = MZ_BEST_COMPRESSION; break;
-    case CompressionStyle::Type::Default:         m_compressionLevel = MZ_DEFAULT_LEVEL; break;
+    case CompressionStyle::Type::BestSpeed:
+        m_compressionLevel = MZ_BEST_SPEED;
+        break;
+    case CompressionStyle::Type::BestCompression:
+        m_compressionLevel = MZ_BEST_COMPRESSION;
+        break;
+    case CompressionStyle::Type::Default:
+        m_compressionLevel = MZ_DEFAULT_LEVEL;
+        break;
     case CompressionStyle::Type::Level:
         {
             int level = int(style.m_level * 10.0f + 0.5);

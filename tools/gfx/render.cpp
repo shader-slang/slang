@@ -221,8 +221,10 @@ extern "C"
         case Format::BC6H_UF16:
         case Format::BC6H_SF16:
         case Format::BC7_UNORM:
-        case Format::BC7_UNORM_SRGB: return true;
-        default:                     return false;
+        case Format::BC7_UNORM_SRGB:
+            return true;
+        default:
+            return false;
         }
     }
 
@@ -241,8 +243,10 @@ extern "C"
         case Format::R8G8_TYPELESS:
         case Format::R8_TYPELESS:
         case Format::B8G8R8A8_TYPELESS:
-        case Format::R10G10B10A2_TYPELESS:  return true;
-        default:                            return false;
+        case Format::R10G10B10A2_TYPELESS:
+            return true;
+        default:
+            return false;
         }
     }
 
@@ -260,23 +264,38 @@ extern "C"
         switch (type)
         {
 #if SLANG_ENABLE_DIRECTX
-        case DeviceType::DirectX11: SLANG_RETURN_ON_FAIL(getD3D11Adapters(adapters)); break;
-        case DeviceType::DirectX12: SLANG_RETURN_ON_FAIL(getD3D12Adapters(adapters)); break;
+        case DeviceType::DirectX11:
+            SLANG_RETURN_ON_FAIL(getD3D11Adapters(adapters));
+            break;
+        case DeviceType::DirectX12:
+            SLANG_RETURN_ON_FAIL(getD3D12Adapters(adapters));
+            break;
 #endif
 #if SLANG_WINDOWS_FAMILY
-        case DeviceType::OpenGl: return SLANG_E_NOT_IMPLEMENTED;
+        case DeviceType::OpenGl:
+            return SLANG_E_NOT_IMPLEMENTED;
 #endif
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
         // Assume no Vulkan or CUDA on MacOS or Cygwin
-        case DeviceType::Vulkan: SLANG_RETURN_ON_FAIL(getVKAdapters(adapters)); break;
-        case DeviceType::CUDA:   SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters)); break;
+        case DeviceType::Vulkan:
+            SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
+            break;
+        case DeviceType::CUDA:
+            SLANG_RETURN_ON_FAIL(getCUDAAdapters(adapters));
+            break;
 #endif
 #if SLANG_APPLE_FAMILY
-        case DeviceType::Vulkan: SLANG_RETURN_ON_FAIL(getVKAdapters(adapters)); break;
-        case DeviceType::Metal:  SLANG_RETURN_ON_FAIL(getMetalAdapters(adapters)); break;
+        case DeviceType::Vulkan:
+            SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
+            break;
+        case DeviceType::Metal:
+            SLANG_RETURN_ON_FAIL(getMetalAdapters(adapters));
+            break;
 #endif
-        case DeviceType::CPU: return SLANG_E_NOT_IMPLEMENTED;
-        default:              return SLANG_E_INVALID_ARG;
+        case DeviceType::CPU:
+            return SLANG_E_NOT_IMPLEMENTED;
+        default:
+            return SLANG_E_INVALID_ARG;
         }
 
         auto adaptersBlob =
@@ -372,7 +391,8 @@ extern "C"
             }
             break;
 
-        default: return SLANG_FAIL;
+        default:
+            return SLANG_FAIL;
         }
     }
 
@@ -417,16 +437,26 @@ extern "C"
     {
         switch (type)
         {
-        case gfx::DeviceType::Unknown:   return "Unknown";
-        case gfx::DeviceType::Default:   return "Default";
-        case gfx::DeviceType::DirectX11: return "DirectX11";
-        case gfx::DeviceType::DirectX12: return "DirectX12";
-        case gfx::DeviceType::OpenGl:    return "OpenGL";
-        case gfx::DeviceType::Vulkan:    return "Vulkan";
-        case gfx::DeviceType::Metal:     return "Metal";
-        case gfx::DeviceType::CPU:       return "CPU";
-        case gfx::DeviceType::CUDA:      return "CUDA";
-        default:                         return "?";
+        case gfx::DeviceType::Unknown:
+            return "Unknown";
+        case gfx::DeviceType::Default:
+            return "Default";
+        case gfx::DeviceType::DirectX11:
+            return "DirectX11";
+        case gfx::DeviceType::DirectX12:
+            return "DirectX12";
+        case gfx::DeviceType::OpenGl:
+            return "OpenGL";
+        case gfx::DeviceType::Vulkan:
+            return "Vulkan";
+        case gfx::DeviceType::Metal:
+            return "Metal";
+        case gfx::DeviceType::CPU:
+            return "CPU";
+        case gfx::DeviceType::CUDA:
+            return "CUDA";
+        default:
+            return "?";
         }
     }
 

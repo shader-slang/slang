@@ -616,7 +616,9 @@ public:
                     (Format)cmd.operands[1],
                     (UInt)cmd.operands[2]);
                 break;
-            case CommandName::Draw: m_renderer->draw(cmd.operands[0], cmd.operands[1]); break;
+            case CommandName::Draw:
+                m_renderer->draw(cmd.operands[0], cmd.operands[1]);
+                break;
             case CommandName::DrawIndexed:
                 m_renderer->drawIndexed(cmd.operands[0], cmd.operands[1], cmd.operands[2]);
                 break;
@@ -664,7 +666,9 @@ public:
                     m_writer.getObject<QueryPoolBase>(cmd.operands[0]),
                     (GfxIndex)cmd.operands[1]);
                 break;
-            default: assert(!"unknown command"); break;
+            default:
+                assert(!"unknown command");
+                break;
             }
         }
         m_writer.clear();
