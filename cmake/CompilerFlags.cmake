@@ -16,9 +16,15 @@ function(add_supported_cxx_flags target)
     endif()
 
     foreach(flag ${flags})
+message(STATUS "Flag Initial ${flag}")
         if(NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+message(STATUS "Non-MSVC Flag ${flag}")
             string(REGEX REPLACE "/EHa" "" flag_to_test "${flag}")
+        else()
+message(STATUS "MSVC Flag ${flag}")
+            set(flag_to_test "${flag}")
         endif()
+message(STATUS "Flag_to_test ${flag_to_test}")
         # remove the `no-` prefix from warnings because gcc doesn't treat it as an
         # error on its own
         string(
