@@ -170,8 +170,10 @@ struct WrapStructuredBuffersContext
                         case kIROp_StructuredBufferLoadStatus:
                         case kIROp_RWStructuredBufferStore:
                         case kIROp_RWStructuredBufferLoadStatus:
-                        case kIROp_RWStructuredBufferGetElementPtr: break;
-                        default:                                    return;
+                        case kIROp_RWStructuredBufferGetElementPtr:
+                            break;
+                        default:
+                            return;
                         }
 
                         builder->setInsertAfter(user);

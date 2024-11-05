@@ -9,9 +9,14 @@ static ICompressionSystem* _getCompressionSystem(CompressionSystemType type)
 {
     switch (type)
     {
-    case CompressionSystemType::Deflate: return DeflateCompressionSystem::getSingleton(); break;
-    case CompressionSystemType::LZ4:     return LZ4CompressionSystem::getSingleton(); break;
-    default:                             break;
+    case CompressionSystemType::Deflate:
+        return DeflateCompressionSystem::getSingleton();
+        break;
+    case CompressionSystemType::LZ4:
+        return LZ4CompressionSystem::getSingleton();
+        break;
+    default:
+        break;
     }
     return nullptr;
 }

@@ -12,11 +12,14 @@ static bool _shouldStripInst(IRInst* inst, IRStripOptions const& options)
 {
     switch (inst->getOp())
     {
-    default: return false;
+    default:
+        return false;
 
-    case kIROp_HighLevelDeclDecoration: return true;
+    case kIROp_HighLevelDeclDecoration:
+        return true;
 
-    case kIROp_NameHintDecoration: return options.shouldStripNameHints;
+    case kIROp_NameHintDecoration:
+        return options.shouldStripNameHints;
     }
 }
 

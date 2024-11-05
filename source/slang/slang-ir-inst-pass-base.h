@@ -136,8 +136,10 @@ public:
                 {
                 case kIROp_GenericSpecializationDictionary:
                 case kIROp_ExistentialFuncSpecializationDictionary:
-                case kIROp_ExistentialTypeSpecializationDictionary: continue;
-                default:                                            break;
+                case kIROp_ExistentialTypeSpecializationDictionary:
+                    continue;
+                default:
+                    break;
                 }
                 SLANG_ASSERT(child);
                 if (shouldInstBeLiveIfParentIsLive(child, IRDeadCodeEliminationOptions()))

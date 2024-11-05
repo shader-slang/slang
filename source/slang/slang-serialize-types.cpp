@@ -287,11 +287,13 @@ struct ByteReader
 /* static */ UnownedStringSlice SerialParseUtil::getText(SerialCompressionType type)
 {
 #define SLANG_SERIAL_BINARY_CASE(type, name) \
-    case SerialCompressionType::type: return UnownedStringSlice::fromLiteral(#name);
+    case SerialCompressionType::type:        \
+        return UnownedStringSlice::fromLiteral(#name);
     switch (type)
     {
         SLANG_SERIAL_BINARY_COMPRESSION_TYPE(SLANG_SERIAL_BINARY_CASE)
-    default: break;
+    default:
+        break;
     }
     SLANG_ASSERT(!"Unknown compression type");
     return UnownedStringSlice::fromLiteral("unknown");

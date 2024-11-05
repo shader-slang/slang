@@ -142,13 +142,21 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         StringBuilder nameSb;
         switch (inst->getOp())
         {
-        case kIROp_HLSLRWStructuredBufferType:      nameSb << "RWStructuredBuffer"; break;
-        case kIROp_HLSLAppendStructuredBufferType:  nameSb << "AppendStructuredBuffer"; break;
-        case kIROp_HLSLConsumeStructuredBufferType: nameSb << "ConsumeStructuredBuffer"; break;
+        case kIROp_HLSLRWStructuredBufferType:
+            nameSb << "RWStructuredBuffer";
+            break;
+        case kIROp_HLSLAppendStructuredBufferType:
+            nameSb << "AppendStructuredBuffer";
+            break;
+        case kIROp_HLSLConsumeStructuredBufferType:
+            nameSb << "ConsumeStructuredBuffer";
+            break;
         case kIROp_HLSLRasterizerOrderedStructuredBufferType:
             nameSb << "RasterizerOrderedStructuredBuffer";
             break;
-        default: nameSb << "StructuredBuffer"; break;
+        default:
+            nameSb << "StructuredBuffer";
+            break;
         }
         builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
         if (m_sharedContext->isSpirv14OrLater())
@@ -347,8 +355,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
         case kIROp_RaytracingAccelerationStructureType:
         case kIROp_GLSLAtomicUintType:
-        case kIROp_RayQueryType:                        return true;
-        default:                                        return false;
+        case kIROp_RayQueryType:
+            return true;
+        default:
+            return false;
         }
     }
 
@@ -585,9 +595,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
         case LayoutResourceKind::Uniform:
         case LayoutResourceKind::DescriptorTableSlot:
-        case LayoutResourceKind::ConstantBuffer:      addressSpace = AddressSpace::Uniform; break;
-        case LayoutResourceKind::VaryingInput:        addressSpace = AddressSpace::Input; break;
-        case LayoutResourceKind::VaryingOutput:       addressSpace = AddressSpace::Output; break;
+        case LayoutResourceKind::ConstantBuffer:
+            addressSpace = AddressSpace::Uniform;
+            break;
+        case LayoutResourceKind::VaryingInput:
+            addressSpace = AddressSpace::Input;
+            break;
+        case LayoutResourceKind::VaryingOutput:
+            addressSpace = AddressSpace::Output;
+            break;
         case LayoutResourceKind::ShaderResource:
         case LayoutResourceKind::UnorderedAccess:
             addressSpace = getStorageBufferAddressSpace();
@@ -598,15 +614,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         case LayoutResourceKind::SpecializationConstant:
             addressSpace = AddressSpace::SpecializationConstant;
             break;
-        case LayoutResourceKind::RayPayload: addressSpace = AddressSpace::IncomingRayPayload; break;
+        case LayoutResourceKind::RayPayload:
+            addressSpace = AddressSpace::IncomingRayPayload;
+            break;
         case LayoutResourceKind::CallablePayload:
             addressSpace = AddressSpace::IncomingCallableData;
             break;
-        case LayoutResourceKind::HitAttributes: addressSpace = AddressSpace::HitAttribute; break;
+        case LayoutResourceKind::HitAttributes:
+            addressSpace = AddressSpace::HitAttribute;
+            break;
         case LayoutResourceKind::ShaderRecord:
             addressSpace = AddressSpace::ShaderRecordBuffer;
             break;
-        default: break;
+        default:
+            break;
         }
         return addressSpace;
     }
@@ -846,7 +867,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             switch (arg->getOp())
             {
             case kIROp_Var:
-            case kIROp_GlobalVar: newArgs.add(arg); continue;
+            case kIROp_GlobalVar:
+                newArgs.add(arg);
+                continue;
             case kIROp_Param:
                 if (arg->getParent() == getParentFunc(arg)->getFirstBlock())
                 {
@@ -854,7 +877,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     continue;
                 }
                 break;
-            default: break;
+            default:
+                break;
             }
             auto root = getRootAddr(arg);
             if (root)
@@ -1146,7 +1170,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     case kIROp_IntCast:
                     case kIROp_GetElementPtr:
                     case kIROp_Load:
-                    case kIROp_NonUniformResourceIndex: resWorkList.add(nonuniformUser); break;
+                    case kIROp_NonUniformResourceIndex:
+                        resWorkList.add(nonuniformUser);
+                        break;
                     };
 
                     // Clean up the base inst from the IR module, to avoid duplicate decorations.
@@ -1573,7 +1599,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MakeVector:
             case kIROp_MakeMatrix:
             case kIROp_MakeMatrixFromScalar:
-            case kIROp_MakeVectorFromScalar: return true;
+            case kIROp_MakeVectorFromScalar:
+                return true;
             default:
                 if (as<IRConstant>(inst))
                     return true;
@@ -1643,7 +1670,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_Neq:
             case kIROp_Eql:
             case kIROp_Call:
-            case kIROp_SPIRVAsm:             return true;
+            case kIROp_SPIRVAsm:
+                return true;
             default:
                 if (as<IRSPIRVAsmInst>(inst))
                     return true;
@@ -1720,7 +1748,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 case kIROp_Func:
                 case kIROp_Specialize:
                 case kIROp_Generic:
-                case kIROp_LookupWitness: return inst;
+                case kIROp_LookupWitness:
+                    return inst;
                 }
                 if (as<IRType>(inst))
                     return inst;
@@ -1805,18 +1834,42 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             switch (inst->getOp())
             {
-            case kIROp_StructField:    processStructField(as<IRStructField>(inst)); break;
-            case kIROp_GlobalParam:    processGlobalParam(as<IRGlobalParam>(inst)); break;
-            case kIROp_GlobalVar:      processGlobalVar(as<IRGlobalVar>(inst)); break;
-            case kIROp_Var:            processVar(as<IRVar>(inst)); break;
-            case kIROp_Param:          processParam(as<IRParam>(inst)); break;
-            case kIROp_Call:           processCall(as<IRCall>(inst)); break;
-            case kIROp_GetElement:     processGetElement(as<IRGetElement>(inst)); break;
-            case kIROp_GetElementPtr:  processGetElementPtr(as<IRGetElementPtr>(inst)); break;
-            case kIROp_GetOffsetPtr:   processGetOffsetPtr(inst); break;
-            case kIROp_FieldAddress:   processFieldAddress(as<IRFieldAddress>(inst)); break;
-            case kIROp_FieldExtract:   processFieldExtract(as<IRFieldExtract>(inst)); break;
-            case kIROp_ImageSubscript: processImageSubscript(as<IRImageSubscript>(inst)); break;
+            case kIROp_StructField:
+                processStructField(as<IRStructField>(inst));
+                break;
+            case kIROp_GlobalParam:
+                processGlobalParam(as<IRGlobalParam>(inst));
+                break;
+            case kIROp_GlobalVar:
+                processGlobalVar(as<IRGlobalVar>(inst));
+                break;
+            case kIROp_Var:
+                processVar(as<IRVar>(inst));
+                break;
+            case kIROp_Param:
+                processParam(as<IRParam>(inst));
+                break;
+            case kIROp_Call:
+                processCall(as<IRCall>(inst));
+                break;
+            case kIROp_GetElement:
+                processGetElement(as<IRGetElement>(inst));
+                break;
+            case kIROp_GetElementPtr:
+                processGetElementPtr(as<IRGetElementPtr>(inst));
+                break;
+            case kIROp_GetOffsetPtr:
+                processGetOffsetPtr(inst);
+                break;
+            case kIROp_FieldAddress:
+                processFieldAddress(as<IRFieldAddress>(inst));
+                break;
+            case kIROp_FieldExtract:
+                processFieldExtract(as<IRFieldExtract>(inst));
+                break;
+            case kIROp_ImageSubscript:
+                processImageSubscript(as<IRImageSubscript>(inst));
+                break;
             case kIROp_RWStructuredBufferGetElementPtr:
                 processRWStructuredBufferGetElementPtr(
                     cast<IRRWStructuredBufferGetElementPtr>(inst));
@@ -1824,22 +1877,38 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MeshOutputRef:
                 processMeshOutputGetElementPtr(cast<IRMeshOutputRef>(inst));
                 break;
-            case kIROp_MeshOutputSet:                processMeshOutputSet(cast<IRMeshOutputSet>(inst)); break;
+            case kIROp_MeshOutputSet:
+                processMeshOutputSet(cast<IRMeshOutputSet>(inst));
+                break;
             case kIROp_RWStructuredBufferLoad:
             case kIROp_StructuredBufferLoad:
             case kIROp_RWStructuredBufferLoadStatus:
-            case kIROp_StructuredBufferLoadStatus:   processStructuredBufferLoad(inst); break;
-            case kIROp_RWStructuredBufferStore:      processRWStructuredBufferStore(inst); break;
-            case kIROp_NonUniformResourceIndex:      processNonUniformResourceIndex(inst); break;
-            case kIROp_loop:                         processLoop(as<IRLoop>(inst)); break;
-            case kIROp_ifElse:                       processIfElse(as<IRIfElse>(inst)); break;
-            case kIROp_Switch:                       processSwitch(as<IRSwitch>(inst)); break;
+            case kIROp_StructuredBufferLoadStatus:
+                processStructuredBufferLoad(inst);
+                break;
+            case kIROp_RWStructuredBufferStore:
+                processRWStructuredBufferStore(inst);
+                break;
+            case kIROp_NonUniformResourceIndex:
+                processNonUniformResourceIndex(inst);
+                break;
+            case kIROp_loop:
+                processLoop(as<IRLoop>(inst));
+                break;
+            case kIROp_ifElse:
+                processIfElse(as<IRIfElse>(inst));
+                break;
+            case kIROp_Switch:
+                processSwitch(as<IRSwitch>(inst));
+                break;
             case kIROp_Less:
             case kIROp_Leq:
             case kIROp_Eql:
             case kIROp_Geq:
             case kIROp_Greater:
-            case kIROp_Neq:                          processComparison(inst); break;
+            case kIROp_Neq:
+                processComparison(inst);
+                break;
             case kIROp_MakeVectorFromScalar:
             case kIROp_MakeUInt64:
             case kIROp_MakeVector:
@@ -1854,10 +1923,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MakeResultValue:
             case kIROp_MakeResultError:
             case kIROp_MakeOptionalValue:
-            case kIROp_MakeOptionalNone:             processConstructor(inst); break;
-            case kIROp_PtrLit:                       processPtrLit(inst); break;
-            case kIROp_unconditionalBranch:          processBranch(inst); break;
-            case kIROp_SPIRVAsm:                     processSPIRVAsm(as<IRSPIRVAsm>(inst)); break;
+            case kIROp_MakeOptionalNone:
+                processConstructor(inst);
+                break;
+            case kIROp_PtrLit:
+                processPtrLit(inst);
+                break;
+            case kIROp_unconditionalBranch:
+                processBranch(inst);
+                break;
+            case kIROp_SPIRVAsm:
+                processSPIRVAsm(as<IRSPIRVAsm>(inst));
+                break;
             case kIROp_DebugValue:
                 if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
                     inst->removeAndDeallocate();
@@ -1932,7 +2009,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 case CapabilityName::SPV_EXT_demote_to_helper_invocation:
                     m_sharedContext->m_useDemoteToHelperInvocationExtension = true;
                     break;
-                default: break;
+                default:
+                    break;
                 }
             }
         }

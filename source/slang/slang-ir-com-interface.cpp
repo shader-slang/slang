@@ -33,7 +33,8 @@ static bool _canReplace(IRUse* use)
             // If it's a pointer type it could be because it is a global.
             break;
         }
-    default: break;
+    default:
+        break;
     }
     return true;
 }

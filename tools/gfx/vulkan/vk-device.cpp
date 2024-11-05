@@ -1429,7 +1429,8 @@ uint32_t DeviceImpl::getQueueFamilyIndex(ICommandQueue::QueueType queueType)
     switch (queueType)
     {
     case ICommandQueue::QueueType::Graphics:
-    default:                                 return m_queueFamilyIndex;
+    default:
+        return m_queueFamilyIndex;
     }
 }
 
@@ -2154,11 +2155,15 @@ Result DeviceImpl::createTextureView(
     case IResource::Type::Texture2D:
         createInfo.viewType = isArray ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
         break;
-    case IResource::Type::Texture3D: createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D; break;
+    case IResource::Type::Texture3D:
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
+        break;
     case IResource::Type::TextureCube:
         createInfo.viewType = isArray ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
         break;
-    default: SLANG_UNIMPLEMENTED_X("Unknown Texture type."); break;
+    default:
+        SLANG_UNIMPLEMENTED_X("Unknown Texture type.");
+        break;
     }
 
     createInfo.subresourceRange.aspectMask = getAspectMaskFromFormat(resourceImpl->m_vkformat);
@@ -2190,8 +2195,12 @@ Result DeviceImpl::createTextureView(
     case IResourceView::Type::ShaderResource:
         view->m_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         break;
-    case IResourceView::Type::UnorderedAccess: view->m_layout = VK_IMAGE_LAYOUT_GENERAL; break;
-    default:                                   SLANG_UNIMPLEMENTED_X("Unknown TextureViewDesc type."); break;
+    case IResourceView::Type::UnorderedAccess:
+        view->m_layout = VK_IMAGE_LAYOUT_GENERAL;
+        break;
+    default:
+        SLANG_UNIMPLEMENTED_X("Unknown TextureViewDesc type.");
+        break;
     }
     m_api.vkCreateImageView(m_device, &createInfo, nullptr, &view->m_view);
     returnComPtr(outView, view);
@@ -2246,8 +2255,11 @@ Result DeviceImpl::getFormatSupportedResourceStates(Format format, ResourceState
     switch (format)
     {
     case Format::R32_UINT:
-    case Format::R16_UINT: allowedStates.add(ResourceState::IndexBuffer); break;
-    default:               break;
+    case Format::R16_UINT:
+        allowedStates.add(ResourceState::IndexBuffer);
+        break;
+    default:
+        break;
     }
     // ConstantBuffer
     allowedStates.add(ResourceState::ConstantBuffer);
@@ -2335,7 +2347,9 @@ Result DeviceImpl::createBufferView(
 
     switch (desc.type)
     {
-    default: assert(!"unhandled"); return SLANG_FAIL;
+    default:
+        assert(!"unhandled");
+        return SLANG_FAIL;
 
     case IResourceView::Type::UnorderedAccess:
     case IResourceView::Type::ShaderResource:

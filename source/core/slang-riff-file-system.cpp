@@ -155,7 +155,8 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
             m_compressionSystem = LZ4CompressionSystem::getSingleton();
             break;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     // Read all of the contained data
@@ -209,8 +210,10 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
                     dstEntry.m_contents = RawBlob::create(srcData, srcEntry->compressedSize);
                     break;
                 }
-            case SLANG_PATH_TYPE_DIRECTORY: break;
-            default:                        return SLANG_FAIL;
+            case SLANG_PATH_TYPE_DIRECTORY:
+                break;
+            default:
+                return SLANG_FAIL;
             }
 
             // If it's the root entry we can ignore (as already added)

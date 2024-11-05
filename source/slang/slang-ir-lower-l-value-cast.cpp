@@ -23,8 +23,11 @@ struct LValueCastLoweringContext
         switch (inst->getOp())
         {
         case kIROp_InOutImplicitCast:
-        case kIROp_OutImplicitCast:   _processLValueCast(inst); break;
-        default:                      break;
+        case kIROp_OutImplicitCast:
+            _processLValueCast(inst);
+            break;
+        default:
+            break;
         }
     }
 
@@ -149,7 +152,8 @@ struct LValueCastLoweringContext
                 }
                 break;
             }
-        default: break;
+        default:
+            break;
         }
 
         // If we can't use the other mechanisms we are going to do a conversion

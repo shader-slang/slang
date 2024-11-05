@@ -25,14 +25,22 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     using namespace Slang;
     switch (apiType)
     {
-    case RenderApiType::D3D11:  return rhi::DeviceType::D3D11;
-    case RenderApiType::D3D12:  return rhi::DeviceType::D3D12;
-    case RenderApiType::Vulkan: return rhi::DeviceType::Vulkan;
-    case RenderApiType::Metal:  return rhi::DeviceType::Metal;
-    case RenderApiType::CPU:    return rhi::DeviceType::CPU;
-    case RenderApiType::CUDA:   return rhi::DeviceType::CUDA;
-    case RenderApiType::WebGPU: return rhi::DeviceType::WGPU;
-    default:                    return rhi::DeviceType::Default;
+    case RenderApiType::D3D11:
+        return rhi::DeviceType::D3D11;
+    case RenderApiType::D3D12:
+        return rhi::DeviceType::D3D12;
+    case RenderApiType::Vulkan:
+        return rhi::DeviceType::Vulkan;
+    case RenderApiType::Metal:
+        return rhi::DeviceType::Metal;
+    case RenderApiType::CPU:
+        return rhi::DeviceType::CPU;
+    case RenderApiType::CUDA:
+        return rhi::DeviceType::CUDA;
+    case RenderApiType::WebGPU:
+        return rhi::DeviceType::WGPU;
+    default:
+        return rhi::DeviceType::Default;
     }
 }
 

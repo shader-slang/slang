@@ -340,8 +340,10 @@ inline bool isCompositeType(IRType* type)
     {
     case kIROp_StructType:
     case kIROp_ArrayType:
-    case kIROp_UnsizedArrayType: return true;
-    default:                     return false;
+    case kIROp_UnsizedArrayType:
+        return true;
+    default:
+        return false;
     }
 }
 

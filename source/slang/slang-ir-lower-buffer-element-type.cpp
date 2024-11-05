@@ -308,10 +308,14 @@ struct LoweredElementTypeContext
     {
         switch (name)
         {
-        case IRTypeLayoutRuleName::Std140:  return "std140";
-        case IRTypeLayoutRuleName::Std430:  return "std430";
-        case IRTypeLayoutRuleName::Natural: return "natural";
-        default:                            return "default";
+        case IRTypeLayoutRuleName::Std140:
+            return "std140";
+        case IRTypeLayoutRuleName::Std430:
+            return "std430";
+        case IRTypeLayoutRuleName::Natural:
+            return "natural";
+        default:
+            return "default";
         }
     }
 
@@ -613,7 +617,8 @@ struct LoweredElementTypeContext
                         return info;
                     }
                 }
-            default: break;
+            default:
+                break;
             }
         }
 
@@ -957,8 +962,11 @@ struct LoweredElementTypeContext
                             }
                             break;
                         case kIROp_RWStructuredBufferGetElementPtr:
-                        case kIROp_GetOffsetPtr:                    ptrValsWorkList.add(user); break;
-                        case kIROp_StructuredBufferGetDimensions:   break;
+                        case kIROp_GetOffsetPtr:
+                            ptrValsWorkList.add(user);
+                            break;
+                        case kIROp_StructuredBufferGetDimensions:
+                            break;
                         case kIROp_Call:
                             {
                                 // If a structured buffer or pointer typed value is used directly as
@@ -991,7 +999,8 @@ struct LoweredElementTypeContext
                                 builder.emitStore(ptrVal, packedVal);
                             }
                             break;
-                        default: break;
+                        default:
+                            break;
                         }
                     });
             }
@@ -1194,16 +1203,22 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
                                     : kIROp_DefaultBufferLayoutType;
             switch (layoutTypeOp)
             {
-            case kIROp_DefaultBufferLayoutType: return IRTypeLayoutRules::getStd430();
-            case kIROp_Std140BufferLayoutType:  return IRTypeLayoutRules::getStd140();
-            case kIROp_Std430BufferLayoutType:  return IRTypeLayoutRules::getStd430();
-            case kIROp_ScalarBufferLayoutType:  return IRTypeLayoutRules::getNatural();
+            case kIROp_DefaultBufferLayoutType:
+                return IRTypeLayoutRules::getStd430();
+            case kIROp_Std140BufferLayoutType:
+                return IRTypeLayoutRules::getStd140();
+            case kIROp_Std430BufferLayoutType:
+                return IRTypeLayoutRules::getStd430();
+            case kIROp_ScalarBufferLayoutType:
+                return IRTypeLayoutRules::getNatural();
             }
             return IRTypeLayoutRules::getStd430();
         }
     case kIROp_ConstantBufferType:
-    case kIROp_ParameterBlockType: return IRTypeLayoutRules::getStd140();
-    case kIROp_PtrType:            return IRTypeLayoutRules::getNatural();
+    case kIROp_ParameterBlockType:
+        return IRTypeLayoutRules::getStd140();
+    case kIROp_PtrType:
+        return IRTypeLayoutRules::getNatural();
     }
     return IRTypeLayoutRules::getNatural();
 }

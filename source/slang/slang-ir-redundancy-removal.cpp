@@ -204,8 +204,11 @@ static IRInst* _getRootVar(IRInst* inst)
         switch (inst->getOp())
         {
         case kIROp_FieldAddress:
-        case kIROp_GetElementPtr: inst = inst->getOperand(0); break;
-        default:                  return inst;
+        case kIROp_GetElementPtr:
+            inst = inst->getOperand(0);
+            break;
+        default:
+            return inst;
         }
     }
     return inst;
@@ -253,8 +256,11 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
             switch (accessChain->getOp())
             {
             case kIROp_GetElementPtr:
-            case kIROp_FieldAddress:  accessChain = accessChain->getOperand(0); continue;
-            default:                  break;
+            case kIROp_FieldAddress:
+                accessChain = accessChain->getOperand(0);
+                continue;
+            default:
+                break;
             }
             break;
         }

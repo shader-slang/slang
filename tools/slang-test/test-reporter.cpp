@@ -16,12 +16,23 @@ static void appendXmlEncode(char c, StringBuilder& out)
 {
     switch (c)
     {
-    case '&':  out << "&amp;"; break;
-    case '<':  out << "&lt;"; break;
-    case '>':  out << "&gt;"; break;
-    case '\'': out << "&apos;"; break;
-    case '"':  out << "&quot;"; break;
-    default:   out.append(c);
+    case '&':
+        out << "&amp;";
+        break;
+    case '<':
+        out << "&lt;";
+        break;
+    case '>':
+        out << "&gt;";
+        break;
+    case '\'':
+        out << "&apos;";
+        break;
+    case '"':
+        out << "&quot;";
+        break;
+    default:
+        out.append(c);
     }
 }
 
@@ -105,7 +116,8 @@ bool TestReporter::canWriteStdError() const
         {
             return false;
         }
-    default: return true;
+    default:
+        return true;
     }
 }
 
@@ -247,13 +259,20 @@ static char _getTeamCityEscapeChar(char c)
 {
     switch (c)
     {
-    case '|':  return '|';
-    case '\'': return '\'';
-    case '\n': return 'n';
-    case '\r': return 'r';
-    case '[':  return '[';
-    case ']':  return ']';
-    default:   return 0;
+    case '|':
+        return '|';
+    case '\'':
+        return '\'';
+    case '\n':
+        return 'n';
+    case '\r':
+        return 'r';
+    case '[':
+        return '[';
+    case ']':
+        return ']';
+    default:
+        return 0;
     }
 }
 
@@ -325,14 +344,24 @@ void TestReporter::_addResult(TestInfo info)
 
     switch (info.testResult)
     {
-    case TestResult::Fail: m_failedTestCount++; break;
+    case TestResult::Fail:
+        m_failedTestCount++;
+        break;
 
-    case TestResult::Pass:         m_passedTestCount++; break;
-    case TestResult::ExpectedFail: m_expectedFailedTestCount++; break;
+    case TestResult::Pass:
+        m_passedTestCount++;
+        break;
+    case TestResult::ExpectedFail:
+        m_expectedFailedTestCount++;
+        break;
 
-    case TestResult::Ignored: m_ignoredTestCount++; break;
+    case TestResult::Ignored:
+        m_ignoredTestCount++;
+        break;
 
-    default: assert(!"unexpected"); break;
+    default:
+        assert(!"unexpected");
+        break;
     }
 
     m_testInfos.add(info);
@@ -342,11 +371,21 @@ void TestReporter::_addResult(TestInfo info)
         char const* resultString = "UNEXPECTED";
         switch (info.testResult)
         {
-        case TestResult::Fail:         resultString = "FAILED"; break;
-        case TestResult::ExpectedFail: resultString = "failed(expected)"; break;
-        case TestResult::Pass:         resultString = "passed"; break;
-        case TestResult::Ignored:      resultString = "ignored"; break;
-        default:                       assert(!"unexpected"); break;
+        case TestResult::Fail:
+            resultString = "FAILED";
+            break;
+        case TestResult::ExpectedFail:
+            resultString = "failed(expected)";
+            break;
+        case TestResult::Pass:
+            resultString = "passed";
+            break;
+        case TestResult::Ignored:
+            resultString = "ignored";
+            break;
+        default:
+            assert(!"unexpected");
+            break;
         }
 
         StringBuilder buffer;
@@ -443,7 +482,9 @@ void TestReporter::_addResult(TestInfo info)
                     }
                     break;
                 }
-            default: assert(!"unexpected"); break;
+            default:
+                assert(!"unexpected");
+                break;
             }
 
             printf("##teamcity[testFinished name='%s']\n", escapedTestName.begin());
@@ -461,12 +502,22 @@ void TestReporter::_addResult(TestInfo info)
             char const* resultString = "None";
             switch (info.testResult)
             {
-            case TestResult::Fail:         resultString = "Failed"; break;
-            case TestResult::Pass:         resultString = "Passed"; break;
-            case TestResult::Ignored:      resultString = "Ignored"; break;
-            case TestResult::ExpectedFail: resultString = "ExpectedFail"; break;
+            case TestResult::Fail:
+                resultString = "Failed";
+                break;
+            case TestResult::Pass:
+                resultString = "Passed";
+                break;
+            case TestResult::Ignored:
+                resultString = "Ignored";
+                break;
+            case TestResult::ExpectedFail:
+                resultString = "ExpectedFail";
+                break;
 
-            default: assert(!"unexpected"); break;
+            default:
+                assert(!"unexpected");
+                break;
             }
 
             // https://www.appveyor.com/docs/build-worker-api/#add-tests
@@ -704,7 +755,8 @@ void TestReporter::outputSummary()
                             printf("      <skip>Ignored</skip>\n");
                             break;
                         }
-                    default: break;
+                    default:
+                        break;
                     }
                     printf("    </testcase>\n");
                 }
@@ -744,7 +796,8 @@ void TestReporter::startSuite(const String& name)
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -765,7 +818,8 @@ void TestReporter::endSuite()
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     m_suiteStack.removeLast();

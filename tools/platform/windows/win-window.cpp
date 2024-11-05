@@ -184,7 +184,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             return DefWindowProc(hWnd, message, wParam, lParam);
         }
         break;
-    default: break;
+    default:
+        break;
     }
     if (message == WM_DESTROY && hWnd == Win32AppContext::mainWindowHandle)
     {

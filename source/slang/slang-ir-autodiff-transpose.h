@@ -184,7 +184,8 @@ struct DiffTransposePass
             auto terminator = currentBlock->getTerminator();
             switch (terminator->getOp())
             {
-            case kIROp_Return: return RegionEntryPoint(revBlockMap[currentBlock], nullptr);
+            case kIROp_Return:
+                return RegionEntryPoint(revBlockMap[currentBlock], nullptr);
 
             case kIROp_unconditionalBranch:
                 {
@@ -853,7 +854,9 @@ struct DiffTransposePass
             case kIROp_ForwardDifferentiate:
             case kIROp_BackwardDifferentiate:
             case kIROp_BackwardDifferentiatePrimal:
-            case kIROp_BackwardDifferentiatePropagate: typeInsts.add(child); break;
+            case kIROp_BackwardDifferentiatePropagate:
+                typeInsts.add(child);
+                break;
             }
         }
 
@@ -995,8 +998,10 @@ struct DiffTransposePass
     {
         switch (inst->getOp())
         {
-        case kIROp_ForwardDifferentiate: return;
-        default:                         break;
+        case kIROp_ForwardDifferentiate:
+            return;
+        default:
+            break;
         }
 
         // Look for gradient entries for this inst.
@@ -1349,13 +1354,18 @@ struct DiffTransposePass
         switch (terminatorInst->getOp())
         {
         case kIROp_unconditionalBranch:
-        case kIROp_Return:              return nullptr;
+        case kIROp_Return:
+            return nullptr;
 
-        case kIROp_ifElse: return as<IRIfElse>(terminatorInst)->getAfterBlock();
-        case kIROp_Switch: return as<IRSwitch>(terminatorInst)->getBreakLabel();
-        case kIROp_loop:   return as<IRLoop>(terminatorInst)->getBreakBlock();
+        case kIROp_ifElse:
+            return as<IRIfElse>(terminatorInst)->getAfterBlock();
+        case kIROp_Switch:
+            return as<IRSwitch>(terminatorInst)->getBreakLabel();
+        case kIROp_loop:
+            return as<IRLoop>(terminatorInst)->getBreakBlock();
 
-        default: SLANG_UNIMPLEMENTED_X("Unhandled terminator inst when building after-block map");
+        default:
+            SLANG_UNIMPLEMENTED_X("Unhandled terminator inst when building after-block map");
         }
     }
 
@@ -1438,13 +1448,17 @@ struct DiffTransposePass
         case kIROp_Mul:
         case kIROp_Sub:
         case kIROp_Div:
-        case kIROp_Neg: return transposeArithmetic(builder, fwdInst, revValue);
+        case kIROp_Neg:
+            return transposeArithmetic(builder, fwdInst, revValue);
 
-        case kIROp_Select: return transposeSelect(builder, fwdInst, revValue);
+        case kIROp_Select:
+            return transposeSelect(builder, fwdInst, revValue);
 
-        case kIROp_Call: return transposeCall(builder, as<IRCall>(fwdInst), revValue);
+        case kIROp_Call:
+            return transposeCall(builder, as<IRCall>(fwdInst), revValue);
 
-        case kIROp_swizzle: return transposeSwizzle(builder, as<IRSwizzle>(fwdInst), revValue);
+        case kIROp_swizzle:
+            return transposeSwizzle(builder, as<IRSwizzle>(fwdInst), revValue);
 
         case kIROp_FieldExtract:
             return transposeFieldExtract(builder, as<IRFieldExtract>(fwdInst), revValue);
@@ -1452,11 +1466,14 @@ struct DiffTransposePass
         case kIROp_GetElement:
             return transposeGetElement(builder, as<IRGetElement>(fwdInst), revValue);
 
-        case kIROp_Return: return transposeReturn(builder, as<IRReturn>(fwdInst), revValue);
+        case kIROp_Return:
+            return transposeReturn(builder, as<IRReturn>(fwdInst), revValue);
 
-        case kIROp_Store: return transposeStore(builder, as<IRStore>(fwdInst), revValue);
+        case kIROp_Store:
+            return transposeStore(builder, as<IRStore>(fwdInst), revValue);
 
-        case kIROp_Load: return transposeLoad(builder, as<IRLoad>(fwdInst), revValue);
+        case kIROp_Load:
+            return transposeLoad(builder, as<IRLoad>(fwdInst), revValue);
 
         case kIROp_MakeDifferentialPair:
             return transposeMakePair(builder, as<IRMakeDifferentialPair>(fwdInst), revValue);
@@ -1485,32 +1502,43 @@ struct DiffTransposePass
                 as<IRDifferentialPairGetDifferentialUserCode>(fwdInst),
                 revValue);
 
-        case kIROp_MakeVector: return transposeMakeVector(builder, fwdInst, revValue);
+        case kIROp_MakeVector:
+            return transposeMakeVector(builder, fwdInst, revValue);
         case kIROp_MakeVectorFromScalar:
             return transposeMakeVectorFromScalar(builder, fwdInst, revValue);
         case kIROp_MakeMatrixFromScalar:
             return transposeMakeMatrixFromScalar(builder, fwdInst, revValue);
-        case kIROp_MakeMatrix:    return transposeMakeMatrix(builder, fwdInst, revValue);
-        case kIROp_MatrixReshape: return transposeMatrixReshape(builder, fwdInst, revValue);
-        case kIROp_MakeStruct:    return transposeMakeStruct(builder, fwdInst, revValue);
-        case kIROp_MakeArray:     return transposeMakeArray(builder, fwdInst, revValue);
+        case kIROp_MakeMatrix:
+            return transposeMakeMatrix(builder, fwdInst, revValue);
+        case kIROp_MatrixReshape:
+            return transposeMatrixReshape(builder, fwdInst, revValue);
+        case kIROp_MakeStruct:
+            return transposeMakeStruct(builder, fwdInst, revValue);
+        case kIROp_MakeArray:
+            return transposeMakeArray(builder, fwdInst, revValue);
         case kIROp_MakeTuple:
-        case kIROp_MakeValuePack: return transposeMakeTuple(builder, fwdInst, revValue);
+        case kIROp_MakeValuePack:
+            return transposeMakeTuple(builder, fwdInst, revValue);
         case kIROp_MakeArrayFromElement:
             return transposeMakeArrayFromElement(builder, fwdInst, revValue);
 
-        case kIROp_UpdateElement: return transposeUpdateElement(builder, fwdInst, revValue);
+        case kIROp_UpdateElement:
+            return transposeUpdateElement(builder, fwdInst, revValue);
 
-        case kIROp_FloatCast: return transposeFloatCast(builder, fwdInst, revValue);
+        case kIROp_FloatCast:
+            return transposeFloatCast(builder, fwdInst, revValue);
 
-        case kIROp_MakeExistential: return transposeMakeExistential(builder, fwdInst, revValue);
+        case kIROp_MakeExistential:
+            return transposeMakeExistential(builder, fwdInst, revValue);
 
         case kIROp_ExtractExistentialValue:
             return transposeExtractExistentialValue(builder, fwdInst, revValue);
 
-        case kIROp_Reinterpret: return transposeReinterpret(builder, fwdInst, revValue);
+        case kIROp_Reinterpret:
+            return transposeReinterpret(builder, fwdInst, revValue);
 
-        case kIROp_PackAnyValue: return transposePackAnyValue(builder, fwdInst, revValue);
+        case kIROp_PackAnyValue:
+            return transposePackAnyValue(builder, fwdInst, revValue);
 
         case kIROp_LoadReverseGradient:
         case kIROp_ReverseGradientDiffPairRef:
@@ -1530,7 +1558,8 @@ struct DiffTransposePass
                 return TranspositionResult();
             }
 
-        default: SLANG_ASSERT_FAILURE("Unhandled instruction");
+        default:
+            SLANG_ASSERT_FAILURE("Unhandled instruction");
         }
     }
 
@@ -2081,8 +2110,10 @@ struct DiffTransposePass
             switch (type->getOp())
             {
             case kIROp_ExtractExistentialType:
-            case kIROp_LookupWitness:          return true;
-            default:                           return false;
+            case kIROp_LookupWitness:
+                return true;
+            default:
+                return false;
             }
         };
 
@@ -2430,7 +2461,8 @@ struct DiffTransposePass
                 }
             }
 
-        default: SLANG_ASSERT_FAILURE("Unhandled arithmetic");
+        default:
+            SLANG_ASSERT_FAILURE("Unhandled arithmetic");
         }
     }
 
@@ -2641,7 +2673,8 @@ struct DiffTransposePass
                 aggPrimalType,
                 gradients);
 
-        default: SLANG_ASSERT_FAILURE("Unhandled gradient flavor for materialization");
+        default:
+            SLANG_ASSERT_FAILURE("Unhandled gradient flavor for materialization");
         }
     }
 

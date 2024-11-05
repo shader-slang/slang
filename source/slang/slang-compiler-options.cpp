@@ -82,11 +82,20 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 v.unpackInt3(kind, set, shift);
                 switch ((HLSLToVulkanLayoutOptions::Kind)(kind))
                 {
-                case HLSLToVulkanLayoutOptions::Kind::UnorderedAccess: sb << " -fvk-u-shift"; break;
-                case HLSLToVulkanLayoutOptions::Kind::Sampler:         sb << " -fvk-s-shift"; break;
-                case HLSLToVulkanLayoutOptions::Kind::ShaderResource:  sb << " -fvk-t-shift"; break;
-                case HLSLToVulkanLayoutOptions::Kind::ConstantBuffer:  sb << " -fvk-b-shift"; break;
-                default:                                               continue;
+                case HLSLToVulkanLayoutOptions::Kind::UnorderedAccess:
+                    sb << " -fvk-u-shift";
+                    break;
+                case HLSLToVulkanLayoutOptions::Kind::Sampler:
+                    sb << " -fvk-s-shift";
+                    break;
+                case HLSLToVulkanLayoutOptions::Kind::ShaderResource:
+                    sb << " -fvk-t-shift";
+                    break;
+                case HLSLToVulkanLayoutOptions::Kind::ConstantBuffer:
+                    sb << " -fvk-b-shift";
+                    break;
+                default:
+                    continue;
                 }
                 sb << " " << shift << " " << set;
             }
@@ -176,7 +185,8 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::Capability:
     case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
-    case CompilerOptionName::VulkanBindShiftAll: return true;
+    case CompilerOptionName::VulkanBindShiftAll:
+        return true;
     }
     return false;
 }
@@ -186,7 +196,8 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
     {
     case CompilerOptionName::Optimization:
         return CompilerOptionValue::fromEnum(OptimizationLevel::Default);
-    default: return CompilerOptionValue();
+    default:
+        return CompilerOptionValue();
     }
 }
 

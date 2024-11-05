@@ -123,7 +123,8 @@ SlangResult FileStream::_init(
             mode = "ab";
         }
         break;
-    default: break;
+    default:
+        break;
     }
 #ifdef _WIN32
 
@@ -144,11 +145,21 @@ SlangResult FileStream::_init(
     int shFlag = _SH_DENYRW;
     switch (share)
     {
-    case FileShare::None:      shFlag = _SH_DENYRW; break;
-    case FileShare::ReadOnly:  shFlag = _SH_DENYWR; break;
-    case FileShare::WriteOnly: shFlag = _SH_DENYRD; break;
-    case FileShare::ReadWrite: shFlag = _SH_DENYNO; break;
-    default:                   SLANG_ASSERT(!"Invalid file share mode."); return SLANG_FAIL;
+    case FileShare::None:
+        shFlag = _SH_DENYRW;
+        break;
+    case FileShare::ReadOnly:
+        shFlag = _SH_DENYWR;
+        break;
+    case FileShare::WriteOnly:
+        shFlag = _SH_DENYRD;
+        break;
+    case FileShare::ReadWrite:
+        shFlag = _SH_DENYNO;
+        break;
+    default:
+        SLANG_ASSERT(!"Invalid file share mode.");
+        return SLANG_FAIL;
     }
     if (share == FileShare::None)
 #pragma warning(suppress : 4996)
@@ -193,10 +204,18 @@ SlangResult FileStream::seek(SeekOrigin seekOrigin, Int64 offset)
     int fseekOrigin;
     switch (seekOrigin)
     {
-    case SeekOrigin::Start:   fseekOrigin = SEEK_SET; break;
-    case SeekOrigin::End:     fseekOrigin = SEEK_END; break;
-    case SeekOrigin::Current: fseekOrigin = SEEK_CUR; break;
-    default:                  SLANG_ASSERT(!"Unsupported seek origin."); return SLANG_FAIL;
+    case SeekOrigin::Start:
+        fseekOrigin = SEEK_SET;
+        break;
+    case SeekOrigin::End:
+        fseekOrigin = SEEK_END;
+        break;
+    case SeekOrigin::Current:
+        fseekOrigin = SEEK_CUR;
+        break;
+    default:
+        SLANG_ASSERT(!"Unsupported seek origin.");
+        return SLANG_FAIL;
     }
 
     // If endReached is intended to be like feof - then doing a seek will reset it
@@ -285,10 +304,18 @@ SlangResult MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
     Int64 pos = 0;
     switch (origin)
     {
-    case SeekOrigin::Start:   pos = offset; break;
-    case SeekOrigin::End:     pos = Int64(m_contentsSize) + offset; break;
-    case SeekOrigin::Current: pos = Int64(m_position) + offset; break;
-    default:                  SLANG_ASSERT(!"Unsupported seek origin."); return SLANG_E_NOT_IMPLEMENTED;
+    case SeekOrigin::Start:
+        pos = offset;
+        break;
+    case SeekOrigin::End:
+        pos = Int64(m_contentsSize) + offset;
+        break;
+    case SeekOrigin::Current:
+        pos = Int64(m_position) + offset;
+        break;
+    default:
+        SLANG_ASSERT(!"Unsupported seek origin.");
+        return SLANG_E_NOT_IMPLEMENTED;
     }
 
     m_atEnd = false;
@@ -682,10 +709,14 @@ static FILE* _getFileFromStdStreamType(StdStreamType stdStream)
 {
     switch (stdStream)
     {
-    case StdStreamType::ErrorOut: return stderr;
-    case StdStreamType::Out:      return stdout;
-    case StdStreamType::In:       return stdin;
-    default:                      return nullptr;
+    case StdStreamType::ErrorOut:
+        return stderr;
+    case StdStreamType::Out:
+        return stdout;
+    case StdStreamType::In:
+        return stdin;
+    default:
+        return nullptr;
     }
 }
 
@@ -693,10 +724,13 @@ static int _getBufferOptions(StreamBufferStyle style)
 {
     switch (style)
     {
-    case StreamBufferStyle::None: return _IONBF;
-    case StreamBufferStyle::Line: return _IOLBF;
+    case StreamBufferStyle::None:
+        return _IONBF;
+    case StreamBufferStyle::Line:
+        return _IOLBF;
     default:
-    case StreamBufferStyle::Full: return _IOFBF;
+    case StreamBufferStyle::Full:
+        return _IOFBF;
     }
 }
 

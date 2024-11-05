@@ -8,10 +8,12 @@ ProfileFamily getProfileFamily(ProfileVersion version)
 {
     switch (version)
     {
-    default: return ProfileFamily::Unknown;
+    default:
+        return ProfileFamily::Unknown;
 
 #define PROFILE_VERSION(TAG, FAMILY) \
-    case ProfileVersion::TAG: return ProfileFamily::FAMILY;
+    case ProfileVersion::TAG:        \
+        return ProfileFamily::FAMILY;
 #include "slang-profile-defs.h"
     }
 }
@@ -25,8 +27,10 @@ bool isRaytracingStage(Stage inStage)
     case Stage::Intersection:
     case Stage::ClosestHit:
     case Stage::Callable:
-    case Stage::AnyHit:        return true;
-    default:                   return false;
+    case Stage::AnyHit:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -35,11 +39,13 @@ const char* getStageName(Stage stage)
     switch (stage)
     {
 #define PROFILE_STAGE(ID, NAME, ENUM) \
-    case Stage::ID: return #NAME;
+    case Stage::ID:                   \
+        return #NAME;
 
 #include "slang-profile-defs.h"
 
-    default: return nullptr;
+    default:
+        return nullptr;
     }
 }
 

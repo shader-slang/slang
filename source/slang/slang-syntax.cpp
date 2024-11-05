@@ -37,30 +37,78 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
 
     switch (nodeType)
     {
-    case ASTNodeType::Decl:                      sb << "Decl"; break;
-    case ASTNodeType::UnresolvedDecl:            sb << "UnresolvedDecl"; break;
-    case ASTNodeType::ContainerDecl:             sb << "ContainerDecl"; break;
-    case ASTNodeType::AggTypeDeclBase:           sb << "AggTypeDeclBase"; break;
-    case ASTNodeType::ExtensionDecl:             sb << "extension"; break;
-    case ASTNodeType::AggTypeDecl:               sb << "AggTypeDecl"; break;
-    case ASTNodeType::StructDecl:                sb << "struct"; break;
-    case ASTNodeType::ClassDecl:                 sb << "class"; break;
-    case ASTNodeType::GLSLInterfaceBlockDecl:    sb << "GLSL interface block"; break;
-    case ASTNodeType::EnumDecl:                  sb << "enum"; break;
-    case ASTNodeType::ThisTypeDecl:              sb << "This"; break;
-    case ASTNodeType::InterfaceDecl:             sb << "interface"; break;
-    case ASTNodeType::AssocTypeDecl:             sb << "associatedtype"; break;
-    case ASTNodeType::GlobalGenericParamDecl:    sb << "global generic param"; break;
-    case ASTNodeType::ScopeDecl:                 sb << "scope"; break;
-    case ASTNodeType::CallableDecl:              sb << "CallableDecl"; break;
-    case ASTNodeType::FunctionDeclBase:          sb << "FunctionDeclBase"; break;
-    case ASTNodeType::ConstructorDecl:           sb << "__init"; break;
-    case ASTNodeType::AccessorDecl:              sb << "accessor"; break;
-    case ASTNodeType::GetterDecl:                sb << "getter"; break;
-    case ASTNodeType::SetterDecl:                sb << "setter"; break;
-    case ASTNodeType::RefAccessorDecl:           sb << "ref accessor"; break;
-    case ASTNodeType::FuncDecl:                  sb << "function"; break;
-    case ASTNodeType::DerivativeRequirementDecl: sb << "DerivativeRequirementDecl"; break;
+    case ASTNodeType::Decl:
+        sb << "Decl";
+        break;
+    case ASTNodeType::UnresolvedDecl:
+        sb << "UnresolvedDecl";
+        break;
+    case ASTNodeType::ContainerDecl:
+        sb << "ContainerDecl";
+        break;
+    case ASTNodeType::AggTypeDeclBase:
+        sb << "AggTypeDeclBase";
+        break;
+    case ASTNodeType::ExtensionDecl:
+        sb << "extension";
+        break;
+    case ASTNodeType::AggTypeDecl:
+        sb << "AggTypeDecl";
+        break;
+    case ASTNodeType::StructDecl:
+        sb << "struct";
+        break;
+    case ASTNodeType::ClassDecl:
+        sb << "class";
+        break;
+    case ASTNodeType::GLSLInterfaceBlockDecl:
+        sb << "GLSL interface block";
+        break;
+    case ASTNodeType::EnumDecl:
+        sb << "enum";
+        break;
+    case ASTNodeType::ThisTypeDecl:
+        sb << "This";
+        break;
+    case ASTNodeType::InterfaceDecl:
+        sb << "interface";
+        break;
+    case ASTNodeType::AssocTypeDecl:
+        sb << "associatedtype";
+        break;
+    case ASTNodeType::GlobalGenericParamDecl:
+        sb << "global generic param";
+        break;
+    case ASTNodeType::ScopeDecl:
+        sb << "scope";
+        break;
+    case ASTNodeType::CallableDecl:
+        sb << "CallableDecl";
+        break;
+    case ASTNodeType::FunctionDeclBase:
+        sb << "FunctionDeclBase";
+        break;
+    case ASTNodeType::ConstructorDecl:
+        sb << "__init";
+        break;
+    case ASTNodeType::AccessorDecl:
+        sb << "accessor";
+        break;
+    case ASTNodeType::GetterDecl:
+        sb << "getter";
+        break;
+    case ASTNodeType::SetterDecl:
+        sb << "setter";
+        break;
+    case ASTNodeType::RefAccessorDecl:
+        sb << "ref accessor";
+        break;
+    case ASTNodeType::FuncDecl:
+        sb << "function";
+        break;
+    case ASTNodeType::DerivativeRequirementDecl:
+        sb << "DerivativeRequirementDecl";
+        break;
     case ASTNodeType::ForwardDerivativeRequirementDecl:
         sb << "ForwardDerivativeRequirementDecl";
         break;
@@ -70,42 +118,114 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
     case ASTNodeType::DerivativeRequirementReferenceDecl:
         sb << "DerivativeRequirementReferenceDecl";
         break;
-    case ASTNodeType::SubscriptDecl:               sb << "__subscript"; break;
-    case ASTNodeType::PropertyDecl:                sb << "property"; break;
-    case ASTNodeType::NamespaceDeclBase:           sb << "NamespaceDeclBase"; break;
-    case ASTNodeType::NamespaceDecl:               sb << "namespace"; break;
-    case ASTNodeType::ModuleDecl:                  sb << "module"; break;
-    case ASTNodeType::FileDecl:                    sb << "included file"; break;
-    case ASTNodeType::GenericDecl:                 sb << "generic"; break;
-    case ASTNodeType::AttributeDecl:               sb << "attribute"; break;
-    case ASTNodeType::VarDeclBase:                 sb << "variable definition"; break;
-    case ASTNodeType::VarDecl:                     sb << "variable definition"; break;
-    case ASTNodeType::LetDecl:                     sb << "immutable value definition"; break;
-    case ASTNodeType::GlobalGenericValueParamDecl: sb << "GlobalGenericValueParamDecl"; break;
-    case ASTNodeType::ParamDecl:                   sb << "parameter"; break;
-    case ASTNodeType::ModernParamDecl:             sb << "parameter"; break;
-    case ASTNodeType::GenericValueParamDecl:       sb << "GenericValueParamDecl"; break;
-    case ASTNodeType::EnumCaseDecl:                sb << "enum case"; break;
-    case ASTNodeType::TypeConstraintDecl:          sb << "TypeConstraintDecl"; break;
-    case ASTNodeType::ThisTypeConstraintDecl:      sb << "ThisTypeConstraintDecl"; break;
-    case ASTNodeType::InheritanceDecl:             sb << "InheritanceDecl"; break;
-    case ASTNodeType::GenericTypeConstraintDecl:   sb << "GenericTypeConstraintDecl"; break;
-    case ASTNodeType::SimpleTypeDecl:              sb << "SimpleTypeDecl"; break;
-    case ASTNodeType::TypeDefDecl:                 sb << "typedef"; break;
-    case ASTNodeType::TypeAliasDecl:               sb << "typealias"; break;
-    case ASTNodeType::GenericTypeParamDecl:        sb << "GenericTypeParamDecl"; break;
-    case ASTNodeType::UsingDecl:                   sb << "using"; break;
-    case ASTNodeType::FileReferenceDeclBase:       sb << "FileReferenceDeclBase"; break;
-    case ASTNodeType::ImportDecl:                  sb << "import"; break;
-    case ASTNodeType::IncludeDeclBase:             sb << "IncludeDeclBase"; break;
-    case ASTNodeType::IncludeDecl:                 sb << "__include"; break;
-    case ASTNodeType::ImplementingDecl:            sb << "implementing"; break;
-    case ASTNodeType::ModuleDeclarationDecl:       sb << "module"; break;
-    case ASTNodeType::EmptyDecl:                   sb << "empty"; break;
-    case ASTNodeType::SyntaxDecl:                  sb << "syntax"; break;
-    case ASTNodeType::DeclGroup:                   sb << "decl-group"; break;
-    case ASTNodeType::RequireCapabilityDecl:       sb << "__require_capability"; break;
-    default:                                       sb << "decl"; break;
+    case ASTNodeType::SubscriptDecl:
+        sb << "__subscript";
+        break;
+    case ASTNodeType::PropertyDecl:
+        sb << "property";
+        break;
+    case ASTNodeType::NamespaceDeclBase:
+        sb << "NamespaceDeclBase";
+        break;
+    case ASTNodeType::NamespaceDecl:
+        sb << "namespace";
+        break;
+    case ASTNodeType::ModuleDecl:
+        sb << "module";
+        break;
+    case ASTNodeType::FileDecl:
+        sb << "included file";
+        break;
+    case ASTNodeType::GenericDecl:
+        sb << "generic";
+        break;
+    case ASTNodeType::AttributeDecl:
+        sb << "attribute";
+        break;
+    case ASTNodeType::VarDeclBase:
+        sb << "variable definition";
+        break;
+    case ASTNodeType::VarDecl:
+        sb << "variable definition";
+        break;
+    case ASTNodeType::LetDecl:
+        sb << "immutable value definition";
+        break;
+    case ASTNodeType::GlobalGenericValueParamDecl:
+        sb << "GlobalGenericValueParamDecl";
+        break;
+    case ASTNodeType::ParamDecl:
+        sb << "parameter";
+        break;
+    case ASTNodeType::ModernParamDecl:
+        sb << "parameter";
+        break;
+    case ASTNodeType::GenericValueParamDecl:
+        sb << "GenericValueParamDecl";
+        break;
+    case ASTNodeType::EnumCaseDecl:
+        sb << "enum case";
+        break;
+    case ASTNodeType::TypeConstraintDecl:
+        sb << "TypeConstraintDecl";
+        break;
+    case ASTNodeType::ThisTypeConstraintDecl:
+        sb << "ThisTypeConstraintDecl";
+        break;
+    case ASTNodeType::InheritanceDecl:
+        sb << "InheritanceDecl";
+        break;
+    case ASTNodeType::GenericTypeConstraintDecl:
+        sb << "GenericTypeConstraintDecl";
+        break;
+    case ASTNodeType::SimpleTypeDecl:
+        sb << "SimpleTypeDecl";
+        break;
+    case ASTNodeType::TypeDefDecl:
+        sb << "typedef";
+        break;
+    case ASTNodeType::TypeAliasDecl:
+        sb << "typealias";
+        break;
+    case ASTNodeType::GenericTypeParamDecl:
+        sb << "GenericTypeParamDecl";
+        break;
+    case ASTNodeType::UsingDecl:
+        sb << "using";
+        break;
+    case ASTNodeType::FileReferenceDeclBase:
+        sb << "FileReferenceDeclBase";
+        break;
+    case ASTNodeType::ImportDecl:
+        sb << "import";
+        break;
+    case ASTNodeType::IncludeDeclBase:
+        sb << "IncludeDeclBase";
+        break;
+    case ASTNodeType::IncludeDecl:
+        sb << "__include";
+        break;
+    case ASTNodeType::ImplementingDecl:
+        sb << "implementing";
+        break;
+    case ASTNodeType::ModuleDeclarationDecl:
+        sb << "module";
+        break;
+    case ASTNodeType::EmptyDecl:
+        sb << "empty";
+        break;
+    case ASTNodeType::SyntaxDecl:
+        sb << "syntax";
+        break;
+    case ASTNodeType::DeclGroup:
+        sb << "decl-group";
+        break;
+    case ASTNodeType::RequireCapabilityDecl:
+        sb << "__require_capability";
+        break;
+    default:
+        sb << "decl";
+        break;
     }
 }
 
@@ -380,8 +500,10 @@ RequirementWitness RequirementWitness::specialize(
 {
     switch (getFlavor())
     {
-    default:                               SLANG_UNEXPECTED("unknown requirement witness flavor");
-    case RequirementWitness::Flavor::none: return RequirementWitness();
+    default:
+        SLANG_UNEXPECTED("unknown requirement witness flavor");
+    case RequirementWitness::Flavor::none:
+        return RequirementWitness();
 
     case RequirementWitness::Flavor::witnessTable:
         return RequirementWitness(this->getWitnessTable()->specialize(astBuilder, subst));
@@ -1005,11 +1127,16 @@ char const* getTryClauseTypeName(TryClauseType c)
 {
     switch (c)
     {
-    case TryClauseType::None:     return "None";
-    case TryClauseType::Standard: return "Standard";
-    case TryClauseType::Optional: return "Optional";
-    case TryClauseType::Assert:   return "Assert";
-    default:                      return "Unknown";
+    case TryClauseType::None:
+        return "None";
+    case TryClauseType::Standard:
+        return "Standard";
+    case TryClauseType::Optional:
+        return "Optional";
+    case TryClauseType::Assert:
+        return "Assert";
+    default:
+        return "Unknown";
     }
 }
 

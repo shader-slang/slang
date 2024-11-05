@@ -243,7 +243,8 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
     // Allow exceptions.
     switch (inst->getOp())
     {
-    case kIROp_DifferentiableTypeDictionaryItem: return;
+    case kIROp_DifferentiableTypeDictionaryItem:
+        return;
     }
     //
     // We failed to find `operandParent` while walking the ancestors of `inst`,
@@ -289,8 +290,10 @@ void validateIRInstOperands(IRInst* inst)
     case kIROp_ifElse:
     case kIROp_unconditionalBranch:
     case kIROp_conditionalBranch:
-    case kIROp_Switch:              return;
-    default:                        break;
+    case kIROp_Switch:
+        return;
+    default:
+        break;
     }
 
     validateIRInstOperands(nullptr, inst);

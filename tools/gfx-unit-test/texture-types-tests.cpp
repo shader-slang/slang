@@ -56,13 +56,18 @@ struct BaseTextureViewTest
     {
         switch (type)
         {
-        case IResourceView::Type::RenderTarget:    return ResourceState::RenderTarget;
-        case IResourceView::Type::DepthStencil:    return ResourceState::DepthWrite;
-        case IResourceView::Type::ShaderResource:  return ResourceState::ShaderResource;
-        case IResourceView::Type::UnorderedAccess: return ResourceState::UnorderedAccess;
+        case IResourceView::Type::RenderTarget:
+            return ResourceState::RenderTarget;
+        case IResourceView::Type::DepthStencil:
+            return ResourceState::DepthWrite;
+        case IResourceView::Type::ShaderResource:
+            return ResourceState::ShaderResource;
+        case IResourceView::Type::UnorderedAccess:
+            return ResourceState::UnorderedAccess;
         case IResourceView::Type::AccelerationStructure:
             return ResourceState::AccelerationStructure;
-        default: return ResourceState::Undefined;
+        default:
+            return ResourceState::Undefined;
         }
     }
 
@@ -74,21 +79,43 @@ struct BaseTextureViewTest
 
         switch (textureInfo->textureType)
         {
-        case IResource::Type::Texture1D:   shape = "1D"; break;
-        case IResource::Type::Texture2D:   shape = "2D"; break;
-        case IResource::Type::Texture3D:   shape = "3D"; break;
-        case IResource::Type::TextureCube: shape = "Cube"; break;
-        default:                           assert(!"Invalid texture shape"); SLANG_CHECK_ABORT(false);
+        case IResource::Type::Texture1D:
+            shape = "1D";
+            break;
+        case IResource::Type::Texture2D:
+            shape = "2D";
+            break;
+        case IResource::Type::Texture3D:
+            shape = "3D";
+            break;
+        case IResource::Type::TextureCube:
+            shape = "Cube";
+            break;
+        default:
+            assert(!"Invalid texture shape");
+            SLANG_CHECK_ABORT(false);
         }
 
         switch (viewType)
         {
-        case IResourceView::Type::RenderTarget:          view = "Render"; break;
-        case IResourceView::Type::DepthStencil:          view = "Depth"; break;
-        case IResourceView::Type::ShaderResource:        view = "Shader"; break;
-        case IResourceView::Type::UnorderedAccess:       view = "Unordered"; break;
-        case IResourceView::Type::AccelerationStructure: view = "Accel"; break;
-        default:                                         assert(!"Invalid resource view"); SLANG_CHECK_ABORT(false);
+        case IResourceView::Type::RenderTarget:
+            view = "Render";
+            break;
+        case IResourceView::Type::DepthStencil:
+            view = "Depth";
+            break;
+        case IResourceView::Type::ShaderResource:
+            view = "Shader";
+            break;
+        case IResourceView::Type::UnorderedAccess:
+            view = "Unordered";
+            break;
+        case IResourceView::Type::AccelerationStructure:
+            view = "Accel";
+            break;
+        default:
+            assert(!"Invalid resource view");
+            SLANG_CHECK_ABORT(false);
         }
 
         return base + shape + view;

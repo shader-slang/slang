@@ -76,8 +76,10 @@ struct GenericFunctionLoweringContext
         {
             switch (genericChild->getOp())
             {
-            case kIROp_Func:   continue;
-            case kIROp_Return: continue;
+            case kIROp_Func:
+                continue;
+            case kIROp_Return:
+                continue;
             }
             // Process all generic parameters and local type definitions.
             auto clonedChild = cloneInst(&cloneEnv, &builder, genericChild);
@@ -95,7 +97,9 @@ struct GenericFunctionLoweringContext
                 }
                 break;
             case kIROp_Specialize:
-            case kIROp_LookupWitness: childrenToDemote.add(clonedChild); break;
+            case kIROp_LookupWitness:
+                childrenToDemote.add(clonedChild);
+                break;
             default:
                 {
                     bool shouldDemote = false;

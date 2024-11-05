@@ -232,7 +232,8 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
                 newTerminator =
                     builder.emitBranch(as<IRUnconditionalBranch>(terminator)->getTargetBlock());
                 break;
-            default: SLANG_UNREACHABLE("terminator type");
+            default:
+                SLANG_UNREACHABLE("terminator type");
             }
 
             // Modify jump targets in newTerminator to point to the right recompute block or
@@ -852,11 +853,13 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
             switch (impRes.e)
             {
             // This wasn't an induction variable
-            case ImplicationResult::Falsified: break;
+            case ImplicationResult::Falsified:
+                break;
 
             // The loop doesn't loop (because in every case the break flag is
             // true)
-            case ImplicationResult::AntecedentHolds: break;
+            case ImplicationResult::AntecedentHolds:
+                break;
 
             case ImplicationResult::ConsequentHolds:
                 {
@@ -1580,7 +1583,8 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 switch (inst->getOp())
                 {
                 case kIROp_GetSequentialID:
-                case kIROp_ExtractExistentialValue: return true;
+                case kIROp_ExtractExistentialValue:
+                    return true;
                 }
 
                 return false;
@@ -2057,9 +2061,11 @@ static CheckpointPreference getCheckpointPreference(IRInst* callee)
     {
         switch (decor->getOp())
         {
-        case kIROp_PreferCheckpointDecoration: return CheckpointPreference::PreferCheckpoint;
+        case kIROp_PreferCheckpointDecoration:
+            return CheckpointPreference::PreferCheckpoint;
         case kIROp_PreferRecomputeDecoration:
-        case kIROp_TargetIntrinsicDecoration:  return CheckpointPreference::PreferRecompute;
+        case kIROp_TargetIntrinsicDecoration:
+            return CheckpointPreference::PreferRecompute;
         }
     }
     return CheckpointPreference::None;
@@ -2131,7 +2137,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_Specialize:
     case kIROp_LookupWitness:
     case kIROp_Param:
-    case kIROp_DetachDerivative:                        return false;
+    case kIROp_DetachDerivative:
+        return false;
 
     // Never store these op codes because they are trivial to compute.
     case kIROp_Add:
@@ -2156,7 +2163,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_BitXor:
     case kIROp_Lsh:
     case kIROp_Rsh:
-    case kIROp_Select:  return false;
+    case kIROp_Select:
+        return false;
 
     case kIROp_GetElement:
     case kIROp_FieldExtract:
@@ -2166,7 +2174,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_GetOptionalValue:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
-    case kIROp_GetTupleElement:  return false;
+    case kIROp_GetTupleElement:
+        return false;
 
     case kIROp_Load:
         // In general, don't store loads, because:
@@ -2205,7 +2214,8 @@ static bool shouldStoreInst(IRInst* inst)
 
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (as<IRType>(inst))

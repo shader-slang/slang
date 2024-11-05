@@ -349,16 +349,35 @@ struct TupleLoweringContext
         switch (inst->getOp())
         {
         case kIROp_MakeTuple:
-        case kIROp_MakeValuePack:   processMakeTuple((IRMakeTuple*)inst); break;
-        case kIROp_GetTupleElement: processGetTupleElement((IRGetTupleElement*)inst); break;
-        case kIROp_GetElementPtr:   processGetElementPtr((IRGetElementPtr*)inst); break;
-        case kIROp_swizzle:         processSwizzle((IRSwizzle*)inst); break;
-        case kIROp_swizzleSet:      processSwizzleSet((IRSwizzleSet*)inst); break;
-        case kIROp_SwizzledStore:   processSwizzledStore((IRSwizzledStore*)inst); break;
-        case kIROp_TupleType:       processTupleType((IRTupleType*)inst); break;
-        case kIROp_IndexedFieldKey: processIndexedFieldKey((IRIndexedFieldKey*)inst); break;
-        case kIROp_UpdateElement:   processUpdateElement((IRUpdateElement*)inst); break;
-        default:                    break;
+        case kIROp_MakeValuePack:
+            processMakeTuple((IRMakeTuple*)inst);
+            break;
+        case kIROp_GetTupleElement:
+            processGetTupleElement((IRGetTupleElement*)inst);
+            break;
+        case kIROp_GetElementPtr:
+            processGetElementPtr((IRGetElementPtr*)inst);
+            break;
+        case kIROp_swizzle:
+            processSwizzle((IRSwizzle*)inst);
+            break;
+        case kIROp_swizzleSet:
+            processSwizzleSet((IRSwizzleSet*)inst);
+            break;
+        case kIROp_SwizzledStore:
+            processSwizzledStore((IRSwizzledStore*)inst);
+            break;
+        case kIROp_TupleType:
+            processTupleType((IRTupleType*)inst);
+            break;
+        case kIROp_IndexedFieldKey:
+            processIndexedFieldKey((IRIndexedFieldKey*)inst);
+            break;
+        case kIROp_UpdateElement:
+            processUpdateElement((IRUpdateElement*)inst);
+            break;
+        default:
+            break;
         }
     }
 

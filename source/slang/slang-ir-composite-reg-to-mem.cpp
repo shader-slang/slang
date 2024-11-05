@@ -184,7 +184,8 @@ void convertCompositeTypeParametersToPointers(IRFunc* func)
                     initialStore = builder.emitStore(tempVar, inst);
                     break;
                 }
-            default: break;
+            default:
+                break;
             }
 
             if (!tempVar)

@@ -95,7 +95,9 @@ static Result _calcSizeAndAlignment(
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::HostExecutable:
-    case CodeGenTarget::HostSharedLibrary: kPointerSize = (int)sizeof(void*); break;
+    case CodeGenTarget::HostSharedLibrary:
+        kPointerSize = (int)sizeof(void*);
+        break;
     }
 
     switch (type->getOp())
@@ -360,7 +362,8 @@ static Result _calcSizeAndAlignment(
                 attributedType->getBaseType(),
                 outSizeAndAlignment);
         }
-    default: break;
+    default:
+        break;
     }
     if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
     {
@@ -650,11 +653,16 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
 {
     switch (name)
     {
-    case IRTypeLayoutRuleName::Std430:            return getStd430();
-    case IRTypeLayoutRuleName::Std140:            return getStd140();
-    case IRTypeLayoutRuleName::Natural:           return getNatural();
-    case IRTypeLayoutRuleName::D3DConstantBuffer: return getConstantBuffer();
-    default:                                      return nullptr;
+    case IRTypeLayoutRuleName::Std430:
+        return getStd430();
+    case IRTypeLayoutRuleName::Std140:
+        return getStd140();
+    case IRTypeLayoutRuleName::Natural:
+        return getNatural();
+    case IRTypeLayoutRuleName::D3DConstantBuffer:
+        return getConstantBuffer();
+    default:
+        return nullptr;
     }
 }
 

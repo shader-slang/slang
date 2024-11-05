@@ -206,7 +206,8 @@ static int _peek(Lexer* lexer, int offset = 0)
                         c = e;
                     continue;
                 }
-            default: break;
+            default:
+                break;
             }
 
             // Only continue this while loop in the case where we consumed
@@ -261,7 +262,8 @@ static int _advance(Lexer* lexer)
                 // escaped newline.
                 continue;
 
-            default: break;
+            default:
+                break;
             }
         }
 
@@ -291,9 +293,12 @@ static void _lexLineComment(Lexer* lexer)
         {
         case '\n':
         case '\r':
-        case kEOF: return;
+        case kEOF:
+            return;
 
-        default: _advance(lexer); continue;
+        default:
+            _advance(lexer);
+            continue;
         }
     }
 }
@@ -309,18 +314,25 @@ static void _lexBlockComment(Lexer* lexer)
             return;
 
         case '\n':
-        case '\r': _handleNewLine(lexer); continue;
+        case '\r':
+            _handleNewLine(lexer);
+            continue;
 
         case '*':
             _advance(lexer);
             switch (_peek(lexer))
             {
-            case '/': _advance(lexer); return;
+            case '/':
+                _advance(lexer);
+                return;
 
-            default: continue;
+            default:
+                continue;
             }
 
-        default: _advance(lexer); continue;
+        default:
+            _advance(lexer);
+            continue;
         }
     }
 }
@@ -332,9 +344,12 @@ static void _lexHorizontalSpace(Lexer* lexer)
         switch (_peek(lexer))
         {
         case ' ':
-        case '\t': _advance(lexer); continue;
+        case '\t':
+            _advance(lexer);
+            continue;
 
-        default: return;
+        default:
+            return;
         }
     }
 }
@@ -382,7 +397,9 @@ static void _lexDigits(Lexer* lexer, int base)
         case '6':
         case '7':
         case '8':
-        case '9': digitVal = c - '0'; break;
+        case '9':
+            digitVal = c - '0';
+            break;
 
         case 'a':
         case 'b':
@@ -456,7 +473,8 @@ static bool _isNumberExponent(int c, int base)
 {
     switch (c)
     {
-    default: return false;
+    default:
+        return false;
 
     case 'e':
     case 'E':
@@ -502,7 +520,9 @@ static bool _maybeLexNumberExponent(Lexer* lexer, int base)
     switch (_peek(lexer))
     {
     case '+':
-    case '-': _advance(lexer); break;
+    case '-':
+        _advance(lexer);
+        break;
     }
 
     // TODO(tfoley): it would be an error to not see digits here...
@@ -535,7 +555,8 @@ static TokenType _lexNumber(Lexer* lexer, int base)
         {
             // 123.xxxx or 123.rrrr
         case 'x':
-        case 'r': break;
+        case 'r':
+            break;
 
         default:
             tokenType = TokenType::FloatingPointLiteral;
@@ -563,10 +584,13 @@ static int _maybeReadDigit(char const** ioCursor, int base)
         int c = *cursor;
         switch (c)
         {
-        default: return -1;
+        default:
+            return -1;
 
         // TODO: need to decide on digit separator characters
-        case '_': cursor++; continue;
+        case '_':
+            cursor++;
+            continue;
 
         case '0':
         case '1':
@@ -577,7 +601,9 @@ static int _maybeReadDigit(char const** ioCursor, int base)
         case '6':
         case '7':
         case '8':
-        case '9': cursor++; return c - '0';
+        case '9':
+            cursor++;
+            return c - '0';
 
         case 'a':
         case 'b':
@@ -617,10 +643,14 @@ static int _readOptionalBase(char const** ioCursor)
         switch (*cursor)
         {
         case 'x':
-        case 'X': cursor++; return 16;
+        case 'X':
+            cursor++;
+            return 16;
 
         case 'b':
-        case 'B': cursor++; return 2;
+        case 'B':
+            cursor++;
+            return 2;
 
         case '0':
         case '1':
@@ -631,9 +661,11 @@ static int _readOptionalBase(char const** ioCursor)
         case '6':
         case '7':
         case '8':
-        case '9': return 8;
+        case '9':
+            return 8;
 
-        default: return 10;
+        default:
+            return 10;
         }
     }
 
@@ -731,14 +763,17 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         bool exponentIsNegative = false;
         switch (*cursor)
         {
-        default: break;
+        default:
+            break;
 
         case '-':
             exponentIsNegative = true;
             cursor++;
             break;
 
-        case '+': cursor++; break;
+        case '+':
+            cursor++;
+            break;
         }
 
         int exponentRadix = 10;
@@ -824,7 +859,9 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote)
             case 'n':
             case 'r':
             case 't':
-            case 'v':  _advance(lexer); break;
+            case 'v':
+                _advance(lexer);
+                break;
 
             case '0':
             case '1':
@@ -874,7 +911,9 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote)
             }
             break;
 
-        default: _advance(lexer); continue;
+        default:
+            _advance(lexer);
+            continue;
         }
     }
 }
@@ -921,7 +960,9 @@ static void _lexRawStringLiteralBody(Lexer* lexer)
                 sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
             }
             return;
-        default: _advance(lexer); continue;
+        default:
+            _advance(lexer);
+            continue;
         }
     }
 }
@@ -992,16 +1033,32 @@ String getStringLiteralTokenValue(Token const& token)
         case '\'':
         case '\"':
         case '\\':
-        case '?':  valueBuilder.append(d); continue;
+        case '?':
+            valueBuilder.append(d);
+            continue;
 
         // Traditional escape sequences for special characters
-        case 'a': valueBuilder.append('\a'); continue;
-        case 'b': valueBuilder.append('\b'); continue;
-        case 'f': valueBuilder.append('\f'); continue;
-        case 'n': valueBuilder.append('\n'); continue;
-        case 'r': valueBuilder.append('\r'); continue;
-        case 't': valueBuilder.append('\t'); continue;
-        case 'v': valueBuilder.append('\v'); continue;
+        case 'a':
+            valueBuilder.append('\a');
+            continue;
+        case 'b':
+            valueBuilder.append('\b');
+            continue;
+        case 'f':
+            valueBuilder.append('\f');
+            continue;
+        case 'n':
+            valueBuilder.append('\n');
+            continue;
+        case 'r':
+            valueBuilder.append('\r');
+            continue;
+        case 't':
+            valueBuilder.append('\t');
+            continue;
+        case 'v':
+            valueBuilder.append('\v');
+            continue;
 
         // Octal escape: up to 3 characters
         case '0':
@@ -1093,15 +1150,21 @@ static TokenType _lexTokenImpl(Lexer* lexer)
     int nextCodePoint = _peek(lexer);
     switch (nextCodePoint)
     {
-    default: break;
+    default:
+        break;
 
-    case kEOF: return TokenType::EndOfFile;
+    case kEOF:
+        return TokenType::EndOfFile;
 
     case '\r':
-    case '\n': _handleNewLine(lexer); return TokenType::NewLine;
+    case '\n':
+        _handleNewLine(lexer);
+        return TokenType::NewLine;
 
     case ' ':
-    case '\t': _lexHorizontalSpace(lexer); return TokenType::WhiteSpace;
+    case '\t':
+        _lexHorizontalSpace(lexer);
+        return TokenType::WhiteSpace;
 
     case '.':
         _advance(lexer);
@@ -1116,7 +1179,8 @@ static TokenType _lexTokenImpl(Lexer* lexer)
         case '6':
         case '7':
         case '8':
-        case '9': return _lexNumberAfterDecimalPoint(lexer, 10);
+        case '9':
+            return _lexNumberAfterDecimalPoint(lexer, 10);
 
         case '.':
             // Note: consuming the second `.` here means that
@@ -1128,12 +1192,16 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             _advance(lexer);
             switch (_peek(lexer))
             {
-            case '.': _advance(lexer); return TokenType::Ellipsis;
+            case '.':
+                _advance(lexer);
+                return TokenType::Ellipsis;
 
-            default: return TokenType::DotDot;
+            default:
+                return TokenType::DotDot;
             }
 
-        default: return TokenType::Dot;
+        default:
+            return TokenType::Dot;
         }
 
     case '1':
@@ -1144,7 +1212,8 @@ static TokenType _lexTokenImpl(Lexer* lexer)
     case '6':
     case '7':
     case '8':
-    case '9': return _lexNumber(lexer, 10);
+    case '9':
+        return _lexNumber(lexer, 10);
 
     case '0':
         {
@@ -1152,22 +1221,30 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             _advance(lexer);
             switch (_peek(lexer))
             {
-            default: return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
+            default:
+                return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
 
             case '.':
                 switch (_peek(lexer, 1))
                 {
                     // 0.xxxx or 0.rrrr
                 case 'x':
-                case 'r': return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
-                default:  _advance(lexer); return _lexNumberAfterDecimalPoint(lexer, 10);
+                case 'r':
+                    return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
+                default:
+                    _advance(lexer);
+                    return _lexNumberAfterDecimalPoint(lexer, 10);
                 }
 
             case 'x':
-            case 'X': _advance(lexer); return _lexNumber(lexer, 16);
+            case 'X':
+                _advance(lexer);
+                return _lexNumber(lexer, 16);
 
             case 'b':
-            case 'B': _advance(lexer); return _lexNumber(lexer, 2);
+            case 'B':
+                _advance(lexer);
+                return _lexNumber(lexer, 2);
 
             case '0':
             case '1':
@@ -1238,12 +1315,16 @@ static TokenType _lexTokenImpl(Lexer* lexer)
     case 'X':
     case 'Y':
     case 'Z':
-    case '_': _lexIdentifier(lexer); return TokenType::Identifier;
+    case '_':
+        _lexIdentifier(lexer);
+        return TokenType::Identifier;
     case 'R':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        default: _lexIdentifier(lexer); return TokenType::Identifier;
+        default:
+            _lexIdentifier(lexer);
+            return TokenType::Identifier;
         case '\"':
             _advance(lexer);
             _lexRawStringLiteralBody(lexer);
@@ -1265,34 +1346,51 @@ static TokenType _lexTokenImpl(Lexer* lexer)
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '+': _advance(lexer); return TokenType::OpInc;
-        case '=': _advance(lexer); return TokenType::OpAddAssign;
-        default:  return TokenType::OpAdd;
+        case '+':
+            _advance(lexer);
+            return TokenType::OpInc;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpAddAssign;
+        default:
+            return TokenType::OpAdd;
         }
 
     case '-':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '-': _advance(lexer); return TokenType::OpDec;
-        case '=': _advance(lexer); return TokenType::OpSubAssign;
-        case '>': _advance(lexer); return TokenType::RightArrow;
-        default:  return TokenType::OpSub;
+        case '-':
+            _advance(lexer);
+            return TokenType::OpDec;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpSubAssign;
+        case '>':
+            _advance(lexer);
+            return TokenType::RightArrow;
+        default:
+            return TokenType::OpSub;
         }
 
     case '*':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '=': _advance(lexer); return TokenType::OpMulAssign;
-        default:  return TokenType::OpMul;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpMulAssign;
+        default:
+            return TokenType::OpMul;
         }
 
     case '/':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '=': _advance(lexer); return TokenType::OpDivAssign;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpDivAssign;
         case '/':
             _advance(lexer);
             _lexLineComment(lexer);
@@ -1301,41 +1399,58 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             _advance(lexer);
             _lexBlockComment(lexer);
             return TokenType::BlockComment;
-        default: return TokenType::OpDiv;
+        default:
+            return TokenType::OpDiv;
         }
 
     case '%':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '=': _advance(lexer); return TokenType::OpModAssign;
-        default:  return TokenType::OpMod;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpModAssign;
+        default:
+            return TokenType::OpMod;
         }
 
     case '|':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '|': _advance(lexer); return TokenType::OpOr;
-        case '=': _advance(lexer); return TokenType::OpOrAssign;
-        default:  return TokenType::OpBitOr;
+        case '|':
+            _advance(lexer);
+            return TokenType::OpOr;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpOrAssign;
+        default:
+            return TokenType::OpBitOr;
         }
 
     case '&':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '&': _advance(lexer); return TokenType::OpAnd;
-        case '=': _advance(lexer); return TokenType::OpAndAssign;
-        default:  return TokenType::OpBitAnd;
+        case '&':
+            _advance(lexer);
+            return TokenType::OpAnd;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpAndAssign;
+        default:
+            return TokenType::OpBitAnd;
         }
 
     case '^':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '=': _advance(lexer); return TokenType::OpXorAssign;
-        default:  return TokenType::OpBitXor;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpXorAssign;
+        default:
+            return TokenType::OpBitXor;
         }
 
     case '>':
@@ -1346,11 +1461,17 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             _advance(lexer);
             switch (_peek(lexer))
             {
-            case '=': _advance(lexer); return TokenType::OpShrAssign;
-            default:  return TokenType::OpRsh;
+            case '=':
+                _advance(lexer);
+                return TokenType::OpShrAssign;
+            default:
+                return TokenType::OpRsh;
             }
-        case '=': _advance(lexer); return TokenType::OpGeq;
-        default:  return TokenType::OpGreater;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpGeq;
+        default:
+            return TokenType::OpGreater;
         }
 
     case '<':
@@ -1361,41 +1482,60 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             _advance(lexer);
             switch (_peek(lexer))
             {
-            case '=': _advance(lexer); return TokenType::OpShlAssign;
-            default:  return TokenType::OpLsh;
+            case '=':
+                _advance(lexer);
+                return TokenType::OpShlAssign;
+            default:
+                return TokenType::OpLsh;
             }
-        case '=': _advance(lexer); return TokenType::OpLeq;
-        default:  return TokenType::OpLess;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpLeq;
+        default:
+            return TokenType::OpLess;
         }
 
     case '=':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '=': _advance(lexer); return TokenType::OpEql;
-        default:  return TokenType::OpAssign;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpEql;
+        default:
+            return TokenType::OpAssign;
         }
 
     case '!':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '=': _advance(lexer); return TokenType::OpNeq;
-        default:  return TokenType::OpNot;
+        case '=':
+            _advance(lexer);
+            return TokenType::OpNeq;
+        default:
+            return TokenType::OpNot;
         }
 
     case '#':
         _advance(lexer);
         switch (_peek(lexer))
         {
-        case '#': _advance(lexer); return TokenType::PoundPound;
+        case '#':
+            _advance(lexer);
+            return TokenType::PoundPound;
 
-        case '?': _advance(lexer); return TokenType::CompletionRequest;
+        case '?':
+            _advance(lexer);
+            return TokenType::CompletionRequest;
 
-        default: return TokenType::Pound;
+        default:
+            return TokenType::Pound;
         }
 
-    case '~': _advance(lexer); return TokenType::OpBitNot;
+    case '~':
+        _advance(lexer);
+        return TokenType::OpBitNot;
 
     case ':':
         {
@@ -1407,18 +1547,38 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             }
             return TokenType::Colon;
         }
-    case ';': _advance(lexer); return TokenType::Semicolon;
-    case ',': _advance(lexer); return TokenType::Comma;
+    case ';':
+        _advance(lexer);
+        return TokenType::Semicolon;
+    case ',':
+        _advance(lexer);
+        return TokenType::Comma;
 
-    case '{': _advance(lexer); return TokenType::LBrace;
-    case '}': _advance(lexer); return TokenType::RBrace;
-    case '[': _advance(lexer); return TokenType::LBracket;
-    case ']': _advance(lexer); return TokenType::RBracket;
-    case '(': _advance(lexer); return TokenType::LParent;
-    case ')': _advance(lexer); return TokenType::RParent;
+    case '{':
+        _advance(lexer);
+        return TokenType::LBrace;
+    case '}':
+        _advance(lexer);
+        return TokenType::RBrace;
+    case '[':
+        _advance(lexer);
+        return TokenType::LBracket;
+    case ']':
+        _advance(lexer);
+        return TokenType::RBracket;
+    case '(':
+        _advance(lexer);
+        return TokenType::LParent;
+    case ')':
+        _advance(lexer);
+        return TokenType::RParent;
 
-    case '?': _advance(lexer); return TokenType::QuestionMark;
-    case '@': _advance(lexer); return TokenType::At;
+    case '?':
+        _advance(lexer);
+        return TokenType::QuestionMark;
+    case '@':
+        _advance(lexer);
+        return TokenType::At;
     case '$':
         {
             _advance(lexer);
@@ -1565,7 +1725,8 @@ Token Lexer::lexToken()
                             }
                             continue;
 
-                        default: break;
+                        default:
+                            break;
                         }
                     }
                     *dst++ = c;
@@ -1603,12 +1764,14 @@ TokenList Lexer::lexAllSemanticTokens()
         //
         switch (token.type)
         {
-        default: break;
+        default:
+            break;
 
         case TokenType::WhiteSpace:
         case TokenType::BlockComment:
         case TokenType::LineComment:
-        case TokenType::NewLine:      continue;
+        case TokenType::NewLine:
+            continue;
         }
 
         tokenList.add(token);
@@ -1625,10 +1788,12 @@ TokenList Lexer::lexAllMarkupTokens()
         Token token = lexToken();
         switch (token.type)
         {
-        default: break;
+        default:
+            break;
 
         case TokenType::WhiteSpace:
-        case TokenType::NewLine:    continue;
+        case TokenType::NewLine:
+            continue;
         }
 
         tokenList.add(token);

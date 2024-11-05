@@ -117,7 +117,8 @@ public:
             {
                 return true;
             }
-        default: break;
+        default:
+            break;
         }
         return false;
     }

@@ -31,10 +31,17 @@ IRFunc* specializeDispatchFunction(
     {
         switch (inst->getOp())
         {
-        case kIROp_Call:          callInst = cast<IRCall>(inst); break;
-        case kIROp_LookupWitness: lookupInst = cast<IRLookupWitnessMethod>(inst); break;
-        case kIROp_Return:        returnInst = cast<IRReturn>(inst); break;
-        default:                  break;
+        case kIROp_Call:
+            callInst = cast<IRCall>(inst);
+            break;
+        case kIROp_LookupWitness:
+            lookupInst = cast<IRLookupWitnessMethod>(inst);
+            break;
+        case kIROp_Return:
+            returnInst = cast<IRReturn>(inst);
+            break;
+        default:
+            break;
         }
     }
     SLANG_ASSERT(callInst && lookupInst && returnInst);

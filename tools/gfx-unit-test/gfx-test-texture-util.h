@@ -61,7 +61,9 @@ struct ValidationTextureFormat : ValidationTextureFormatBase
 
         switch (componentCount)
         {
-        case 1: temp[0] = T(x + y + z + mipLevel + arrayLayer); break;
+        case 1:
+            temp[0] = T(x + y + z + mipLevel + arrayLayer);
+            break;
         case 2:
             temp[0] = T(x + z + arrayLayer);
             temp[1] = T(y + mipLevel);
@@ -77,7 +79,9 @@ struct ValidationTextureFormat : ValidationTextureFormatBase
             temp[2] = (T)z;
             temp[3] = (T)mipLevel;
             break;
-        default: assert(!"component count should be no greater than 4"); SLANG_CHECK_ABORT(false);
+        default:
+            assert(!"component count should be no greater than 4");
+            SLANG_CHECK_ABORT(false);
         }
     }
 };

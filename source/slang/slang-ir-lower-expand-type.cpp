@@ -19,7 +19,8 @@ IRInst* clonePatternValImpl(
 
     switch (val->getOp())
     {
-    case kIROp_ExpandTypeOrVal: return val;
+    case kIROp_ExpandTypeOrVal:
+        return val;
     case kIROp_Each:
         {
             auto eachInst = as<IREach>(val);
@@ -33,7 +34,8 @@ IRInst* clonePatternValImpl(
     case kIROp_Specialize:
     case kIROp_LookupWitness:
     case kIROp_ExtractExistentialType:
-    case kIROp_ExtractExistentialWitnessTable: break;
+    case kIROp_ExtractExistentialWitnessTable:
+        break;
     default:
         // If the value is not a type, and it is not in a block, then it is some global inst
         // that shouldn't be deep copied into current block, such as a IRFunc.

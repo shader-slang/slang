@@ -86,13 +86,21 @@ UnownedStringSlice getHeaderNameFromAutoDocHeaderGroup(UInt headerGroup)
 {
     switch (headerGroup)
     {
-    case (UInt)AutoDocHeaderGroup::Targets:    return UnownedStringSlice("Targets");
-    case (UInt)AutoDocHeaderGroup::Stages:     return UnownedStringSlice("Stages");
-    case (UInt)AutoDocHeaderGroup::Extensions: return UnownedStringSlice("Extensions");
-    case (UInt)AutoDocHeaderGroup::Versions:   return UnownedStringSlice("Versions");
-    case (UInt)AutoDocHeaderGroup::Compound:   return UnownedStringSlice("Compound Capabilities");
-    case (UInt)AutoDocHeaderGroup::Other:      return UnownedStringSlice("Other");
-    default:                                   SLANG_ASSERT("Unknown `AutoDocHeaderGroup`"); return UnownedStringSlice("");
+    case (UInt)AutoDocHeaderGroup::Targets:
+        return UnownedStringSlice("Targets");
+    case (UInt)AutoDocHeaderGroup::Stages:
+        return UnownedStringSlice("Stages");
+    case (UInt)AutoDocHeaderGroup::Extensions:
+        return UnownedStringSlice("Extensions");
+    case (UInt)AutoDocHeaderGroup::Versions:
+        return UnownedStringSlice("Versions");
+    case (UInt)AutoDocHeaderGroup::Compound:
+        return UnownedStringSlice("Compound Capabilities");
+    case (UInt)AutoDocHeaderGroup::Other:
+        return UnownedStringSlice("Other");
+    default:
+        SLANG_ASSERT("Unknown `AutoDocHeaderGroup`");
+        return UnownedStringSlice("");
     }
 }
 
@@ -116,7 +124,9 @@ UnownedStringSlice getHeaderDescriptionFromAutoDocHeaderGroup(UInt headerGroup)
                                   "capabilities (`raytracing`, `meshshading`...)");
     case (UInt)AutoDocHeaderGroup::Other:
         return UnownedStringSlice("Capabilities which may be deprecated");
-    default: SLANG_ASSERT("Unknown `AutoDocHeaderGroup`"); return UnownedStringSlice("");
+    default:
+        SLANG_ASSERT("Unknown `AutoDocHeaderGroup`");
+        return UnownedStringSlice("");
     }
 }
 
@@ -1256,9 +1266,15 @@ SlangResult generateDefinitions(
         // flavor.
         switch (def->flavor)
         {
-        case CapabilityFlavor::Normal:   sbCpp << "CapabilityNameFlavor::Concrete"; break;
-        case CapabilityFlavor::Abstract: sbCpp << "CapabilityNameFlavor::Abstract"; break;
-        case CapabilityFlavor::Alias:    sbCpp << "CapabilityNameFlavor::Alias"; break;
+        case CapabilityFlavor::Normal:
+            sbCpp << "CapabilityNameFlavor::Concrete";
+            break;
+        case CapabilityFlavor::Abstract:
+            sbCpp << "CapabilityNameFlavor::Abstract";
+            break;
+        case CapabilityFlavor::Alias:
+            sbCpp << "CapabilityNameFlavor::Alias";
+            break;
         }
         sbCpp << ", ";
 

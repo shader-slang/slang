@@ -16,7 +16,8 @@ bool isPolymorphicType(IRInst* typeInst)
     case kIROp_ThisType:
     case kIROp_AssociatedType:
     case kIROp_InterfaceType:
-    case kIROp_LookupWitness:  return true;
+    case kIROp_LookupWitness:
+        return true;
     case kIROp_Specialize:
         {
             for (UInt i = 0; i < typeInst->getOperandCount(); i++)
@@ -26,7 +27,8 @@ bool isPolymorphicType(IRInst* typeInst)
             }
             return false;
         }
-    default: break;
+    default:
+        break;
     }
     if (auto ptrType = as<IRPtrTypeBase>(typeInst))
     {
@@ -42,8 +44,10 @@ bool isTypeValue(IRInst* typeInst)
         switch (typeInst->getOp())
         {
         case kIROp_TypeType:
-        case kIROp_TypeKind: return true;
-        default:             return false;
+        case kIROp_TypeKind:
+            return true;
+        default:
+            return false;
         }
     }
     return false;

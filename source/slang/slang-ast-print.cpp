@@ -14,14 +14,22 @@ ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
 
     switch (type)
     {
-    case Type::ParamType:             return Kind::Type;
-    case Type::ParamName:             return Kind::Name;
-    case Type::ReturnType:            return Kind::Type;
-    case Type::DeclPath:              return Kind::Name;
-    case Type::GenericParamType:      return Kind::Type;
-    case Type::GenericParamValue:     return Kind::Value;
-    case Type::GenericParamValueType: return Kind::Type;
-    default:                          break;
+    case Type::ParamType:
+        return Kind::Type;
+    case Type::ParamName:
+        return Kind::Name;
+    case Type::ReturnType:
+        return Kind::Type;
+    case Type::DeclPath:
+        return Kind::Name;
+    case Type::GenericParamType:
+        return Kind::Type;
+    case Type::GenericParamValue:
+        return Kind::Value;
+    case Type::GenericParamValueType:
+        return Kind::Type;
+    default:
+        break;
     }
     return Kind::None;
 }

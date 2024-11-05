@@ -256,7 +256,8 @@ SlangResult DefaultArtifactHandler::_createOSFile(
                 }
                 break;
             }
-        default: break;
+        default:
+            break;
         }
 
         if (path.getLength())

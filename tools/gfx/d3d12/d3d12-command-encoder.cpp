@@ -24,10 +24,15 @@ int PipelineCommandEncoder::getBindPointIndex(PipelineType type)
 {
     switch (type)
     {
-    case PipelineType::Graphics:   return 0;
-    case PipelineType::Compute:    return 1;
-    case PipelineType::RayTracing: return 2;
-    default:                       assert(!"unknown pipeline type."); return -1;
+    case PipelineType::Graphics:
+        return 0;
+    case PipelineType::Compute:
+        return 1;
+    case PipelineType::RayTracing:
+        return 2;
+    default:
+        assert(!"unknown pipeline type.");
+        return -1;
     }
 }
 
@@ -124,7 +129,9 @@ Result PipelineCommandEncoder::_bindRenderState(
             d3dheap = m_transientHeap->getCurrentSamplerHeap().getHeap();
             m_commandBuffer->bindDescriptorHeaps();
             break;
-        default: assert(!"shouldn't be here"); return SLANG_FAIL;
+        default:
+            assert(!"shouldn't be here");
+            return SLANG_FAIL;
         }
 
         // Try again.
@@ -456,7 +463,8 @@ void ResourceCommandEncoderImpl::clearResourceView(
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 }
 

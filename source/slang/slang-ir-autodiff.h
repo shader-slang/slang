@@ -363,12 +363,15 @@ struct DifferentiableTypeConformanceContext
             case kIROp_HalfType:
             case kIROp_DoubleType:
             case kIROp_DifferentialPairType:
-            case kIROp_DifferentialPairUserCodeType: return true;
+            case kIROp_DifferentialPairUserCodeType:
+                return true;
             case kIROp_VectorType:
             case kIROp_ArrayType:
             case kIROp_PtrType:
             case kIROp_OutType:
-            case kIROp_InOutType:                    origType = (IRType*)origType->getOperand(0); continue;
+            case kIROp_InOutType:
+                origType = (IRType*)origType->getOperand(0);
+                continue;
             default:
                 return lookUpConformanceForType(origType, DiffConformanceKind::Value) != nullptr;
             }
@@ -386,8 +389,11 @@ struct DifferentiableTypeConformanceContext
             case kIROp_ArrayType:
             case kIROp_PtrType:
             case kIROp_OutType:
-            case kIROp_InOutType:  origType = (IRType*)origType->getOperand(0); continue;
-            default:               return lookUpConformanceForType(origType, DiffConformanceKind::Ptr) != nullptr;
+            case kIROp_InOutType:
+                origType = (IRType*)origType->getOperand(0);
+                continue;
+            default:
+                return lookUpConformanceForType(origType, DiffConformanceKind::Ptr) != nullptr;
             }
         }
         return false;

@@ -285,7 +285,8 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
             }
             return SLANG_FAIL;
         }
-    default: break;
+    default:
+        break;
     }
     return SLANG_FAIL;
 }
@@ -408,7 +409,8 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
 
     switch (rttiInfo->m_kind)
     {
-    case RttiInfo::Kind::Invalid: return SLANG_FAIL;
+    case RttiInfo::Kind::Invalid:
+        return SLANG_FAIL;
     case RttiInfo::Kind::Bool:
         {
             out = JSONValue::makeBool(RttiUtil::asBool(rttiInfo, in));
@@ -512,7 +514,8 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     return SLANG_E_NOT_IMPLEMENTED;

@@ -20,7 +20,8 @@ bool isBackwardDifferentiableFunc(IRInst* func)
         switch (decorations->getOp())
         {
         case kIROp_BackwardDifferentiableDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration: return true;
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            return true;
         }
     }
     return false;
@@ -303,8 +304,10 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
     {
     case kIROp_LookupWitness:
     case kIROp_Specialize:
-    case kIROp_Param:         return nullptr;
-    default:                  break;
+    case kIROp_Param:
+        return nullptr;
+    default:
+        break;
     }
 
     IRBuilder builder(sharedContext->moduleInst);
@@ -1054,7 +1057,8 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(
                     diffTypeList.getBuffer());
         }
 
-    default: return (IRType*)getDifferentialForType(builder, (IRType*)primalType);
+    default:
+        return (IRType*)getDifferentialForType(builder, (IRType*)primalType);
     }
 }
 
@@ -1593,8 +1597,11 @@ void stripDerivativeDecorations(IRInst* inst)
         case kIROp_BackwardDerivativePropagateDecoration:
         case kIROp_BackwardDerivativePrimalDecoration:
         case kIROp_UserDefinedBackwardDerivativeDecoration:
-        case kIROp_AutoDiffOriginalValueDecoration:              decor->removeAndDeallocate(); break;
-        default:                                                 break;
+        case kIROp_AutoDiffOriginalValueDecoration:
+            decor->removeAndDeallocate();
+            break;
+        default:
+            break;
         }
         decor = next;
     }
@@ -1629,13 +1636,16 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_AutoDiffOriginalValueDecoration:
             case kIROp_UserDefinedBackwardDerivativeDecoration:
             case kIROp_IntermediateContextFieldDifferentialTypeDecoration:
-            case kIROp_CheckpointIntermediateDecoration:                   decor->removeAndDeallocate(); break;
+            case kIROp_CheckpointIntermediateDecoration:
+                decor->removeAndDeallocate();
+                break;
             case kIROp_AutoDiffBuiltinDecoration:
                 // Remove the builtin decoration, and also remove any export/keep-alive
                 // decorations.
                 shouldRemoveKeepAliveDecorations = true;
                 decor->removeAndDeallocate();
-            default: break;
+            default:
+                break;
             }
             decor = next;
         }
@@ -1649,7 +1659,9 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
                 {
                 case kIROp_ExportDecoration:
                 case kIROp_HLSLExportDecoration:
-                case kIROp_KeepAliveDecoration:  decor->removeAndDeallocate(); break;
+                case kIROp_KeepAliveDecoration:
+                    decor->removeAndDeallocate();
+                    break;
                 }
                 decor = next;
             }
@@ -1682,8 +1694,11 @@ void stripTempDecorations(IRInst* inst)
         case kIROp_BackwardDerivativePrimalReturnDecoration:
         case kIROp_BackwardDerivativePrimalContextDecoration:
         case kIROp_PrimalValueStructKeyDecoration:
-        case kIROp_PrimalElementTypeDecoration:               decor->removeAndDeallocate(); break;
-        default:                                              break;
+        case kIROp_PrimalElementTypeDecoration:
+            decor->removeAndDeallocate();
+            break;
+        default:
+            break;
         }
         decor = next;
     }
@@ -1767,9 +1782,12 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_FloatType:
     case kIROp_VectorType:
     case kIROp_MatrixType:
-    case kIROp_BackwardDiffIntermediateContextType: return true;
-    case kIROp_AttributedType:                      return canTypeBeStored(type->getOperand(0));
-    default:                                        return false;
+    case kIROp_BackwardDiffIntermediateContextType:
+        return true;
+    case kIROp_AttributedType:
+        return canTypeBeStored(type->getOperand(0));
+    default:
+        return false;
     }
 }
 
@@ -1882,7 +1900,8 @@ struct AutoDiffPass : public InstPassBase
                             }
                         }
                         break;
-                    default: break;
+                    default:
+                        break;
                     }
                 });
             result |= changed;
@@ -1932,7 +1951,8 @@ struct AutoDiffPass : public InstPassBase
                 contextTypes,
                 sortedSet,
                 findGenericReturnVal(as<IRGeneric>(t)));
-        default: return true;
+        default:
+            return true;
         }
     }
 
@@ -2344,7 +2364,9 @@ struct AutoDiffPass : public InstPassBase
                 if (!isTypeFullyDifferentiated(type->getOperand(i)))
                     return false;
             [[fallthrough]];
-        default: fullyDifferentiatedInsts.add(type); return true;
+        default:
+            fullyDifferentiatedInsts.add(type);
+            return true;
         }
     }
 
@@ -2365,7 +2387,8 @@ struct AutoDiffPass : public InstPassBase
                 case kIROp_BackwardDifferentiate:
                 case kIROp_BackwardDifferentiatePrimal:
                 case kIROp_BackwardDifferentiatePropagate:
-                case kIROp_BackwardDiffIntermediateContextType: return false;
+                case kIROp_BackwardDiffIntermediateContextType:
+                    return false;
                 }
                 if (ii->getDataType() && !isTypeFullyDifferentiated(ii->getDataType()))
                     return false;
@@ -2416,7 +2439,9 @@ struct AutoDiffPass : public InstPassBase
                             }
                             autoDiffWorkList.add(inst);
                             break;
-                        default: autoDiffWorkList.add(inst->getOperand(0)); break;
+                        default:
+                            autoDiffWorkList.add(inst->getOperand(0));
+                            break;
                         }
                         break;
                     case kIROp_PrimalSubstitute:
@@ -2468,7 +2493,8 @@ struct AutoDiffPass : public InstPassBase
                         diffFunc = backwardTranscriber.transcribe(&subBuilder, baseFunc);
                     }
                     break;
-                default: break;
+                default:
+                    break;
                 }
 
                 if (diffFunc)
@@ -2513,7 +2539,8 @@ struct AutoDiffPass : public InstPassBase
                     case FuncBodyTranscriptionTaskType::BackwardPropagate:
                         backwardPropagateTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
                         break;
-                    default: break;
+                    default:
+                        break;
                     }
 
                     autodiffCleanupList.add(diffFunc);
@@ -2851,7 +2878,8 @@ UIndex addPhiOutputArg(
         }
         break;
 
-    default: SLANG_UNEXPECTED("Unexpected branch-type for phi replacement");
+    default:
+        SLANG_UNEXPECTED("Unexpected branch-type for phi replacement");
     }
 
     branchInst->removeAndDeallocate();
@@ -2867,8 +2895,10 @@ bool isDifferentialOrRecomputeBlock(IRBlock* block)
         switch (decor->getOp())
         {
         case kIROp_DifferentialInstDecoration:
-        case kIROp_RecomputeBlockDecoration:   return true;
-        default:                               break;
+        case kIROp_RecomputeBlockDecoration:
+            return true;
+        default:
+            break;
         }
     }
     return false;
