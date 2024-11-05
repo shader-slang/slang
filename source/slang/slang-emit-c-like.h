@@ -355,6 +355,7 @@ public:
     void diagnoseUnhandledInst(IRInst* inst);
     void emitInst(IRInst* inst);
 
+    void emitSemanticsPrefix(IRInst* inst);
     void emitSemantics(IRInst* inst, bool allowOffsets = false);
     void emitSemanticsUsingVarLayout(IRVarLayout* varLayout);
 
@@ -556,6 +557,10 @@ protected:
     {
         SLANG_UNUSED(rate);
         SLANG_UNUSED(addressSpace);
+    }
+    virtual void emitSemanticsPrefixImpl(IRInst* inst)
+    {
+        SLANG_UNUSED(inst);
     }
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
     {
