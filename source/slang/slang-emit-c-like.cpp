@@ -668,6 +668,13 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     {
         needParens = true;
     }
+    // a ^ b * c => (a ^ b) * c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left)
+    {
+        needParens = true;
+    }
 
     if (needParens)
     {

@@ -1076,28 +1076,65 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // https://www.w3.org/TR/WGSL/#bit-expr
             IRInst* const shiftAmount = inst->getOperand(1);
             IRType* const shiftAmountType = shiftAmount->getDataType();
+            
+            // Dawn complains about mixing '<<' and '|', '^' and a bunch of other bit operators without
+            // a paranthesis, so we'll always emit paranthesis around the shift amount.
+            //
+
+            m_writer->emit("(");
+
+            const auto emitOp = getEmitOpForOp(inst->getOp());
+            const auto info = getInfo(emitOp);
+
+            const bool needClose = maybeEmitParens(outerPrec, info);
+            emitOperand(inst->getOperand(0), leftSide(outerPrec, info));
+            m_writer->emit(" ");
+            m_writer->emit(info.op);
+            m_writer->emit(" ");
+
             if (shiftAmountType->getOp() == kIROp_IntType)
             {
-                // Dawn complains about "mixing '<<' and '|' requires parenthesis", so let's
-                // add parenthesis.
-                m_writer->emit("(");
-
-                const auto emitOp = getEmitOpForOp(inst->getOp());
-                const auto info = getInfo(emitOp);
-
-                const bool needClose = maybeEmitParens(outerPrec, info);
-                emitOperand(inst->getOperand(0), leftSide(outerPrec, info));
-                m_writer->emit(" ");
-                m_writer->emit(info.op);
-                m_writer->emit(" ");
                 m_writer->emit("bitcast<u32>(");
                 emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
                 m_writer->emit(")");
-                maybeCloseParens(needClose);
-
-                m_writer->emit(")");
-                return true;
             }
+            else
+            {
+                m_writer->emit("(");
+                emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
+                m_writer->emit(")");
+            }
+            
+            maybeCloseParens(needClose);
+
+            m_writer->emit(")");
+
+            return true;
+        }
+    case kIROp_BitXor:
+    case kIROp_BitOr:
+        {
+            // Emit bitwise operators with paranthesis to avoid precedence issues
+            const auto emitOp = getEmitOpForOp(inst->getOp());
+            const auto info = getInfo(emitOp);
+
+            m_writer->emit("(");
+
+            const bool needClose = maybeEmitParens(outerPrec, info);
+            emitOperand(inst->getOperand(0), leftSide(outerPrec, info));
+            m_writer->emit(" ");
+
+            m_writer->emit(info.op);
+
+            m_writer->emit(" (");
+            emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
+            m_writer->emit(")");
+            
+            maybeCloseParens(needClose);
+
+            m_writer->emit(")");
+            return true;
+
         }
         break;
 
