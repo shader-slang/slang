@@ -9498,7 +9498,8 @@ T ldexp(T x, T exp)
     __target_switch
     {
     case hlsl: __intrinsic_asm "ldexp";
-    case wgsl: __intrinsic_asm "ldexp";
+    // In WGSL spec, ldexp can only take integer as the exponent.
+    case wgsl: __intrinsic_asm "($0 * exp2($1))";
     default:
         return x * exp2(exp);
     }
@@ -9512,7 +9513,8 @@ vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
     __target_switch
     {
     case hlsl: __intrinsic_asm "ldexp";
-    case wgsl: __intrinsic_asm "ldexp";
+    // In WGSL spec, ldexp can only take integer as the exponent.
+    case wgsl: __intrinsic_asm "($0 * exp2($1))";
     default:
         return x * exp2(exp);
     }
@@ -9737,13 +9739,14 @@ matrix<T, N, M> log(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T log10(T x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "log10";
     case metal: __intrinsic_asm "log10";
+    case wgsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
     case glsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
     case cuda: __intrinsic_asm "$P_log10($0)";
     case cpp: __intrinsic_asm "$P_log10($0)";
@@ -9760,13 +9763,14 @@ T log10(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T,N> log10(vector<T,N> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "log10";
     case metal: __intrinsic_asm "log10";
+    case wgsl: __intrinsic_asm "(log( $0 ) * $S0(0.43429448190325182765112891891661) )";
     case glsl: __intrinsic_asm "(log( $0 ) * $S0(0.43429448190325182765112891891661) )";
     case spirv:
     {
