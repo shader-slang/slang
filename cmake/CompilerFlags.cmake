@@ -16,26 +16,13 @@ function(add_supported_cxx_flags target)
     endif()
 
     foreach(flag ${flags})
-message(STATUS "Flag Initial ${flag}")
-        # /EHa enables SEH on Windows, it is not available in Linux
-        # At this time, it is believed to be a MSVC specific feature.
-        # It can be extended to gcc on windows if support exists.
+        # /EHa enables SEH on Windows, it is not available in Linux.
         if(NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-message(STATUS "Non-MSVC do replace")
             string(REGEX REPLACE "/EHa" "" flag "${flag}")
-        else()
-message(STATUS "MSVC keep the flag")
         endif()
-message(STATUS "Flag After ${flag}")
         # remove the `no-` prefix from warnings because gcc doesn't treat it as an
         # error on its own
-        string(
-            REGEX REPLACE
-            "\\-Wno\\-(.+)"
-            "-W\\1"
-            flag_to_test
-            "${flag}"
-        )
+        string(REGEX REPLACE "\\-Wno\\-(.+)" "-W\\1" flag_to_test "${flag}")
         string(
             REGEX REPLACE
             "[^a-zA-Z0-9]+"
