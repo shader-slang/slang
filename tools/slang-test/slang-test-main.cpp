@@ -3583,6 +3583,11 @@ TestResult doRenderComparisonTestRun(
 
     *outOutput = output;
 
+    // Always fail if the compilation produced a failure.
+    if (exeRes.resultCode != 0)
+    {
+        return TestResult::Fail;
+    }
     return TestResult::Pass;
 }
 
