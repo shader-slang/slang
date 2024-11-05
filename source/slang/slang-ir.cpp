@@ -2266,7 +2266,7 @@ IRInst* IRBuilder::getBoolValue(bool inValue)
 
 IRInst* IRBuilder::getIntValue(IRIntegerValue value)
 {
-    return getIntValue(getIntType(), 4);
+    return getIntValue(getIntType(), value);
 }
 
 IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue inValue)
