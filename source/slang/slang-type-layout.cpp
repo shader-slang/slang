@@ -2350,6 +2350,17 @@ bool isD3DTarget(TargetRequest* targetReq)
     }
 }
 
+bool isWGSLTarget(TargetRequest* targetReq)
+{
+    switch (targetReq->getTarget())
+    {
+    case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly: return true;
+    default:                               return false;
+    }
+}
+
 bool isMetalTarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
