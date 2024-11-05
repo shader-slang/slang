@@ -1327,7 +1327,7 @@ IRInst* DifferentiableTypeConformanceContext::buildArrayWitness(
             auto loopCounter = emitLoopBlocks(
                 &b,
                 b.getIntValue(b.getIntType(), 0),
-                b.emitCast(b.getIntType(), as<IRArrayTypeBase>(diffArrayType)->getElementCount()),
+                as<IRArrayTypeBase>(diffArrayType)->getElementCount(),
                 loopBodyBlock,
                 loopBreakBlock);
             b.setInsertBefore(loopBodyBlock->getTerminator());

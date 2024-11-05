@@ -999,9 +999,6 @@ struct LoweredElementTypeContext
                         // this case and insert proper packing/unpacking logic around it.
                         if (arrayType->getElementType() != originalElementType)
                         {
-                            getElementPtr->setFullType(getLoweredPtrLikeType(
-                                getElementPtr->getFullType(),
-                                arrayType->getElementType()));
                             loweredElementTypeInfo.loweredType = arrayType->getElementType();
                             loweredElementTypeInfo.originalType = (IRType*)originalElementType;
                             loweredElementTypeInfo.convertLoweredToOriginal = getConversionMethod(
@@ -1025,6 +1022,10 @@ struct LoweredElementTypeContext
 
                 if (!loweredElementTypeInfo.convertLoweredToOriginal)
                     continue;
+
+                ptrVal->setFullType(getLoweredPtrLikeType(
+                    ptrVal->getFullType(),
+                    loweredElementTypeInfo.loweredType));
 
                 traverseUses(
                     ptrVal,
