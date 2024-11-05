@@ -332,16 +332,27 @@ public:
         const char* typeStr = "";
         switch (type)
         {
-        case DebugMessageType::Info:    typeStr = "INFO: "; break;
-        case DebugMessageType::Warning: typeStr = "WARNING: "; break;
-        case DebugMessageType::Error:   typeStr = "ERROR: "; break;
-        default:                        break;
+        case DebugMessageType::Info:
+            typeStr = "INFO: ";
+            break;
+        case DebugMessageType::Warning:
+            typeStr = "WARNING: ";
+            break;
+        case DebugMessageType::Error:
+            typeStr = "ERROR: ";
+            break;
+        default:
+            break;
         }
         const char* sourceStr = "[GraphicsLayer]: ";
         switch (source)
         {
-        case DebugMessageSource::Slang:  sourceStr = "[Slang]: "; break;
-        case DebugMessageSource::Driver: sourceStr = "[Driver]: "; break;
+        case DebugMessageSource::Slang:
+            sourceStr = "[Slang]: ";
+            break;
+        case DebugMessageSource::Driver:
+            sourceStr = "[Driver]: ";
+            break;
         }
         printf("%s%s%s\n", sourceStr, typeStr, message);
 #ifdef _WIN32

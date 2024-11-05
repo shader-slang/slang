@@ -420,10 +420,12 @@ void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocat
     switch (mode)
     {
     case LineDirectiveMode::SourceMap:
-    case LineDirectiveMode::None:      return;
+    case LineDirectiveMode::None:
+        return;
 
     case LineDirectiveMode::Default:
-    default:                         break;
+    default:
+        break;
     }
 
     // Ignore invalid source locations
@@ -533,7 +535,9 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
                         //
                         // TODO: should probably canonicalize paths to not use backslash
                         // somewhere else in the compilation pipeline...
-                    case '\\': emitRawText("/"); break;
+                    case '\\':
+                        emitRawText("/");
+                        break;
                     }
                 }
                 emitRawText("\"");

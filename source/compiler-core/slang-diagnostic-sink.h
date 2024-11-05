@@ -36,13 +36,20 @@ inline const char* getSeverityName(Severity severity)
 {
     switch (severity)
     {
-    case Severity::Disable:  return "ignored";
-    case Severity::Note:     return "note";
-    case Severity::Warning:  return "warning";
-    case Severity::Error:    return "error";
-    case Severity::Fatal:    return "fatal error";
-    case Severity::Internal: return "internal error";
-    default:                 return "unknown error";
+    case Severity::Disable:
+        return "ignored";
+    case Severity::Note:
+        return "note";
+    case Severity::Warning:
+        return "warning";
+    case Severity::Error:
+        return "error";
+    case Severity::Fatal:
+        return "fatal error";
+    case Severity::Internal:
+        return "internal error";
+    default:
+        return "unknown error";
     }
 }
 

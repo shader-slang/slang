@@ -488,14 +488,18 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     switch (options.matrixLayout)
     {
-    default: break;
+    default:
+        break;
 
-    case SLANG_MATRIX_LAYOUT_ROW_MAJOR: args.add(L"-Zpr"); break;
+    case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+        args.add(L"-Zpr");
+        break;
     }
 
     switch (options.floatingPointMode)
     {
-    default: break;
+    default:
+        break;
 
     case FloatingPointMode::Precise:
         args.add(L"-Gis"); // "force IEEE strictness"
@@ -505,19 +509,31 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     switch (options.optimizationLevel)
     {
-    default: break;
+    default:
+        break;
 
-    case OptimizationLevel::None:    args.add(L"-Od"); break;
-    case OptimizationLevel::Default: args.add(L"-O1"); break;
-    case OptimizationLevel::High:    args.add(L"-O2"); break;
-    case OptimizationLevel::Maximal: args.add(L"-O3"); break;
+    case OptimizationLevel::None:
+        args.add(L"-Od");
+        break;
+    case OptimizationLevel::Default:
+        args.add(L"-O1");
+        break;
+    case OptimizationLevel::High:
+        args.add(L"-O2");
+        break;
+    case OptimizationLevel::Maximal:
+        args.add(L"-O3");
+        break;
     }
 
     switch (options.debugInfoType)
     {
-    case DebugInfoType::None: break;
+    case DebugInfoType::None:
+        break;
 
-    default: args.add(L"-Zi"); break;
+    default:
+        args.add(L"-Zi");
+        break;
     }
 
     // Slang strives to produce correct code, and by default

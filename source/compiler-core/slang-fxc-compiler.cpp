@@ -265,9 +265,12 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     switch (options.floatingPointMode)
     {
-    default: break;
+    default:
+        break;
 
-    case FloatingPointMode::Precise: flags |= D3DCOMPILE_IEEE_STRICTNESS; break;
+    case FloatingPointMode::Precise:
+        flags |= D3DCOMPILE_IEEE_STRICTNESS;
+        break;
     }
 
     flags |= D3DCOMPILE_ENABLE_STRICTNESS;
@@ -275,19 +278,31 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     switch (options.optimizationLevel)
     {
-    default: break;
+    default:
+        break;
 
-    case OptimizationLevel::None:    flags |= D3DCOMPILE_OPTIMIZATION_LEVEL0; break;
-    case OptimizationLevel::Default: flags |= D3DCOMPILE_OPTIMIZATION_LEVEL1; break;
-    case OptimizationLevel::High:    flags |= D3DCOMPILE_OPTIMIZATION_LEVEL2; break;
-    case OptimizationLevel::Maximal: flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3; break;
+    case OptimizationLevel::None:
+        flags |= D3DCOMPILE_OPTIMIZATION_LEVEL0;
+        break;
+    case OptimizationLevel::Default:
+        flags |= D3DCOMPILE_OPTIMIZATION_LEVEL1;
+        break;
+    case OptimizationLevel::High:
+        flags |= D3DCOMPILE_OPTIMIZATION_LEVEL2;
+        break;
+    case OptimizationLevel::Maximal:
+        flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
+        break;
     }
 
     switch (options.debugInfoType)
     {
-    case DebugInfoType::None: break;
+    case DebugInfoType::None:
+        break;
 
-    default: flags |= D3DCOMPILE_DEBUG; break;
+    default:
+        flags |= D3DCOMPILE_DEBUG;
+        break;
     }
 
     ComPtr<ISlangBlob> sourceBlob;

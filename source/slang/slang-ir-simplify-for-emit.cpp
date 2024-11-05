@@ -232,13 +232,25 @@ struct SimplifyForEmitContext : public InstPassBase
         //    emit logic to skip producing a temp var for the loaded result.
         switch (inst->getOp())
         {
-        case kIROp_MakeStruct:           processMakeStruct(inst); break;
-        case kIROp_MakeArray:            processMakeArray(inst); break;
-        case kIROp_MakeArrayFromElement: processMakeArrayFromElement(inst); break;
-        case kIROp_Load:                 processLoad(as<IRLoad>(inst)); break;
+        case kIROp_MakeStruct:
+            processMakeStruct(inst);
+            break;
+        case kIROp_MakeArray:
+            processMakeArray(inst);
+            break;
+        case kIROp_MakeArrayFromElement:
+            processMakeArrayFromElement(inst);
+            break;
+        case kIROp_Load:
+            processLoad(as<IRLoad>(inst));
+            break;
         case kIROp_GetElement:
-        case kIROp_FieldExtract:         processElementExtract(inst); break;
-        case kIROp_Var:                  processVar(inst); break;
+        case kIROp_FieldExtract:
+            processElementExtract(inst);
+            break;
+        case kIROp_Var:
+            processVar(inst);
+            break;
         }
     }
 
@@ -255,7 +267,9 @@ struct SimplifyForEmitContext : public InstPassBase
                 {
                 case kIROp_MakeStruct:
                 case kIROp_MakeArray:
-                case kIROp_MakeArrayFromElement: addToFollowUpWorkList(inst); break;
+                case kIROp_MakeArrayFromElement:
+                    addToFollowUpWorkList(inst);
+                    break;
                 }
             }
         }
@@ -274,7 +288,9 @@ struct SimplifyForEmitContext : public InstPassBase
             {
                 switch (inst->getOp())
                 {
-                case kIROp_Load: addToFollowUpWorkList(inst); break;
+                case kIROp_Load:
+                    addToFollowUpWorkList(inst);
+                    break;
                 }
             }
         }
@@ -293,7 +309,9 @@ struct SimplifyForEmitContext : public InstPassBase
             {
                 switch (inst->getOp())
                 {
-                case kIROp_Var: addToFollowUpWorkList(inst); break;
+                case kIROp_Var:
+                    addToFollowUpWorkList(inst);
+                    break;
                 }
             }
         }
@@ -313,7 +331,9 @@ struct SimplifyForEmitContext : public InstPassBase
                 switch (inst->getOp())
                 {
                 case kIROp_GetElement:
-                case kIROp_FieldExtract: addToFollowUpWorkList(inst); break;
+                case kIROp_FieldExtract:
+                    addToFollowUpWorkList(inst);
+                    break;
                 }
             }
         }

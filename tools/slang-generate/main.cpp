@@ -185,7 +185,8 @@ void skipOptionalNewline(Reader& reader)
 {
     switch (peek(reader))
     {
-    default: break;
+    default:
+        break;
 
     case '\r':
     case '\n':
@@ -225,7 +226,9 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
 
         switch (c)
         {
-        default: atStartOfLine = false; break;
+        default:
+            atStartOfLine = false;
+            break;
 
         case EOF:
             {
@@ -283,7 +286,8 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
 
 
         case ' ':
-        case '\t': break;
+        case '\t':
+            break;
 
         case '\r':
         case '\n':
@@ -355,12 +359,16 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
                         int c = get(reader);
                         switch (c)
                         {
-                        default: continue;
+                        default:
+                            continue;
 
-                        case EOF: break;
+                        case EOF:
+                            break;
 
                         case '\r':
-                        case '\n': handleNewline(reader, c); break;
+                        case '\n':
+                            handleNewline(reader, c);
+                            break;
                         }
 
                         break;
@@ -426,11 +434,18 @@ void emitRaw(FILE* stream, char const* begin, char const* end)
         int c = *cc;
         switch (c)
         {
-        case '\\': fputs("\\\\", stream); break;
+        case '\\':
+            fputs("\\\\", stream);
+            break;
 
-        case '\r': break;
-        case '\t': fputs("\\t", stream); break;
-        case '\"': fputs("\\\"", stream); break;
+        case '\r':
+            break;
+        case '\t':
+            fputs("\\t", stream);
+            break;
+        case '\"':
+            fputs("\\\"", stream);
+            break;
         case '\n':
             fputs("\\n\";\n", stream);
             fputs("sb << \"", stream);
@@ -487,15 +502,25 @@ void emitStringLiteralText(FILE* stream, StringSpan const& span)
         switch (c)
         {
         case '\r':
-        case '\n': fprintf(stream, "\\n"); break;
+        case '\n':
+            fprintf(stream, "\\n");
+            break;
 
-        case '\t': fprintf(stream, "\\t"); break;
+        case '\t':
+            fprintf(stream, "\\t");
+            break;
 
-        case ' ': fprintf(stream, " "); break;
+        case ' ':
+            fprintf(stream, " ");
+            break;
 
-        case '"': fprintf(stream, "\\\""); break;
+        case '"':
+            fprintf(stream, "\\\"");
+            break;
 
-        case '\\': fprintf(stream, "\\\\"); break;
+        case '\\':
+            fprintf(stream, "\\\\");
+            break;
 
         default:
             if (isASCIIPrintable(c))
@@ -542,7 +567,9 @@ void emitCodeNodes(FILE* stream, Node* node)
             emit(stream, "\n");
             break;
 
-        default: throw "unexpected"; break;
+        default:
+            throw "unexpected";
+            break;
         }
     }
 }
@@ -617,7 +644,9 @@ void emitTemplateNodes(SourceFile* sourceFile, FILE* stream, Node* node)
             emit(stream, ")\n");
             break;
 
-        case Node::Flavor::escape: emitCodeNodes(stream, nn->body); break;
+        case Node::Flavor::escape:
+            emitCodeNodes(stream, nn->body);
+            break;
         }
     }
 }

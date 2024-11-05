@@ -156,7 +156,8 @@ SlangResult MemoryFileSystem::getPath(PathKind kind, const char* path, ISlangBlo
             *outPath = StringBlob::moveCreate(buffer).detach();
             return SLANG_OK;
         }
-    default: break;
+    default:
+        break;
     }
     return SLANG_E_NOT_AVAILABLE;
 }

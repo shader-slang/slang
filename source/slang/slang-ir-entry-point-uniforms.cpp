@@ -126,7 +126,8 @@ bool isVaryingResourceKind(LayoutResourceKind kind)
         // Ray-tracing shader input/output:
     case LayoutResourceKind::CallablePayload:
     case LayoutResourceKind::HitAttributes:
-    case LayoutResourceKind::RayPayload:      return true;
+    case LayoutResourceKind::RayPayload:
+        return true;
     }
 }
 

@@ -765,7 +765,8 @@ protected:
                         bindingRangeInfo.baseIndex = m_storageBufferCount;
                         m_storageBufferCount += count;
                         break;
-                    case slang::BindingType::Sampler: break;
+                    case slang::BindingType::Sampler:
+                        break;
 
                     case slang::BindingType::Texture:
                     case slang::BindingType::CombinedTextureSampler:
@@ -783,8 +784,11 @@ protected:
                         m_storageBufferCount += count;
                         break;
                     case slang::BindingType::VaryingInput:
-                    case slang::BindingType::VaryingOutput: break;
-                    default:                                SLANG_ASSERT(!"unsupported binding type."); break;
+                    case slang::BindingType::VaryingOutput:
+                        break;
+                    default:
+                        SLANG_ASSERT(!"unsupported binding type.");
+                        break;
                     }
                     m_bindingRanges.add(bindingRangeInfo);
                 }
@@ -1416,8 +1420,10 @@ protected:
                 {
                 case slang::BindingType::ConstantBuffer:
                 case slang::BindingType::ParameterBlock:
-                case slang::BindingType::ExistentialValue: break;
-                default:                                   continue;
+                case slang::BindingType::ExistentialValue:
+                    break;
+                default:
+                    continue;
                 }
 
                 for (Index i = 0; i < bindingRange.count; i++)
@@ -1742,12 +1748,16 @@ protected:
 {
     switch (format)
     {
-    case Format::R8G8B8A8_UNORM: return GlPixelFormat::R8G8B8A8_UNORM;
-    case Format::D32_FLOAT:      return GlPixelFormat::D32_FLOAT;
+    case Format::R8G8B8A8_UNORM:
+        return GlPixelFormat::R8G8B8A8_UNORM;
+    case Format::D32_FLOAT:
+        return GlPixelFormat::D32_FLOAT;
     // case Format::D24_UNORM_S8_UINT:     return GlPixelFormat::D_Unorm24_S8;
-    case Format::D32_FLOAT_S8_UINT: return GlPixelFormat::D32_FLOAT_S8;
+    case Format::D32_FLOAT_S8_UINT:
+        return GlPixelFormat::D32_FLOAT_S8;
 
-    default: return GlPixelFormat::Unknown;
+    default:
+        return GlPixelFormat::Unknown;
     }
 }
 
@@ -1779,8 +1789,11 @@ void GLDevice::debugCallback(
     DebugMessageType msgType = DebugMessageType::Info;
     switch (type)
     {
-    case GL_DEBUG_TYPE_ERROR: msgType = DebugMessageType::Error; break;
-    default:                  break;
+    case GL_DEBUG_TYPE_ERROR:
+        msgType = DebugMessageType::Error;
+        break;
+    default:
+        break;
     }
     getDebugCallback()->handleMessage(msgType, DebugMessageSource::Driver, message);
 }
@@ -1801,7 +1814,9 @@ void GLDevice::debugCallback(
 {
     switch (format)
     {
-    default: assert(!"unexpected"); return VertexAttributeFormat();
+    default:
+        assert(!"unexpected");
+        return VertexAttributeFormat();
 
 #define CASE(NAME, COUNT, TYPE, NORMALIZED)                           \
     case Format::NAME:                                                \
@@ -1935,8 +1950,10 @@ GLuint GLDevice::loadShader(GLenum stage, const char* source)
     const char* stagePrelude = "\n";
     switch (stage)
     {
-#define CASE(NAME) \
-    case GL_##NAME##_SHADER: stagePrelude = "#define __GLSL_" #NAME "__ 1\n"; break
+#define CASE(NAME)                                       \
+    case GL_##NAME##_SHADER:                             \
+        stagePrelude = "#define __GLSL_" #NAME "__ 1\n"; \
+        break
 
         CASE(VERTEX);
         CASE(TESS_CONTROL);
@@ -2573,7 +2590,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
             }
             break;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -2595,8 +2613,10 @@ static GLenum _calcUsage(ResourceState state)
 {
     switch (state)
     {
-    case ResourceState::ConstantBuffer: return GL_DYNAMIC_DRAW;
-    default:                            return GL_STATIC_READ;
+    case ResourceState::ConstantBuffer:
+        return GL_DYNAMIC_DRAW;
+    default:
+        return GL_STATIC_READ;
     }
 }
 
@@ -2604,8 +2624,10 @@ static GLenum _calcTarget(ResourceState state)
 {
     switch (state)
     {
-    case ResourceState::ConstantBuffer: return GL_UNIFORM_BUFFER;
-    default:                            return GL_SHADER_STORAGE_BUFFER;
+    case ResourceState::ConstantBuffer:
+        return GL_UNIFORM_BUFFER;
+    default:
+        return GL_SHADER_STORAGE_BUFFER;
     }
 }
 
@@ -2737,8 +2759,12 @@ void* GLDevice::map(IBufferResource* bufferIn, MapFlavor flavor)
     switch (flavor)
     {
     case MapFlavor::WriteDiscard:
-    case MapFlavor::HostWrite:    access = GL_WRITE_ONLY; break;
-    case MapFlavor::HostRead:     access = GL_READ_ONLY; break;
+    case MapFlavor::HostWrite:
+        access = GL_WRITE_ONLY;
+        break;
+    case MapFlavor::HostRead:
+        access = GL_READ_ONLY;
+        break;
     }
 
     glBindBuffer(buffer->m_target, buffer->m_handle);
@@ -2759,8 +2785,10 @@ void GLDevice::setPrimitiveTopology(PrimitiveTopology topology)
     GLenum glTopology = 0;
     switch (topology)
     {
-#define CASE(NAME, VALUE) \
-    case PrimitiveTopology::NAME: glTopology = VALUE; break
+#define CASE(NAME, VALUE)         \
+    case PrimitiveTopology::NAME: \
+        glTopology = VALUE;       \
+        break
 
         CASE(TriangleList, GL_TRIANGLES);
 
@@ -2930,13 +2958,27 @@ Result GLDevice::createProgram(
         auto stage = programLayout->getEntryPointByIndex(i)->getStage();
         switch (stage)
         {
-        case SLANG_STAGE_COMPUTE:  glShaderType = GL_COMPUTE_SHADER; break;
-        case SLANG_STAGE_VERTEX:   glShaderType = GL_VERTEX_SHADER; break;
-        case SLANG_STAGE_FRAGMENT: glShaderType = GL_FRAGMENT_SHADER; break;
-        case SLANG_STAGE_GEOMETRY: glShaderType = GL_GEOMETRY_SHADER; break;
-        case SLANG_STAGE_DOMAIN:   glShaderType = GL_TESS_CONTROL_SHADER; break;
-        case SLANG_STAGE_HULL:     glShaderType = GL_TESS_EVALUATION_SHADER; break;
-        default:                   SLANG_ASSERT(!"unsupported shader type."); break;
+        case SLANG_STAGE_COMPUTE:
+            glShaderType = GL_COMPUTE_SHADER;
+            break;
+        case SLANG_STAGE_VERTEX:
+            glShaderType = GL_VERTEX_SHADER;
+            break;
+        case SLANG_STAGE_FRAGMENT:
+            glShaderType = GL_FRAGMENT_SHADER;
+            break;
+        case SLANG_STAGE_GEOMETRY:
+            glShaderType = GL_GEOMETRY_SHADER;
+            break;
+        case SLANG_STAGE_DOMAIN:
+            glShaderType = GL_TESS_CONTROL_SHADER;
+            break;
+        case SLANG_STAGE_HULL:
+            glShaderType = GL_TESS_EVALUATION_SHADER;
+            break;
+        default:
+            SLANG_ASSERT(!"unsupported shader type.");
+            break;
         }
         auto shaderID = loadShader(glShaderType, (char const*)kernelCode->getBufferPointer());
         shaderIDs.add(shaderID);

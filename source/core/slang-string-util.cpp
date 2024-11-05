@@ -577,7 +577,8 @@ String StringUtil::replaceAll(
                 outLine = UnownedStringSlice(begin, lineEnd);
                 return true;
             }
-        default: break;
+        default:
+            break;
         }
     }
 

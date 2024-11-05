@@ -281,9 +281,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
     switch (scalarType)
     {
 #define SLANG_SCALAR_TYPE_TO_TEXT(value, text) \
-    case ScalarType::value: return UnownedStringSlice::fromLiteral(#text);
+    case ScalarType::value:                    \
+        return UnownedStringSlice::fromLiteral(#text);
         SLANG_SCALAR_TYPES(SLANG_SCALAR_TYPE_TO_TEXT)
-    default: break;
+    default:
+        break;
     }
 
     return UnownedStringSlice();

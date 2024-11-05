@@ -16,8 +16,10 @@ struct DebugValueStoreContext
         switch (inst->getOp())
         {
         case kIROp_TypeKind:
-        case kIROp_TypeType: return true;
-        default:             return false;
+        case kIROp_TypeType:
+            return true;
+        default:
+            return false;
         }
     }
     bool isDebuggableType(IRType* type)
@@ -28,7 +30,8 @@ struct DebugValueStoreContext
         bool debuggable = false;
         switch (type->getOp())
         {
-        case kIROp_VoidType: break;
+        case kIROp_VoidType:
+            break;
         case kIROp_StructType:
             {
                 auto structType = static_cast<IRStructType*>(type);
@@ -53,7 +56,9 @@ struct DebugValueStoreContext
             }
         case kIROp_VectorType:
         case kIROp_MatrixType:
-        case kIROp_PtrType:    debuggable = true; break;
+        case kIROp_PtrType:
+            debuggable = true;
+            break;
         case kIROp_Param:
             // Assume generic parameters are debuggable.
             debuggable = true;

@@ -699,7 +699,8 @@ struct CFGNormalizationPass
 
                 return info.breakBlock;
             }
-        default: break;
+        default:
+            break;
         }
 
         SLANG_UNEXPECTED("Unhandled control-flow inst");

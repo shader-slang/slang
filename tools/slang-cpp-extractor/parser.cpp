@@ -705,7 +705,8 @@ SlangResult Parser::_maybeParseTemplateArg(Index& ioTemplateDepth)
             m_reader.advanceToken();
             return SLANG_OK;
         }
-    default: break;
+    default:
+        break;
     }
     return SLANG_FAIL;
 }
@@ -796,7 +797,8 @@ static bool _canRepeatTokenType(TokenType type)
         {
             return false;
         }
-    default: break;
+    default:
+        break;
     }
     return true;
 }
@@ -1259,10 +1261,14 @@ static TokenType _getBalancedClose(TokenType tokenType)
     SLANG_ASSERT(_isBalancedOpen(tokenType));
     switch (tokenType)
     {
-    case TokenType::LBrace:   return TokenType::RBrace;
-    case TokenType::LParent:  return TokenType::RParent;
-    case TokenType::LBracket: return TokenType::RBracket;
-    default:                  return TokenType::Unknown;
+    case TokenType::LBrace:
+        return TokenType::RBrace;
+    case TokenType::LParent:
+        return TokenType::RParent;
+    case TokenType::LBracket:
+        return TokenType::RBracket;
+    default:
+        return TokenType::Unknown;
     }
 }
 
@@ -1360,7 +1366,8 @@ SlangResult Parser::_consumeBalancedParens()
                 // If we hit the end of the file, then not balanced
                 return SLANG_FAIL;
             }
-        default: break;
+        default:
+            break;
         }
 
         m_reader.advanceToken();
@@ -1445,7 +1452,8 @@ SlangResult Parser::_parseExpression(List<Token>& outExprTokens)
                 break;
             }
 
-        default: break;
+        default:
+            break;
         }
 
         outExprTokens.add(m_reader.advanceToken());
@@ -1841,12 +1849,18 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
 {
     switch (style)
     {
-    case IdentifierStyle::Class:     return Node::Kind::ClassType;
-    case IdentifierStyle::Struct:    return Node::Kind::StructType;
-    case IdentifierStyle::Namespace: return Node::Kind::Namespace;
-    case IdentifierStyle::Enum:      return Node::Kind::Enum;
-    case IdentifierStyle::TypeDef:   return Node::Kind::TypeDef;
-    default:                         return Node::Kind::Invalid;
+    case IdentifierStyle::Class:
+        return Node::Kind::ClassType;
+    case IdentifierStyle::Struct:
+        return Node::Kind::StructType;
+    case IdentifierStyle::Namespace:
+        return Node::Kind::Namespace;
+    case IdentifierStyle::Enum:
+        return Node::Kind::Enum;
+    case IdentifierStyle::TypeDef:
+        return Node::Kind::TypeDef;
+    default:
+        return Node::Kind::Invalid;
     }
 }
 

@@ -119,8 +119,10 @@ AddressAccessInfo analyzeAddressUse(IRDominatorTree* dom, IRGlobalValueWithCode*
                             switch (inst->getOp())
                             {
                             case kIROp_GetElementPtr:
-                            case kIROp_FieldAddress:  return true;
-                            default:                  return false;
+                            case kIROp_FieldAddress:
+                                return true;
+                            default:
+                                return false;
                             }
                         });
 

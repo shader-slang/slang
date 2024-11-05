@@ -16,13 +16,21 @@ public:
     {
         switch (classId)
         {
-        case ApiClassId::Class_IModule:     m_className = "IModule"; break;
-        case ApiClassId::Class_IEntryPoint: m_className = "IEntryPoint"; break;
+        case ApiClassId::Class_IModule:
+            m_className = "IModule";
+            break;
+        case ApiClassId::Class_IEntryPoint:
+            m_className = "IEntryPoint";
+            break;
         case ApiClassId::Class_ICompositeComponentType:
             m_className = "ICompositeComponentType";
             break;
-        case ApiClassId::Class_ITypeConformance: m_className = "ITypeConformance"; break;
-        default:                                 slangRecordLog(LogLevel::Error, "Invalid classNo %u\n", classId); break;
+        case ApiClassId::Class_ITypeConformance:
+            m_className = "ITypeConformance";
+            break;
+        default:
+            slangRecordLog(LogLevel::Error, "Invalid classNo %u\n", classId);
+            break;
         }
     }
     CommonInterfaceWriter() = delete;

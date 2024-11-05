@@ -136,7 +136,8 @@ struct CleanUpVoidContext
                     ii->removeAndDeallocate();
             }
             break;
-        default: break;
+        default:
+            break;
         }
 
         // If inst has void type, all uses of it should be replaced with void val.

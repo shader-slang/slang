@@ -1270,30 +1270,50 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_EXHAUSTIVE_SWITCH_BEGIN
         switch (addrSpace)
         {
-        case AddressSpace::Generic:                return SpvStorageClassMax;
-        case AddressSpace::ThreadLocal:            return SpvStorageClassPrivate;
-        case AddressSpace::GroupShared:            return SpvStorageClassWorkgroup;
-        case AddressSpace::Uniform:                return SpvStorageClassUniform;
-        case AddressSpace::Input:                  return SpvStorageClassInput;
-        case AddressSpace::Output:                 return SpvStorageClassOutput;
-        case AddressSpace::TaskPayloadWorkgroup:   return SpvStorageClassTaskPayloadWorkgroupEXT;
-        case AddressSpace::Function:               return SpvStorageClassFunction;
-        case AddressSpace::StorageBuffer:          return SpvStorageClassStorageBuffer;
-        case AddressSpace::PushConstant:           return SpvStorageClassPushConstant;
-        case AddressSpace::RayPayloadKHR:          return SpvStorageClassRayPayloadKHR;
-        case AddressSpace::IncomingRayPayload:     return SpvStorageClassIncomingRayPayloadKHR;
-        case AddressSpace::CallableDataKHR:        return SpvStorageClassCallableDataKHR;
-        case AddressSpace::IncomingCallableData:   return SpvStorageClassIncomingCallableDataKHR;
-        case AddressSpace::HitObjectAttribute:     return SpvStorageClassHitObjectAttributeNV;
-        case AddressSpace::HitAttribute:           return SpvStorageClassHitAttributeKHR;
-        case AddressSpace::ShaderRecordBuffer:     return SpvStorageClassShaderRecordBufferKHR;
-        case AddressSpace::UniformConstant:        return SpvStorageClassUniformConstant;
-        case AddressSpace::Image:                  return SpvStorageClassImage;
-        case AddressSpace::UserPointer:            return SpvStorageClassPhysicalStorageBuffer;
+        case AddressSpace::Generic:
+            return SpvStorageClassMax;
+        case AddressSpace::ThreadLocal:
+            return SpvStorageClassPrivate;
+        case AddressSpace::GroupShared:
+            return SpvStorageClassWorkgroup;
+        case AddressSpace::Uniform:
+            return SpvStorageClassUniform;
+        case AddressSpace::Input:
+            return SpvStorageClassInput;
+        case AddressSpace::Output:
+            return SpvStorageClassOutput;
+        case AddressSpace::TaskPayloadWorkgroup:
+            return SpvStorageClassTaskPayloadWorkgroupEXT;
+        case AddressSpace::Function:
+            return SpvStorageClassFunction;
+        case AddressSpace::StorageBuffer:
+            return SpvStorageClassStorageBuffer;
+        case AddressSpace::PushConstant:
+            return SpvStorageClassPushConstant;
+        case AddressSpace::RayPayloadKHR:
+            return SpvStorageClassRayPayloadKHR;
+        case AddressSpace::IncomingRayPayload:
+            return SpvStorageClassIncomingRayPayloadKHR;
+        case AddressSpace::CallableDataKHR:
+            return SpvStorageClassCallableDataKHR;
+        case AddressSpace::IncomingCallableData:
+            return SpvStorageClassIncomingCallableDataKHR;
+        case AddressSpace::HitObjectAttribute:
+            return SpvStorageClassHitObjectAttributeNV;
+        case AddressSpace::HitAttribute:
+            return SpvStorageClassHitAttributeKHR;
+        case AddressSpace::ShaderRecordBuffer:
+            return SpvStorageClassShaderRecordBufferKHR;
+        case AddressSpace::UniformConstant:
+            return SpvStorageClassUniformConstant;
+        case AddressSpace::Image:
+            return SpvStorageClassImage;
+        case AddressSpace::UserPointer:
+            return SpvStorageClassPhysicalStorageBuffer;
         case AddressSpace::Global:
         case AddressSpace::MetalObjectData:
         case AddressSpace::SpecializationConstant:
-                                                   // msvc is limiting us from putting the UNEXPECTED macro here, so
+            // msvc is limiting us from putting the UNEXPECTED macro here, so
             // just fall out
             ;
         }
@@ -1428,7 +1448,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // [3.32.6: Type-Declaration Instructions]
             //
 
-        case kIROp_VoidType: return emitOpTypeVoid(inst);
+        case kIROp_VoidType:
+            return emitOpTypeVoid(inst);
         case kIROp_BoolType:
             return emitOpTypeBool(inst);
 
@@ -1646,9 +1667,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
-        case kIROp_TextureType:                return ensureTextureType(inst, cast<IRTextureType>(inst));
+        case kIROp_TextureType:
+            return ensureTextureType(inst, cast<IRTextureType>(inst));
         case kIROp_SamplerStateType:
-        case kIROp_SamplerComparisonStateType: return emitOpTypeSampler(inst);
+        case kIROp_SamplerComparisonStateType:
+            return emitOpTypeSampler(inst);
 
         case kIROp_RaytracingAccelerationStructureType:
             requireSPIRVCapability(SpvCapabilityRayTracingKHR);
@@ -1737,9 +1760,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitMakeMatrixFromScalar(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 inst);
-        case kIROp_GlobalParam:               return emitGlobalParam(as<IRGlobalParam>(inst));
-        case kIROp_GlobalVar:                 return emitGlobalVar(as<IRGlobalVar>(inst));
-        case kIROp_SPIRVAsmOperandBuiltinVar: return emitBuiltinVar(inst);
+        case kIROp_GlobalParam:
+            return emitGlobalParam(as<IRGlobalParam>(inst));
+        case kIROp_GlobalVar:
+            return emitGlobalVar(as<IRGlobalVar>(inst));
+        case kIROp_SPIRVAsmOperandBuiltinVar:
+            return emitBuiltinVar(inst);
         case kIROp_Var:
             return emitVar(getSection(SpvLogicalSectionID::GlobalVariables), inst);
             // ...
@@ -1828,15 +1854,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 return result;
             }
-        case kIROp_GetStringHash:          return emitGetStringHash(inst);
-        case kIROp_AttributedType:         return ensureInst(as<IRAttributedType>(inst)->getBaseType());
-        case kIROp_AllocateOpaqueHandle:   return nullptr;
+        case kIROp_GetStringHash:
+            return emitGetStringHash(inst);
+        case kIROp_AttributedType:
+            return ensureInst(as<IRAttributedType>(inst)->getBaseType());
+        case kIROp_AllocateOpaqueHandle:
+            return nullptr;
         case kIROp_HLSLTriangleStreamType:
         case kIROp_HLSLLineStreamType:
         case kIROp_HLSLPointStreamType:
         case kIROp_VerticesType:
         case kIROp_IndicesType:
-        case kIROp_PrimitivesType:         return nullptr;
+        case kIROp_PrimitivesType:
+            return nullptr;
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
@@ -1854,49 +1884,92 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
         switch (imageFormat)
         {
-        case ImageFormat::unknown:        return SpvImageFormatUnknown;
-        case ImageFormat::rgba32f:        return SpvImageFormatRgba32f;
-        case ImageFormat::rgba16f:        return SpvImageFormatRgba16f;
-        case ImageFormat::rg32f:          return SpvImageFormatRg32f;
-        case ImageFormat::rg16f:          return SpvImageFormatRg16f;
-        case ImageFormat::r11f_g11f_b10f: return SpvImageFormatR11fG11fB10f;
-        case ImageFormat::r32f:           return SpvImageFormatR32f;
-        case ImageFormat::r16f:           return SpvImageFormatR16f;
-        case ImageFormat::rgba16:         return SpvImageFormatRgba16;
-        case ImageFormat::rgb10_a2:       return SpvImageFormatRgb10A2;
-        case ImageFormat::rgba8:          return SpvImageFormatRgba8;
-        case ImageFormat::rg16:           return SpvImageFormatRg16;
-        case ImageFormat::rg8:            return SpvImageFormatRg8;
-        case ImageFormat::r16:            return SpvImageFormatR16;
-        case ImageFormat::r8:             return SpvImageFormatR8;
-        case ImageFormat::rgba16_snorm:   return SpvImageFormatRgba16Snorm;
-        case ImageFormat::rgba8_snorm:    return SpvImageFormatRgba8Snorm;
-        case ImageFormat::rg16_snorm:     return SpvImageFormatRg16Snorm;
-        case ImageFormat::rg8_snorm:      return SpvImageFormatRg8Snorm;
-        case ImageFormat::r16_snorm:      return SpvImageFormatR16Snorm;
-        case ImageFormat::r8_snorm:       return SpvImageFormatR8Snorm;
-        case ImageFormat::rgba32i:        return SpvImageFormatRgba32i;
-        case ImageFormat::rgba16i:        return SpvImageFormatRgba16i;
-        case ImageFormat::rgba8i:         return SpvImageFormatRgba8i;
-        case ImageFormat::rg32i:          return SpvImageFormatRg32i;
-        case ImageFormat::rg16i:          return SpvImageFormatRg16i;
-        case ImageFormat::rg8i:           return SpvImageFormatRg8i;
-        case ImageFormat::r32i:           return SpvImageFormatR32i;
-        case ImageFormat::r16i:           return SpvImageFormatR16i;
-        case ImageFormat::r8i:            return SpvImageFormatR8i;
-        case ImageFormat::rgba32ui:       return SpvImageFormatRgba32ui;
-        case ImageFormat::rgba16ui:       return SpvImageFormatRgba16ui;
-        case ImageFormat::rgb10_a2ui:     return SpvImageFormatRgb10a2ui;
-        case ImageFormat::rgba8ui:        return SpvImageFormatRgba8ui;
-        case ImageFormat::rg32ui:         return SpvImageFormatRg32ui;
-        case ImageFormat::rg16ui:         return SpvImageFormatRg16ui;
-        case ImageFormat::rg8ui:          return SpvImageFormatRg8ui;
-        case ImageFormat::r32ui:          return SpvImageFormatR32ui;
-        case ImageFormat::r16ui:          return SpvImageFormatR16ui;
-        case ImageFormat::r8ui:           return SpvImageFormatR8ui;
-        case ImageFormat::r64ui:          return SpvImageFormatR64ui;
-        case ImageFormat::r64i:           return SpvImageFormatR64i;
-        default:                          SLANG_UNIMPLEMENTED_X("unknown image format for spirv emit");
+        case ImageFormat::unknown:
+            return SpvImageFormatUnknown;
+        case ImageFormat::rgba32f:
+            return SpvImageFormatRgba32f;
+        case ImageFormat::rgba16f:
+            return SpvImageFormatRgba16f;
+        case ImageFormat::rg32f:
+            return SpvImageFormatRg32f;
+        case ImageFormat::rg16f:
+            return SpvImageFormatRg16f;
+        case ImageFormat::r11f_g11f_b10f:
+            return SpvImageFormatR11fG11fB10f;
+        case ImageFormat::r32f:
+            return SpvImageFormatR32f;
+        case ImageFormat::r16f:
+            return SpvImageFormatR16f;
+        case ImageFormat::rgba16:
+            return SpvImageFormatRgba16;
+        case ImageFormat::rgb10_a2:
+            return SpvImageFormatRgb10A2;
+        case ImageFormat::rgba8:
+            return SpvImageFormatRgba8;
+        case ImageFormat::rg16:
+            return SpvImageFormatRg16;
+        case ImageFormat::rg8:
+            return SpvImageFormatRg8;
+        case ImageFormat::r16:
+            return SpvImageFormatR16;
+        case ImageFormat::r8:
+            return SpvImageFormatR8;
+        case ImageFormat::rgba16_snorm:
+            return SpvImageFormatRgba16Snorm;
+        case ImageFormat::rgba8_snorm:
+            return SpvImageFormatRgba8Snorm;
+        case ImageFormat::rg16_snorm:
+            return SpvImageFormatRg16Snorm;
+        case ImageFormat::rg8_snorm:
+            return SpvImageFormatRg8Snorm;
+        case ImageFormat::r16_snorm:
+            return SpvImageFormatR16Snorm;
+        case ImageFormat::r8_snorm:
+            return SpvImageFormatR8Snorm;
+        case ImageFormat::rgba32i:
+            return SpvImageFormatRgba32i;
+        case ImageFormat::rgba16i:
+            return SpvImageFormatRgba16i;
+        case ImageFormat::rgba8i:
+            return SpvImageFormatRgba8i;
+        case ImageFormat::rg32i:
+            return SpvImageFormatRg32i;
+        case ImageFormat::rg16i:
+            return SpvImageFormatRg16i;
+        case ImageFormat::rg8i:
+            return SpvImageFormatRg8i;
+        case ImageFormat::r32i:
+            return SpvImageFormatR32i;
+        case ImageFormat::r16i:
+            return SpvImageFormatR16i;
+        case ImageFormat::r8i:
+            return SpvImageFormatR8i;
+        case ImageFormat::rgba32ui:
+            return SpvImageFormatRgba32ui;
+        case ImageFormat::rgba16ui:
+            return SpvImageFormatRgba16ui;
+        case ImageFormat::rgb10_a2ui:
+            return SpvImageFormatRgb10a2ui;
+        case ImageFormat::rgba8ui:
+            return SpvImageFormatRgba8ui;
+        case ImageFormat::rg32ui:
+            return SpvImageFormatRg32ui;
+        case ImageFormat::rg16ui:
+            return SpvImageFormatRg16ui;
+        case ImageFormat::rg8ui:
+            return SpvImageFormatRg8ui;
+        case ImageFormat::r32ui:
+            return SpvImageFormatR32ui;
+        case ImageFormat::r16ui:
+            return SpvImageFormatR16ui;
+        case ImageFormat::r8ui:
+            return SpvImageFormatR8ui;
+        case ImageFormat::r64ui:
+            return SpvImageFormatR64ui;
+        case ImageFormat::r64i:
+            return SpvImageFormatR64i;
+        default:
+            SLANG_UNIMPLEMENTED_X("unknown image format for spirv emit");
         }
     }
 
@@ -1919,8 +1992,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case SpvStorageClassUniformConstant:
         case SpvStorageClassUniform:
-        case SpvStorageClassStorageBuffer:   return true;
-        default:                             return false;
+        case SpvStorageClassStorageBuffer:
+            return true;
+        default:
+            return false;
         }
     }
 
@@ -1941,10 +2016,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case SpvImageFormatRgba32ui:
         case SpvImageFormatRgba16ui:
         case SpvImageFormatRgba8ui:
-        case SpvImageFormatR32ui:      return SpvCapabilityShader;
+        case SpvImageFormatR32ui:
+            return SpvCapabilityShader;
         case SpvImageFormatR64ui:
-        case SpvImageFormatR64i:       return SpvCapabilityInt64ImageEXT;
-        default:                       return SpvCapabilityStorageImageExtendedFormats;
+        case SpvImageFormatR64i:
+            return SpvCapabilityInt64ImageEXT;
+        default:
+            return SpvCapabilityStorageImageExtendedFormats;
         }
     }
 
@@ -2048,11 +2126,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvDim dim = SpvDim1D; // Silence uninitialized warnings from msvc...
         switch (inst->GetBaseShape())
         {
-        case SLANG_TEXTURE_1D:     dim = SpvDim1D; break;
-        case SLANG_TEXTURE_2D:     dim = SpvDim2D; break;
-        case SLANG_TEXTURE_3D:     dim = SpvDim3D; break;
-        case SLANG_TEXTURE_CUBE:   dim = SpvDimCube; break;
-        case SLANG_TEXTURE_BUFFER: dim = SpvDimBuffer; break;
+        case SLANG_TEXTURE_1D:
+            dim = SpvDim1D;
+            break;
+        case SLANG_TEXTURE_2D:
+            dim = SpvDim2D;
+            break;
+        case SLANG_TEXTURE_3D:
+            dim = SpvDim3D;
+            break;
+        case SLANG_TEXTURE_CUBE:
+            dim = SpvDimCube;
+            break;
+        case SLANG_TEXTURE_BUFFER:
+            dim = SpvDimBuffer;
+            break;
         }
         SpvWord arrayed =
             inst->isArray() ? ImageOpConstants::isArrayed : ImageOpConstants::notArrayed;
@@ -2096,19 +2184,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     case kIROp_UNormAttr:
                         switch (vectorSize)
                         {
-                        case 1: format = SpvImageFormatR8; break;
-                        case 2: format = SpvImageFormatRg8; break;
-                        case 3: format = SpvImageFormatRgba8; break;
-                        case 4: format = SpvImageFormatRgba8; break;
+                        case 1:
+                            format = SpvImageFormatR8;
+                            break;
+                        case 2:
+                            format = SpvImageFormatRg8;
+                            break;
+                        case 3:
+                            format = SpvImageFormatRgba8;
+                            break;
+                        case 4:
+                            format = SpvImageFormatRgba8;
+                            break;
                         }
                         break;
                     case kIROp_SNormAttr:
                         switch (vectorSize)
                         {
-                        case 1: format = SpvImageFormatR8Snorm; break;
-                        case 2: format = SpvImageFormatRg8Snorm; break;
-                        case 3: format = SpvImageFormatRgba8Snorm; break;
-                        case 4: format = SpvImageFormatRgba8Snorm; break;
+                        case 1:
+                            format = SpvImageFormatR8Snorm;
+                            break;
+                        case 2:
+                            format = SpvImageFormatRg8Snorm;
+                            break;
+                        case 3:
+                            format = SpvImageFormatRgba8Snorm;
+                            break;
+                        case 4:
+                            format = SpvImageFormatRgba8Snorm;
+                            break;
                         }
                         break;
                     }
@@ -2138,7 +2242,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ms == ImageOpConstants::isMultisampled && arrayed == ImageOpConstants::isArrayed)
                 requireSPIRVCapability(SpvCapabilityImageMSArray);
             break;
-        case SpvDim3D: break;
+        case SpvDim3D:
+            break;
         case SpvDimCube:
             // Requires shader also
             if (sampled == ImageOpConstants::readWriteImage &&
@@ -2236,7 +2341,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 varInst,
                 SpvDecorationNoPerspective);
             return true;
-        case IRInterpolationMode::Linear: return true;
+        case IRInterpolationMode::Linear:
+            return true;
         case IRInterpolationMode::Sample:
             emitOpDecorate(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -2251,7 +2357,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 varInst,
                 SpvDecorationCentroid);
             return true;
-        default: return false;
+        default:
+            return false;
         }
     }
     void emitSystemVarDecoration(IRInst* var, SpvInst* varInst)
@@ -2286,7 +2393,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             UInt space = rr->getSpace();
             switch (rr->getResourceKind())
             {
-            case LayoutResourceKind::Uniform: break;
+            case LayoutResourceKind::Uniform:
+                break;
 
             case LayoutResourceKind::VaryingInput:
                 emitOpDecorateLocation(
@@ -2379,7 +2487,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvLiteralInteger::from32((int32_t)index));
                 }
                 break;
-            default: break;
+            default:
+                break;
             }
         }
         if (needDefaultSetBindingDecoration && !hasExplicitSetBinding && !isDescirptorSetDecorated)
@@ -2787,7 +2896,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     {
                         switch (inst->getOp())
                         {
-                        case kIROp_Var: emitLocalInst(spvBlock, inst); break;
+                        case kIROp_Var:
+                            emitLocalInst(spvBlock, inst);
+                            break;
                         case kIROp_DebugVar:
                             // Declare an ordinary local variable for debugDeclare association
                             // of a debug variable. This variable is what we will actually write
@@ -2960,7 +3071,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitIntConstant(
                 IRIntegerValue{SpvMemorySemanticsSequentiallyConsistentMask},
                 builder.getUIntType());
-        default: SLANG_UNEXPECTED("unhandled memory order"); UNREACHABLE_RETURN(nullptr);
+        default:
+            SLANG_UNEXPECTED("unhandled memory order");
+            UNREACHABLE_RETURN(nullptr);
         }
     }
 
@@ -2991,10 +3104,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return typeSelect(SpvOpAtomicSMin, SpvOpAtomicUMin, SpvOpAtomicFMinEXT);
         case kIROp_AtomicMax:
             return typeSelect(SpvOpAtomicSMax, SpvOpAtomicUMax, SpvOpAtomicFMaxEXT);
-        case kIROp_AtomicAnd: return SpvOpAtomicAnd;
-        case kIROp_AtomicOr:  return SpvOpAtomicOr;
-        case kIROp_AtomicXor: return SpvOpAtomicXor;
-        default:              SLANG_UNEXPECTED("unhandled atomic op"); UNREACHABLE_RETURN(SpvOpNop);
+        case kIROp_AtomicAnd:
+            return SpvOpAtomicAnd;
+        case kIROp_AtomicOr:
+            return SpvOpAtomicOr;
+        case kIROp_AtomicXor:
+            return SpvOpAtomicXor;
+        default:
+            SLANG_UNEXPECTED("unhandled atomic op");
+            UNREACHABLE_RETURN(SpvOpNop);
         }
     }
 
@@ -3062,7 +3180,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (typeOp)
         {
         case kIROp_UInt64Type:
-        case kIROp_Int64Type:  requireSPIRVCapability(SpvCapabilityInt64Atomics); break;
+        case kIROp_Int64Type:
+            requireSPIRVCapability(SpvCapabilityInt64Atomics);
+            break;
         }
     }
 
@@ -3122,11 +3242,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         switch (type->getOp())
         {
-        case kIROp_UnsizedArrayType: return false;
-        case kIROp_ArrayType:        return isLegalType(as<IRArrayType>(type)->getElementType());
+        case kIROp_UnsizedArrayType:
+            return false;
+        case kIROp_ArrayType:
+            return isLegalType(as<IRArrayType>(type)->getElementType());
         case kIROp_VectorType:
         case kIROp_StructType:
-        case kIROp_MatrixType:       return true;
+        case kIROp_MatrixType:
+            return true;
         case kIROp_PtrType:
             return as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::UserPointer;
         default:
@@ -3187,44 +3310,83 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Specialize:
         case kIROp_MissingReturn:
         case kIROp_StaticAssert:
-        case kIROp_Unmodified:    break;
-        case kIROp_Var:           result = emitVar(parent, inst); break;
-        case kIROp_Call:          result = emitCall(parent, static_cast<IRCall*>(inst)); break;
-        case kIROp_FieldAddress:  result = emitFieldAddress(parent, as<IRFieldAddress>(inst)); break;
-        case kIROp_FieldExtract:  result = emitFieldExtract(parent, as<IRFieldExtract>(inst)); break;
+        case kIROp_Unmodified:
+            break;
+        case kIROp_Var:
+            result = emitVar(parent, inst);
+            break;
+        case kIROp_Call:
+            result = emitCall(parent, static_cast<IRCall*>(inst));
+            break;
+        case kIROp_FieldAddress:
+            result = emitFieldAddress(parent, as<IRFieldAddress>(inst));
+            break;
+        case kIROp_FieldExtract:
+            result = emitFieldExtract(parent, as<IRFieldExtract>(inst));
+            break;
         case kIROp_GetElementPtr:
             result = emitGetElementPtr(parent, as<IRGetElementPtr>(inst));
             break;
-        case kIROp_GetOffsetPtr:         result = emitGetOffsetPtr(parent, inst); break;
-        case kIROp_GetElement:           result = emitGetElement(parent, as<IRGetElement>(inst)); break;
-        case kIROp_MakeStruct:           result = emitCompositeConstruct(parent, inst); break;
-        case kIROp_MakeArrayFromElement: result = emitMakeArrayFromElement(parent, inst); break;
-        case kIROp_MakeMatrixFromScalar: result = emitMakeMatrixFromScalar(parent, inst); break;
-        case kIROp_MakeMatrix:           result = emitMakeMatrix(parent, inst); break;
-        case kIROp_Load:                 result = emitLoad(parent, as<IRLoad>(inst)); break;
-        case kIROp_Store:                result = emitStore(parent, as<IRStore>(inst)); break;
+        case kIROp_GetOffsetPtr:
+            result = emitGetOffsetPtr(parent, inst);
+            break;
+        case kIROp_GetElement:
+            result = emitGetElement(parent, as<IRGetElement>(inst));
+            break;
+        case kIROp_MakeStruct:
+            result = emitCompositeConstruct(parent, inst);
+            break;
+        case kIROp_MakeArrayFromElement:
+            result = emitMakeArrayFromElement(parent, inst);
+            break;
+        case kIROp_MakeMatrixFromScalar:
+            result = emitMakeMatrixFromScalar(parent, inst);
+            break;
+        case kIROp_MakeMatrix:
+            result = emitMakeMatrix(parent, inst);
+            break;
+        case kIROp_Load:
+            result = emitLoad(parent, as<IRLoad>(inst));
+            break;
+        case kIROp_Store:
+            result = emitStore(parent, as<IRStore>(inst));
+            break;
         case kIROp_SwizzledStore:
             result = emitSwizzledStore(parent, as<IRSwizzledStore>(inst));
             break;
-        case kIROp_swizzleSet: result = emitSwizzleSet(parent, as<IRSwizzleSet>(inst)); break;
+        case kIROp_swizzleSet:
+            result = emitSwizzleSet(parent, as<IRSwizzleSet>(inst));
+            break;
         case kIROp_RWStructuredBufferGetElementPtr:
             result = emitStructuredBufferGetElementPtr(parent, inst);
             break;
         case kIROp_StructuredBufferGetDimensions:
             result = emitStructuredBufferGetDimensions(parent, inst);
             break;
-        case kIROp_swizzle:   result = emitSwizzle(parent, as<IRSwizzle>(inst)); break;
-        case kIROp_IntCast:   result = emitIntCast(parent, as<IRIntCast>(inst)); break;
-        case kIROp_FloatCast: result = emitFloatCast(parent, as<IRFloatCast>(inst)); break;
+        case kIROp_swizzle:
+            result = emitSwizzle(parent, as<IRSwizzle>(inst));
+            break;
+        case kIROp_IntCast:
+            result = emitIntCast(parent, as<IRIntCast>(inst));
+            break;
+        case kIROp_FloatCast:
+            result = emitFloatCast(parent, as<IRFloatCast>(inst));
+            break;
         case kIROp_CastIntToFloat:
             result = emitIntToFloatCast(parent, as<IRCastIntToFloat>(inst));
             break;
         case kIROp_CastFloatToInt:
             result = emitFloatToIntCast(parent, as<IRCastFloatToInt>(inst));
             break;
-        case kIROp_CastPtrToInt:  result = emitCastPtrToInt(parent, inst); break;
-        case kIROp_CastPtrToBool: result = emitCastPtrToBool(parent, inst); break;
-        case kIROp_CastIntToPtr:  result = emitCastIntToPtr(parent, inst); break;
+        case kIROp_CastPtrToInt:
+            result = emitCastPtrToInt(parent, inst);
+            break;
+        case kIROp_CastPtrToBool:
+            result = emitCastPtrToBool(parent, inst);
+            break;
+        case kIROp_CastIntToPtr:
+            result = emitCastIntToPtr(parent, inst);
+            break;
         case kIROp_PtrCast:
         case kIROp_BitCast:
             result = emitOpBitcast(parent, inst, inst->getDataType(), inst->getOperand(0));
@@ -3250,7 +3412,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Greater:
         case kIROp_Geq:
         case kIROp_Rsh:
-        case kIROp_Lsh:     result = emitArithmetic(parent, inst); break;
+        case kIROp_Lsh:
+            result = emitArithmetic(parent, inst);
+            break;
         case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));
@@ -3432,11 +3596,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     });
                 break;
             }
-        case kIROp_Unreachable: result = emitOpUnreachable(parent, inst); break;
+        case kIROp_Unreachable:
+            result = emitOpUnreachable(parent, inst);
+            break;
         case kIROp_conditionalBranch:
             SLANG_UNEXPECTED("Unstructured branching is not supported by SPIRV.");
             break;
-        case kIROp_MakeVector: result = emitConstruct(parent, inst); break;
+        case kIROp_MakeVector:
+            result = emitConstruct(parent, inst);
+            break;
         case kIROp_MakeVectorFromScalar:
             {
                 const auto scalar = inst->getOperand(0);
@@ -3447,7 +3615,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = emitSplat(parent, inst, scalar, numElems->getValue());
             }
             break;
-        case kIROp_MakeArray: result = emitConstruct(parent, inst); break;
+        case kIROp_MakeArray:
+            result = emitConstruct(parent, inst);
+            break;
         case kIROp_Select:
             result = emitInst(
                 parent,
@@ -3457,14 +3627,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 kResultID,
                 OperandsOf(inst));
             break;
-        case kIROp_DebugLine:     result = emitDebugLine(parent, as<IRDebugLine>(inst)); break;
-        case kIROp_DebugVar:      result = emitDebugVarDeclaration(parent, as<IRDebugVar>(inst)); break;
-        case kIROp_DebugValue:    result = emitDebugValue(parent, as<IRDebugValue>(inst)); break;
-        case kIROp_GetStringHash: result = emitGetStringHash(inst); break;
-        case kIROp_undefined:     result = emitOpUndef(parent, inst, inst->getDataType()); break;
-        case kIROp_SPIRVAsm:      result = emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst)); break;
-        case kIROp_ImageLoad:     result = emitImageLoad(parent, as<IRImageLoad>(inst)); break;
-        case kIROp_ImageStore:    result = emitImageStore(parent, as<IRImageStore>(inst)); break;
+        case kIROp_DebugLine:
+            result = emitDebugLine(parent, as<IRDebugLine>(inst));
+            break;
+        case kIROp_DebugVar:
+            result = emitDebugVarDeclaration(parent, as<IRDebugVar>(inst));
+            break;
+        case kIROp_DebugValue:
+            result = emitDebugValue(parent, as<IRDebugValue>(inst));
+            break;
+        case kIROp_GetStringHash:
+            result = emitGetStringHash(inst);
+            break;
+        case kIROp_undefined:
+            result = emitOpUndef(parent, inst, inst->getDataType());
+            break;
+        case kIROp_SPIRVAsm:
+            result = emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst));
+            break;
+        case kIROp_ImageLoad:
+            result = emitImageLoad(parent, as<IRImageLoad>(inst));
+            break;
+        case kIROp_ImageStore:
+            result = emitImageStore(parent, as<IRImageStore>(inst));
+            break;
         case kIROp_ImageSubscript:
             result = emitImageSubscript(parent, as<IRImageSubscript>(inst));
             break;
@@ -3784,7 +3970,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     kResultID,
                     SpvLiteralBits::fromUnownedStringSlice(value));
             }
-        default: return nullptr;
+        default:
+            return nullptr;
         }
     }
 
@@ -3871,7 +4058,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
             case kIROp_SwizzledStore:
             case kIROp_Store:
-            case kIROp_Call:          return result;
+            case kIROp_Call:
+                return result;
             }
         }
         return SpvExecutionModeMax;
@@ -3944,7 +4132,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         switch (decoration->getOp())
         {
-        default: break;
+        default:
+            break;
 
         // [3.32.2. Debug Instructions]
         //
@@ -4017,14 +4206,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                     case SpvOpSpecConstant:
                                     case SpvOpSpecConstantFalse:
                                     case SpvOpSpecConstantTrue:
-                                    case SpvOpSpecConstantComposite: break;
-                                    default:                         params.add(spvGlobalInst); break;
+                                    case SpvOpSpecConstantComposite:
+                                        break;
+                                    default:
+                                        params.add(spvGlobalInst);
+                                        break;
                                     }
                                 }
                             }
                             break;
                         }
-                    default: break;
+                    default:
+                        break;
                     }
                 }
                 emitOpEntryPoint(section, decoration, spvStage, dstID, name, params);
@@ -4051,11 +4244,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 getIRInstSpvID(entryPoint),
                                 SpvExecutionModeEarlyFragmentTests);
                             break;
-                        default: break;
+                        default:
+                            break;
                         }
                     }
                     break;
-                case Stage::Geometry: requireSPIRVCapability(SpvCapabilityGeometry); break;
+                case Stage::Geometry:
+                    requireSPIRVCapability(SpvCapabilityGeometry);
+                    break;
                 case Stage::Miss:
                 case Stage::AnyHit:
                 case Stage::ClosestHit:
@@ -4094,8 +4290,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
                         break;
                     }
-                case Stage::Domain: requireSPIRVCapability(SpvCapabilityTessellation); break;
-                default:            break;
+                case Stage::Domain:
+                    requireSPIRVCapability(SpvCapabilityTessellation);
+                    break;
+                default:
+                    break;
                 }
             }
             break;
@@ -4205,7 +4404,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         dstID,
                         SpvExecutionModeOutputTriangleStrip);
                     break;
-                default: SLANG_ASSERT(!"Unknown stream out type");
+                default:
+                    SLANG_ASSERT(!"Unknown stream out type");
                 }
             }
             break;
@@ -4456,7 +4656,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             switch (decoration->getOp())
             {
-            default: break;
+            default:
+                break;
             case kIROp_SemanticDecoration:
                 {
                     ensureExtensionDeclarationBeforeSpv14(
@@ -4699,10 +4900,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         switch (stage)
         {
-        default: SLANG_UNEXPECTED("unhandled stage"); UNREACHABLE_RETURN((SpvExecutionModel)0);
+        default:
+            SLANG_UNEXPECTED("unhandled stage");
+            UNREACHABLE_RETURN((SpvExecutionModel)0);
 
 #define CASE(STAGE, MODEL) \
-    case Stage::STAGE: return SpvExecutionModel##MODEL
+    case Stage::STAGE:     \
+        return SpvExecutionModel##MODEL
 
             CASE(Vertex, Vertex);
             CASE(Hull, TessellationControl);
@@ -4960,7 +5164,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 case Stage::AnyHit:
                                 case Stage::ClosestHit:
                                 case Stage::Hull:
-                                case Stage::Domain:        needGeometryCapability = false; break;
+                                case Stage::Domain:
+                                    needGeometryCapability = false;
+                                    break;
                                 }
                             }
                         }
@@ -5200,8 +5406,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case kIROp_Func:
         case kIROp_GlobalParam:
-        case kIROp_GlobalVar:   return true;
-        default:                return false;
+        case kIROp_GlobalVar:
+            return true;
+        default:
+            return false;
         }
     }
 
@@ -5247,7 +5455,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             case IRLoopControl::kIRLoopControl_Loop:
                 loopControl = SpvLoopControlDontUnrollMask;
                 break;
-            default: break;
+            default:
+                break;
             }
         }
         emitOpLoopMerge(
@@ -5303,8 +5512,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     UInt argStartIndex = 0;
                     switch (branchInst->getOp())
                     {
-                    case kIROp_unconditionalBranch: argStartIndex = 1; break;
-                    case kIROp_loop:                argStartIndex = 3; break;
+                    case kIROp_unconditionalBranch:
+                        argStartIndex = 1;
+                        break;
+                    case kIROp_loop:
+                        argStartIndex = 3;
+                        break;
                     default:
                         // A phi argument can only come from an unconditional branch inst.
                         // Other uses are not relavent so we should skip.
@@ -5455,11 +5668,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRType* irType = nullptr;
         switch (type)
         {
-        case SpvSnippet::ASMType::Float:  irType = builder.getType(kIROp_FloatType); break;
-        case SpvSnippet::ASMType::Half:   irType = builder.getType(kIROp_HalfType); break;
-        case SpvSnippet::ASMType::Int:    irType = builder.getIntType(); break;
-        case SpvSnippet::ASMType::UInt:   irType = builder.getUIntType(); break;
-        case SpvSnippet::ASMType::UInt16: irType = builder.getType(kIROp_UInt16Type); break;
+        case SpvSnippet::ASMType::Float:
+            irType = builder.getType(kIROp_FloatType);
+            break;
+        case SpvSnippet::ASMType::Half:
+            irType = builder.getType(kIROp_HalfType);
+            break;
+        case SpvSnippet::ASMType::Int:
+            irType = builder.getIntType();
+            break;
+        case SpvSnippet::ASMType::UInt:
+            irType = builder.getUIntType();
+            break;
+        case SpvSnippet::ASMType::UInt16:
+            irType = builder.getType(kIROp_UInt16Type);
+            break;
         case SpvSnippet::ASMType::Float2:
             irType = builder.getVectorType(
                 builder.getType(kIROp_FloatType),
@@ -5470,7 +5693,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 builder.getType(kIROp_UIntType),
                 builder.getIntValue(builder.getIntType(), 2));
             break;
-        default: SLANG_UNEXPECTED("unhandled case in emitSpvSnippetASMTypeOperand");
+        default:
+            SLANG_UNEXPECTED("unhandled case in emitSpvSnippetASMTypeOperand");
         }
         emitOperand(irType);
     }
@@ -5491,12 +5715,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 switch (operand.type)
                 {
-                case SpvSnippet::ASMOperandType::SpvWord: emitOperand(operand.content); break;
+                case SpvSnippet::ASMOperandType::SpvWord:
+                    emitOperand(operand.content);
+                    break;
                 case SpvSnippet::ASMOperandType::ObjectReference:
                     SLANG_ASSERT(operand.content < (SpvWord)context.argumentIds.getCount());
                     emitOperand(context.argumentIds[operand.content]);
                     break;
-                case SpvSnippet::ASMOperandType::ResultId: emitOperand(kResultID); break;
+                case SpvSnippet::ASMOperandType::ResultId:
+                    emitOperand(kResultID);
+                    break;
                 case SpvSnippet::ASMOperandType::ResultTypeId:
                     {
                         emitOperand(context.resultType);
@@ -5548,11 +5776,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         {
                             switch (extractBaseType(context.irResultType))
                             {
-                            case BaseType::Float: constant.type = SpvSnippet::ASMType::Float; break;
+                            case BaseType::Float:
+                                constant.type = SpvSnippet::ASMType::Float;
+                                break;
                             case BaseType::Double:
                                 constant.type = SpvSnippet::ASMType::Double;
                                 break;
-                            default: break;
+                            default:
+                                break;
                             }
                         }
                         SpvInst* spvConstant = maybeEmitSpvConstant(constant);
@@ -6398,14 +6629,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (type->getOp())
         {
         case kIROp_FloatType:
-        case kIROp_DoubleType: return true;
+        case kIROp_DoubleType:
+            return true;
         case kIROp_IntType:
         case kIROp_Int16Type:
         case kIROp_Int64Type:
-        case kIROp_Int8Type:   return true;
-        case kIROp_VectorType: return isSignedType(as<IRVectorType>(type)->getElementType());
-        case kIROp_MatrixType: return isSignedType(as<IRMatrixType>(type)->getElementType());
-        default:               return false;
+        case kIROp_Int8Type:
+            return true;
+        case kIROp_VectorType:
+            return isSignedType(as<IRVectorType>(type)->getElementType());
+        case kIROp_MatrixType:
+            return isSignedType(as<IRMatrixType>(type)->getElementType());
+        default:
+            return false;
         }
     }
 
@@ -6415,10 +6651,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case kIROp_FloatType:
         case kIROp_DoubleType:
-        case kIROp_HalfType:   return true;
-        case kIROp_VectorType: return isFloatType(as<IRVectorType>(type)->getElementType());
-        case kIROp_MatrixType: return isFloatType(as<IRMatrixType>(type)->getElementType());
-        default:               return false;
+        case kIROp_HalfType:
+            return true;
+        case kIROp_VectorType:
+            return isFloatType(as<IRVectorType>(type)->getElementType());
+        case kIROp_MatrixType:
+            return isFloatType(as<IRMatrixType>(type)->getElementType());
+        default:
+            return false;
         }
     }
 
@@ -6438,22 +6678,37 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case BaseType::Float:
         case BaseType::Double:
-        case BaseType::Half:   isFloatingPoint = true; break;
-        case BaseType::Bool:   isBool = true; break;
-        default:               break;
+        case BaseType::Half:
+            isFloatingPoint = true;
+            break;
+        case BaseType::Bool:
+            isBool = true;
+            break;
+        default:
+            break;
         }
         SpvOp opCode = SpvOpUndef;
         bool isSigned = isSignedType(basicType);
         switch (op)
         {
-        case kIROp_Add: opCode = isFloatingPoint ? SpvOpFAdd : SpvOpIAdd; break;
-        case kIROp_Sub: opCode = isFloatingPoint ? SpvOpFSub : SpvOpISub; break;
-        case kIROp_Mul: opCode = isFloatingPoint ? SpvOpFMul : SpvOpIMul; break;
+        case kIROp_Add:
+            opCode = isFloatingPoint ? SpvOpFAdd : SpvOpIAdd;
+            break;
+        case kIROp_Sub:
+            opCode = isFloatingPoint ? SpvOpFSub : SpvOpISub;
+            break;
+        case kIROp_Mul:
+            opCode = isFloatingPoint ? SpvOpFMul : SpvOpIMul;
+            break;
         case kIROp_Div:
             opCode = isFloatingPoint ? SpvOpFDiv : isSigned ? SpvOpSDiv : SpvOpUDiv;
             break;
-        case kIROp_IRem: opCode = isSigned ? SpvOpSRem : SpvOpUMod; break;
-        case kIROp_FRem: opCode = SpvOpFRem; break;
+        case kIROp_IRem:
+            opCode = isSigned ? SpvOpSRem : SpvOpUMod;
+            break;
+        case kIROp_FRem:
+            opCode = SpvOpFRem;
+            break;
         case kIROp_Less:
             opCode = isFloatingPoint ? SpvOpFOrdLessThan
                      : isSigned      ? SpvOpSLessThan
@@ -6482,10 +6737,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                      : isSigned      ? SpvOpSGreaterThan
                                      : SpvOpUGreaterThan;
             break;
-        case kIROp_Neg: opCode = isFloatingPoint ? SpvOpFNegate : SpvOpSNegate; break;
-        case kIROp_And: opCode = SpvOpLogicalAnd; break;
-        case kIROp_Or:  opCode = SpvOpLogicalOr; break;
-        case kIROp_Not: opCode = SpvOpLogicalNot; break;
+        case kIROp_Neg:
+            opCode = isFloatingPoint ? SpvOpFNegate : SpvOpSNegate;
+            break;
+        case kIROp_And:
+            opCode = SpvOpLogicalAnd;
+            break;
+        case kIROp_Or:
+            opCode = SpvOpLogicalOr;
+            break;
+        case kIROp_Not:
+            opCode = SpvOpLogicalNot;
+            break;
         case kIROp_BitAnd:
             if (isBool)
                 opCode = SpvOpLogicalAnd;
@@ -6513,8 +6776,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Rsh:
             opCode = isSigned ? SpvOpShiftRightArithmetic : SpvOpShiftRightLogical;
             break;
-        case kIROp_Lsh: opCode = SpvOpShiftLeftLogical; break;
-        default:        SLANG_ASSERT(!"unknown arithmetic opcode"); break;
+        case kIROp_Lsh:
+            opCode = SpvOpShiftLeftLogical;
+            break;
+        default:
+            SLANG_ASSERT(!"unknown arithmetic opcode");
+            break;
         }
         if (operandCount == 1)
         {
@@ -7169,9 +7436,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 default:
                     switch (opcode)
                     {
-                    case SpvOpName:       return getSection(SpvLogicalSectionID::DebugNames);
-                    case SpvOpCapability: return getSection(SpvLogicalSectionID::Capabilities);
-                    case SpvOpExtension:  return getSection(SpvLogicalSectionID::Extensions);
+                    case SpvOpName:
+                        return getSection(SpvLogicalSectionID::DebugNames);
+                    case SpvOpCapability:
+                        return getSection(SpvLogicalSectionID::Capabilities);
+                    case SpvOpExtension:
+                        return getSection(SpvLogicalSectionID::Extensions);
                     case SpvOpExecutionMode:
                     case SpvOpExecutionModeId:
                         return getSection(SpvLogicalSectionID::ExecutionModes);
@@ -7181,7 +7451,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     case SpvOpMemberDecorate:
                     case SpvOpMemberDecorateString:
                         return getSection(SpvLogicalSectionID::Annotations);
-                    default: return defaultParent;
+                    default:
+                        return defaultParent;
                     }
                 }
             };
@@ -7211,7 +7482,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 }
                             case kIROp_StringLit:
                                 SLANG_UNIMPLEMENTED_X("String constants in SPIR-V emit");
-                            default: SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                            default:
+                                SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                             }
                             emitOperand(constant);
                         }
@@ -7230,7 +7502,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                     emitOperand(SpvLiteralInteger::from32(uint32_t(i)));
                                     break;
                                 }
-                            default: SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                            default:
+                                SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                             }
                         }
                         break;
@@ -7309,7 +7582,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         emitOperand(getNonSemanticDebugPrintfExtInst());
                         break;
                     }
-                default: SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                default:
+                    SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                 }
             };
 
@@ -7319,7 +7593,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     switch (operand->getOp())
                     {
-                    case kIROp_SPIRVAsmOperandInst: return cast<IRType>(operand->getValue());
+                    case kIROp_SPIRVAsmOperandInst:
+                        return cast<IRType>(operand->getValue());
                     case kIROp_SPIRVAsmOperandSampledType:
                         {
                             // Make a 4 vector of the component type
@@ -7332,7 +7607,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     case kIROp_SPIRVAsmOperandResult:
                     case kIROp_SPIRVAsmOperandId:
                         SLANG_UNEXPECTED("truncate should have been given slang types");
-                    default: SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
+                    default:
+                        SLANG_UNREACHABLE("Unhandled case in emitSPIRVAsm");
                     }
                 };
 
@@ -7473,7 +7749,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         }
                         continue;
                     }
-                default: break;
+                default:
+                    break;
                 }
                 const auto opParent = parentForOpCode(opcode, parent);
                 const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);

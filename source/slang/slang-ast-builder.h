@@ -349,7 +349,8 @@ public:
                            lookupDeclRef->getWitness(),
                            memberDecl)
                     .template as<T>();
-            default: break;
+            default:
+                break;
             }
         }
         else if (auto directDeclRef = as<DirectDeclRef>(parent.declRefBase))

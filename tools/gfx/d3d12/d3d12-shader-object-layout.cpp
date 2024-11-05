@@ -198,7 +198,8 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
                 break;
 
             case slang::BindingType::VaryingInput:
-            case slang::BindingType::VaryingOutput: break;
+            case slang::BindingType::VaryingOutput:
+                break;
 
             default:
                 bindingRangeInfo.baseIndex = m_ownCounts.resource;
@@ -491,7 +492,8 @@ Result RootShaderObjectLayoutImpl::RootSignatureDescBuilder::translateDescriptor
     case slang::BindingType::Sampler:
         *outType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
         return SLANG_OK;
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 }
 
@@ -748,9 +750,11 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
         {
         case slang::BindingType::ConstantBuffer:
         case slang::BindingType::ParameterBlock:
-        case slang::BindingType::ExistentialValue: continue;
+        case slang::BindingType::ExistentialValue:
+            continue;
 
-        default: break;
+        default:
+            break;
         }
 
         // For binding ranges that don't represent sub-objects, we will add

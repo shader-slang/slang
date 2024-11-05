@@ -167,10 +167,18 @@ struct App
                 {
                 // The common C escape sequencs are handled directly.
                 //
-                case '"':  fprintf(outputFile, "\\\""); break;
-                case '\n': fprintf(outputFile, "\\n"); break;
-                case '\t': fprintf(outputFile, "\\t"); break;
-                case '\\': fprintf(outputFile, "\\\\"); break;
+                case '"':
+                    fprintf(outputFile, "\\\"");
+                    break;
+                case '\n':
+                    fprintf(outputFile, "\\n");
+                    break;
+                case '\t':
+                    fprintf(outputFile, "\\t");
+                    break;
+                case '\\':
+                    fprintf(outputFile, "\\\\");
+                    break;
                 default:
                     // For all other cases, we detect if the byte
                     // is in the printable ASCII range, and emit
@@ -252,8 +260,10 @@ struct App
         {
             switch (*cursor)
             {
-            default:  break;
-            case '-': *cursor = '_';
+            default:
+                break;
+            case '-':
+                *cursor = '_';
             }
         }
 

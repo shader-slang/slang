@@ -12,19 +12,32 @@ gfx::Format convertTypelessFormat(gfx::Format format)
 {
     switch (format)
     {
-    case gfx::Format::R32G32B32A32_TYPELESS: return gfx::Format::R32G32B32A32_FLOAT;
-    case gfx::Format::R32G32B32_TYPELESS:    return gfx::Format::R32G32B32_FLOAT;
-    case gfx::Format::R32G32_TYPELESS:       return gfx::Format::R32G32_FLOAT;
-    case gfx::Format::R32_TYPELESS:          return gfx::Format::R32_FLOAT;
-    case gfx::Format::R16G16B16A16_TYPELESS: return gfx::Format::R16G16B16A16_FLOAT;
-    case gfx::Format::R16G16_TYPELESS:       return gfx::Format::R16G16_FLOAT;
-    case gfx::Format::R16_TYPELESS:          return gfx::Format::R16_FLOAT;
-    case gfx::Format::R8G8B8A8_TYPELESS:     return gfx::Format::R8G8B8A8_UNORM;
-    case gfx::Format::R8G8_TYPELESS:         return gfx::Format::R8G8_UNORM;
-    case gfx::Format::R8_TYPELESS:           return gfx::Format::R8_UNORM;
-    case gfx::Format::B8G8R8A8_TYPELESS:     return gfx::Format::B8G8R8A8_UNORM;
-    case gfx::Format::R10G10B10A2_TYPELESS:  return gfx::Format::R10G10B10A2_UINT;
-    default:                                 return gfx::Format::Unknown;
+    case gfx::Format::R32G32B32A32_TYPELESS:
+        return gfx::Format::R32G32B32A32_FLOAT;
+    case gfx::Format::R32G32B32_TYPELESS:
+        return gfx::Format::R32G32B32_FLOAT;
+    case gfx::Format::R32G32_TYPELESS:
+        return gfx::Format::R32G32_FLOAT;
+    case gfx::Format::R32_TYPELESS:
+        return gfx::Format::R32_FLOAT;
+    case gfx::Format::R16G16B16A16_TYPELESS:
+        return gfx::Format::R16G16B16A16_FLOAT;
+    case gfx::Format::R16G16_TYPELESS:
+        return gfx::Format::R16G16_FLOAT;
+    case gfx::Format::R16_TYPELESS:
+        return gfx::Format::R16_FLOAT;
+    case gfx::Format::R8G8B8A8_TYPELESS:
+        return gfx::Format::R8G8B8A8_UNORM;
+    case gfx::Format::R8G8_TYPELESS:
+        return gfx::Format::R8G8_UNORM;
+    case gfx::Format::R8_TYPELESS:
+        return gfx::Format::R8_UNORM;
+    case gfx::Format::B8G8R8A8_TYPELESS:
+        return gfx::Format::B8G8R8A8_UNORM;
+    case gfx::Format::R10G10B10A2_TYPELESS:
+        return gfx::Format::R10G10B10A2_UINT;
+    default:
+        return gfx::Format::Unknown;
     }
 }
 

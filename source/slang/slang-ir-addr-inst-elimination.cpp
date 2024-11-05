@@ -22,7 +22,8 @@ struct AddressInstEliminationContext
     {
         switch (addr->getOp())
         {
-        default: return builder.emitLoad(addr);
+        default:
+            return builder.emitLoad(addr);
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             {
@@ -44,7 +45,9 @@ struct AddressInstEliminationContext
         {
             switch (inst->getOp())
             {
-            default: accessChain.add(inst); goto endLoop;
+            default:
+                accessChain.add(inst);
+                goto endLoop;
             case kIROp_GetElementPtr:
             case kIROp_FieldAddress:
                 accessChain.add(inst->getOperand(1));
@@ -158,13 +161,20 @@ struct AddressInstEliminationContext
 
                 switch (use->getUser()->getOp())
                 {
-                case kIROp_Load:          transformLoadAddr(transformBuilder, use); break;
-                case kIROp_Store:         transformStoreAddr(transformBuilder, use); break;
-                case kIROp_Call:          transformCallAddr(transformBuilder, use); break;
+                case kIROp_Load:
+                    transformLoadAddr(transformBuilder, use);
+                    break;
+                case kIROp_Store:
+                    transformStoreAddr(transformBuilder, use);
+                    break;
+                case kIROp_Call:
+                    transformCallAddr(transformBuilder, use);
+                    break;
                 case kIROp_GetElementPtr:
                 case kIROp_FieldAddress:
                 case kIROp_Unmodified:
-                case kIROp_DebugValue:    break;
+                case kIROp_DebugValue:
+                    break;
                 default:
                     sink->diagnose(
                         use->getUser()->sourceLoc,

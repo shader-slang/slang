@@ -363,9 +363,14 @@ void RenderCommandEncoder::setIndexBuffer(
 
     switch (indexFormat)
     {
-    case Format::R16_UINT: m_indexBufferType = MTL::IndexTypeUInt16; break;
-    case Format::R32_UINT: m_indexBufferType = MTL::IndexTypeUInt32; break;
-    default:               assert(!"unsupported index format");
+    case Format::R16_UINT:
+        m_indexBufferType = MTL::IndexTypeUInt16;
+        break;
+    case Format::R32_UINT:
+        m_indexBufferType = MTL::IndexTypeUInt32;
+        break;
+    default:
+        assert(!"unsupported index format");
     }
 }
 

@@ -141,17 +141,28 @@ static char _getCppEscapedChar(char c)
 {
     switch (c)
     {
-    case '\b': return 'b';
-    case '\f': return 'f';
-    case '\n': return 'n';
-    case '\r': return 'r';
-    case '\a': return 'a';
-    case '\t': return 't';
-    case '\v': return 'v';
-    case '\'': return '\'';
-    case '\"': return '"';
-    case '\\': return '\\';
-    default:   return 0;
+    case '\b':
+        return 'b';
+    case '\f':
+        return 'f';
+    case '\n':
+        return 'n';
+    case '\r':
+        return 'r';
+    case '\a':
+        return 'a';
+    case '\t':
+        return 't';
+    case '\v':
+        return 'v';
+    case '\'':
+        return '\'';
+    case '\"':
+        return '"';
+    case '\\':
+        return '\\';
+    default:
+        return 0;
     }
 }
 
@@ -159,17 +170,28 @@ static char _getCppUnescapedChar(char c)
 {
     switch (c)
     {
-    case 'b':  return '\b';
-    case 'f':  return '\f';
-    case 'n':  return '\n';
-    case 'r':  return '\r';
-    case 'a':  return '\a';
-    case 't':  return '\t';
-    case 'v':  return '\v';
-    case '\'': return '\'';
-    case '\"': return '"';
-    case '\\': return '\\';
-    default:   return 0;
+    case 'b':
+        return '\b';
+    case 'f':
+        return '\f';
+    case 'n':
+        return '\n';
+    case 'r':
+        return '\r';
+    case 'a':
+        return '\a';
+    case 't':
+        return '\t';
+    case 'v':
+        return '\v';
+    case '\'':
+        return '\'';
+    case '\"':
+        return '"';
+    case '\\':
+        return '\\';
+    default:
+        return 0;
     }
 }
 
@@ -669,7 +691,8 @@ SlangResult JSONStringEscapeHandler::lexQuoted(const char* cursor, const char** 
 
         switch (c)
         {
-        case 0: return SLANG_FAIL;
+        case 0:
+            return SLANG_FAIL;
         case '"':
             {
                 *outCursor = cursor;
@@ -708,7 +731,8 @@ SlangResult JSONStringEscapeHandler::lexQuoted(const char* cursor, const char** 
                 }
             }
         // Somewhat surprisingly it appears it's valid to have \r\n inside of quotes.
-        default: break;
+        default:
+            break;
         }
     }
 }
@@ -717,15 +741,24 @@ static char _getJSONEscapedChar(char c)
 {
     switch (c)
     {
-    case '\b': return 'b';
-    case '\f': return 'f';
-    case '\n': return 'n';
-    case '\r': return 'r';
-    case '\t': return 't';
-    case '\\': return '\\';
-    case '/':  return '/';
-    case '"':  return '"';
-    default:   return 0;
+    case '\b':
+        return 'b';
+    case '\f':
+        return 'f';
+    case '\n':
+        return 'n';
+    case '\r':
+        return 'r';
+    case '\t':
+        return 't';
+    case '\\':
+        return '\\';
+    case '/':
+        return '/';
+    case '"':
+        return '"';
+    default:
+        return 0;
     }
 }
 
@@ -733,15 +766,24 @@ static char _getJSONUnescapedChar(char c)
 {
     switch (c)
     {
-    case 'b':  return '\b';
-    case 'f':  return '\f';
-    case 'n':  return '\n';
-    case 'r':  return '\r';
-    case 't':  return '\t';
-    case '\\': return '\\';
-    case '/':  return '/';
-    case '"':  return '"';
-    default:   return 0;
+    case 'b':
+        return '\b';
+    case 'f':
+        return '\f';
+    case 'n':
+        return '\n';
+    case 'r':
+        return '\r';
+    case 't':
+        return '\t';
+    case '\\':
+        return '\\';
+    case '/':
+        return '/';
+    case '"':
+        return '"';
+    default:
+        return 0;
     }
 }
 
@@ -997,14 +1039,19 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
 {
     switch (style)
     {
-    case Style::Cpp:   return &g_cppHandler;
-    case Style::Space: return &g_spaceHandler;
-    case Style::JSON:  return &g_jsonHandler;
+    case Style::Cpp:
+        return &g_cppHandler;
+    case Style::Space:
+        return &g_spaceHandler;
+    case Style::JSON:
+        return &g_jsonHandler;
     // TODO(JS): For now we make Slang language string encoding/decoding the same as C++
     // That may not be desirable because C++ has a variety of surprising edge cases (for example
     // around \x)
-    case Style::Slang: return &g_cppHandler;
-    default:           return nullptr;
+    case Style::Slang:
+        return &g_cppHandler;
+    default:
+        return nullptr;
     }
 }
 

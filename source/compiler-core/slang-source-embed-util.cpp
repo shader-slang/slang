@@ -184,7 +184,8 @@ static SlangResult _append(
             // literalSuffix = toSlice("ULL");
             break;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     // Output the variable
@@ -247,7 +248,9 @@ static SlangResult _append(
 
         switch (bytesPerElement)
         {
-        case 1: _appendHex<uint8_t>(lineBytes, workView, dstChars, bytesForLine, buf); break;
+        case 1:
+            _appendHex<uint8_t>(lineBytes, workView, dstChars, bytesForLine, buf);
+            break;
         case 2:
             _appendHex<uint16_t>((const uint16_t*)lineBytes, workView, dstChars, bytesForLine, buf);
             break;

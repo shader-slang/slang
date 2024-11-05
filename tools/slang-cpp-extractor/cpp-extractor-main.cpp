@@ -107,7 +107,8 @@ static DocMarkupExtractor::SearchStyle _getSearchStyle(Node* node)
         {
             return SearchStyle::Before;
         }
-    default: break;
+    default:
+        break;
     }
 
     // Default is to only allow before.

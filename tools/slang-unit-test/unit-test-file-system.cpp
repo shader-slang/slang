@@ -361,15 +361,20 @@ static SlangResult _createFileSystem(
     outFileSystem.setNull();
     switch (type)
     {
-    case FileSystemType::Zip:              return ZipFileSystem::create(outFileSystem);
-    case FileSystemType::RiffUncompressed: outFileSystem = new RiffFileSystem(nullptr); break;
+    case FileSystemType::Zip:
+        return ZipFileSystem::create(outFileSystem);
+    case FileSystemType::RiffUncompressed:
+        outFileSystem = new RiffFileSystem(nullptr);
+        break;
     case FileSystemType::RiffDeflate:
         outFileSystem = new RiffFileSystem(DeflateCompressionSystem::getSingleton());
         break;
     case FileSystemType::RiffLZ4:
         outFileSystem = new RiffFileSystem(LZ4CompressionSystem::getSingleton());
         break;
-    case FileSystemType::Memory: outFileSystem = new MemoryFileSystem; break;
+    case FileSystemType::Memory:
+        outFileSystem = new MemoryFileSystem;
+        break;
     case FileSystemType::Relative:
         {
             ComPtr<ISlangMutableFileSystem> memoryFileSystem(new MemoryFileSystem);

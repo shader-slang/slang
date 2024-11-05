@@ -25,7 +25,8 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                 switch (returnVal->getOp())
                 {
                 case kIROp_StructType:
-                case kIROp_ClassType:  break;
+                case kIROp_ClassType:
+                    break;
                 case kIROp_Func:
                 case kIROp_FuncType:
                 default:
