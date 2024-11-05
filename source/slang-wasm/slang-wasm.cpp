@@ -406,7 +406,9 @@ TypeLayoutReflection* ProgramLayout::getGlobalParamsTypeLayout()
     return new TypeLayoutReflection(m_internal->getGlobalParamsTypeLayout());
 }
 
-BindingType TypeLayoutReflection::getDescriptorSetDescriptorRangeType(unsigned int setIndex, unsigned int rangeIndex)
+BindingType TypeLayoutReflection::getDescriptorSetDescriptorRangeType(
+    unsigned int setIndex,
+    unsigned int rangeIndex)
 {
     return m_interface->getDescriptorSetDescriptorRangeType(setIndex, rangeIndex);
 }

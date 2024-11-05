@@ -1255,9 +1255,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // https://www.w3.org/TR/WGSL/#bit-expr
             IRInst* const shiftAmount = inst->getOperand(1);
             IRType* const shiftAmountType = shiftAmount->getDataType();
-            
-            // Dawn complains about mixing '<<' and '|', '^' and a bunch of other bit operators without
-            // a paranthesis, so we'll always emit paranthesis around the shift amount.
+
+            // Dawn complains about mixing '<<' and '|', '^' and a bunch of other bit operators
+            // without a paranthesis, so we'll always emit paranthesis around the shift amount.
             //
 
             m_writer->emit("(");
@@ -1283,7 +1283,7 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
                 m_writer->emit(")");
             }
-            
+
             maybeCloseParens(needClose);
 
             m_writer->emit(")");
@@ -1308,12 +1308,11 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(" (");
             emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
             m_writer->emit(")");
-            
+
             maybeCloseParens(needClose);
 
             m_writer->emit(")");
             return true;
-
         }
         break;
 

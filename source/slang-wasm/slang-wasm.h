@@ -55,6 +55,7 @@ class TypeLayoutReflection
 {
 private:
     slang::TypeLayoutReflection* m_interface;
+
 public:
     TypeLayoutReflection(slang::TypeLayoutReflection* interface)
         : m_interface(interface)
@@ -70,6 +71,7 @@ class VariableLayoutReflection
 {
 private:
     slang::VariableLayoutReflection* m_internal;
+
 public:
     VariableLayoutReflection(slang::VariableLayoutReflection* interface)
         : m_internal(interface)
@@ -81,7 +83,6 @@ public:
     unsigned int getBindingIndex();
 
     slang::VariableLayoutReflection* interface() const { return m_internal; }
-
 };
 
 
@@ -89,12 +90,13 @@ class ProgramLayout
 {
 private:
     slang::ProgramLayout* m_internal;
+
 public:
     ProgramLayout(slang::ProgramLayout* interface)
         : m_internal(interface)
     {
     }
-    
+
     unsigned int getParameterCount();
     slang::wgsl::VariableLayoutReflection* getParameterByIndex(unsigned int index);
 
