@@ -558,10 +558,7 @@ protected:
         SLANG_UNUSED(rate);
         SLANG_UNUSED(addressSpace);
     }
-    virtual void emitSemanticsPrefixImpl(IRInst* inst)
-    {
-        SLANG_UNUSED(inst);
-    }
+    virtual void emitSemanticsPrefixImpl(IRInst* inst) { SLANG_UNUSED(inst); }
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
     {
         SLANG_UNUSED(inst);

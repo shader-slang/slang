@@ -1023,16 +1023,15 @@ struct LegalizeWGSLEntryPointContext
                 builder.addTargetSystemValueDecoration(key, toSlice("position"));
                 break;
             }
-        default: SLANG_ASSERT(false); return;
+        default:
+            SLANG_ASSERT(false);
+            return;
         }
 
         fixUpFuncType(func, structType);
     }
 
-    IRInst* tryConvertValue(
-        IRBuilder& builder,
-        IRInst* val,
-        IRType* toType)
+    IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
     {
         auto fromType = val->getFullType();
         if (auto fromVector = as<IRVectorType>(fromType))
@@ -1079,7 +1078,9 @@ struct LegalizeWGSLEntryPointContext
         UInt attrIndex;
     };
 
-    std::optional<SystemValLegalizationWorkItem> tryToMakeSystemValWorkItem(IRInst* var, IRType* varType)
+    std::optional<SystemValLegalizationWorkItem> tryToMakeSystemValWorkItem(
+        IRInst* var,
+        IRType* varType)
     {
         if (auto semanticDecoration = var->findDecoration<IRSemanticDecoration>())
         {
@@ -1266,8 +1267,10 @@ struct LegalizeWGSLEntryPointContext
             switch (arg->getOp())
             {
             case kIROp_Var:
-            case kIROp_Param: continue;
-            default:          break;
+            case kIROp_Param:
+                continue;
+            default:
+                break;
             }
 
             // Create a local variable to hold the input argument.
