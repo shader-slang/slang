@@ -50,6 +50,8 @@ public:
 
     void emit(const AddressSpace addressSpace);
 
+    virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
+
 private:
     // Emit the matrix type with 'rowCountWGSL' WGSL-rows and 'colCountWGSL' WGSL-columns
     void emitMatrixType(

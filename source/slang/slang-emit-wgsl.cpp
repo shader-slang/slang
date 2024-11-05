@@ -497,6 +497,34 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     }
 }
 
+static bool isStaticConst(IRInst* inst)
+{
+    if (inst->getParent()->getOp() == kIROp_Module)
+    {
+        return true;
+    }
+    switch (inst->getOp())
+    {
+    case kIROp_MakeVector:
+    case kIROp_swizzle:
+    case kIROp_swizzleSet:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_CastFloatToInt:
+    case kIROp_CastIntToFloat:
+    case kIROp_BitCast:
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (!isStaticConst(inst->getOperand(i)))
+                    return false;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
     switch (varDecl->getOp())
@@ -505,14 +533,10 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     case kIROp_GlobalVar:
     case kIROp_Var:         m_writer->emit("var"); break;
     default:
-        if (as<IRModuleInst>(varDecl->getParent()))
-        {
+        if (isStaticConst(varDecl))
             m_writer->emit("const");
-        }
         else
-        {
             m_writer->emit("var");
-        }
         break;
     }
 
@@ -977,6 +1001,33 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
     }
 }
 
+bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
+{
+    bool result = CLikeSourceEmitter::shouldFoldInstIntoUseSites(inst);
+    if (result)
+    {
+        // If inst is a matrix, and is used in a component-wise multiply,
+        // we need to not fold it.
+        if (as<IRMatrixType>(inst->getDataType()))
+        {
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user->getOp() == kIROp_Mul)
+                {
+                    if (as<IRMatrixType>(user->getOperand(0)->getDataType()) &&
+                        as<IRMatrixType>(user->getOperand(1)->getDataType()))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return result;
+}
+
+
 bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -1126,6 +1177,71 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
         break;
+
+    case kIROp_GetStringHash:
+        {
+            auto getStringHashInst = as<IRGetStringHash>(inst);
+            auto stringLit = getStringHashInst->getStringLit();
+
+            if (stringLit)
+            {
+                auto slice = stringLit->getStringSlice();
+                emitType(inst->getDataType());
+                m_writer->emit("(");
+                m_writer->emit((int)getStableHashCode32(slice.begin(), slice.getLength()).hash);
+                m_writer->emit(")");
+            }
+            else
+            {
+                // Couldn't handle
+                diagnoseUnhandledInst(inst);
+            }
+            return true;
+        }
+
+    case kIROp_Mul:
+        {
+            if (!as<IRMatrixType>(inst->getOperand(0)->getDataType()) ||
+                !as<IRMatrixType>(inst->getOperand(1)->getDataType()))
+            {
+                return false;
+            }
+            // Mul(m1, m2) should be translated to component-wise multiplication in WGSL.
+            auto matrixType = as<IRMatrixType>(inst->getDataType());
+            auto rowCount = getIntVal(matrixType->getRowCount());
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            for (IRIntegerValue i = 0; i < rowCount; i++)
+            {
+                if (i != 0)
+                {
+                    m_writer->emit(", ");
+                }
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::Postfix));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("] * ");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::Postfix));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("]");
+            }
+            m_writer->emit(")");
+
+            return true;
+        }
+
+    case kIROp_Select:
+        {
+            m_writer->emit("select(");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     }
 
     return false;

@@ -4021,6 +4021,7 @@ public:
     IRInst* emitDifferentialPairGetPrimalUserCode(IRInst* diffPair);
     IRInst* emitMakeVector(IRType* type, UInt argCount, IRInst* const* args);
     IRInst* emitMakeVectorFromScalar(IRType* type, IRInst* scalarValue);
+    IRInst* emitMakeCompositeFromScalar(IRType* type, IRInst* scalarValue);
 
     IRInst* emitMakeVector(IRType* type, List<IRInst*> const& args)
     {
