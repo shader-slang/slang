@@ -2356,8 +2356,10 @@ bool isWGSLTarget(TargetRequest* targetReq)
     {
     case CodeGenTarget::WGSL:
     case CodeGenTarget::WGSLSPIRV:
-    case CodeGenTarget::WGSLSPIRVAssembly: return true;
-    default:                               return false;
+    case CodeGenTarget::WGSLSPIRVAssembly:
+        return true;
+    default:
+        return false;
     }
 }
 
