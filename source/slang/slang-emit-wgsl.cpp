@@ -581,8 +581,12 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
             m_writer->emit("@binding(");
             m_writer->emit(attr->getOffset());
             m_writer->emit(") ");
+
+            EmitVarChain chain = {};
+            chain.varLayout = layout;
+            auto space = getBindingSpaceForKinds(&chain, kind);
             m_writer->emit("@group(");
-            m_writer->emit(attr->getSpace());
+            m_writer->emit(space);
             m_writer->emit(") ");
 
             return;
