@@ -75,7 +75,8 @@ void validateAccelerationStructureBuildInputs(
                 case Format::R16G16B16A16_FLOAT:
                 case Format::R16G16_FLOAT:
                 case Format::R16G16B16A16_SNORM:
-                case Format::R16G16_SNORM:       break;
+                case Format::R16G16_SNORM:
+                    break;
                 default:
                     GFX_DIAGNOSE_ERROR(
                         "Unsupported "
@@ -89,7 +90,8 @@ void validateAccelerationStructureBuildInputs(
                     switch (buildInputs.geometryDescs[i].content.triangles.indexFormat)
                     {
                     case Format::R32_UINT:
-                    case Format::R16_UINT: break;
+                    case Format::R16_UINT:
+                        break;
                     default:
                         GFX_DIAGNOSE_ERROR(
                             "Unsupported "
@@ -149,7 +151,9 @@ void validateAccelerationStructureBuildInputs(
             }
         }
         break;
-    default: GFX_DIAGNOSE_ERROR("Invalid value of IAccelerationStructure::Kind."); break;
+    default:
+        GFX_DIAGNOSE_ERROR("Invalid value of IAccelerationStructure::Kind.");
+        break;
     }
 }
 

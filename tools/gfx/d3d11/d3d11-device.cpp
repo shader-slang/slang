@@ -660,7 +660,8 @@ Result DeviceImpl::createTextureResource(
             texture->m_resource = texture3D;
             break;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     returnComPtr(outResource, texture);
@@ -722,7 +723,8 @@ Result DeviceImpl::createBufferResource(
             bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (bufferDesc.BindFlags & (D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE))
@@ -818,7 +820,8 @@ Result DeviceImpl::createTextureView(
 
     switch (desc.type)
     {
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
 
     case IResourceView::Type::RenderTarget:
         {
@@ -920,7 +923,8 @@ Result DeviceImpl::createBufferView(
 
     switch (desc.type)
     {
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
 
     case IResourceView::Type::UnorderedAccess:
         {
@@ -1056,11 +1060,20 @@ Result DeviceImpl::createInputLayout(IInputLayout::Desc const& desc, IInputLayou
         switch (inputElementsIn[ii].format)
         {
         case Format::R32G32B32A32_FLOAT:
-        case Format::R8G8B8A8_UNORM:     typeName = "float4"; break;
-        case Format::R32G32B32_FLOAT:    typeName = "float3"; break;
-        case Format::R32G32_FLOAT:       typeName = "float2"; break;
-        case Format::R32_FLOAT:          typeName = "float"; break;
-        default:                         return SLANG_FAIL;
+        case Format::R8G8B8A8_UNORM:
+            typeName = "float4";
+            break;
+        case Format::R32G32B32_FLOAT:
+            typeName = "float3";
+            break;
+        case Format::R32G32_FLOAT:
+            typeName = "float2";
+            break;
+        case Format::R32_FLOAT:
+            typeName = "float";
+            break;
+        default:
+            return SLANG_FAIL;
         }
 
         hlslCursor += sprintf(
@@ -1117,10 +1130,17 @@ void* DeviceImpl::map(IBufferResource* bufferIn, MapFlavor flavor)
 
     switch (flavor)
     {
-    case MapFlavor::WriteDiscard: mapType = D3D11_MAP_WRITE_DISCARD; break;
-    case MapFlavor::HostWrite:    mapType = D3D11_MAP_WRITE_NO_OVERWRITE; break;
-    case MapFlavor::HostRead:     mapType = D3D11_MAP_READ; break;
-    default:                      return nullptr;
+    case MapFlavor::WriteDiscard:
+        mapType = D3D11_MAP_WRITE_DISCARD;
+        break;
+    case MapFlavor::HostWrite:
+        mapType = D3D11_MAP_WRITE_NO_OVERWRITE;
+        break;
+    case MapFlavor::HostRead:
+        mapType = D3D11_MAP_READ;
+        break;
+    default:
+        return nullptr;
     }
 
     bufferResource->m_mapFlavor = flavor;
@@ -1292,7 +1312,8 @@ void DeviceImpl::setPipelineState(IPipelineState* state)
 
     switch (pipelineType)
     {
-    default: break;
+    default:
+        break;
 
     case PipelineType::Graphics:
         {
@@ -1482,7 +1503,8 @@ Result DeviceImpl::createProgram(
                 nullptr,
                 shaderProgram->m_pixelShader.writeRef()));
             break;
-        default: SLANG_ASSERT(!"pipeline stage not implemented");
+        default:
+            SLANG_ASSERT(!"pipeline stage not implemented");
         }
     }
     returnComPtr(outProgram, shaderProgram);

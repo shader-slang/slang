@@ -55,7 +55,8 @@ SlangResult GLSLSourceEmitter::init()
             _requireSPIRVVersion(SemanticVersion(1, 4));
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (getTargetProgram()->getOptionSet().shouldUseScalarLayout())
@@ -112,8 +113,10 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
 {
     switch (version)
     {
-#define CASE(NUMBER) \
-    case NUMBER: _requireGLSLVersion(ProfileVersion::GLSL_##NUMBER); break
+#define CASE(NUMBER)                                        \
+    case NUMBER:                                            \
+        _requireGLSLVersion(ProfileVersion::GLSL_##NUMBER); \
+        break
         CASE(150);
         CASE(330);
         CASE(400);
@@ -180,13 +183,19 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
         m_writer->emit(
             getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std430");
         break;
-    case kIROp_Std430BufferLayoutType: m_writer->emit("std430"); break;
-    case kIROp_Std140BufferLayoutType: m_writer->emit("std140"); break;
+    case kIROp_Std430BufferLayoutType:
+        m_writer->emit("std430");
+        break;
+    case kIROp_Std140BufferLayoutType:
+        m_writer->emit("std140");
+        break;
     case kIROp_ScalarBufferLayoutType:
         _requireGLSLExtension(toSlice("GL_EXT_scalar_block_layout"));
         m_writer->emit("scalar");
         break;
-    default: m_writer->emit("std430"); break;
+    default:
+        m_writer->emit("std430");
+        break;
     }
 
     bool isReadOnly = (as<IRHLSLStructuredBufferType>(structuredBufferType) != nullptr);
@@ -297,8 +306,12 @@ void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferTyp
             m_writer->emit(
                 getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std430");
             break;
-        case kIROp_Std430BufferLayoutType: m_writer->emit("std430"); break;
-        case kIROp_Std140BufferLayoutType: m_writer->emit("std140"); break;
+        case kIROp_Std430BufferLayoutType:
+            m_writer->emit("std430");
+            break;
+        case kIROp_Std140BufferLayoutType:
+            m_writer->emit("std140");
+            break;
         case kIROp_ScalarBufferLayoutType:
             _requireGLSLExtension(toSlice("GL_EXT_scalar_block_layout"));
             m_writer->emit("scalar");
@@ -607,7 +620,9 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
         m_writer->emit("layout(");
         switch (vectorWidth)
         {
-        default: m_writer->emit("rgba"); break;
+        default:
+            m_writer->emit("rgba");
+            break;
 
         case 3:
             {
@@ -635,23 +650,49 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
                 break;
             }
 
-        case 2: m_writer->emit("rg"); break;
-        case 1: m_writer->emit("r"); break;
+        case 2:
+            m_writer->emit("rg");
+            break;
+        case 1:
+            m_writer->emit("r");
+            break;
         }
         switch (elementBasicType->getBaseType())
         {
         default:
-        case BaseType::Float:  m_writer->emit("32f"); break;
-        case BaseType::Half:   m_writer->emit("16f"); break;
-        case BaseType::UInt:   m_writer->emit("32ui"); break;
-        case BaseType::Int:    m_writer->emit("32i"); break;
-        case BaseType::Int8:   m_writer->emit("8i"); break;
-        case BaseType::Int16:  m_writer->emit("16i"); break;
-        case BaseType::Int64:  m_writer->emit("64i"); break;
-        case BaseType::IntPtr: m_writer->emit("64i"); break;
-        case BaseType::UInt8:  m_writer->emit("8ui"); break;
-        case BaseType::UInt16: m_writer->emit("16ui"); break;
-        case BaseType::UInt64: m_writer->emit("64ui"); break;
+        case BaseType::Float:
+            m_writer->emit("32f");
+            break;
+        case BaseType::Half:
+            m_writer->emit("16f");
+            break;
+        case BaseType::UInt:
+            m_writer->emit("32ui");
+            break;
+        case BaseType::Int:
+            m_writer->emit("32i");
+            break;
+        case BaseType::Int8:
+            m_writer->emit("8i");
+            break;
+        case BaseType::Int16:
+            m_writer->emit("16i");
+            break;
+        case BaseType::Int64:
+            m_writer->emit("64i");
+            break;
+        case BaseType::IntPtr:
+            m_writer->emit("64i");
+            break;
+        case BaseType::UInt8:
+            m_writer->emit("8ui");
+            break;
+        case BaseType::UInt16:
+            m_writer->emit("16ui");
+            break;
+        case BaseType::UInt64:
+            m_writer->emit("64ui");
+            break;
         case BaseType::UIntPtr:
             m_writer->emit("64ui");
             break;
@@ -783,8 +824,12 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(
         m_writer->emit(")\n");
         break;
 
-    case LayoutResourceKind::PushConstantBuffer: m_writer->emit("layout(push_constant)\n"); break;
-    case LayoutResourceKind::ShaderRecord:       m_writer->emit("layout(shaderRecordEXT)\n"); break;
+    case LayoutResourceKind::PushConstantBuffer:
+        m_writer->emit("layout(push_constant)\n");
+        break;
+    case LayoutResourceKind::ShaderRecord:
+        m_writer->emit("layout(shaderRecordEXT)\n");
+        break;
 
     case LayoutResourceKind::InputAttachmentIndex:
         m_writer->emit("layout(input_attachment_index = ");
@@ -805,9 +850,11 @@ void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(
 
     switch (getSourceLanguage())
     {
-    default: return;
+    default:
+        return;
 
-    case SourceLanguage::GLSL: break;
+    case SourceLanguage::GLSL:
+        break;
     }
 
     EmitVarChain chain(layout, inChain);
@@ -850,12 +897,24 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(
     m_writer->emit(baseName);
     switch (type->GetBaseShape())
     {
-    case SLANG_TEXTURE_1D:     m_writer->emit("1D"); break;
-    case SLANG_TEXTURE_2D:     m_writer->emit("2D"); break;
-    case SLANG_TEXTURE_3D:     m_writer->emit("3D"); break;
-    case SLANG_TEXTURE_CUBE:   m_writer->emit("Cube"); break;
-    case SLANG_TEXTURE_BUFFER: m_writer->emit("Buffer"); break;
-    default:                   SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape"); break;
+    case SLANG_TEXTURE_1D:
+        m_writer->emit("1D");
+        break;
+    case SLANG_TEXTURE_2D:
+        m_writer->emit("2D");
+        break;
+    case SLANG_TEXTURE_3D:
+        m_writer->emit("3D");
+        break;
+    case SLANG_TEXTURE_CUBE:
+        m_writer->emit("Cube");
+        break;
+    case SLANG_TEXTURE_BUFFER:
+        m_writer->emit("Buffer");
+        break;
+    default:
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+        break;
     }
 
     if (type->isMultisample())
@@ -882,9 +941,15 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         // no prefix
         break;
 
-    case kIROp_Int8Type:  m_writer->emit("i8"); break;
-    case kIROp_Int16Type: m_writer->emit("i16"); break;
-    case kIROp_IntType:   m_writer->emit("i"); break;
+    case kIROp_Int8Type:
+        m_writer->emit("i8");
+        break;
+    case kIROp_Int16Type:
+        m_writer->emit("i16");
+        break;
+    case kIROp_IntType:
+        m_writer->emit("i");
+        break;
     case kIROp_Int64Type:
         {
             _requireBaseType(BaseType::Int64);
@@ -902,9 +967,15 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
             break;
         }
 
-    case kIROp_UInt8Type:  m_writer->emit("u8"); break;
-    case kIROp_UInt16Type: m_writer->emit("u16"); break;
-    case kIROp_UIntType:   m_writer->emit("u"); break;
+    case kIROp_UInt8Type:
+        m_writer->emit("u8");
+        break;
+    case kIROp_UInt16Type:
+        m_writer->emit("u16");
+        break;
+    case kIROp_UIntType:
+        m_writer->emit("u");
+        break;
 
     case kIROp_UInt64Type:
         {
@@ -922,7 +993,9 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
 #endif
             break;
         }
-    case kIROp_BoolType: m_writer->emit("b"); break;
+    case kIROp_BoolType:
+        m_writer->emit("b");
+        break;
 
     case kIROp_HalfType:
         {
@@ -937,7 +1010,9 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
             }
             break;
         }
-    case kIROp_DoubleType: m_writer->emit("d"); break;
+    case kIROp_DoubleType:
+        m_writer->emit("d");
+        break;
 
     case kIROp_VectorType:
         _emitGLSLTypePrefix(cast<IRVectorType>(type)->getElementType(), promoteHalfToFloat);
@@ -947,7 +1022,9 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         _emitGLSLTypePrefix(cast<IRMatrixType>(type)->getElementType(), promoteHalfToFloat);
         break;
 
-    default: SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled GLSL type prefix"); break;
+    default:
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled GLSL type prefix");
+        break;
     }
 }
 
@@ -1044,11 +1121,14 @@ void GLSLSourceEmitter::_maybeEmitGLSLFlatModifier(IRType* valueType)
 
     switch (tt->getOp())
     {
-    default: break;
+    default:
+        break;
 
     case kIROp_IntType:
     case kIROp_UIntType:
-    case kIROp_UInt64Type: m_writer->emit("flat "); break;
+    case kIROp_UInt64Type:
+        m_writer->emit("flat ");
+        break;
     }
 }
 
@@ -1183,9 +1263,14 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     m_writer->emit(((IRConstant*)inst)->value.floatVal);
                     switch (type->getOp())
                     {
-                    case kIROp_HalfType:   m_writer->emit("HF"); break;
-                    case kIROp_DoubleType: m_writer->emit("LF"); break;
-                    default:               break;
+                    case kIROp_HalfType:
+                        m_writer->emit("HF");
+                        break;
+                    case kIROp_DoubleType:
+                        m_writer->emit("LF");
+                        break;
+                    default:
+                        break;
                     }
 
                     return;
@@ -1194,7 +1279,8 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             break;
         }
 
-    default: break;
+    default:
+        break;
     }
 
     Super::emitSimpleValueImpl(inst);
@@ -1296,12 +1382,17 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
 
                 switch (type->getOp())
                 {
-                case kIROp_HLSLPointStreamType: m_writer->emit("layout(points) out;\n"); break;
-                case kIROp_HLSLLineStreamType:  m_writer->emit("layout(line_strip) out;\n"); break;
+                case kIROp_HLSLPointStreamType:
+                    m_writer->emit("layout(points) out;\n");
+                    break;
+                case kIROp_HLSLLineStreamType:
+                    m_writer->emit("layout(line_strip) out;\n");
+                    break;
                 case kIROp_HLSLTriangleStreamType:
                     m_writer->emit("layout(triangle_strip) out;\n");
                     break;
-                default: SLANG_ASSERT(!"Unknown stream out type");
+                default:
+                    SLANG_ASSERT(!"Unknown stream out type");
                 }
             }
         }
@@ -1347,7 +1438,8 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
         }
         break;
     // TODO: There are other stages that will need this kind of handling.
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -1508,7 +1600,8 @@ void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* var
             }
             break;
 
-        default: break;
+        default:
+            break;
         }
     }
 }
@@ -1535,7 +1628,9 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
         case LayoutResourceKind::Uniform:
 
         //
-        case LayoutResourceKind::DescriptorTableSlot: m_writer->emit("uniform "); break;
+        case LayoutResourceKind::DescriptorTableSlot:
+            m_writer->emit("uniform ");
+            break;
 
         case LayoutResourceKind::VaryingInput:
             {
@@ -1567,7 +1662,8 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
             }
             break;
 
-        default: continue;
+        default:
+            continue;
         }
 
         break;
@@ -1581,13 +1677,20 @@ static const char* _getGLSLVectorCompareFunctionName(IROp op)
 
     switch (op)
     {
-    case kIROp_Eql:     return "equal";
-    case kIROp_Neq:     return "notEqual";
-    case kIROp_Greater: return "greaterThan";
-    case kIROp_Less:    return "lessThan";
-    case kIROp_Geq:     return "greaterThanEqual";
-    case kIROp_Leq:     return "lessThanEqual";
-    default:            return nullptr;
+    case kIROp_Eql:
+        return "equal";
+    case kIROp_Neq:
+        return "notEqual";
+    case kIROp_Greater:
+        return "greaterThan";
+    case kIROp_Less:
+        return "lessThan";
+    case kIROp_Geq:
+        return "greaterThanEqual";
+    case kIROp_Leq:
+        return "lessThanEqual";
+    default:
+        return nullptr;
     }
 }
 
@@ -1760,13 +1863,17 @@ void GLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_HLSLConstBufferPointerType: emitBufferPointerTypeDefinition(inst); break;
+    case kIROp_HLSLConstBufferPointerType:
+        emitBufferPointerTypeDefinition(inst);
+        break;
     // No need to use structs which are just taking part in a SSBO declaration
     case kIROp_StructType:
         if (isSSBOInternalStructType(inst))
             break;
         [[fallthrough]];
-    default: Super::emitGlobalInstImpl(inst); break;
+    default:
+        Super::emitGlobalInstImpl(inst);
+        break;
     }
 }
 
@@ -1845,7 +1952,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
             switch (toType)
             {
-            default: diagnoseUnhandledInst(inst); break;
+            default:
+                diagnoseUnhandledInst(inst);
+                break;
 
             case BaseType::UInt:
                 if (fromType == BaseType::Float)
@@ -1905,18 +2014,28 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                     m_writer->emit(")).x)");
                     return true;
-                default: emitType(inst->getDataType()); break;
+                default:
+                    emitType(inst->getDataType());
+                    break;
                 }
                 break;
             case BaseType::Float:
                 switch (fromType)
                 {
-                case BaseType::Int:  m_writer->emit("intBitsToFloat"); break;
-                case BaseType::UInt: m_writer->emit("uintBitsToFloat"); break;
-                default:             emitType(inst->getDataType()); break;
+                case BaseType::Int:
+                    m_writer->emit("intBitsToFloat");
+                    break;
+                case BaseType::UInt:
+                    m_writer->emit("uintBitsToFloat");
+                    break;
+                default:
+                    emitType(inst->getDataType());
+                    break;
                 }
                 break;
-            case BaseType::Bool: m_writer->emit("bool"); break;
+            case BaseType::Bool:
+                m_writer->emit("bool");
+                break;
             }
 
             m_writer->emit("(");
@@ -1925,8 +2044,10 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
-    case kIROp_And: return _tryEmitLogicalBinOp(inst, getInfo(EmitOp::BitAnd), inOuterPrec);
-    case kIROp_Or:  return _tryEmitLogicalBinOp(inst, getInfo(EmitOp::BitOr), inOuterPrec);
+    case kIROp_And:
+        return _tryEmitLogicalBinOp(inst, getInfo(EmitOp::BitAnd), inOuterPrec);
+    case kIROp_Or:
+        return _tryEmitLogicalBinOp(inst, getInfo(EmitOp::BitOr), inOuterPrec);
     case kIROp_Not:
         {
             IRInst* operand = inst->getOperand(0);
@@ -2197,7 +2318,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-    default: break;
+    default:
+        break;
     }
 
     // Not handled
@@ -2526,7 +2648,8 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(");\n");
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -2539,7 +2662,8 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     {
         switch (decoration->getOp())
         {
-        default: break;
+        default:
+            break;
 
         case kIROp_RequireGLSLExtensionDecoration:
             {
@@ -2627,8 +2751,9 @@ static Index _getGLSLVersion(ProfileVersion profile)
 {
     switch (profile)
     {
-#define CASE(TAG, VALUE) \
-    case ProfileVersion::TAG: return VALUE;
+#define CASE(TAG, VALUE)      \
+    case ProfileVersion::TAG: \
+        return VALUE;
         CASE(GLSL_150, 150);
         CASE(GLSL_330, 330);
         CASE(GLSL_400, 400);
@@ -2640,7 +2765,8 @@ static Index _getGLSLVersion(ProfileVersion profile)
         CASE(GLSL_460, 460);
 #undef CASE
 
-    default: break;
+    default:
+        break;
     }
     return -1;
 }
@@ -2854,7 +2980,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_StructType:
-    case kIROp_HLSLConstBufferPointerType: m_writer->emit(getName(type)); return;
+    case kIROp_HLSLConstBufferPointerType:
+        m_writer->emit(getName(type));
+        return;
 
     case kIROp_VectorType:
         {
@@ -2883,8 +3011,12 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             auto samplerStateType = cast<IRSamplerStateTypeBase>(type);
             switch (samplerStateType->getOp())
             {
-            case kIROp_SamplerStateType:           m_writer->emit("sampler"); break;
-            case kIROp_SamplerComparisonStateType: m_writer->emit("samplerShadow"); break;
+            case kIROp_SamplerStateType:
+                m_writer->emit("sampler");
+                break;
+            case kIROp_SamplerComparisonStateType:
+                m_writer->emit("samplerShadow");
+                break;
             default:
                 SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
                 break;
@@ -2925,7 +3057,8 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
             return;
         }
-    default: break;
+    default:
+        break;
     }
 
     // TODO: Ideally the following should be data-driven,
@@ -2946,7 +3079,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             _emitGLSLTextureOrTextureSamplerType(texType, "image");
             break;
 
-        default: _emitGLSLTextureOrTextureSamplerType(texType, "texture"); break;
+        default:
+            _emitGLSLTextureOrTextureSamplerType(texType, "texture");
+            break;
         }
         return;
     }
@@ -2988,7 +3123,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 m_writer->emit("accelerationStructureEXT");
                 break;
             }
-        default: SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type"); break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+            break;
         }
 
         return;
@@ -3031,11 +3168,21 @@ bool GLSLSourceEmitter::_maybeEmitInterpolationModifierText(
 {
     switch (mode)
     {
-    case IRInterpolationMode::NoInterpolation: m_writer->emit("flat "); return true;
-    case IRInterpolationMode::NoPerspective:   m_writer->emit("noperspective "); return true;
-    case IRInterpolationMode::Linear:          m_writer->emit("smooth "); return true;
-    case IRInterpolationMode::Sample:          m_writer->emit("sample "); return true;
-    case IRInterpolationMode::Centroid:        m_writer->emit("centroid "); return true;
+    case IRInterpolationMode::NoInterpolation:
+        m_writer->emit("flat ");
+        return true;
+    case IRInterpolationMode::NoPerspective:
+        m_writer->emit("noperspective ");
+        return true;
+    case IRInterpolationMode::Linear:
+        m_writer->emit("smooth ");
+        return true;
+    case IRInterpolationMode::Sample:
+        m_writer->emit("sample ");
+        return true;
+    case IRInterpolationMode::Centroid:
+        m_writer->emit("centroid ");
+        return true;
     case IRInterpolationMode::PerVertex:
         if (stage == Stage::Fragment && isInput)
         {
@@ -3047,7 +3194,8 @@ bool GLSLSourceEmitter::_maybeEmitInterpolationModifierText(
             m_writer->emit("flat ");
         }
         return true;
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -3078,7 +3226,8 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(
 
         switch (decoration->getMode())
         {
-        default: break;
+        default:
+            break;
 
         case IRInterpolationMode::PerVertex:
             if (stage == Stage::Fragment)
@@ -3188,7 +3337,8 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
                 postfix = toSlice("NV");
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
-            default: continue;
+            default:
+                continue;
             }
             m_writer->emit(toSlice("layout(location = "));
             m_writer->emit(locationValue);
@@ -3222,9 +3372,13 @@ void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* varType)
         //
         switch (getIntVal(matrixType->getLayout()))
         {
-        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR: m_writer->emit("layout(row_major)\n"); break;
+        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+            m_writer->emit("layout(row_major)\n");
+            break;
 
-        case SLANG_MATRIX_LAYOUT_ROW_MAJOR: m_writer->emit("layout(column_major)\n"); break;
+        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+            m_writer->emit("layout(column_major)\n");
+            break;
         }
     }
 }

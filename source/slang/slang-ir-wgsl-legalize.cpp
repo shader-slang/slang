@@ -330,8 +330,10 @@ void LegalizeWGSLEntryPointContext::legalizeCall(IRCall* call)
         switch (arg->getOp())
         {
         case kIROp_Var:
-        case kIROp_Param: continue;
-        default:          break;
+        case kIROp_Param:
+            continue;
+        default:
+            break;
         }
 
         // Create a local variable to hold the input argument.
@@ -386,8 +388,10 @@ void LegalizeWGSLEntryPointContext::legalizeBinaryOp(IRInst* inst)
         switch (type->getOp())
         {
         case kIROp_VectorType:
-        case kIROp_MatrixType: return true;
-        default:               return false;
+        case kIROp_MatrixType:
+            return true;
+        default:
+            return false;
         }
     };
     if (isVectorOrMatrix(inst->getOperand(0)->getDataType()) &&
@@ -417,8 +421,12 @@ void LegalizeWGSLEntryPointContext::processInst(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_Call:   legalizeCall(static_cast<IRCall*>(inst)); break;
-    case kIROp_Switch: legalizeSwitch(as<IRSwitch>(inst)); break;
+    case kIROp_Call:
+        legalizeCall(static_cast<IRCall*>(inst));
+        break;
+    case kIROp_Switch:
+        legalizeSwitch(as<IRSwitch>(inst));
+        break;
 
     // For all binary operators, make sure both side of the operator have the same type
     // (vector-ness and matrix-ness).
@@ -440,7 +448,9 @@ void LegalizeWGSLEntryPointContext::processInst(IRInst* inst)
     case kIROp_Greater:
     case kIROp_Less:
     case kIROp_Geq:
-    case kIROp_Leq:     legalizeBinaryOp(inst); break;
+    case kIROp_Leq:
+        legalizeBinaryOp(inst);
+        break;
 
     default:
         for (auto child : inst->getModifiableChildren())

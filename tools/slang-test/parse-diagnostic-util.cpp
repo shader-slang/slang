@@ -84,10 +84,17 @@ static SlangResult _getSlangDiagnosticSeverity(
 
     switch (index)
     {
-    case -1: return SLANG_FAIL;
-    case 0:  outSeverity = ArtifactDiagnostic::Severity::Info; break;
-    case 1:  outSeverity = ArtifactDiagnostic::Severity::Warning; break;
-    default: outSeverity = ArtifactDiagnostic::Severity::Error; break;
+    case -1:
+        return SLANG_FAIL;
+    case 0:
+        outSeverity = ArtifactDiagnostic::Severity::Info;
+        break;
+    case 1:
+        outSeverity = ArtifactDiagnostic::Severity::Warning;
+        break;
+    default:
+        outSeverity = ArtifactDiagnostic::Severity::Error;
+        break;
     }
 
     outCode = 0;
@@ -260,9 +267,12 @@ static SlangResult _findDownstreamCompiler(
 {
     switch (compilerIdentity.m_type)
     {
-    case CompilerIdentity::Slang:              return &parseSlangLine;
-    case CompilerIdentity::DownstreamCompiler: return &parseGenericLine;
-    default:                                   return nullptr;
+    case CompilerIdentity::Slang:
+        return &parseSlangLine;
+    case CompilerIdentity::DownstreamCompiler:
+        return &parseGenericLine;
+    default:
+        return nullptr;
     }
 }
 

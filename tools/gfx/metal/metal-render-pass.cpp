@@ -22,10 +22,14 @@ static inline MTL::LoadAction translateLoadOp(IRenderPassLayout::TargetLoadOp lo
 {
     switch (loadOp)
     {
-    case IRenderPassLayout::TargetLoadOp::Load:     return MTL::LoadActionLoad;
-    case IRenderPassLayout::TargetLoadOp::Clear:    return MTL::LoadActionClear;
-    case IRenderPassLayout::TargetLoadOp::DontCare: return MTL::LoadActionDontCare;
-    default:                                        return MTL::LoadAction(0);
+    case IRenderPassLayout::TargetLoadOp::Load:
+        return MTL::LoadActionLoad;
+    case IRenderPassLayout::TargetLoadOp::Clear:
+        return MTL::LoadActionClear;
+    case IRenderPassLayout::TargetLoadOp::DontCare:
+        return MTL::LoadActionDontCare;
+    default:
+        return MTL::LoadAction(0);
     }
 }
 
@@ -33,9 +37,12 @@ static inline MTL::StoreAction translateStoreOp(IRenderPassLayout::TargetStoreOp
 {
     switch (storeOp)
     {
-    case IRenderPassLayout::TargetStoreOp::Store:    return MTL::StoreActionStore;
-    case IRenderPassLayout::TargetStoreOp::DontCare: return MTL::StoreActionDontCare;
-    default:                                         return MTL::StoreAction(0);
+    case IRenderPassLayout::TargetStoreOp::Store:
+        return MTL::StoreActionStore;
+    case IRenderPassLayout::TargetStoreOp::DontCare:
+        return MTL::StoreActionDontCare;
+    default:
+        return MTL::StoreAction(0);
     }
 }
 

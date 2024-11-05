@@ -155,17 +155,28 @@ int getKeyChar(KeyCode keyCode, int keyState)
         {
             switch (keyCode)
             {
-            case KeyCode::Key0: return ')';
-            case KeyCode::Key1: return '!';
-            case KeyCode::Key2: return '@';
-            case KeyCode::Key3: return '#';
-            case KeyCode::Key4: return '$';
-            case KeyCode::Key5: return '%';
-            case KeyCode::Key6: return '^';
-            case KeyCode::Key7: return '&';
-            case KeyCode::Key8: return '*';
-            case KeyCode::Key9: return '(';
-            default:            return 0;
+            case KeyCode::Key0:
+                return ')';
+            case KeyCode::Key1:
+                return '!';
+            case KeyCode::Key2:
+                return '@';
+            case KeyCode::Key3:
+                return '#';
+            case KeyCode::Key4:
+                return '$';
+            case KeyCode::Key5:
+                return '%';
+            case KeyCode::Key6:
+                return '^';
+            case KeyCode::Key7:
+                return '&';
+            case KeyCode::Key8:
+                return '*';
+            case KeyCode::Key9:
+                return '(';
+            default:
+                return 0;
             }
         }
     }
@@ -173,36 +184,60 @@ int getKeyChar(KeyCode keyCode, int keyState)
     {
         switch (keyCode)
         {
-        case KeyCode::Semicolon: return ':';
-        case KeyCode::Comma:     return '<';
-        case KeyCode::Dot:       return '>';
-        case KeyCode::Slash:     return '?';
-        case KeyCode::Quote:     return '\"';
-        case KeyCode::LBracket:  return '{';
-        case KeyCode::RBracket:  return '}';
-        case KeyCode::Backslash: return '|';
-        case KeyCode::Minus:     return '_';
-        case KeyCode::Plus:      return '+';
-        case KeyCode::Tilde:     return '~';
-        default:                 return 0;
+        case KeyCode::Semicolon:
+            return ':';
+        case KeyCode::Comma:
+            return '<';
+        case KeyCode::Dot:
+            return '>';
+        case KeyCode::Slash:
+            return '?';
+        case KeyCode::Quote:
+            return '\"';
+        case KeyCode::LBracket:
+            return '{';
+        case KeyCode::RBracket:
+            return '}';
+        case KeyCode::Backslash:
+            return '|';
+        case KeyCode::Minus:
+            return '_';
+        case KeyCode::Plus:
+            return '+';
+        case KeyCode::Tilde:
+            return '~';
+        default:
+            return 0;
         }
     }
     else
     {
         switch (keyCode)
         {
-        case KeyCode::Semicolon: return ';';
-        case KeyCode::Comma:     return ',';
-        case KeyCode::Dot:       return '.';
-        case KeyCode::Slash:     return '/';
-        case KeyCode::Quote:     return '\'';
-        case KeyCode::LBracket:  return '[';
-        case KeyCode::RBracket:  return ']';
-        case KeyCode::Backslash: return '\\';
-        case KeyCode::Minus:     return '-';
-        case KeyCode::Plus:      return '=';
-        case KeyCode::Tilde:     return '`';
-        default:                 return 0;
+        case KeyCode::Semicolon:
+            return ';';
+        case KeyCode::Comma:
+            return ',';
+        case KeyCode::Dot:
+            return '.';
+        case KeyCode::Slash:
+            return '/';
+        case KeyCode::Quote:
+            return '\'';
+        case KeyCode::LBracket:
+            return '[';
+        case KeyCode::RBracket:
+            return ']';
+        case KeyCode::Backslash:
+            return '\\';
+        case KeyCode::Minus:
+            return '-';
+        case KeyCode::Plus:
+            return '=';
+        case KeyCode::Tilde:
+            return '`';
+        default:
+            return 0;
         }
     }
 }

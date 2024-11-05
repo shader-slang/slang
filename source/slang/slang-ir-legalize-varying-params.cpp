@@ -134,13 +134,18 @@ IRInst* materialize(IRBuilder& builder, LegalizedVaryingVal const& val)
 {
     switch (val.getFlavor())
     {
-    case LegalizedVaryingVal::Flavor::None: return nullptr; // TODO: should use a `void` literal
+    case LegalizedVaryingVal::Flavor::None:
+        return nullptr; // TODO: should use a `void` literal
 
-    case LegalizedVaryingVal::Flavor::Value: return val.getValue();
+    case LegalizedVaryingVal::Flavor::Value:
+        return val.getValue();
 
-    case LegalizedVaryingVal::Flavor::Address: return builder.emitLoad(val.getAddress());
+    case LegalizedVaryingVal::Flavor::Address:
+        return builder.emitLoad(val.getAddress());
 
-    default: SLANG_UNEXPECTED("unimplemented"); break;
+    default:
+        SLANG_UNEXPECTED("unimplemented");
+        break;
     }
 }
 
@@ -148,13 +153,16 @@ void assign(IRBuilder& builder, LegalizedVaryingVal const& dest, LegalizedVaryin
 {
     switch (dest.getFlavor())
     {
-    case LegalizedVaryingVal::Flavor::None: break;
+    case LegalizedVaryingVal::Flavor::None:
+        break;
 
     case LegalizedVaryingVal::Flavor::Address:
         builder.emitStore(dest.getAddress(), materialize(builder, src));
         break;
 
-    default: SLANG_UNEXPECTED("unimplemented"); break;
+    default:
+        SLANG_UNEXPECTED("unimplemented");
+        break;
     }
 }
 
@@ -1263,7 +1271,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             return LegalizedVaryingVal::makeValue(groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
             return LegalizedVaryingVal::makeValue(dispatchThreadID);
-        default: return diagnoseUnsupportedSystemVal(info);
+        default:
+            return diagnoseUnsupportedSystemVal(info);
         }
     }
 
@@ -1312,7 +1321,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 }
                 return LegalizedVaryingVal::makeValue(getHitAttributes);
             }
-        default: return diagnoseUnsupportedUserVal(info);
+        default:
+            return diagnoseUnsupportedUserVal(info);
         }
     }
 };
@@ -1438,7 +1448,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
         switch (info.systemValueSemanticName)
         {
-        case SystemValueSemanticName::GroupID: return LegalizedVaryingVal::makeValue(groupID);
+        case SystemValueSemanticName::GroupID:
+            return LegalizedVaryingVal::makeValue(groupID);
         case SystemValueSemanticName::GroupThreadID:
             return LegalizedVaryingVal::makeValue(groupThreadID);
         case SystemValueSemanticName::GroupIndex:
@@ -1446,7 +1457,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         case SystemValueSemanticName::DispatchThreadID:
             return LegalizedVaryingVal::makeValue(dispatchThreadID);
 
-        default: return diagnoseUnsupportedSystemVal(info);
+        default:
+            return diagnoseUnsupportedSystemVal(info);
         }
     }
 };

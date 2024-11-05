@@ -95,7 +95,8 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             m_textureCount += count;
             m_textureRanges.add(r);
             break;
-        default: break;
+        default:
+            break;
         }
 
         // We'd like to extract the information on the Metal resource

@@ -548,14 +548,16 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
     // decl in the interface.
     switch (item.declRef.getDecl()->astNodeType)
     {
-    case ASTNodeType::AssocTypeDecl: break;
+    case ASTNodeType::AssocTypeDecl:
+        break;
     case ASTNodeType::FuncDecl:
         // We don't need to intercept lookup results with synthesized decls for methods,
         // because function lookups will only take place when we are checking the decl bodies.
         // At that point conformance check and synthesis is already done so they will always
         // resolve to the synthesized method.
         return nullptr;
-    default: return nullptr;
+    default:
+        return nullptr;
     }
 
     // We need to check if the lookup should resolve to a definition in an implementation type
@@ -595,7 +597,8 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 }
             }
             break;
-        default: break;
+        default:
+            break;
         }
     }
     if (!subType)
@@ -688,7 +691,8 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
             }
         }
         break;
-    default: return nullptr;
+    default:
+        return nullptr;
     }
 
     auto synthDeclMemberRef =
@@ -731,7 +735,9 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
             bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, name, loc, originalExpr);
             break;
 
-        case LookupResultItem::Breadcrumb::Kind::Deref: bb = ConstructDerefExpr(bb, loc); break;
+        case LookupResultItem::Breadcrumb::Kind::Deref:
+            bb = ConstructDerefExpr(bb, loc);
+            break;
 
         case LookupResultItem::Breadcrumb::Kind::SuperType:
             {
@@ -846,7 +852,8 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
             }
             break;
 
-        default: SLANG_UNREACHABLE("all cases handle");
+        default:
+            SLANG_UNREACHABLE("all cases handle");
         }
         if (getShared()->isInLanguageServer())
         {
@@ -2215,7 +2222,8 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
         else
             expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
         break;
-    default: break;
+    default:
+        break;
     }
 
     // No need to issue further errors if the type coercion failed.
@@ -4415,13 +4423,21 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
         switch (ch)
         {
         case 'x':
-        case 'r': elementIndex = 0; break;
+        case 'r':
+            elementIndex = 0;
+            break;
         case 'y':
-        case 'g': elementIndex = 1; break;
+        case 'g':
+            elementIndex = 1;
+            break;
         case 'z':
-        case 'b': elementIndex = 2; break;
+        case 'b':
+            elementIndex = 2;
+            break;
         case 'w':
-        case 'a': elementIndex = 3; break;
+        case 'a':
+            elementIndex = 3;
+            break;
         default:
             // An invalid character in the swizzle is an error
             anyError = true;

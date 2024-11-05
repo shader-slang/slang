@@ -163,9 +163,12 @@ HLSLToVulkanLayoutOptions::Binding HLSLToVulkanLayoutOptions::inferBinding(
         {
             return Kind::ConstantBuffer;
         }
-    case ParameterCategory::ShaderResource:  return Kind::ShaderResource;
-    case ParameterCategory::UnorderedAccess: return Kind::UnorderedAccess;
-    case ParameterCategory::SamplerState:    return Kind::Sampler;
+    case ParameterCategory::ShaderResource:
+        return Kind::ShaderResource;
+    case ParameterCategory::UnorderedAccess:
+        return Kind::UnorderedAccess;
+    case ParameterCategory::SamplerState:
+        return Kind::Sampler;
 
     default:
         {

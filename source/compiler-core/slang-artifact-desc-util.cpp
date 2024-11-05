@@ -261,25 +261,38 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
 {
     switch (target)
     {
-    case SLANG_TARGET_UNKNOWN: return Desc::make(Kind::Unknown, Payload::None, Style::Unknown, 0);
-    case SLANG_TARGET_NONE:    return Desc::make(Kind::None, Payload::None, Style::Unknown, 0);
+    case SLANG_TARGET_UNKNOWN:
+        return Desc::make(Kind::Unknown, Payload::None, Style::Unknown, 0);
+    case SLANG_TARGET_NONE:
+        return Desc::make(Kind::None, Payload::None, Style::Unknown, 0);
     case SLANG_GLSL:
         {
             // For the moment we Desc::make all just map to GLSL, but we could use flags
             // or some other mechanism to distinguish the types
             return Desc::make(Kind::Source, Payload::GLSL, Style::Kernel, 0);
         }
-    case SLANG_HLSL:                return Desc::make(Kind::Source, Payload::HLSL, Style::Kernel, 0);
-    case SLANG_SPIRV:               return Desc::make(Kind::ObjectCode, Payload::SPIRV, Style::Kernel, 0);
-    case SLANG_SPIRV_ASM:           return Desc::make(Kind::Assembly, Payload::SPIRV, Style::Kernel, 0);
-    case SLANG_DXBC:                return Desc::make(Kind::ObjectCode, Payload::DXBC, Style::Kernel, 0);
-    case SLANG_DXBC_ASM:            return Desc::make(Kind::Assembly, Payload::DXBC, Style::Kernel, 0);
-    case SLANG_DXIL:                return Desc::make(Kind::ObjectCode, Payload::DXIL, Style::Kernel, 0);
-    case SLANG_DXIL_ASM:            return Desc::make(Kind::Assembly, Payload::DXIL, Style::Kernel, 0);
-    case SLANG_C_SOURCE:            return Desc::make(Kind::Source, Payload::C, Style::Kernel, 0);
-    case SLANG_CPP_SOURCE:          return Desc::make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
-    case SLANG_HOST_CPP_SOURCE:     return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
-    case SLANG_CPP_PYTORCH_BINDING: return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
+    case SLANG_HLSL:
+        return Desc::make(Kind::Source, Payload::HLSL, Style::Kernel, 0);
+    case SLANG_SPIRV:
+        return Desc::make(Kind::ObjectCode, Payload::SPIRV, Style::Kernel, 0);
+    case SLANG_SPIRV_ASM:
+        return Desc::make(Kind::Assembly, Payload::SPIRV, Style::Kernel, 0);
+    case SLANG_DXBC:
+        return Desc::make(Kind::ObjectCode, Payload::DXBC, Style::Kernel, 0);
+    case SLANG_DXBC_ASM:
+        return Desc::make(Kind::Assembly, Payload::DXBC, Style::Kernel, 0);
+    case SLANG_DXIL:
+        return Desc::make(Kind::ObjectCode, Payload::DXIL, Style::Kernel, 0);
+    case SLANG_DXIL_ASM:
+        return Desc::make(Kind::Assembly, Payload::DXIL, Style::Kernel, 0);
+    case SLANG_C_SOURCE:
+        return Desc::make(Kind::Source, Payload::C, Style::Kernel, 0);
+    case SLANG_CPP_SOURCE:
+        return Desc::make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
+    case SLANG_HOST_CPP_SOURCE:
+        return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
+    case SLANG_CPP_PYTORCH_BINDING:
+        return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
     case SLANG_HOST_EXECUTABLE:
         return Desc::make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
     case SLANG_HOST_SHARED_LIBRARY:
@@ -294,20 +307,26 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         // Not entirely clear how best to represent PTX here. We could mark as 'Assembly'.
         // Saying it is 'Executable' implies it is Binary (which PTX isn't). Executable also
         // implies 'complete for executation', irrespective of it being text.
-    case SLANG_PTX:         return Desc::make(Kind::ObjectCode, Payload::PTX, Style::Kernel, 0);
-    case SLANG_OBJECT_CODE: return Desc::make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
+    case SLANG_PTX:
+        return Desc::make(Kind::ObjectCode, Payload::PTX, Style::Kernel, 0);
+    case SLANG_OBJECT_CODE:
+        return Desc::make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
     case SLANG_HOST_HOST_CALLABLE:
         return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
-    case SLANG_METAL:     return Desc::make(Kind::Source, Payload::Metal, Style::Kernel, 0);
-    case SLANG_METAL_LIB: return Desc::make(Kind::ObjectCode, Payload::MetalAIR, Style::Kernel, 0);
+    case SLANG_METAL:
+        return Desc::make(Kind::Source, Payload::Metal, Style::Kernel, 0);
+    case SLANG_METAL_LIB:
+        return Desc::make(Kind::ObjectCode, Payload::MetalAIR, Style::Kernel, 0);
     case SLANG_METAL_LIB_ASM:
         return Desc::make(Kind::Assembly, Payload::MetalAIR, Style::Kernel, 0);
-    case SLANG_WGSL: return Desc::make(Kind::Source, Payload::WGSL, Style::Kernel, 0);
+    case SLANG_WGSL:
+        return Desc::make(Kind::Source, Payload::WGSL, Style::Kernel, 0);
     case SLANG_WGSL_SPIRV_ASM:
         return Desc::make(Kind::Assembly, Payload::WGSL_SPIRV, Style::Kernel, 0);
     case SLANG_WGSL_SPIRV:
         return Desc::make(Kind::ObjectCode, Payload::WGSL_SPIRV, Style::Kernel, 0);
-    default: break;
+    default:
+        break;
     }
 
     SLANG_UNEXPECTED("Unhandled type");
@@ -320,13 +339,20 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     switch (language)
     {
     default:
-    case SLANG_SOURCE_LANGUAGE_UNKNOWN: return Payload::Unknown;
-    case SLANG_SOURCE_LANGUAGE_SLANG:   return Payload::Slang;
-    case SLANG_SOURCE_LANGUAGE_HLSL:    return Payload::HLSL;
-    case SLANG_SOURCE_LANGUAGE_GLSL:    return Payload::GLSL;
-    case SLANG_SOURCE_LANGUAGE_C:       return Payload::C;
-    case SLANG_SOURCE_LANGUAGE_CPP:     return Payload::Cpp;
-    case SLANG_SOURCE_LANGUAGE_CUDA:    return Payload::CUDA;
+    case SLANG_SOURCE_LANGUAGE_UNKNOWN:
+        return Payload::Unknown;
+    case SLANG_SOURCE_LANGUAGE_SLANG:
+        return Payload::Slang;
+    case SLANG_SOURCE_LANGUAGE_HLSL:
+        return Payload::HLSL;
+    case SLANG_SOURCE_LANGUAGE_GLSL:
+        return Payload::GLSL;
+    case SLANG_SOURCE_LANGUAGE_C:
+        return Payload::C;
+    case SLANG_SOURCE_LANGUAGE_CPP:
+        return Payload::Cpp;
+    case SLANG_SOURCE_LANGUAGE_CUDA:
+        return Payload::CUDA;
     }
 }
 
@@ -339,20 +365,28 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
 {
     switch (desc.kind)
     {
-    case ArtifactKind::None: return SLANG_TARGET_NONE;
+    case ArtifactKind::None:
+        return SLANG_TARGET_NONE;
     case ArtifactKind::Source:
         {
             switch (desc.payload)
             {
-            case Payload::HLSL: return SLANG_HLSL;
-            case Payload::GLSL: return SLANG_GLSL;
-            case Payload::C:    return SLANG_C_SOURCE;
+            case Payload::HLSL:
+                return SLANG_HLSL;
+            case Payload::GLSL:
+                return SLANG_GLSL;
+            case Payload::C:
+                return SLANG_C_SOURCE;
             case Payload::Cpp:
                 return (desc.style == Style::Host) ? SLANG_HOST_CPP_SOURCE : SLANG_CPP_SOURCE;
-            case Payload::CUDA:  return SLANG_CUDA_SOURCE;
-            case Payload::Metal: return SLANG_METAL;
-            case Payload::WGSL:  return SLANG_WGSL;
-            default:             break;
+            case Payload::CUDA:
+                return SLANG_CUDA_SOURCE;
+            case Payload::Metal:
+                return SLANG_METAL;
+            case Payload::WGSL:
+                return SLANG_WGSL;
+            default:
+                break;
             }
             break;
         }
@@ -360,16 +394,24 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         {
             switch (desc.payload)
             {
-            case Payload::SPIRV:      return SLANG_SPIRV_ASM;
-            case Payload::DXIL:       return SLANG_DXIL_ASM;
-            case Payload::DXBC:       return SLANG_DXBC_ASM;
-            case Payload::PTX:        return SLANG_PTX;
-            case Payload::MetalAIR:   return SLANG_METAL_LIB_ASM;
-            case Payload::WGSL_SPIRV: return SLANG_WGSL_SPIRV_ASM;
-            default:                  break;
+            case Payload::SPIRV:
+                return SLANG_SPIRV_ASM;
+            case Payload::DXIL:
+                return SLANG_DXIL_ASM;
+            case Payload::DXBC:
+                return SLANG_DXBC_ASM;
+            case Payload::PTX:
+                return SLANG_PTX;
+            case Payload::MetalAIR:
+                return SLANG_METAL_LIB_ASM;
+            case Payload::WGSL_SPIRV:
+                return SLANG_WGSL_SPIRV_ASM;
+            default:
+                break;
             }
         }
-    default: break;
+    default:
+        break;
     }
 
     if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
@@ -378,28 +420,38 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         {
             switch (desc.kind)
             {
-            case Kind::Executable: return SLANG_HOST_EXECUTABLE;
+            case Kind::Executable:
+                return SLANG_HOST_EXECUTABLE;
             case Kind::SharedLibrary:
                 return desc.style == ArtifactStyle::Host ? SLANG_HOST_SHARED_LIBRARY
                                                          : SLANG_SHADER_SHARED_LIBRARY;
             case Kind::HostCallable:
                 return desc.style == ArtifactStyle::Host ? SLANG_HOST_HOST_CALLABLE
                                                          : SLANG_SHADER_HOST_CALLABLE;
-            case Kind::ObjectCode: return SLANG_OBJECT_CODE;
-            default:               break;
+            case Kind::ObjectCode:
+                return SLANG_OBJECT_CODE;
+            default:
+                break;
             }
         }
         else
         {
             switch (desc.payload)
             {
-            case Payload::SPIRV:      return SLANG_SPIRV;
-            case Payload::DXIL:       return SLANG_DXIL;
-            case Payload::DXBC:       return SLANG_DXBC;
-            case Payload::PTX:        return SLANG_PTX;
-            case Payload::MetalAIR:   return SLANG_METAL_LIB_ASM;
-            case Payload::WGSL_SPIRV: return SLANG_WGSL_SPIRV;
-            default:                  break;
+            case Payload::SPIRV:
+                return SLANG_SPIRV;
+            case Payload::DXIL:
+                return SLANG_DXIL;
+            case Payload::DXBC:
+                return SLANG_DXBC;
+            case Payload::PTX:
+                return SLANG_PTX;
+            case Payload::MetalAIR:
+                return SLANG_METAL_LIB_ASM;
+            case Payload::WGSL_SPIRV:
+                return SLANG_WGSL_SPIRV;
+            default:
+                break;
             }
         }
     }
@@ -483,7 +535,8 @@ static const KindExtension g_cpuKindExts[] = {
         {
             return true;
         }
-    default: break;
+    default:
+        break;
     }
     return false;
 }
@@ -642,35 +695,52 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
     switch (payload)
     {
     /* Source types */
-    case Payload::HLSL: return toSlice("hlsl");
-    case Payload::GLSL: return toSlice("glsl");
+    case Payload::HLSL:
+        return toSlice("hlsl");
+    case Payload::GLSL:
+        return toSlice("glsl");
 
-    case Payload::Cpp: return toSlice("cpp");
-    case Payload::C:   return toSlice("c");
+    case Payload::Cpp:
+        return toSlice("cpp");
+    case Payload::C:
+        return toSlice("c");
 
-    case Payload::Metal: return toSlice("metal");
+    case Payload::Metal:
+        return toSlice("metal");
 
-    case Payload::CUDA: return toSlice("cu");
+    case Payload::CUDA:
+        return toSlice("cu");
 
-    case Payload::Slang: return toSlice("slang");
+    case Payload::Slang:
+        return toSlice("slang");
 
     /* Binary types */
-    case Payload::DXIL:  return toSlice("dxil");
-    case Payload::DXBC:  return toSlice("dxbc");
-    case Payload::SPIRV: return toSlice("spv");
+    case Payload::DXIL:
+        return toSlice("dxil");
+    case Payload::DXBC:
+        return toSlice("dxbc");
+    case Payload::SPIRV:
+        return toSlice("spv");
 
-    case Payload::PTX: return toSlice("ptx");
+    case Payload::PTX:
+        return toSlice("ptx");
 
-    case Payload::LLVMIR: return toSlice("llvm-ir");
+    case Payload::LLVMIR:
+        return toSlice("llvm-ir");
 
-    case Payload::SlangIR: return toSlice("slang-ir");
+    case Payload::SlangIR:
+        return toSlice("slang-ir");
 
-    case Payload::MetalAIR: return toSlice("metallib");
+    case Payload::MetalAIR:
+        return toSlice("metallib");
 
-    case Payload::PdbDebugInfo: return toSlice("pdb");
-    case Payload::SourceMap:    return toSlice("map");
+    case Payload::PdbDebugInfo:
+        return toSlice("pdb");
+    case Payload::SourceMap:
+        return toSlice("map");
 
-    default: break;
+    default:
+        break;
     }
     return UnownedStringSlice();
 }
@@ -778,7 +848,8 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (ArtifactDescUtil::isGpuUsable(desc))

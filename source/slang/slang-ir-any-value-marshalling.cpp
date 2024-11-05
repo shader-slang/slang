@@ -354,7 +354,8 @@ struct AnyValueMarshallingContext
 #endif
                 SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
                 break;
-            default: SLANG_UNREACHABLE("unknown basic type");
+            default:
+                SLANG_UNREACHABLE("unknown basic type");
             }
         }
 
@@ -546,7 +547,8 @@ struct AnyValueMarshallingContext
             case kIROp_UInt8Type:
                 SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
                 break;
-            default: SLANG_UNREACHABLE("unknown basic type");
+            default:
+                SLANG_UNREACHABLE("unknown basic type");
             }
         }
 
@@ -728,15 +730,19 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_IntType:
     case kIROp_FloatType:
     case kIROp_UIntType:
-    case kIROp_BoolType:   return alignUp(offset, 4) + 4;
+    case kIROp_BoolType:
+        return alignUp(offset, 4) + 4;
     case kIROp_UInt64Type:
     case kIROp_Int64Type:
-    case kIROp_DoubleType: return -1;
+    case kIROp_DoubleType:
+        return -1;
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
-    case kIROp_HalfType:   return alignUp(offset, 2) + 2;
+    case kIROp_HalfType:
+        return alignUp(offset, 2) + 2;
     case kIROp_UInt8Type:
-    case kIROp_Int8Type:   return -1;
+    case kIROp_Int8Type:
+        return -1;
     case kIROp_VectorType:
         {
             auto vectorType = static_cast<IRVectorType*>(type);

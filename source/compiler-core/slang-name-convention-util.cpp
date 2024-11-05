@@ -34,8 +34,12 @@ namespace Slang
     {
         switch (c)
         {
-        case '-': flags |= Flag::Dash; break;
-        case '_': flags |= Flag::Underscore; break;
+        case '-':
+            flags |= Flag::Dash;
+            break;
+        case '_':
+            flags |= Flag::Underscore;
+            break;
         default:
             {
                 if (CharUtil::isLower(c))
@@ -63,21 +67,28 @@ namespace Slang
     switch (flags)
     {
     // We'll assume it's lower camel.
-    case Flag::Lower: return NameConvention::LowerCamel;
+    case Flag::Lower:
+        return NameConvention::LowerCamel;
     // We'll assume it's upper snake. It almost certainly isn't camel, and snake is more usual
     // than kabab.
-    case Flag::Upper: return NameConvention::UpperSnake;
+    case Flag::Upper:
+        return NameConvention::UpperSnake;
     case Flag::Upper | Flag::Lower:
         {
             // Looks like camel, choose the right case based on first char
             return CharUtil::isUpper(slice[0]) ? NameConvention::UpperCamel
                                                : NameConvention::LowerCamel;
         }
-    case Flag::Lower | Flag::Dash:       return NameConvention::LowerKabab;
-    case Flag::Upper | Flag::Dash:       return NameConvention::UpperKabab;
-    case Flag::Lower | Flag::Underscore: return NameConvention::LowerSnake;
-    case Flag::Upper | Flag::Underscore: return NameConvention::UpperSnake;
-    default:                             break;
+    case Flag::Lower | Flag::Dash:
+        return NameConvention::LowerKabab;
+    case Flag::Upper | Flag::Dash:
+        return NameConvention::UpperKabab;
+    case Flag::Lower | Flag::Underscore:
+        return NameConvention::LowerSnake;
+    case Flag::Upper | Flag::Underscore:
+        return NameConvention::UpperSnake;
+    default:
+        break;
     }
 
     // Don't know what this style is
@@ -90,9 +101,12 @@ namespace Slang
     {
         switch (c)
         {
-        case '-': return NameStyle::Kabab;
-        case '_': return NameStyle::Snake;
-        default:  break;
+        case '-':
+            return NameStyle::Kabab;
+        case '_':
+            return NameStyle::Snake;
+        default:
+            break;
         }
     }
     return NameStyle::Camel;
@@ -249,8 +263,10 @@ void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStri
 
     switch (style)
     {
-    case NameStyle::Kabab: return join(slices, slicesCount, convention, '-', out);
-    case NameStyle::Snake: return join(slices, slicesCount, convention, '_', out);
+    case NameStyle::Kabab:
+        return join(slices, slicesCount, convention, '-', out);
+    case NameStyle::Snake:
+        return join(slices, slicesCount, convention, '_', out);
     case NameStyle::Camel:
         {
             Index totalSize = 0;

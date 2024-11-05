@@ -87,7 +87,8 @@ struct SpecializationContext
         {
         case kIROp_GlobalGenericParam:
         case kIROp_LookupWitness:
-        case kIROp_GetTupleElement:    return false;
+        case kIROp_GetTupleElement:
+            return false;
         case kIROp_Specialize:
             // The `specialize` instruction is a bit sepcial,
             // because it is possible to have a `specialize`
@@ -560,34 +561,45 @@ struct SpecializationContext
             // but in order to realize these we often need to propagate
             // through local simplification on values of existential type.
             //
-        case kIROp_ExtractExistentialType:  return maybeSpecializeExtractExistentialType(inst);
-        case kIROp_ExtractExistentialValue: return maybeSpecializeExtractExistentialValue(inst);
+        case kIROp_ExtractExistentialType:
+            return maybeSpecializeExtractExistentialType(inst);
+        case kIROp_ExtractExistentialValue:
+            return maybeSpecializeExtractExistentialValue(inst);
         case kIROp_ExtractExistentialWitnessTable:
             return maybeSpecializeExtractExistentialWitnessTable(inst);
 
-        case kIROp_Load: return maybeSpecializeLoad(as<IRLoad>(inst));
+        case kIROp_Load:
+            return maybeSpecializeLoad(as<IRLoad>(inst));
 
-        case kIROp_FieldExtract: return maybeSpecializeFieldExtract(as<IRFieldExtract>(inst));
-        case kIROp_FieldAddress: return maybeSpecializeFieldAddress(as<IRFieldAddress>(inst));
+        case kIROp_FieldExtract:
+            return maybeSpecializeFieldExtract(as<IRFieldExtract>(inst));
+        case kIROp_FieldAddress:
+            return maybeSpecializeFieldAddress(as<IRFieldAddress>(inst));
 
-        case kIROp_GetElement: return maybeSpecializeGetElement(as<IRGetElement>(inst));
+        case kIROp_GetElement:
+            return maybeSpecializeGetElement(as<IRGetElement>(inst));
         case kIROp_GetElementPtr:
             return maybeSpecializeGetElementAddress(as<IRGetElementPtr>(inst));
 
         case kIROp_BindExistentialsType:
             return maybeSpecializeBindExistentialsType(as<IRBindExistentialsType>(inst));
 
-        case kIROp_Expand: return maybeSpecializeExpand(as<IRExpand>(inst));
+        case kIROp_Expand:
+            return maybeSpecializeExpand(as<IRExpand>(inst));
 
-        case kIROp_GetTupleElement: return maybeSpecializeFoldableInst(inst);
+        case kIROp_GetTupleElement:
+            return maybeSpecializeFoldableInst(inst);
 
         case kIROp_TypePack:
-        case kIROp_TupleType: return maybeSpecializeTypePackOrTupleType(inst);
+        case kIROp_TupleType:
+            return maybeSpecializeTypePackOrTupleType(inst);
 
         case kIROp_MakeValuePack:
-        case kIROp_MakeTuple:     return maybeSpecializeMakeValuePackOrTuple(inst);
+        case kIROp_MakeTuple:
+            return maybeSpecializeMakeValuePackOrTuple(inst);
 
-        case kIROp_CountOf: return maybeSpecializeCountOf(inst);
+        case kIROp_CountOf:
+            return maybeSpecializeCountOf(inst);
 
         case kIROp_Func:
 
@@ -722,15 +734,19 @@ struct SpecializationContext
         switch (operand->getOp())
         {
         case kIROp_MakeValuePack:
-        case kIROp_MakeTuple:     operand = operand->getDataType(); break;
+        case kIROp_MakeTuple:
+            operand = operand->getDataType();
+            break;
         }
 
         // We can only figure out the count of a type pack or tuple type.
         switch (operand->getOp())
         {
         case kIROp_TypePack:
-        case kIROp_TupleType: break;
-        default:              return false;
+        case kIROp_TupleType:
+            break;
+        default:
+            return false;
         }
 
         // If none of the element type is a TypePack, we can just return the count.
@@ -740,7 +756,8 @@ struct SpecializationContext
             {
             case kIROp_Param:
             case kIROp_TypePack:
-            case kIROp_ExpandTypeOrVal: return false;
+            case kIROp_ExpandTypeOrVal:
+                return false;
             }
         }
         IRBuilder builder(module);
@@ -901,7 +918,8 @@ struct SpecializationContext
             case kIROp_ExistentialTypeSpecializationDictionary:
                 _readSpecializationDictionaryImpl(existentialSpecializedStructs, child);
                 break;
-            default: continue;
+            default:
+                continue;
             }
         }
     }
@@ -1543,8 +1561,10 @@ struct SpecializationContext
             case kIROp_Call:
             case kIROp_ExtractExistentialType:
             case kIROp_CreateExistentialObject:
-            case kIROp_Param:                   return false;
-            default:                            break;
+            case kIROp_Param:
+                return false;
+            default:
+                break;
             }
 
             for (UInt i = 0; i < curInst->getOperandCount(); ++i)
@@ -2729,7 +2749,8 @@ struct SpecializationContext
 
                 switch (inst->getOp())
                 {
-                default: break;
+                default:
+                    break;
 
                 case kIROp_GlobalGenericParam:
                 case kIROp_BindGlobalGenericParam:
@@ -2878,7 +2899,8 @@ void finalizeSpecialization(IRModule* module)
 
         switch (inst->getOp())
         {
-        default: break;
+        default:
+            break;
 
         case kIROp_StructKey:
         case kIROp_Func:
@@ -2888,8 +2910,11 @@ void finalizeSpecialization(IRModule* module)
                 switch (decor->getOp())
                 {
                 case kIROp_DispatchFuncDecoration:
-                case kIROp_ResultWitnessDecoration: decor->removeAndDeallocate(); break;
-                default:                            break;
+                case kIROp_ResultWitnessDecoration:
+                    decor->removeAndDeallocate();
+                    break;
+                default:
+                    break;
                 }
                 decor = nextDecor;
             }
@@ -2897,7 +2922,9 @@ void finalizeSpecialization(IRModule* module)
 
         case kIROp_ExistentialFuncSpecializationDictionary:
         case kIROp_ExistentialTypeSpecializationDictionary:
-        case kIROp_GenericSpecializationDictionary:         inst->removeAndDeallocate(); break;
+        case kIROp_GenericSpecializationDictionary:
+            inst->removeAndDeallocate();
+            break;
         }
     }
 }

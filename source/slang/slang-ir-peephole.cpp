@@ -349,7 +349,8 @@ struct PeepholeContext : InstPassBase
                     }
                     break;
                 }
-            default: break;
+            default:
+                break;
             }
             break;
         case kIROp_FieldExtract:
@@ -914,7 +915,9 @@ struct PeepholeContext : InstPassBase
         case kIROp_Sub:
         case kIROp_Div:
         case kIROp_And:
-        case kIROp_Or:  changed |= tryOptimizeArithmeticInst(inst); break;
+        case kIROp_Or:
+            changed |= tryOptimizeArithmeticInst(inst);
+            break;
         case kIROp_Param:
             {
                 auto block = as<IRBlock>(inst->parent);
@@ -1117,17 +1120,27 @@ struct PeepholeContext : InstPassBase
                     bool result = false;
                     switch (inst->getOp())
                     {
-                    case kIROp_IsInt:   result = isIntegralType(type); break;
-                    case kIROp_IsBool:  result = type->getOp() == kIROp_BoolType; break;
-                    case kIROp_IsFloat: result = isFloatingType(type); break;
-                    case kIROp_IsHalf:  result = type->getOp() == kIROp_HalfType; break;
+                    case kIROp_IsInt:
+                        result = isIntegralType(type);
+                        break;
+                    case kIROp_IsBool:
+                        result = type->getOp() == kIROp_BoolType;
+                        break;
+                    case kIROp_IsFloat:
+                        result = isFloatingType(type);
+                        break;
+                    case kIROp_IsHalf:
+                        result = type->getOp() == kIROp_HalfType;
+                        break;
                     case kIROp_IsUnsignedInt:
                         result = isIntegralType(type) && !getIntTypeInfo(type).isSigned;
                         break;
                     case kIROp_IsSignedInt:
                         result = isIntegralType(type) && getIntTypeInfo(type).isSigned;
                         break;
-                    case kIROp_IsVector: result = as<IRVectorType>(type); break;
+                    case kIROp_IsVector:
+                        result = as<IRVectorType>(type);
+                        break;
                     }
                     inst->replaceUsesWith(builder.getBoolValue(result));
                     maybeRemoveOldInst(inst);
@@ -1169,7 +1182,8 @@ struct PeepholeContext : InstPassBase
                 }
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 

@@ -65,9 +65,14 @@ Result PipelineStateImpl::createMetalRenderPipelineState()
 
         switch (module.stage)
         {
-        case SLANG_STAGE_VERTEX:   pd->setVertexFunction(function.get()); break;
-        case SLANG_STAGE_FRAGMENT: pd->setFragmentFunction(function.get()); break;
-        default:                   return SLANG_FAIL;
+        case SLANG_STAGE_VERTEX:
+            pd->setVertexFunction(function.get());
+            break;
+        case SLANG_STAGE_FRAGMENT:
+            pd->setFragmentFunction(function.get());
+            break;
+        default:
+            return SLANG_FAIL;
         }
     }
 
@@ -236,7 +241,9 @@ Result PipelineStateImpl::ensureAPIPipelineStateCreated()
         return m_computePipelineState ? SLANG_OK : createMetalComputePipelineState();
     case PipelineType::Graphics:
         return m_renderPipelineState ? SLANG_OK : createMetalRenderPipelineState();
-    default: SLANG_UNREACHABLE("Unknown pipeline type."); return SLANG_FAIL;
+    default:
+        SLANG_UNREACHABLE("Unknown pipeline type.");
+        return SLANG_FAIL;
     }
     return SLANG_OK;
 }

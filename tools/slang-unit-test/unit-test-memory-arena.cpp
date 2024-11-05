@@ -37,10 +37,14 @@ static size_t getAlignment(TestMode mode)
     switch (mode)
     {
     default:
-    case TestMode::eUnaligned:       return 1;
-    case TestMode::eExplicitAligned: return 16;
-    case TestMode::eImplicitAligned: return 32;
-    case TestMode::eDefaultAligned:  return MemoryArena::kMinAlignment;
+    case TestMode::eUnaligned:
+        return 1;
+    case TestMode::eExplicitAligned:
+        return 16;
+    case TestMode::eImplicitAligned:
+        return 32;
+    case TestMode::eDefaultAligned:
+        return MemoryArena::kMinAlignment;
     }
 }
 

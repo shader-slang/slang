@@ -677,8 +677,12 @@ SlangResult ArtifactContainerReader::_readContainerDirectory(
             case IArtifact::ContainedKind::Associated:
                 containerArtifact->addAssociated(artifact);
                 break;
-            case IArtifact::ContainedKind::Children: containerArtifact->addChild(artifact); break;
-            default:                                 SLANG_ASSERT(!"Can't add artifact to this kind"); return SLANG_FAIL;
+            case IArtifact::ContainedKind::Children:
+                containerArtifact->addChild(artifact);
+                break;
+            default:
+                SLANG_ASSERT(!"Can't add artifact to this kind");
+                return SLANG_FAIL;
             }
         }
     }

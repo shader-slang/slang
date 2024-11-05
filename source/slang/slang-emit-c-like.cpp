@@ -232,7 +232,9 @@ void CLikeSourceEmitter::emitDeclaratorImpl(DeclaratorInfo* declarator)
             emitDeclarator(attributedDeclarator->next);
         }
         break;
-    default: SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor"); break;
+    default:
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor");
+        break;
     }
 }
 
@@ -245,28 +247,45 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 {
     switch (op)
     {
-    case kIROp_VoidType: return UnownedStringSlice("void");
-    case kIROp_BoolType: return UnownedStringSlice("bool");
+    case kIROp_VoidType:
+        return UnownedStringSlice("void");
+    case kIROp_BoolType:
+        return UnownedStringSlice("bool");
 
-    case kIROp_Int8Type:   return UnownedStringSlice("int8_t");
-    case kIROp_Int16Type:  return UnownedStringSlice("int16_t");
-    case kIROp_IntType:    return UnownedStringSlice("int");
-    case kIROp_Int64Type:  return UnownedStringSlice("int64_t");
-    case kIROp_IntPtrType: return UnownedStringSlice("intptr_t");
+    case kIROp_Int8Type:
+        return UnownedStringSlice("int8_t");
+    case kIROp_Int16Type:
+        return UnownedStringSlice("int16_t");
+    case kIROp_IntType:
+        return UnownedStringSlice("int");
+    case kIROp_Int64Type:
+        return UnownedStringSlice("int64_t");
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("intptr_t");
 
-    case kIROp_UInt8Type:   return UnownedStringSlice("uint8_t");
-    case kIROp_UInt16Type:  return UnownedStringSlice("uint16_t");
-    case kIROp_UIntType:    return UnownedStringSlice("uint");
-    case kIROp_UInt64Type:  return UnownedStringSlice("uint64_t");
-    case kIROp_UIntPtrType: return UnownedStringSlice("uintptr_t");
+    case kIROp_UInt8Type:
+        return UnownedStringSlice("uint8_t");
+    case kIROp_UInt16Type:
+        return UnownedStringSlice("uint16_t");
+    case kIROp_UIntType:
+        return UnownedStringSlice("uint");
+    case kIROp_UInt64Type:
+        return UnownedStringSlice("uint64_t");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("uintptr_t");
 
-    case kIROp_HalfType: return UnownedStringSlice("half");
+    case kIROp_HalfType:
+        return UnownedStringSlice("half");
 
-    case kIROp_FloatType:  return UnownedStringSlice("float");
-    case kIROp_DoubleType: return UnownedStringSlice("double");
+    case kIROp_FloatType:
+        return UnownedStringSlice("float");
+    case kIROp_DoubleType:
+        return UnownedStringSlice("double");
 
-    case kIROp_CharType: return UnownedStringSlice("uint8_t");
-    default:             return UnownedStringSlice();
+    case kIROp_CharType:
+        return UnownedStringSlice("uint8_t");
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -357,7 +376,9 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
     switch (type->getOp())
     {
-    default: emitSimpleTypeAndDeclarator(type, declarator); break;
+    default:
+        emitSimpleTypeAndDeclarator(type, declarator);
+        break;
 
     case kIROp_RateQualifiedType:
         {
@@ -527,8 +548,11 @@ void CLikeSourceEmitter::defaultEmitInstStmt(IRInst* inst)
             m_writer->emit(");\n");
         }
         break;
-    case kIROp_discard: m_writer->emit("discard;\n"); break;
-    default:            diagnoseUnhandledInst(inst);
+    case kIROp_discard:
+        m_writer->emit("discard;\n");
+        break;
+    default:
+        diagnoseUnhandledInst(inst);
     }
 }
 
@@ -610,7 +634,8 @@ void CLikeSourceEmitter::emitLivenessImpl(IRInst* inst)
             text = UnownedStringSlice::fromLiteral("SLANG_LIVE_END");
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     m_writer->emit(text);
@@ -695,14 +720,28 @@ void CLikeSourceEmitter::emitStringLiteral(String const& value)
         char buffer[] = {c, 0};
         switch (c)
         {
-        default: m_writer->emit(buffer); break;
+        default:
+            m_writer->emit(buffer);
+            break;
 
-        case '\"': m_writer->emit("\\\""); break;
-        case '\'': m_writer->emit("\\\'"); break;
-        case '\\': m_writer->emit("\\\\"); break;
-        case '\n': m_writer->emit("\\n"); break;
-        case '\r': m_writer->emit("\\r"); break;
-        case '\t': m_writer->emit("\\t"); break;
+        case '\"':
+            m_writer->emit("\\\"");
+            break;
+        case '\'':
+            m_writer->emit("\\\'");
+            break;
+        case '\\':
+            m_writer->emit("\\\\");
+            break;
+        case '\n':
+            m_writer->emit("\\n");
+            break;
+        case '\r':
+            m_writer->emit("\\r");
+            break;
+        case '\t':
+            m_writer->emit("\\t");
+            break;
         }
     }
     m_writer->emit("\"");
@@ -912,11 +951,14 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
         //
         switch (c)
         {
-        default: break;
+        default:
+            break;
 
         case '.':
         case '\\':
-        case '/':  c = '_'; break;
+        case '/':
+            c = '_';
+            break;
         }
 
         if (((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')))
@@ -1140,7 +1182,8 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
             sb << "_" << Int32(getID(inst));
             return sb.produceString();
         }
-    default: break;
+    default:
+        break;
     }
     // Otherwise fall back to a construct temporary name
     // for the instruction.
@@ -1276,7 +1319,9 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             break;
         }
 
-    case kIROp_FloatLit: m_writer->emit(((IRConstant*)inst)->value.floatVal); break;
+    case kIROp_FloatLit:
+        m_writer->emit(((IRConstant*)inst)->value.floatVal);
+        break;
 
     case kIROp_BoolLit:
         {
@@ -1285,7 +1330,9 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
         }
         break;
 
-    default: SLANG_UNIMPLEMENTED_X("val case for emit"); break;
+    default:
+        SLANG_UNIMPLEMENTED_X("val case for emit");
+        break;
     }
 }
 
@@ -1294,7 +1341,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // Certain opcodes should never/always be folded in
     switch (inst->getOp())
     {
-    default: break;
+    default:
+        break;
 
     // Never fold these in, because they represent declarations
     //
@@ -1305,13 +1353,15 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_Param:
     case kIROp_Func:
     case kIROp_Alloca:
-    case kIROp_Store:          return false;
+    case kIROp_Store:
+        return false;
 
     // Never fold these, because their result cannot be computed
     // as a sub-expression (they must be emitted as a declaration
     // or statement).
     case kIROp_UpdateElement:
-    case kIROp_DefaultConstruct: return false;
+    case kIROp_DefaultConstruct:
+        return false;
 
     // Always fold these in, because they are trivial
     //
@@ -1319,7 +1369,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_FloatLit:
     case kIROp_BoolLit:
     case kIROp_CapabilityConjunction:
-    case kIROp_CapabilityDisjunction: return true;
+    case kIROp_CapabilityDisjunction:
+        return true;
 
     // Always fold these in, because their results
     // cannot be represented in the type system of
@@ -1333,11 +1384,14 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_GetElementPtr:
     case kIROp_Specialize:
     case kIROp_LookupWitness:
-    case kIROp_GetValueFromBoundInterface: return true;
+    case kIROp_GetValueFromBoundInterface:
+        return true;
 
-    case kIROp_GetVulkanRayTracingPayloadLocation: return true;
+    case kIROp_GetVulkanRayTracingPayloadLocation:
+        return true;
 
-    case kIROp_NonUniformResourceIndex: return true;
+    case kIROp_NonUniformResourceIndex:
+        return true;
     }
 
     // Layouts and attributes are only present to annotate other
@@ -1351,7 +1405,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
     switch (inst->getOp())
     {
-    default: break;
+    default:
+        break;
 
     // HACK: don't fold these in because we currently lower
     // them to initializer lists, which aren't allowed in
@@ -1360,7 +1415,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_MakeStruct:
     case kIROp_MakeArray:
     case kIROp_swizzleSet:
-    case kIROp_MakeArrayFromElement: return false;
+    case kIROp_MakeArrayFromElement:
+        return false;
     }
 
     // Instructions with specific result *types* will usually
@@ -1710,11 +1766,21 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
                         emitBracketPostfix = false;
                         switch (intLit->getValue())
                         {
-                        case 0:  m_writer->emit(".x"); break;
-                        case 1:  m_writer->emit(".y"); break;
-                        case 2:  m_writer->emit(".z"); break;
-                        case 3:  m_writer->emit(".w"); break;
-                        default: emitBracketPostfix = true; break;
+                        case 0:
+                            m_writer->emit(".x");
+                            break;
+                        case 1:
+                            m_writer->emit(".y");
+                            break;
+                        case 2:
+                            m_writer->emit(".z");
+                            break;
+                        case 3:
+                            m_writer->emit(".w");
+                            break;
+                        default:
+                            emitBracketPostfix = true;
+                            break;
                         }
                     }
                 }
@@ -1727,7 +1793,8 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
                 maybeCloseParens(rightSideNeedClose);
                 return;
             }
-        default: break;
+        default:
+            break;
         }
 
         auto dereferencePrec = EmitOpInfo::get(EmitOp::Prefix);
@@ -1770,8 +1837,12 @@ void CLikeSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPr
     switch (inst->getOp())
     {
     case kIROp_Var:
-    case kIROp_GlobalVar: emitVarExpr(inst, outerPrec); break;
-    default:              m_writer->emit(getName(inst)); break;
+    case kIROp_GlobalVar:
+        emitVarExpr(inst, outerPrec);
+        break;
+    default:
+        m_writer->emit(getName(inst));
+        break;
     }
 }
 
@@ -1832,12 +1903,18 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
         case SourceLanguage::CUDA:
         case SourceLanguage::HLSL:
         case SourceLanguage::C:
-        case SourceLanguage::CPP:   m_writer->emit("static const "); break;
-        case SourceLanguage::Metal: m_writer->emit("constant "); break;
+        case SourceLanguage::CPP:
+            m_writer->emit("static const ");
+            break;
+        case SourceLanguage::Metal:
+            m_writer->emit("constant ");
+            break;
         case SourceLanguage::WGSL:
             // This is handled by emitVarKeyword, below
             break;
-        default: m_writer->emit("const "); break;
+        default:
+            m_writer->emit("const ");
+            break;
         }
     }
 
@@ -2069,7 +2146,9 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
             break;
         case kIROp_ComPtrType:
         case kIROp_PtrType:
-        case kIROp_NativePtrType: emitComInterfaceCallExpr(inst, outerPrec); return;
+        case kIROp_NativePtrType:
+            emitComInterfaceCallExpr(inst, outerPrec);
+            return;
         }
     }
 
@@ -2191,14 +2270,19 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         /* Don't need to to output anything for this instruction - it's used for reflecting
         string literals that are hashed with 'getStringHash' */
         break;
-    case kIROp_RTTIPointerType: break;
+    case kIROp_RTTIPointerType:
+        break;
 
     case kIROp_undefined:
-    case kIROp_DefaultConstruct: m_writer->emit(getName(inst)); break;
+    case kIROp_DefaultConstruct:
+        m_writer->emit(getName(inst));
+        break;
 
     case kIROp_IntLit:
     case kIROp_FloatLit:
-    case kIROp_BoolLit:  emitSimpleValue(inst); break;
+    case kIROp_BoolLit:
+        emitSimpleValue(inst);
+        break;
 
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
@@ -2678,7 +2762,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
-    case kIROp_Param: m_writer->emit(getName(inst)); break;
+    case kIROp_Param:
+        m_writer->emit(getName(inst));
+        break;
 
     case kIROp_MakeArray:
     case kIROp_MakeStruct:
@@ -2739,7 +2825,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
     case kIROp_GlobalConstant:
-    case kIROp_GetValueFromBoundInterface: emitOperand(inst->getOperand(0), outerPrec); break;
+    case kIROp_GetValueFromBoundInterface:
+        emitOperand(inst->getOperand(0), outerPrec);
+        break;
 
     case kIROp_ByteAddressBufferLoad:
         {
@@ -2860,7 +2948,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             break; // should already have been parsed and used.
         }
-    default: diagnoseUnhandledInst(inst); break;
+    default:
+        diagnoseUnhandledInst(inst);
+        break;
     }
     maybeCloseParens(needClose);
 }
@@ -2913,7 +3003,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugSource:
     case kIROp_DebugLine:
     case kIROp_DebugVar:
-    case kIROp_DebugValue:  break;
+    case kIROp_DebugValue:
+        break;
 
     case kIROp_Unmodified:
         break;
@@ -2934,10 +3025,14 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_AtomicExchange:
     case kIROp_AtomicCompareExchange:
     case kIROp_StructuredBufferGetDimensions:
-    case kIROp_MetalAtomicCast:               emitInstStmt(inst); break;
+    case kIROp_MetalAtomicCast:
+        emitInstStmt(inst);
+        break;
 
     case kIROp_LiveRangeStart:
-    case kIROp_LiveRangeEnd:   emitLiveness(inst); break;
+    case kIROp_LiveRangeEnd:
+        emitLiveness(inst);
+        break;
     case kIROp_undefined:
     case kIROp_DefaultConstruct:
         {
@@ -2946,7 +3041,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         }
         break;
 
-    case kIROp_AllocateOpaqueHandle: break;
+    case kIROp_AllocateOpaqueHandle:
+        break;
     case kIROp_Var:
         {
             auto var = cast<IRVar>(inst);
@@ -2980,7 +3076,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         m_writer->emit(";\n");
         break;
 
-    case kIROp_discard: emitInstStmt(inst); break;
+    case kIROp_discard:
+        emitInstStmt(inst);
+        break;
 
     case kIROp_swizzleSet:
         {
@@ -3157,7 +3255,9 @@ void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* 
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
-    case CodeGenTarget::CUDASource:        m_writer->emit(" = {}"); break;
+    case CodeGenTarget::CUDASource:
+        m_writer->emit(" = {}");
+        break;
     }
     m_writer->emit(";\n");
 }
@@ -3293,8 +3393,12 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
         // Break and continue regions are trivial to handle, as long as we
         // don't need to consider multi-level break/continue (which we
         // don't for now).
-        case Region::Flavor::Break:    m_writer->emit("break;\n"); break;
-        case Region::Flavor::Continue: m_writer->emit("continue;\n"); break;
+        case Region::Flavor::Break:
+            m_writer->emit("break;\n");
+            break;
+        case Region::Flavor::Continue:
+            m_writer->emit("continue;\n");
+            break;
 
         case Region::Flavor::If:
             {
@@ -3655,7 +3759,8 @@ bool shouldWrapInExternCBlock(IRFunc* func)
     {
         switch (decor->getOp())
         {
-        case kIROp_ExternCDecoration: return true;
+        case kIROp_ExternCDecoration:
+            return true;
         }
     }
     return false;
@@ -4083,7 +4188,8 @@ bool _isFoldableValue(IRInst* val)
                     return false;
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -4154,7 +4260,8 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
         m_writer->emit("static ");
         break;
 
-    default: break;
+    default:
+        break;
     }
 
     emitVarModifiers(layout, varDecl, varType);
@@ -4305,18 +4412,34 @@ void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
         }
         break;
 
-    case kIROp_GlobalVar: emitGlobalVar((IRGlobalVar*)inst); break;
+    case kIROp_GlobalVar:
+        emitGlobalVar((IRGlobalVar*)inst);
+        break;
 
-    case kIROp_GlobalParam: emitGlobalParam((IRGlobalParam*)inst); break;
+    case kIROp_GlobalParam:
+        emitGlobalParam((IRGlobalParam*)inst);
+        break;
 
-    case kIROp_Var: emitVar((IRVar*)inst); break;
+    case kIROp_Var:
+        emitVar((IRVar*)inst);
+        break;
 
-    case kIROp_StructType:    emitStruct(cast<IRStructType>(inst)); break;
-    case kIROp_ClassType:     emitClass(cast<IRClassType>(inst)); break;
-    case kIROp_InterfaceType: emitInterface(cast<IRInterfaceType>(inst)); break;
-    case kIROp_WitnessTable:  emitWitnessTable(cast<IRWitnessTable>(inst)); break;
+    case kIROp_StructType:
+        emitStruct(cast<IRStructType>(inst));
+        break;
+    case kIROp_ClassType:
+        emitClass(cast<IRClassType>(inst));
+        break;
+    case kIROp_InterfaceType:
+        emitInterface(cast<IRInterfaceType>(inst));
+        break;
+    case kIROp_WitnessTable:
+        emitWitnessTable(cast<IRWitnessTable>(inst));
+        break;
 
-    case kIROp_RTTIObject: emitRTTIObject(cast<IRRTTIObject>(inst)); break;
+    case kIROp_RTTIObject:
+        emitRTTIObject(cast<IRRTTIObject>(inst));
+        break;
 
     default:
         // We have an "ordinary" instruction at the global
@@ -4368,7 +4491,9 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
             }
             break;
         }
-    case kIROp_NativePtrType: requiredLevel = EmitAction::ForwardDeclaration; break;
+    case kIROp_NativePtrType:
+        requiredLevel = EmitAction::ForwardDeclaration;
+        break;
     case kIROp_LookupWitness:
     case kIROp_FieldExtract:
     case kIROp_FieldAddress:
@@ -4380,7 +4505,8 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (auto comWitnessDecoration = as<IRCOMWitnessDecoration>(inst))
@@ -4423,9 +4549,12 @@ void CLikeSourceEmitter::ensureGlobalInst(
     // Skip certain instructions that don't affect output.
     switch (inst->getOp())
     {
-    case kIROp_Generic:  return;
-    case kIROp_ThisType: return;
-    default:             break;
+    case kIROp_Generic:
+        return;
+    case kIROp_ThisType:
+        return;
+    default:
+        break;
     }
     if (as<IRBasicType>(inst))
         return;
@@ -4439,7 +4568,8 @@ void CLikeSourceEmitter::ensureGlobalInst(
         // but the pointer type itself should be considered emitted as definition.
         requiredLevel = EmitAction::Level::Definition;
         break;
-    default: break;
+    default:
+        break;
     }
 
     // Have we already processed this instruction?
@@ -4481,7 +4611,8 @@ void CLikeSourceEmitter::ensureGlobalInst(
             return;
         }
 
-    default: break;
+    default:
+        break;
     }
     ctx->actions->add(action);
 }
@@ -4547,7 +4678,9 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_Func: emitFuncDecl(cast<IRFunc>(inst)); break;
+    case kIROp_Func:
+        emitFuncDecl(cast<IRFunc>(inst));
+        break;
     case kIROp_StructType:
         m_writer->emit("struct ");
         m_writer->emit(getName(inst));
@@ -4563,7 +4696,8 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
             }
             break;
         }
-    default: SLANG_UNREACHABLE("emit forward declaration");
+    default:
+        SLANG_UNREACHABLE("emit forward declaration");
     }
 }
 
@@ -4573,9 +4707,13 @@ void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
     {
         switch (action.level)
         {
-        case EmitAction::Level::ForwardDeclaration: emitForwardDeclaration(action.inst); break;
+        case EmitAction::Level::ForwardDeclaration:
+            emitForwardDeclaration(action.inst);
+            break;
 
-        case EmitAction::Level::Definition: emitGlobalInst(action.inst); break;
+        case EmitAction::Level::Definition:
+            emitGlobalInst(action.inst);
+            break;
         }
     }
 }

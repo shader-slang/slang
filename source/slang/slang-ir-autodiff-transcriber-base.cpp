@@ -405,8 +405,10 @@ bool AutoDiffTranscriberBase::isExistentialType(IRType* type)
     {
     case kIROp_ExtractExistentialType:
     case kIROp_InterfaceType:
-    case kIROp_AssociatedType:         return true;
-    default:                           return false;
+    case kIROp_AssociatedType:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -416,7 +418,9 @@ void AutoDiffTranscriberBase::copyOriginalDecorations(IRInst* origFunc, IRInst* 
     {
         switch (decor->getOp())
         {
-        case kIROp_ForceInlineDecoration: cloneDecoration(decor, diffFunc); break;
+        case kIROp_ForceInlineDecoration:
+            cloneDecoration(decor, diffFunc);
+            break;
         }
     }
 }
@@ -942,8 +946,10 @@ static void _markGenericChildrenWithoutRelaventUse(
             // its transcription.
             switch (inst->getOp())
             {
-            case kIROp_Return: continue;
-            default:           break;
+            case kIROp_Return:
+                continue;
+            default:
+                break;
             }
 
             bool hasRelaventUse = false;
@@ -958,7 +964,8 @@ static void _markGenericChildrenWithoutRelaventUse(
                 case kIROp_BackwardDerivativePrimalContextDecoration:
                 case kIROp_BackwardDerivativePrimalDecoration:
                 case kIROp_BackwardDerivativePropagateDecoration:
-                case kIROp_PrimalSubstituteDecoration:                   break;
+                case kIROp_PrimalSubstituteDecoration:
+                    break;
                 default:
                     if (!outInstsToSkip.contains(use->getUser()))
                     {
@@ -1165,11 +1172,14 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
     // Handle instructions with children
     switch (origInst->getOp())
     {
-    case kIROp_Func: return transcribeFuncHeader(builder, as<IRFunc>(origInst));
+    case kIROp_Func:
+        return transcribeFuncHeader(builder, as<IRFunc>(origInst));
 
-    case kIROp_Block: return transcribeBlock(builder, as<IRBlock>(origInst));
+    case kIROp_Block:
+        return transcribeBlock(builder, as<IRBlock>(origInst));
 
-    case kIROp_Generic: return transcribeGeneric(builder, as<IRGeneric>(origInst));
+    case kIROp_Generic:
+        return transcribeGeneric(builder, as<IRGeneric>(origInst));
     }
 
     // At this point we should not see any global insts that are differentiable.

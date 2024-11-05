@@ -40,7 +40,8 @@ SlangResult createD3D12BufferDescriptor(
 
     switch (desc.type)
     {
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
 
     case IResourceView::Type::UnorderedAccess:
         {

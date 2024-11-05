@@ -25,10 +25,15 @@ int PipelineCommandEncoder::getBindPointIndex(VkPipelineBindPoint bindPoint)
 {
     switch (bindPoint)
     {
-    case VK_PIPELINE_BIND_POINT_GRAPHICS:        return 0;
-    case VK_PIPELINE_BIND_POINT_COMPUTE:         return 1;
-    case VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR: return 2;
-    default:                                     assert(!"unknown pipeline type."); return -1;
+    case VK_PIPELINE_BIND_POINT_GRAPHICS:
+        return 0;
+    case VK_PIPELINE_BIND_POINT_COMPUTE:
+        return 1;
+    case VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR:
+        return 2;
+    default:
+        assert(!"unknown pipeline type.");
+        return -1;
     }
 }
 
@@ -1063,7 +1068,8 @@ void RenderCommandEncoder::setPrimitiveTopology(PrimitiveTopology topology)
     {
         switch (topology)
         {
-        case PrimitiveTopology::TriangleList: break;
+        case PrimitiveTopology::TriangleList:
+            break;
         default:
             // We are using a non-list topology, but we don't have dynmaic state
             // extension, error out.
@@ -1107,9 +1113,14 @@ void RenderCommandEncoder::setIndexBuffer(
     VkIndexType indexType = VK_INDEX_TYPE_UINT16;
     switch (indexFormat)
     {
-    case Format::R16_UINT: indexType = VK_INDEX_TYPE_UINT16; break;
-    case Format::R32_UINT: indexType = VK_INDEX_TYPE_UINT32; break;
-    default:               assert(!"unsupported index format");
+    case Format::R16_UINT:
+        indexType = VK_INDEX_TYPE_UINT16;
+        break;
+    case Format::R32_UINT:
+        indexType = VK_INDEX_TYPE_UINT32;
+        break;
+    default:
+        assert(!"unsupported index format");
     }
 
     BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(buffer);
@@ -1367,7 +1378,8 @@ void RayTracingCommandEncoder::_queryAccelerationStructureProperties(
         case QueryType::AccelerationStructureSerializedSize:
             queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR;
             break;
-        case QueryType::AccelerationStructureCurrentSize: continue;
+        case QueryType::AccelerationStructureCurrentSize:
+            continue;
         default:
             getDebugCallback()->handleMessage(
                 DebugMessageType::Error,

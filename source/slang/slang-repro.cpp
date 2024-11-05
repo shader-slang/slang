@@ -335,7 +335,8 @@ static bool _isStorable(const PathInfo::Type type)
         {
             return true;
         }
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -346,8 +347,11 @@ static String _scrubName(const String& in)
     {
         switch (c)
         {
-        case ':': c = '_'; break;
-        default:  break;
+        case ':':
+            c = '_';
+            break;
+        default:
+            break;
         }
         builder.appendChar(c);
     }
@@ -1347,9 +1351,14 @@ static SlangResult _calcCommandLine(
 
             switch (isolatedBit)
             {
-            case SLANG_COMPILE_FLAG_NO_MANGLING: cmd.addArg("-no-mangle"); break;
-            case SLANG_COMPILE_FLAG_NO_CODEGEN:  cmd.addArg("-no-codegen"); break;
-            default:                             break;
+            case SLANG_COMPILE_FLAG_NO_MANGLING:
+                cmd.addArg("-no-mangle");
+                break;
+            case SLANG_COMPILE_FLAG_NO_CODEGEN:
+                cmd.addArg("-no-codegen");
+                break;
+            default:
+                break;
             }
 
             // Remove the bit
@@ -1359,32 +1368,52 @@ static SlangResult _calcCommandLine(
 
         switch (SlangLineDirectiveMode(requestState->lineDirectiveMode))
         {
-        case SLANG_LINE_DIRECTIVE_MODE_DEFAULT: break;
+        case SLANG_LINE_DIRECTIVE_MODE_DEFAULT:
+            break;
         case SLANG_LINE_DIRECTIVE_MODE_NONE:
             {
                 cmd.addArg("-line-directive-mode");
                 cmd.addArg("none");
                 break;
             }
-        default: break;
+        default:
+            break;
         }
 
         switch (SlangDebugInfoLevel(requestState->debugInfoLevel))
         {
-        case SLANG_DEBUG_INFO_LEVEL_STANDARD: cmd.addArg("-g"); break;
-        case SLANG_DEBUG_INFO_LEVEL_NONE:     cmd.addArg("-g0"); break;
-        case SLANG_DEBUG_INFO_LEVEL_MINIMAL:  cmd.addArg("-g1"); break;
-        case SLANG_DEBUG_INFO_LEVEL_MAXIMAL:  cmd.addArg("-g3"); break;
-        default:                              break;
+        case SLANG_DEBUG_INFO_LEVEL_STANDARD:
+            cmd.addArg("-g");
+            break;
+        case SLANG_DEBUG_INFO_LEVEL_NONE:
+            cmd.addArg("-g0");
+            break;
+        case SLANG_DEBUG_INFO_LEVEL_MINIMAL:
+            cmd.addArg("-g1");
+            break;
+        case SLANG_DEBUG_INFO_LEVEL_MAXIMAL:
+            cmd.addArg("-g3");
+            break;
+        default:
+            break;
         }
 
         switch (SlangOptimizationLevel(requestState->optimizationLevel))
         {
-        case SLANG_OPTIMIZATION_LEVEL_NONE:    cmd.addArg("-O0"); break;
-        case SLANG_OPTIMIZATION_LEVEL_DEFAULT: cmd.addArg("-O"); break;
-        case SLANG_OPTIMIZATION_LEVEL_HIGH:    cmd.addArg("-O2"); break;
-        case SLANG_OPTIMIZATION_LEVEL_MAXIMAL: cmd.addArg("-O3"); break;
-        default:                               break;
+        case SLANG_OPTIMIZATION_LEVEL_NONE:
+            cmd.addArg("-O0");
+            break;
+        case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
+            cmd.addArg("-O");
+            break;
+        case SLANG_OPTIMIZATION_LEVEL_HIGH:
+            cmd.addArg("-O2");
+            break;
+        case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
+            cmd.addArg("-O3");
+            break;
+        default:
+            break;
         }
 
         // spSetOutputContainerFormat(externalRequest,
@@ -1392,7 +1421,8 @@ static SlangResult _calcCommandLine(
 
         switch (SlangPassThrough(requestState->passThroughMode))
         {
-        case SLANG_PASS_THROUGH_NONE: break;
+        case SLANG_PASS_THROUGH_NONE:
+            break;
         default:
             {
                 cmd.addArg("-pass-through");
@@ -1409,9 +1439,14 @@ static SlangResult _calcCommandLine(
 
         switch (requestState->defaultMatrixLayoutMode)
         {
-        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:    cmd.addArg("-matrix-layout-row-major"); break;
-        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR: cmd.addArg("-matrix-layout-column-major"); break;
-        default:                               break;
+        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+            cmd.addArg("-matrix-layout-row-major");
+            break;
+        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+            cmd.addArg("-matrix-layout-column-major");
+            break;
+        default:
+            break;
         }
     }
 
@@ -1449,7 +1484,8 @@ static SlangResult _calcCommandLine(
                     cmd.addArg("precise");
                     break;
                 }
-            default: break;
+            default:
+                break;
             }
 
 #if 0
@@ -1632,9 +1668,15 @@ static SlangResult _calcCommandLine(
                 {
                     switch (pathInfo->pathType)
                     {
-                    case SLANG_PATH_TYPE_FILE:      builder << "file "; break;
-                    case SLANG_PATH_TYPE_DIRECTORY: builder << "directory "; break;
-                    default:                        builder << "?"; break;
+                    case SLANG_PATH_TYPE_FILE:
+                        builder << "file ";
+                        break;
+                    case SLANG_PATH_TYPE_DIRECTORY:
+                        builder << "directory ";
+                        break;
+                    default:
+                        builder << "?";
+                        break;
                     }
                 }
 
@@ -1655,12 +1697,20 @@ static SlangResult _calcCommandLine(
                 switch (curRes)
                 {
                 default:
-                case CompressedResult::Uninitialized: break;
-                case CompressedResult::Ok:            break;
+                case CompressedResult::Uninitialized:
+                    break;
+                case CompressedResult::Ok:
+                    break;
 
-                case CompressedResult::NotFound:   builder << "[not found]"; break;
-                case CompressedResult::CannotOpen: builder << "[cannot open]"; break;
-                case CompressedResult::Fail:       builder << "[fail]"; break;
+                case CompressedResult::NotFound:
+                    builder << "[not found]";
+                    break;
+                case CompressedResult::CannotOpen:
+                    builder << "[cannot open]";
+                    break;
+                case CompressedResult::Fail:
+                    builder << "[fail]";
+                    break;
                 }
             }
         }

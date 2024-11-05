@@ -17,8 +17,11 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
     m_queryDesc.MiscFlags = 0;
     switch (desc.type)
     {
-    case QueryType::Timestamp: m_queryDesc.Query = D3D11_QUERY_TIMESTAMP; break;
-    default:                   return SLANG_E_INVALID_ARG;
+    case QueryType::Timestamp:
+        m_queryDesc.Query = D3D11_QUERY_TIMESTAMP;
+        break;
+    default:
+        return SLANG_E_INVALID_ARG;
     }
     m_queries.setCount(desc.count);
     return SLANG_OK;

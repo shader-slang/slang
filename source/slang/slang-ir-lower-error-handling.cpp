@@ -164,10 +164,17 @@ struct ErrorHandlingLoweringContext
     {
         switch (inst->getOp())
         {
-        case kIROp_TryCall: processTryCall(cast<IRTryCall>(inst)); break;
-        case kIROp_Return:  processReturn(cast<IRReturn>(inst)); break;
-        case kIROp_Throw:   processThrow(cast<IRThrow>(inst)); break;
-        default:            break;
+        case kIROp_TryCall:
+            processTryCall(cast<IRTryCall>(inst));
+            break;
+        case kIROp_Return:
+            processReturn(cast<IRReturn>(inst));
+            break;
+        case kIROp_Throw:
+            processThrow(cast<IRThrow>(inst));
+            break;
+        default:
+            break;
         }
     }
 
@@ -204,8 +211,11 @@ struct ErrorHandlingLoweringContext
         {
             switch (child->getOp())
             {
-            case kIROp_FuncType: oldFuncTypes.add(cast<IRFuncType>(child)); break;
-            default:             break;
+            case kIROp_FuncType:
+                oldFuncTypes.add(cast<IRFuncType>(child));
+                break;
+            default:
+                break;
             }
         }
         for (auto funcType : oldFuncTypes)

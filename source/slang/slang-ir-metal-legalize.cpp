@@ -323,7 +323,9 @@ struct LegalizeMetalEntryPointContext
         case Stage::Mesh:
         case Stage::Geometry:
         case Stage::Domain:
-        case Stage::Hull:          isGeometryStage = true; break;
+        case Stage::Hull:
+            isGeometryStage = true;
+            break;
         }
 
         List<IRParam*> paramsToPack;
@@ -1408,7 +1410,9 @@ struct LegalizeMetalEntryPointContext
                 builder.addTargetSystemValueDecoration(key, toSlice("position"));
                 break;
             }
-        default: SLANG_ASSERT(false); return;
+        default:
+            SLANG_ASSERT(false);
+            return;
         }
 
         fixUpFuncType(func, structType);
@@ -1921,9 +1925,14 @@ struct LegalizeMetalEntryPointContext
         // Other Legalize
         switch (entryPoint.entryPointDecor->getProfile().getStage())
         {
-        case Stage::Amplification: legalizeDispatchMeshPayloadForMetal(entryPoint); break;
-        case Stage::Mesh:          legalizeMeshEntryPoint(entryPoint); break;
-        default:                   break;
+        case Stage::Amplification:
+            legalizeDispatchMeshPayloadForMetal(entryPoint);
+            break;
+        case Stage::Mesh:
+            legalizeMeshEntryPoint(entryPoint);
+            break;
+        default:
+            break;
         }
     }
 };
@@ -2038,11 +2047,14 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
     {
         switch (inst->getOp())
         {
-        case kIROp_Var: outAddressSpace = AddressSpace::ThreadLocal; return true;
+        case kIROp_Var:
+            outAddressSpace = AddressSpace::ThreadLocal;
+            return true;
         case kIROp_RWStructuredBufferGetElementPtr:
             outAddressSpace = AddressSpace::Global;
             return true;
-        default: return false;
+        default:
+            return false;
         }
     }
 
@@ -2079,12 +2091,14 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
             return AddressSpace::GroupShared;
         switch (inst->getOp())
         {
-        case kIROp_RWStructuredBufferGetElementPtr: return AddressSpace::Global;
+        case kIROp_RWStructuredBufferGetElementPtr:
+            return AddressSpace::Global;
         case kIROp_Var:
             if (as<IRBlock>(inst->getParent()))
                 return AddressSpace::ThreadLocal;
             break;
-        default: break;
+        default:
+            break;
         }
         auto type = unwrapAttributedType(inst->getDataType());
         if (!type)

@@ -16,9 +16,12 @@ bool VulkanApi::areDefined(ProcType type) const
 {
     switch (type)
     {
-    case ProcType::Global:   return VK_API_CHECK_FUNCTIONS(VK_API_ALL_GLOBAL_PROCS);
-    case ProcType::Instance: return VK_API_CHECK_FUNCTIONS(VK_API_ALL_INSTANCE_PROCS);
-    case ProcType::Device:   return VK_API_CHECK_FUNCTIONS(VK_API_DEVICE_PROCS);
+    case ProcType::Global:
+        return VK_API_CHECK_FUNCTIONS(VK_API_ALL_GLOBAL_PROCS);
+    case ProcType::Instance:
+        return VK_API_CHECK_FUNCTIONS(VK_API_ALL_INSTANCE_PROCS);
+    case ProcType::Device:
+        return VK_API_CHECK_FUNCTIONS(VK_API_DEVICE_PROCS);
     default:
         {
             assert(!"Unhandled type");

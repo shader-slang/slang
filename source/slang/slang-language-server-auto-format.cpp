@@ -123,7 +123,8 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
             case TokenType::WhiteSpace:
             case TokenType::LineComment:
             case TokenType::BlockComment:
-            case TokenType::NewLine:      break;
+            case TokenType::NewLine:
+                break;
             default:
                 if (braceCounter == 0)
                     goto breakLabel;

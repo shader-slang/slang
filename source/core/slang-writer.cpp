@@ -177,7 +177,8 @@ SlangResult FileWriter::setMode(SlangWriterMode mode)
             break;
 #endif
         }
-    default: break;
+    default:
+        break;
     }
     return SLANG_FAIL;
 }

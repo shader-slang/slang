@@ -31,22 +31,33 @@ VkDescriptorType ShaderObjectLayoutImpl::Builder::_mapDescriptorType(
     switch (slangBindingType)
     {
     case slang::BindingType::PushConstant:
-    default:                               SLANG_ASSERT("unsupported binding type"); return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+    default:
+        SLANG_ASSERT("unsupported binding type");
+        return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 
-    case slang::BindingType::Sampler: return VK_DESCRIPTOR_TYPE_SAMPLER;
+    case slang::BindingType::Sampler:
+        return VK_DESCRIPTOR_TYPE_SAMPLER;
     case slang::BindingType::CombinedTextureSampler:
         return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    case slang::BindingType::Texture:            return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    case slang::BindingType::MutableTexture:     return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    case slang::BindingType::TypedBuffer:        return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-    case slang::BindingType::MutableTypedBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+    case slang::BindingType::Texture:
+        return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    case slang::BindingType::MutableTexture:
+        return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    case slang::BindingType::TypedBuffer:
+        return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+    case slang::BindingType::MutableTypedBuffer:
+        return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
     case slang::BindingType::RawBuffer:
-    case slang::BindingType::MutableRawBuffer:   return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    case slang::BindingType::InputRenderTarget:  return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    case slang::BindingType::InlineUniformData:  return VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT;
+    case slang::BindingType::MutableRawBuffer:
+        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    case slang::BindingType::InputRenderTarget:
+        return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+    case slang::BindingType::InlineUniformData:
+        return VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT;
     case slang::BindingType::RayTracingAccelerationStructure:
         return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-    case slang::BindingType::ConstantBuffer: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    case slang::BindingType::ConstantBuffer:
+        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     }
 }
 
@@ -84,7 +95,8 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
         auto bindingRangeType = typeLayout->getBindingRangeType(bindingRangeIndex);
         switch (bindingRangeType)
         {
-        default: break;
+        default:
+            break;
 
         // We will skip over ranges that represent sub-objects for now, and handle
         // them in a separate pass.
@@ -92,7 +104,8 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
         case slang::BindingType::ParameterBlock:
         case slang::BindingType::ConstantBuffer:
         case slang::BindingType::ExistentialValue:
-        case slang::BindingType::PushConstant:     continue;
+        case slang::BindingType::PushConstant:
+            continue;
         }
 
         // Given a binding range we are interested in, we will then enumerate
@@ -124,8 +137,10 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
             {
             case slang::BindingType::ExistentialValue:
             case slang::BindingType::InlineUniformData:
-            case slang::BindingType::PushConstant:      continue;
-            default:                                    break;
+            case slang::BindingType::PushConstant:
+                continue;
+            default:
+                break;
             }
 
             auto vkDescriptorType = _mapDescriptorType(slangDescriptorType);
@@ -170,7 +185,8 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
         // decriptor sets of a parent object.
         //
         case slang::BindingType::ParameterBlock:
-        default:                                 break;
+        default:
+            break;
 
         case slang::BindingType::ExistentialValue:
             // An interest/existential-typed sub-object range will only contribute
@@ -508,7 +524,8 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
             }
             break;
 
-        default: break;
+        default:
+            break;
         }
 
         m_subObjectRanges.add(subObjectRange);

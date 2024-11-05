@@ -36,7 +36,8 @@ void* DefaultSerialObjectFactory::create(SerialTypeKind typeKind, SerialSubType 
             }
             return nullptr;
         }
-    default: break;
+    default:
+        break;
     }
 
     return nullptr;

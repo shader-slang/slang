@@ -392,12 +392,16 @@ Result DeviceImpl::createTextureResource(
         NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
     switch (desc.memoryType)
     {
-    case MemoryType::DeviceLocal: textureDesc->setStorageMode(MTL::StorageModePrivate); break;
+    case MemoryType::DeviceLocal:
+        textureDesc->setStorageMode(MTL::StorageModePrivate);
+        break;
     case MemoryType::Upload:
         textureDesc->setStorageMode(MTL::StorageModeShared);
         textureDesc->setCpuCacheMode(MTL::CPUCacheModeWriteCombined);
         break;
-    case MemoryType::ReadBack: textureDesc->setStorageMode(MTL::StorageModeShared); break;
+    case MemoryType::ReadBack:
+        textureDesc->setStorageMode(MTL::StorageModeShared);
+        break;
     }
 
     bool isArray = desc.arraySize > 0;
@@ -433,7 +437,9 @@ Result DeviceImpl::createTextureResource(
         textureDesc->setHeight(descIn.size.height);
         textureDesc->setDepth(descIn.size.depth);
         break;
-    default: assert("!Unsupported texture type"); return SLANG_FAIL;
+    default:
+        assert("!Unsupported texture type");
+        return SLANG_FAIL;
     }
 
     MTL::TextureUsage textureUsage = MTL::TextureUsageUnknown;
@@ -456,7 +462,9 @@ Result DeviceImpl::createTextureResource(
         case Format::R32_UINT:
         case Format::R32_SINT:
         case Format::R32G32_UINT:
-        case Format::R32G32_SINT: textureUsage |= MTL::TextureUsageShaderAtomic; break;
+        case Format::R32G32_SINT:
+            textureUsage |= MTL::TextureUsageShaderAtomic;
+            break;
         }
     }
 
@@ -548,11 +556,15 @@ Result DeviceImpl::createBufferResource(
     MTL::ResourceOptions resourceOptions = MTL::ResourceOptions(0);
     switch (desc.memoryType)
     {
-    case MemoryType::DeviceLocal: resourceOptions = MTL::ResourceStorageModePrivate; break;
+    case MemoryType::DeviceLocal:
+        resourceOptions = MTL::ResourceStorageModePrivate;
+        break;
     case MemoryType::Upload:
         resourceOptions = MTL::ResourceStorageModeShared | MTL::CPUCacheModeWriteCombined;
         break;
-    case MemoryType::ReadBack: resourceOptions = MTL::ResourceStorageModeShared; break;
+    case MemoryType::ReadBack:
+        resourceOptions = MTL::ResourceStorageModeShared;
+        break;
     }
     resourceOptions |= (desc.memoryType == MemoryType::DeviceLocal)
                            ? MTL::ResourceStorageModePrivate

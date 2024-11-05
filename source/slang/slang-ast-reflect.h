@@ -35,7 +35,8 @@ public:                                                                         
 #define SLANG_AST_NODE_INVOKE(method, methodParams) _##method##Override methodParams
 
 #define SLANG_AST_NODE_CASE(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    case ASTNodeType::NAME: return static_cast<NAME*>(this)->SLANG_AST_NODE_INVOKE param;
+    case ASTNodeType::NAME:                                                 \
+        return static_cast<NAME*>(this)->SLANG_AST_NODE_INVOKE param;
 
 #define SLANG_AST_NODE_VIRTUAL_CALL(base, methodName, methodParams)                       \
     switch (astNodeType)                                                                  \
@@ -46,7 +47,8 @@ public:                                                                         
 
 // Same but for a method that's const
 #define SLANG_AST_NODE_CONST_CASE(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    case ASTNodeType::NAME: return static_cast<const NAME*>(this)->SLANG_AST_NODE_INVOKE param;
+    case ASTNodeType::NAME:                                                       \
+        return static_cast<const NAME*>(this)->SLANG_AST_NODE_INVOKE param;
 #define SLANG_AST_NODE_CONST_VIRTUAL_CALL(base, methodName, methodParams)                       \
     switch (astNodeType)                                                                        \
     {                                                                                           \
