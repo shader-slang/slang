@@ -1233,7 +1233,6 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
     case kIROp_Select:
         {
-            auto prec = getInfo(EmitOp::Conditional);
             m_writer->emit("select(");
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
             m_writer->emit(", ");
