@@ -26,6 +26,39 @@
 namespace Slang
 {
 
+// In WGSL, expression of "1.0/0.0" is not allowed, it will report compile error,
+// so to construct infinity or nan, we have to assign the float literal to a variable
+// and then use it to bypass the compile error.
+static const char* kWGSLBuiltinPreludeGetInfinity = R"(
+fn _slang_getInfinity(positive: bool) -> f32
+{
+    let a = select(f32(-1.0), f32(1.0), positive);
+    let b = f32(0.0);
+    return a / b;
+}
+)";
+
+static const char* kWGSLBuiltinPreludeGetNan = R"(
+fn _slang_getNan() -> f32
+{
+    let a = f32(0.0);
+    let b = f32(0.0);
+    return a / b;
+}
+)";
+
+void WGSLSourceEmitter::ensurePrelude(const char* preludeText)
+{
+    IRStringLit* stringLit;
+    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
+    {
+        IRBuilder builder(m_irModule);
+        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
+        m_builtinPreludes[preludeText] = stringLit;
+    }
+    m_requiredPreludes.add(stringLit);
+}
+
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     const SwitchRegion::Case* const currentCase,
     const bool isDefault)
@@ -878,8 +911,32 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 case BaseType::Float:
                     {
-                        m_writer->emit(litInst->value.floatVal);
-                        m_writer->emit("f");
+                        IRConstant::FloatKind kind = litInst->getFloatKind();
+                        switch (kind)
+                        {
+                        case IRConstant::FloatKind::Nan:
+                            {
+                                ensurePrelude(kWGSLBuiltinPreludeGetNan);
+                                m_writer->emit("_slang_getNan()");
+                                break;
+                            }
+                        case IRConstant::FloatKind::PositiveInfinity:
+                            {
+                                ensurePrelude(kWGSLBuiltinPreludeGetInfinity);
+                                m_writer->emit("_slang_getInfinity(true)");
+                                break;
+                            }
+                        case IRConstant::FloatKind::NegativeInfinity:
+                            {
+                                ensurePrelude(kWGSLBuiltinPreludeGetInfinity);
+                                m_writer->emit("_slang_getInfinity(false)");
+                                break;
+                            }
+                        default:
+                            m_writer->emit(litInst->value.floatVal);
+                            m_writer->emit("f");
+                            break;
+                        }
                     }
                     break;
 
