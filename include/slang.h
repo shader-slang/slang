@@ -884,6 +884,7 @@ typedef uint32_t SlangSizeT;
         DumpWarningDiagnostics,
         InputFilesRemain,
         EmitIr,                        // bool
+        EmitReflectionJSON,            // bool
         ReportDownstreamTime,          // bool
         ReportPerfBenchmark,           // bool
         ReportCheckpointIntermediates, // bool

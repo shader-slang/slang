@@ -22,7 +22,7 @@ struct PrettyWriter
 
     void writeRaw(const UnownedStringSlice& slice) { m_builder.append(slice); }
     void writeRaw(char const* begin, char const* end);
-    void writeRaw(PrettyWriter& writer, char const* begin) { writeRaw(UnownedStringSlice(begin)); }
+    void writeRaw(char const* begin) { writeRaw(UnownedStringSlice(begin)); }
 
     void writeRawChar(int c) { m_builder.appendChar(char(c)); }
 
@@ -116,7 +116,7 @@ private:
     PrettyWriter::CommaState* m_previousState;
 };
 
-};
+}
 
 
 #endif

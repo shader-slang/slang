@@ -37,6 +37,7 @@
 #include "slang-serialize-ir.h"
 #include "slang-tag-version.h"
 #include "slang-type-layout.h"
+#include "slang-reflection-json.h"
 
 #include <sys/stat.h>
 
@@ -6854,6 +6855,21 @@ SlangResult EndToEndCompileRequest::compile()
                     Diagnostics::unableToWriteReproFile,
                     reproFileName);
             }
+        }
+    }
+    
+    auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
+    if (reflectionPath.getLength() != 0)
+    {
+        reflectionPath.appendChar('\0');
+        auto bufferWriter = PrettyWriter();
+        emitReflectionJSON(this, this->getReflection(), bufferWriter);
+        if (SLANG_FAILED(OSFileSystem::getMutableSingleton()->saveFile(reflectionPath.getBuffer(), bufferWriter.getBuilder().getBuffer(), bufferWriter.getBuilder().getLength())))
+        {
+            getSink()->diagnose(
+                    SourceLoc(),
+                    Diagnostics::unableToWriteFile,
+                    reflectionPath);
         }
     }
 

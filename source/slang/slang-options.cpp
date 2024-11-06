@@ -524,7 +524,12 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Preserve all resource parameters in the output code, even if they are not used by the "
          "shader."},
+        {OptionKind::EmitReflectionJSON,
+         "-reflection-json",
+         "reflection-json <path>",
+         "Emit reflection data in JSON format to a file."},
     };
+    
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -2661,6 +2666,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(outputPath));
 
                 addOutputPath(outputPath.value.getBuffer());
+                break;
+            }
+        case OptionKind::EmitReflectionJSON:
+            {
+                CommandLineArg outputPath;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(outputPath));
+                
+                linkage->m_optionSet.set(CompilerOptionName::EmitReflectionJSON, outputPath.value);
                 break;
             }
         case OptionKind::DepFile:
