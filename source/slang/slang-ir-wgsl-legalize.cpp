@@ -30,6 +30,32 @@ struct LegalizeWGSLEntryPointContext
     {
     }
 
+    void removeSemanticLayoutsFromLegalizedStructs()
+    {
+        // WGSL does not allow duplicate attributes to appear in the same shader.
+        // If we emit our own struct with `[[color(0)]`, all existing uses of `[[color(0)]]`
+        // must be removed.
+        for (auto field : semanticInfoToRemove)
+        {
+            auto key = field->getKey();
+            // Some decorations appear twice, destroy all found
+            for (;;)
+            {
+                if (auto semanticDecor = key->findDecoration<IRSemanticDecoration>())
+                {
+                    semanticDecor->removeAndDeallocate();
+                    continue;
+                }
+                else if (auto layoutDecor = key->findDecoration<IRLayoutDecoration>())
+                {
+                    layoutDecor->removeAndDeallocate();
+                    continue;
+                }
+                break;
+            }
+        }
+    }
+
     // Flattens all struct parameters of an entryPoint to ensure parameters are a flat struct
     void flattenInputParameters(EntryPointInfo entryPoint)
     {
@@ -1419,9 +1445,8 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
 
     LegalizeWGSLEntryPointContext context(sink, module);
     for (auto entryPoint : entryPoints)
-    {
         context.legalizeEntryPointForWGSL(entryPoint);
-    }
+    context.removeSemanticLayoutsFromLegalizedStructs();
 
     // Go through every instruction in the module and legalize them as needed.
     context.processInst(module->getModuleInst());
