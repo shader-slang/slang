@@ -1,7 +1,6 @@
 // Bug related to resource specialization on unused resource typed fields.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D
 Texture2D t2D;

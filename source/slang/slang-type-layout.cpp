@@ -2350,19 +2350,6 @@ bool isD3DTarget(TargetRequest* targetReq)
     }
 }
 
-bool isWGSLTarget(TargetRequest* targetReq)
-{
-    switch (targetReq->getTarget())
-    {
-    case CodeGenTarget::WGSL:
-    case CodeGenTarget::WGSLSPIRV:
-    case CodeGenTarget::WGSLSPIRVAssembly:
-        return true;
-    default:
-        return false;
-    }
-}
-
 bool isMetalTarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
@@ -2406,6 +2393,20 @@ bool isCUDATarget(TargetRequest* targetReq)
 
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::PTX:
+        return true;
+    }
+}
+
+bool isWGPUTarget(TargetRequest* targetReq)
+{
+    switch (targetReq->getTarget())
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
         return true;
     }
 }
@@ -2545,7 +2546,7 @@ static bool shouldAllocateRegisterSpaceForParameterBlock(TypeLayoutContext const
     // If we know that we are targetting Vulkan, then
     // the only way to effectively use parameter blocks
     // is by using descriptor sets.
-    if (isVulkanTarget(targetReq) || isWGSLTarget(targetReq))
+    if (isVulkanTarget(targetReq) || isWGPUTarget(targetReq))
         return true;
 
     // If none of the above passed, then it seems like we
