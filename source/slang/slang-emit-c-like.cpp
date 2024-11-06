@@ -3293,6 +3293,11 @@ void CLikeSourceEmitter::emitSemanticsUsingVarLayout(IRVarLayout* varLayout)
     }
 }
 
+void CLikeSourceEmitter::emitSemanticsPrefix(IRInst* inst)
+{
+    emitSemanticsPrefixImpl(inst);
+}
+
 void CLikeSourceEmitter::emitSemantics(IRInst* inst, bool allowOffsetLayout)
 {
     emitSemanticsImpl(inst, allowOffsetLayout);
@@ -3869,6 +3874,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(
                 emitPackOffsetModifier(fieldKey, fieldType, packOffsetDecoration);
             }
         }
+        emitSemanticsPrefix(fieldKey);
         emitStructFieldAttributes(structType, ff);
         emitMemoryQualifiers(fieldKey);
         emitType(fieldType, getName(fieldKey));

@@ -16,8 +16,8 @@ struct StandardBoneWeightSet : IBoneWeightSet
 {
     struct PackedType
     {
-        uint boneIds : BONEIDS;
-        uint boneWeights : BONEWEIGHTS;
+        uint boneIds;
+        uint boneWeights;
     };
     PackedType field;
 };
