@@ -381,7 +381,9 @@ struct LoweredElementTypeContext
         }
     }
 
-    IRIntegerValue get16ByteAlignedVectorSize(IRType* elementType, IRIntegerValue minCount)
+    // Returns the number of elements N that ensures the IRVectorType(elementType,N)
+    // has 16-byte aligned size and N is no less than `minCount`.
+    IRIntegerValue get16ByteAlignedVectorElementCount(IRType* elementType, IRIntegerValue minCount)
     {
         IRSizeAndAlignment sizeAlignment;
         getNaturalSizeAndAlignment(target->getOptionSet(), elementType, &sizeAlignment);
@@ -434,7 +436,7 @@ struct LoweredElementTypeContext
             {
                 // For constant buffer layout, we need to use 16-byte aligned vector if
                 // we are required to ensure array element types has 16-byte stride.
-                vectorSize = builder.getIntValue(get16ByteAlignedVectorSize(
+                vectorSize = builder.getIntValue(get16ByteAlignedVectorElementCount(
                     matrixType->getElementType(),
                     getIntVal(vectorSize)));
             }
@@ -476,7 +478,7 @@ struct LoweredElementTypeContext
                 {
                     packedVectorType = builder.getVectorType(
                         vectorType->getElementType(),
-                        builder.getIntValue(get16ByteAlignedVectorSize(
+                        builder.getIntValue(get16ByteAlignedVectorElementCount(
                             vectorType->getElementType(),
                             getIntVal(vectorType->getElementCount()))));
                     if (packedVectorType != loweredInnerTypeInfo.originalType)
@@ -489,7 +491,7 @@ struct LoweredElementTypeContext
                 {
                     packedVectorType = builder.getVectorType(
                         loweredInnerTypeInfo.loweredType,
-                        get16ByteAlignedVectorSize(scalarType, 1));
+                        get16ByteAlignedVectorElementCount(scalarType, 1));
                     loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
                     loweredInnerTypeInfo.convertOriginalToLowered = kIROp_MakeVectorFromScalar;
                 }
