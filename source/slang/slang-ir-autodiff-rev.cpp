@@ -243,14 +243,17 @@ InstPair BackwardDiffTranscriberBase::transcribeInstImpl(IRBuilder* builder, IRI
 {
     switch (origInst->getOp())
     {
-    case kIROp_Param: return transcribeParam(builder, as<IRParam>(origInst));
+    case kIROp_Param:
+        return transcribeParam(builder, as<IRParam>(origInst));
 
-    case kIROp_Return: return transcribeReturn(builder, as<IRReturn>(origInst));
+    case kIROp_Return:
+        return transcribeReturn(builder, as<IRReturn>(origInst));
 
     case kIROp_LookupWitness:
         return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
 
-    case kIROp_Specialize: return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
+    case kIROp_Specialize:
+        return transcribeSpecialize(builder, as<IRSpecialize>(origInst));
 
     case kIROp_MakeTuple:
     case kIROp_FloatLit:
@@ -261,9 +264,11 @@ InstPair BackwardDiffTranscriberBase::transcribeInstImpl(IRBuilder* builder, IRI
     case kIROp_ExtractExistentialValue:
     case kIROp_WrapExistential:
     case kIROp_MakeExistential:
-    case kIROp_MakeExistentialWithRTTI:        return transcribeNonDiffInst(builder, origInst);
+    case kIROp_MakeExistentialWithRTTI:
+        return transcribeNonDiffInst(builder, origInst);
 
-    case kIROp_StructKey: return InstPair(origInst, nullptr);
+    case kIROp_StructKey:
+        return InstPair(origInst, nullptr);
     }
 
     return InstPair(nullptr, nullptr);

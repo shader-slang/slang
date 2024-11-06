@@ -110,12 +110,17 @@ struct DiffPairLoweringPass : InstPassBase
                 case kIROp_DifferentialPairGetDifferentialUserCode:
                 case kIROp_DifferentialPairGetPrimalUserCode:
                 case kIROp_DifferentialPtrPairGetDifferential:
-                case kIROp_DifferentialPtrPairGetPrimal:            lowerPairAccess(builder, inst); break;
+                case kIROp_DifferentialPtrPairGetPrimal:
+                    lowerPairAccess(builder, inst);
+                    break;
 
                 case kIROp_MakeDifferentialPairUserCode:
-                case kIROp_MakeDifferentialPtrPair:      lowerMakePair(builder, inst); break;
+                case kIROp_MakeDifferentialPtrPair:
+                    lowerMakePair(builder, inst);
+                    break;
 
-                default: break;
+                default:
+                    break;
                 }
             });
 
@@ -222,13 +227,16 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
                 switch (inst->getOp())
                 {
                 case kIROp_DifferentialPairGetDifferential:
-                case kIROp_DifferentialPairGetPrimal:       rewritePairAccess(builder, inst); break;
+                case kIROp_DifferentialPairGetPrimal:
+                    rewritePairAccess(builder, inst);
+                    break;
 
                 case kIROp_MakeDifferentialPair:
                     rewriteMakePair(builder, as<IRMakeDifferentialPair>(inst));
                     break;
 
-                default: break;
+                default:
+                    break;
                 }
             });
 

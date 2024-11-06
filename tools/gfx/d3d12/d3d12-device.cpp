@@ -124,7 +124,8 @@ Result DeviceImpl::createBuffer(
         if (initialState != D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE)
             initialState = D3D12_RESOURCE_STATE_COMMON;
         break;
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     // Create the resource.
@@ -774,7 +775,8 @@ Result DeviceImpl::initialize(const Desc& desc)
                 case D3D12_PROGRAMMABLE_SAMPLE_POSITIONS_TIER_1:
                     m_features.add("programmable-sample-positions-1");
                     break;
-                default: break;
+                default:
+                    break;
                 }
             }
         }
@@ -1436,7 +1438,8 @@ Result DeviceImpl::createTextureView(
     bool isMultiSample = resourceImpl ? resourceImpl->getDesc()->sampleDesc.numSamples > 1 : false;
     switch (desc.type)
     {
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
 
     case IResourceView::Type::RenderTarget:
         {
@@ -1516,8 +1519,11 @@ Result DeviceImpl::createTextureView(
                 rtvDesc.Texture3D.WSize =
                     (desc.subresourceRange.layerCount == 0) ? -1 : desc.subresourceRange.layerCount;
                 break;
-            case IResource::Type::Buffer: rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_BUFFER; break;
-            default:                      return SLANG_FAIL;
+            case IResource::Type::Buffer:
+                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_BUFFER;
+                break;
+            default:
+                return SLANG_FAIL;
             }
             m_device->CreateRenderTargetView(
                 resourceImpl ? resourceImpl->m_resource.getResource() : nullptr,
@@ -1561,7 +1567,8 @@ Result DeviceImpl::createTextureView(
                 dsvDesc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount;
                 dsvDesc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
                 break;
-            default: return SLANG_FAIL;
+            default:
+                return SLANG_FAIL;
             }
             m_device->CreateDepthStencilView(
                 resourceImpl ? resourceImpl->m_resource.getResource() : nullptr,
@@ -1637,7 +1644,8 @@ Result DeviceImpl::createTextureView(
                 d3d12desc.Texture3D.WSize =
                     resourceDesc.size.depth >> desc.subresourceRange.mipLevel;
                 break;
-            default: return SLANG_FAIL;
+            default:
+                return SLANG_FAIL;
             }
             m_device->CreateUnorderedAccessView(
                 resourceImpl->m_resource,

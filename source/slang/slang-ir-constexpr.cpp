@@ -58,9 +58,11 @@ bool isConstExpr(IRInst* value)
     case kIROp_Func:
     case kIROp_StructKey:
     case kIROp_WitnessTable:
-    case kIROp_Generic:      return true;
+    case kIROp_Generic:
+        return true;
 
-    default: break;
+    default:
+        break;
     }
 
     if (isConstExpr(value->getFullType()))
@@ -143,7 +145,8 @@ bool opCanBeConstExpr(IROp op)
         // TODO: more cases
         return true;
 
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -234,7 +237,8 @@ bool maybeMarkConstExprBackwardPass(PropagateConstExprContext* context, IRInst* 
                     }
                     break;
 
-                default: break;
+                default:
+                    break;
                 }
             }
         }
@@ -633,7 +637,8 @@ void propagateConstExpr(IRModule* module, DiagnosticSink* sink)
 
         switch (gv->getOp())
         {
-        default: break;
+        default:
+            break;
 
         case kIROp_Generic:
             {
@@ -662,7 +667,8 @@ void propagateConstExpr(IRModule* module, DiagnosticSink* sink)
     {
         switch (ii->getOp())
         {
-        default: break;
+        default:
+            break;
 
         case kIROp_Func:
         case kIROp_GlobalVar:

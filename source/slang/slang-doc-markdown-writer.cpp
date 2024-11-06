@@ -514,7 +514,8 @@ void DocMarkdownWriter::_appendCommaList(const List<String>& strings, char wrapC
                 break;
             }
 
-        default: break;
+        default:
+            break;
         }
     }
 }
@@ -525,11 +526,21 @@ void escapeHTMLContent(StringBuilder& sb, UnownedStringSlice str)
     {
         switch (ch)
         {
-        case '<': sb << "&lt;"; break;
-        case '>': sb << "&gt;"; break;
-        case '&': sb << "&amp;"; break;
-        case '"': sb << "&quot;"; break;
-        default:  sb.appendChar(ch); break;
+        case '<':
+            sb << "&lt;";
+            break;
+        case '>':
+            sb << "&gt;";
+            break;
+        case '&':
+            sb << "&amp;";
+            break;
+        case '"':
+            sb << "&quot;";
+            break;
+        default:
+            sb.appendChar(ch);
+            break;
         }
     }
 }
@@ -1450,7 +1461,9 @@ void DeclDocumentation::parse(const UnownedStringSlice& text)
         {
         case DocPageSection::ExperimentalCallout:
         case DocPageSection::InternalCallout:
-        case DocPageSection::DeprecatedCallout:   currentSection = DocPageSection::Description; break;
+        case DocPageSection::DeprecatedCallout:
+            currentSection = DocPageSection::Description;
+            break;
         }
     }
     for (auto& kv : sectionBuilders)
@@ -1744,7 +1757,8 @@ void DocMarkdownWriter::_appendEscaped(const UnownedStringSlice& text)
                 start = cur;
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -2052,7 +2066,9 @@ String DocMarkdownWriter::escapeMarkdownText(String text)
             sb << '\\';
             sb.appendChar(c);
             break;
-        default: sb.appendChar(c); break;
+        default:
+            sb.appendChar(c);
+            break;
         }
     }
     return sb.produceString();
@@ -2154,7 +2170,9 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
             case Slang::Misc::TokenType::Comma:
             case Slang::Misc::TokenType::Dot:
             case Slang::Misc::TokenType::IntLiteral:
-            case Slang::Misc::TokenType::Semicolon:  requireSpaceBeforeNextToken = false; break;
+            case Slang::Misc::TokenType::Semicolon:
+                requireSpaceBeforeNextToken = false;
+                break;
             default:
                 requireSpaceBeforeNextToken = true;
                 sb.appendChar(' ');
@@ -2287,13 +2305,20 @@ const char* getSectionTitle(DocPageSection section)
 {
     switch (section)
     {
-    case DocPageSection::Description: return "Description";
-    case DocPageSection::Parameter:   return "Parameters";
-    case DocPageSection::ReturnInfo:  return "Return value";
-    case DocPageSection::Remarks:     return "Remarks";
-    case DocPageSection::Example:     return "Example";
-    case DocPageSection::SeeAlso:     return "See also";
-    default:                          return "";
+    case DocPageSection::Description:
+        return "Description";
+    case DocPageSection::Parameter:
+        return "Parameters";
+    case DocPageSection::ReturnInfo:
+        return "Return value";
+    case DocPageSection::Remarks:
+        return "Remarks";
+    case DocPageSection::Example:
+        return "Example";
+    case DocPageSection::SeeAlso:
+        return "See also";
+    default:
+        return "";
     }
 }
 

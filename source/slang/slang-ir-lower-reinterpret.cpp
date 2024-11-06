@@ -28,8 +28,11 @@ struct ReinterpretLoweringContext
     {
         switch (inst->getOp())
         {
-        case kIROp_Reinterpret: processReinterpret(inst); break;
-        default:                break;
+        case kIROp_Reinterpret:
+            processReinterpret(inst);
+            break;
+        default:
+            break;
         }
     }
 

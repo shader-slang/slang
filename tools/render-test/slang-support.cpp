@@ -121,7 +121,9 @@ void ShaderCompilerUtil::Output::reset()
         case SLANG_SOURCE_LANGUAGE_HLSL:
             spAddPreprocessorDefine(slangRequest, "__HLSL__", "1");
             break;
-        case SLANG_SOURCE_LANGUAGE_C: spAddPreprocessorDefine(slangRequest, "__C__", "1"); break;
+        case SLANG_SOURCE_LANGUAGE_C:
+            spAddPreprocessorDefine(slangRequest, "__C__", "1");
+            break;
         case SLANG_SOURCE_LANGUAGE_CPP:
             spAddPreprocessorDefine(slangRequest, "__CPP__", "1");
             break;
@@ -132,7 +134,9 @@ void ShaderCompilerUtil::Output::reset()
             spAddPreprocessorDefine(slangRequest, "__WGSL__", "1");
             break;
 
-        default: assert(!"unexpected"); break;
+        default:
+            assert(!"unexpected");
+            break;
         }
 
         if (input.passThrough != SLANG_PASS_THROUGH_NONE)
@@ -316,8 +320,11 @@ void ShaderCompilerUtil::Output::reset()
         switch (input.passThrough)
         {
         case SLANG_PASS_THROUGH_DXC:
-        case SLANG_PASS_THROUGH_FXC: canUseSlangForPrecompile = true; break;
-        default:                     break;
+        case SLANG_PASS_THROUGH_FXC:
+            canUseSlangForPrecompile = true;
+            break;
+        default:
+            break;
         }
         // If we are doing a HLSL pass-through compilation, then we can't rely
         // on the downstream compiler for the reflection information that
@@ -419,10 +426,14 @@ void ShaderCompilerUtil::Output::reset()
     // Default the amount of renderTargets based on shader type
     switch (shaderType)
     {
-    default: layout.numRenderTargets = 1; break;
+    default:
+        layout.numRenderTargets = 1;
+        break;
 
     case Options::ShaderProgramType::Compute:
-    case Options::ShaderProgramType::RayTracing: layout.numRenderTargets = 0; break;
+    case Options::ShaderProgramType::RayTracing:
+        layout.numRenderTargets = 0;
+        break;
     }
 
     // Deterministic random generator

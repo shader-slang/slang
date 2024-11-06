@@ -155,10 +155,14 @@ protected:
         {
             switch (m_kind)
             {
-            case Kind::Root:   return (m_flags & Flag::HasPrevious) == 0;
-            case Kind::Array:  return true;
-            case Kind::Object: return (m_flags & Flag::HasKey) != 0;
-            default:           return false;
+            case Kind::Root:
+                return (m_flags & Flag::HasPrevious) == 0;
+            case Kind::Array:
+                return true;
+            case Kind::Object:
+                return (m_flags & Flag::HasKey) != 0;
+            default:
+                return false;
             }
         }
 

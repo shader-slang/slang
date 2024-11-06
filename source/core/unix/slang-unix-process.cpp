@@ -653,7 +653,8 @@ closePipes:
             out = new UnixPipeStream(STDERR_FILENO, FileAccess::Write, false);
             break;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
     return SLANG_OK;
 }

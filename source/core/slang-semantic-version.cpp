@@ -152,7 +152,8 @@ void SemanticVersion::append(StringBuilder& buf) const
                 matchVersion.m_version.m_patch + 1);
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     List<SemanticVersion> sortedVersions;
@@ -198,9 +199,15 @@ void MatchSemanticVersion::append(StringBuilder& buf) const
     switch (m_kind)
     {
     default:
-    case Kind::Unknown: buf << "unknown"; break;
-    case Kind::Past:    buf << "past"; break;
-    case Kind::Future:  buf << "future"; break;
+    case Kind::Unknown:
+        buf << "unknown";
+        break;
+    case Kind::Past:
+        buf << "past";
+        break;
+    case Kind::Future:
+        buf << "future";
+        break;
     case Kind::Major:
         {
             buf << m_version.m_major;

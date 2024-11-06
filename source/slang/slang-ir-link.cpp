@@ -225,7 +225,8 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_InterfaceRequirementEntry:
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
-    case kIROp_InterfaceType:             return cloneGlobalValue(this, originalValue);
+    case kIROp_InterfaceType:
+        return cloneGlobalValue(this, originalValue);
 
     case kIROp_BoolLit:
         {
@@ -404,7 +405,8 @@ static void cloneExtraDecorationsFromInst(
     {
         switch (decoration->getOp())
         {
-        default: break;
+        default:
+            break;
 
         case kIROp_HLSLExportDecoration:
         case kIROp_BindExistentialSlotsDecoration:
@@ -1153,8 +1155,10 @@ bool canInstContainBasicBlocks(IROp opcode)
 {
     switch (opcode)
     {
-    case kIROp_Expand: return true;
-    default:           return false;
+    case kIROp_Expand:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -1230,7 +1234,8 @@ IRInst* cloneInst(
             cast<IRGlobalGenericParam>(originalInst),
             originalValues);
 
-    default: break;
+    default:
+        break;
     }
 
     // The common case is that we just need to construct a cloned
@@ -1484,8 +1489,10 @@ static bool doesFuncHaveDefinition(IRFunc* func)
         switch (decor->getOp())
         {
         case kIROp_IntrinsicOpDecoration:
-        case kIROp_TargetIntrinsicDecoration: return true;
-        default:                              continue;
+        case kIROp_TargetIntrinsicDecoration:
+            return true;
+        default:
+            continue;
         }
     }
     return false;
@@ -1529,7 +1536,8 @@ static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
         if (req->getOptionSet().getBoolOption(CompilerOptionName::IncompleteLibrary))
             return true;
         return false;
-    default: return false;
+    default:
+        return false;
     }
 }
 
@@ -1918,7 +1926,8 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 }
                 break;
 
-            default: break;
+            default:
+                break;
             }
         }
     }

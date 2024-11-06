@@ -67,7 +67,10 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
             else
                 return isIllegalGLSLParameterType(type);
         }
-
+        else if (isWGPUTarget(targetRequest))
+        {
+            return isIllegalWGSLParameterType(type);
+        }
 
         // For now, we will not treat any other parameters as
         // needing specialization, even if they use resource
@@ -935,7 +938,8 @@ struct ResourceOutputSpecializationPass
                         }
                         return;
                     }
-                default: return;
+                default:
+                    return;
                 };
             });
         if (failedResult(recursiveSpecializationResult))
@@ -1016,7 +1020,9 @@ struct ResourceOutputSpecializationPass
             //
             switch (oldParamInfo.oldArgMode)
             {
-            default: SLANG_UNEXPECTED("unhandled case"); break;
+            default:
+                SLANG_UNEXPECTED("unhandled case");
+                break;
 
             case ParamInfo::OldArgMode::Keep:
                 // If the parameter was not specialized away, then
@@ -1217,7 +1223,7 @@ bool specializeResourceOutputs(
     HashSet<IRFunc*>& unspecializableFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
-    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest))
     {
     }
     else
@@ -1316,8 +1322,10 @@ bool isIllegalGLSLParameterType(IRType* type)
         {
         case SLANG_RESOURCE_ACCESS_READ_WRITE:
         case SLANG_RESOURCE_ACCESS_WRITE:
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED: return true;
-        default:                                   break;
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            return true;
+        default:
+            break;
         }
     }
     if (as<IRSubpassInputType>(type))
@@ -1349,4 +1357,10 @@ bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
     }
     return false;
 }
+
+bool isIllegalWGSLParameterType(IRType* type)
+{
+    return isIllegalGLSLParameterType(type);
+}
+
 } // namespace Slang

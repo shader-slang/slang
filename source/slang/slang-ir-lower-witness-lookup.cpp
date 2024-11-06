@@ -97,7 +97,8 @@ struct WitnessLookupLoweringContext
         case kIROp_MatrixType:
         case kIROp_StructType:
         case kIROp_ClassType:
-        case kIROp_InterfaceType: return (IRType*)type;
+        case kIROp_InterfaceType:
+            return (IRType*)type;
         default:
             {
                 List<IRInst*> translatedOperands;

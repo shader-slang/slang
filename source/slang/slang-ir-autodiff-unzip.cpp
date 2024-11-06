@@ -129,7 +129,8 @@ struct ExtractPrimalFuncContext
                 auto primal = insertIntoReturnBlock(builder, inst->getOperand(0));
                 return builder.emitMakeDifferentialPair(inst->getDataType(), primal, diff);
             }
-        default: SLANG_UNREACHABLE("unknown case of mixed inst.");
+        default:
+            SLANG_UNREACHABLE("unknown case of mixed inst.");
         }
     }
 
@@ -308,10 +309,12 @@ bool isIntermediateContextType(IRInst* type)
 {
     switch (type->getOp())
     {
-    case kIROp_BackwardDiffIntermediateContextType: return true;
+    case kIROp_BackwardDiffIntermediateContextType:
+        return true;
     case kIROp_AttributedType:
         return isIntermediateContextType(as<IRAttributedType>(type)->getBaseType());
-    case kIROp_Specialize: return isIntermediateContextType(as<IRSpecialize>(type)->getBase());
+    case kIROp_Specialize:
+        return isIntermediateContextType(as<IRSpecialize>(type)->getBase());
     default:
         if (as<IRPtrTypeBase>(type))
             return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());

@@ -36,14 +36,18 @@ void MangledLexer::readGenericParam()
     switch (peekChar())
     {
     case 'T':
-    case 'C': nextChar(); break;
+    case 'C':
+        nextChar();
+        break;
 
     case 'v':
         nextChar();
         readType();
         break;
 
-    default: SLANG_UNEXPECTED("bad name mangling"); break;
+    default:
+        SLANG_UNEXPECTED("bad name mangling");
+        break;
     }
 }
 
@@ -69,7 +73,9 @@ void MangledLexer::readType()
     case 'U':
     case 'h':
     case 'f':
-    case 'd': nextChar(); break;
+    case 'd':
+        nextChar();
+        break;
 
     case 'v':
         nextChar();
@@ -77,7 +83,9 @@ void MangledLexer::readType()
         readType();
         break;
 
-    default: readNamedType(); break;
+    default:
+        readNamedType();
+        break;
     }
 }
 
@@ -95,7 +103,9 @@ void MangledLexer::readVal()
         readRawStringSegment();
         break;
 
-    default: readType(); break;
+    default:
+        readType();
+        break;
     }
 }
 
@@ -237,7 +247,8 @@ UInt MangledLexer::readParamCount()
                 lexer.nextChar();
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 

@@ -276,6 +276,7 @@ if(SLANG_ENABLE_TESTS)
                 EXTRA_COMPILE_DEFINITIONS_PRIVATE
                     $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
                     $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
+                EXTRA_COMPILE_OPTIONS_PRIVATE /EHa
                 OUTPUT_NAME render-test-tool
                 REQUIRED_BY slang-test
                 FOLDER test/tools

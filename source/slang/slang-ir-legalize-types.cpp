@@ -208,11 +208,16 @@ struct LegalCallBuilder
 
         switch (val.flavor)
         {
-        case LegalVal::Flavor::none: break;
+        case LegalVal::Flavor::none:
+            break;
 
-        case LegalVal::Flavor::simple: m_args.add(val.getSimple()); break;
+        case LegalVal::Flavor::simple:
+            m_args.add(val.getSimple());
+            break;
 
-        case LegalVal::Flavor::implicitDeref: addArg(val.getImplicitDeref()); break;
+        case LegalVal::Flavor::implicitDeref:
+            addArg(val.getImplicitDeref());
+            break;
 
         case LegalVal::Flavor::pair:
             {
@@ -232,7 +237,9 @@ struct LegalCallBuilder
             }
             break;
 
-        default: SLANG_UNEXPECTED("uhandled val flavor"); break;
+        default:
+            SLANG_UNEXPECTED("uhandled val flavor");
+            break;
         }
     }
 
@@ -385,7 +392,8 @@ private:
             // The remaining cases are a straightforward structural recursion
             // on top of the base case above.
 
-        case LegalType::Flavor::none: return LegalVal();
+        case LegalType::Flavor::none:
+            return LegalVal();
 
         case LegalVal::Flavor::implicitDeref:
             return LegalVal::implicitDeref(_addOutArg(resultType.getImplicitDeref()->valueType));
@@ -486,7 +494,9 @@ struct LegalReturnBuilder
             builder->emitReturn();
             break;
 
-        case LegalVal::Flavor::implicitDeref: returnVal(val.getImplicitDeref()); break;
+        case LegalVal::Flavor::implicitDeref:
+            returnVal(val.getImplicitDeref());
+            break;
 
         case LegalVal::Flavor::pair:
             {
@@ -629,9 +639,12 @@ private:
             // The remaining cases are just a straightforward recursion
             // over the structure of the `val`.
 
-        case LegalVal::Flavor::none: break;
+        case LegalVal::Flavor::none:
+            break;
 
-        case LegalVal::Flavor::implicitDeref: _writeResultParam(val.getImplicitDeref()); break;
+        case LegalVal::Flavor::implicitDeref:
+            _writeResultParam(val.getImplicitDeref());
+            break;
 
         case LegalVal::Flavor::pair:
             {
@@ -678,7 +691,9 @@ static void _addVal(ShortList<IRInst*>& rs, const LegalVal& legalVal)
 {
     switch (legalVal.flavor)
     {
-    case LegalVal::Flavor::simple: rs.add(legalVal.getSimple()); break;
+    case LegalVal::Flavor::simple:
+        rs.add(legalVal.getSimple());
+        break;
     case LegalVal::Flavor::tuple:
         for (auto element : legalVal.getTuple()->elements)
             _addVal(rs, element.val);
@@ -687,8 +702,10 @@ static void _addVal(ShortList<IRInst*>& rs, const LegalVal& legalVal)
         _addVal(rs, legalVal.getPair()->ordinaryVal);
         _addVal(rs, legalVal.getPair()->specialVal);
         break;
-    case LegalVal::Flavor::none: break;
-    default:                     SLANG_UNEXPECTED("unhandled legalized val flavor");
+    case LegalVal::Flavor::none:
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled legalized val flavor");
     }
 }
 
@@ -702,8 +719,11 @@ static LegalVal legalizeUnconditionalBranch(
     {
         switch (arg.flavor)
         {
-        case LegalVal::Flavor::none:   break;
-        case LegalVal::Flavor::simple: newArgs.add(arg.getSimple()); break;
+        case LegalVal::Flavor::none:
+            break;
+        case LegalVal::Flavor::simple:
+            newArgs.add(arg.getSimple());
+            break;
         case LegalVal::Flavor::pair:
             _addVal(newArgs, arg.getPair()->ordinaryVal);
             _addVal(newArgs, arg.getPair()->specialVal);
@@ -714,7 +734,8 @@ static LegalVal legalizeUnconditionalBranch(
                 _addVal(newArgs, element.val);
             }
             break;
-        default: SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor.");
+        default:
+            SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor.");
         }
     }
     context->builder->emitIntrinsicInst(
@@ -729,7 +750,8 @@ static LegalVal legalizeLoad(IRTypeLegalizationContext* context, LegalVal legalP
 {
     switch (legalPtrVal.flavor)
     {
-    case LegalVal::Flavor::none: return LegalVal();
+    case LegalVal::Flavor::none:
+        return LegalVal();
 
     case LegalVal::Flavor::simple:
         {
@@ -771,7 +793,9 @@ static LegalVal legalizeLoad(IRTypeLegalizationContext* context, LegalVal legalP
         }
         break;
 
-    default: SLANG_UNEXPECTED("unhandled case"); break;
+    default:
+        SLANG_UNEXPECTED("unhandled case");
+        break;
     }
 }
 
@@ -782,10 +806,16 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
     {
         switch (arg.flavor)
         {
-        case LegalVal::Flavor::none:   break;
-        case LegalVal::Flavor::simple: legalArgs.add(arg.getSimple()); break;
-        case LegalVal::Flavor::pair:   legalArgs.add(arg.getPair()->ordinaryVal.getSimple()); break;
-        default:                       SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for printf operand");
+        case LegalVal::Flavor::none:
+            break;
+        case LegalVal::Flavor::simple:
+            legalArgs.add(arg.getSimple());
+            break;
+        case LegalVal::Flavor::pair:
+            legalArgs.add(arg.getPair()->ordinaryVal.getSimple());
+            break;
+        default:
+            SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for printf operand");
         }
     }
     return LegalVal::simple(context->builder->emitIntrinsicInst(
@@ -815,7 +845,8 @@ static LegalVal legalizeDebugVar(
             copyNameHintAndDebugDecorations(legalVal, originalInst);
             return LegalVal::simple(legalVal);
         }
-    case LegalType::Flavor::none: return LegalVal();
+    case LegalType::Flavor::none:
+        return LegalVal();
     case LegalType::Flavor::pair:
         {
             auto pairType = type.getPair();
@@ -833,7 +864,8 @@ static LegalVal legalizeDebugVar(
             }
             return LegalVal();
         }
-    default: return LegalVal();
+    default:
+        return LegalVal();
     }
 }
 
@@ -849,7 +881,8 @@ static LegalVal legalizeDebugValue(
     case LegalType::Flavor::simple:
         return LegalVal::simple(
             context->builder->emitDebugValue(debugVar.getSimple(), debugValue.getSimple()));
-    case LegalType::Flavor::none: return LegalVal();
+    case LegalType::Flavor::none:
+        return LegalVal();
     case LegalType::Flavor::pair:
         {
             auto ordinaryVal = legalizeDebugValue(
@@ -870,7 +903,8 @@ static LegalVal legalizeDebugValue(
             }
             return LegalVal();
         }
-    default: return LegalVal();
+    default:
+        return LegalVal();
     }
 }
 
@@ -881,7 +915,8 @@ static LegalVal legalizeStore(
 {
     switch (legalPtrVal.flavor)
     {
-    case LegalVal::Flavor::none: return LegalVal();
+    case LegalVal::Flavor::none:
+        return LegalVal();
 
     case LegalVal::Flavor::simple:
         {
@@ -936,7 +971,9 @@ static LegalVal legalizeStore(
         }
         break;
 
-    default: SLANG_UNEXPECTED("unhandled case"); break;
+    default:
+        SLANG_UNEXPECTED("unhandled case");
+        break;
     }
 }
 
@@ -953,7 +990,8 @@ static LegalVal legalizeFieldExtract(
 
     switch (legalStructOperand.flavor)
     {
-    case LegalVal::Flavor::none: return LegalVal();
+    case LegalVal::Flavor::none:
+        return LegalVal();
 
     case LegalVal::Flavor::simple:
         return LegalVal::simple(
@@ -1027,7 +1065,9 @@ static LegalVal legalizeFieldExtract(
             UNREACHABLE_RETURN(LegalVal());
         }
 
-    default: SLANG_UNEXPECTED("unhandled"); UNREACHABLE_RETURN(LegalVal());
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 
@@ -1065,7 +1105,8 @@ static LegalVal unwrapBufferValue(
         UNREACHABLE_RETURN(LegalVal());
         break;
 
-    case LegalElementWrapping::Flavor::none: return LegalVal();
+    case LegalElementWrapping::Flavor::none:
+        return LegalVal();
 
     case LegalElementWrapping::Flavor::simple:
         {
@@ -1156,12 +1197,14 @@ static LegalType getPointedToType(IRTypeLegalizationContext* context, LegalType 
 {
     switch (type.flavor)
     {
-    case LegalType::Flavor::none: return LegalType();
+    case LegalType::Flavor::none:
+        return LegalType();
 
     case LegalType::Flavor::simple:
         return LegalType::simple(getPointedToType(context, type.getSimple()));
 
-    case LegalType::Flavor::implicitDeref: return type.getImplicitDeref()->valueType;
+    case LegalType::Flavor::implicitDeref:
+        return type.getImplicitDeref()->valueType;
 
     case LegalType::Flavor::pair:
         {
@@ -1203,7 +1246,8 @@ static LegalVal legalizeFieldAddress(
 
     switch (legalPtrOperand.flavor)
     {
-    case LegalVal::Flavor::none: return LegalVal();
+    case LegalVal::Flavor::none:
+        return LegalVal();
 
     case LegalVal::Flavor::simple:
         switch (type.flavor)
@@ -1304,7 +1348,9 @@ static LegalVal legalizeFieldAddress(
                 legalizeFieldExtract(context, valueType, implicitDerefVal, fieldKey));
         }
 
-    default: SLANG_UNEXPECTED("unhandled"); UNREACHABLE_RETURN(LegalVal());
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 
@@ -1331,7 +1377,8 @@ static LegalVal legalizeGetElement(
 
     switch (legalPtrOperand.flavor)
     {
-    case LegalVal::Flavor::none: return LegalVal();
+    case LegalVal::Flavor::none:
+        return LegalVal();
 
     case LegalVal::Flavor::simple:
         return LegalVal::simple(builder->emitElementExtract(
@@ -1397,7 +1444,9 @@ static LegalVal legalizeGetElement(
             return LegalVal::tuple(resTupleInfo);
         }
 
-    default: SLANG_UNEXPECTED("unhandled"); UNREACHABLE_RETURN(LegalVal());
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 
@@ -1424,7 +1473,8 @@ static LegalVal legalizeGetElementPtr(
 
     switch (legalPtrOperand.flavor)
     {
-    case LegalVal::Flavor::none: return LegalVal();
+    case LegalVal::Flavor::none:
+        return LegalVal();
 
     case LegalVal::Flavor::simple:
         return LegalVal::simple(builder->emitElementAddress(
@@ -1509,7 +1559,9 @@ static LegalVal legalizeGetElementPtr(
                 legalizeGetElement(context, valueType, implicitDerefVal, indexOperand));
         }
 
-    default: SLANG_UNEXPECTED("unhandled"); UNREACHABLE_RETURN(LegalVal());
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 
@@ -1536,7 +1588,8 @@ static LegalVal legalizeMakeStruct(
 
     switch (legalType.flavor)
     {
-    case LegalType::Flavor::none: return LegalVal();
+    case LegalType::Flavor::none:
+        return LegalVal();
 
     case LegalType::Flavor::simple:
         {
@@ -1636,7 +1689,9 @@ static LegalVal legalizeMakeStruct(
             return LegalVal::tuple(resTupleInfo);
         }
 
-    default: SLANG_UNEXPECTED("unhandled"); UNREACHABLE_RETURN(LegalVal());
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 
@@ -1651,7 +1706,8 @@ static LegalVal legalizeMakeArray(
 
     switch (legalType.flavor)
     {
-    case LegalType::Flavor::none: return LegalVal();
+    case LegalType::Flavor::none:
+        return LegalVal();
 
     case LegalType::Flavor::simple:
         {
@@ -1805,7 +1861,9 @@ static LegalVal legalizeMakeArray(
             return LegalVal::tuple(resTupleInfo);
         }
 
-    default: SLANG_UNEXPECTED("unhandled"); UNREACHABLE_RETURN(LegalVal());
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 
@@ -1815,7 +1873,8 @@ static LegalVal legalizeDefaultConstruct(IRTypeLegalizationContext* context, Leg
 
     switch (legalType.flavor)
     {
-    case LegalType::Flavor::none: return LegalVal();
+    case LegalType::Flavor::none:
+        return LegalVal();
 
     case LegalType::Flavor::simple:
         {
@@ -1853,7 +1912,9 @@ static LegalVal legalizeDefaultConstruct(IRTypeLegalizationContext* context, Leg
             return LegalVal::tuple(resTupleInfo);
         }
 
-    default: SLANG_UNEXPECTED("unhandled"); UNREACHABLE_RETURN(LegalVal());
+    default:
+        SLANG_UNEXPECTED("unhandled");
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 
@@ -1863,7 +1924,8 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
 {
     switch (type.flavor)
     {
-    case LegalType::Flavor::none: return LegalVal();
+    case LegalType::Flavor::none:
+        return LegalVal();
     case LegalType::Flavor::simple:
         {
             if (val.flavor != LegalVal::Flavor::simple)
@@ -1978,7 +2040,8 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
                 UNREACHABLE_RETURN(LegalVal());
             }
         }
-    default: return val;
+    default:
+        return val;
     }
 }
 
@@ -1991,26 +2054,44 @@ static LegalVal legalizeInst(
     LegalVal result = LegalVal();
     switch (inst->getOp())
     {
-    case kIROp_Load: result = legalizeLoad(context, args[0]); break;
+    case kIROp_Load:
+        result = legalizeLoad(context, args[0]);
+        break;
 
-    case kIROp_GetValueFromBoundInterface: result = args[0]; break;
+    case kIROp_GetValueFromBoundInterface:
+        result = args[0];
+        break;
 
-    case kIROp_FieldAddress: result = legalizeFieldAddress(context, type, args[0], args[1]); break;
+    case kIROp_FieldAddress:
+        result = legalizeFieldAddress(context, type, args[0], args[1]);
+        break;
 
-    case kIROp_FieldExtract: result = legalizeFieldExtract(context, type, args[0], args[1]); break;
+    case kIROp_FieldExtract:
+        result = legalizeFieldExtract(context, type, args[0], args[1]);
+        break;
 
-    case kIROp_GetElement: result = legalizeGetElement(context, type, args[0], args[1]); break;
+    case kIROp_GetElement:
+        result = legalizeGetElement(context, type, args[0], args[1]);
+        break;
 
     case kIROp_GetElementPtr:
         result = legalizeGetElementPtr(context, type, args[0], args[1]);
         break;
 
-    case kIROp_Store: result = legalizeStore(context, args[0], args[1]); break;
+    case kIROp_Store:
+        result = legalizeStore(context, args[0], args[1]);
+        break;
 
-    case kIROp_Call:   result = legalizeCall(context, (IRCall*)inst); break;
-    case kIROp_Return: result = legalizeRetVal(context, args[0], (IRReturn*)inst); break;
+    case kIROp_Call:
+        result = legalizeCall(context, (IRCall*)inst);
+        break;
+    case kIROp_Return:
+        result = legalizeRetVal(context, args[0], (IRReturn*)inst);
+        break;
 
-    case kIROp_DebugVar: result = legalizeDebugVar(context, type, (IRDebugVar*)inst); break;
+    case kIROp_DebugVar:
+        result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
+        break;
     case kIROp_DebugValue:
         result = legalizeDebugValue(context, args[0], args[1], (IRDebugValue*)inst);
         break;
@@ -2027,13 +2108,18 @@ static LegalVal legalizeInst(
             inst->getOperandCount(),
             inst->getOp());
         break;
-    case kIROp_DefaultConstruct: result = legalizeDefaultConstruct(context, type); break;
+    case kIROp_DefaultConstruct:
+        result = legalizeDefaultConstruct(context, type);
+        break;
     case kIROp_unconditionalBranch:
     case kIROp_loop:
         result = legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);
         break;
-    case kIROp_Printf:    result = legalizePrintf(context, args); break;
-    case kIROp_undefined: return LegalVal();
+    case kIROp_Printf:
+        result = legalizePrintf(context, args);
+        break;
+    case kIROp_undefined:
+        return LegalVal();
     case kIROp_GpuForeach:
         // This case should only happen when compiling for a target that does not support
         // GpuForeach
@@ -2178,23 +2264,30 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
     // Special-case certain operations
     switch (inst->getOp())
     {
-    case kIROp_Var: return legalizeLocalVar(context, cast<IRVar>(inst));
+    case kIROp_Var:
+        return legalizeLocalVar(context, cast<IRVar>(inst));
 
-    case kIROp_Param: return legalizeParam(context, cast<IRParam>(inst));
+    case kIROp_Param:
+        return legalizeParam(context, cast<IRParam>(inst));
 
     case kIROp_WitnessTable:
         // Just skip these.
         break;
 
-    case kIROp_Func: return legalizeFunc(context, cast<IRFunc>(inst));
+    case kIROp_Func:
+        return legalizeFunc(context, cast<IRFunc>(inst));
 
-    case kIROp_GlobalVar: return legalizeGlobalVar(context, cast<IRGlobalVar>(inst));
+    case kIROp_GlobalVar:
+        return legalizeGlobalVar(context, cast<IRGlobalVar>(inst));
 
-    case kIROp_GlobalParam: return legalizeGlobalParam(context, cast<IRGlobalParam>(inst));
+    case kIROp_GlobalParam:
+        return legalizeGlobalParam(context, cast<IRGlobalParam>(inst));
 
-    case kIROp_Block: return LegalVal::simple(inst);
+    case kIROp_Block:
+        return LegalVal::simple(inst);
 
-    default: break;
+    default:
+        break;
     }
 
     if (as<IRAttr>(inst))
@@ -2454,9 +2547,12 @@ private:
 
         switch (t.flavor)
         {
-        case LegalType::Flavor::none: break;
+        case LegalType::Flavor::none:
+            break;
 
-        case LegalType::Flavor::simple: m_paramTypes.add(t.getSimple()); break;
+        case LegalType::Flavor::simple:
+            m_paramTypes.add(t.getSimple());
+            break;
 
         case LegalType::Flavor::implicitDeref:
             {
@@ -2478,7 +2574,8 @@ private:
                     _addParam(elem.type);
             }
             break;
-        default: SLANG_UNEXPECTED("unknown legalized type flavor");
+        default:
+            SLANG_UNEXPECTED("unknown legalized type flavor");
         }
     }
 
@@ -2544,7 +2641,8 @@ private:
             }
             break;
 
-        default: SLANG_UNEXPECTED("unknown legalized type flavor");
+        default:
+            SLANG_UNEXPECTED("unknown legalized type flavor");
         }
     }
 
@@ -2564,7 +2662,8 @@ private:
             // The remaining cases are all simple recursion on the
             // structure of `t`.
 
-        case LegalType::Flavor::none: break;
+        case LegalType::Flavor::none:
+            break;
 
         case LegalType::Flavor::implicitDeref:
             {
@@ -2588,7 +2687,8 @@ private:
                 }
             }
             break;
-        default: SLANG_UNEXPECTED("unknown legalized type flavor");
+        default:
+            SLANG_UNEXPECTED("unknown legalized type flavor");
         }
     }
 };
@@ -2607,9 +2707,12 @@ static void cloneDecorationToVar(IRInst* srcInst, IRInst* varInst)
         {
         case kIROp_FormatDecoration:
         case kIROp_UserTypeNameDecoration:
-        case kIROp_SemanticDecoration:     cloneDecoration(decoration, varInst); break;
+        case kIROp_SemanticDecoration:
+            cloneDecoration(decoration, varInst);
+            break;
 
-        default: break;
+        default:
+            break;
         }
     }
 }
@@ -2677,7 +2780,9 @@ static LegalVal declareSimpleVar(
         }
         break;
 
-    default: SLANG_UNEXPECTED("unexpected IR opcode"); break;
+    default:
+        SLANG_UNEXPECTED("unexpected IR opcode");
+        break;
     }
 
     if (irVar)
@@ -2955,7 +3060,9 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
         }
         break;
 
-    default: SLANG_UNEXPECTED("unhandled element wrapping flavor"); break;
+    default:
+        SLANG_UNEXPECTED("unhandled element wrapping flavor");
+        break;
     }
 }
 
@@ -3330,7 +3437,8 @@ static LegalVal declareVars(
 
     switch (type.flavor)
     {
-    case LegalType::Flavor::none: return LegalVal();
+    case LegalType::Flavor::none:
+        return LegalVal();
 
     case LegalType::Flavor::simple:
         return declareSimpleVar(
@@ -3975,7 +4083,8 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
             case kIROp_DllImportDecoration:
             case kIROp_DllExportDecoration:
             case kIROp_HLSLExportDecoration:
-            case kIROp_BinaryInterfaceTypeDecoration: return true;
+            case kIROp_BinaryInterfaceTypeDecoration:
+                return true;
             }
         }
         return false;

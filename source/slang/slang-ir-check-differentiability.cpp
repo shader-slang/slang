@@ -34,7 +34,8 @@ public:
             switch (decorations->getOp())
             {
             case kIROp_ForwardDifferentiableDecoration:
-            case kIROp_BackwardDifferentiableDecoration: return true;
+            case kIROp_BackwardDifferentiableDecoration:
+                return true;
             }
         }
         return false;
@@ -63,8 +64,10 @@ public:
                 break;
             case kIROp_UserDefinedBackwardDerivativeDecoration:
             case kIROp_BackwardDerivativeDecoration:
-            case kIROp_BackwardDifferentiableDecoration:        return true;
-            default:                                            break;
+            case kIROp_BackwardDifferentiableDecoration:
+                return true;
+            default:
+                break;
             }
         }
         return false;
@@ -94,7 +97,8 @@ public:
                         ->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
                 return isDifferentiableFunc(bwdDerivative->getBackwardDerivativeFunc(), level);
             return isDifferentiableFunc(func->getOperand(0), level);
-        default: break;
+        default:
+            break;
         }
 
         func = getResolvedInstForDecorations(func);
@@ -175,7 +179,8 @@ public:
             switch (addr->getOp())
             {
             case kIROp_Var:
-            case kIROp_Param: return isDifferentiableType(diffTypeContext, addr->getDataType());
+            case kIROp_Param:
+                return isDifferentiableType(diffTypeContext, addr->getDataType());
             case kIROp_FieldAddress:
                 if (!as<IRFieldAddress>(addr)->getField() ||
                     as<IRFieldAddress>(addr)
@@ -191,7 +196,8 @@ public:
                     return false;
                 addr = as<IRGetElementPtr>(addr)->getBase();
                 break;
-            default: return false;
+            default:
+                return false;
             }
         }
         return false;
@@ -203,7 +209,8 @@ public:
     {
         switch (inst->getOp())
         {
-        case kIROp_DetachDerivative: return false;
+        case kIROp_DetachDerivative:
+            return false;
         case kIROp_Call:
             {
                 auto call = as<IRCall>(inst);
@@ -211,7 +218,8 @@ public:
                     call->getCallee(),
                     CheckDifferentiabilityPassContext::DifferentiableLevel::Forward);
             }
-        default: return isDifferentiableType(diffTypeContext, inst->getDataType());
+        default:
+            return isDifferentiableType(diffTypeContext, inst->getDataType());
         }
     }
 
@@ -308,7 +316,8 @@ public:
         {
             switch (inst->getOp())
             {
-            case kIROp_FloatLit: return true;
+            case kIROp_FloatLit:
+                return true;
             case kIROp_Call:
                 return shouldTreatCallAsDifferentiable(inst) ||
                        isDifferentiableFunc(as<IRCall>(inst)->getCallee(), requiredDiffLevel) &&
@@ -340,7 +349,8 @@ public:
         {
             switch (inst->getOp())
             {
-            case kIROp_DetachDerivative: return false;
+            case kIROp_DetachDerivative:
+                return false;
             case kIROp_Call:
                 if (shouldTreatCallAsDifferentiable(inst))
                     return false;
@@ -449,7 +459,8 @@ public:
                             }
                         }
                         break;
-                    default: break;
+                    default:
+                        break;
                     }
                 }
             }

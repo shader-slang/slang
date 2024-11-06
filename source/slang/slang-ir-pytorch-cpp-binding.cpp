@@ -528,7 +528,8 @@ IRType* translateToHostType(
                 return nullptr;
             return builder->getArrayType(elementType, as<IRArrayType>(type)->getElementCount());
         }
-    default: break;
+    default:
+        break;
     }
 
     if (sink)
@@ -583,7 +584,8 @@ IRInst* castHostToCUDAType(IRBuilder* builder, IRType* hostType, IRType* cudaTyp
 
     switch (cudaType->getOp())
     {
-    case kIROp_TensorViewType: return builder->emitMakeTensorView(cudaType, inst);
+    case kIROp_TensorViewType:
+        return builder->emitMakeTensorView(cudaType, inst);
     case kIROp_StructType:
         {
             auto cudaStructType = cast<IRStructType>(cudaType);
@@ -653,7 +655,8 @@ IRInst* castHostToCUDAType(IRBuilder* builder, IRType* hostType, IRType* cudaTyp
                 resultElements.getBuffer());
         }
 
-    default: break;
+    default:
+        break;
     }
 
     // If translateToHostType worked correctly, there should be no unhandled cases here.
@@ -950,7 +953,8 @@ void generateReflectionForType(IRType* type, DiagnosticSink* sink)
                 builder.getStringValue(elementCountStr.getUnownedSlice())));
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     auto _nameListTupleType = builder.getTargetTupleType(

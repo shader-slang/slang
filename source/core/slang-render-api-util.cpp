@@ -183,7 +183,8 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
             SLANG_RETURN_ON_FAIL(findApiFlagsByName(lexeme, &apiFlags));
             break;
         }
-    default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     while (true)
@@ -196,8 +197,10 @@ static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStrin
                 *apiFlagsOut = apiFlags;
                 return SLANG_OK;
             }
-        case Token::eOp: break;
-        default:         return SLANG_FAIL;
+        case Token::eOp:
+            break;
+        default:
+            return SLANG_FAIL;
         }
 
         const char op = lexeme[0];
@@ -276,10 +279,13 @@ static bool _canLoadSharedLibrary(const char* libName)
         return _canLoadSharedLibrary("webgpu_dawn") && _canLoadSharedLibrary("dxcompiler") &&
                _canLoadSharedLibrary("dxil");
 #elif SLANG_APPLE_FAMILY
-    case RenderApiType::Vulkan: return true;
-    case RenderApiType::Metal:  return true;
+    case RenderApiType::Vulkan:
+        return true;
+    case RenderApiType::Metal:
+        return true;
 #elif SLANG_UNIX_FAMILY
-    case RenderApiType::Vulkan: return true;
+    case RenderApiType::Vulkan:
+        return true;
 #endif
 
 #if SLANG_ENABLE_DIRECTX
@@ -289,10 +295,13 @@ static bool _canLoadSharedLibrary(const char* libName)
         return _canLoadSharedLibrary(SLANG_ENABLE_VKD3D ? "vkd3d-proton-d3d12" : "d3d12");
 #endif
 
-    case RenderApiType::CPU: return true;
+    case RenderApiType::CPU:
+        return true;
     // We'll assume CUDA is available, and if not, trying to create it will detect it
-    case RenderApiType::CUDA: return true;
-    default:                  break;
+    case RenderApiType::CUDA:
+        return true;
+    default:
+        break;
     }
     return false;
 }

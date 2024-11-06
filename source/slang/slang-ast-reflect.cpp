@@ -71,7 +71,8 @@ SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
 
 // We dispatch to non 'abstract' types
 #define SLANG_CASE_AST(NAME) \
-    case ASTNodeType::NAME: return visitor->dispatch_##NAME(static_cast<NAME*>(this), extra);
+    case ASTNodeType::NAME:  \
+        return visitor->dispatch_##NAME(static_cast<NAME*>(this), extra);
 #define SLANG_CASE_ABSTRACT_AST(NAME)
 
 #define SLANG_CASE_DISPATCH(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \

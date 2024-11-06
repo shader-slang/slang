@@ -138,8 +138,9 @@ static const char* opClassToString(Slang::SPIRVCoreGrammarInfo::OpInfo::Class c)
 {
     switch (c)
     {
-#define GO(n) \
-    case SPIRVCoreGrammarInfo::OpInfo::n: return #n;
+#define GO(n)                             \
+    case SPIRVCoreGrammarInfo::OpInfo::n: \
+        return #n;
         GO(Miscellaneous)
         GO(Debug)
         GO(Annotation)
@@ -165,7 +166,8 @@ static const char* opClassToString(Slang::SPIRVCoreGrammarInfo::OpInfo::Class c)
         GO(Pipe)
         GO(NonUniform)
         GO(Reserved)
-    default: GO(Other)
+    default:
+        GO(Other)
 #undef GO
     }
 }

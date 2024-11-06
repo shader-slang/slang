@@ -195,7 +195,8 @@ struct AssignValsFromLayoutContext
             dataCursor = dataCursor.getDereferenced();
             break;
 
-        default: break;
+        default:
+            break;
         }
 
         SLANG_RETURN_ON_FAIL(dataCursor.setData(srcVal->bufferData.getBuffer(), bufferSize));
@@ -376,7 +377,8 @@ struct AssignValsFromLayoutContext
             auto slangTypeLayout = dstCursor.getTypeLayout();
             switch (slangTypeLayout->getKind())
             {
-            default: break;
+            default:
+                break;
 
             case slang::TypeReflection::Kind::ConstantBuffer:
             case slang::TypeReflection::Kind::ParameterBlock:
@@ -483,7 +485,9 @@ struct AssignValsFromLayoutContext
             return assignAccelerationStructure(
                 dstCursor,
                 (ShaderInputLayout::AccelerationStructureVal*)srcVal.Ptr());
-        default: assert(!"Unhandled type"); return SLANG_FAIL;
+        default:
+            assert(!"Unhandled type");
+            return SLANG_FAIL;
         }
     }
 };
@@ -541,7 +545,8 @@ Result RenderTestApp::applyBinding(PipelineType pipelineType, IPassEncoder* enco
             setProjectionMatrix(rootObject);
         }
         break;
-    default: throw "unknown pipeline type";
+    default:
+        throw "unknown pipeline type";
     }
     return SLANG_OK;
 }
@@ -589,7 +594,9 @@ SlangResult RenderTestApp::initialize(
     {
         switch (m_options.shaderType)
         {
-        default: assert(!"unexpected test shader type"); return SLANG_FAIL;
+        default:
+            assert(!"unexpected test shader type");
+            return SLANG_FAIL;
 
         case Options::ShaderProgramType::Compute:
             {
@@ -1280,7 +1287,9 @@ static SlangResult _innerMain(
         slangPassThrough = SLANG_PASS_THROUGH_NONE;
         break;
 
-    default: fprintf(stderr, "error: unexpected\n"); return SLANG_FAIL;
+    default:
+        fprintf(stderr, "error: unexpected\n");
+        return SLANG_FAIL;
     }
 
     switch (options.inputLanguageID)
@@ -1295,7 +1304,8 @@ static SlangResult _innerMain(
         input.passThrough = slangPassThrough;
         break;
 
-    default: break;
+    default:
+        break;
     }
 
     if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)
@@ -1337,7 +1347,8 @@ static SlangResult _innerMain(
                 // As long as we have CPU, then this should work
                 return spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP);
             }
-        default: break;
+        default:
+            break;
         }
     }
 

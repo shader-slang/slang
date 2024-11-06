@@ -96,7 +96,8 @@ void checkUnsupportedInst(TargetRequest* target, IRModule* module, DiagnosticSin
                     checkUnsupportedInst(target, innerFunc, sink);
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 }

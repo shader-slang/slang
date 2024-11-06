@@ -13,10 +13,14 @@ namespace Slang
 {
     switch (severity)
     {
-    default:                return UnownedStringSlice::fromLiteral("Unknown");
-    case Severity::Info:    return UnownedStringSlice::fromLiteral("Info");
-    case Severity::Warning: return UnownedStringSlice::fromLiteral("Warning");
-    case Severity::Error:   return UnownedStringSlice::fromLiteral("Error");
+    default:
+        return UnownedStringSlice::fromLiteral("Unknown");
+    case Severity::Info:
+        return UnownedStringSlice::fromLiteral("Info");
+    case Severity::Warning:
+        return UnownedStringSlice::fromLiteral("Warning");
+    case Severity::Error:
+        return UnownedStringSlice::fromLiteral("Error");
     }
 }
 

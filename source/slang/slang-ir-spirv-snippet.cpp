@@ -56,7 +56,9 @@ SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
     {
         switch (reader.NextToken().Type)
         {
-        case Slang::Misc::TokenType::IntLiteral: ret = reader.ReadUInt(); break;
+        case Slang::Misc::TokenType::IntLiteral:
+            ret = reader.ReadUInt();
+            break;
         case Slang::Misc::TokenType::Identifier:
             {
                 const auto i = reader.ReadWord();
@@ -80,7 +82,8 @@ SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
                 }
             }
             break;
-        default: throw Misc::TextFormatException("Text parsing error: Expected int or SPIR-V enum");
+        default:
+            throw Misc::TextFormatException("Text parsing error: Expected int or SPIR-V enum");
         }
     } while (reader.AdvanceIf(Misc::TokenType::OpBitOr));
     return ret;
@@ -114,7 +117,9 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             SpvOp opCode;
             switch (tokenReader.NextToken().Type)
             {
-            case Slang::Misc::TokenType::IntLiteral: opCode = (SpvOp)tokenReader.ReadInt(); break;
+            case Slang::Misc::TokenType::IntLiteral:
+                opCode = (SpvOp)tokenReader.ReadInt();
+                break;
             case Slang::Misc::TokenType::Identifier:
                 {
                     auto opName = tokenReader.ReadWord();
@@ -302,7 +307,9 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         }
                     }
                     break;
-                default: insideOperandList = false; break;
+                default:
+                    insideOperandList = false;
+                    break;
                 }
             }
             snippet->instructions.add(inst);

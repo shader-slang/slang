@@ -33,8 +33,11 @@ struct BitCastLoweringContext
     {
         switch (inst->getOp())
         {
-        case kIROp_BitCast: processBitCast(inst); break;
-        default:            break;
+        case kIROp_BitCast:
+            processBitCast(inst);
+            break;
+        default:
+            break;
         }
     }
 

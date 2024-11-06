@@ -289,7 +289,9 @@ struct TupleTypeBuilder
             }
             break;
 
-        case LegalType::Flavor::none: anyComplex = true; break;
+        case LegalType::Flavor::none:
+            anyComplex = true;
+            break;
 
         case LegalType::Flavor::implicitDeref:
             {
@@ -347,7 +349,9 @@ struct TupleTypeBuilder
             }
             break;
 
-        default: SLANG_UNEXPECTED("unknown legal type flavor"); break;
+        default:
+            SLANG_UNEXPECTED("unknown legal type flavor");
+            break;
         }
 
         PairInfo::Element pairElement;
@@ -533,9 +537,11 @@ static LegalType createLegalUniformBufferType(
     //
     switch (legalElementType.flavor)
     {
-    default: return context->createLegalUniformBufferType(op, legalElementType);
+    default:
+        return context->createLegalUniformBufferType(op, legalElementType);
 
-    case LegalType::Flavor::none: return LegalType();
+    case LegalType::Flavor::none:
+        return LegalType();
 
     case LegalType::Flavor::simple:
         {
@@ -761,7 +767,8 @@ LegalElementWrapping declareStructFields(
 
     switch (fieldType.flavor)
     {
-    case LegalType::Flavor::none: return LegalElementWrapping::makeVoid();
+    case LegalType::Flavor::none:
+        return LegalElementWrapping::makeVoid();
 
     case LegalType::Flavor::simple:
         {
@@ -1005,7 +1012,8 @@ static LegalType wrapLegalType(
 {
     switch (legalType.flavor)
     {
-    case LegalType::Flavor::none: return LegalType();
+    case LegalType::Flavor::none:
+        return LegalType();
 
     case LegalType::Flavor::simple:
         {
@@ -1150,8 +1158,11 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
                 return LegalType::simple(bufferType);
             newElementType = legalElementType.getSimple();
             break;
-        case LegalType::Flavor::none: newElementType = context->getBuilder()->getIntType(); break;
-        default:                      return LegalType::simple(bufferType);
+        case LegalType::Flavor::none:
+            newElementType = context->getBuilder()->getIntType();
+            break;
+        default:
+            return LegalType::simple(bufferType);
         }
         ShortList<IRInst*> operands;
         for (UInt i = 0; i < bufferType->getOperandCount(); i++)

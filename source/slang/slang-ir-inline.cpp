@@ -256,7 +256,8 @@ struct InliningPassBase
         {
             switch (decor->getOp())
             {
-            case kIROp_IntrinsicOpDecoration: return true;
+            case kIROp_IntrinsicOpDecoration:
+                return true;
             }
         }
 
@@ -766,7 +767,8 @@ struct TypeInliningPass : InliningPassBase
             {
                 return true;
             }
-        default: break;
+        default:
+            break;
         }
 
         return false;
@@ -885,10 +887,15 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             switch (decor->getOp())
             {
             case kIROp_UnsafeForceInlineEarlyDecoration:
-            case kIROp_IntrinsicOpDecoration:                   return true;
-            case kIROp_ForceInlineDecoration:                   hasForceInline = true; break;
+            case kIROp_IntrinsicOpDecoration:
+                return true;
+            case kIROp_ForceInlineDecoration:
+                hasForceInline = true;
+                break;
             case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_ForwardDerivativeDecoration:             hasUserDefinedDerivative = true; break;
+            case kIROp_ForwardDerivativeDecoration:
+                hasUserDefinedDerivative = true;
+                break;
             }
         }
         if (!hasForceInline || hasUserDefinedDerivative)
@@ -908,10 +915,14 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
                 case kIROp_ForwardDifferentiate:
                 case kIROp_BackwardDifferentiate:
                 case kIROp_BackwardDifferentiatePrimal:
-                case kIROp_BackwardDifferentiatePropagate: canInline = false; goto end;
+                case kIROp_BackwardDifferentiatePropagate:
+                    canInline = false;
+                    goto end;
 
                 // Also avoid inlining functions with inline-asm instructions.
-                case kIROp_SPIRVAsm: canInline = false; goto end;
+                case kIROp_SPIRVAsm:
+                    canInline = false;
+                    goto end;
                 }
             }
         }
@@ -1008,11 +1019,15 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
             switch (inst->getOp())
             {
             case kIROp_SPIRVAsmOperandInst:
-            case kIROp_SPIRVAsm:            hasSpvAsm = true; continue;
+            case kIROp_SPIRVAsm:
+                hasSpvAsm = true;
+                continue;
             case kIROp_Load:
             case kIROp_swizzle:
-            case kIROp_Store:               continue;
-            default:                        return false;
+            case kIROp_Store:
+                continue;
+            default:
+                return false;
             }
         }
         return hasSpvAsm;

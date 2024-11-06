@@ -91,8 +91,10 @@ struct IntroduceExplicitGlobalContextPass
                     case kIROp_VulkanCallablePayloadDecoration:
                     case kIROp_VulkanCallablePayloadInDecoration:
                     case kIROp_VulkanHitObjectAttributesDecoration:
-                    case kIROp_VulkanHitAttributesDecoration:       return false;
-                    default:                                        continue;
+                    case kIROp_VulkanHitAttributesDecoration:
+                        return false;
+                    default:
+                        continue;
                     };
                 }
             }

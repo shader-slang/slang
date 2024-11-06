@@ -11,8 +11,10 @@ IRType* NativeCallMarshallingContext::getNativeType(IRBuilder& builder, IRType* 
 {
     switch (type->getOp())
     {
-    case kIROp_StringType:    return builder.getNativeStringType();
-    case kIROp_InterfaceType: return builder.getNativePtrType(type);
+    case kIROp_StringType:
+        return builder.getNativeStringType();
+    case kIROp_InterfaceType:
+        return builder.getNativePtrType(type);
     case kIROp_ComPtrType:
         return builder.getNativePtrType((IRType*)as<IRComPtrType>(type)->getOperand(0));
     case kIROp_InOutType:
@@ -20,7 +22,8 @@ IRType* NativeCallMarshallingContext::getNativeType(IRBuilder& builder, IRType* 
     case kIROp_ConstRefType:
     case kIROp_OutType:
         return builder.getPtrType(getNativeType(builder, (IRType*)type->getOperand(0)));
-    default: return type;
+    default:
+        return type;
     }
 }
 
@@ -64,8 +67,12 @@ void NativeCallMarshallingContext::marshalRefManagedValueToNativeValue(
     switch (ptrTypeBase->getValueType()->getOp())
     {
     case kIROp_InterfaceType:
-    case kIROp_ComPtrType:    args.add(builder.emitGetManagedPtrWriteRef(originalArg)); break;
-    default:                  args.add(originalArg); break;
+    case kIROp_ComPtrType:
+        args.add(builder.emitGetManagedPtrWriteRef(originalArg));
+        break;
+    default:
+        args.add(originalArg);
+        break;
     }
 }
 
@@ -80,7 +87,8 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
     case kIROp_InOutType:
     case kIROp_RefType:
     case kIROp_ConstRefType:
-    case kIROp_OutType:      return marshalRefManagedValueToNativeValue(builder, originalArg, args);
+    case kIROp_OutType:
+        return marshalRefManagedValueToNativeValue(builder, originalArg, args);
     case kIROp_StringType:
         {
             auto nativeStr = builder.emitGetNativeString(originalArg);
@@ -93,7 +101,9 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
             args.add(nativePtr);
         }
         break;
-    default: args.add(originalArg); break;
+    default:
+        args.add(originalArg);
+        break;
     }
 }
 
@@ -125,7 +135,9 @@ IRInst* NativeCallMarshallingContext::marshalNativeValueToManagedValue(
             return builder.emitLoad(comPtrVar);
         }
         break;
-    default: return nativeVal; break;
+    default:
+        return nativeVal;
+        break;
     }
 }
 
@@ -174,7 +186,9 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeResultValue(
             args.add(nativePtr);
         }
         break;
-    default: args.add(originalArg); break;
+    default:
+        args.add(originalArg);
+        break;
     }
 }
 

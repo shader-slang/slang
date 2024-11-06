@@ -438,7 +438,8 @@ static SlangResult _parseGCCFamilyLine(
                 prevLineResult = lineRes;
                 break;
             }
-        default: return SLANG_FAIL;
+        default:
+            return SLANG_FAIL;
         }
     }
 
@@ -553,7 +554,8 @@ static SlangResult _parseGCCFamilyLine(
             cmdLine.addArg("-O4");
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     if (options.debugInfoType != DebugInfoType::None)
@@ -568,7 +570,8 @@ static SlangResult _parseGCCFamilyLine(
 
     switch (options.floatingPointMode)
     {
-    case FloatingPointMode::Default: break;
+    case FloatingPointMode::Default:
+        break;
     case FloatingPointMode::Precise:
         {
             // cmdLine.addArg("-fno-unsafe-math-optimizations");
@@ -619,7 +622,8 @@ static SlangResult _parseGCCFamilyLine(
             cmdLine.addArg("-c");
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     // Add defines

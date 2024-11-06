@@ -99,22 +99,38 @@ namespace Slang
 {
     switch (baseType)
     {
-    case BaseType::Void:    return UnownedStringSlice::fromLiteral("void");
-    case BaseType::Bool:    return UnownedStringSlice::fromLiteral("bool");
-    case BaseType::Int8:    return UnownedStringSlice::fromLiteral("int8_t");
-    case BaseType::Int16:   return UnownedStringSlice::fromLiteral("int16_t");
-    case BaseType::Int:     return UnownedStringSlice::fromLiteral("int");
-    case BaseType::Int64:   return UnownedStringSlice::fromLiteral("int64_t");
-    case BaseType::UInt8:   return UnownedStringSlice::fromLiteral("uint8_t");
-    case BaseType::UInt16:  return UnownedStringSlice::fromLiteral("uint16_t");
-    case BaseType::UInt:    return UnownedStringSlice::fromLiteral("uint");
-    case BaseType::UInt64:  return UnownedStringSlice::fromLiteral("uint64_t");
-    case BaseType::Half:    return UnownedStringSlice::fromLiteral("half");
-    case BaseType::Float:   return UnownedStringSlice::fromLiteral("float");
-    case BaseType::Double:  return UnownedStringSlice::fromLiteral("double");
-    case BaseType::Char:    return UnownedStringSlice::fromLiteral("char");
-    case BaseType::IntPtr:  return UnownedStringSlice::fromLiteral("intptr_t");
-    case BaseType::UIntPtr: return UnownedStringSlice::fromLiteral("uintptr_t");
+    case BaseType::Void:
+        return UnownedStringSlice::fromLiteral("void");
+    case BaseType::Bool:
+        return UnownedStringSlice::fromLiteral("bool");
+    case BaseType::Int8:
+        return UnownedStringSlice::fromLiteral("int8_t");
+    case BaseType::Int16:
+        return UnownedStringSlice::fromLiteral("int16_t");
+    case BaseType::Int:
+        return UnownedStringSlice::fromLiteral("int");
+    case BaseType::Int64:
+        return UnownedStringSlice::fromLiteral("int64_t");
+    case BaseType::UInt8:
+        return UnownedStringSlice::fromLiteral("uint8_t");
+    case BaseType::UInt16:
+        return UnownedStringSlice::fromLiteral("uint16_t");
+    case BaseType::UInt:
+        return UnownedStringSlice::fromLiteral("uint");
+    case BaseType::UInt64:
+        return UnownedStringSlice::fromLiteral("uint64_t");
+    case BaseType::Half:
+        return UnownedStringSlice::fromLiteral("half");
+    case BaseType::Float:
+        return UnownedStringSlice::fromLiteral("float");
+    case BaseType::Double:
+        return UnownedStringSlice::fromLiteral("double");
+    case BaseType::Char:
+        return UnownedStringSlice::fromLiteral("char");
+    case BaseType::IntPtr:
+        return UnownedStringSlice::fromLiteral("intptr_t");
+    case BaseType::UIntPtr:
+        return UnownedStringSlice::fromLiteral("uintptr_t");
     default:
         {
             SLANG_ASSERT(!"Unknown basic type");
@@ -984,7 +1000,8 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     // output with Shader Model 5.0...
     switch (target->getTarget())
     {
-    default: break;
+    default:
+        break;
 
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
@@ -1041,7 +1058,8 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     case ProfileFamily::DX:
         switch (effectiveProfile.getStage())
         {
-        default: break;
+        default:
+            break;
 
         case Stage::RayGeneration:
         case Stage::Intersection:
@@ -1062,7 +1080,8 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     case ProfileFamily::GLSL:
         switch (effectiveProfile.getStage())
         {
-        default: break;
+        default:
+            break;
 
         case Stage::RayGeneration:
         case Stage::Intersection:
@@ -1077,7 +1096,8 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         }
         break;
 
-    default: break;
+    default:
+        break;
     }
 
     if (stageMinVersion > effectiveProfile.getVersion())
@@ -1609,7 +1629,9 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
                 containerTypeReflection = arrType;
             }
             break;
-        default: containerTypeReflection = type; break;
+        default:
+            containerTypeReflection = type;
+            break;
         }
 
         m_containerTypes.add(key, containerTypeReflection);
@@ -1965,9 +1987,13 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::DXBytecodeAssembly:
     case CodeGenTarget::DXIL:
-    case CodeGenTarget::DXILAssembly:       atoms.add(CapabilityName::hlsl); break;
+    case CodeGenTarget::DXILAssembly:
+        atoms.add(CapabilityName::hlsl);
+        break;
 
-    case CodeGenTarget::CSource: atoms.add(CapabilityName::c); break;
+    case CodeGenTarget::CSource:
+        atoms.add(CapabilityName::c);
+        break;
 
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::PyTorchCppBinding:
@@ -1975,20 +2001,29 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::HostHostCallable:
-    case CodeGenTarget::ShaderHostCallable:  atoms.add(CapabilityName::cpp); break;
+    case CodeGenTarget::ShaderHostCallable:
+        atoms.add(CapabilityName::cpp);
+        break;
 
     case CodeGenTarget::CUDASource:
-    case CodeGenTarget::PTX:        atoms.add(CapabilityName::cuda); break;
+    case CodeGenTarget::PTX:
+        atoms.add(CapabilityName::cuda);
+        break;
 
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
-    case CodeGenTarget::MetalLibAssembly: atoms.add(CapabilityName::metal); break;
+    case CodeGenTarget::MetalLibAssembly:
+        atoms.add(CapabilityName::metal);
+        break;
 
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
-    case CodeGenTarget::WGSL:              atoms.add(CapabilityName::wgsl); break;
+    case CodeGenTarget::WGSL:
+        atoms.add(CapabilityName::wgsl);
+        break;
 
-    default: break;
+    default:
+        break;
     }
 
     CapabilitySet targetCap = CapabilitySet(atoms);
@@ -2077,10 +2112,14 @@ Scope* TranslationUnitRequest::getLanguageScope()
     Scope* languageScope = nullptr;
     switch (sourceLanguage)
     {
-    case SourceLanguage::HLSL: languageScope = getSession()->hlslLanguageScope; break;
+    case SourceLanguage::HLSL:
+        languageScope = getSession()->hlslLanguageScope;
+        break;
 
     case SourceLanguage::Slang:
-    default:                    languageScope = getSession()->slangLanguageScope; break;
+    default:
+        languageScope = getSession()->slangLanguageScope;
+        break;
     }
     return languageScope;
 }
@@ -2123,7 +2162,8 @@ Dictionary<String, String> TranslationUnitRequest::getCombinedPreprocessorDefini
             // Used to indicate compiled as Slang language
             combinedPreprocessorDefinitions.addIfNotExists("__SLANG__", "1");
             break;
-        default: break;
+        default:
+            break;
         }
 
         // If not set, define as 0.
@@ -2284,9 +2324,12 @@ static ISlangWriter* _getDefaultWriter(WriterChannel chan)
 
     switch (chan)
     {
-    case WriterChannel::StdError:   return &stdError;
-    case WriterChannel::StdOutput:  return &stdOut;
-    case WriterChannel::Diagnostic: return &nullWriter;
+    case WriterChannel::StdError:
+        return &stdError;
+    case WriterChannel::StdOutput:
+        return &stdOut;
+    case WriterChannel::Diagnostic:
+        return &nullWriter;
     default:
         {
             SLANG_ASSERT(!"Unknown type");
@@ -2889,7 +2932,8 @@ static void _outputIncludesRec(
             // If any of these types we don't output
             return;
         }
-    default: break;
+    default:
+        break;
     }
 
     // Okay output this file at the current depth
@@ -3035,10 +3079,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         Scope* languageScope = nullptr;
         switch (sourceLanguage)
         {
-        case SourceLanguage::HLSL: languageScope = getSession()->hlslLanguageScope; break;
+        case SourceLanguage::HLSL:
+            languageScope = getSession()->hlslLanguageScope;
+            break;
 
         case SourceLanguage::Slang:
-        default:                    languageScope = getSession()->slangLanguageScope; break;
+        default:
+            languageScope = getSession()->slangLanguageScope;
+            break;
         }
 
         if (optionSet.getBoolOption(CompilerOptionName::OutputIncludes))
@@ -3392,11 +3440,16 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         auto language = inferSourceLanguage(getFrontEndReq());
         switch (language)
         {
-        case SourceLanguage::HLSL: getLinkage()->addTarget(CodeGenTarget::DXBytecode); break;
+        case SourceLanguage::HLSL:
+            getLinkage()->addTarget(CodeGenTarget::DXBytecode);
+            break;
 
-        case SourceLanguage::GLSL: getLinkage()->addTarget(CodeGenTarget::SPIRV); break;
+        case SourceLanguage::GLSL:
+            getLinkage()->addTarget(CodeGenTarget::SPIRV);
+            break;
 
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -4515,7 +4568,8 @@ static bool _canExportDeclSymbol(ASTNodeType type)
         {
             return false;
         }
-    default: break;
+    default:
+        break;
     }
 
     return true;
@@ -4916,9 +4970,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
         SpecializationArg expandedArg;
         switch (apiArg.kind)
         {
-        case slang::SpecializationArg::Kind::Type: expandedArg.val = asInternal(apiArg.type); break;
+        case slang::SpecializationArg::Kind::Type:
+            expandedArg.val = asInternal(apiArg.type);
+            break;
 
-        default: sink.getBlobIfNeeded(outDiagnostics); return SLANG_FAIL;
+        default:
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_FAIL;
         }
         expandedArgs.add(expandedArg);
     }

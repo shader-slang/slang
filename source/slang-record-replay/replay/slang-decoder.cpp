@@ -46,7 +46,9 @@ bool SlangDecoder::processIGlobalSessionMethods(
 {
     switch (callId)
     {
-    default: slangRecordLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId); break;
+    default:
+        slangRecordLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
+        break;
     case ApiCallId::IGlobalSession_createSession:
         IGlobalSession_createSession(objectId, parameterBlock);
         break;
@@ -143,7 +145,9 @@ bool SlangDecoder::processISessionMethods(
     case ApiCallId::ISession_getGlobalSession:
         ISession_getGlobalSession(objectId, parameterBlock);
         break;
-    case ApiCallId::ISession_loadModule: ISession_loadModule(objectId, parameterBlock); break;
+    case ApiCallId::ISession_loadModule:
+        ISession_loadModule(objectId, parameterBlock);
+        break;
     case ApiCallId::ISession_loadModuleFromIRBlob:
         ISession_loadModuleFromIRBlob(objectId, parameterBlock);
         break;
@@ -159,7 +163,9 @@ bool SlangDecoder::processISessionMethods(
     case ApiCallId::ISession_specializeType:
         ISession_specializeType(objectId, parameterBlock);
         break;
-    case ApiCallId::ISession_getTypeLayout: ISession_getTypeLayout(objectId, parameterBlock); break;
+    case ApiCallId::ISession_getTypeLayout:
+        ISession_getTypeLayout(objectId, parameterBlock);
+        break;
     case ApiCallId::ISession_getContainerType:
         ISession_getContainerType(objectId, parameterBlock);
         break;
@@ -213,33 +219,51 @@ bool SlangDecoder::processIModuleMethods(
     case ApiCallId::IModule_getDefinedEntryPoint:
         IModule_getDefinedEntryPoint(objectId, parameterBlock);
         break;
-    case ApiCallId::IModule_serialize:   IModule_serialize(objectId, parameterBlock); break;
-    case ApiCallId::IModule_writeToFile: IModule_writeToFile(objectId, parameterBlock); break;
-    case ApiCallId::IModule_getName:     IModule_getName(objectId, parameterBlock); break;
-    case ApiCallId::IModule_getFilePath: IModule_getFilePath(objectId, parameterBlock); break;
+    case ApiCallId::IModule_serialize:
+        IModule_serialize(objectId, parameterBlock);
+        break;
+    case ApiCallId::IModule_writeToFile:
+        IModule_writeToFile(objectId, parameterBlock);
+        break;
+    case ApiCallId::IModule_getName:
+        IModule_getName(objectId, parameterBlock);
+        break;
+    case ApiCallId::IModule_getFilePath:
+        IModule_getFilePath(objectId, parameterBlock);
+        break;
     case ApiCallId::IModule_getUniqueIdentity:
         IModule_getUniqueIdentity(objectId, parameterBlock);
         break;
     case ApiCallId::IModule_findAndCheckEntryPoint:
         IModule_findAndCheckEntryPoint(objectId, parameterBlock);
         break;
-    case ApiCallId::IModule_getSession: IModule_getSession(objectId, parameterBlock); break;
-    case ApiCallId::IModule_getLayout:  IModule_getLayout(objectId, parameterBlock); break;
+    case ApiCallId::IModule_getSession:
+        IModule_getSession(objectId, parameterBlock);
+        break;
+    case ApiCallId::IModule_getLayout:
+        IModule_getLayout(objectId, parameterBlock);
+        break;
     case ApiCallId::IModule_getSpecializationParamCount:
         IModule_getSpecializationParamCount(objectId, parameterBlock);
         break;
     case ApiCallId::IModule_getEntryPointCode:
         IModule_getEntryPointCode(objectId, parameterBlock);
         break;
-    case ApiCallId::IModule_getTargetCode: IModule_getTargetCode(objectId, parameterBlock); break;
+    case ApiCallId::IModule_getTargetCode:
+        IModule_getTargetCode(objectId, parameterBlock);
+        break;
     case ApiCallId::IModule_getResultAsFileSystem:
         IModule_getResultAsFileSystem(objectId, parameterBlock);
         break;
     case ApiCallId::IModule_getEntryPointHash:
         IModule_getEntryPointHash(objectId, parameterBlock);
         break;
-    case ApiCallId::IModule_specialize: IModule_specialize(objectId, parameterBlock); break;
-    case ApiCallId::IModule_link:       IModule_link(objectId, parameterBlock); break;
+    case ApiCallId::IModule_specialize:
+        IModule_specialize(objectId, parameterBlock);
+        break;
+    case ApiCallId::IModule_link:
+        IModule_link(objectId, parameterBlock);
+        break;
     case ApiCallId::IModule_getEntryPointHostCallable:
         IModule_getEntryPointHostCallable(objectId, parameterBlock);
         break;
@@ -263,8 +287,12 @@ bool SlangDecoder::processIEntryPointMethods(
     default:
         slangRecordLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
         return false;
-    case ApiCallId::IEntryPoint_getSession: IEntryPoint_getSession(objectId, parameterBlock); break;
-    case ApiCallId::IEntryPoint_getLayout:  IEntryPoint_getLayout(objectId, parameterBlock); break;
+    case ApiCallId::IEntryPoint_getSession:
+        IEntryPoint_getSession(objectId, parameterBlock);
+        break;
+    case ApiCallId::IEntryPoint_getLayout:
+        IEntryPoint_getLayout(objectId, parameterBlock);
+        break;
     case ApiCallId::IEntryPoint_getSpecializationParamCount:
         IEntryPoint_getSpecializationParamCount(objectId, parameterBlock);
         break;
@@ -280,8 +308,12 @@ bool SlangDecoder::processIEntryPointMethods(
     case ApiCallId::IEntryPoint_getEntryPointHash:
         IEntryPoint_getEntryPointHash(objectId, parameterBlock);
         break;
-    case ApiCallId::IEntryPoint_specialize: IEntryPoint_specialize(objectId, parameterBlock); break;
-    case ApiCallId::IEntryPoint_link:       IEntryPoint_link(objectId, parameterBlock); break;
+    case ApiCallId::IEntryPoint_specialize:
+        IEntryPoint_specialize(objectId, parameterBlock);
+        break;
+    case ApiCallId::IEntryPoint_link:
+        IEntryPoint_link(objectId, parameterBlock);
+        break;
     case ApiCallId::IEntryPoint_getEntryPointHostCallable:
         IEntryPoint_getEntryPointHostCallable(objectId, parameterBlock);
         break;
@@ -302,7 +334,9 @@ bool SlangDecoder::processICompositeComponentTypeMethods(
 {
     switch (callId)
     {
-    default: slangRecordLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId); break;
+    default:
+        slangRecordLog(LogLevel::Error, "Unhandled Slang API call: %d\n", callId);
+        break;
     case ApiCallId::ICompositeComponentType_getSession:
         ICompositeComponentType_getSession(objectId, parameterBlock);
         break;
@@ -377,7 +411,9 @@ bool SlangDecoder::processITypeConformanceMethods(
     case ApiCallId::ITypeConformance_specialize:
         ITypeConformance_specialize(objectId, parameterBlock);
         break;
-    case ApiCallId::ITypeConformance_link: ITypeConformance_link(objectId, parameterBlock); break;
+    case ApiCallId::ITypeConformance_link:
+        ITypeConformance_link(objectId, parameterBlock);
+        break;
     case ApiCallId::ITypeConformance_getEntryPointHostCallable:
         ITypeConformance_getEntryPointHostCallable(objectId, parameterBlock);
         break;
@@ -400,7 +436,9 @@ bool SlangDecoder::processFunctionCall(
     default:
         slangRecordLog(LogLevel::Error, "Unhandled Slang API call: %d\n", header.callId);
         return false;
-    case ApiCallId::CreateGlobalSession: CreateGlobalSession(parameterBlock); break;
+    case ApiCallId::CreateGlobalSession:
+        CreateGlobalSession(parameterBlock);
+        break;
     }
     return true;
 }

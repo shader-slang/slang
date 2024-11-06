@@ -355,11 +355,20 @@ public:
 
         switch (eventType)
         {
-        case MouseEvent::Down:   events.mouseDown(e); break;
-        case MouseEvent::Up:     events.mouseUp(e); break;
-        case MouseEvent::Move:   events.mouseMove(e); break;
-        case MouseEvent::Scroll: events.mouseWheel(e); break;
-        default:                 break;
+        case MouseEvent::Down:
+            events.mouseDown(e);
+            break;
+        case MouseEvent::Up:
+            events.mouseUp(e);
+            break;
+        case MouseEvent::Move:
+            events.mouseMove(e);
+            break;
+        case MouseEvent::Scroll:
+            events.mouseWheel(e);
+            break;
+        default:
+            break;
         }
     }
 

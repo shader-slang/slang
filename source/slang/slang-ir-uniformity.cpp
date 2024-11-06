@@ -180,11 +180,17 @@ struct ValidateUniformityContext
                     return true;
                 addr = as<IRFieldAddress>(addr)->getBase();
                 break;
-            case kIROp_GetElementPtr: addr = as<IRGetElementPtr>(addr)->getBase(); break;
-            case kIROp_GetOffsetPtr:  addr = addr->getOperand(0); break;
+            case kIROp_GetElementPtr:
+                addr = as<IRGetElementPtr>(addr)->getBase();
+                break;
+            case kIROp_GetOffsetPtr:
+                addr = addr->getOperand(0);
+                break;
             case kIROp_Param:
-            case kIROp_Var:           return addr->findDecoration<IRDynamicUniformDecoration>() != nullptr;
-            default:                  addr = nullptr;
+            case kIROp_Var:
+                return addr->findDecoration<IRDynamicUniformDecoration>() != nullptr;
+            default:
+                addr = nullptr;
             }
         }
         return false;
@@ -238,8 +244,12 @@ struct ValidateUniformityContext
                     switch (inst->getOp())
                     {
                     case kIROp_Store:
-                    case kIROp_SwizzledStore: addToWorkList(inst->getOperand(0)); break;
-                    case kIROp_Return:        addToWorkList(inst); break;
+                    case kIROp_SwizzledStore:
+                        addToWorkList(inst->getOperand(0));
+                        break;
+                    case kIROp_Return:
+                        addToWorkList(inst);
+                        break;
                     case kIROp_Call:
                         {
                             auto call = as<IRCall>(inst);
@@ -269,7 +279,8 @@ struct ValidateUniformityContext
                         continue;
                     switch (user->getOp())
                     {
-                    case kIROp_TreatAsDynamicUniform: continue;
+                    case kIROp_TreatAsDynamicUniform:
+                        continue;
                     case kIROp_FieldAddress:
                         {
                             if (isDynamicUniformLocation(user))
@@ -408,7 +419,8 @@ struct ValidateUniformityContext
                             }
                             break;
                         }
-                    default: break;
+                    default:
+                        break;
                     }
                     addToWorkList(user);
                 }

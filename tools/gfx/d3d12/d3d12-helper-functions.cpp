@@ -42,12 +42,16 @@ D3D12_RESOURCE_FLAGS calcResourceFlag(ResourceState state)
 {
     switch (state)
     {
-    case ResourceState::RenderTarget:          return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    case ResourceState::RenderTarget:
+        return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     case ResourceState::DepthRead:
-    case ResourceState::DepthWrite:            return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+    case ResourceState::DepthWrite:
+        return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
     case ResourceState::UnorderedAccess:
-    case ResourceState::AccelerationStructure: return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-    default:                                   return D3D12_RESOURCE_FLAG_NONE;
+    case ResourceState::AccelerationStructure:
+        return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    default:
+        return D3D12_RESOURCE_FLAG_NONE;
     }
 }
 
@@ -67,15 +71,19 @@ D3D12_RESOURCE_DIMENSION calcResourceDimension(IResource::Type type)
 {
     switch (type)
     {
-    case IResource::Type::Buffer:    return D3D12_RESOURCE_DIMENSION_BUFFER;
-    case IResource::Type::Texture1D: return D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+    case IResource::Type::Buffer:
+        return D3D12_RESOURCE_DIMENSION_BUFFER;
+    case IResource::Type::Texture1D:
+        return D3D12_RESOURCE_DIMENSION_TEXTURE1D;
     case IResource::Type::TextureCube:
     case IResource::Type::Texture2D:
         {
             return D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         }
-    case IResource::Type::Texture3D: return D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-    default:                         return D3D12_RESOURCE_DIMENSION_UNKNOWN;
+    case IResource::Type::Texture3D:
+        return D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+    default:
+        return D3D12_RESOURCE_DIMENSION_UNKNOWN;
     }
 }
 
@@ -83,12 +91,16 @@ DXGI_FORMAT getTypelessFormatFromDepthFormat(Format format)
 {
     switch (format)
     {
-    case Format::D16_UNORM:         return DXGI_FORMAT_R16_TYPELESS;
-    case Format::D32_FLOAT:         return DXGI_FORMAT_R32_TYPELESS;
-    case Format::D32_FLOAT_S8_UINT: return DXGI_FORMAT_R32G8X24_TYPELESS;
+    case Format::D16_UNORM:
+        return DXGI_FORMAT_R16_TYPELESS;
+    case Format::D32_FLOAT:
+        return DXGI_FORMAT_R32_TYPELESS;
+    case Format::D32_FLOAT_S8_UINT:
+        return DXGI_FORMAT_R32G8X24_TYPELESS;
     // case Format::D24_UNORM_S8_UINT:
     //     return DXGI_FORMAT_R24G8_TYPELESS;
-    default: return D3DUtil::getMapFormat(format);
+    default:
+        return D3DUtil::getMapFormat(format);
     }
 }
 
@@ -99,8 +111,10 @@ bool isTypelessDepthFormat(DXGI_FORMAT format)
     case DXGI_FORMAT_R16_TYPELESS:
     case DXGI_FORMAT_R32_TYPELESS:
     case DXGI_FORMAT_R32G8X24_TYPELESS:
-    case DXGI_FORMAT_R24G8_TYPELESS:    return true;
-    default:                            return false;
+    case DXGI_FORMAT_R24G8_TYPELESS:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -108,10 +122,12 @@ D3D12_FILTER_TYPE translateFilterMode(TextureFilteringMode mode)
 {
     switch (mode)
     {
-    default: return D3D12_FILTER_TYPE(0);
+    default:
+        return D3D12_FILTER_TYPE(0);
 
-#define CASE(SRC, DST) \
-    case TextureFilteringMode::SRC: return D3D12_FILTER_TYPE_##DST
+#define CASE(SRC, DST)              \
+    case TextureFilteringMode::SRC: \
+        return D3D12_FILTER_TYPE_##DST
 
         CASE(Point, POINT);
         CASE(Linear, LINEAR);
@@ -124,10 +140,12 @@ D3D12_FILTER_REDUCTION_TYPE translateFilterReduction(TextureReductionOp op)
 {
     switch (op)
     {
-    default: return D3D12_FILTER_REDUCTION_TYPE(0);
+    default:
+        return D3D12_FILTER_REDUCTION_TYPE(0);
 
-#define CASE(SRC, DST) \
-    case TextureReductionOp::SRC: return D3D12_FILTER_REDUCTION_TYPE_##DST
+#define CASE(SRC, DST)            \
+    case TextureReductionOp::SRC: \
+        return D3D12_FILTER_REDUCTION_TYPE_##DST
 
         CASE(Average, STANDARD);
         CASE(Comparison, COMPARISON);
@@ -142,10 +160,12 @@ D3D12_TEXTURE_ADDRESS_MODE translateAddressingMode(TextureAddressingMode mode)
 {
     switch (mode)
     {
-    default: return D3D12_TEXTURE_ADDRESS_MODE(0);
+    default:
+        return D3D12_TEXTURE_ADDRESS_MODE(0);
 
-#define CASE(SRC, DST) \
-    case TextureAddressingMode::SRC: return D3D12_TEXTURE_ADDRESS_MODE_##DST
+#define CASE(SRC, DST)               \
+    case TextureAddressingMode::SRC: \
+        return D3D12_TEXTURE_ADDRESS_MODE_##DST
 
         CASE(Wrap, WRAP);
         CASE(ClampToEdge, CLAMP);
@@ -165,8 +185,9 @@ D3D12_COMPARISON_FUNC translateComparisonFunc(ComparisonFunc func)
         // TODO: need to report failures
         return D3D12_COMPARISON_FUNC_ALWAYS;
 
-#define CASE(FROM, TO) \
-    case ComparisonFunc::FROM: return D3D12_COMPARISON_FUNC_##TO
+#define CASE(FROM, TO)         \
+    case ComparisonFunc::FROM: \
+        return D3D12_COMPARISON_FUNC_##TO
 
         CASE(Never, NEVER);
         CASE(Less, LESS);
@@ -236,7 +257,8 @@ void initSrvDesc(
                                               : subresourceRange.mipLevelCount;
             descOut.Texture3D.MostDetailedMip = subresourceRange.mipLevel;
             break;
-        default: assert(!"Unknown dimension");
+        default:
+            assert(!"Unknown dimension");
         }
     }
     else if (resourceType == IResource::Type::TextureCube)
@@ -324,7 +346,8 @@ void initSrvDesc(
                                               : subresourceRange.mipLevelCount;
             break;
 
-        default: assert(!"Unknown dimension");
+        default:
+            assert(!"Unknown dimension");
         }
     }
 }
@@ -503,16 +526,24 @@ Result createNullDescriptor(
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             switch (bindingRange.resourceShape)
             {
-            case SLANG_TEXTURE_1D: srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D; break;
+            case SLANG_TEXTURE_1D:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
+                break;
             case SLANG_TEXTURE_1D_ARRAY:
                 srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
                 break;
-            case SLANG_TEXTURE_2D: srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; break;
+            case SLANG_TEXTURE_2D:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                break;
             case SLANG_TEXTURE_2D_ARRAY:
                 srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
                 break;
-            case SLANG_TEXTURE_3D:   srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D; break;
-            case SLANG_TEXTURE_CUBE: srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE; break;
+            case SLANG_TEXTURE_3D:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+                break;
+            case SLANG_TEXTURE_CUBE:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+                break;
             case SLANG_TEXTURE_CUBE_ARRAY:
                 srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
                 break;
@@ -522,7 +553,8 @@ Result createNullDescriptor(
             case SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY:
                 srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY;
                 break;
-            default: return SLANG_OK;
+            default:
+                return SLANG_OK;
             }
             d3dDevice->CreateShaderResourceView(nullptr, &srvDesc, destDescriptor);
         }
@@ -533,25 +565,33 @@ Result createNullDescriptor(
             uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             switch (bindingRange.resourceShape)
             {
-            case SLANG_TEXTURE_1D: uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D; break;
+            case SLANG_TEXTURE_1D:
+                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+                break;
             case SLANG_TEXTURE_1D_ARRAY:
                 uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
                 break;
-            case SLANG_TEXTURE_2D: uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D; break;
+            case SLANG_TEXTURE_2D:
+                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+                break;
             case SLANG_TEXTURE_2D_ARRAY:
                 uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
                 break;
-            case SLANG_TEXTURE_3D:                   uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D; break;
+            case SLANG_TEXTURE_3D:
+                uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+                break;
             case SLANG_TEXTURE_CUBE:
             case SLANG_TEXTURE_CUBE_ARRAY:
             case SLANG_TEXTURE_2D_MULTISAMPLE:
             case SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY:
-            default:                                 return SLANG_OK;
+            default:
+                return SLANG_OK;
             }
             d3dDevice->CreateUnorderedAccessView(nullptr, nullptr, &uavDesc, destDescriptor);
         }
         break;
-    default: break;
+    default:
+        break;
     }
     return SLANG_OK;
 }

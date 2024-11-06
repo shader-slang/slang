@@ -31,9 +31,12 @@ VkAttachmentLoadOp translateLoadOp(IRenderPassLayout::TargetLoadOp loadOp)
 {
     switch (loadOp)
     {
-    case IRenderPassLayout::TargetLoadOp::Clear: return VK_ATTACHMENT_LOAD_OP_CLEAR;
-    case IRenderPassLayout::TargetLoadOp::Load:  return VK_ATTACHMENT_LOAD_OP_LOAD;
-    default:                                     return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    case IRenderPassLayout::TargetLoadOp::Clear:
+        return VK_ATTACHMENT_LOAD_OP_CLEAR;
+    case IRenderPassLayout::TargetLoadOp::Load:
+        return VK_ATTACHMENT_LOAD_OP_LOAD;
+    default:
+        return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     }
 }
 
@@ -41,8 +44,10 @@ VkAttachmentStoreOp translateStoreOp(IRenderPassLayout::TargetStoreOp storeOp)
 {
     switch (storeOp)
     {
-    case IRenderPassLayout::TargetStoreOp::Store: return VK_ATTACHMENT_STORE_OP_STORE;
-    default:                                      return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    case IRenderPassLayout::TargetStoreOp::Store:
+        return VK_ATTACHMENT_STORE_OP_STORE;
+    default:
+        return VK_ATTACHMENT_STORE_OP_DONT_CARE;
     }
 }
 
@@ -66,21 +71,33 @@ VkImageLayout translateImageLayout(ResourceState state)
 {
     switch (state)
     {
-    case ResourceState::Undefined:              return VK_IMAGE_LAYOUT_UNDEFINED;
-    case ResourceState::PreInitialized:         return VK_IMAGE_LAYOUT_PREINITIALIZED;
-    case ResourceState::UnorderedAccess:        return VK_IMAGE_LAYOUT_GENERAL;
-    case ResourceState::RenderTarget:           return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    case ResourceState::DepthRead:              return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-    case ResourceState::DepthWrite:             return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    case ResourceState::Undefined:
+        return VK_IMAGE_LAYOUT_UNDEFINED;
+    case ResourceState::PreInitialized:
+        return VK_IMAGE_LAYOUT_PREINITIALIZED;
+    case ResourceState::UnorderedAccess:
+        return VK_IMAGE_LAYOUT_GENERAL;
+    case ResourceState::RenderTarget:
+        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    case ResourceState::DepthRead:
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    case ResourceState::DepthWrite:
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     case ResourceState::ShaderResource:
     case ResourceState::NonPixelShaderResource:
-    case ResourceState::PixelShaderResource:    return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    case ResourceState::PixelShaderResource:
+        return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     case ResourceState::ResolveDestination:
-    case ResourceState::CopyDestination:        return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    case ResourceState::CopyDestination:
+        return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     case ResourceState::ResolveSource:
-    case ResourceState::CopySource:             return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    case ResourceState::Present:                return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    default:                                    assert(!"Unsupported"); return VK_IMAGE_LAYOUT_UNDEFINED;
+    case ResourceState::CopySource:
+        return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    case ResourceState::Present:
+        return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    default:
+        assert(!"Unsupported");
+        return VK_IMAGE_LAYOUT_UNDEFINED;
     }
 }
 
@@ -90,28 +107,37 @@ VkAccessFlagBits calcAccessFlags(ResourceState state)
     {
     case ResourceState::Undefined:
     case ResourceState::Present:
-    case ResourceState::PreInitialized: return VkAccessFlagBits(0);
-    case ResourceState::VertexBuffer:   return VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-    case ResourceState::ConstantBuffer: return VK_ACCESS_UNIFORM_READ_BIT;
-    case ResourceState::IndexBuffer:    return VK_ACCESS_INDEX_READ_BIT;
+    case ResourceState::PreInitialized:
+        return VkAccessFlagBits(0);
+    case ResourceState::VertexBuffer:
+        return VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    case ResourceState::ConstantBuffer:
+        return VK_ACCESS_UNIFORM_READ_BIT;
+    case ResourceState::IndexBuffer:
+        return VK_ACCESS_INDEX_READ_BIT;
     case ResourceState::RenderTarget:
         return VkAccessFlagBits(
             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
     case ResourceState::ShaderResource:
     case ResourceState::NonPixelShaderResource:
-    case ResourceState::PixelShaderResource:    return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+    case ResourceState::PixelShaderResource:
+        return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
     case ResourceState::UnorderedAccess:
         return VkAccessFlagBits(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-    case ResourceState::DepthRead: return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    case ResourceState::DepthRead:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
     case ResourceState::DepthWrite:
         return VkAccessFlagBits(
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-    case ResourceState::IndirectArgument:   return VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+    case ResourceState::IndirectArgument:
+        return VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
     case ResourceState::ResolveDestination:
-    case ResourceState::CopyDestination:    return VK_ACCESS_TRANSFER_WRITE_BIT;
+    case ResourceState::CopyDestination:
+        return VK_ACCESS_TRANSFER_WRITE_BIT;
     case ResourceState::ResolveSource:
-    case ResourceState::CopySource:         return VK_ACCESS_TRANSFER_READ_BIT;
+    case ResourceState::CopySource:
+        return VK_ACCESS_TRANSFER_READ_BIT;
     case ResourceState::AccelerationStructure:
         return VkAccessFlagBits(
             VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR |
@@ -120,7 +146,9 @@ VkAccessFlagBits calcAccessFlags(ResourceState state)
         return VkAccessFlagBits(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
     case ResourceState::General:
         return VkAccessFlagBits(VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
-    default: assert(!"Unsupported"); return VkAccessFlagBits(0);
+    default:
+        assert(!"Unsupported");
+        return VkAccessFlagBits(0);
     }
 }
 
@@ -129,9 +157,12 @@ VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
     switch (state)
     {
     case ResourceState::Undefined:
-    case ResourceState::PreInitialized: assert(src); return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    case ResourceState::PreInitialized:
+        assert(src);
+        return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     case ResourceState::VertexBuffer:
-    case ResourceState::IndexBuffer:    return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+    case ResourceState::IndexBuffer:
+        return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
     case ResourceState::ConstantBuffer:
     case ResourceState::UnorderedAccess:
         return VkPipelineStageFlagBits(
@@ -142,22 +173,27 @@ VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
     case ResourceState::ShaderResource:
     case ResourceState::NonPixelShaderResource:
-    case ResourceState::PixelShaderResource:    return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    case ResourceState::RenderTarget:           return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    case ResourceState::PixelShaderResource:
+        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    case ResourceState::RenderTarget:
+        return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     case ResourceState::DepthRead:
     case ResourceState::DepthWrite:
         return VkPipelineStageFlagBits(
             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
-    case ResourceState::IndirectArgument:   return VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+    case ResourceState::IndirectArgument:
+        return VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
     case ResourceState::CopySource:
     case ResourceState::CopyDestination:
     case ResourceState::ResolveSource:
-    case ResourceState::ResolveDestination: return VK_PIPELINE_STAGE_TRANSFER_BIT;
+    case ResourceState::ResolveDestination:
+        return VK_PIPELINE_STAGE_TRANSFER_BIT;
     case ResourceState::Present:
         return src ? VkPipelineStageFlagBits(
                          VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT)
                    : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    case ResourceState::General: return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    case ResourceState::General:
+        return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     case ResourceState::AccelerationStructure:
         return VkPipelineStageFlagBits(
             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
@@ -168,7 +204,9 @@ VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
             VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
     case ResourceState::AccelerationStructureBuildInput:
         return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
-    default: assert(!"Unsupported"); return VkPipelineStageFlagBits(0);
+    default:
+        assert(!"Unsupported");
+        return VkPipelineStageFlagBits(0);
     }
 }
 
@@ -187,10 +225,14 @@ VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
 {
     switch (state)
     {
-    case ResourceState::VertexBuffer:   return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    case ResourceState::IndexBuffer:    return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    case ResourceState::ConstantBuffer: return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    case ResourceState::StreamOutput:   return VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT;
+    case ResourceState::VertexBuffer:
+        return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    case ResourceState::IndexBuffer:
+        return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    case ResourceState::ConstantBuffer:
+        return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    case ResourceState::StreamOutput:
+        return VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT;
     case ResourceState::RenderTarget:
     case ResourceState::DepthRead:
     case ResourceState::DepthWrite:
@@ -206,14 +248,18 @@ VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
     case ResourceState::PixelShaderResource:
         return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    case ResourceState::CopySource:      return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    case ResourceState::CopyDestination: return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    case ResourceState::CopySource:
+        return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::CopyDestination:
+        return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     case ResourceState::AccelerationStructure:
         return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
-    case ResourceState::IndirectArgument: return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+    case ResourceState::IndirectArgument:
+        return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
     case ResourceState::AccelerationStructureBuildInput:
         return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-    default: return VkBufferUsageFlagBits(0);
+    default:
+        return VkBufferUsageFlagBits(0);
     }
 }
 
@@ -233,20 +279,31 @@ VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
 {
     switch (state)
     {
-    case ResourceState::RenderTarget:           return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    case ResourceState::DepthWrite:             return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    case ResourceState::DepthRead:              return VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+    case ResourceState::RenderTarget:
+        return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    case ResourceState::DepthWrite:
+        return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    case ResourceState::DepthRead:
+        return VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
     case ResourceState::ShaderResource:
     case ResourceState::NonPixelShaderResource:
-    case ResourceState::PixelShaderResource:    return VK_IMAGE_USAGE_SAMPLED_BIT;
-    case ResourceState::UnorderedAccess:        return VK_IMAGE_USAGE_STORAGE_BIT;
-    case ResourceState::CopySource:             return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    case ResourceState::CopyDestination:        return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    case ResourceState::ResolveSource:          return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    case ResourceState::ResolveDestination:     return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    case ResourceState::Present:                return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::PixelShaderResource:
+        return VK_IMAGE_USAGE_SAMPLED_BIT;
+    case ResourceState::UnorderedAccess:
+        return VK_IMAGE_USAGE_STORAGE_BIT;
+    case ResourceState::CopySource:
+        return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::CopyDestination:
+        return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    case ResourceState::ResolveSource:
+        return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::ResolveDestination:
+        return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    case ResourceState::Present:
+        return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::Undefined:
-    case ResourceState::General:                return (VkImageUsageFlagBits)0;
+    case ResourceState::General:
+        return (VkImageUsageFlagBits)0;
     default:
         {
             assert(!"Unsupported");
@@ -275,7 +332,8 @@ VkImageViewType _calcImageViewType(ITextureResource::Type type, const ITextureRe
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
@@ -331,9 +389,12 @@ VkAccessFlags calcAccessFlagsFromImageLayout(VkImageLayout layout)
     case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
     case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
         return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL: return VK_ACCESS_SHADER_READ_BIT;
-    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:     return VK_ACCESS_TRANSFER_READ_BIT;
-    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:     return VK_ACCESS_TRANSFER_WRITE_BIT;
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        return VK_ACCESS_SHADER_READ_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return VK_ACCESS_TRANSFER_READ_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        return VK_ACCESS_TRANSFER_WRITE_BIT;
     default:
         assert(!"Unsupported VkImageLayout");
         return (VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
@@ -347,13 +408,16 @@ VkPipelineStageFlags calcPipelineStageFlagsFromImageLayout(VkImageLayout layout)
     case VK_IMAGE_LAYOUT_UNDEFINED:
     case VK_IMAGE_LAYOUT_PREINITIALIZED:
     case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-    case VK_IMAGE_LAYOUT_GENERAL:         return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    case VK_IMAGE_LAYOUT_GENERAL:
+        return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
         return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
         return (VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL: return VK_PIPELINE_STAGE_TRANSFER_BIT;
-    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL: return VK_PIPELINE_STAGE_TRANSFER_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return VK_PIPELINE_STAGE_TRANSFER_BIT;
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        return VK_PIPELINE_STAGE_TRANSFER_BIT;
     case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
     case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
     case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
@@ -364,7 +428,9 @@ VkPipelineStageFlags calcPipelineStageFlagsFromImageLayout(VkImageLayout layout)
     case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
         return (
             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
-    default: assert(!"Unsupported VkImageLayout"); return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    default:
+        assert(!"Unsupported VkImageLayout");
+        return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     }
 }
 
@@ -378,9 +444,12 @@ VkImageAspectFlags getAspectMaskFromFormat(VkFormat format)
         return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     case VK_FORMAT_D16_UNORM:
     case VK_FORMAT_D32_SFLOAT:
-    case VK_FORMAT_X8_D24_UNORM_PACK32: return VK_IMAGE_ASPECT_DEPTH_BIT;
-    case VK_FORMAT_S8_UINT:             return VK_IMAGE_ASPECT_STENCIL_BIT;
-    default:                            return VK_IMAGE_ASPECT_COLOR_BIT;
+    case VK_FORMAT_X8_D24_UNORM_PACK32:
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    case VK_FORMAT_S8_UINT:
+        return VK_IMAGE_ASPECT_STENCIL_BIT;
+    default:
+        return VK_IMAGE_ASPECT_COLOR_BIT;
     }
 }
 

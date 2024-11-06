@@ -531,7 +531,8 @@ struct ShaderInputLayoutParser
             break;
 
         case TokenType::IntLiteral:
-        case TokenType::DoubleLiteral: return parseNumericValExpr(parser);
+        case TokenType::DoubleLiteral:
+            return parseNumericValExpr(parser);
 
         case TokenType::LBrace:
             {
@@ -1454,15 +1455,23 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
     case SLANG_SCALAR_TYPE_UINT64:
     case SLANG_SCALAR_TYPE_UINT32:
     case SLANG_SCALAR_TYPE_UINT16:
-    case SLANG_SCALAR_TYPE_UINT8:   type = SimpleScalarType::kUint; break;
+    case SLANG_SCALAR_TYPE_UINT8:
+        type = SimpleScalarType::kUint;
+        break;
     case SLANG_SCALAR_TYPE_INT64:
     case SLANG_SCALAR_TYPE_INT32:
     case SLANG_SCALAR_TYPE_INT16:
-    case SLANG_SCALAR_TYPE_INT8:    type = SimpleScalarType::kInt; break;
+    case SLANG_SCALAR_TYPE_INT8:
+        type = SimpleScalarType::kInt;
+        break;
     case SLANG_SCALAR_TYPE_FLOAT64:
     case SLANG_SCALAR_TYPE_FLOAT32:
-    case SLANG_SCALAR_TYPE_FLOAT16: type = SimpleScalarType::kFloat; break;
-    default:                        type = SimpleScalarType::kUint; break;
+    case SLANG_SCALAR_TYPE_FLOAT16:
+        type = SimpleScalarType::kFloat;
+        break;
+    default:
+        type = SimpleScalarType::kUint;
+        break;
     }
     // List<List<unsigned int>>& dataBuffer = output.dataBuffer;
     int arraySize = arrLen;

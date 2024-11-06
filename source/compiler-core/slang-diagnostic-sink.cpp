@@ -102,7 +102,9 @@ static void formatDiagnosticMessage(
         switch (d)
         {
         // A double dollar sign `$$` is used to emit a single `$`
-        case '$': sb.append('$'); break;
+        case '$':
+            sb.append('$');
+            break;
 
         // A single digit means to emit the corresponding argument.
         // TODO: support more than 10 arguments, and add options
@@ -133,7 +135,9 @@ static void formatDiagnosticMessage(
             }
             break;
 
-        default: SLANG_INVALID_OPERATION("invalid diagnostic message format"); break;
+        default:
+            SLANG_INVALID_OPERATION("invalid diagnostic message format");
+            break;
         }
 
         spanBegin = spanEnd;
@@ -759,9 +763,12 @@ const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByName(const UnownedStrin
     const auto convention = NameConventionUtil::inferConventionFromText(slice);
     switch (convention)
     {
-    case NameConvention::Invalid:    return nullptr;
-    case NameConvention::LowerCamel: return findDiagnosticByExactName(slice);
-    default:                         break;
+    case NameConvention::Invalid:
+        return nullptr;
+    case NameConvention::LowerCamel:
+        return findDiagnosticByExactName(slice);
+    default:
+        break;
     }
 
     StringBuilder buf;

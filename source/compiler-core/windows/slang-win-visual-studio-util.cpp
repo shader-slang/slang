@@ -155,12 +155,18 @@ static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersi
 
     switch (version)
     {
-    case 1400: return _makeVersion(8);
-    case 1500: return _makeVersion(9);
-    case 1600: return _makeVersion(10);
-    case 1700: return _makeVersion(11);
-    case 1800: return _makeVersion(12);
-    default:   break;
+    case 1400:
+        return _makeVersion(8);
+    case 1500:
+        return _makeVersion(9);
+    case 1600:
+        return _makeVersion(10);
+    case 1700:
+        return _makeVersion(11);
+    case 1800:
+        return _makeVersion(12);
+    default:
+        break;
     }
 
     // Seems like versions go in runs of 10 at this point
@@ -174,41 +180,64 @@ static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersi
     {
         switch (version)
         {
-        case 1910: return _makeVersion(15, 0);
-        case 1911: return _makeVersion(15, 3);
-        case 1912: return _makeVersion(15, 5);
-        case 1913: return _makeVersion(15, 6);
-        case 1914: return _makeVersion(15, 7);
-        case 1915: return _makeVersion(15, 8);
-        case 1916: return _makeVersion(15, 9);
-        default:   return _makeVersion(15);
+        case 1910:
+            return _makeVersion(15, 0);
+        case 1911:
+            return _makeVersion(15, 3);
+        case 1912:
+            return _makeVersion(15, 5);
+        case 1913:
+            return _makeVersion(15, 6);
+        case 1914:
+            return _makeVersion(15, 7);
+        case 1915:
+            return _makeVersion(15, 8);
+        case 1916:
+            return _makeVersion(15, 9);
+        default:
+            return _makeVersion(15);
         }
     }
     else if (version >= 1920 && version < 1930)
     {
         switch (version)
         {
-        case 1920: return _makeVersion(16, 0);
-        case 1921: return _makeVersion(16, 1);
-        case 1922: return _makeVersion(16, 2);
-        case 1923: return _makeVersion(16, 3);
-        case 1924: return _makeVersion(16, 4);
-        case 1925: return _makeVersion(16, 5);
-        case 1926: return _makeVersion(16, 6);
-        case 1927: return _makeVersion(16, 7);
-        case 1928: return _makeVersion(16, 9);
-        case 1929: return _makeVersion(16, 11);
-        default:   return _makeVersion(16);
+        case 1920:
+            return _makeVersion(16, 0);
+        case 1921:
+            return _makeVersion(16, 1);
+        case 1922:
+            return _makeVersion(16, 2);
+        case 1923:
+            return _makeVersion(16, 3);
+        case 1924:
+            return _makeVersion(16, 4);
+        case 1925:
+            return _makeVersion(16, 5);
+        case 1926:
+            return _makeVersion(16, 6);
+        case 1927:
+            return _makeVersion(16, 7);
+        case 1928:
+            return _makeVersion(16, 9);
+        case 1929:
+            return _makeVersion(16, 11);
+        default:
+            return _makeVersion(16);
         }
     }
     else if (version >= 1930 && version < 1940)
     {
         switch (version)
         {
-        case 1930: return _makeVersion(17, 0);
-        case 1931: return _makeVersion(17, 1);
-        case 1932: return _makeVersion(17, 2);
-        default:   return _makeVersion(17);
+        case 1930:
+            return _makeVersion(17, 0);
+        case 1931:
+            return _makeVersion(17, 1);
+        case 1932:
+            return _makeVersion(17, 2);
+        default:
+            return _makeVersion(17);
         }
     }
     else if (version >= 1940)

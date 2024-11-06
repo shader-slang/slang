@@ -82,7 +82,8 @@ bool isSimpleDecoration(IROp op)
         {
             return true;
         }
-    default: break;
+    default:
+        break;
     }
     return false;
 }
@@ -303,9 +304,13 @@ IRIntegerValue getIntVal(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    default: SLANG_UNEXPECTED("needed a known integer value"); UNREACHABLE_RETURN(0);
+    default:
+        SLANG_UNEXPECTED("needed a known integer value");
+        UNREACHABLE_RETURN(0);
 
-    case kIROp_IntLit: return static_cast<IRConstant*>(inst)->value.intVal; break;
+    case kIROp_IntLit:
+        return static_cast<IRConstant*>(inst)->value.intVal;
+        break;
     }
 }
 
@@ -559,7 +564,8 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
     case kIROp_Return:
     case kIROp_Unreachable:
     case kIROp_MissingReturn:
-    case kIROp_GenericAsm:    break;
+    case kIROp_GenericAsm:
+        break;
 
     case kIROp_unconditionalBranch:
     case kIROp_loop:
@@ -723,11 +729,15 @@ UInt IRUnconditionalBranch::getArgCount()
 {
     switch (getOp())
     {
-    case kIROp_unconditionalBranch: return getOperandCount() - 1;
+    case kIROp_unconditionalBranch:
+        return getOperandCount() - 1;
 
-    case kIROp_loop: return getOperandCount() - 3;
+    case kIROp_loop:
+        return getOperandCount() - 3;
 
-    default: SLANG_UNEXPECTED("unhandled unconditional branch opcode"); UNREACHABLE_RETURN(0);
+    default:
+        SLANG_UNEXPECTED("unhandled unconditional branch opcode");
+        UNREACHABLE_RETURN(0);
     }
 }
 
@@ -735,11 +745,15 @@ IRUse* IRUnconditionalBranch::getArgs()
 {
     switch (getOp())
     {
-    case kIROp_unconditionalBranch: return getOperands() + 1;
+    case kIROp_unconditionalBranch:
+        return getOperands() + 1;
 
-    case kIROp_loop: return getOperands() + 3;
+    case kIROp_loop:
+        return getOperands() + 3;
 
-    default: SLANG_UNEXPECTED("unhandled unconditional branch opcode"); UNREACHABLE_RETURN(0);
+    default:
+        SLANG_UNEXPECTED("unhandled unconditional branch opcode");
+        UNREACHABLE_RETURN(0);
     }
 }
 
@@ -747,9 +761,14 @@ void IRUnconditionalBranch::removeArgument(UInt index)
 {
     switch (getOp())
     {
-    case kIROp_unconditionalBranch: removeOperand(1 + index); break;
-    case kIROp_loop:                removeOperand(3 + index); break;
-    default:                        SLANG_UNEXPECTED("unhandled unconditional branch opcode");
+    case kIROp_unconditionalBranch:
+        removeOperand(1 + index);
+        break;
+    case kIROp_loop:
+        removeOperand(3 + index);
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled unconditional branch opcode");
     }
 }
 
@@ -839,7 +858,8 @@ bool isTerminatorInst(IROp op)
 {
     switch (op)
     {
-    default: return false;
+    default:
+        return false;
 
     case kIROp_Return:
     case kIROp_unconditionalBranch:
@@ -848,7 +868,8 @@ bool isTerminatorInst(IROp op)
     case kIROp_ifElse:
     case kIROp_Switch:
     case kIROp_Unreachable:
-    case kIROp_MissingReturn:       return true;
+    case kIROp_MissingReturn:
+        return true;
     }
 }
 
@@ -1239,11 +1260,14 @@ IRInst* IRInsertLoc::getParent() const
     switch (getMode())
     {
     default:
-    case Mode::None:    return nullptr;
+    case Mode::None:
+        return nullptr;
     case Mode::Before:
-    case Mode::After:   return inst->getParent();
+    case Mode::After:
+        return inst->getParent();
     case Mode::AtStart:
-    case Mode::AtEnd:   return inst;
+    case Mode::AtEnd:
+        return inst;
     }
 }
 
@@ -2069,7 +2093,8 @@ bool IRConstant::isValueEqual(IRConstant* rhs)
         {
             return true;
         }
-    default: break;
+    default:
+        break;
     }
 
     SLANG_ASSERT(!"Unhandled type");
@@ -2158,7 +2183,9 @@ IRConstant* IRBuilder::_findOrEmitConstant(IRConstant& keyInst)
 
     switch (keyInst.getOp())
     {
-    default: SLANG_UNEXPECTED("missing case for IR constant"); break;
+    default:
+        SLANG_UNEXPECTED("missing case for IR constant");
+        break;
 
     case kIROp_BoolLit:
     case kIROp_IntLit:
@@ -2237,6 +2264,11 @@ IRInst* IRBuilder::getBoolValue(bool inValue)
     return _findOrEmitConstant(keyInst);
 }
 
+IRInst* IRBuilder::getIntValue(IRIntegerValue value)
+{
+    return getIntValue(getIntType(), value);
+}
+
 IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue inValue)
 {
     IRConstant keyInst;
@@ -2246,17 +2278,31 @@ IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue inValue)
     // Truncate the input value based on `type`.
     switch (type->getOp())
     {
-    case kIROp_Int8Type:   keyInst.value.intVal = static_cast<int8_t>(inValue); break;
-    case kIROp_Int16Type:  keyInst.value.intVal = static_cast<int16_t>(inValue); break;
-    case kIROp_IntType:    keyInst.value.intVal = static_cast<int32_t>(inValue); break;
-    case kIROp_UInt8Type:  keyInst.value.intVal = static_cast<uint8_t>(inValue); break;
-    case kIROp_UInt16Type: keyInst.value.intVal = static_cast<uint16_t>(inValue); break;
+    case kIROp_Int8Type:
+        keyInst.value.intVal = static_cast<int8_t>(inValue);
+        break;
+    case kIROp_Int16Type:
+        keyInst.value.intVal = static_cast<int16_t>(inValue);
+        break;
+    case kIROp_IntType:
+        keyInst.value.intVal = static_cast<int32_t>(inValue);
+        break;
+    case kIROp_UInt8Type:
+        keyInst.value.intVal = static_cast<uint8_t>(inValue);
+        break;
+    case kIROp_UInt16Type:
+        keyInst.value.intVal = static_cast<uint16_t>(inValue);
+        break;
     case kIROp_BoolType:
         keyInst.m_op = kIROp_BoolLit;
         keyInst.value.intVal = ((inValue != 0) ? 1 : 0);
         break;
-    case kIROp_UIntType: keyInst.value.intVal = static_cast<uint32_t>(inValue); break;
-    default:             keyInst.value.intVal = inValue; break;
+    case kIROp_UIntType:
+        keyInst.value.intVal = static_cast<uint32_t>(inValue);
+        break;
+    default:
+        keyInst.value.intVal = inValue;
+        break;
     }
     return _findOrEmitConstant(keyInst);
 }
@@ -2270,9 +2316,15 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     // Truncate the input value based on `type`.
     switch (type->getOp())
     {
-    case kIROp_FloatType: keyInst.value.floatVal = static_cast<float>(inValue); break;
-    case kIROp_HalfType:  keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue)); break;
-    default:              keyInst.value.floatVal = inValue; break;
+    case kIROp_FloatType:
+        keyInst.value.floatVal = static_cast<float>(inValue);
+        break;
+    case kIROp_HalfType:
+        keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue));
+        break;
+    default:
+        keyInst.value.floatVal = inValue;
+        break;
     }
 
     return _findOrEmitConstant(keyInst);
@@ -3714,13 +3766,18 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_UIntType:
     case kIROp_UIntPtrType:
     case kIROp_UInt64Type:
-    case kIROp_CharType:         return getIntValue(type, 0);
-    case kIROp_BoolType:         return getBoolValue(false);
+    case kIROp_CharType:
+        return getIntValue(type, 0);
+    case kIROp_BoolType:
+        return getBoolValue(false);
     case kIROp_FloatType:
     case kIROp_HalfType:
-    case kIROp_DoubleType:       return getFloatValue(type, 0.0);
-    case kIROp_VoidType:         return getVoidValue();
-    case kIROp_StringType:       return getStringValue(UnownedStringSlice());
+    case kIROp_DoubleType:
+        return getFloatValue(type, 0.0);
+    case kIROp_VoidType:
+        return getVoidValue();
+    case kIROp_StringType:
+        return getStringValue(UnownedStringSlice());
     case kIROp_PtrType:
     case kIROp_InOutType:
     case kIROp_OutType:
@@ -3729,7 +3786,8 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_ConstRefType:
     case kIROp_ComPtrType:
     case kIROp_NativePtrType:
-    case kIROp_NativeStringType: return getNullPtrValue(type);
+    case kIROp_NativeStringType:
+        return getNullPtrValue(type);
     case kIROp_OptionalType:
         {
             auto inner =
@@ -3804,7 +3862,8 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
                 return nullptr;
             return emitIntrinsicInst(type, kIROp_MakeMatrixFromScalar, 1, &inner);
         }
-    default: break;
+    default:
+        break;
     }
     if (fallback)
     {
@@ -3842,19 +3901,25 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     auto style = getTypeStyle(type->getOp());
     switch (style)
     {
-    case kIROp_IntType:        return TypeCastStyle::Int;
+    case kIROp_IntType:
+        return TypeCastStyle::Int;
     case kIROp_FloatType:
     case kIROp_HalfType:
-    case kIROp_DoubleType:     return TypeCastStyle::Float;
-    case kIROp_BoolType:       return TypeCastStyle::Bool;
+    case kIROp_DoubleType:
+        return TypeCastStyle::Float;
+    case kIROp_BoolType:
+        return TypeCastStyle::Bool;
     case kIROp_PtrType:
     case kIROp_InOutType:
     case kIROp_OutType:
     case kIROp_RawPointerType:
     case kIROp_RefType:
-    case kIROp_ConstRefType:   return TypeCastStyle::Ptr;
-    case kIROp_VoidType:       return TypeCastStyle::Void;
-    default:                   return TypeCastStyle::Unknown;
+    case kIROp_ConstRefType:
+        return TypeCastStyle::Ptr;
+    case kIROp_VoidType:
+        return TypeCastStyle::Void;
+    default:
+        return TypeCastStyle::Unknown;
     }
 }
 
@@ -4166,10 +4231,15 @@ IRInst* IRBuilder::emitMakeCompositeFromScalar(IRType* type, IRInst* scalarValue
 {
     switch (type->getOp())
     {
-    case kIROp_VectorType: return emitMakeVectorFromScalar(type, scalarValue);
-    case kIROp_MatrixType: return emitMakeMatrixFromScalar(type, scalarValue);
-    case kIROp_ArrayType:  return emitMakeArrayFromElement(type, scalarValue);
-    default:               SLANG_UNEXPECTED("unhandled composite type"); UNREACHABLE_RETURN(nullptr);
+    case kIROp_VectorType:
+        return emitMakeVectorFromScalar(type, scalarValue);
+    case kIROp_MatrixType:
+        return emitMakeMatrixFromScalar(type, scalarValue);
+    case kIROp_ArrayType:
+        return emitMakeArrayFromElement(type, scalarValue);
+    default:
+        SLANG_UNEXPECTED("unhandled composite type");
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -5825,7 +5895,8 @@ IRInst* IRBuilder::emitGetNativePtr(IRInst* value)
             1,
             &value);
         break;
-    case kIROp_ExtractExistentialType: return emitGetNativePtr(value->getOperand(0));
+    case kIROp_ExtractExistentialType:
+        return emitGetNativePtr(value->getOperand(0));
     default:
         SLANG_UNEXPECTED("invalid operand type for `getNativePtr`.");
         UNREACHABLE_RETURN(nullptr);
@@ -6555,9 +6626,11 @@ static bool shouldFoldInstIntoUses(IRDumpContext* context, IRInst* inst)
     case kIROp_StructType:
     case kIROp_ClassType:
     case kIROp_GLSLShaderStorageBufferType:
-    case kIROp_InterfaceType:               return false;
+    case kIROp_InterfaceType:
+        return false;
 
-    default: break;
+    default:
+        break;
     }
 
     if (as<IRType>(inst))
@@ -6830,15 +6903,24 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
             dumpType(context, irConst->getFullType());
             return;
 
-        case kIROp_BoolLit: dump(context, irConst->value.intVal ? "true" : "false"); return;
+        case kIROp_BoolLit:
+            dump(context, irConst->value.intVal ? "true" : "false");
+            return;
 
-        case kIROp_BlobLit: dump(context, "<binary blob>"); return;
+        case kIROp_BlobLit:
+            dump(context, "<binary blob>");
+            return;
 
-        case kIROp_StringLit: dumpEncodeString(context, irConst->getStringSlice()); return;
+        case kIROp_StringLit:
+            dumpEncodeString(context, irConst->getStringSlice());
+            return;
 
-        case kIROp_PtrLit: dump(context, "<ptr>"); return;
+        case kIROp_PtrLit:
+            dump(context, "<ptr>");
+            return;
 
-        default: break;
+        default:
+            break;
         }
     }
 
@@ -6846,9 +6928,15 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
     // clear anyway to the user
     switch (op)
     {
-    case kIROp_SPIRVAsmOperandEnum:    dumpInstExpr(context, inst->getOperand(0)); return;
-    case kIROp_SPIRVAsmOperandLiteral: dumpInstExpr(context, inst->getOperand(0)); return;
-    case kIROp_SPIRVAsmOperandInst:    dumpInstExpr(context, inst->getOperand(0)); return;
+    case kIROp_SPIRVAsmOperandEnum:
+        dumpInstExpr(context, inst->getOperand(0));
+        return;
+    case kIROp_SPIRVAsmOperandLiteral:
+        dumpInstExpr(context, inst->getOperand(0));
+        return;
+    case kIROp_SPIRVAsmOperandInst:
+        dumpInstExpr(context, inst->getOperand(0));
+        return;
     case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
         dump(context, "__rayPayloadFromLocation(");
         dumpInstExpr(context, inst->getOperand(0));
@@ -6868,8 +6956,12 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
         dump(context, "%");
         dumpInstExpr(context, inst->getOperand(0));
         return;
-    case kIROp_SPIRVAsmOperandResult:   dump(context, "result"); return;
-    case kIROp_SPIRVAsmOperandTruncate: dump(context, "__truncate"); return;
+    case kIROp_SPIRVAsmOperandResult:
+        dump(context, "result");
+        return;
+    case kIROp_SPIRVAsmOperandTruncate:
+        dump(context, "__truncate");
+        return;
     case kIROp_SPIRVAsmOperandSampledType:
         dump(context, "__sampledType(");
         dumpInstExpr(context, inst->getOperand(0));
@@ -6913,19 +7005,24 @@ static void dumpInstBody(IRDumpContext* context, IRInst* inst)
     case kIROp_Func:
     case kIROp_GlobalVar:
     case kIROp_Generic:
-    case kIROp_Expand:    dumpIRGlobalValueWithCode(context, (IRGlobalValueWithCode*)inst); return;
+    case kIROp_Expand:
+        dumpIRGlobalValueWithCode(context, (IRGlobalValueWithCode*)inst);
+        return;
 
     case kIROp_WitnessTable:
     case kIROp_StructType:
     case kIROp_ClassType:
     case kIROp_GLSLShaderStorageBufferType:
-    case kIROp_SPIRVAsm:                    dumpIRParentInst(context, inst); return;
+    case kIROp_SPIRVAsm:
+        dumpIRParentInst(context, inst);
+        return;
 
     case kIROp_WitnessTableEntry:
         dumpIRWitnessTableEntry(context, (IRWitnessTableEntry*)inst);
         return;
 
-    default: break;
+    default:
+        break;
     }
 
     // Okay, we have a seemingly "ordinary" op now
@@ -7237,8 +7334,10 @@ bool isIntegralType(IRType* t)
         case BaseType::UInt:
         case BaseType::UInt64:
         case BaseType::IntPtr:
-        case BaseType::UIntPtr: return true;
-        default:                return false;
+        case BaseType::UIntPtr:
+            return true;
+        default:
+            return false;
         }
     }
     return false;
@@ -7252,8 +7351,10 @@ bool isFloatingType(IRType* t)
         {
         case BaseType::Float:
         case BaseType::Half:
-        case BaseType::Double: return true;
-        default:               return false;
+        case BaseType::Double:
+            return true;
+        default:
+            return false;
         }
     }
     return false;
@@ -7263,18 +7364,27 @@ IntInfo getIntTypeInfo(const IRType* intType)
 {
     switch (intType->getOp())
     {
-    case kIROp_UInt8Type:  return {8, false};
-    case kIROp_UInt16Type: return {16, false};
-    case kIROp_UIntType:   return {32, false};
-    case kIROp_UInt64Type: return {64, false};
-    case kIROp_Int8Type:   return {8, true};
-    case kIROp_Int16Type:  return {16, true};
-    case kIROp_IntType:    return {32, true};
-    case kIROp_Int64Type:  return {64, true};
+    case kIROp_UInt8Type:
+        return {8, false};
+    case kIROp_UInt16Type:
+        return {16, false};
+    case kIROp_UIntType:
+        return {32, false};
+    case kIROp_UInt64Type:
+        return {64, false};
+    case kIROp_Int8Type:
+        return {8, true};
+    case kIROp_Int16Type:
+        return {16, true};
+    case kIROp_IntType:
+        return {32, true};
+    case kIROp_Int64Type:
+        return {64, true};
 
     case kIROp_IntPtrType:  // target platform dependent
     case kIROp_UIntPtrType: // target platform dependent
-    default:                SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
+    default:
+        SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
     }
 }
 
@@ -7282,11 +7392,16 @@ IROp getIntTypeOpFromInfo(const IntInfo info)
 {
     switch (info.width)
     {
-    case 8:  return info.isSigned ? kIROp_Int8Type : kIROp_UInt8Type;
-    case 16: return info.isSigned ? kIROp_Int16Type : kIROp_UInt16Type;
-    case 32: return info.isSigned ? kIROp_IntType : kIROp_UIntType;
-    case 64: return info.isSigned ? kIROp_Int64Type : kIROp_UInt64Type;
-    default: SLANG_UNEXPECTED("Unhandled info passed to getIntTypeOpFromInfo");
+    case 8:
+        return info.isSigned ? kIROp_Int8Type : kIROp_UInt8Type;
+    case 16:
+        return info.isSigned ? kIROp_Int16Type : kIROp_UInt16Type;
+    case 32:
+        return info.isSigned ? kIROp_IntType : kIROp_UIntType;
+    case 64:
+        return info.isSigned ? kIROp_Int64Type : kIROp_UInt64Type;
+    default:
+        SLANG_UNEXPECTED("Unhandled info passed to getIntTypeOpFromInfo");
     }
 }
 
@@ -7294,10 +7409,14 @@ FloatInfo getFloatingTypeInfo(const IRType* floatType)
 {
     switch (floatType->getOp())
     {
-    case kIROp_HalfType:   return {16};
-    case kIROp_FloatType:  return {32};
-    case kIROp_DoubleType: return {64};
-    default:               SLANG_UNEXPECTED("Unhandled type passed to getFloatTypeInfo");
+    case kIROp_HalfType:
+        return {16};
+    case kIROp_FloatType:
+        return {32};
+    case kIROp_DoubleType:
+        return {64};
+    default:
+        SLANG_UNEXPECTED("Unhandled type passed to getFloatTypeInfo");
     }
 }
 
@@ -7308,8 +7427,10 @@ bool isIntegralScalarOrCompositeType(IRType* t)
     switch (t->getOp())
     {
     case kIROp_VectorType:
-    case kIROp_MatrixType: return isIntegralType((IRType*)t->getOperand(0));
-    default:               return isIntegralType(t);
+    case kIROp_MatrixType:
+        return isIntegralType((IRType*)t->getOperand(0));
+    default:
+        return isIntegralType(t);
     }
 }
 
@@ -7718,11 +7839,20 @@ void IRInst::insertAt(IRInsertLoc const& loc)
     IRInst* other = loc.getInst();
     switch (loc.getMode())
     {
-    case IRInsertLoc::Mode::None:    break;
-    case IRInsertLoc::Mode::Before:  insertBefore(other); break;
-    case IRInsertLoc::Mode::After:   insertAfter(other); break;
-    case IRInsertLoc::Mode::AtStart: insertAtStart(other); break;
-    case IRInsertLoc::Mode::AtEnd:   insertAtEnd(other); break;
+    case IRInsertLoc::Mode::None:
+        break;
+    case IRInsertLoc::Mode::Before:
+        insertBefore(other);
+        break;
+    case IRInsertLoc::Mode::After:
+        insertAfter(other);
+        break;
+    case IRInsertLoc::Mode::AtStart:
+        insertAtStart(other);
+        break;
+    case IRInsertLoc::Mode::AtEnd:
+        insertAtEnd(other);
+        break;
     }
 }
 
@@ -7857,7 +7987,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     {
     // By default, assume that we might have side effects,
     // to safely cover all the instructions we haven't had time to think about.
-    default: break;
+    default:
+        break;
 
     case kIROp_Call:
         {
@@ -8015,13 +8146,15 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_TorchTensorGetView:
     case kIROp_GetStringHash:
     case kIROp_AllocateOpaqueHandle:
-    case kIROp_GetArrayLength:                      return false;
+    case kIROp_GetArrayLength:
+        return false;
 
     case kIROp_ForwardDifferentiate:
     case kIROp_BackwardDifferentiate:
     case kIROp_BackwardDifferentiatePrimal:
     case kIROp_BackwardDifferentiatePropagate:
-    case kIROp_DetachDerivative:               return false;
+    case kIROp_DetachDerivative:
+        return false;
 
     case kIROp_Div:
     case kIROp_IRem:
@@ -8036,7 +8169,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
         }
         return false;
 
-    case kIROp_FRem: return false;
+    case kIROp_FRem:
+        return false;
     }
     return true;
 }
@@ -8288,7 +8422,8 @@ IRInst* getResolvedInstForDecorations(IRInst* inst, bool resolveThroughDifferent
             case kIROp_BackwardDifferentiatePropagate:
                 candidate = candidate->getOperand(0);
                 continue;
-            default: break;
+            default:
+                break;
             }
         }
         if (auto genericInst = as<IRGeneric>(candidate))
@@ -8314,11 +8449,14 @@ bool isDefinition(IRInst* inVal)
     //
     switch (val->getOp())
     {
-    case kIROp_Func: return val->getFirstChild() != nullptr;
+    case kIROp_Func:
+        return val->getFirstChild() != nullptr;
 
-    case kIROp_GlobalConstant: return cast<IRGlobalConstant>(val)->getValue() != nullptr;
+    case kIROp_GlobalConstant:
+        return cast<IRGlobalConstant>(val)->getValue() != nullptr;
 
-    default: break;
+    default:
+        break;
     }
 
     // In all other cases, if we have an instruciton
@@ -8451,7 +8589,8 @@ bool isMovableInst(IRInst* inst)
     case kIROp_Eql:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
-    case kIROp_ExtractExistentialWitnessTable: return true;
+    case kIROp_ExtractExistentialWitnessTable:
+        return true;
     case kIROp_Call:
         // Similar to the case in IRInst::mightHaveSideEffects, pure
         // calls are ok
@@ -8464,12 +8603,15 @@ bool isMovableInst(IRInst* inst)
             switch (addrType->getOp())
             {
             case kIROp_ConstantBufferType:
-            case kIROp_ParameterBlockType: return true;
-            default:                       break;
+            case kIROp_ParameterBlockType:
+                return true;
+            default:
+                break;
             }
         }
         return false;
-    default: return false;
+    default:
+        return false;
     }
 }
 

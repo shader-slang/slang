@@ -54,10 +54,13 @@ struct CollectGlobalUniformParametersContext
     {
         switch (key->getOp())
         {
-        case kIROp_GlobalParam:     return cast<IRGlobalParam>(key);
+        case kIROp_GlobalParam:
+            return cast<IRGlobalParam>(key);
         case kIROp_MakeExistential:
-        case kIROp_WrapExistential: return as<IRGlobalParam>(key->getOperand(0));
-        default:                    return nullptr;
+        case kIROp_WrapExistential:
+            return as<IRGlobalParam>(key->getOperand(0));
+        default:
+            return nullptr;
         }
     }
 

@@ -3566,6 +3566,7 @@ public:
     IRInst* replaceOperand(IRUse* use, IRInst* newValue);
 
     IRInst* getBoolValue(bool value);
+    IRInst* getIntValue(IRIntegerValue value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);

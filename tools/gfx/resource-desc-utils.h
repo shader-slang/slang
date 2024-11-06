@@ -35,9 +35,12 @@ inline int calcEffectiveArraySize(const ITextureResource::Desc& desc)
         {
             return arrSize;
         }
-    case IResource::Type::TextureCube: return arrSize * 6;
-    case IResource::Type::Texture3D:   return 1;
-    default:                           return 0;
+    case IResource::Type::TextureCube:
+        return arrSize * 6;
+    case IResource::Type::Texture3D:
+        return 1;
+    default:
+        return 0;
     }
 }
 
@@ -46,7 +49,8 @@ inline int calcMaxDimension(ITextureResource::Extents size, IResource::Type type
 {
     switch (type)
     {
-    case IResource::Type::Texture1D: return size.width;
+    case IResource::Type::Texture1D:
+        return size.width;
     case IResource::Type::Texture3D:
         return Slang::Math::Max(Slang::Math::Max(size.width, size.height), size.depth);
     case IResource::Type::TextureCube: // fallthru
@@ -54,7 +58,8 @@ inline int calcMaxDimension(ITextureResource::Extents size, IResource::Type type
         {
             return Slang::Math::Max(size.width, size.height);
         }
-    default: return 0;
+    default:
+        return 0;
     }
 }
 
@@ -84,7 +89,8 @@ inline int calcNumSubResources(const ITextureResource::Desc& desc)
             // There are 6 faces to a cubemap
             return numMipMaps * arrSize * 6;
         }
-    default: return 0;
+    default:
+        return 0;
     }
 }
 

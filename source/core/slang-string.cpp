@@ -367,11 +367,16 @@ OSString String::toWString(Index* outLength) const
         List<Byte> buf;
         switch (sizeof(wchar_t))
         {
-        case 2: Slang::CharEncoding::UTF16->encode(getUnownedSlice(), buf); break;
+        case 2:
+            Slang::CharEncoding::UTF16->encode(getUnownedSlice(), buf);
+            break;
 
-        case 4: Slang::CharEncoding::UTF32->encode(getUnownedSlice(), buf); break;
+        case 4:
+            Slang::CharEncoding::UTF32->encode(getUnownedSlice(), buf);
+            break;
 
-        default: break;
+        default:
+            break;
         }
 
         auto length = Index(buf.getCount() / sizeof(wchar_t));
@@ -688,9 +693,12 @@ Index UnownedStringSlice::indexOf(const UnownedStringSlice& in) const
     const char* inChars = in.m_begin;
     switch (inLen)
     {
-    case 0:  return 0;
-    case 1:  return indexOf(inChars[0]);
-    default: break;
+    case 0:
+        return 0;
+    case 1:
+        return indexOf(inChars[0]);
+    default:
+        break;
     }
 
     const char* chars = m_begin;

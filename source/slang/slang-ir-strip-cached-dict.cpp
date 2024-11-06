@@ -15,8 +15,11 @@ void stripCachedDictionaries(IRModule* module)
         {
         case kIROp_GenericSpecializationDictionary:
         case kIROp_ExistentialFuncSpecializationDictionary:
-        case kIROp_ExistentialTypeSpecializationDictionary: toRemove.add(inst); break;
-        default:                                            continue;
+        case kIROp_ExistentialTypeSpecializationDictionary:
+            toRemove.add(inst);
+            break;
+        default:
+            continue;
         }
     }
     for (auto inst : toRemove)

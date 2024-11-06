@@ -56,7 +56,8 @@ static IRInst* findBreakableRegionHeaderInst(IRDominatorTree* domTree, IRBlock* 
         switch (terminator->getOp())
         {
         case kIROp_Switch:
-        case kIROp_loop:   return terminator;
+        case kIROp_loop:
+            return terminator;
         }
     }
     return nullptr;
@@ -145,7 +146,8 @@ static bool isTrivialSingleIterationLoop(
                 if (isBlockInRegion(context.domTree, as<IRSwitch>(terminator), breakOriginBlock))
                     return false;
                 break;
-            default: break;
+            default:
+                break;
             }
         }
     }
@@ -576,7 +578,8 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
                     // If the target block is used by a special control flow inst,
                     // it is likely a merge block and we can't fuse it.
                     return;
-                default: break;
+                default:
+                    break;
                 }
             }
             targetUse->set(target);

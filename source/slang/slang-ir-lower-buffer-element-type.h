@@ -8,6 +8,14 @@ class TargetProgram;
 struct IRTypeLayoutRules;
 struct IRType;
 
+struct BufferElementTypeLoweringOptions
+{
+    bool lowerBufferPointer = false;
+
+    // For WGSL, we can only create arrays that has a stride of 16 bytes for constant buffers.
+    bool use16ByteArrayElementForConstantBuffer = false;
+};
+
 // For each struct type S used as element type of a ConstantBuffer, ParameterBlock or
 // [RW]StructuredBuffer, we create a lowered type L, where matrix types are lowered to arrays of
 // vectors based on major-ness, and loads from the buffer are converted to L_to_S(load(buffer)), and
@@ -18,7 +26,7 @@ struct IRType;
 void lowerBufferElementTypeToStorageType(
     TargetProgram* target,
     IRModule* module,
-    bool lowerBufferPointer = false);
+    BufferElementTypeLoweringOptions options = BufferElementTypeLoweringOptions());
 
 
 // Returns the type layout rules should be used for a buffer resource type.

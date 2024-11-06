@@ -582,8 +582,11 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
         {
             switch (decor->getOp())
             {
-            case kIROp_ExportDecoration: return true;
-            case kIROp_ImportDecoration: isImported = true; break;
+            case kIROp_ExportDecoration:
+                return true;
+            case kIROp_ImportDecoration:
+                isImported = true;
+                break;
             }
         }
         for (auto decor : innerInst->getDecorations())
@@ -592,7 +595,9 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
             {
             case kIROp_ForwardDerivativeDecoration:
             case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_PrimalSubstituteDecoration:              shouldKeptAliveIfImported = true; break;
+            case kIROp_PrimalSubstituteDecoration:
+                shouldKeptAliveIfImported = true;
+                break;
             }
         }
         if (isImported && shouldKeptAliveIfImported)
@@ -643,10 +648,13 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
         // this problem.
         //
     case kIROp_StructField:
-    case kIROp_WitnessTableEntry: return true;
+    case kIROp_WitnessTableEntry:
+        return true;
 
-    case kIROp_GlobalParam: return options.keepGlobalParamsAlive;
-    default:                break;
+    case kIROp_GlobalParam:
+        return options.keepGlobalParamsAlive;
+    default:
+        break;
     }
 
     // If none of the explicit cases above matched, then we will consider
@@ -673,7 +681,8 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
         // Ignore all operands of SpecializationDictionaryItem.
         // This inst is used as a cache and shouldn't hold anything alive.
         return true;
-    default: break;
+    default:
+        break;
     }
     return false;
 }

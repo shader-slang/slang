@@ -1,7 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-mtl -compute -shaderobj -output-using-type -render-features argument-buffer-tier-2
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 struct TestStruct<Format:__BuiltinIntegerType, let count : int>
 {

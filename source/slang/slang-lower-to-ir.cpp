@@ -756,7 +756,8 @@ LoweredValInfo emitCallToVal(
     auto builder = context->irBuilder;
     switch (funcVal.flavor)
     {
-    case LoweredValInfo::Flavor::None: SLANG_UNEXPECTED("null function");
+    case LoweredValInfo::Flavor::None:
+        SLANG_UNEXPECTED("null function");
     default:
         switch (tryEnv.clauseType)
         {
@@ -806,7 +807,8 @@ LoweredValInfo emitCallToVal(
                 return LoweredValInfo::simple(value);
             }
             break;
-        default: SLANG_UNIMPLEMENTED_X("emitCallToVal(tryClauseType)");
+        default:
+            SLANG_UNIMPLEMENTED_X("emitCallToVal(tryClauseType)");
         }
     }
 }
@@ -1053,7 +1055,8 @@ top:
     {
     case LoweredValInfo::Flavor::None:
     case LoweredValInfo::Flavor::Simple:
-    case LoweredValInfo::Flavor::Ptr:    return lowered;
+    case LoweredValInfo::Flavor::Ptr:
+        return lowered;
 
     case LoweredValInfo::Flavor::BoundStorage:
         {
@@ -1188,7 +1191,9 @@ top:
             auto result = builder->emitCast(info->type, getSimpleVal(context, baseVal));
             return LoweredValInfo::simple(result);
         }
-    default: SLANG_UNEXPECTED("unhandled value flavor"); UNREACHABLE_RETURN(LoweredValInfo());
+    default:
+        SLANG_UNEXPECTED("unhandled value flavor");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 }
 
@@ -1202,13 +1207,18 @@ IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
 
     switch (lowered.flavor)
     {
-    case LoweredValInfo::Flavor::None: return nullptr;
+    case LoweredValInfo::Flavor::None:
+        return nullptr;
 
-    case LoweredValInfo::Flavor::Simple: return lowered.val;
+    case LoweredValInfo::Flavor::Simple:
+        return lowered.val;
 
-    case LoweredValInfo::Flavor::Ptr: return builder->emitLoad(lowered.val);
+    case LoweredValInfo::Flavor::Ptr:
+        return builder->emitLoad(lowered.val);
 
-    default: SLANG_UNEXPECTED("unhandled value flavor"); UNREACHABLE_RETURN(nullptr);
+    default:
+        SLANG_UNEXPECTED("unhandled value flavor");
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
@@ -2318,10 +2328,18 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         IROp op;
         switch (t->getOp())
         {
-        case kIROp_VerticesType:   op = kIROp_VerticesDecoration; break;
-        case kIROp_IndicesType:    op = kIROp_IndicesDecoration; break;
-        case kIROp_PrimitivesType: op = kIROp_PrimitivesDecoration; break;
-        default:                   SLANG_UNREACHABLE("Missing case for IRMeshOutputType"); break;
+        case kIROp_VerticesType:
+            op = kIROp_VerticesDecoration;
+            break;
+        case kIROp_IndicesType:
+            op = kIROp_IndicesDecoration;
+            break;
+        case kIROp_PrimitivesType:
+            op = kIROp_PrimitivesDecoration;
+            break;
+        default:
+            SLANG_UNREACHABLE("Missing case for IRMeshOutputType");
+            break;
         }
         builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
     }
@@ -2516,7 +2534,9 @@ void addInArg(IRGenContext* context, List<IRInst*>* ioArgs, LoweredValInfo argVa
         args.add(getSimpleVal(context, argVal));
         break;
 
-    default: SLANG_UNIMPLEMENTED_X("addInArg case"); break;
+    default:
+        SLANG_UNIMPLEMENTED_X("addInArg case");
+        break;
     }
 }
 
@@ -2649,7 +2669,9 @@ void addArg(
         }
         break;
 
-    default: addInArg(context, ioArgs, argVal); break;
+    default:
+        addInArg(context, ioArgs, argVal);
+        break;
     }
 }
 
@@ -3203,15 +3225,21 @@ void _lowerFuncDeclBaseTypeInfo(
         // then we will represent it with a pointer type in
         // the IR, but we will use a specialized pointer
         // type that encodes the parameter direction information.
-        case kParameterDirection_Out:   irParamType = builder->getOutType(irParamType); break;
-        case kParameterDirection_InOut: irParamType = builder->getInOutType(irParamType); break;
+        case kParameterDirection_Out:
+            irParamType = builder->getOutType(irParamType);
+            break;
+        case kParameterDirection_InOut:
+            irParamType = builder->getInOutType(irParamType);
+            break;
         case kParameterDirection_Ref:
             irParamType = builder->getRefType(irParamType, AddressSpace::Generic);
             break;
         case kParameterDirection_ConstRef:
             irParamType = builder->getConstRefType(irParamType);
             break;
-        default: SLANG_UNEXPECTED("unknown parameter direction"); break;
+        default:
+            SLANG_UNEXPECTED("unknown parameter direction");
+            break;
         }
 
         // If the parameter was explicitly marked as being a compile-time
@@ -3605,7 +3633,8 @@ struct ExprLoweringContext
     {
         switch (funcVal.flavor)
         {
-        default: return;
+        default:
+            return;
         }
     }
 
@@ -4511,7 +4540,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 UNREACHABLE_RETURN(LoweredValInfo());
                 break;
 
-            case BaseType::Bool: return LoweredValInfo::simple(getBuilder()->getBoolValue(false));
+            case BaseType::Bool:
+                return LoweredValInfo::simple(getBuilder()->getBoolValue(false));
 
             case BaseType::Int8:
             case BaseType::Int16:
@@ -5204,7 +5234,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         case LoweredValInfo::Flavor::Ptr:
             return LoweredValInfo::ptr(builder->emitElementAddress(baseVal.val, indexVal));
 
-        default: SLANG_UNIMPLEMENTED_X("subscript expr"); UNREACHABLE_RETURN(LoweredValInfo());
+        default:
+            SLANG_UNIMPLEMENTED_X("subscript expr");
+            UNREACHABLE_RETURN(LoweredValInfo());
         }
     }
 
@@ -7051,7 +7083,8 @@ LoweredValInfo tryGetAddress(
         break;
         // TODO: are there other cases we need to handled here?
 
-    default: break;
+    default:
+        break;
     }
 
     // If none of the special cases above applied, then we werent' able to make
@@ -7471,7 +7504,9 @@ top:
         }
         break;
 
-    default: SLANG_UNIMPLEMENTED_X("assignment"); break;
+    default:
+        SLANG_UNIMPLEMENTED_X("assignment");
+        break;
     }
 }
 
@@ -7770,7 +7805,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
                 break;
 
-            default: SLANG_UNEXPECTED("handled requirement witness case"); break;
+            default:
+                SLANG_UNEXPECTED("handled requirement witness case");
+                break;
             }
 
 
@@ -8974,10 +9011,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             switch (semantic->componentMask.getContent()[0])
             {
-            case 'x': componentOffset = 0; break;
-            case 'y': componentOffset = 1; break;
-            case 'z': componentOffset = 2; break;
-            case 'w': componentOffset = 3; break;
+            case 'x':
+                componentOffset = 0;
+                break;
+            case 'y':
+                componentOffset = 1;
+                break;
+            case 'z':
+                componentOffset = 2;
+                break;
+            case 'w':
+                componentOffset = 3;
+                break;
             }
         }
         builder->addDecoration(
@@ -10808,8 +10853,10 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
             irArgs.getBuffer());
         switch (genericVal.flavor)
         {
-        case LoweredValInfo::Flavor::Simple: return LoweredValInfo::simple(irSpecializedVal);
-        case LoweredValInfo::Flavor::Ptr:    return LoweredValInfo::ptr(irSpecializedVal);
+        case LoweredValInfo::Flavor::Simple:
+            return LoweredValInfo::simple(irSpecializedVal);
+        case LoweredValInfo::Flavor::Ptr:
+            return LoweredValInfo::ptr(irSpecializedVal);
         default:
             SLANG_UNEXPECTED("unhandled lowered value flavor");
             UNREACHABLE_RETURN(LoweredValInfo());

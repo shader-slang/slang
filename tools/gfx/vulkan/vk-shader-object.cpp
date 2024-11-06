@@ -672,7 +672,8 @@ Result ShaderObjectImpl::bindAsValue(
         {
         case slang::BindingType::ConstantBuffer:
         case slang::BindingType::ParameterBlock:
-        case slang::BindingType::ExistentialValue: break;
+        case slang::BindingType::ExistentialValue:
+            break;
 
         case slang::BindingType::Texture:
             rangeOffset.bindingSet += bindingRangeInfo.setOffset;
@@ -751,7 +752,8 @@ Result ShaderObjectImpl::bindAsValue(
                 m_resourceViews.getArrayView(baseIndex, count));
             break;
         case slang::BindingType::VaryingInput:
-        case slang::BindingType::VaryingOutput: break;
+        case slang::BindingType::VaryingOutput:
+            break;
 
         default:
             SLANG_ASSERT(!"unsupported binding type");

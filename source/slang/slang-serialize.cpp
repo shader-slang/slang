@@ -361,7 +361,9 @@ SerialIndex SerialWriter::writeValObject(const Val* node)
         auto operand = node->m_operands[i];
         switch (operand.kind)
         {
-        case ValNodeOperandKind::ConstantValue: serializedOperands.add((SerialIndex)0); break;
+        case ValNodeOperandKind::ConstantValue:
+            serializedOperands.add((SerialIndex)0);
+            break;
         case ValNodeOperandKind::ValNode:
         case ValNodeOperandKind::ASTNode:
             serializedOperands.add(addPointer(operand.values.nodeOperand));
@@ -774,7 +776,8 @@ size_t SerialInfo::Entry::calcSize(SerialClasses* serialClasses) const
             return size;
         }
 
-    default: break;
+    default:
+        break;
     }
 
     SLANG_ASSERT(!"Unknown type");
@@ -810,7 +813,8 @@ const void* SerialReader::getArray(SerialIndex index, Index& outCount)
             outCount = Index(arrayEntry->elementCount);
             return (arrayEntry + 1);
         }
-    default: break;
+    default:
+        break;
     }
 
     SLANG_ASSERT(!"Not an array");
@@ -849,7 +853,8 @@ SerialPointer SerialReader::getPointer(SerialIndex index)
             }
             break;
         }
-    default: break;
+    default:
+        break;
     }
 
     return ptr;
@@ -1162,7 +1167,8 @@ SlangResult SerialReader::deserializeObjects()
 
                 break;
             }
-        default: break;
+        default:
+            break;
         }
     }
 

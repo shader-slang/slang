@@ -150,7 +150,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
         }
         break;
 
-    default: SLANG_UNEXPECTED("unknown flavor of overload candidate"); break;
+    default:
+        SLANG_UNEXPECTED("unknown flavor of overload candidate");
+        break;
     }
 
     if (argCount >= paramCounts.required &&
@@ -598,7 +600,9 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
     {
     case kParameterDirection_InOut:
     case kParameterDirection_Out:
-    case kParameterDirection_Ref:   isLVal = true; break;
+    case kParameterDirection_Ref:
+        isLVal = true;
+        break;
     }
     return QualType(paramType, isLVal);
 }
@@ -645,7 +649,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             return TryCheckGenericOverloadCandidateTypes(context, candidate);
         }
-    default: SLANG_UNEXPECTED("unknown flavor of overload candidate"); break;
+    default:
+        SLANG_UNEXPECTED("unknown flavor of overload candidate");
+        break;
     }
 
     Index paramIndex = 0;
@@ -1087,7 +1093,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 context.originalExpr);
             break;
         case OverloadCandidate::Flavor::Expr:
-        default:                              baseExpr = nullptr; break;
+        default:
+            baseExpr = nullptr;
+            break;
         }
 
         switch (candidate.flavor)
@@ -2715,8 +2723,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 case kParameterDirection_Out:
                 case kParameterDirection_InOut:
                 case kParameterDirection_Ref:
-                case kParameterDirection_ConstRef: break;
-                default:                           continue;
+                case kParameterDirection_ConstRef:
+                    break;
+                default:
+                    continue;
                 }
             }
             if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(arg))
