@@ -4160,7 +4160,7 @@ struct StructuredBuffer
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     __intrinsic_op($(kIROp_StructuredBufferLoad))
     [__readNone]
-    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
@@ -5299,7 +5299,7 @@ for(auto item : kMutableStructuredBufferCases) {
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
 /**
 Represents an opaque handle to a mutable structured buffer allocated in global memory.
 A structured buffer can be viewed as an array of the specified element type.
