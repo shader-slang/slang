@@ -1457,7 +1457,7 @@ Result linkAndOptimizeIR(
 
     BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions;
     bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
-        isWGSLTarget(targetRequest);
+        isWGPUTarget(targetRequest);
     lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
 
     // Rewrite functions that return arrays to return them via `out` parameter,

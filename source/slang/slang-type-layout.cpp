@@ -2350,19 +2350,6 @@ bool isD3DTarget(TargetRequest* targetReq)
     }
 }
 
-bool isWGSLTarget(TargetRequest* targetReq)
-{
-    switch (targetReq->getTarget())
-    {
-    case CodeGenTarget::WGSL:
-    case CodeGenTarget::WGSLSPIRV:
-    case CodeGenTarget::WGSLSPIRVAssembly:
-        return true;
-    default:
-        return false;
-    }
-}
-
 bool isMetalTarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
@@ -2406,6 +2393,20 @@ bool isCUDATarget(TargetRequest* targetReq)
 
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::PTX:
+        return true;
+    }
+}
+
+bool isWGPUTarget(TargetRequest* targetReq)
+{
+    switch (targetReq->getTarget())
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
         return true;
     }
 }

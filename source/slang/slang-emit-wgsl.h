@@ -38,6 +38,7 @@ public:
     virtual void emitParamTypeImpl(IRType* type, const String& name) SLANG_OVERRIDE;
     virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+    virtual void emitSemanticsPrefixImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitStructFieldAttributes(IRStructType* structType, IRStructField* field)
         SLANG_OVERRIDE;
     virtual void emitCallArg(IRInst* inst) SLANG_OVERRIDE;
@@ -57,6 +58,8 @@ protected:
     void ensurePrelude(const char* preludeText);
 
 private:
+    bool maybeEmitSystemSemantic(IRInst* inst);
+
     // Emit the matrix type with 'rowCountWGSL' WGSL-rows and 'colCountWGSL' WGSL-columns
     void emitMatrixType(
         IRType* const elementType,

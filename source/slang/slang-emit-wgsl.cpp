@@ -236,6 +236,32 @@ static bool isPowerOf2(const uint32_t n)
     return (n != 0U) && ((n - 1U) & n) == 0U;
 }
 
+bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
+{
+    if (auto sysSemanticDecor = inst->findDecoration<IRTargetSystemValueDecoration>())
+    {
+        m_writer->emit("@builtin(");
+        m_writer->emit(sysSemanticDecor->getSemantic());
+        m_writer->emit(")");
+        return true;
+    }
+    return false;
+}
+
+void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
+{
+    if (!maybeEmitSystemSemantic(inst))
+    {
+        if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
+        {
+            m_writer->emit("@location(");
+            m_writer->emit(semanticDecoration->getSemanticIndex());
+            m_writer->emit(")");
+            return;
+        }
+    }
+}
+
 void WGSLSourceEmitter::emitStructFieldAttributes(IRStructType* structType, IRStructField* field)
 {
     // Tint emits errors unless we explicitly spell out the layout in some cases, so emit

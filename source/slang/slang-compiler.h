@@ -1958,8 +1958,8 @@ bool isCUDATarget(TargetRequest* targetReq);
 // Are we generating code for a CPU target
 bool isCPUTarget(TargetRequest* targetReq);
 
-// Are we generating code for WGSL?
-bool isWGSLTarget(TargetRequest* targetReq);
+/// Are we generating code for the WebGPU API?
+bool isWGPUTarget(TargetRequest* targetReq);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject

@@ -337,9 +337,10 @@ function(slang_add_target dir type)
         )
     endif()
     if(ARG_EXTRA_COMPILE_OPTIONS_PRIVATE)
-        target_compile_options(
+        add_supported_cxx_flags(
             ${target}
-            PRIVATE ${ARG_EXTRA_COMPILE_OPTIONS_PRIVATE}
+            PRIVATE
+            ${ARG_EXTRA_COMPILE_OPTIONS_PRIVATE}
         )
     endif()
 
