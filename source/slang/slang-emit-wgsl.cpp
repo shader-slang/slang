@@ -87,9 +87,23 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
     auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
 
-    for (auto attr : varLayout->getOffsetAttrs())
-    {
+    EmitVarChain blockChain(varLayout);
 
+    EmitVarChain containerChain = blockChain;
+    EmitVarChain elementChain = blockChain;
+
+    auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
+    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+    {
+        containerChain =
+            EmitVarChain(parameterGroupTypeLayout->getContainerVarLayout(), &blockChain);
+        elementChain = EmitVarChain(parameterGroupTypeLayout->getElementVarLayout(), &blockChain);
+
+        typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
+    }
+
+    for (auto attr : containerChain.varLayout->getOffsetAttrs())
+    {
         const LayoutResourceKind kind = attr->getResourceKind();
         switch (kind)
         {
@@ -120,12 +134,17 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
         case LayoutResourceKind::UnorderedAccess:
         case LayoutResourceKind::SamplerState:
         case LayoutResourceKind::DescriptorTableSlot:
-            m_writer->emit("@binding(");
-            m_writer->emit(attr->getOffset());
-            m_writer->emit(") ");
-            m_writer->emit("@group(");
-            m_writer->emit(attr->getSpace());
-            m_writer->emit(") ");
+            {
+                m_writer->emit("@binding(");
+                m_writer->emit(attr->getOffset());
+                m_writer->emit(") ");
+                m_writer->emit("@group(");
+                auto space = getBindingSpaceForKinds(
+                    &containerChain,
+                    LayoutResourceKind::DescriptorTableSlot);
+                m_writer->emit(space);
+                m_writer->emit(") ");
+            }
             break;
         }
     }
