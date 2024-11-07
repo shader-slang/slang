@@ -23,7 +23,8 @@ void CompilerOptionSet::load(uint32_t count, slang::CompilerOptionEntry* entries
         // translate them to EmitSpirvMethod.
         if (entries[i].name == slang::CompilerOptionName::EmitSpirvDirectly)
         {
-            set(slang::CompilerOptionName::EmitSpirvMethod, value.intValue != 0 ? SLANG_EMIT_SPIRV_DIRECTLY : SLANG_EMIT_SPIRV_VIA_GLSL);
+            set(slang::CompilerOptionName::EmitSpirvMethod,
+                value.intValue != 0 ? SLANG_EMIT_SPIRV_DIRECTLY : SLANG_EMIT_SPIRV_VIA_GLSL);
         }
         else if (entries[i].name == slang::CompilerOptionName::EmitSpirvViaGLSL)
         {
