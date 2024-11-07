@@ -6861,10 +6861,13 @@ SlangResult EndToEndCompileRequest::compile()
     auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
     if (reflectionPath.getLength() != 0)
     {
-        reflectionPath.appendChar('\0');
         auto bufferWriter = PrettyWriter();
         emitReflectionJSON(this, this->getReflection(), bufferWriter);
-        if (SLANG_FAILED(OSFileSystem::getMutableSingleton()->saveFile(reflectionPath.getBuffer(), bufferWriter.getBuilder().getBuffer(), bufferWriter.getBuilder().getLength())))
+        if (reflectionPath == "-")
+        {
+            auto builder = bufferWriter.getBuilder();
+            StdWriters::getOut().write(builder.getBuffer(), builder.getLength());
+        } else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
         {
             getSink()->diagnose(
                     SourceLoc(),
