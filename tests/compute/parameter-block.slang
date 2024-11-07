@@ -3,7 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-shaderobj
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -render-features argument-buffer-tier-2
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
+//TEST(compute):COMPARE_COMPUTE:-wgpu
 
 // Ensure that Slang `ParameterBlock` type is lowered
 // to HLSL in the fashion that we expect.

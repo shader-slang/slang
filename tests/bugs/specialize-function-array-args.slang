@@ -1,6 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // When a function is passed a parameter that contains an array, it specialized it as a performance
 // improvement for VK. If the struct contained a structured buffer, though it meant that the 

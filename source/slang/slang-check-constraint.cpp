@@ -925,6 +925,12 @@ bool SemanticsVisitor::TryUnifyIntParam(
     // We want to constrain the given parameter to equal the given value.
     Constraint constraint;
     constraint.decl = paramDecl;
+    // If `val` is of different type than `paramDecl`, we want to insert a type cast.
+    if (val->getType() != paramDecl->getType())
+    {
+        auto cast = m_astBuilder->getTypeCastIntVal(paramDecl->getType(), val);
+        val = cast;
+    }
     constraint.val = val;
 
     constraints.constraints.add(constraint);

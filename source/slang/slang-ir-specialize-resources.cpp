@@ -67,7 +67,10 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
             else
                 return isIllegalGLSLParameterType(type);
         }
-
+        else if (isWGPUTarget(targetRequest))
+        {
+            return isIllegalWGSLParameterType(type);
+        }
 
         // For now, we will not treat any other parameters as
         // needing specialization, even if they use resource
@@ -1220,7 +1223,7 @@ bool specializeResourceOutputs(
     HashSet<IRFunc*>& unspecializableFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
-    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest))
     {
     }
     else
@@ -1354,4 +1357,10 @@ bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
     }
     return false;
 }
+
+bool isIllegalWGSLParameterType(IRType* type)
+{
+    return isIllegalGLSLParameterType(type);
+}
+
 } // namespace Slang

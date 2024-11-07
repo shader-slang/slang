@@ -2397,6 +2397,20 @@ bool isCUDATarget(TargetRequest* targetReq)
     }
 }
 
+bool isWGPUTarget(TargetRequest* targetReq)
+{
+    switch (targetReq->getTarget())
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
+        return true;
+    }
+}
+
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
@@ -2532,7 +2546,7 @@ static bool shouldAllocateRegisterSpaceForParameterBlock(TypeLayoutContext const
     // If we know that we are targetting Vulkan, then
     // the only way to effectively use parameter blocks
     // is by using descriptor sets.
-    if (isVulkanTarget(targetReq))
+    if (isVulkanTarget(targetReq) || isWGPUTarget(targetReq))
         return true;
 
     // If none of the above passed, then it seems like we

@@ -3,7 +3,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 //TEST_INPUT:ubuffer(data=[4 3 2 1], stride=4):name inputBuffer
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 
 RWStructuredBuffer<uint> outputBuffer;
