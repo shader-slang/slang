@@ -1,6 +1,5 @@
 
 #include "slang-reflection-json.h"
-#include "../core/slang-pretty-writer.h"
 #include "slang.h"
 
 template<typename T>

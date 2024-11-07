@@ -2,9 +2,9 @@
 #define SLANG_CORE_PRETTY_WRITER_H
 
 
-#include "slang-char-util.h"
-#include "slang-string.h"
-#include "slang-string-util.h"
+#include "../core/slang-char-util.h"
+#include "../core/slang-string.h"
+#include "../core/slang-string-util.h"
 
 namespace Slang
 {

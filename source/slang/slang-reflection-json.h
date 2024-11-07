@@ -2,7 +2,7 @@
 #define SLANG_REFLECTION_JSON_H
 
 #include "slang.h"
-#include "../core/slang-pretty-writer.h"
+#include "../compiler-core/slang-pretty-writer.h"
 
 namespace Slang
 {
