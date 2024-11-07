@@ -3,7 +3,6 @@
 // Test that a function/method can return a value of an opaque type.
 
 //TEST(compute):COMPARE_COMPUTE:
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 struct Stuff
 {

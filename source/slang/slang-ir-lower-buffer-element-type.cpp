@@ -999,7 +999,8 @@ struct LoweredElementTypeContext
                         // the base array.
                         // We should setup loweredElementTypeInfo so the remaining logic can handle
                         // this case and insert proper packing/unpacking logic around it.
-                        if (arrayType->getElementType() != originalElementType)
+                        if (arrayType->getElementType() != originalElementType &&
+                            isScalarOrVectorType(originalElementType))
                         {
                             loweredElementTypeInfo.loweredType = arrayType->getElementType();
                             loweredElementTypeInfo.originalType = (IRType*)originalElementType;
