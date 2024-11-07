@@ -1,6 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

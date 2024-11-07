@@ -1,7 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE: -vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Test that matrix swizzle writes work correctly
 // Matrix swizzles can either be one or zero indexed
