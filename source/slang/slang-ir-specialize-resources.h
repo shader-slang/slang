@@ -26,5 +26,6 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
 
 bool isIllegalGLSLParameterType(IRType* type);
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray);
+bool isIllegalWGSLParameterType(IRType* type);
 
 } // namespace Slang

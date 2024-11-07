@@ -8,7 +8,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-dx12 -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 //NO_TEST:SIMPLE:-target glsl -entry computeMain -stage compute -validate-ir -dump-ir
 

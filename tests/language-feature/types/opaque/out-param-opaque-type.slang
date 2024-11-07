@@ -4,7 +4,6 @@
 
 //TEST(compute):COMPARE_COMPUTE:
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 //TEST_INPUT:set gThings = ubuffer(data=[16 17 18 19], stride=4)
 RWStructuredBuffer<int> gThings;
