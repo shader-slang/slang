@@ -1026,13 +1026,13 @@ static void emitReflectionEntryPointJSON(
         break;
     }
 
-    auto parameterCount = entryPoint->getParameterCount();
-    if (parameterCount)
+    auto entryPointParameterCount = entryPoint->getParameterCount();
+    if (entryPointParameterCount)
     {
         writer << ",\n\"parameters\": [\n";
         writer.indent();
 
-        for (auto pp : makeRange(parameterCount))
+        for (auto pp : makeRange(entryPointParameterCount))
         {
             if (pp != 0)
                 writer << ",\n";
@@ -1075,8 +1075,8 @@ static void emitReflectionEntryPointJSON(
         writer << ",\n\"bindings\": [\n";
         writer.indent();
 
-        auto parameterCount = programReflection->getParameterCount();
-        for (auto pp : makeRange(parameterCount))
+        auto programParameterCount = programReflection->getParameterCount();
+        for (auto pp : makeRange(programParameterCount))
         {
             if (pp != 0)
                 writer << ",\n";
