@@ -5,7 +5,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj  -xslang -Wno-38040
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -xslang -Wno-38040
 //TEST:SIMPLE(filecheck=WARNING): -target spirv
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 struct Data
 {

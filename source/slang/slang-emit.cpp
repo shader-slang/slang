@@ -1455,7 +1455,10 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.meshOutput)
         legalizeMeshOutputTypes(irModule);
 
-    lowerBufferElementTypeToStorageType(targetProgram, irModule);
+    BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions;
+    bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
+        isWGPUTarget(targetRequest);
+    lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
