@@ -1,6 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -compile-arg -obfuscate -shaderobj 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -compile-arg -obfuscate -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name a
 RWStructuredBuffer<int> a;

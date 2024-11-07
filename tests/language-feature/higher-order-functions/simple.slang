@@ -2,7 +2,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX():-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

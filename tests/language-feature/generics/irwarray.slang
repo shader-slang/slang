@@ -1,6 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 void writeToArray<U, T : IRWArray<U>>(inout T array, int index, U value) { array[index] = value; }
 void writeToBuffer<U, T : IRWArray<U>>(T array, int index, U value) { array[index] = value; }
