@@ -21,15 +21,15 @@ void CompilerOptionSet::load(uint32_t count, slang::CompilerOptionEntry* entries
 
         // When we see option EmitSpirvDirectly or EmitSpirvViaGLSL, we will need to
         // translate them to EmitSpirvMethod.
-        if (entries[i].name == slang::CompilerOptionName::EmitSpirvDirectly && value.intValue)
+        if (entries[i].name == slang::CompilerOptionName::EmitSpirvDirectly)
         {
-            set(slang::CompilerOptionName::EmitSpirvMethod, SLANG_EMIT_SPIRV_DIRECTLY);
+            set(slang::CompilerOptionName::EmitSpirvMethod, value.intValue != 0 ? SLANG_EMIT_SPIRV_DIRECTLY : SLANG_EMIT_SPIRV_VIA_GLSL);
         }
-        else if (entries[i].name == slang::CompilerOptionName::EmitSpirvViaGLSL && value.intValue)
+        else if (entries[i].name == slang::CompilerOptionName::EmitSpirvViaGLSL)
         {
             SlangEmitSpirvMethod current =
                 getEnumOption<SlangEmitSpirvMethod>(slang::CompilerOptionName::EmitSpirvMethod);
-            if (current != SLANG_EMIT_SPIRV_DEFAULT)
+            if (current == SLANG_EMIT_SPIRV_DEFAULT && value.intValue)
             {
                 set(CompilerOptionName::EmitSpirvMethod, SLANG_EMIT_SPIRV_VIA_GLSL);
             }
