@@ -101,7 +101,7 @@ cmake --install build --prefix generators --component generators
 pushd ../emsdk
 source ./emsdk_env # For Windows, emsdk_env.bat
 popd
-emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja"
+emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten
 
 # Build slang-wasm.js and slang-wasm.wasm in build.em/Release/bin
 cmake --build --preset emscripten --target slang-wasm
@@ -239,13 +239,14 @@ Windows
 
 ```bash
 # build the generators
+"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat" x64
 cmake --workflow --preset generators --fresh
 mkdir build-platform-generators
 cmake --install build --config Release --prefix build-platform-generators --component generators
 # reconfigure, pointing to these generators
 # Here is also where you should set up any cross compiling environment
-# For example
-./vcvarsamd64_arm64.bat
+# For example:
+"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat" x64_arm64
 cmake \
   --preset default \
   --fresh \
@@ -261,7 +262,7 @@ One option is to build using the ninja generator, which requires providing the
 native and cross environments via `vcvarsall.bat`
 
 ```bash
-vcvarsall.bat
+"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat" x64
 cmake --workflow --preset generators --fresh
 mkdir generators
 cmake --install build --prefix generators --component generators
