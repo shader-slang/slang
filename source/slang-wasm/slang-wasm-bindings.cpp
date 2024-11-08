@@ -46,7 +46,7 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "getLayout",
             &slang::wgsl::ComponentType::getLayout,
-            return_value_policy::take_ownership())
+            allow_raw_pointers())
         .function(
             "loadStrings",
             &slang::wgsl::ComponentType::loadStrings,
@@ -62,7 +62,7 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "getTypeLayout",
             &slang::wgsl::VariableLayoutReflection::getTypeLayout,
-            return_value_policy::take_ownership())
+            allow_raw_pointers())
         .function("getBindingIndex", &slang::wgsl::VariableLayoutReflection::getBindingIndex);
 
     class_<slang::wgsl::ProgramLayout>("ProgramLayout")
@@ -70,11 +70,11 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "getParameterByIndex",
             &slang::wgsl::ProgramLayout::getParameterByIndex,
-            return_value_policy::take_ownership())
+            allow_raw_pointers())
         .function(
             "getGlobalParamsTypeLayout",
             &slang::wgsl::ProgramLayout::getGlobalParamsTypeLayout,
-            return_value_policy::take_ownership());
+            allow_raw_pointers());
 
     enum_<slang::BindingType>("BindingType")
         .value("Unknown", slang::BindingType::Unknown)
