@@ -667,10 +667,6 @@ void initCommandOptions(CommandOptions& options)
          "-incomplete-library",
          nullptr,
          "Allow generating code from incomplete libraries with unresolved external functions"},
-        {OptionKind::EmbedDownstreamIR,
-         "-embed-downstream-ir",
-         nullptr,
-         "Embed downstream IR into emitted slang IR"},
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -845,6 +841,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-passes",
          nullptr,
          "Enable experimental compiler passes"},
+        {OptionKind::EmbedDownstreamIR,
+         "-embed-downstream-ir",
+         nullptr,
+         "Embed downstream IR into emitted slang IR"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 

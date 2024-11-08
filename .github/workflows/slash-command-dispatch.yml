@@ -13,8 +13,14 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           reaction-token: ${{ secrets.SLANGBOT_PAT }}
           issue-type: pull-request
-          commands: |
-            format
+          config: >
+            [
+              {
+                "command": "format",
+                "permission": "none",
+                "issue_type": "pull-request"
+              }
+            ]
 
       - name: Edit comment with error message
         if: steps.scd.outputs.error-message
