@@ -5,6 +5,25 @@
 #include <slang.h>
 #include <unordered_map>
 
+/**
+The web assembly binding here is designed to make javascript code as simple and native as possible.
+The big issue being handled here is lifetime management of objects created in the Slang API.
+
+The idea here is to make lifetime management as coarse grained as possible from the javascript side.
+Only two types of objects need to be explicitly deleted by javascript: GlobalSession and Session.
+
+All the remaining objects returned by member functions of Session will have their lifetime managed
+by the owning session in the C++ side. This way, the javascript code will never need to worry about
+freeing small objects like ComponentType, EntryPoint, Module, TypeLayoutReflection,
+VariableLayoutReflection, ProgramLayout etc.
+
+When a Session is no longer needed, the javascript code should explicitly delete it, this will allow
+us to free all the objects we allocated from the session in one single explicit call.
+
+By making explicit memory management as coarse grained as possible, we are making memory management
+efficient, simple, and less error prone.
+*/
+
 namespace Slang
 {
 class LanguageServerCore;
@@ -28,28 +47,9 @@ public:
 
 Error getLastError();
 
-class CompileTargets
-{
-public:
-    CompileTargets();
-    int findCompileTarget(const std::string& name);
-
-private:
-    std::unordered_map<std::string, SlangCompileTarget> m_compileTargetMap;
-};
-
-class HashedString
-{
-public:
-    std::string getString(uint32_t hash) { return m_hashedStrings[(int)hash]; }
-    void insertString(int hash, const std::string& str) { m_hashedStrings[hash] = str; }
-
-private:
-    std::unordered_map<int, std::string> m_hashedStrings;
-};
-
-CompileTargets* getCompileTargets();
-
+// returns mapping of codegen target from string to SlangCompileTarget
+// in the form of [{name: STRING, value: INT}, ...].
+emscripten::val getCompileTargets();
 
 class TypeLayoutReflection
 {
@@ -84,37 +84,44 @@ public:
     slang::ProgramLayout* interface() const { return (slang::ProgramLayout*)this; }
 };
 
+class Session;
 class ComponentType
 {
 public:
-    ComponentType(slang::IComponentType* interface)
-        : m_interface(interface)
+    IComponentType* m_interface;
+    Session* m_session;
+
+public:
+    ComponentType(slang::IComponentType* interface, Session* session)
+        : m_interface(interface), m_session(session)
     {
     }
 
-    ComponentType* link();
+    // Returns ComponentType or null.
+    emscripten::val link();
 
     std::string getEntryPointCode(int entryPointIndex, int targetIndex);
+
+    // Returns UInt8Array or null.
     emscripten::val getEntryPointCodeBlob(int entryPointIndex, int targetIndex);
     std::string getTargetCode(int targetIndex);
+
+    // Returns UInt8Array or null.
     emscripten::val getTargetCodeBlob(int targetIndex);
 
     slang::wgsl::ProgramLayout* getLayout(unsigned int targetIndex);
 
     slang::IComponentType* interface() const { return m_interface; }
 
-    HashedString* loadStrings();
-    virtual ~ComponentType() = default;
-
-private:
-    Slang::ComPtr<slang::IComponentType> m_interface;
+    // returns [{hash: HASH, string: STRING}, ...]
+    emscripten::val loadStrings();
 };
 
 class EntryPoint : public ComponentType
 {
 public:
-    EntryPoint(slang::IEntryPoint* interface)
-        : ComponentType(interface)
+    EntryPoint(slang::IComponentType* interface, Session* session)
+        : ComponentType(interface, session)
     {
     }
     std::string getName() const
@@ -132,14 +139,20 @@ private:
 class Module : public ComponentType
 {
 public:
-    Module(slang::IModule* interface)
-        : ComponentType(interface)
+    Module(slang::IComponentType* interface, Session* session)
+        : ComponentType(interface, session)
     {
     }
 
-    EntryPoint* findEntryPointByName(const std::string& name);
-    EntryPoint* findAndCheckEntryPoint(const std::string& name, int stage);
-    EntryPoint* getDefinedEntryPoint(int index);
+    // Returns EntryPoint or null.
+    emscripten::val findEntryPointByName(const std::string& name);
+
+    // Returns EntryPoint or null.
+    emscripten::val findAndCheckEntryPoint(const std::string& name, int stage);
+
+    // Returns EntryPoint or null.
+    emscripten::val getDefinedEntryPoint(int index);
+
     int getDefinedEntryPointCount();
 
     slang::IModule* moduleInterface() const { return static_cast<slang::IModule*>(interface()); }
@@ -152,17 +165,27 @@ public:
         : m_interface(interface)
     {
     }
+    ~Session();
 
-    Module* loadModuleFromSource(
+    // Returns Module or null.
+    emscripten::val loadModuleFromSource(
         const std::string& slangCode,
         const std::string& name,
         const std::string& path);
 
-    ComponentType* createCompositeComponentType(const std::vector<ComponentType*>& components);
+    // `components` is a javascript array of ComponentType/Module/EntryPoint objects.
+    // Returns ComponentType or null.
+    emscripten::val createCompositeComponentType(emscripten::val components);
 
     slang::ISession* interface() const { return m_interface; }
 
+    void addComponentType(slang::IComponentType* componentType)
+    {
+        m_componentTypes.push_back(Slang::ComPtr<slang::IComponentType>(componentType));
+    }
+
 private:
+    std::vector<Slang::ComPtr<slang::IComponentType>> m_componentTypes;
     Slang::ComPtr<slang::ISession> m_interface;
 };
 
