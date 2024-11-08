@@ -43,10 +43,7 @@ EMSCRIPTEN_BINDINGS(slang)
         .function("getEntryPointCodeBlob", &slang::wgsl::ComponentType::getEntryPointCodeBlob)
         .function("getTargetCodeBlob", &slang::wgsl::ComponentType::getTargetCodeBlob)
         .function("getTargetCode", &slang::wgsl::ComponentType::getTargetCode)
-        .function(
-            "getLayout",
-            &slang::wgsl::ComponentType::getLayout,
-            allow_raw_pointers())
+        .function("getLayout", &slang::wgsl::ComponentType::getLayout, allow_raw_pointers())
         .function(
             "loadStrings",
             &slang::wgsl::ComponentType::loadStrings,

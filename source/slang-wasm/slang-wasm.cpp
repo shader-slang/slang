@@ -388,7 +388,7 @@ HashedString* ComponentType::loadStrings()
 
 ProgramLayout* ComponentType::getLayout(unsigned int targetIndex)
 {
-    return (slang::wgsl::ProgramLayout*) interface()->getLayout(targetIndex);
+    return (slang::wgsl::ProgramLayout*)interface()->getLayout(targetIndex);
 }
 
 unsigned int ProgramLayout::getParameterCount()
@@ -398,12 +398,12 @@ unsigned int ProgramLayout::getParameterCount()
 
 VariableLayoutReflection* ProgramLayout::getParameterByIndex(unsigned int index)
 {
-    return (slang::wgsl::VariableLayoutReflection*) (interface()->getParameterByIndex(index));
+    return (slang::wgsl::VariableLayoutReflection*)(interface()->getParameterByIndex(index));
 }
 
 TypeLayoutReflection* ProgramLayout::getGlobalParamsTypeLayout()
 {
-    return (slang::wgsl::TypeLayoutReflection*) (interface()->getGlobalParamsTypeLayout());
+    return (slang::wgsl::TypeLayoutReflection*)(interface()->getGlobalParamsTypeLayout());
 }
 
 BindingType TypeLayoutReflection::getDescriptorSetDescriptorRangeType(
@@ -420,7 +420,7 @@ std::string VariableLayoutReflection::getName()
 
 TypeLayoutReflection* VariableLayoutReflection::getTypeLayout()
 {
-    return (slang::wgsl::TypeLayoutReflection*) (interface()->getTypeLayout());
+    return (slang::wgsl::TypeLayoutReflection*)(interface()->getTypeLayout());
 }
 
 unsigned int VariableLayoutReflection::getBindingIndex()

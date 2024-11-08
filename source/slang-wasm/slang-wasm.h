@@ -62,19 +62,20 @@ public:
 class VariableLayoutReflection
 {
 public:
-
     std::string getName();
     slang::wgsl::TypeLayoutReflection* getTypeLayout();
     unsigned int getBindingIndex();
 
-    slang::VariableLayoutReflection* interface() const { return (slang::VariableLayoutReflection*)this; }
+    slang::VariableLayoutReflection* interface() const
+    {
+        return (slang::VariableLayoutReflection*)this;
+    }
 };
 
 
 class ProgramLayout
 {
 public:
-
     unsigned int getParameterCount();
     slang::wgsl::VariableLayoutReflection* getParameterByIndex(unsigned int index);
 
