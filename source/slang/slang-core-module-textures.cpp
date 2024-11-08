@@ -374,6 +374,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                         glsl << ", ($" << aa++ << " = textureQueryLevels($0))";
                     }
                 };
+                glsl << "if (isCombined == 0) { __requireGLSLExtension(\"GL_EXT_samplerless_texture_functions\"); }\n";
                 glsl << "if (access == " << kCoreModule_ResourceAccessReadOnly
                      << ") __intrinsic_asm \"";
                 emitIntrinsic(toSlice("textureSize"), !isMultisample);
@@ -491,7 +492,6 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             }
 
             sb << "    __glsl_version(450)\n";
-            sb << "    __glsl_extension(GL_EXT_samplerless_texture_functions)\n";
 
             sb << "    [require(cpp";
             if (glsl.getLength())
