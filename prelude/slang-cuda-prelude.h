@@ -733,12 +733,12 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     Matrix<T, ROWS, COLS> rs;
     if (COLS == 3)
     {
-        rs.rows[0].x = v0;
-        rs.rows[0].y = v1;
-        rs.rows[0].z = v2;
-        rs.rows[1].x = v3;
-        rs.rows[1].y = v4;
-        rs.rows[1].z = v5;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 0) = v0;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 1) = v1;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 2) = v2;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 0) = v3;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 1) = v4;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 2) = v5;
     }
     else
     {
@@ -766,14 +766,14 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     Matrix<T, ROWS, COLS> rs;
     if (COLS == 4)
     {
-        rs.rows[0].x = v0;
-        rs.rows[0].y = v1;
-        rs.rows[0].z = v2;
-        rs.rows[0].w = v3;
-        rs.rows[1].x = v4;
-        rs.rows[1].y = v5;
-        rs.rows[1].z = v6;
-        rs.rows[1].w = v7;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 0) = v0;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 1) = v1;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 2) = v2;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 3) = v3;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 0) = v4;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 1) = v5;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 2) = v6;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 3) = v7;
     }
     else
     {
@@ -832,18 +832,18 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     Matrix<T, ROWS, COLS> rs;
     if (COLS == 4)
     {
-        rs.rows[0].x = v0;
-        rs.rows[0].y = v1;
-        rs.rows[0].z = v2;
-        rs.rows[0].w = v3;
-        rs.rows[1].x = v4;
-        rs.rows[1].y = v5;
-        rs.rows[1].z = v6;
-        rs.rows[1].w = v7;
-        rs.rows[2].x = v8;
-        rs.rows[2].y = v9;
-        rs.rows[2].z = v10;
-        rs.rows[2].w = v11;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 0) = v0;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 1) = v1;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 2) = v2;
+        *_slang_vector_get_element_ptr(&rs.rows[0], 3) = v3;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 0) = v4;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 1) = v5;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 2) = v6;
+        *_slang_vector_get_element_ptr(&rs.rows[1], 3) = v7;
+        *_slang_vector_get_element_ptr(&rs.rows[2], 0) = v8;
+        *_slang_vector_get_element_ptr(&rs.rows[2], 1) = v9;
+        *_slang_vector_get_element_ptr(&rs.rows[2], 2) = v10;
+        *_slang_vector_get_element_ptr(&rs.rows[2], 3) = v11;
     }
     else
     {

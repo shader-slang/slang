@@ -5,7 +5,6 @@
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -emit-spirv-directly -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // BUF:      type: int32_t
 // BUF-NEXT: 1

@@ -87,9 +87,23 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
     auto varLayout = getVarLayout(varDecl);
     SLANG_RELEASE_ASSERT(varLayout);
 
-    for (auto attr : varLayout->getOffsetAttrs())
-    {
+    EmitVarChain blockChain(varLayout);
 
+    EmitVarChain containerChain = blockChain;
+    EmitVarChain elementChain = blockChain;
+
+    auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
+    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+    {
+        containerChain =
+            EmitVarChain(parameterGroupTypeLayout->getContainerVarLayout(), &blockChain);
+        elementChain = EmitVarChain(parameterGroupTypeLayout->getElementVarLayout(), &blockChain);
+
+        typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
+    }
+
+    for (auto attr : containerChain.varLayout->getOffsetAttrs())
+    {
         const LayoutResourceKind kind = attr->getResourceKind();
         switch (kind)
         {
@@ -120,12 +134,17 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
         case LayoutResourceKind::UnorderedAccess:
         case LayoutResourceKind::SamplerState:
         case LayoutResourceKind::DescriptorTableSlot:
-            m_writer->emit("@binding(");
-            m_writer->emit(attr->getOffset());
-            m_writer->emit(") ");
-            m_writer->emit("@group(");
-            m_writer->emit(attr->getSpace());
-            m_writer->emit(") ");
+            {
+                m_writer->emit("@binding(");
+                m_writer->emit(attr->getOffset());
+                m_writer->emit(") ");
+                m_writer->emit("@group(");
+                auto space = getBindingSpaceForKinds(
+                    &containerChain,
+                    LayoutResourceKind::DescriptorTableSlot);
+                m_writer->emit(space);
+                m_writer->emit(") ");
+            }
             break;
         }
     }
@@ -234,6 +253,32 @@ void WGSLSourceEmitter::emitStructDeclarationSeparatorImpl()
 static bool isPowerOf2(const uint32_t n)
 {
     return (n != 0U) && ((n - 1U) & n) == 0U;
+}
+
+bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
+{
+    if (auto sysSemanticDecor = inst->findDecoration<IRTargetSystemValueDecoration>())
+    {
+        m_writer->emit("@builtin(");
+        m_writer->emit(sysSemanticDecor->getSemantic());
+        m_writer->emit(")");
+        return true;
+    }
+    return false;
+}
+
+void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
+{
+    if (!maybeEmitSystemSemantic(inst))
+    {
+        if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
+        {
+            m_writer->emit("@location(");
+            m_writer->emit(semanticDecoration->getSemanticIndex());
+            m_writer->emit(")");
+            return;
+        }
+    }
 }
 
 void WGSLSourceEmitter::emitStructFieldAttributes(IRStructType* structType, IRStructField* field)
@@ -581,8 +626,12 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
             m_writer->emit("@binding(");
             m_writer->emit(attr->getOffset());
             m_writer->emit(") ");
+
+            EmitVarChain chain = {};
+            chain.varLayout = layout;
+            auto space = getBindingSpaceForKinds(&chain, kind);
             m_writer->emit("@group(");
-            m_writer->emit(attr->getSpace());
+            m_writer->emit(space);
             m_writer->emit(") ");
 
             return;

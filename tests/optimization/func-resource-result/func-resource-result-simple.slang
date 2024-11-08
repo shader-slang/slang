@@ -4,7 +4,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Test that a function that returns a resource type can be
 // compiled for targets that don't natively support resource

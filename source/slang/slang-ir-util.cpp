@@ -221,6 +221,17 @@ bool isValueType(IRInst* dataType)
     }
 }
 
+bool isScalarOrVectorType(IRInst* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_VectorType:
+        return true;
+    default:
+        return as<IRBasicType>(type) != nullptr;
+    }
+}
+
 bool isSimpleDataType(IRType* type)
 {
     type = (IRType*)unwrapAttributedType(type);

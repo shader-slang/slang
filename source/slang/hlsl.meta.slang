@@ -444,8 +444,8 @@ interface __ITextureShape1D2D3D : __ITextureShape
 {
 }
 
-/// @category misc_types Miscelaneous types
 /// When used as the `Shape` parameter of the `_Texture` type, specifies a 1D texture.
+/// @category misc_types Miscelaneous types
 __magic_type(TextureShape1DType)
 __intrinsic_type($(kIROp_TextureShape1DType))
 struct __Shape1D : __ITextureShape1D2D3D
@@ -455,8 +455,8 @@ struct __Shape1D : __ITextureShape1D2D3D
     static const int planeDimensions = 1;
 }
 
-/// @category misc_types
 /// When used as the `Shape` parameter of the `_Texture` type, specifies a 2D texture.
+/// @category misc_types
 __magic_type(TextureShape2DType)
 __intrinsic_type($(kIROp_TextureShape2DType))
 struct __Shape2D : __ITextureShape1D2D3D
@@ -466,8 +466,8 @@ struct __Shape2D : __ITextureShape1D2D3D
     static const int planeDimensions = 2;
 }
 
-/// @category misc_types
 /// When used as the `Shape` parameter of the `_Texture` type, specifies a 3D texture.
+/// @category misc_types
 __magic_type(TextureShape3DType)
 __intrinsic_type($(kIROp_TextureShape3DType))
 struct __Shape3D : __ITextureShape1D2D3D
@@ -477,8 +477,8 @@ struct __Shape3D : __ITextureShape1D2D3D
     static const int planeDimensions = 3;
 }
 
-/// @category misc_types
 /// When used as the `Shape` parameter of the `_Texture` type, specifies a Cube texture.
+/// @category misc_types
 __magic_type(TextureShapeCubeType)
 __intrinsic_type($(kIROp_TextureShapeCubeType))
 struct __ShapeCube : __ITextureShape
@@ -488,8 +488,8 @@ struct __ShapeCube : __ITextureShape
     static const int planeDimensions = 2;
 }
 
-/// @category misc_types
 /// When used as the `Shape` parameter of the `_Texture` type, specifies a buffer texture.
+/// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
 struct __ShapeBuffer : __ITextureShape
@@ -4034,12 +4034,12 @@ ${{{{
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
 }}}}
-/// @category texture_types
 /// Represents a handle to a $(accessDocumentation[access])$(isMS?", multisampled": "") $(shapeTypeNames[shape]) $(isCombined?"combined texture-sampler": "texture")$(isArray?" array":"").
 /// @param T The texel type of the texture.
 /// @param sampleCount The number of samples in the texture, when the texture is multisampled.
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
+/// @category texture_types
 typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }
@@ -4160,7 +4160,7 @@ struct StructuredBuffer
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     __intrinsic_op($(kIROp_StructuredBufferLoad))
     [__readNone]
-    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
@@ -5299,7 +5299,7 @@ for(auto item : kMutableStructuredBufferCases) {
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
 /**
 Represents an opaque handle to a mutable structured buffer allocated in global memory.
 A structured buffer can be viewed as an array of the specified element type.
@@ -7662,8 +7662,8 @@ void DeviceMemoryBarrier()
     }
 }
 
-/// @category barrier
 /// Barrier for device memory with group synchronization.
+/// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void DeviceMemoryBarrierWithGroupSync()
@@ -7834,8 +7834,8 @@ T dot(vector<T, N> x, vector<T, N> y)
 }
 
 /// Helper for computing distance terms for lighting (obsolete)
-/// @category math
 /// @deprecated
+/// @category math
 __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<T,4> y);
 
 // Given a RWByteAddressBuffer allow it to be interpreted as a RWStructuredBuffer
@@ -9665,8 +9665,8 @@ matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 }
 
 // Legacy lighting function (obsolete)
-/// @category math
 /// @deprecated
+/// @category math
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
 float4 lit(float n_dot_l, float n_dot_h, float m)
@@ -15115,56 +15115,84 @@ ${{{{
 
 // 10.1.1 - Ray Flags
 
-/// @category raytracing Ray-tracing
+/// Flags that control ray traversal behavior and shader execution.
+/// @category raytracing
 typedef uint RAY_FLAG;
 
+/// No special ray flags.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_NONE = 0x00;
+
+/// Forces all geometries to be treated as opaque, disabling any-hit shader execution.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_FORCE_OPAQUE = 0x01;
+
+/// Forces all geometries to be treated as non-opaque, enabling any-hit shader execution.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_FORCE_NON_OPAQUE = 0x02;
+
+/// Accepts the first intersection found and skips searching for closer hits.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH = 0x04;
+
+/// Skips execution of closest hit shaders, useful for shadow rays.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_SKIP_CLOSEST_HIT_SHADER = 0x08;
+
+/// Culls triangles facing away from the ray origin.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_CULL_BACK_FACING_TRIANGLES = 0x10;
+
+/// Culls triangles facing toward the ray origin.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_CULL_FRONT_FACING_TRIANGLES = 0x20;
+
+/// Skips intersections with opaque geometry.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_CULL_OPAQUE = 0x40;
+
+/// Skips intersections with non-opaque geometry.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_CULL_NON_OPAQUE = 0x80;
+
+/// Skips all triangle intersections.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_SKIP_TRIANGLES = 0x100;
+
+/// Skips all procedural primitive intersections.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES = 0x200;
 
 // 10.1.2 - Ray Description Structure
+/// Describes a ray for traversal through an acceleration structure.
 /// @category raytracing
 __target_intrinsic(hlsl, RayDesc)
 __target_intrinsic(cuda, RayDesc)
 struct RayDesc
 {
+    /// Starting point of the ray in world space.
     __target_intrinsic(hlsl, Origin)
     __target_intrinsic(cuda, Origin)
     float3 Origin;
 
+    /// Minimum distance along the ray to consider intersections.
     __target_intrinsic(hlsl, TMin)
     __target_intrinsic(cuda, TMin)
     float  TMin;
 
+    /// Normalized direction vector of the ray in world space.
     __target_intrinsic(hlsl, Direction)
     __target_intrinsic(cuda, Direction)
     float3 Direction;
 
+    /// Maximum distance along the ray to consider intersections.
     __target_intrinsic(hlsl, TMax)
     __target_intrinsic(cuda, TMax)
     float  TMax;
 };
 
 // 10.1.3 - Ray Acceleration Structure
+/// Opaque type representing a ray-tracing acceleration structure.
 /// @category raytracing
 __builtin
 __magic_type(RaytracingAccelerationStructureType)
@@ -15179,11 +15207,13 @@ struct RaytracingAccelerationStructure {};
 // for this stuff comes across as a kludge rather than the best possible design.
 
 // 10.1.5 - Intersection Attributes Structure
+/// Built-in structure containing intersection attributes for triangle primitives.
 /// @category raytracing
 __target_intrinsic(hlsl, BuiltInTriangleIntersectionAttributes)
 [require(cpp_cuda_glsl_hlsl_spirv, raytracing)]
 struct BuiltInTriangleIntersectionAttributes
 {
+    /// Barycentric coordinates of the intersection point on the triangle.
     __target_intrinsic(hlsl, barycentrics)
     float2 barycentrics;
 };
@@ -15221,6 +15251,10 @@ int __callablePayloadLocation(__ref Payload payload);
 // targets, which maps the generic HLSL operation into the non-generic
 // GLSL equivalent.
 //
+/// Executes a callable shader with the specified payload.
+/// @param shaderIndex Index of the callable shader to execute
+/// @param payload Data structure to pass to and receive from the callable shader
+/// @remarks Used to implement dynamic shader calls during ray tracing
 /// @category raytracing
 __generic<Payload>
 [require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
@@ -15312,6 +15346,16 @@ __generic<Payload>
 __intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __rayPayloadLocation(__ref Payload payload);
 
+/// Traces a ray through the acceleration structure.
+/// @param AccelerationStructure The acceleration structure to traverse
+/// @param RayFlags Flags controlling ray behavior
+/// @param InstanceInclusionMask Mask for filtering instance visibility
+/// @param RayContributionToHitGroupIndex Offset for hit group indexing
+/// @param MultiplierForGeometryContributionToHitGroupIndex Multiplier for geometry-based hit group indexing
+/// @param MissShaderIndex Index of the miss shader to execute if no hit is found
+/// @param Ray Description of the ray to trace
+/// @param Payload Structure for passing data between shaders
+/// @remarks Core ray tracing function for initiating traversal
 /// @category raytracing
 [ForceInline]
 __generic<payload_t>
@@ -15437,6 +15481,17 @@ void __traceMotionRay(
     }
 }
 
+/// Traces a ray with motion blur support through the acceleration structure.
+/// @param AccelerationStructure The acceleration structure to traverse
+/// @param RayFlags Flags controlling ray behavior
+/// @param InstanceInclusionMask Mask for filtering instance visibility
+/// @param RayContributionToHitGroupIndex Offset for hit group indexing
+/// @param MultiplierForGeometryContributionToHitGroupIndex Multiplier for geometry-based hit group indexing
+/// @param MissShaderIndex Index of the miss shader to execute if no hit is found
+/// @param Ray Description of the ray to trace
+/// @param CurrentTime Time value for motion blur interpolation
+/// @param Payload Structure for passing data between shaders
+/// @remarks Extended version of TraceRay with motion blur support
 /// @category raytracing
 [ForceInline]
 [require(glsl_hlsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
@@ -15538,6 +15593,12 @@ bool __reportIntersection(float tHit, uint hitKind)
     }
 }
 
+/// Reports a hit from an intersection shader.
+/// @param tHit Distance along the ray where the intersection occurred
+/// @param hitKind User-defined value identifying the type of hit
+/// @param attributes Custom attributes for the intersection
+/// @return true if the hit was accepted, false if rejected
+/// @remarks Used in custom intersection shaders to report primitive intersections
 /// @category raytracing
 __generic<A>
 [ForceInline]
@@ -15557,6 +15618,12 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
     }
 }
 
+/// Reports a hit optimized for OptiX.
+/// @param tHit Distance along the ray where the intersection occurred
+/// @param hitKind User-defined value identifying the type of hit
+/// @param attribs Attribute values for the intersection
+/// @return true if the hit was accepted, false if rejected
+/// @remarks OptiX-specific version of ReportHit with optimized attribute handling
 /// @category raytracing
 __generic<each T : __BuiltinIntegerType>
 [ForceInline]
@@ -15573,6 +15640,8 @@ bool ReportHitOptix(float tHit, uint hitKind, expand each T attribs)
 }
 
 // 10.3.4
+/// Ignores the current intersection and continues traversal.
+/// @remarks Used in any-hit shaders to reject potential intersections
 /// @category raytracing
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void IgnoreHit()
@@ -15591,6 +15660,8 @@ void IgnoreHit()
 }
 
 // 10.3.5
+/// Accepts the current intersection and terminates further traversal.
+/// @remarks Used in any-hit shaders to immediately accept an intersection
 /// @category raytracing
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void AcceptHitAndEndSearch()
@@ -15615,6 +15686,9 @@ void AcceptHitAndEndSearch()
 
 // 10.4.1 - Ray Dispatch System Values
 
+/// Returns the current ray dispatch coordinates.
+/// @return 3D index of the current ray being processed
+/// @remarks Available in all ray tracing shader stages
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
@@ -15633,6 +15707,9 @@ uint3 DispatchRaysIndex()
     }
 }
 
+/// Returns the dimensions of the ray dispatch.
+/// @return 3D dimensions of the ray dispatch grid
+/// @remarks Available in all ray tracing shader stages
 /// @category raytracing
 [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
 uint3 DispatchRaysDimensions()
@@ -15652,6 +15729,9 @@ uint3 DispatchRaysDimensions()
 
 // 10.4.2 - Ray System Values
 
+/// Returns the origin of the current ray in world space.
+/// @return World-space position where the ray originated
+/// @remarks Available in any-hit, closest-hit, intersection, and miss shaders
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
@@ -15670,6 +15750,9 @@ float3 WorldRayOrigin()
     }
 }
 
+/// Returns the direction of the current ray in world space.
+/// @return Normalized world-space direction vector of the ray
+/// @remarks Available in any-hit, closest-hit, intersection, and miss shaders
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
@@ -15688,6 +15771,9 @@ float3 WorldRayDirection()
     }
 }
 
+/// Returns the minimum valid intersection distance for the current ray.
+/// @return Minimum distance along the ray where intersections are considered
+/// @remarks Used to prevent self-intersections and near-plane clipping
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
@@ -15716,6 +15802,10 @@ float RayTMin()
 // we should simply provide two overloads here, specialized
 // to the appropriate Vulkan stages.
 //
+
+/// Returns the current intersection distance or maximum ray distance.
+/// @return Current t-value for hit shaders or maximum distance for intersection shaders
+/// @remarks Interpretation depends on shader stage (hit vs. intersection)
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
@@ -15734,6 +15824,9 @@ float RayTCurrent()
     }
 }
 
+/// Returns the flags used when tracing the current ray.
+/// @return Combination of RAY_FLAG values used for this ray
+/// @remarks Allows shaders to modify behavior based on ray trace flags
 /// @category raytracing
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
 uint RayFlags()
@@ -15753,6 +15846,9 @@ uint RayFlags()
 
 // 10.4.3 - Primitive/Object Space System Values
 
+/// Returns the index of the current instance in the acceleration structure.
+/// @return Zero-based index of the current instance
+/// @remarks Available in any-hit, closest-hit, and intersection shaders
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15771,6 +15867,9 @@ uint InstanceIndex()
     }
 }
 
+/// Returns the user-provided ID of the current instance.
+/// @return Custom instance identifier set during acceleration structure build
+/// @remarks Used for instance-specific shader behavior
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15789,6 +15888,9 @@ uint InstanceID()
     }
 }
 
+/// Returns the index of the current primitive within its geometry.
+/// @return Zero-based index of the intersected primitive
+/// @remarks Available in any-hit, closest-hit, and intersection shaders
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15807,6 +15909,9 @@ uint PrimitiveIndex()
     }
 }
 
+/// Returns the ray origin in object space of the current instance.
+/// @return Object-space position where the ray originated
+/// @remarks Transformed by the inverse of the instance transform
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15825,6 +15930,9 @@ float3 ObjectRayOrigin()
     }
 }
 
+/// Returns the ray direction in object space of the current instance.
+/// @return Object-space direction vector of the ray
+/// @remarks Transformed by the inverse of the instance transform
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15845,6 +15953,9 @@ float3 ObjectRayDirection()
 
 // TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
 // floats by reference.
+/// Returns the object-to-world transformation matrix (3x4).
+/// @return 3x4 matrix transforming from object to world space
+/// @remarks Includes position and orientation of the current instance
 /// @category raytracing
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15863,6 +15974,9 @@ float3x4 ObjectToWorld3x4()
     }
 }
 
+/// Returns the world-to-object transformation matrix (3x4).
+/// @return 3x4 matrix transforming from world to object space
+/// @remarks Inverse of the object-to-world transform
 /// @category raytracing
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15881,6 +15995,9 @@ float3x4 WorldToObject3x4()
     }
 }
 
+/// Returns the object-to-world transformation matrix (4x3).
+/// @return 4x3 matrix transforming from object to world space
+/// @remarks Transposed version of ObjectToWorld3x4
 /// @category raytracing
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15898,6 +16015,9 @@ float4x3 ObjectToWorld4x3()
     }
 }
 
+/// Returns the world-to-object transformation matrix (4x3).
+/// @return 4x3 matrix transforming from world to object space
+/// @remarks Transposed version of WorldToObject3x4
 /// @category raytracing
 [NonUniformReturn]
 [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
@@ -15919,6 +16039,9 @@ float4x3 WorldToObject4x3()
 // The name of the following functions may change when DXR supports
 // a feature similar to the `GL_NV_ray_tracing_motion_blur` extension
 
+/// Returns the current time value for motion blur.
+/// @return Time value between 0 and 1 for motion blur interpolation
+/// @remarks Available when motion blur extension is enabled
 /// @category raytracing
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
@@ -15947,12 +16070,17 @@ float RayCurrentTime()
 // declarations, so that users can know they aren't coding
 // against the final spec?
 //
+/// Alias for ObjectToWorld3x4.
 /// @category raytracing
 [NonUniformReturn] float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
+/// Alias for WorldToObject3x4.
 /// @category raytracing
 [NonUniformReturn] float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
+/// Returns the type of intersection that was found.
+/// @return Hit kind value (HIT_KIND_TRIANGLE_FRONT_FACE, HIT_KIND_TRIANGLE_BACK_FACE, or custom value)
+/// @remarks Available in any-hit and closest-hit shaders
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit)]
@@ -15972,10 +16100,13 @@ uint HitKind()
 }
 
 // Pre-defined hit kinds (not documented explicitly)
+/// Predefined hit kind value for front-facing triangle intersections.
 /// @category raytracing
 static const uint HIT_KIND_TRIANGLE_FRONT_FACE = 254;
+
+/// Predefined hit kind value for back-facing triangle intersections.
 /// @category raytracing
-static const uint HIT_KIND_TRIANGLE_BACK_FACE   = 255;
+static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
 
 //
 // Shader Model 6.4
@@ -16253,7 +16384,9 @@ extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
 // DXR 1.1 and `TraceRayInline` support
 //
 
-// Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
+/// Returns the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader.
+/// @return Zero-based index of the geometry in the current instance
+/// @remarks Available in intersection, any-hit, and closest-hit shaders
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
@@ -16272,6 +16405,10 @@ uint GeometryIndex()
 
 /// Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader.
 /// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
+/// @param index Index of the vertex (0-2)
+/// @return World-space position of the specified vertex
+/// @remarks Requires ray tracing position fetch extension
+/// @see GL_EXT_ray_tracing_position_fetch
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_ray_tracing_position_fetch)
@@ -16296,18 +16433,18 @@ float3 HitTriangleVertexPosition(uint index)
     }
 }
 
-/// Status of whether a (closest) hit has been committed in a `RayQuery`.
+/// Status indicating whether and what type of hit has been committed in a RayQuery.
 /// @category raytracing
 typedef uint COMMITTED_STATUS;
 
-/// No hit committed.
+/// Indicates no hit has been committed yet.
 /// @category raytracing
 static const COMMITTED_STATUS COMMITTED_NOTHING = 0;
 
 /// Closest hit is a triangle.
 /// This could be an opaque triangle hit found by the fixed-function
 /// traversal and intersection implementation, or a non-opaque
-/// triangle hit committed by user code with `RayQuery.CommitNonOpaqueTriangleHit`
+/// triangle hit committed by user code with `RayQuery.CommitNonOpaqueTriangleHit`.
 /// @category raytracing
 static const COMMITTED_STATUS COMMITTED_TRIANGLE_HIT = 1;
 
@@ -16361,15 +16498,14 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 /// HLSL does not care about whether `q` is declared `inout` or not.
 ///
 ///cannot use a cap for struct with unequal target support
-///since it will propegate rules to children
+///since it will propegate rules to children.
 /// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
 __intrinsic_type($(kIROp_RayQueryType))
 struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 {
-    // Create a new ray query, initialized to its default state.
-    //
+    /// Initialize a new ray query in its default state.
     __intrinsic_op($(kIROp_AllocateOpaqueHandle))
     __init();
 
@@ -16396,18 +16532,22 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-    // Initialize a ray-tracing query.
-    //
-    // This method may be called on a "fresh" ray query, or
-    // on one that is already tracing a ray. In the latter
-    // case any state related to the ray previously being
-    // traced is overwritten.
-    //
-    // The `rayFlags` here will be bitwise ORed with
-    // the `rayFlags` passed as a generic argument to
-    // `RayQuery` to get the effective ray flags, which
-    // must obey any API-imposed restrictions.
-    //
+    /// Initialize a ray-tracing query.
+    ///
+    /// This method may be called on a "fresh" ray query, or
+    /// on one that is already tracing a ray. In the latter
+    /// case any state related to the ray previously being
+    /// traced is overwritten.
+    ///
+    /// The `rayFlags` here will be bitwise ORed with
+    /// the `rayFlags` passed as a generic argument to
+    /// `RayQuery` to get the effective ray flags, which
+    /// must obey any API-imposed restrictions.
+    ///
+    /// @param accelerationStructure Acceleration structure to traverse
+    /// @param rayFlags Additional flags for this trace (combined with rayFlagsGeneric)
+    /// @param instanceInclusionMask Mask for filtering instance visibility
+    /// @param ray Description of ray parameters (origin, direction, tMin, tMax)
     [__unsafeForceInlineEarly]
     [mutating]
     [require(glsl_hlsl_spirv, rayquery)]
@@ -16433,20 +16573,22 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
     
-    // Resume the ray query coroutine.
-    //
-    // If the coroutine suspends because of encountering
-    // a candidate hit that cannot be resolved with fixed-funciton
-    // logic, this function returns `true`, and the `Candidate*()`
-    // functions should be used by application code to resolve
-    // the candidate hit (by either committing or ignoring it).
-    //
-    // If the coroutine terminates because traversal is
-    // complete (or has been aborted), this function returns
-    // `false`, and application code should use the `Committed*()`
-    // functions to appropriately handle the closest hit (it any)
-    // that was found.
-    //
+    /// Resume the ray query coroutine.
+    ///
+    /// If the coroutine suspends because of encountering
+    /// a candidate hit that cannot be resolved with fixed-funciton
+    /// logic, this function returns `true`, and the `Candidate*()`
+    /// functions should be used by application code to resolve
+    /// the candidate hit (by either committing or ignoring it).
+    ///
+    /// If the coroutine terminates because traversal is
+    /// complete (or has been aborted), this function returns
+    /// `false`, and application code should use the `Committed*()`
+    /// functions to appropriately handle the closest hit (it any)
+    /// that was found.
+    ///
+    /// @return true if a candidate hit needs evaluation, false if traversal is complete
+    /// @remarks When true is returned, use Candidate* methods to evaluate the hit
     __glsl_extension(GL_EXT_ray_query)
     [mutating]
     [require(glsl_hlsl_spirv, rayquery)]
@@ -16463,12 +16605,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-    // Causes the ray query to terminate.
-    //
-    // This function cases the ray query to act as if
-    // traversal has terminated, so that subsequent
-    // `Proceed()` calls will return `false`.
-    //
+    /// Terminate ray traversal immediately.
+    /// @remarks Causes subsequent Proceed() calls to return false
     __glsl_extension(GL_EXT_ray_query)
     [mutating]
     [require(glsl_hlsl_spirv, rayquery)]
@@ -16482,7 +16620,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-    // Commit the current non-opaque triangle hit.
+    /// Commit the current non-opaque triangle hit as the closest hit.
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [mutating]
@@ -16497,7 +16635,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-    // Commit the current procedural primitive hit, with hit time `t`.
+    /// Commit a procedural primitive hit at the specified distance.
+    /// @param t Distance along the ray where the hit occurred
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [mutating]
@@ -16512,15 +16651,15 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-    // Get the type of candidate hit being considered.
-    //
-    // The ray query coroutine will suspend when it encounters
-    // a hit that cannot be resolved with fixed-function logic
-    // (either a non-opaque triangle or a procedural primitive).
-    // In either of those cases, `CandidateType()` will return
-    // the kind of candidate hit that must be resolved by
-    // user code.
-    //
+    /// Get the type of candidate hit being considered.
+    ///
+    /// The ray query coroutine will suspend when it encounters
+    /// a hit that cannot be resolved with fixed-function logic
+    /// (either a non-opaque triangle or a procedural primitive).
+    /// In either of those cases, `CandidateType()` will return
+    /// the kind of candidate hit that must be resolved by
+    /// user code.
+    ///
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
@@ -16539,7 +16678,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-    // Get the status of the committed (closest) hit, if any.
+    /// Returns the status of the committed (closest) hit.
+    /// @return COMMITTED_STATUS indicating type of committed hit, if any
+    /// @remarks Valid after traversal is complete (Proceed() returns false)
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
@@ -16559,6 +16700,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Checks if the candidate procedural primitive is non-opaque.
+    /// @return true if the primitive is non-opaque and requires shader evaluation
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
@@ -16579,6 +16722,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the distance to the candidate triangle hit.
+    /// @return t-value along the ray where intersection occurred
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
@@ -16597,6 +16742,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             };
         }
     }
+
+    /// Gets the distance to the committed (closest) hit.
+    /// @return t-value along the ray where the closest hit occurred
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
@@ -16616,7 +16764,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
-///missing hlsl equivlent; only implemented for glsl & spirv
+    /// Gets the custom index of the instance containing the candidate hit.
+    /// @return User-provided instance identifier
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16634,6 +16784,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the custom index of the instance containing the committed hit.
+    /// @return User-provided instance identifier
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16651,6 +16804,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the instance ID of the candidate hit.
+    /// @return System-assigned instance identifier
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16668,6 +16824,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the instance ID of the committed hit.
+    /// @return System-assigned instance identifier
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16685,6 +16844,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the shader binding table offset for the instance containing the candidate hit.
+    /// @return Offset into the shader binding table for hit group selection
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16702,6 +16864,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the shader binding table offset for the instance containing the committed hit.
+    /// @return Offset into the shader binding table for hit group selection
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16719,6 +16884,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the geometry index for the candidate hit.
+    /// @return Zero-based index of the geometry in the instance
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16736,6 +16904,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the geometry index for the committed hit.
+    /// @return Zero-based index of the geometry in the instance
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16753,6 +16924,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the primitive index for the candidate hit.
+    /// @return Zero-based index of the primitive in the geometry
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16770,6 +16944,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the primitive index for the committed hit.
+    /// @return Zero-based index of the primitive in the geometry
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16787,6 +16964,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the barycentric coordinates of the candidate hit point.
+    /// @return UV barycentric coordinates on the triangle
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16804,6 +16984,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the barycentric coordinates of the committed hit point.
+    /// @return UV barycentric coordinates on the triangle
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16821,6 +17004,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Checks if the candidate hit is on the front face of a triangle.
+    /// @return true if hit is on triangle front face
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16838,6 +17024,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Checks if the committed hit is on the front face of a triangle.
+    /// @return true if hit is on triangle front face
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16855,6 +17044,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the ray direction in object space for the candidate hit.
+    /// @return Direction vector transformed into instance's object space
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16872,6 +17064,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the ray direction in object space for the committed hit.
+    /// @return Direction vector transformed into instance's object space
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16889,6 +17084,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the ray origin in object space for the candidate hit.
+    /// @return Origin point transformed into instance's object space
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16906,6 +17104,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the ray origin in object space for the committed hit.
+    /// @return Origin point transformed into instance's object space
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16923,6 +17124,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the object-to-world transform matrix for the candidate hit instance.
+    /// @return 4x3 matrix transforming from object to world space
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16940,6 +17144,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the object-to-world transform matrix for the committed hit instance.
+    /// @return 4x3 matrix transforming from object to world space
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16957,6 +17164,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the world-to-object transform matrix for the candidate hit instance.
+    /// @return 4x3 matrix transforming from world to object space
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -16974,6 +17184,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the world-to-object transform matrix for the committed hit instance.
+    /// @return 4x3 matrix transforming from world to object space
+    /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_spirv, rayquery)]
@@ -17011,6 +17224,9 @@ ${{{{
         __intrinsic_asm "rayQueryGetIntersectionTriangleVertexPositionsEXT($0, $(ccTF), $1)";
     };
 
+    /// Gets the triangle vertex positions for an intersection.
+    /// @return Array of three vertex positions in world space
+    /// @remarks Requires ray query position fetch extension
     __glsl_extension(GL_EXT_ray_query)
     [require(glsl, rayquery_position)]
     [require(spirv, rayquery_position)]
@@ -17044,6 +17260,9 @@ ${{{{
     for (auto matName : kRayQueryMatrixNames) {
     }}}}
 
+    /// Gets the object-to-world transform as a 3x4 matrix.
+    /// @return 3x4 matrix transforming from object to world space
+    /// @remarks Available for both candidate and committed hits
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
@@ -17064,6 +17283,9 @@ ${{{{
         }
     }
 
+    /// Gets the world-to-object transform as a 4x3 matrix.
+    /// @return 4x3 matrix transforming from world to object space
+    /// @remarks Available for both candidate and committed hits
     __glsl_extension(GL_EXT_ray_query)
     [__readNone]
     [NonUniformReturn]
@@ -17150,6 +17372,8 @@ ${{{{
         }
     }
 
+    /// Gets the world-space origin of the ray.
+    /// @return Starting point of the ray in world space
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
@@ -17168,6 +17392,8 @@ ${{{{
         }
     }
 
+    /// Gets the world-space direction of the ray.
+    /// @return Normalized direction vector in world space
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
@@ -17186,6 +17412,9 @@ ${{{{
         }
     }
 
+    /// Gets the minimum valid distance along the ray.
+    /// @return Minimum t-value for considering intersections
+    /// @remarks Used to prevent self-intersections
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
