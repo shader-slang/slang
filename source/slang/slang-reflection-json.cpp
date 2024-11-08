@@ -1,5 +1,6 @@
 
 #include "slang-reflection-json.h"
+
 #include "slang.h"
 
 template<typename T>
@@ -1185,10 +1186,13 @@ static void emitReflectionJSON(
     writer << "\n}\n";
 }
 
-void emitReflectionJSON(SlangCompileRequest* request, SlangReflection* reflection, PrettyWriter& writer)
+void emitReflectionJSON(
+    SlangCompileRequest* request,
+    SlangReflection* reflection,
+    PrettyWriter& writer)
 {
     auto programReflection = (slang::ShaderReflection*)reflection;
     emitReflectionJSON(writer, request, programReflection);
 }
 
-}
+} // namespace Slang

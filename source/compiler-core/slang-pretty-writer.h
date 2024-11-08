@@ -3,8 +3,8 @@
 
 
 #include "../core/slang-char-util.h"
-#include "../core/slang-string.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-string.h"
 
 namespace Slang
 {
@@ -116,7 +116,7 @@ private:
     PrettyWriter::CommaState* m_previousState;
 };
 
-}
+} // namespace Slang
 
 
 #endif

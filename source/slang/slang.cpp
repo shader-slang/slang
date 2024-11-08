@@ -31,13 +31,13 @@
 #include "slang-parameter-binding.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
+#include "slang-reflection-json.h"
 #include "slang-repro.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
 #include "slang-tag-version.h"
 #include "slang-type-layout.h"
-#include "slang-reflection-json.h"
 
 #include <sys/stat.h>
 
@@ -6857,7 +6857,7 @@ SlangResult EndToEndCompileRequest::compile()
             }
         }
     }
-    
+
     auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
     if (reflectionPath.getLength() != 0)
     {
@@ -6867,12 +6867,10 @@ SlangResult EndToEndCompileRequest::compile()
         {
             auto builder = bufferWriter.getBuilder();
             StdWriters::getOut().write(builder.getBuffer(), builder.getLength());
-        } else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
+        }
+        else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
         {
-            getSink()->diagnose(
-                    SourceLoc(),
-                    Diagnostics::unableToWriteFile,
-                    reflectionPath);
+            getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, reflectionPath);
         }
     }
 
