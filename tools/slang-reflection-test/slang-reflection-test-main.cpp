@@ -5,7 +5,8 @@
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-test-tool-util.h"
-#include "../../source/slang/slang-reflection-json.h"
+#include "../../source/core/slang-blob.h"
+#include "slang-deprecated.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -18,15 +19,12 @@ using namespace Slang;
 
 void emitReflectionJSON(SlangCompileRequest* request, SlangReflection* reflection)
 {
-    PrettyWriter writer;
+    ISlangBlob* b;
 
-    emitReflectionJSON(request, reflection, writer);
-
-    // Get the contents of the writer
-    const auto slice = writer.getBuilder().getUnownedSlice();
+    spReflection_ToJson(reflection, request, &b);
 
     // Output the writer content to out stream
-    StdWriters::getOut().write(slice.begin(), slice.getLength());
+    StdWriters::getOut().write((const char*) b->getBufferPointer(), b->getBufferSize());
 }
 
 static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* request)

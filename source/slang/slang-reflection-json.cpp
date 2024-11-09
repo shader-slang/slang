@@ -2,6 +2,7 @@
 #include "slang-reflection-json.h"
 
 #include "slang.h"
+#include "../core/slang-blob.h"
 
 template<typename T>
 struct Range
@@ -1196,3 +1197,12 @@ void emitReflectionJSON(
 }
 
 } // namespace Slang
+
+
+extern "C" SLANG_API SlangResult spReflection_ToJson(SlangReflection* reflection, SlangCompileRequest* request, ISlangBlob** outBlob) {
+    using namespace Slang;
+    PrettyWriter writer;
+    emitReflectionJSON(request, reflection, writer);
+    *outBlob = StringBlob::moveCreate(writer.getBuilder());
+    return SLANG_OK;
+}

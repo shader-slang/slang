@@ -498,6 +498,7 @@ extern "C"
     SLANG_API SlangReflectionGeneric* spReflectionType_GetGenericContainer(
         SlangReflectionType* type);
 
+    SLANG_API SlangResult spReflection_ToJson(SlangReflection* reflection, SlangCompileRequest* request, ISlangBlob** outBlob);
     // Type Layout Reflection
 
     SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTypeLayout* type);
