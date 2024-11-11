@@ -488,10 +488,11 @@ struct TupleTypeBuilder
 
                 // TODO: shallow clone of modifiers, etc.
                 IRStructField* originalField = findStructField(originalStructType, ee.fieldKey);
-                IRStructField* newField = builder->createStructField(ordinaryStructType, ee.fieldKey, fieldType);
-                // In case the original struct had offset decorations attached, transfer those as well.
-                // The original offsets should still be valid, since we only skip fields of types that aren't
-                // representable in memory.
+                IRStructField* newField =
+                    builder->createStructField(ordinaryStructType, ee.fieldKey, fieldType);
+                // In case the original struct had offset decorations attached, transfer those as
+                // well. The original offsets should still be valid, since we only skip fields of
+                // types that aren't representable in memory.
                 originalField->transferDecorationsTo(newField);
             }
 
