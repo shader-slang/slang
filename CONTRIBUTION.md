@@ -202,7 +202,10 @@ $ git push origin feature/your-feature-name
 ```
 
 ### Request Pull
-Request a pull from "shader-slang" repository.
+
+Open a pull request against `shader-slang/slang`.
+
+Code formatting can be automatically fixed on your branch by commenting `/format`, a bot will proceed to open a PR targeting *your* branch.
 
 For the Pull Request, you will need to write a PR message. This message is for a set of commits you are requesting to pull. Try to make it brief because the actual details should be in the commit messages of each commit.
  

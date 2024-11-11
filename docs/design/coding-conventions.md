@@ -136,165 +136,20 @@ All standard module code that a Slang user might link against should go in the `
 The public C API is obviously an exception to this.
 
 
-Indenting, Spacing, and Braces
+Code Formatting
 ------------------------------
 
-Indent by four spaces. Don't use tabs except in files that require them (e.g., `Makefile`s).
+- For C++ files, please format using `clang-format`; `.clang-format` files in
+  the source tree define the style.
+- For CMake files, please format using `gersemi`
+- For shell scripts, please format using `shfmt`
+- For YAML files, please use `prettier`
 
-Matching opening/closing curly braces should be indented to the same column, with an exception for empty braces (`{}`).
-An opening curly brace should always be on a new line.
+The formatting for the codebase is overall specified by the
+[`extras/formatting.sh`](./extras/formatting.sh) script.
 
-```c++
-void someFunc(int a)
-{
-    doThings(a);
-}
-
-void emptyFunc()
-{}
-
-struct Helper
-{
-    void help()
-    {
-        emptyFunc();
-    }
-}
-```
-
-Extremely short "accessor" style functions can violate these rules if the whole definition fits on a line.
-
-```c++
-struct Vec1
-{
-    float x;
-
-    float getX() { return x; }
-}
-```
-
-There is no hard limit on line length, but if you are going past 80-100 columns quite often, maybe think about breaking lines.
-
-When you decide to break lines for a parameter or argument list, always break after the opening `(`, and put each argument/parameter on its own line:
-
-```c++
-float bigFunc(
-    int     a,
-    float   b,
-    void*   c)
-{
-    ...
-}
-
-float gVar = bigFunc(
-    0,
-    1.0f,
-    data);
-```
-
-You can vertically align succesive lines of code to emphasize common structure, but this is not required:
-
-```c++
-case A_AND_B: doA(); doB(); break;
-case JUST_A:  doA();        break;
-case JUST_B:         doB(); break;
-```
-
-Put space between a control-flow keyword and a following `(`.
-This is a default setting of Visual Studio 2019 and 2022.
-Examples of how to format the major C++ control-flow constructs follow:
-
-```c++
-void example()
-{
-    for (int ii = 0; ii < N; ++ii)
-    {
-        if (ii == 0)
-        {
-        }
-        else
-        {
-        }
-    }
-
-    int x = 0;
-    while (x < 100)
-    {
-        x++;
-    }
-
-    int mode = 0;
-    do
-    {
-        switch (mode)
-        {
-        case 0:
-            x /= 2;
-            /* fallthrough */
-        case 1:
-            x--;
-            mode = 3;
-
-        case 2:
-        default:
-            x++;
-            mode--;
-            break;
-        }
-    } while (x > 0);
-}
-```
-
-Don't put space between a unary operator and its operand.
-Always put space between an assignment (including compound assignment) operator and its operands.
-For other binary operators, use your best judgement.
-
-If you have to line break a binary expression, put the line break after the operator for an assignment, and before the operator before all others.
-
-Intializer lists for constructors get some special-case formatting rules.
-If everything fits on one line, then great:
-
-```c++
-SomeClass::SomeClass()
-    : a(0), b(1), c(2)
-{}
-```
-
-Otherwise, put the line break *before* the comma:
-
-```c++
-SomeClass::SomeClass()
-    : a(0)
-    , b(1)
-    , c(2)
-{}
-```
-
-When working with `static const` arrays, put the outer `{}` for the array on their own line, and then put each element on its own line and aim for vertical alignment.
-
-```c++
-struct Mapping
-{
-    char const* key;
-    char const* val;
-} kMapping[] =
-{
-    { "a", "aardvark" },
-    { "b", "bat" },
-};
-```
-
-A trailing comma should always be used for array initializer lists like this, as well as for `enum` tags.
-
-When writing multi-line macros, the backslash escapes should align vertically.
-For consistentcy, a trailing `\` can be used, followed by a comment to mark the end of the definition:
-
-```c++
-#define FOREACH_ANIMAL(X)   \
-    X(Aardvark)             \
-    X(Bat)                  \
-    /* end */
-```
+If you open a pull request and the formatting is incorrect, you can comment
+`/format` and a bot will format your code for you.
 
 Naming
 ------
