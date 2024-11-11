@@ -1,5 +1,4 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 struct Param
 {

@@ -16,10 +16,6 @@ function(add_supported_cxx_flags target)
     endif()
 
     foreach(flag ${flags})
-        # /EHa enables SEH on Windows, it is not available in Linux.
-        if(NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-            string(REGEX REPLACE "/EHa" "" flag "${flag}")
-        endif()
         # remove the `no-` prefix from warnings because gcc doesn't treat it as an
         # error on its own
         string(REGEX REPLACE "\\-Wno\\-(.+)" "-W\\1" flag_to_test "${flag}")
