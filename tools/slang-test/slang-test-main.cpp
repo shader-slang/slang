@@ -4887,7 +4887,7 @@ SlangResult innerMain(int argc, char** argv)
 
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again.
-        static constexpr int kFailedTestLimitForRetry = 16;
+        static constexpr int kFailedTestLimitForRetry = 0;
         if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
             if (context.failedFileTests.getCount() > 0)
