@@ -884,7 +884,6 @@ typedef uint32_t SlangSizeT;
         DumpWarningDiagnostics,
         InputFilesRemain,
         EmitIr,                        // bool
-        EmitReflectionJSON,            // bool
         ReportDownstreamTime,          // bool
         ReportPerfBenchmark,           // bool
         ReportCheckpointIntermediates, // bool
@@ -1004,6 +1003,8 @@ typedef uint32_t SlangSizeT;
         // Add this new option to the end of the list to avoid breaking ABI as much as possible.
         // Setting of EmitSpirvDirectly or EmitSpirvViaGLSL will turn into this option internally.
         EmitSpirvMethod, // enum SlangEmitSpirvMethod
+
+        EmitReflectionJSON, // bool
         CountOf,
     };
 
