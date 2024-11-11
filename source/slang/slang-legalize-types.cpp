@@ -487,8 +487,13 @@ struct TupleTypeBuilder
                     fieldType = context->getBuilder()->getVoidType();
 
                 // TODO: shallow clone of modifiers, etc.
-
-                builder->createStructField(ordinaryStructType, ee.fieldKey, fieldType);
+                IRStructField* originalField = findStructField(originalStructType, ee.fieldKey);
+                IRStructField* newField =
+                    builder->createStructField(ordinaryStructType, ee.fieldKey, fieldType);
+                // In case the original struct had offset decorations attached, transfer those as
+                // well. The original offsets should still be valid, since we only skip fields of
+                // types that aren't representable in memory.
+                originalField->transferDecorationsTo(newField);
             }
 
             ordinaryType = LegalType::simple((IRType*)ordinaryStructType);
