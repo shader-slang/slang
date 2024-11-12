@@ -25,9 +25,7 @@ struct DeferBufferLoadContext
         switch (valueInst->getOp())
         {
         case kIROp_StructuredBufferLoad:
-        case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoadStatus:
-        case kIROp_RWStructuredBufferLoadStatus:
             {
                 result = b.emitRWStructuredBufferGetElementPtr(
                     valueInst->getOperand(0),
