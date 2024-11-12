@@ -54,6 +54,7 @@ EMSCRIPTEN_BINDINGS(slang)
         .function("getBindingIndex", &slang::wgsl::VariableLayoutReflection::getBindingIndex);
 
     class_<slang::wgsl::ProgramLayout>("ProgramLayout")
+        .function("toJsonObject", &slang::wgsl::ProgramLayout::toJsonObject)
         .function("getParameterCount", &slang::wgsl::ProgramLayout::getParameterCount)
         .function(
             "getParameterByIndex",

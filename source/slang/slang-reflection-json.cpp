@@ -1071,7 +1071,7 @@ static void emitReflectionEntryPointJSON(
     }
 
     // If code generation has been performed, print out the parameter usage by this entry point.
-    if ((request->getCompileFlags() & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
+    if (request && (request->getCompileFlags() & SLANG_COMPILE_FLAG_NO_CODEGEN) == 0)
     {
         writer << ",\n\"bindings\": [\n";
         writer.indent();

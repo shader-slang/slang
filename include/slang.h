@@ -3322,6 +3322,11 @@ struct ShaderReflection
         return (VariableLayoutReflection*)spReflection_getGlobalParamsVarLayout(
             (SlangReflection*)this);
     }
+
+    SlangResult toJson(ISlangBlob** outBlob)
+    {
+        return spReflection_ToJson((SlangReflection*)this, nullptr, outBlob);
+    }
 };
 
 
