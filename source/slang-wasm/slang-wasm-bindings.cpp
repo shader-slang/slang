@@ -53,6 +53,16 @@ EMSCRIPTEN_BINDINGS(slang)
             allow_raw_pointers())
         .function("getBindingIndex", &slang::wgsl::VariableLayoutReflection::getBindingIndex);
 
+    class_<slang::wgsl::EntryPointReflection>("EntryPointReflection")
+        .function(
+            "getComputeThreadGroupSize",
+            &slang::wgsl::EntryPointReflection::getComputeThreadGroupSize);
+
+    class_<slang::wgsl::EntryPointReflection::ThreadGroupSize>("ThreadGroupSize")
+        .property("x", &slang::wgsl::EntryPointReflection::ThreadGroupSize::x)
+        .property("y", &slang::wgsl::EntryPointReflection::ThreadGroupSize::y)
+        .property("z", &slang::wgsl::EntryPointReflection::ThreadGroupSize::z);
+
     class_<slang::wgsl::ProgramLayout>("ProgramLayout")
         .function("toJsonObject", &slang::wgsl::ProgramLayout::toJsonObject)
         .function("getParameterCount", &slang::wgsl::ProgramLayout::getParameterCount)
@@ -63,6 +73,10 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "getGlobalParamsTypeLayout",
             &slang::wgsl::ProgramLayout::getGlobalParamsTypeLayout,
+            allow_raw_pointers())
+        .function(
+            "findEntryPointByName",
+            &slang::wgsl::ProgramLayout::findEntryPointByName,
             allow_raw_pointers());
 
     enum_<slang::BindingType>("BindingType")

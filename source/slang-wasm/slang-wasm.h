@@ -72,6 +72,20 @@ public:
     }
 };
 
+class EntryPointReflection
+{
+
+public:
+    struct ThreadGroupSize
+    {
+        unsigned int x;
+        unsigned int y;
+        unsigned int z;
+    };
+
+    ThreadGroupSize getComputeThreadGroupSize();
+    slang::EntryPointReflection* interface() const { return (slang::EntryPointReflection*)this; }
+};
 
 class ProgramLayout
 {
@@ -80,6 +94,8 @@ public:
     slang::wgsl::VariableLayoutReflection* getParameterByIndex(unsigned int index);
 
     slang::wgsl::TypeLayoutReflection* getGlobalParamsTypeLayout();
+
+    slang::wgsl::EntryPointReflection* findEntryPointByName(std::string name);
 
     slang::ProgramLayout* interface() const { return (slang::ProgramLayout*)this; }
 

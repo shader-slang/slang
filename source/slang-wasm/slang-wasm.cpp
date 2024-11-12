@@ -438,6 +438,18 @@ TypeLayoutReflection* ProgramLayout::getGlobalParamsTypeLayout()
     return (slang::wgsl::TypeLayoutReflection*)(interface()->getGlobalParamsTypeLayout());
 }
 
+EntryPointReflection* ProgramLayout::findEntryPointByName(std::string name)
+{
+    return (slang::wgsl::EntryPointReflection*)(interface()->findEntryPointByName(name.c_str()));
+}
+
+EntryPointReflection::ThreadGroupSize EntryPointReflection::getComputeThreadGroupSize()
+{
+    SlangUInt size[3];
+    interface()->getComputeThreadGroupSize(3, size);
+    return {size[0], size[1], size[2]};
+}
+
 BindingType TypeLayoutReflection::getDescriptorSetDescriptorRangeType(
     unsigned int setIndex,
     unsigned int rangeIndex)
