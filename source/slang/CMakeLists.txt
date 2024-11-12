@@ -205,12 +205,7 @@ set(slang_link_args
     slang-lookup-tables
     SPIRV-Headers
 )
-set(slang_interface_args
-    # slang.h is in the project root, so include that directory in the interface
-    # for slang
-    INCLUDE_DIRECTORIES_PUBLIC
-    ${slang_SOURCE_DIR}
-)
+set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
     PUBLIC_HEADERS
     ${slang_SOURCE_DIR}/include/slang*.h

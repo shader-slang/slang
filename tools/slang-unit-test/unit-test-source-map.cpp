@@ -7,7 +7,7 @@
 #include "../../source/compiler-core/slang-source-map.h"
 #include "../../source/core/slang-rtti-info.h"
 #include "../../source/core/slang-string-escape-util.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 

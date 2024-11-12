@@ -1,9 +1,9 @@
 #pragma once
 
+#include "core/slang-basic.h"
+#include "core/slang-render-api-util.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
-#include "source/core/slang-render-api-util.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 using namespace gfx;

@@ -7,7 +7,7 @@
 #endif
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "external/stb/stb_image.h"
+#include "stb_image.h"
 
 using namespace Slang;
 using namespace gfx;

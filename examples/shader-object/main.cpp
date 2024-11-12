@@ -12,10 +12,10 @@
 #include "slang.h"
 using Slang::ComPtr;
 
+#include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 #include "gfx-util/shader-cursor.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
 
 using namespace gfx;
 
