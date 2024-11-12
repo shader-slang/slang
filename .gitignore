@@ -93,3 +93,4 @@ vkd3d-proton.cache.write
 *~
 .*.swp
 .*.swo
+/generators

@@ -415,6 +415,19 @@ unsigned int ProgramLayout::getParameterCount()
     return interface()->getParameterCount();
 }
 
+emscripten::val ProgramLayout::toJsonObject()
+{
+    Slang::ComPtr<ISlangBlob> blob;
+    if (SLANG_FAILED(interface()->toJson(blob.writeRef())))
+        return {};
+    auto jsonString = std::string(
+        (char*)blob->getBufferPointer(),
+        (char*)blob->getBufferPointer() + blob->getBufferSize());
+    emscripten::val parsedObject =
+        emscripten::val::global("JSON").call<emscripten::val>("parse", jsonString);
+    return parsedObject;
+}
+
 VariableLayoutReflection* ProgramLayout::getParameterByIndex(unsigned int index)
 {
     return (slang::wgsl::VariableLayoutReflection*)(interface()->getParameterByIndex(index));

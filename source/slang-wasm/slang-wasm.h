@@ -82,6 +82,8 @@ public:
     slang::wgsl::TypeLayoutReflection* getGlobalParamsTypeLayout();
 
     slang::ProgramLayout* interface() const { return (slang::ProgramLayout*)this; }
+
+    emscripten::val toJsonObject();
 };
 
 class Session;
