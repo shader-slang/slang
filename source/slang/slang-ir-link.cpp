@@ -1829,8 +1829,11 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
         auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);
         auto entryPoint = program->getEntryPoint(entryPointIndex).get();
-        irEntryPoints.add(
-            specializeIRForEntryPoint(context, entryPointMangledName, entryPoint, nameOverride.getUnownedSlice()));
+        irEntryPoints.add(specializeIRForEntryPoint(
+            context,
+            entryPointMangledName,
+            entryPoint,
+            nameOverride.getUnownedSlice()));
     }
 
     // Layout information for global shader parameters is also required,
