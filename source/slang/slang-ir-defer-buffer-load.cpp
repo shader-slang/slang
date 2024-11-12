@@ -58,12 +58,12 @@ struct DeferBufferLoadContext
 
     static bool isStructuredBufferLoad(IRInst* inst)
     {
+        // Note: we cannot defer loads from RWStructuredBuffer because there can be other
+        // instructions that modify the buffer.
         switch (inst->getOp())
         {
         case kIROp_StructuredBufferLoad:
-        case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoadStatus:
-        case kIROp_RWStructuredBufferLoadStatus:
             return true;
         default:
             return false;
