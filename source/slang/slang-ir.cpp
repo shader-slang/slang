@@ -6175,7 +6175,7 @@ IRInst* IRBuilder::emitGenericAsm(UnownedStringSlice asmText)
 
 IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index)
 {
-    const auto sbt = cast<IRHLSLRWStructuredBufferType>(structuredBuffer->getDataType());
+    const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
     const auto t = getPtrType(sbt->getElementType());
     IRInst* const operands[2] = {structuredBuffer, index};
     const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
