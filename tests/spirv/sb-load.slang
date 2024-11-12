@@ -8,7 +8,7 @@ struct FillPatternBuffer
     float4 px[FILL_PATTERN_DIMENSIONS_Y][FILL_PATTERN_DIMENSIONS_X];
 };
 
-RWStructuredBuffer<FillPatternBuffer> dp;
+StructuredBuffer<FillPatternBuffer> dp;
 RWStructuredBuffer<float4> outputBuffer;
 
 // CHECK-NOT: OpCompositeConstruct
