@@ -873,6 +873,7 @@ static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* buil
 
 IRFunc* specializeIRForEntryPoint(
     IRSpecContext* context,
+    String const& mangledName,
     EntryPoint* entryPoint,
     UnownedStringSlice nameOverride)
 {
@@ -886,7 +887,6 @@ IRFunc* specializeIRForEntryPoint(
     // not the same as the mangled name of the decl.
     //
     RefPtr<IRSpecSymbol> sym;
-    auto mangledName = entryPoint->getEntryPointMangledName(0);
     if (!context->getSymbols().tryGetValue(mangledName, sym))
     {
         String hashedName = getHashedName(mangledName.getUnownedSlice());
@@ -1830,7 +1830,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);
         auto entryPoint = program->getEntryPoint(entryPointIndex).get();
         irEntryPoints.add(
-            specializeIRForEntryPoint(context, entryPoint, nameOverride.getUnownedSlice()));
+            specializeIRForEntryPoint(context, entryPointMangledName, entryPoint, nameOverride.getUnownedSlice()));
     }
 
     // Layout information for global shader parameters is also required,
