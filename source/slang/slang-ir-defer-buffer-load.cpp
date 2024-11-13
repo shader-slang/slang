@@ -108,7 +108,8 @@ struct DeferBufferLoadContext
             }
         }
         auto targetBlock = findEarliestDominatingBlock(valueInst, dependentBlocks);
-        IRInst* insertBeforeInst = targetBlock->getTerminator();
+        IRInst* insertBeforeInst =
+            targetBlock == getBlock(valueInst) ? valueInst : targetBlock->getTerminator();
         for (;;)
         {
             auto prev = insertBeforeInst->getPrevInst();
