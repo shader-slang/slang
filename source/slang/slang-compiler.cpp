@@ -2722,7 +2722,7 @@ SLANG_NO_THROW char const* SLANG_MCALL Module::getDependencyFilePath(SlangInt32 
 {
     SourceFile* sourceFile = getFileDependencies()[index];
     return sourceFile->getPathInfo().hasFoundPath()
-               ? sourceFile->getPathInfo().foundPath.getBuffer()
+               ? sourceFile->getPathInfo().getMostUniqueIdentity().getBuffer()
                : nullptr;
 }
 
