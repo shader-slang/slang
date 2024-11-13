@@ -183,6 +183,23 @@ The name for this directive could easily lead to a lot of bikeshedding, with maj
 
 * We could hew closely to the precedent of Racket and use `#lang` instead of `#language`. There is no strong reason to pursue actual *compatibility* between the two (i.e., so that Slang code can be fed to the Racket toolchain, or vice versa), so the benefits of using the exact same spelling are minimal. This proposal favors being more humane and spelling things out fully over using contractions.
 
+### What is the right default? ###
+
+Given that existing Slang code doesn't use anything like `#language`, we cannot require that all files add the directive without breaking **all** existing code (which is unacceptable).
+Thus we need to provide a default behavior for files that don't use `#language`, and there are seemingly only two reasonable options:
+
+* We can follow the precedent of GLSL and treat the absence of the directive as a request for the lowest possible version of the language. In our case, that would mean locking code without a `#language` to whatever was the last language version before `#language` was introduced.
+
+* We can follow the precedent of most other toolsets, and treat the absence of the directive as a request for the latest *stable* language version. That is, in the absence of a directive a program should have access to all *non-experimental* language features.
+
+While the first option was the right choice for GLSL (where existing applications might feed existing GLSL to new GPU drivers with new compiler implementations, and need it to Just Work), it ultimately leads to the directive being *de facto* required after a certain point (does anybody intentionally write GLSL 1.10 code any more?).
+
+Furthermore, interpreting a missing directive as asking for some old language version will not play nicely with our intention to allow newer toolset releases to (eventually) drop support for older language versions. It is probably reasonable for Slang releases in 2026 to no longer support the 2024 version of the language, but if that meant they would have to reject all source files that omit `#language` because of a version mismatch... again, we are back to the recognition that the directive has become required without us explicitly saying so.
+
+The second option means that omitting the `#language` directive will remain a meaningful choice for developers: it indicates an intention to track the language as it evolves, and to accept that some things might break along the way.
+Any developer that does not accept those terms would need to specify the language version they are sticking with, which is exactly what the `#language` directive does.
+
+
 Future Directions
 -----------------
 
