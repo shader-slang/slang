@@ -135,13 +135,13 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
         case LayoutResourceKind::SamplerState:
         case LayoutResourceKind::DescriptorTableSlot:
             {
+                auto kinds = LayoutResourceKindFlag::make(LayoutResourceKind::DescriptorTableSlot);
                 m_writer->emit("@binding(");
-                m_writer->emit(attr->getOffset());
+                auto index = getBindingOffsetForKinds(&containerChain, kinds);
+                m_writer->emit(index);
                 m_writer->emit(") ");
                 m_writer->emit("@group(");
-                auto space = getBindingSpaceForKinds(
-                    &containerChain,
-                    LayoutResourceKind::DescriptorTableSlot);
+                auto space = getBindingSpaceForKinds(&containerChain, kinds);
                 m_writer->emit(space);
                 m_writer->emit(") ");
             }

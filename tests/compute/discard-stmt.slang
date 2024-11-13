@@ -3,7 +3,6 @@
 //TEST_INPUT: Texture2D(size=4, content = one):name tex
 //TEST_INPUT: Sampler:name samp
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name outputBuffer
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 
 Texture2D tex;
