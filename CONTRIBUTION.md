@@ -224,6 +224,16 @@ $ git submodule update --recursive
 
 The Slang repository uses the squash strategy for merging pull requests, which means all your commits will be squashed into one commit by GitHub upon merge.
 
+## Labeling Breaking Changes
+
+All pull requests must be labeled as either `pr: non-breaking` or `pr: breaking change` before it can be merged to the main branch. If you are already a committer, you are expected to label your PR when you create it. If you are not yet a committer, a reviewer will do this for you.
+
+A PR is considered to introduce a breaking change if an existing application that uses Slang may no longer compile or behave the same way with the change. Typical examples of breaking changes include:
+
+- Changes to `slang.h` that modifies the Slang API in a way that breaks binary compatibility.
+- Changes to the language syntax or semantics that may cause existing Slang code to not compile or produce different run-time result. For example changing the overload resolution rules.
+- Removing or renaming an existing intrinsic from the core module.
+
 
 ## Code Style
 Follow our [Coding conventions](docs/design/coding-conventions.md) to maintain consistency throughout the project.
