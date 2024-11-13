@@ -2,8 +2,11 @@ SP #012: Introduce a `#language` Directive
 =========================================
 
 Status: Design Review
+
 Implementation: -
+
 Author: Theresa Foley <tfoley@nvidia.com>
+
 Reviewer: -
 
 Introduction
