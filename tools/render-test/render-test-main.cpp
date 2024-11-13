@@ -597,7 +597,7 @@ SlangResult RenderTestApp::initialize(
 
                 BufferDesc vertexBufferDesc;
                 vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
-                vertexBufferDesc.memoryType = MemoryType::Upload;
+                vertexBufferDesc.memoryType = MemoryType::DeviceLocal;
                 vertexBufferDesc.usage = BufferUsage::VertexBuffer;
                 vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
 
