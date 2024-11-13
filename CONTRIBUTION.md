@@ -211,25 +211,19 @@ For the Pull Request, you will need to write a PR message. This message is for a
  
 The PR requires an approval from people who have permissions. They will review the changes before approve the Pull. During this step, you will get feedbacks from other people and they may request you to make some changes. When you need to make adjustments, you can commit new changes to the branch in your forlked repository that already has the changes in PR process. When new commits are added to the branch, they will automatically appear in the PR.
 
-## Update your Repository
-After your pull request is submitted, you can update your repository for your next changes.
+## Addressing Code Reviews and Keep Branch In-Sync
+After your pull request is submitted, you can update your repository for your next changes. Follow-up changes that address review comments should be pushed to your pull request branch as additional commits. When your branch is out of sync with top-of-tree, submit a merge commit to keep them in-sync. Do not rebase and force push after the PR is created to keep the change history during the review process.
 
-Update your forked repository in github
-When your forked repository is behind the original repository, Github will allow you to sync via a "Sync fork" button.
+Use these commands to sync your branch:
 
-Update your local machine from your forked repository
 ```
-$ git checkout master
-$ git pull
-$ git submodule update --init --recursive
+$ git fetch upstream master
+$ git merge upstream/master # resolve any conflicts here
+$ git submodule update --recursive
 ```
 
-When you update the submodule, "--init" is required if there are new submodules added to the project.
-Update tags on your local machine and your forked repository
-```
-$ git fetch --tags upstream
-$ git push --tags origin
-```
+The Slang repository uses the squash strategy for merging pull requests, which means all your commits will be squashed into one commit by GitHub upon merge.
+
 
 ## Code Style
 Follow our [Coding conventions](docs/design/coding-conventions.md) to maintain consistency throughout the project.
