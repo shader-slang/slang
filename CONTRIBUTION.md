@@ -212,7 +212,7 @@ For the Pull Request, you will need to write a PR message. This message is for a
 The PR requires an approval from people who have permissions. They will review the changes before approve the Pull. During this step, you will get feedbacks from other people and they may request you to make some changes. When you need to make adjustments, you can commit new changes to the branch in your forlked repository that already has the changes in PR process. When new commits are added to the branch, they will automatically appear in the PR.
 
 ## Addressing Code Reviews and Keep Branch In-Sync
-After your pull request is submitted, you can update your repository for your next changes. Follow-up changes that address review comments should be pushed to your pull request branch as additional commits. When your branch is out of sync with top-of-tree, submit a merge commit to keep them in-sync. Do not rebase and force push after the PR is created to keep the change history during the review process.
+After your pull request is submitted, you will receive code reviews from the community within 24 hours. Follow-up changes that address review comments should be pushed to your pull request branch as additional commits. When your branch is out of sync with top-of-tree, submit a merge commit to keep them in-sync. Do not rebase and force push after the PR is created to keep the change history during the review process.
 
 Use these commands to sync your branch:
 
