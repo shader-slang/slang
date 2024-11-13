@@ -953,7 +953,9 @@ Result linkAndOptimizeIR(
     performForceInlining(irModule);
 
     // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
-    deferBufferLoad(irModule);
+    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
+        isWGPUTarget(targetRequest))
+        deferBufferLoad(irModule);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
