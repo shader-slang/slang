@@ -30,6 +30,7 @@
 #include "slang-ir-com-interface.h"
 #include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
@@ -950,6 +951,11 @@ Result linkAndOptimizeIR(
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
+
+    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
+    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
+        isWGPUTarget(targetRequest))
+        deferBufferLoad(irModule);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
