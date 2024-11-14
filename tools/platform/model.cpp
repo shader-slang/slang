@@ -7,13 +7,13 @@
 #include "../../external/tinyobjloader/tiny_obj_loader.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "../../external/stb/stb_image.h"
+#include "stb_image.h"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "../../external/glm/glm/glm.hpp"
 #include "../../external/glm/glm/gtc/constants.hpp"
 #include "../../external/glm/glm/gtc/matrix_transform.hpp"
-#include "../../external/stb/stb_image_resize.h"
+#include "stb_image_resize.h"
 
 #include <memory>
 #include <unordered_map>

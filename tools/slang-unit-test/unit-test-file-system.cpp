@@ -8,7 +8,7 @@
 #include "../../source/core/slang-memory-file-system.h"
 #include "../../source/core/slang-riff-file-system.h"
 #include "../../source/core/slang-zip-file-system.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 

@@ -2,7 +2,7 @@
 
 #include "gfx-test-util.h"
 #include "slang-com-ptr.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +12,7 @@
 #pragma warning(disable : 4996)
 #endif
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
+#include "stb_image_write.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif

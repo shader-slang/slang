@@ -1,7 +1,7 @@
 // unit-test-find-type-by-name.cpp
 
 #include "slang.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>

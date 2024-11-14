@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
+#include "stb_image_write.h"
 
 namespace renderer_test
 {

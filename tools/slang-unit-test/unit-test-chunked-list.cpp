@@ -1,8 +1,8 @@
 // unit-test-path.cpp
 
-#include "source/core/slang-basic.h"
-#include "source/core/slang-chunked-list.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "core/slang-basic.h"
+#include "core/slang-chunked-list.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 

@@ -19,12 +19,12 @@ using Slang::ComPtr;
 // this layer is *not* required or assumed when using the Slang language,
 // compiler, and API.
 //
+#include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
+#include "gfx-util/shader-cursor.h"
+#include "platform/performance-counter.h"
+#include "platform/window.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
-#include "tools/gfx-util/shader-cursor.h"
-#include "tools/platform/performance-counter.h"
-#include "tools/platform/window.h"
 
 #include <chrono>
 

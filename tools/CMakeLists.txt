@@ -98,6 +98,7 @@ if(SLANG_ENABLE_GFX)
         LINK_WITH_PRIVATE
             core
             imgui
+            stb
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
             "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
@@ -106,7 +107,7 @@ if(SLANG_ENABLE_GFX)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
         INCLUDE_FROM_PRIVATE gfx
-        INCLUDE_DIRECTORIES_PUBLIC platform
+        INCLUDE_DIRECTORIES_PUBLIC . platform
         EXPORT_MACRO_PREFIX SLANG_PLATFORM
     )
 
@@ -122,6 +123,7 @@ if(SLANG_ENABLE_GFX)
             slang
             Vulkan-Headers
             metal-cpp
+            stb
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore Metal
@@ -182,6 +184,7 @@ if(SLANG_ENABLE_TESTS)
         EXECUTABLE
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE core compiler-core slang
+        INCLUDE_FROM_PRIVATE unit-test
         FOLDER test
     )
     slang_add_target(
@@ -196,10 +199,12 @@ if(SLANG_ENABLE_TESTS)
         slang-test
         EXECUTABLE
         USE_FEWER_WARNINGS
+        INCLUDE_DIRECTORIES_PUBLIC .
         LINK_WITH_PRIVATE
             core
             compiler-core
             slang
+            stb
             ${CMAKE_DL_LIBS}
             Threads::Threads
         REQUIRES
@@ -241,6 +246,7 @@ if(SLANG_ENABLE_TESTS)
         unit-test
         OBJECT
         EXCLUDE_FROM_ALL
+        INCLUDE_DIRECTORIES_PUBLIC .
         INCLUDE_FROM_PRIVATE slang core
         INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/include
         FOLDER test
@@ -254,7 +260,7 @@ if(SLANG_ENABLE_TESTS)
             EXCLUDE_FROM_ALL
             EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
             USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform
+            LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform stb
             OUTPUT_NAME gfx-unit-test-tool
             REQUIRED_BY slang-test
             FOLDER test/tools
@@ -272,6 +278,7 @@ if(SLANG_ENABLE_TESTS)
                     slang
                     slang-rhi
                     platform
+                    stb
                     $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
                 EXTRA_COMPILE_DEFINITIONS_PRIVATE
                     $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>

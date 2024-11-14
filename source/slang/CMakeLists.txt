@@ -176,6 +176,23 @@ configure_file(
 )
 
 #
+# Copy headers into the build tree to support source linking
+#
+add_custom_target(
+    copy_slang_headers
+    COMMAND
+        ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_BINARY_DIR}/$<CONFIG>/include"
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_directory "${slang_SOURCE_DIR}/include"
+        "${CMAKE_BINARY_DIR}/$<CONFIG>/include"
+    COMMAND
+        ${CMAKE_COMMAND} -E copy
+        "${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/slang-tag-version.h"
+        "${CMAKE_BINARY_DIR}/$<CONFIG>/include/slang-tag-version.h"
+)
+
+#
 # Slang itself
 #
 
@@ -193,6 +210,8 @@ set(slang_build_args
     ${SLANG_LIB_TYPE}
     EXTRA_SOURCE_DIRS
     ${SLANG_RECORD_REPLAY_SYSTEM}
+    REQUIRES
+    copy_slang_headers
 )
 set(slang_link_args
     LINK_WITH_PRIVATE
@@ -205,12 +224,7 @@ set(slang_link_args
     slang-lookup-tables
     SPIRV-Headers
 )
-set(slang_interface_args
-    # slang.h is in the project root, so include that directory in the interface
-    # for slang
-    INCLUDE_DIRECTORIES_PUBLIC
-    ${slang_SOURCE_DIR}
-)
+set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
     PUBLIC_HEADERS
     ${slang_SOURCE_DIR}/include/slang*.h

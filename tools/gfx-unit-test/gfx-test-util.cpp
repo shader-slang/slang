@@ -1,7 +1,7 @@
 #include "gfx-test-util.h"
 
 #include "slang-com-ptr.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #define GFX_ENABLE_RENDERDOC_INTEGRATION 0
 #define GFX_ENABLE_SPIRV_DEBUG 0

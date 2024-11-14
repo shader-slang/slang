@@ -3,7 +3,7 @@
 #include "../../source/core/slang-byte-encode-util.h"
 #include "../../source/core/slang-list.h"
 #include "../../source/core/slang-random-generator.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>

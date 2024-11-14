@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/slang-string-util.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
-#include "source/core/slang-string-util.h"
 
 using Slang::ComPtr;
 

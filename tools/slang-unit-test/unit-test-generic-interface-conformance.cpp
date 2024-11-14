@@ -4,7 +4,7 @@
 #include "../../source/core/slang-process.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
