@@ -1341,6 +1341,7 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_BitXor:
     case kIROp_BitOr:
+    case kIROp_BitAnd:
         {
             // Emit bitwise operators with paranthesis to avoid precedence issues
             const auto emitOp = getEmitOpForOp(inst->getOp());
