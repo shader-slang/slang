@@ -2894,6 +2894,13 @@ struct IRUndefined : IRInst
 {
 };
 
+// Special inst for targets that support default initialization,
+// like the braces '= {}' in C/HLSL
+struct IRDefaultConstruct : IRInst
+{
+    IR_LEAF_ISA(DefaultConstruct)
+};
+
 // A global-scope generic parameter (a type parameter, a
 // constraint parameter, etc.)
 struct IRGlobalGenericParam : IRInst
