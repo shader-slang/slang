@@ -75,6 +75,10 @@ Session* GlobalSession::createSession(int compileTarget)
         constexpr SlangInt targetCount = 1;
         TargetDesc target = {};
         target.format = (SlangCompileTarget)compileTarget;
+        if (compileTarget == SLANG_HLSL)
+        {
+            target.profile = spFindProfile(m_interface, "sm_6_6");
+        }
         sessionDesc.targets = &target;
         sessionDesc.targetCount = targetCount;
         SlangResult result = m_interface->createSession(sessionDesc, session.writeRef());
@@ -436,6 +440,18 @@ VariableLayoutReflection* ProgramLayout::getParameterByIndex(unsigned int index)
 TypeLayoutReflection* ProgramLayout::getGlobalParamsTypeLayout()
 {
     return (slang::wgsl::TypeLayoutReflection*)(interface()->getGlobalParamsTypeLayout());
+}
+
+EntryPointReflection* ProgramLayout::findEntryPointByName(std::string name)
+{
+    return (slang::wgsl::EntryPointReflection*)(interface()->findEntryPointByName(name.c_str()));
+}
+
+EntryPointReflection::ThreadGroupSize EntryPointReflection::getComputeThreadGroupSize()
+{
+    SlangUInt size[3];
+    interface()->getComputeThreadGroupSize(3, size);
+    return {size[0], size[1], size[2]};
 }
 
 BindingType TypeLayoutReflection::getDescriptorSetDescriptorRangeType(
