@@ -928,16 +928,16 @@ Result RenderTestApp::update()
         applyBinding(rootObject);
         rootObject->finalize();
 
-        encoder->beginComputePass();
+        auto passEncoder = encoder->beginComputePass();
         ComputeState state;
         state.pipeline = static_cast<IComputePipeline*>(m_pipeline.get());
         state.rootObject = rootObject;
-        encoder->setComputeState(state);
-        encoder->dispatchCompute(
+        passEncoder->setComputeState(state);
+        passEncoder->dispatchCompute(
             m_options.computeDispatchSize[0],
             m_options.computeDispatchSize[1],
             m_options.computeDispatchSize[2]);
-        encoder->endComputePass();
+        passEncoder->end();
     }
     else
     {
@@ -959,7 +959,7 @@ Result RenderTestApp::update()
         renderPass.colorAttachmentCount = 1;
         renderPass.depthStencilAttachment = &depthStencilAttachment;
 
-        encoder->beginRenderPass(renderPass);
+        auto passEncoder = encoder->beginRenderPass(renderPass);
 
         RenderState state;
         state.pipeline = static_cast<IRenderPipeline*>(m_pipeline.get());
@@ -972,8 +972,8 @@ Result RenderTestApp::update()
         if (m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute ||
             m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute)
         {
-            encoder->setRenderState(state);
-            encoder->drawMeshTasks(
+            passEncoder->setRenderState(state);
+            passEncoder->drawMeshTasks(
                 m_options.computeDispatchSize[0],
                 m_options.computeDispatchSize[1],
                 m_options.computeDispatchSize[2]);
@@ -982,12 +982,12 @@ Result RenderTestApp::update()
         {
             state.vertexBuffers[0] = m_vertexBuffer;
             state.vertexBufferCount = 1;
-            encoder->setRenderState(state);
+            passEncoder->setRenderState(state);
             DrawArguments args;
             args.vertexCount = 3;
-            encoder->draw(args);
+            passEncoder->draw(args);
         }
-        encoder->endRenderPass();
+        passEncoder->end();
     }
     m_startTicks = Process::getClockTick();
     m_queue->submit(encoder->finish());

@@ -2,7 +2,7 @@
 
 #include "../../source/core/slang-random-generator.h"
 #include "../../source/core/slang-riff.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 

@@ -6890,7 +6890,7 @@ char const* EndToEndCompileRequest::getDependencyFilePath(int index)
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
     SourceFile* sourceFile = program->getFileDependencies()[index];
     return sourceFile->getPathInfo().hasFoundPath()
-               ? sourceFile->getPathInfo().foundPath.getBuffer()
+               ? sourceFile->getPathInfo().getMostUniqueIdentity().getBuffer()
                : "unknown";
 }
 

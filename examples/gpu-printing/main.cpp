@@ -5,12 +5,12 @@
 #include <string>
 using Slang::ComPtr;
 
+#include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 #include "gfx-util/shader-cursor.h"
 #include "gpu-printing.h"
+#include "platform/window.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
-#include "tools/platform/window.h"
 
 using namespace gfx;
 

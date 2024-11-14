@@ -64,6 +64,7 @@ if(SLANG_ENABLE_EXAMPLES)
             slang
             gfx
             platform
+            stb
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         FOLDER examples
     )

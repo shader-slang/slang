@@ -1,11 +1,11 @@
+#include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 #include "gfx-util/shader-cursor.h"
+#include "platform/vector-math.h"
+#include "platform/window.h"
 #include "slang-com-ptr.h"
 #include "slang-gfx.h"
 #include "slang.h"
-#include "source/core/slang-basic.h"
-#include "tools/platform/vector-math.h"
-#include "tools/platform/window.h"
 
 using namespace gfx;
 using namespace Slang;

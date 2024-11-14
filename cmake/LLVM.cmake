@@ -79,6 +79,10 @@ function(fetch_or_build_slang_llvm)
             LINK_WITH_PRIVATE core compiler-core llvm-dep clang-dep
             # We include slang.h, but don't need to link with it
             INCLUDE_FROM_PRIVATE slang
+            # We include tools/slang-test/filecheck.h, but don't need to link
+            # with it and it might not be a target if SLANG_ENABLE_TESTS is
+            # false, so just include the directory manually here
+            INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/tools
             # This uses the SLANG_DLL_EXPORT macro from slang.h, so make sure to set
             # SLANG_DYNAMIC and SLANG_DYNAMIC_EXPORT
             EXPORT_MACRO_PREFIX SLANG

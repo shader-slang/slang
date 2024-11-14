@@ -7,7 +7,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-secure-crt.h"
-#include "external/stb/stb_image_write.h"
+#include "stb_image_write.h"
 
 #if SLANG_WIN64 || SLANG_WIN64
 #define ENABLE_GL_IMPL 1

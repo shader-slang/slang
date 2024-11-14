@@ -7,7 +7,7 @@
 #include "../../source/core/slang-platform.h"
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-string-util.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <mutex>
 
