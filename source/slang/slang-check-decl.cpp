@@ -1709,6 +1709,18 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
     }
 }
 
+bool isSpecializationConstant(VarDeclBase* varDecl)
+{
+    for (auto modifier : varDecl->modifiers)
+    {
+        if (as<SpecializationConstantAttribute>(modifier))
+            return true;
+        if (as<VkConstantIdAttribute>(modifier))
+            return true;
+    }
+    return false;
+}
+
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     // A variable that didn't have an explicit type written must
@@ -1943,7 +1955,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // without any `uniform` modifiers as true global variables by default.
             if (!varDecl->findModifier<HLSLUniformModifier>() &&
                 !varDecl->findModifier<InModifier>() && !varDecl->findModifier<OutModifier>() &&
-                !varDecl->findModifier<GLSLBufferModifier>())
+                !varDecl->findModifier<GLSLBufferModifier>() && !isSpecializationConstant(varDecl))
             {
                 if (!isUniformParameterType(varDecl->type))
                 {
