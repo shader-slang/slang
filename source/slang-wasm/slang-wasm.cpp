@@ -75,6 +75,10 @@ Session* GlobalSession::createSession(int compileTarget)
         constexpr SlangInt targetCount = 1;
         TargetDesc target = {};
         target.format = (SlangCompileTarget)compileTarget;
+        if (compileTarget == SLANG_HLSL)
+        {
+            target.profile = spFindProfile(m_interface, "sm_6_6");
+        }
         sessionDesc.targets = &target;
         sessionDesc.targetCount = targetCount;
         SlangResult result = m_interface->createSession(sessionDesc, session.writeRef());
