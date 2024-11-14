@@ -12,7 +12,7 @@
 #include "../../source/core/slang-writer.h"
 #include "slang-com-helper.h"
 #include "test-server-diagnostics.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>

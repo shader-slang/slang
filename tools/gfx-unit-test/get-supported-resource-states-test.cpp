@@ -1,8 +1,8 @@
+#include "core/slang-basic.h"
 #include "gfx-test-util.h"
+#include "gfx-util/shader-cursor.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
-#include "tools/gfx-util/shader-cursor.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #if SLANG_WINDOWS_FAMILY
 #include <d3d12.h>

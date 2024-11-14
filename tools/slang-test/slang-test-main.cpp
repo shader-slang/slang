@@ -17,7 +17,7 @@
 #include "../../source/core/slang-token-reader.h"
 #include "../../source/core/slang-type-text-util.h"
 #include "slang-com-helper.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 #undef SLANG_UNIT_TEST
 
 #include "../../source/compiler-core/slang-artifact-associated-impl.h"
@@ -32,7 +32,7 @@
 #include "test-reporter.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "external/stb/stb_image.h"
+#include "stb_image.h"
 
 #include <math.h>
 #include <stdarg.h>

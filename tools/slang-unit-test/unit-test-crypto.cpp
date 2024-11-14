@@ -1,6 +1,6 @@
 // unit-test-sha1.cpp
 #include "../../source/core/slang-crypto.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 

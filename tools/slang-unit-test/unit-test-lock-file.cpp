@@ -1,7 +1,7 @@
 // unit-test-lock-file.cpp
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <atomic>
 #include <future>

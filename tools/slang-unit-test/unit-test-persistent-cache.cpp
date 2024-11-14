@@ -4,7 +4,7 @@
 #include "../../source/core/slang-persistent-cache.h"
 #include "../../source/core/slang-process.h"
 #include "../../source/core/slang-random-generator.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <atomic>
 #include <chrono>

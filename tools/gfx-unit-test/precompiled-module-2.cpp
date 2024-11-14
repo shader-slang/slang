@@ -1,11 +1,11 @@
+#include "core/slang-basic.h"
+#include "core/slang-blob.h"
+#include "core/slang-io.h"
+#include "core/slang-memory-file-system.h"
 #include "gfx-test-util.h"
+#include "gfx-util/shader-cursor.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
-#include "source/core/slang-blob.h"
-#include "source/core/slang-io.h"
-#include "source/core/slang-memory-file-system.h"
-#include "tools/gfx-util/shader-cursor.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace gfx;
 

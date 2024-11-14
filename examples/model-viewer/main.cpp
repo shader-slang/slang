@@ -25,12 +25,12 @@
 // and parameter binding.
 //
 #include "examples/example-base/example-base.h"
+#include "gfx-util/shader-cursor.h"
+#include "platform/gui.h"
+#include "platform/model.h"
+#include "platform/vector-math.h"
+#include "platform/window.h"
 #include "slang-gfx.h"
-#include "tools/gfx-util/shader-cursor.h"
-#include "tools/platform/gui.h"
-#include "tools/platform/model.h"
-#include "tools/platform/vector-math.h"
-#include "tools/platform/window.h"
 
 #include <map>
 #include <sstream>

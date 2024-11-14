@@ -1,10 +1,10 @@
 #pragma once
 
+#include "core/slang-basic.h"
+#include "core/slang-io.h"
+#include "platform/window.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
-#include "source/core/slang-io.h"
 #include "test-base.h"
-#include "tools/platform/window.h"
 
 #ifdef _WIN32
 void _Win32OutputDebugString(const char* str);

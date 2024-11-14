@@ -1,6 +1,6 @@
 #include "examples/example-base/example-base.h"
+#include "platform/window.h"
 #include "slang.h"
-#include "tools/platform/window.h"
 
 using namespace gfx;
 using namespace Slang;
