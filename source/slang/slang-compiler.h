@@ -1622,7 +1622,7 @@ public:
 
     virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
-    virtual slang::DeclReflection* getModuleReflection() SLANG_OVERRIDE;
+    virtual slang::DeclReflection* SLANG_MCALL getModuleReflection() SLANG_OVERRIDE;
 
     void setDigest(SHA1::Digest const& digest) { m_digest = digest; }
     SHA1::Digest computeDigest();

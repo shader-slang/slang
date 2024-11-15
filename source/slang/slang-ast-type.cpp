@@ -706,7 +706,7 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
         ShortList<Type*> expandedTypes;
         SLANG_ASSERT(capturedPacks.getCount() != 0);
 
-        for (Index i = 0; i < concreteTypePacks[0]->getTypeCount(); i++)
+        for (int i = 0; i < (int)concreteTypePacks[0]->getTypeCount(); i++)
         {
             subst.packExpansionIndex = i;
             auto substElementType = getPatternType()->substituteImpl(astBuilder, subst, &diff);

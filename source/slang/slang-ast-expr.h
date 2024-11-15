@@ -293,7 +293,7 @@ class SwizzleExpr : public Expr
 {
     SLANG_AST_CLASS(SwizzleExpr)
     Expr* base = nullptr;
-    ShortList<UInt, 4> elementIndices;
+    ShortList<uint32_t, 4> elementIndices;
     SourceLoc memberOpLoc;
 };
 

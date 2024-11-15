@@ -1524,6 +1524,11 @@ bool Parser::_isCtor()
     return isCtor;
 }
 
+bool isAlphaNumeric(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+}
+
 SlangResult Parser::_maybeParseContained(Node** outNode)
 {
     *outNode = nullptr;
@@ -1833,7 +1838,37 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             fieldNode->m_name = nameToken;
             fieldNode->m_reflectionType = m_currentScope->getContainedReflectionType();
             fieldNode->m_isStatic = isStatic;
-
+            if (fieldNode->m_reflectionType == ReflectionType::Reflected)
+            {
+                static const char* illegalTypes[] = {
+                    "size_t",
+                    "Int",
+                    "UInt",
+                    "Index",
+                    "Count",
+                    "UIndex",
+                    "UCount",
+                    "PtrInt",
+                    "intptr_t",
+                    "uintptr_t"};
+                for (const auto& illegalType : illegalTypes)
+                {
+                    int index = typeName.indexOf(UnownedStringSlice(illegalType));
+                    if (index != -1)
+                    {
+                        index += UnownedStringSlice(illegalType).getLength();
+                        if (index >= typeName.getLength() || !isAlphaNumeric(typeName[index]))
+                        {
+                            // Cannot use this type in a field (as it's arch dependent
+                            m_sink->diagnose(
+                                nameToken,
+                                CPPDiagnostics::cannoseUseArchDependentType,
+                                illegalType);
+                            return SLANG_FAIL;
+                        }
+                    }
+                }
+            }
             m_currentScope->addChild(fieldNode);
 
             *outNode = fieldNode;
@@ -2187,7 +2222,8 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                     m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::braceOpenAtEndOfFile);
                     return SLANG_FAIL;
                 }
-
+                if (m_sink->getErrorCount())
+                    return SLANG_FAIL;
                 return SLANG_OK;
             }
         case TokenType::Pound:

@@ -333,8 +333,8 @@ struct SwizzledLValueInfo : ExtendedValueInfo
     // The base expression (this should be an l-value)
     LoweredValInfo base;
 
-    // THe indices for the elements being swizzled
-    ShortList<UInt, 4> elementIndices;
+    // The indices for the elements being swizzled
+    ShortList<uint32_t, 4> elementIndices;
 };
 
 // Represents the result of a matrix swizzle operation in an l-value context.
@@ -5495,7 +5495,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo;
             swizzledLValue->type = irType;
             swizzledLValue->base = baseSwizzleInfo->base;
-            swizzledLValue->elementIndices = elementCount;
+            swizzledLValue->elementIndices.add((uint32_t)elementCount);
 
             // Take the swizzle element of the "outer" swizzle, as it was
             // written by the user. In our running example of `foo[i].zw.y`
@@ -7146,7 +7146,7 @@ void assign(IRGenContext* context, LoweredValInfo const& inLeft, LoweredValInfo 
     // If there's a single element, just emit a regular store, otherwise
     // proceed with a swizzle store
     auto swizzledStore =
-        [builder](IRInst* dest, IRInst* source, UInt elementCount, UInt const* elementIndices)
+        [builder](IRInst* dest, IRInst* source, UInt elementCount, uint32_t const* elementIndices)
     {
         if (elementCount == 1)
         {
@@ -7272,14 +7272,14 @@ top:
             // The number of element writes in each row
             UInt rowSizes[maxRowIndex] = {};
             // The columns being written to in each row
-            UInt rowWrites[maxRowIndex][maxCols];
+            uint32_t rowWrites[maxRowIndex][maxCols];
             // The RHS element indices being written in each row
             UInt rowIndices[maxRowIndex][maxCols];
             for (UInt i = 0; i < swizzleInfo->elementCount; ++i)
             {
                 const auto& c = swizzleInfo->elementCoords[i];
                 auto& rowSize = rowSizes[c.row];
-                rowWrites[c.row][rowSize] = c.col;
+                rowWrites[c.row][rowSize] = (uint32_t)c.col;
                 rowIndices[c.row][rowSize] = i;
                 ++rowSize;
             }

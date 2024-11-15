@@ -689,7 +689,7 @@ struct SubstitutionSet
     // `T` is a type pack, then packExpansionIndex will have a value starting from 0
     // to the count of the type pack during expansion of the `expand` type when we
     // substitute `each T` with the element of `T` at index `packExpansionIndex`.
-    Index packExpansionIndex = -1;
+    int packExpansionIndex = -1;
 
     SubstitutionSet() = default;
     SubstitutionSet(DeclRefBase* declRefBase)

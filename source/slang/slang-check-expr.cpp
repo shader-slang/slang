@@ -4308,7 +4308,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     auto span = swizzleText.getUnownedSlice();
     Index pos = 0;
 
-    ShortList<UInt> elementCoords;
+    ShortList<uint32_t> elementCoords;
 
     bool anyDuplicates = false;
 
@@ -4316,7 +4316,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     // Every update to cursor corresponds to a check against 0-termination
     while (pos < span.getLength())
     {
-        UInt elementCoord;
+        uint32_t elementCoord;
 
         // Check for the preceding underscore
         if (span[pos] != '_')
@@ -4341,7 +4341,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
             // member lookup.
             return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
         }
-        elementCoord = (UInt)StringUtil::parseIntAndAdvancePos(span, pos);
+        elementCoord = (uint32_t)StringUtil::parseIntAndAdvancePos(span, pos);
 
         if (elementCoord >= tupleElementCount)
         {
@@ -4400,7 +4400,7 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
     IntegerLiteralValue limitElement = baseElementCount;
 
-    ShortList<UInt, 4> elementIndices;
+    ShortList<uint32_t, 4> elementIndices;
 
     bool anyDuplicates = false;
     bool anyError = false;
