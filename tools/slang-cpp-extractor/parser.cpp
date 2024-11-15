@@ -1849,7 +1849,8 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                     "UIndex",
                     "UCount",
                     "PtrInt",
-                    "intptr_t"};
+                    "intptr_t",
+                    "uintptr_t"};
                 for (const auto& illegalType : illegalTypes)
                 {
                     int index = typeName.indexOf(UnownedStringSlice(illegalType));
