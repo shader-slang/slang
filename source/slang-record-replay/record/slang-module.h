@@ -180,7 +180,7 @@ public:
             outDiagnostics);
     }
 
-    virtual SLANG_NO_THROW slang::DeclReflection* getModuleReflection() override;
+    virtual SLANG_NO_THROW slang::DeclReflection* SLANG_MCALL getModuleReflection() override;
 
     slang::IModule* getActualModule() const { return m_actualModule; }
 

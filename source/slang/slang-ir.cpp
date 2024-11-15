@@ -5311,7 +5311,24 @@ IRInst* IRBuilder::emitSwizzle(
     IRType* type,
     IRInst* base,
     UInt elementCount,
-    UInt const* elementIndices)
+    uint64_t const* elementIndices)
+{
+    auto intType = getBasicType(BaseType::Int);
+
+    IRInst* irElementIndices[4];
+    for (UInt ii = 0; ii < elementCount; ++ii)
+    {
+        irElementIndices[ii] = getIntValue(intType, elementIndices[ii]);
+    }
+
+    return emitSwizzle(type, base, elementCount, irElementIndices);
+}
+
+IRInst* IRBuilder::emitSwizzle(
+    IRType* type,
+    IRInst* base,
+    UInt elementCount,
+    uint32_t const* elementIndices)
 {
     auto intType = getBasicType(BaseType::Int);
 
@@ -5380,7 +5397,25 @@ IRInst* IRBuilder::emitSwizzleSet(
     IRInst* base,
     IRInst* source,
     UInt elementCount,
-    UInt const* elementIndices)
+    uint32_t const* elementIndices)
+{
+    auto intType = getBasicType(BaseType::Int);
+
+    IRInst* irElementIndices[4];
+    for (UInt ii = 0; ii < elementCount; ++ii)
+    {
+        irElementIndices[ii] = getIntValue(intType, elementIndices[ii]);
+    }
+
+    return emitSwizzleSet(type, base, source, elementCount, irElementIndices);
+}
+
+IRInst* IRBuilder::emitSwizzleSet(
+    IRType* type,
+    IRInst* base,
+    IRInst* source,
+    UInt elementCount,
+    uint64_t const* elementIndices)
 {
     auto intType = getBasicType(BaseType::Int);
 
@@ -5419,7 +5454,24 @@ IRInst* IRBuilder::emitSwizzledStore(
     IRInst* dest,
     IRInst* source,
     UInt elementCount,
-    UInt const* elementIndices)
+    uint32_t const* elementIndices)
+{
+    auto intType = getBasicType(BaseType::Int);
+
+    IRInst* irElementIndices[4];
+    for (UInt ii = 0; ii < elementCount; ++ii)
+    {
+        irElementIndices[ii] = getIntValue(intType, elementIndices[ii]);
+    }
+
+    return emitSwizzledStore(dest, source, elementCount, irElementIndices);
+}
+
+IRInst* IRBuilder::emitSwizzledStore(
+    IRInst* dest,
+    IRInst* source,
+    UInt elementCount,
+    uint64_t const* elementIndices)
 {
     auto intType = getBasicType(BaseType::Int);
 
