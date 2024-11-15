@@ -10,4 +10,4 @@ Slang can produce code for a variety of targets. When producing code for a targe
 In this chapter:
 1. [SPIR-V target specific](a2-01-spirv-target-specific.md)
 2. Metal target specific
-3. WebGPU
+3. [WGSL target specific](a2-03-wgsl-target-specific.md)
