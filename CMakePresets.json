@@ -22,6 +22,7 @@
       "binaryDir": "${sourceDir}/build.em",
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "SLANG_EMBED_CORE_MODULE": "ON",
         "CMAKE_C_FLAGS_INIT": "-fwasm-exceptions -Os",
         "CMAKE_CXX_FLAGS_INIT": "-fwasm-exceptions -Os",
         "CMAKE_EXE_LINKER_FLAGS": "-sASSERTIONS -sALLOW_MEMORY_GROWTH -fwasm-exceptions --export=__cpp_exception"
@@ -71,7 +72,8 @@
       "inherits": "default",
       "description": "Build the compile time generators used in building Slang",
       "cacheVariables": {
-        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE"
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "SLANG_ENABLE_SLANG_RHI": false
       }
     }
   ],
@@ -95,19 +97,25 @@
       "name": "emscripten",
       "configurePreset": "emscripten",
       "configuration": "Release",
-      "targets": ["slang-wasm"]
+      "targets": [
+        "slang-wasm"
+      ]
     },
     {
       "name": "generators",
       "inherits": "release",
       "configurePreset": "generators",
-      "targets": ["all-generators"]
+      "targets": [
+        "all-generators"
+      ]
     },
     {
       "name": "slang-llvm",
       "inherits": "release",
       "configurePreset": "slang-llvm",
-      "targets": ["slang-llvm"]
+      "targets": [
+        "slang-llvm"
+      ]
     }
   ],
   "packagePresets": [
@@ -115,7 +123,9 @@
       "name": "base",
       "hidden": true,
       "configurePreset": "default",
-      "generators": ["ZIP"],
+      "generators": [
+        "ZIP"
+      ],
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang",
         "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
@@ -124,19 +134,25 @@
     {
       "name": "release",
       "inherits": "base",
-      "configurations": ["Release"],
+      "configurations": [
+        "Release"
+      ],
       "packageDirectory": "dist-release"
     },
     {
       "name": "releaseWithDebugInfo",
       "inherits": "base",
-      "configurations": ["RelWithDebInfo"],
+      "configurations": [
+        "RelWithDebInfo"
+      ],
       "packageDirectory": "dist-releaseWithDebugInfo"
     },
     {
       "name": "debug",
       "inherits": "base",
-      "configurations": ["Debug"],
+      "configurations": [
+        "Debug"
+      ],
       "packageDirectory": "dist-debug"
     },
     {

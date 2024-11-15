@@ -364,7 +364,7 @@ Val* ExpandSubtypeWitness::_substituteImplOverride(
         // If sub is substituted into a concrete type pack, we should return a
         // TypePackSubtypeWitness.
         ShortList<SubtypeWitness*> newWitnesses;
-        for (Index i = 0; i < subTypePack->getTypeCount(); i++)
+        for (int i = 0; i < (int)subTypePack->getTypeCount(); i++)
         {
             auto elementType = subTypePack->getElementType(i);
             subst.packExpansionIndex = i;
