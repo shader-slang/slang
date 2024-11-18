@@ -2817,7 +2817,7 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
     //
     // Accessing the members via index side steps the issue.
 
-    Index parameterIndex = 0;
+    int parameterIndex = 0;
     const auto& members = genericDecl->members;
     for (Index i = 0; i < members.getCount(); ++i)
     {
@@ -4392,7 +4392,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
                 auto elementType = typePack->getElementType(i);
                 auto synMemberExpr = m_astBuilder->create<SwizzleExpr>();
                 synMemberExpr->base = synArg;
-                synMemberExpr->elementIndices.add((UInt)i);
+                synMemberExpr->elementIndices.add((uint32_t)i);
                 synMemberExpr->type = elementType;
                 synArgs.add(synMemberExpr);
             }

@@ -398,7 +398,7 @@ class HLSLPackOffsetSemantic : public HLSLLayoutSemantic
 {
     SLANG_AST_CLASS(HLSLPackOffsetSemantic)
 
-    Index uniformOffset = 0;
+    int uniformOffset = 0;
 };
 
 

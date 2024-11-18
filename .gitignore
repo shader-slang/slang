@@ -94,3 +94,4 @@ vkd3d-proton.cache.write
 .*.swp
 .*.swo
 /generators
+/tests/library/linked.spirv
