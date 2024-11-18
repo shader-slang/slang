@@ -1308,6 +1308,9 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
 
 bool isIllegalGLSLParameterType(IRType* type)
 {
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return isIllegalGLSLParameterType(arrayType->getElementType());
+
     if (as<IRParameterGroupType>(type))
         return true;
     if (as<IRHLSLStructuredBufferTypeBase>(type))
