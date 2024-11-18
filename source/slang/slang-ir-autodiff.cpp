@@ -1275,7 +1275,9 @@ IRInst* DifferentiableTypeConformanceContext::buildArrayWitness(
     IRWitnessTable* table = nullptr;
     if (target == DiffConformanceKind::Value)
     {
-        SLANG_ASSERT(isDifferentiableValueType((IRType*)arrayType));
+        if (!isDifferentiableValueType((IRType*)arrayType))
+            return nullptr;
+
         auto innerWitness = tryGetDifferentiableWitness(
             builder,
             as<IRArrayTypeBase>(arrayType)->getElementType(),
@@ -1360,7 +1362,8 @@ IRInst* DifferentiableTypeConformanceContext::buildArrayWitness(
     }
     else if (target == DiffConformanceKind::Ptr)
     {
-        SLANG_ASSERT(isDifferentiablePtrType((IRType*)arrayType));
+        if (!isDifferentiablePtrType((IRType*)arrayType))
+            return nullptr;
 
         table = builder->createWitnessTable(
             sharedContext->differentiablePtrInterfaceType,
