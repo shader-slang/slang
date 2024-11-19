@@ -244,7 +244,7 @@ sh_formatting() {
 ((run_all || run_sh)) && sh_formatting
 ((run_all || run_cmake)) && cmake_formatting
 ((run_all || run_yaml)) && yaml_json_formatting
-((run_all || run_markdown)) && markdown_formatting
+((run_markdown)) && markdown_formatting
 ((run_all || run_cpp)) && cpp_formatting
 
 exit $exit_code
