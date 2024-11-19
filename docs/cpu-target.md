@@ -52,9 +52,9 @@ SLANG_HOST_CPP_SOURCE,     ///< C++ code for `host` style
    
 Using the `-target` command line option
 
-* C_SOURCE: c
-* CPP_SOURCE: cpp,c++,cxx
-* HOST_CPP_SOURCE: host-cpp,host-c++,host-cxx
+* `C_SOURCE`: c
+* `CPP_SOURCE`: cpp,c++,cxx
+* `HOST_CPP_SOURCE`: host-cpp,host-c++,host-cxx
 
 Note! Output of C source is not currently supported.
 
@@ -70,11 +70,11 @@ SLANG_OBJECT_CODE,              ///< Object code that can be used for later link
 
 Using the `-target` command line option
 
-* EXECUTABLE: exe, executable
-* SHADER_SHARED_LIBRARY: sharedlib, sharedlibrary, dll
-* SHADER_HOST_CALLABLE: callable, host-callable
-* OBJECT_CODE: object-conde
-* HOST_HOST_CALLABLE: host-host-callable
+* `EXECUTABLE`: exe, executable
+* `SHADER_SHARED_LIBRARY`: sharedlib, sharedlibrary, dll
+* `SHADER_HOST_CALLABLE`: callable, host-callable
+* `OBJECT_CODE`: object-conde
+* `HOST_HOST_CALLABLE`: host-host-callable
     
 Using `host-callable` types from the the command line, other than to test such code compile and can be loaded for host execution.
 

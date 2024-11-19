@@ -20,9 +20,9 @@ Overview
 
 The Slang language supports 64 bit built in types. Such as
 
-* double
-* uint64_t
-* int64_t
+* `double`
+* `uint64_t`
+* `int64_t`
 
 This also applies to vector and matrix versions of these types. 
 
@@ -125,8 +125,8 @@ D3D12    | FXC/DXBC         |      No        |          No        |   2
 
 2) uint64_t support requires https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12, so DXBC is not a target.
 
-The intrinsics available on uint64_t type are `abs`, `min`, `max`, `clamp` and `countbits`.
-The intrinsics available on uint64_t type are `abs`, `min`, `max` and `clamp`.
+The intrinsics available on `uint64_t` type are `abs`, `min`, `max`, `clamp` and `countbits`.
+The intrinsics available on `uint64_t` type are `abs`, `min`, `max` and `clamp`.
 
 GLSL
 ====
