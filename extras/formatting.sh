@@ -19,7 +19,7 @@ show_help() {
   cat <<EOF
 $me: Format or check formatting of files in this repo
 
-Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [-md] [--sh] [--cmake]
+Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [--md] [--sh] [--cmake]
 
 Options:
     --check-only       Check formatting without modifying files
@@ -49,7 +49,7 @@ while [[ "$#" -gt 0 ]]; do
     run_yaml=1
     run_all=0
     ;;
-  --markdown)
+  --md)
     run_markdown=1
     run_all=0
     ;;
@@ -199,7 +199,7 @@ prettier_formatting() {
         continue
       fi
       if ! diff -q "$file" <(echo "$output") >/dev/null 2>&1; then
-        diff --color -u --label "$file" --label "$file" "$file" <(echo "$output")
+        diff --color -u --label "$file" --label "$file" "$file" <(echo "$output") || :
         exit_code=1
       fi
     done
