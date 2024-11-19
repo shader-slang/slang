@@ -243,7 +243,7 @@ Here are a few highlights
 1. Don't use the STL containers, iostreams, or the built-in C++ RTTI system.
 1. Don't use the C++ variants of C headers (e.g., use `<stdio.h>` instead of `<cstdio>`).
 1. Don't use exceptions for non-fatal errors (and even then support a build flag to opt out of exceptions).
-1. Types should use UpperCamelCase, values should use lowerCamelCase, and macros should use SCREAMING_SNAKE_CASE with a prefix `SLANG_`.
+1. Types should use UpperCamelCase, values should use lowerCamelCase, and macros should use `SCREAMING_SNAKE_CASE` with a prefix `SLANG_`.
 1. Global variables should have a `g` prefix, non-const static class members can have an `s` prefix, constant data (in the sense of static const) should have a `k` prefix, and an `m_` prefix on member variables and a `_` prefix on member functions are allowed.
 1. Prefixes based on types (e.g., p for pointers) should never be used.
 1. In function parameter lists, an `in`, `out`, or `io` prefix can be added to a parameter name to indicate whether a pointer/reference/buffer is intended to be used for input, output, or both input and output.

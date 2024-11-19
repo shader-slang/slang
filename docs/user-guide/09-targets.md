@@ -3,13 +3,11 @@ layout: user-guide
 permalink: /user-guide/targets
 ---
 
-Supported Compilation Targets
-============================
+# Supported Compilation Targets
 
 This chapter provides a brief overview of the compilation targets supported by Slang, and their different capabilities.
 
-Background and Terminology
---------------------------
+## Background and Terminology
 
 ### Code Formats
 
@@ -48,13 +46,13 @@ Just as applications can do computation outside of the dedicated compute pipelin
 
 The kernels that execute within a pipeline typically has access to four different kinds of data:
 
-* _Varying inputs_ coming from the system or from a preceding pipeline stage
+- _Varying inputs_ coming from the system or from a preceding pipeline stage
 
-* _Varying outputs_ which will be passed along to the system or to a following pipeline stage
+- _Varying outputs_ which will be passed along to the system or to a following pipeline stage
 
-* _Temporaries_ which are scratch memory or registers used by each invocation of the kernel and then dismissed on exit.
+- _Temporaries_ which are scratch memory or registers used by each invocation of the kernel and then dismissed on exit.
 
-* _Shader parameters_ (sometimes also called _uniform parameters_), which provide access to data from outside the pipeline dataflow
+- _Shader parameters_ (sometimes also called _uniform parameters_), which provide access to data from outside the pipeline dataflow
 
 The first three of these kinds of data are largely handled by the implementation of a pipeline.
 In contrast, an application programmer typically needs to manually prepare shader parameters, using the appropriate mechanisms and rules for each target platform.
@@ -100,8 +98,7 @@ Using root constants can eliminate some overheads from passing parameters of ord
 Passing a single `float` using a root constant rather than a buffer obviously eliminates a level of indirection.
 More importantly, though, using a root constant can avoid application code having to allocate and manage the lifetime of a buffer in a concurrent CPU/GPU program.
 
-Direct3D 11
------------
+## Direct3D 11
 
 Direct3D 11 (D3D11) is a older graphics API, but remains popular because it is much simpler to learn and use than some more recent APIs.
 In this section we will give an overview of the relevant features of D3D11 when used as a target platform for Slang.
@@ -117,28 +114,28 @@ D3D11 exposes two pipelines: rasterization and compute.
 
 The D3D11 rasterization pipeline can include up to five programmable stages, although most of them are optional:
 
-* The `vertex` stage (VS) transforms vertex data loaded from memory
+- The `vertex` stage (VS) transforms vertex data loaded from memory
 
-* The optional `hull` stage (HS) typically sets up and computes desired tessellation levels for a higher-order primitive
+- The optional `hull` stage (HS) typically sets up and computes desired tessellation levels for a higher-order primitive
 
-* The optional `domain` stage (DS) evaluates a higher-order surface at domain locations chosen by a fixed-function tessellator
+- The optional `domain` stage (DS) evaluates a higher-order surface at domain locations chosen by a fixed-function tessellator
 
-* The optional `geometry` stage  (GS) receives as input a primitive and can produce zero or more new primitives as output
+- The optional `geometry` stage (GS) receives as input a primitive and can produce zero or more new primitives as output
 
-* The optional `fragment` stage transforms fragments produced by the fixed-function rasterizer, determining the values for those fragments that will be merged with values in zero or more render targets. The fragment stage is sometimes called a "pixel" stage (PS), even when it does not process pixels.
+- The optional `fragment` stage transforms fragments produced by the fixed-function rasterizer, determining the values for those fragments that will be merged with values in zero or more render targets. The fragment stage is sometimes called a "pixel" stage (PS), even when it does not process pixels.
 
 ### Parameter Passing
 
 Shader parameters are passed to each D3D11 stage via slots.
 Each stage has its own slots of the following types:
 
-* **Constant buffers** are used for passing relatively small (4KB or less) amounts of data that will be read by GPU code. Constant bufers are passed via `b` registers.
+- **Constant buffers** are used for passing relatively small (4KB or less) amounts of data that will be read by GPU code. Constant bufers are passed via `b` registers.
 
-* **Shader resource views** (SRVs) include most textures, buffers, and other opaque resource types thare are read or sampled by GPU code. SRVs use `t` registers.
+- **Shader resource views** (SRVs) include most textures, buffers, and other opaque resource types thare are read or sampled by GPU code. SRVs use `t` registers.
 
-* **Unordered access views** (UAVs) include textures, buffers, and other opaque resource types used for write or read-write operations in GPU code. UAVs use `u` registers.
+- **Unordered access views** (UAVs) include textures, buffers, and other opaque resource types used for write or read-write operations in GPU code. UAVs use `u` registers.
 
-* **Samplers** are used to pass opaque texture-sampling stage, and use `s` registers.
+- **Samplers** are used to pass opaque texture-sampling stage, and use `s` registers.
 
 In addition, the D3D11 pipeline provides _vertex buffer_ slots and a single _index buffer_ slot to be used as the source vertex and index data that defines primitives.
 User-defined varying vertex shader inputs are bound to _vertex attribute_ slots (referred to as "input elements" in D3D11) which define how data from vertex buffers should be fetched to provide values for vertex attributes.
@@ -149,8 +146,7 @@ User-defined fragment shader varying outputs (with `SV_Target` binding semantics
 One notable detail of the D3D11 API is that the slots for fragment-stage UAVs and RTVs overlap.
 For example, a fragment kernel cannot use both `u0` and `SV_Target0` at once.
 
-Direct3D 12
------------
+## Direct3D 12
 
 Direct3D 12 (D3D12) is the current major version of the Direct3D API.
 
@@ -167,14 +163,15 @@ Revisions to D3D12 have added additional stages to the rasterization pipeline, a
 
 #### Mesh Shaders
 
-> #### Note ###
+> #### Note
+>
 > The Slang system does not currently support mesh shaders.
 
 The D3D12 rasterization pipeline provides alternative geometry processing stages that may be used as an alternative to the `vertex`, `hull`, `domain`, and `geometry` stages:
 
-* The `mesh` stage runs groups of threads which are responsible cooperating to produce both the vertex and index data for a _meshlet_ a bounded-size chunk of geometry.
+- The `mesh` stage runs groups of threads which are responsible cooperating to produce both the vertex and index data for a _meshlet_ a bounded-size chunk of geometry.
 
-* The optional `amplification` stage precedes the mesh stage and is responsible for determining how many mesh shader invocations should be run.
+- The optional `amplification` stage precedes the mesh stage and is responsible for determining how many mesh shader invocations should be run.
 
 Compared to the D3D11 pipeline without tesselllation (hull and domain shaders), a mesh shader is kind of like a combined/generalized vertex and geometry shader.
 
@@ -185,17 +182,17 @@ Compared to the D3D11 pipeline with tessellation, an amplification shader is kin
 The DirectX Ray Tracing (DXR) feature added a ray tracing pipeline to D3D12.
 The D3D12 ray tracing pipeline exposes the following programmable stages:
 
-* The ray generation (`raygeneration`) stage is similar to a compute stage, but can trace zero or more rays and make use of the results of those traces.
+- The ray generation (`raygeneration`) stage is similar to a compute stage, but can trace zero or more rays and make use of the results of those traces.
 
-* The `intersection` stage runs kernels to compute whether a ray intersects a user-defined primitive type. The system also includes a default intersector that handles triangle meshes.
+- The `intersection` stage runs kernels to compute whether a ray intersects a user-defined primitive type. The system also includes a default intersector that handles triangle meshes.
 
-* The so-called any-hit (`anyhit`) stage runs on _candidate_ hits where a ray has intersected some geometry, but the hit must be either accepted or rejected by application logic. Note that the any-hit stage does not necessarily run on *all* hits, because configuration options on both scene geometry and rays can lead to these checks being bypassed.
+- The so-called any-hit (`anyhit`) stage runs on _candidate_ hits where a ray has intersected some geometry, but the hit must be either accepted or rejected by application logic. Note that the any-hit stage does not necessarily run on _all_ hits, because configuration options on both scene geometry and rays can lead to these checks being bypassed.
 
-* The closest-hit (`closesthit`) stage runs a single _accepted_ hit for a ray; under typical circumstances this will be the closest hit to the origin of the ray. A typical closest-hit shader might compute the apparent color of a surface, similar to a typical fragment shader.
+- The closest-hit (`closesthit`) stage runs a single _accepted_ hit for a ray; under typical circumstances this will be the closest hit to the origin of the ray. A typical closest-hit shader might compute the apparent color of a surface, similar to a typical fragment shader.
 
-* The `miss` stage runs for rays that do not find or accept any hits in a scene. A typical miss shader might return a background color or sample an environment map.
+- The `miss` stage runs for rays that do not find or accept any hits in a scene. A typical miss shader might return a background color or sample an environment map.
 
-* The `callable` stage allows user-defined kernels to be invoked like subroutines in the context of the ray tracing pipeline.
+- The `callable` stage allows user-defined kernels to be invoked like subroutines in the context of the ray tracing pipeline.
 
 Compared to existing rasterization and compute pipelines, an important difference in the design of the D3D12 ray tracing pipeline is that multiple kernels can be loaded into the pipeline for each of the programming stages.
 The specific closest-hit, miss, or other kernel that runs for a given hit or ray is determined by indexing into an appropriate _shader table_, which is effectively an array of kernels.
@@ -203,7 +200,6 @@ The indexing into a shader table can depend on many factors including the type o
 
 Note that DXR version 1.1 adds ray tracing types and operations that can be used outside of the dedicated ray tracing pipeline.
 These new mechanisms have less visible impact for a programmer using or integrating Slang.
-
 
 ### Parameter Passing
 
@@ -218,7 +214,7 @@ While shader parameters are bound registers and spaces, those registers and spac
 Instead, the configuration of the root parameters and the correspondence of registers/spaces to root parameters, blocks, and/or slots are defined by a _pipeline layout_ that D3D12 calls a "root signature."
 
 Unlike D3D11, all of the stages in a D3D12 pipeline share the same root parameters.
-A D3D12 pipeline layout can specify that certain root parameters or certain slots within blocks will only be accessed by a subset of stages, and can map the *same* register/space pair to different parameters/blocks/slots as long as this is done for disjoint subset of stages.
+A D3D12 pipeline layout can specify that certain root parameters or certain slots within blocks will only be accessed by a subset of stages, and can map the _same_ register/space pair to different parameters/blocks/slots as long as this is done for disjoint subset of stages.
 
 #### Ray Tracing Specifics
 
@@ -231,8 +227,7 @@ Shader parameters are still bound to registers and spaces as for non-ray-tracing
 One important detail is that some shader table entries are associated with a kernel for a single stage (e.g., a single miss shader), while other shader table entries are associated with a "hit group" consisting of up to one each of an intersection, any-hit, and closest-hit kernel.
 Because multiple kernels in a hit group share the same shader table entry, they also share the configured slots in that entry for binding root constants, blocks, etc.
 
-Vulkan
-------
+## Vulkan
 
 Vulkan is a cross-platform GPU API for graphics and compute with a detailed specification produced by a multi-vendor standards body.
 In contrast with OpenGL, Vulkan focuses on providing explicit control over as many aspects of GPU work as possible.
@@ -266,10 +261,10 @@ That is, a buffer and a texture both using `binding=2` in `set=3` for Vulkan wil
 The Vulkan ray tracing pipeline also uses a shader table, and also forms hit groups similar to D3D12.
 Unlike D3D12, each shader table entry in Vulkan can only be used to pass ordinary values (akin to root constants), and cannot be configured for binding of opaque types or blocks.
 
-OpenGL
-------
+## OpenGL
 
-> #### Note ####
+> #### Note
+>
 > Slang has only limited support for compiling code for OpenGL.
 
 OpenGL has existed for many years, and predates programmable GPU pipelines of the kind this chapter discusses; we will focus solely on use of OpenGL as an API for programmable GPU pipelines.
@@ -296,32 +291,71 @@ The binding index of a parameter is the zero-based index of the slot (of the app
 Note that while OpenGL and Vulkan both use binding indices for shader parameters like textures, the semantics of those are different because OpenGL uses distinct slots for passing buffers and textures.
 For OpenGL it is legal to have a texture that uses `binding=2` and a buffer that uses `binding=2` in the same kernel, because those are indices of distinct kinds of slots, while this scenario would typically be invalid for Vulkan.
 
-Metal
------
+## Metal
 
-> #### Note ####
+> #### Note
+>
 > Slang support for Metal is a work in progress.
 
-Metal is a shading language exclusive on Apple platforms. The functionality from Metal is similar to DX12 or Vulkan with more or less features.
+Metal is Apple's proprietary graphics and compute API for iOS and macOS
+platforms. It provides a modern, low-overhead architecture similar to Direct3D
+12 and Vulkan.
+
+Metal kernels must be compiled to the Metal Shading Language (MSL), which is
+based on C++14 with additional GPU-specific features and constraints. Unlike
+some other APIs, Metal does not use an intermediate representation - MSL source
+code is compiled directly to platform-specific binaries by Apple's compiler.
 
 ### Pipelines
 
-Metal includes vertex, fragment, task, mesh and tessellation stages for rasterization, as well as compute, and ray tracing stages.
+Metal supports rasterization, compute, and ray tracing pipelines.
 
-> #### Note ####
+> #### Note
+>
 > Ray-tracing support for Metal is a work in progress.
+
+The Metal rasterization pipeline includes the following programmable stages:
+
+- The vertex stage transforms vertex data loaded from memory
+
+- The optional mesh stage allows groups of threads to cooperatively generate geometry
+
+- The optional task stage can be used to control mesh shader invocations
+
+- The optional tessellation stages (kernel, post-tessellation vertex) enable hardware tessellation
+
+- The fragment stage processes fragments produced by the rasterizer
 
 ### Parameter Passing
 
-Metal uses slots for binding resources, and it has three types of bindings: buffer, texture and sampler.
-In addition, it has argument buffer which is itself a buffer, but any further resource members of the argument buffer does not occupy any explicit binding points, and instead set via an offset within the buffer referred to as id in the metal spec.
+Metal uses a combination of slots and blocks for parameter passing:
 
-Note that Metal 3.1 currently doesn't support arrays of buffers.
+- Resources (buffers, textures, samplers) are bound to slots using explicit
+  binding indices
 
-CUDA and OptiX
---------------
+- Argument buffers (similar to descriptor tables/sets in other APIs) can group
+  multiple resources together
 
-> #### Note ####
+- Each resource type (buffer, texture, sampler) has its own independent binding
+  space
+
+- Arguments within argument buffers are referenced by offset rather than
+  explicit bindings
+
+Unlike some other APIs, Metal:
+
+- Does not support arrays of buffers as of version 3.1
+- Shares binding slots across all pipeline stages
+- Uses argument buffers that can contain nested resources without consuming additional binding slots
+
+The Metal ray tracing pipeline follows similar parameter passing conventions to
+the rasterization and compute pipelines, while adding intersection,
+closest-hit, and miss stages comparable to those in Direct3D 12 and Vulkan.
+
+## CUDA and OptiX
+
+> #### Note
+>
 > Slang support for OptiX is a work in progress.
 
 CUDA C/C++ is a language for expressing heterogeneous CPU and GPU code with a simple interface to invoking GPU compute work.
@@ -329,7 +363,6 @@ OptiX is a ray tracing API that uses CUDA C++ as the language for expressing sha
 We focus here on OptiX version 7 and up.
 
 CUDA and OptiX allow kernels to be loaded as GPU-specific binaries, or using the PTX intermediate language.
-
 
 ### Pipelines
 
@@ -358,10 +391,10 @@ OptiX supports use of constant memory storage for ray tracing pipelines, where a
 OptiX uses a shader table for managing kernels and hit groups, and allows kernels to access the bytes of their shader table entry via a pointer.
 Similar to the compute pipeline, application code can layer many different policies on top of these mechanisms.
 
-CPU Compute
------------
+## CPU Compute
 
-> #### Note ####
+> #### Note
+>
 > Slang's support for CPU compute is functional, but not feature- or performance-complete.
 > Backwards-incompatible changes to this target may come in future versions of Slang.
 
@@ -379,8 +412,7 @@ Slang's CPU compute target supports only a compute pipeline.
 
 Because CPU target support flexible pointer-based addressing and large low-latency caches, a compute kernel can simply be passed a small fixed number of pointers and be relied upon to load parameter values of any types via indirection through those pointers.
 
-Summary
--------
+## Summary
 
 This chapter has reviewed the main target platforms supported by the Slang compiler and runtime system.
 A key point to take away is that there is great variation in the capabilities of these systems.
