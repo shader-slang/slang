@@ -267,11 +267,11 @@ struct LegalizeWGSLEntryPointContext
             break;
 
         case SystemValueSemanticName::GroupIndex:
-        {
-            result.wgslSystemValueName = toSlice("local_invocation_index");
-            result.permittedTypes.add(builder.getUIntType());
-        }
-        break;
+            {
+                result.wgslSystemValueName = toSlice("local_invocation_index");
+                result.permittedTypes.add(builder.getUIntType());
+            }
+            break;
 
         case SystemValueSemanticName::GroupThreadID:
             {
