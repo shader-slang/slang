@@ -10076,7 +10076,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
-/// Maximum
+/// Maximum.
 /// @param x The first value.
 /// @param y The second value.
 /// @return The maximum of `x` and `y`.
@@ -11216,7 +11216,7 @@ T NonUniformResourceIndex(T index);
 [deprecated("NonUniformResourceIndex on a type other than uint/int is deprecated and has no effect")]
 T NonUniformResourceIndex<T>(T value) { return value; }
 
-/// Normalize a vector
+/// Normalize a vector.
 /// @param x The vector to normalize.
 /// @return The normalized vector, `x`/`length(x)`.
 /// @category math
@@ -11258,7 +11258,7 @@ T normalize(T x)
     }
 }
 
-/// Raise to a power
+/// Raise to a power.
 /// @param x The base value.
 /// @param y The exponent value.
 /// @return The value of `x` raised to the power of `y`.
@@ -11983,7 +11983,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
     }
 }
 
-/// Sine
+/// Sine.
 /// @param x The angle in radians.
 /// @return The sine of `x`.
 /// @category math
@@ -12060,7 +12060,7 @@ vector<T,N> __sincos_metal(vector<T,N> x, out vector<T,N> c)
     }
 }
 
-/// Sine and cosine
+/// Sine and cosine.
 /// Calculate both the sine and cosine of `x`.
 /// @param x The angle in radians.
 /// @param[out] s The sine of `x`.
