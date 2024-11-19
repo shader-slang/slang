@@ -6922,7 +6922,7 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
     }
 }
 
-// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
+/// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
 /// @param x The value to use as the magnitude.
 /// @param y The value to use as the sign.
 /// @return A value whose magnitude is from `x` and whose sign is from `y`.
@@ -6939,7 +6939,7 @@ vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
     return reinterpret<vector<half,N>>(newX);
 }
 
-// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
+/// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
 /// @param x The value to use as the magnitude.
 /// @param y The value to use as the sign.
 /// @return A value whose magnitude is from `x` and whose sign is from `y`.
@@ -6956,7 +6956,7 @@ vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
     return reinterpret<vector<float,N>>(newX);
 }
 
-// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
+/// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
 /// @param x The value to use as the magnitude.
 /// @param y The value to use as the sign.
 /// @return A value whose magnitude is from `x` and whose sign is from `y`.
@@ -6977,7 +6977,7 @@ __generic<T:__BuiltinFloatingPointType, U:__BuiltinFloatingPointType, let N : in
 __intrinsic_op($(kIROp_FloatCast))
 vector<T,N> __real_cast(vector<U,N> val);
 
-// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
+/// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
 /// @param x The value to use as the magnitude.
 /// @param y The value to use as the sign.
 /// @return A value whose magnitude is from x and whose sign is from y.
@@ -7247,7 +7247,7 @@ matrix<T, N, M> cos(matrix<T, N, M> x)
 
 /// Hyperbolic cosine. Returns the hyperbolic cosine of the specified value.
 /// @param x The specified value.
-/// @return The hyperbolic cosine of the specified value, element-wise.
+/// @return The hyperbolic cosine of the specified value.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -12038,7 +12038,6 @@ matrix<T, N, M> sin(matrix<T, N, M> x)
     }
 }
 
-// Sine and cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(metal)]
@@ -12061,6 +12060,8 @@ vector<T,N> __sincos_metal(vector<T,N> x, out vector<T,N> c)
     }
 }
 
+/// Sine and cosine
+/// Calculate both the sine and cosine of `x`.
 /// @param x The angle in radians.
 /// @param[out] s The sine of `x`.
 /// @param[out] c The cosine of `x`.
