@@ -89,6 +89,7 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-strip-cached-dict.h"
+#include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-witness-tables.h"
 #include "slang-ir-strip.h"
 #include "slang-ir-synthesize-active-mask.h"
@@ -1418,6 +1419,19 @@ Result linkAndOptimizeIR(
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
     // we will need to disable this pass.
     stripWitnessTables(irModule);
+
+    switch (target)
+    {
+    // On targets that don't support default initialization, remove 'raw' default construct
+    // insts because our code-gen will not have any way to emit them.
+    //
+    case CodeGenTarget::SPIRV:
+        if (targetProgram->shouldEmitSPIRVDirectly())
+            removeRawDefaultConstructors(irModule);
+        break;
+    default:
+        break;
+    }
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER STRIP WITNESS TABLES");

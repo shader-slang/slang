@@ -1,7 +1,7 @@
 // vk-device.cpp
 #include "vk-device.h"
 
-#include "source/core/slang-platform.h"
+#include "core/slang-platform.h"
 #include "vk-buffer.h"
 #include "vk-command-queue.h"
 #include "vk-fence.h"

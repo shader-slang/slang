@@ -3029,7 +3029,6 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     static const int isMS = 0;
     static const int access = $(kCoreModule_ResourceAccessReadOnly);
 //@public:
-    __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [require(glsl, texture_sm_4_1_samplerless)]
     T __glsl_load(vector<int, Shape.dimensions+isArray> location)
@@ -3037,7 +3036,6 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         __intrinsic_asm "$ctexelFetch($0, ($1), 0)$z";
     }
 
-    __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
@@ -3110,6 +3108,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             static_assert(false, "Unsupported 'Load' of 'texture' for 'metal' target");
             __intrinsic_asm "<invalid intrinsics>";
         case glsl:
+            if (isCombined == 0)
+                __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
         case spirv:
             const int lodLoc = Shape.dimensions+isArray;
@@ -3161,7 +3161,6 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         }
     }
 
-    __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
@@ -3171,9 +3170,11 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         {
             case cpp:
             case hlsl:
-            __intrinsic_asm ".Load";
+                __intrinsic_asm ".Load";
             case glsl:
-            __intrinsic_asm "$ctexelFetchOffset($0, ($1).$w1b, ($1).$w1e, ($2))$z";
+                if (isCombined == 0)
+                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                __intrinsic_asm "$ctexelFetchOffset($0, ($1).$w1b, ($1).$w1e, ($2))$z";
             case spirv:
                 const int lodLoc = Shape.dimensions+isArray;
                 let coord = __vectorReshape<Shape.dimensions+isArray>(location);
@@ -3214,7 +3215,6 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
-        __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
         [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
@@ -3228,6 +3228,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 case metal:
                     return Load(__makeVector(location, 0));
                 case glsl:
+                    if (isCombined == 0)
+                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
                     return __glsl_load(location);
                 case spirv:
                     if (isCombined != 0)
@@ -3263,7 +3265,6 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     static const int access = $(kCoreModule_ResourceAccessReadOnly);
     static const int isMS = 1;
 //@public:
-    __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
@@ -3303,6 +3304,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 // TODO: This needs to be handled by the capability system
                 __intrinsic_asm "<Not supported>";
             case glsl:
+                if (isCombined == 0)
+                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
                 __intrinsic_asm "$ctexelFetch($0, $1, ($2))$z";
             case spirv:
                 if (isCombined != 0)
@@ -3340,7 +3343,6 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         return Load(__vectorReshape<Shape.dimensions + isArray>(locationAndSampleIndex), locationAndSampleIndex[Shape.dimensions + isArray]);
     }
 
-    __glsl_extension(GL_EXT_samplerless_texture_functions)
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
@@ -3352,6 +3354,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             case hlsl:
                 __intrinsic_asm ".Load";
             case glsl:
+                if (isCombined == 0)
+                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
                 __intrinsic_asm "$ctexelFetchOffset($0, $1, ($2), ($3))$z";
             case spirv:
                 if (isCombined != 0)
@@ -3390,7 +3394,6 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
-        __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
         [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
@@ -3402,16 +3405,18 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 case hlsl:
                     __intrinsic_asm "($0).sample[$1]";
                 case metal:
-                case glsl:
                 case spirv:
                 case wgsl:
+                    return Load(location, 0);
+                case glsl:
+                    if (isCombined == 0)
+                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
                     return Load(location, 0);
             }
         }
     }
     __subscript(vector<uint, Shape.dimensions+isArray> location, int sampleIndex) -> T
     {
-        __glsl_extension(GL_EXT_samplerless_texture_functions)
         [__readNone]
         [ForceInline]
         [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
@@ -3423,9 +3428,12 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 case hlsl:
                     __intrinsic_asm "($0).sample[$2][$1]";
                 case metal:
-                case glsl:
                 case spirv:
                 case wgsl:
+                    return Load(location, sampleIndex);
+                case glsl:
+                    if (isCombined == 0)
+                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
                     return Load(location, sampleIndex);
             }
         }
@@ -15278,7 +15286,9 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetDimensions";
-        case glsl: __intrinsic_asm "($1 = $(glslTextureSizeFunc)($0))";
+        case glsl:
+            __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+            __intrinsic_asm "($1 = $(glslTextureSizeFunc)($0))";
         case metal: __intrinsic_asm "(*($1) = $0.get_width())";
         case spirv:
             dim = spirv_asm {
@@ -15288,7 +15298,6 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         }
     }
 
-    __glsl_extension(GL_EXT_samplerless_texture_functions)
     $(isReadOnly?"[__readNone] ":"")
     $(requireToSet)
     T Load(int location)
@@ -15297,7 +15306,9 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         {
         case hlsl: __intrinsic_asm ".Load";
         case metal: __intrinsic_asm "$c$0.read(uint($1))$z";
-        case glsl: __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
+        case glsl:
+            __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+            __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
         case spirv: return spirv_asm {
                 %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
                 __truncate $$T result __sampledType(T) %sampled;

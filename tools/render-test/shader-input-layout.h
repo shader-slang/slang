@@ -1,9 +1,9 @@
 #ifndef SLANG_TEST_SHADER_INPUT_LAYOUT_H
 #define SLANG_TEST_SHADER_INPUT_LAYOUT_H
 
-#include "source/core/slang-basic.h"
-#include "source/core/slang-random-generator.h"
-#include "source/core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-random-generator.h"
+#include "core/slang-writer.h"
 
 #include <slang-rhi.h>
 

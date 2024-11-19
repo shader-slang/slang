@@ -91,8 +91,12 @@ endif()
 add_library(imgui INTERFACE)
 target_include_directories(imgui INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui")
 
+# stb
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE "${CMAKE_CURRENT_LIST_DIR}/stb")
+
+# slang-rhi
 if(SLANG_ENABLE_SLANG_RHI)
-    # slang-rhi
     set(SLANG_RHI_BINARY_DIR ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
     set(SLANG_RHI_SLANG_INCLUDE_DIR ${slang_SOURCE_DIR}/include)
     set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})

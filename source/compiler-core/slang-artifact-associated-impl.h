@@ -189,7 +189,7 @@ public:
         SLANG_OVERRIDE;
 
     // IMetadata
-    SLANG_NO_THROW virtual SlangResult SLANG_MCALL isParameterLocationUsed(
+    SLANG_NO_THROW virtual SlangResult isParameterLocationUsed(
         SlangParameterCategory category, // is this a `t` register? `s` register?
         SlangUInt spaceIndex,            // `space` for D3D12, `set` for Vulkan
         SlangUInt registerIndex,         // `register` for D3D12, `binding` for Vulkan

@@ -1,10 +1,10 @@
 // window.h
 #pragma once
 
+#include "core/slang-basic.h"
+#include "core/slang-func-ptr.h"
 #include "platform-api.h"
 #include "slang-com-ptr.h"
-#include "source/core/slang-basic.h"
-#include "source/core/slang-func-ptr.h"
 
 namespace platform
 {

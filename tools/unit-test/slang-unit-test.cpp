@@ -1,7 +1,7 @@
 #include "slang-unit-test.h"
 
+#include "core/slang-basic.h"
 #include "slang.h"
-#include "source/core/slang-basic.h"
 
 struct SlangUnitTest
 {

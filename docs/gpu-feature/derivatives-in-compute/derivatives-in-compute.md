@@ -6,4 +6,4 @@ GLSL syntax may also be used, but is not reccomended (`derivative_group_quadsNV`
 Targets:
 * **_SPIRV:_** Enables `DerivativeGroupQuadsNV` or `DerivativeGroupLinearNV`.
 * **_GLSL:_** Enables `derivative_group_quadsNV` or `derivative_group_LinearNV`.
-* **_HLSL:_** Does nothing. sm_6_6 is required to use derivatives in compute shaders. HLSL uses an equivlent of `DerivativeGroupQuad`.
+* **_HLSL:_** Does nothing. `sm_6_6` is required to use derivatives in compute shaders. HLSL uses an equivlent of `DerivativeGroupQuad`.

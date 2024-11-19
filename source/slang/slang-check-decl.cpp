@@ -1709,6 +1709,18 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
     }
 }
 
+bool isSpecializationConstant(VarDeclBase* varDecl)
+{
+    for (auto modifier : varDecl->modifiers)
+    {
+        if (as<SpecializationConstantAttribute>(modifier))
+            return true;
+        if (as<VkConstantIdAttribute>(modifier))
+            return true;
+    }
+    return false;
+}
+
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     // A variable that didn't have an explicit type written must
@@ -1943,7 +1955,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // without any `uniform` modifiers as true global variables by default.
             if (!varDecl->findModifier<HLSLUniformModifier>() &&
                 !varDecl->findModifier<InModifier>() && !varDecl->findModifier<OutModifier>() &&
-                !varDecl->findModifier<GLSLBufferModifier>())
+                !varDecl->findModifier<GLSLBufferModifier>() && !isSpecializationConstant(varDecl))
             {
                 if (!isUniformParameterType(varDecl->type))
                 {
@@ -2817,7 +2829,7 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
     //
     // Accessing the members via index side steps the issue.
 
-    Index parameterIndex = 0;
+    int parameterIndex = 0;
     const auto& members = genericDecl->members;
     for (Index i = 0; i < members.getCount(); ++i)
     {
@@ -4392,7 +4404,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
                 auto elementType = typePack->getElementType(i);
                 auto synMemberExpr = m_astBuilder->create<SwizzleExpr>();
                 synMemberExpr->base = synArg;
-                synMemberExpr->elementIndices.add((UInt)i);
+                synMemberExpr->elementIndices.add((uint32_t)i);
                 synMemberExpr->type = elementType;
                 synArgs.add(synMemberExpr);
             }

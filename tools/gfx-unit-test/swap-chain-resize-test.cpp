@@ -1,9 +1,9 @@
+#include "core/slang-basic.h"
 #include "gfx-test-util.h"
+#include "gfx-util/shader-cursor.h"
+#include "platform/window.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
-#include "tools/gfx-util/shader-cursor.h"
-#include "tools/platform/window.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace gfx;
 using namespace Slang;
