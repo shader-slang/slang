@@ -1398,6 +1398,8 @@ struct LegalizeWGSLEntryPointContext
             {
             case kIROp_Var:
             case kIROp_Param:
+            case kIROp_GlobalParam:
+            case kIROp_GlobalVar:
                 continue;
             default:
                 break;

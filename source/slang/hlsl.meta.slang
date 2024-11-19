@@ -20645,3 +20645,22 @@ extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IR
 {
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
+
+//@public:
+
+/// Mark a variable as being workgroup uniform.
+/// @param v The variable to mark as workgroup uniform.
+/// @return The value of `v`.
+/// @remarks This intrinsic maps to `workgroupUniformLoad` when targeting WGSL and is a no-op on other targets.
+/// WGSL is strict on uniformity, and this intrinsic is needed to mark a variable as workgroup uniform in order
+// to silence uniformity errors in certain cases.
+T workgroupUniformLoad<T>(__ref T v)
+{
+    __target_switch
+    {
+    case wgsl:
+        __intrinsic_asm "workgroupUniformLoad(&($0))";
+    default:
+        return v;
+    }
+}
