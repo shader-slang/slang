@@ -31,42 +31,42 @@ System-Value semantics
 
 The system-value semantics are translated to the following SPIR-V code.
 
-| SV semantic name | SPIR-V code |
-|--|--|
-| SV_Barycentrics | BuiltIn BaryCoordKHR |
-| SV_ClipDistance<N> | BuiltIn ClipDistance |
-| SV_CullDistance<N> | BuiltIn CullDistance |
-| SV_Coverage | BuiltIn SampleMask |
-| SV_CullPrimitive | BuiltIn CullPrimitiveEXT |
-| SV_Depth | BuiltIn FragDepth |
-| SV_DepthGreaterEqual | BuiltIn FragDepth |
-| SV_DepthLessEqual | BuiltIn FragDepth |
-| SV_DispatchThreadID | BuiltIn GlobalInvocationId |
-| SV_DomainLocation | BuiltIn TessCoord |
-| SV_GSInstanceID | BuiltIn InvocationId |
-| SV_GroupID | BuiltIn WorkgroupId |
-| SV_GroupIndex | BuiltIn LocalInvocationIndex |
-| SV_GroupThreadID | BuiltIn LocalInvocationId |
-| SV_InnerCoverage | BuiltIn FullyCoveredEXT |
-| SV_InsideTessFactor | BuiltIn TessLevelInner |
-| SV_InstanceID | BuiltIn InstanceIndex |
-| SV_IntersectionAttributes | *Not supported* |
-| SV_IsFrontFace | BuiltIn FrontFacing |
-| SV_OutputControlPointID | BuiltIn InvocationId |
-| SV_PointSize<sup>note</sup> | BuiltIn PointSize |
-| SV_Position | BuiltIn Position/FragCoord |
-| SV_PrimitiveID | BuiltIn PrimitiveId |
-| SV_RenderTargetArrayIndex | BuiltIn Layer |
-| SV_SampleIndex | BuiltIn SampleId |
-| SV_ShadingRate | BuiltIn PrimitiveShadingRateKHR |
-| SV_StartVertexLocation | *Not supported* |
-| SV_StartInstanceLocation | *Not suported* |
-| SV_StencilRef | BuiltIn FragStencilRefEXT |
-| SV_Target<N> | Location |
-| SV_TessFactor | BuiltIn TessLevelOuter |
-| SV_VertexID | BuiltIn VertexIndex |
-| SV_ViewID | BuiltIn ViewIndex |
-| SV_ViewportArrayIndex | BuiltIn ViewportIndex |
+| SV semantic name              | SPIR-V code                       |
+|-------------------------------|-----------------------------------|
+| `SV_Barycentrics`             | `BuiltIn BaryCoordKHR`            |
+| `SV_ClipDistance<N>`          | `BuiltIn ClipDistance`            |
+| `SV_CullDistance<N>`          | `BuiltIn CullDistance`            |
+| `SV_Coverage`                 | `BuiltIn SampleMask`              |
+| `SV_CullPrimitive`            | `BuiltIn CullPrimitiveEXT`        |
+| `SV_Depth`                    | `BuiltIn FragDepth`               |
+| `SV_DepthGreaterEqual`        | `BuiltIn FragDepth`               |
+| `SV_DepthLessEqual`           | `BuiltIn FragDepth`               |
+| `SV_DispatchThreadID`         | `BuiltIn GlobalInvocationId`      |
+| `SV_DomainLocation`           | `BuiltIn TessCoord`               |
+| `SV_GSInstanceID`             | `BuiltIn InvocationId`            |
+| `SV_GroupID`                  | `BuiltIn WorkgroupId`             |
+| `SV_GroupIndex`               | `BuiltIn LocalInvocationIndex`    |
+| `SV_GroupThreadID`            | `BuiltIn LocalInvocationId`       |
+| `SV_InnerCoverage`            | `BuiltIn FullyCoveredEXT`         |
+| `SV_InsideTessFactor`         | `BuiltIn TessLevelInner`          |
+| `SV_InstanceID`               | `BuiltIn InstanceIndex`           |
+| `SV_IntersectionAttributes`   | *Not supported*                   |
+| `SV_IsFrontFace`              | `BuiltIn FrontFacing`             |
+| `SV_OutputControlPointID`     | `BuiltIn InvocationId`            |
+| `SV_PointSize<sup>note</sup>` | `BuiltIn PointSize`               |
+| `SV_Position`                 | `BuiltIn Position/FragCoord`      |
+| `SV_PrimitiveID`              | `BuiltIn PrimitiveId`             |
+| `SV_RenderTargetArrayIndex`   | `BuiltIn Layer`                   |
+| `SV_SampleIndex`              | `BuiltIn SampleId`                |
+| `SV_ShadingRate`              | `BuiltIn PrimitiveShadingRateKHR` |
+| `SV_StartVertexLocation`      | `*Not supported*                  |
+| `SV_StartInstanceLocation`    | `*Not suported*                   |
+| `SV_StencilRef`               | `BuiltIn FragStencilRefEXT`       |
+| `SV_Target<N>`                | `Location`                        |
+| `SV_TessFactor`               | `BuiltIn TessLevelOuter`          |
+| `SV_VertexID`                 | `BuiltIn VertexIndex`             |
+| `SV_ViewID`                   | `BuiltIn ViewIndex`               |
+| `SV_ViewportArrayIndex`       | `BuiltIn ViewportIndex`           |
 
 *Note* that `SV_PointSize` is a unique keyword that HLSL doesn't have.
 
@@ -113,7 +113,7 @@ Slang ignores the keywords above and all of them are treated as `highp`.
 
 Supported atomic types for each target
 --------------------------------------
-Shader Model 6.2 introduced [16-bit scalar types](https://github.com/microsoft/DirectXShaderCompiler/wiki/16-Bit-Scalar-Types) such as float16 and int16_t, but they didn't come with any atomic operations.
+Shader Model 6.2 introduced [16-bit scalar types](https://github.com/microsoft/DirectXShaderCompiler/wiki/16-Bit-Scalar-Types) such as `float16` and `int16_t`, but they didn't come with any atomic operations.
 Shader Model 6.6 introduced [atomic operations for 64-bit integer types and bitwise atomic operations for 32-bit float type](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_Int64_and_Float_Atomics.html), but 16-bit integer types and 16-bit float types are not a part of it.
 
 [GLSL 4.3](https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.30.pdf) introduced atomic operations for 32-bit integer types.
