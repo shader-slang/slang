@@ -75,6 +75,11 @@ DIAGNOSTIC(
     destructorNameDoesntMatch,
     "Destructor name doesn't match class name '$0'");
 DIAGNOSTIC(100023, Error, cannotParseCallable, "Cannot parse callable");
+DIAGNOSTIC(
+    100024,
+    Error,
+    cannoseUseArchDependentType,
+    "Cannot use architecture dependent type '$0' for serializable data.")
 
 // Command line errors 100100
 

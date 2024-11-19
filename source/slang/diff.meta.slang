@@ -1241,6 +1241,12 @@ extension Array<T, N> : IDifferentiable
     }
 }
 
+__generic<T : IDifferentiablePtrType, let N : int>
+extension Array<T, N> : IDifferentiablePtrType
+{
+    typedef Array<T.Differential, N> Differential;
+}
+
 __generic<each T : IDifferentiable>
 extension Tuple<T> : IDifferentiable
 {
