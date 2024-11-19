@@ -1,4 +1,6 @@
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -allow-glsl
 //TEST:SIMPLE(filecheck=GLSL): -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // CHECK-DAG: OpDecorate %[[C0:[0-9A-Za-z_]+]] SpecId 0

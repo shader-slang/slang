@@ -256,7 +256,7 @@ If this fails - the prelude include of `cuda_fp16.h` will most likely fail on NV
 
 CUDA has the `__half` and `__half2` types defined in `cuda_fp16.h`. The `__half2` can produce results just as quickly as doing the same operation on `__half` - in essence for some operations `__half2` is [SIMD](https://en.wikipedia.org/wiki/SIMD) like. The half implementation in Slang tries to take advantage of this optimization.
 
-Since Slang supports up to 4 wide vectors Slang has to build on CUDAs half support. The types _`_half3` and `__half4` are implemented in `slang-cuda-prelude.h` for this reason. It is worth noting that `__half3` is made up of a `__half2` and a `__half`. As `__half2` is 4 byte aligned, this means `__half3` is actually 8 bytes, rather than 6 bytes that might be expected.
+Since Slang supports up to 4 wide vectors Slang has to build on CUDAs half support. The types `__half3` and `__half4` are implemented in `slang-cuda-prelude.h` for this reason. It is worth noting that `__half3` is made up of a `__half2` and a `__half`. As `__half2` is 4 byte aligned, this means `__half3` is actually 8 bytes, rather than 6 bytes that might be expected.
 
 One area where this optimization isn't fully used is in comparisons - as in effect Slang treats all the vector/matrix half comparisons as if they are scalar. This could be perhaps be improved on in the future. Doing so would require using features that are not directly available in the CUDA headers.
 
@@ -265,7 +265,7 @@ Wave Intrinsics
 
 There is broad support for [HLSL Wave intrinsics](https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12), including support for [SM 6.5 intrinsics](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_ShaderModel6_5.html).
 
-Most Wave intrinsics will work with vector, matrix or scalar types of typical built in types - uint, int, float, double, uint64_t, int64_t.
+Most Wave intrinsics will work with vector, matrix or scalar types of typical built in types - `uint`, `int`, `float`, `double`, `uint64_t`, `int64_t`.
 
 The support is provided via both the Slang core module as well as the Slang CUDA prelude found in 'prelude/slang-cuda-prelude.h'. Many Wave intrinsics are not directly applicable within CUDA which supplies a more low level mechanisms. The implementation of most Wave functions work most optimally if a 'Wave' where all lanes are used. If all lanes from index 0 to pow2(n) -1  are used (which is also true if all lanes are used) a binary reduction is typically applied. If this is not the case the implementation fallsback on a slow path which is linear in the number of active lanes, and so is typically significantly less performant.
 
