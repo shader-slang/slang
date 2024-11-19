@@ -315,7 +315,10 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
             auto addParamElement = [&](Type* type, Index elementIndex)
             {
                 if (!first)
+                {
                     sb << ", ";
+                    rangeStart += 2;
+                }
 
                 // Type part.
                 {
