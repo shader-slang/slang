@@ -9,6 +9,7 @@ check_only=0
 no_version_check=0
 run_cpp=0
 run_yaml=0
+run_markdown=0
 run_sh=0
 run_cmake=0
 run_all=1
@@ -24,6 +25,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --yaml)
     run_yaml=1
+    run_all=0
+    ;;
+  --markdown)
+    run_markdown=1
     run_all=0
     ;;
   --sh)
@@ -47,7 +52,7 @@ if [ "$help" ]; then
   cat <<EOF
 $me: Format or check formatting of files in this repo
 
-Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [--sh] [--cmake]
+Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [-md] [--sh] [--cmake]
 
 Options:
     --check-only       Check formatting without modifying files
@@ -55,6 +60,7 @@ Options:
     --source          Path to source directory to format (defaults to parent of script directory)
     --cpp             Format only C++ files
     --yaml            Format only YAML/JSON files
+    --md              Format only markdown files
     --sh              Format only shell script files
     --cmake           Format only CMake files
 EOF
@@ -177,11 +183,9 @@ cpp_formatting() {
   fi
 }
 
-yaml_json_formatting() {
-  echo "Formatting yaml and json files..." >&2
-
-  readarray -t files < <(git ls-files "*.yaml" "*.yml" "*.json" ':!external/**')
-
+# Format the 'files' array using the prettier tool (abstracted here because
+# it's used by markdown and json
+prettier_formatting() {
   if [ "$check_only" -eq 1 ]; then
     for file in "${files[@]}"; do
       if ! output=$(prettier "$file" 2>/dev/null); then
@@ -195,6 +199,22 @@ yaml_json_formatting() {
   else
     prettier --write "${files[@]}" | grep -v '(unchanged)' >&2 || :
   fi
+}
+
+yaml_json_formatting() {
+  echo "Formatting yaml and json files..." >&2
+
+  readarray -t files < <(git ls-files "*.yaml" "*.yml" "*.json" ':!external/**')
+
+  prettier_formatting
+}
+
+markdown_formatting() {
+  echo "Formatting markdown files..." >&2
+
+  readarray -t files < <(git ls-files "*.md" ':!external/**')
+
+  prettier_formatting
 }
 
 sh_formatting() {
@@ -217,6 +237,7 @@ sh_formatting() {
 ((run_all || run_sh)) && sh_formatting
 ((run_all || run_cmake)) && cmake_formatting
 ((run_all || run_yaml)) && yaml_json_formatting
+((run_all || run_markdown)) && markdown_formatting
 ((run_all || run_cpp)) && cpp_formatting
 
 exit $exit_code
