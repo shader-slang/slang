@@ -14,9 +14,31 @@ run_sh=0
 run_cmake=0
 run_all=1
 
+show_help() {
+  me=$(basename "$0")
+  cat <<EOF
+$me: Format or check formatting of files in this repo
+
+Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [-md] [--sh] [--cmake]
+
+Options:
+    --check-only       Check formatting without modifying files
+    --no-version-check Skip version compatibility checks
+    --source          Path to source directory to format (defaults to parent of script directory)
+    --cpp             Format only C++ files
+    --yaml            Format only YAML/JSON files
+    --md              Format only markdown files
+    --sh              Format only shell script files
+    --cmake           Format only CMake files
+EOF
+}
+
 while [[ "$#" -gt 0 ]]; do
   case $1 in
-  -h | --help) help=1 ;;
+  -h | --help)
+    show_help
+    exit 0
+    ;;
   --check-only) check_only=1 ;;
   --no-version-check) no_version_check=1 ;;
   --cpp)
@@ -43,29 +65,14 @@ while [[ "$#" -gt 0 ]]; do
     source_dir="$2"
     shift
     ;;
+  *)
+    echo "unrecognized argument: $1"
+    show_help
+    exit 1
+    ;;
   esac
   shift
 done
-
-if [ "$help" ]; then
-  me=$(basename "$0")
-  cat <<EOF
-$me: Format or check formatting of files in this repo
-
-Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [-md] [--sh] [--cmake]
-
-Options:
-    --check-only       Check formatting without modifying files
-    --no-version-check Skip version compatibility checks
-    --source          Path to source directory to format (defaults to parent of script directory)
-    --cpp             Format only C++ files
-    --yaml            Format only YAML/JSON files
-    --md              Format only markdown files
-    --sh              Format only shell script files
-    --cmake           Format only CMake files
-EOF
-  exit 0
-fi
 
 cd "$source_dir" || exit 1
 
