@@ -68,7 +68,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_ViewID`                   | `BuiltIn ViewIndex`               |
 | `SV_ViewportArrayIndex`       | `BuiltIn ViewportIndex`           |
 
-*Note* that `SV_PointSize` is a unique keyword that HLSL doesn't have.
+*Note* that `SV_PointSize` is a Slang-specific semantic that is not defined in HLSL.
 
 
 Behavior of `discard` after SPIR-V 1.6
@@ -131,17 +131,17 @@ SPIR-V 1.5 with [SPV_EXT_shader_atomic_float16_add](https://github.com/KhronosGr
 | SPIR-V |   Yes           |     Yes         |    Yes (SPV1.5+ext)   | Yes (SPV1.5+ext) | Yes (SPV1.5+ext) |
 
 
-ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)ByteAddressBuffer
+ConstantBuffer, StructuredBuffer and ByteAddressBuffer
 -----------------------------------------------------------------------------------------------
 
 Each member in a `ConstantBuffer` will be emitted as `uniform` parameter in a uniform block.
-StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer with `readonly` layout.
-RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` layout.
+StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer with `readonly` access.
+RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` access.
 RasterizerOrderedStructuredBuffer and RasterizerOrderedByteAddressBuffer will use an extension, `SPV_EXT_fragment_shader_interlock`.
 
-If you need to apply a different buffer layout for indivisual StructuredBuffer, you can specify the layout as a second generic argument to StructuredBuffer. E.g., StructuredBuffer<T, Std140Layout>, StructuredBuffer<T, Std430Layout> or StructuredBuffer<T, ScalarLayout>.
+If you need to apply a different buffer layout for indivisual `ConstantBuffer` or `StructuredBuffer`, you can specify the layout as a second generic argument. E.g., `ConstantBuffer<T, Std430DataLayout>`, `StructuredBuffer<T, Std140DataLayout>`, `StructuredBuffer<T, Std430DataLayout>` or `StructuredBuffer<T, ScalarDataLayout>`.
 
-Note that there are compiler options, "-fvk-use-scalar-layout" and "-force-glsl-scalar-layout".
+Note that there are compiler options, "-fvk-use-scalar-layout" / "-force-glsl-scalar-layout" and "-fvk-use-dx-layout".
 These options do the same but they are applied globally.
 
 
@@ -149,9 +149,11 @@ ParameterBlock for SPIR-V target
 --------------------------------
 
 `ParameterBlock` is a Slang generic type for binding uniform parameters.
-It is similar to `ConstantBuffer` in HLSL, and `ParameterBlock` can include not only constant parameters but also descriptors such as Texture2D or StructuredBuffer.
+In contrast to `ConstantBuffer`, a `ParameterBlock<T>` introduces a new descriptor set ID for resource/sampler handles defined in the element type `T`.
 
-`ParameterBlock` is designed specifically for d3d/vulkan/metal, so that parameters are laid out more naturally on these platforms. For Vulkan, when a ParameterBlock doesn't contain nested parameter block fields, it always maps to a single descriptor set, with a dedicated set number and every resources is placed into the set with binding index starting from 0.
+`ParameterBlock` is designed specifically for D3D12/Vulkan/Metal/WebGPU, so that parameters defined in `T` can be placed into an independent descriptor table/descriptor set/argument buffer/binding group.
+
+For example, when targeting Vulkan, when a ParameterBlock doesn't contain nested parameter block fields, it will always map to a single descriptor set, with a dedicated set number and every resources is placed into the set with binding index starting from 0. This allows the user application to create and pre-populate the descriptor set and reuse it during command encoding, without explicilty specifying the binding index for each individual parameter.
 
 When both ordinary data fields and resource typed fields exist in a parameter block, all ordinary data fields will be grouped together into a uniform buffer and appear as a binding 0 of the resulting descriptor set.
 
@@ -160,8 +162,8 @@ Push Constants
 ---------------------
 
 By default, a `uniform` parameter defined in the parameter list of an entrypoint function is translated to a push constant in SPIRV, if the type of the parameter is ordinary data type (no resources/textures).
-All `uniform` parameter defined in global scope are grouped together and placed in a default constant bbuffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
-on the uniform parameter.
+All `uniform` parameter defined in global scope are grouped together and placed in a default constant buffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
+on the uniform parameter. All push constants follow the std430 layout by-default.
 
 Specialization Constants
 ------------------------
@@ -183,65 +185,6 @@ Alternatively, the GLSL `layout` syntax is also supported by Slang:
 ```glsl
 layout(constant_id = 1) const int MyConst = 1;
 ```
-
-SPIR-V specific Compiler options
---------------------------------
-
-The following compiler options are specific to SPIR-V.
-
-### -emit-spirv-directly
-Generate SPIR-V output directly (default)
-It cannot be used with -emit-spirv-via-glsl
-
-### -emit-spirv-via-glsl
-Generate SPIR-V output by compiling to glsl source first, then use glslang compiler to produce SPIRV from the glsl.
-It cannot be used with -emit-spirv-directly
-
-### -g
-Include debug information in the generated code, where possible.
-When targeting SPIR-V, this option emits [SPIR-V NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
-
-### -O<optimization-level>
-Set the optimization level.
-Under `-O0` option, Slang will not perform extensive inlining for all functions calls, instead it will preserve the call graph as much as possible to help with understanding the SPIRV structure and diagnosing any downstream toolchain issues.
-
-### -fvk-{b|s|t|u}-shift <N> <space>
-For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding
-numbers for all resources in 'b' registers of space <space>. For a resource attached with :register(bX, <space>)
-but not [vk::binding(...)], sets its Vulkan descriptor set to <space> and binding number to X + N. If you need to
-shift the inferred binding numbers for more than one space, provide more than one such option. If more than one
-such option is provided for the same space, the last one takes effect. If you need to shift the inferred binding
-numbers for all sets, use 'all' as <space>.
-
-For more information, see the following pages:
- - [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)
- - [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)
-
-### -fvk-bind-globals <N> <descriptor-set>
-Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.
-It lets you specify the descriptor for the source at a certain register.
-
-For more information, see the following pages:
- - [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#hlsl-global-variables-and-vulkan-binding)
-
-### -fvk-use-scalar-layout, -force-glsl-scalar-layout
-Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV.
-
-### -fvk-use-gl-layout
-Use std430 layout instead of D3D buffer layout for raw buffer load/stores.
-
-### -fvk-use-dx-layout
-Pack members using FXCs member packing rules when targeting GLSL or SPIRV.
-
-### -fvk-use-entrypoint-name
-Uses the entrypoint name from the source instead of 'main' in the spirv output.
-
-### -fspv-reflect
-Include reflection decorations in the resulting SPIRV for shader parameters.
-
-### -spirv-core-grammar
-A path to a specific spirv.core.grammar.json to use when generating SPIR-V output
-
 
 SPIR-V specific Attributes 
 --------------------------
@@ -291,13 +234,13 @@ When there are more than one entry point, the default behavior will prevent a sh
 To generate a valid SPIR-V with multiple entry points, use `-fvk-use-entrypoint-name` compiler option to disable the renaming behavior and preserve the entry point names.
 
 
-Memory pointer is experimental
+Global memory pointers
 ------------------------------
 
-Slang supports memory pointers when targetting SPIRV. See [an example and explanation](convenience-features.html#pointers-limited).
+Slang supports global memory pointers when targetting SPIRV. See [an example and explanation](convenience-features.html#pointers-limited).
 
-When a memory pointer points to a physical memory location, the pointer will be translated to a PhysicalStorageBuffer storage class in SPIRV.
-When a slang module uses a pointer, the resulting SPIRV will be using the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules with pointers but they don't point to a physical memory location will use SpvAddressingModelLogical addressing mode.
+`float4*` in user code will be translated to a pointer in PhysicalStorageBuffer storage class in SPIRV.
+When a slang module uses a pointer type, the resulting SPIRV will be using the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules without use of pointers will use SpvAddressingModelLogical addressing mode.
 
 
 Matrix type translation
@@ -408,5 +351,63 @@ void main() {
 
 This behavior is same to [how DXC translates Hull shader from HLSL to SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#patch-constant-function).
 
+
+SPIR-V specific Compiler options
+--------------------------------
+
+The following compiler options are specific to SPIR-V.
+
+### -emit-spirv-directly
+Generate SPIR-V output directly (default)
+It cannot be used with -emit-spirv-via-glsl
+
+### -emit-spirv-via-glsl
+Generate SPIR-V output by compiling to glsl source first, then use glslang compiler to produce SPIRV from the glsl.
+It cannot be used with -emit-spirv-directly
+
+### -g
+Include debug information in the generated code, where possible.
+When targeting SPIR-V, this option emits [SPIR-V NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
+
+### -O<optimization-level>
+Set the optimization level.
+Under `-O0` option, Slang will not perform extensive inlining for all functions calls, instead it will preserve the call graph as much as possible to help with understanding the SPIRV structure and diagnosing any downstream toolchain issues.
+
+### -fvk-{b|s|t|u}-shift <N> <space>
+For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding
+numbers for all resources in 'b' registers of space <space>. For a resource attached with :register(bX, <space>)
+but not [vk::binding(...)], sets its Vulkan descriptor set to <space> and binding number to X + N. If you need to
+shift the inferred binding numbers for more than one space, provide more than one such option. If more than one
+such option is provided for the same space, the last one takes effect. If you need to shift the inferred binding
+numbers for all sets, use 'all' as <space>.
+
+For more information, see the following pages:
+ - [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)
+ - [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)
+
+### -fvk-bind-globals <N> <descriptor-set>
+Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.
+It lets you specify the descriptor for the source at a certain register.
+
+For more information, see the following pages:
+ - [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#hlsl-global-variables-and-vulkan-binding)
+
+### -fvk-use-scalar-layout, -force-glsl-scalar-layout
+Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV.
+
+### -fvk-use-gl-layout
+Use std430 layout instead of D3D buffer layout for raw buffer load/stores.
+
+### -fvk-use-dx-layout
+Pack members using FXCs member packing rules when targeting GLSL or SPIRV.
+
+### -fvk-use-entrypoint-name
+Uses the entrypoint name from the source instead of 'main' in the spirv output.
+
+### -fspv-reflect
+Include reflection decorations in the resulting SPIRV for shader parameters.
+
+### -spirv-core-grammar
+A path to a specific spirv.core.grammar.json to use when generating SPIR-V output
 
 
