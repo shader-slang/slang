@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-
 set -e
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(dirname "$script_dir")"
+check_only=0
 
 show_help() {
   me=$(basename "$0")
   cat <<EOF
 $me: Build table of contents for documentation directories
 
-Usage: $me [--help] [--source <path>]
+Usage: $me [--help] [--source <path>] [--check-only]
 
 Options:
-    --help           Show this help message
-    --source         Path to project root directory (defaults to parent of the script directory)
+  --help           Show this help message
+  --source         Path to project root directory (defaults to parent of the script directory)
+  --check-only     Check if TOC needs updating, exit 1 if changes needed
 EOF
 }
 
@@ -28,9 +29,12 @@ while [[ "$#" -gt 0 ]]; do
     project_root="$2"
     shift
     ;;
+  --check-only)
+    check_only=1
+    ;;
   *)
-    echo "unrecognized argument: $1"
-    show_help
+    echo "unrecognized argument: $1" >&2
+    show_help >&2
     exit 1
     ;;
   esac
@@ -91,17 +95,33 @@ namespace toc
 EOL
 
 if ! mcs -r:System.Core "$temp_dir/temp_program.cs" -out:"$temp_dir/toc-builder.exe"; then
-  echo "Compilation failed"
+  echo "Compilation of $script_dir/scripts/Program.cs failed" >&2
   exit 1
 fi
 
 for dir in "user-guide" "gfx-user-guide"; do
   if [ -d "$script_dir/$dir" ]; then
+    if [ "$check_only" -eq 1 ]; then
+      # Ensure working directory is clean
+      if ! git diff --quiet "$script_dir/$dir/toc.html" 2>/dev/null; then
+        echo "Working directory not clean, cannot check TOC" >&2
+        exit 1
+      fi
+    fi
+
     if ! mono "$temp_dir/toc-builder.exe" "$script_dir/$dir"; then
-      echo "TOC generation failed for $dir"
+      echo "TOC generation failed for $dir" >&2
       exit 1
     fi
+
+    if [ "$check_only" -eq 1 ]; then
+      if ! git diff --quiet "$script_dir/$dir/toc.html" 2>/dev/null; then
+        git diff --color "$script_dir/$dir/toc.html"
+        git checkout -- "$script_dir/$dir/toc.html" 2>/dev/null
+        exit 1
+      fi
+    fi
   else
-    echo "Directory $dir not found"
+    echo "Directory $dir not found" >&2
   fi
 done
