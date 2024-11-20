@@ -1310,6 +1310,13 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitHLSLSubpassInputType(subpassType);
         return;
     }
+    else if (auto cbufferType = as<IRConstantBufferType>(type))
+    {
+        m_writer->emit("ConstantBuffer<");
+        emitType(cbufferType->getElementType());
+        m_writer->emit(" >");
+        return;
+    }
     else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
         switch (structuredBufferType->getOp())
