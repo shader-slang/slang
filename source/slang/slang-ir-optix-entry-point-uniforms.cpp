@@ -253,7 +253,9 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
         // TODO: reconcile this with OptiX, as the current logic works, but is still focused on
         // VK/DXR..
         //
-        auto constantBufferType = builder.getConstantBufferType(paramStructType);
+        auto constantBufferType = builder.getConstantBufferType(
+            paramStructType,
+            builder.getType(kIROp_DefaultBufferLayoutType));
         collectedParam = builder.createParam(constantBufferType);
 
         // The global shader parameter should have the layout

@@ -985,6 +985,11 @@ Val* _tryLookupConcreteAssociatedTypeFromThisTypeSubst(ASTBuilder* builder, Decl
     return nullptr;
 }
 
+Type* UniformParameterGroupType::getLayoutType()
+{
+    return as<Type>(getGenericArg(getDeclRef(), 1));
+}
+
 ModuleDecl* getModuleDecl(Decl* decl)
 {
     for (auto dd = decl; dd; dd = dd->parentDecl)

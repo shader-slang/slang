@@ -1574,7 +1574,14 @@ SIMPLE_IR_TYPE(MetalMeshGridPropertiesType, Type)
 
 SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)
 SIMPLE_IR_PARENT_TYPE(ParameterGroupType, PointerLikeType)
-SIMPLE_IR_PARENT_TYPE(UniformParameterGroupType, ParameterGroupType)
+
+struct IRUniformParameterGroupType : IRParameterGroupType
+{
+    IR_PARENT_ISA(UniformParameterGroupType)
+
+    IRType* getDataLayout() { return getOperandCount() > 1 ? (IRType*)getOperand(1) : nullptr; }
+};
+
 SIMPLE_IR_PARENT_TYPE(VaryingParameterGroupType, ParameterGroupType)
 SIMPLE_IR_TYPE(ConstantBufferType, UniformParameterGroupType)
 SIMPLE_IR_TYPE(TextureBufferType, UniformParameterGroupType)

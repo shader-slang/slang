@@ -654,7 +654,10 @@ struct IRTypeLegalizationContext
     /// This function will only be called if `legalElementType` is
     /// somehow non-trivial.
     ///
-    virtual LegalType createLegalUniformBufferType(IROp op, LegalType legalElementType) = 0;
+    virtual LegalType createLegalUniformBufferType(
+        IROp op,
+        LegalType legalElementType,
+        IRInst* layoutOperand) = 0;
 };
 
 // This typedef exists to support pre-existing code from when
@@ -675,7 +678,8 @@ ModuleDecl* findModuleForDecl(Decl* decl);
 LegalType createLegalUniformBufferTypeForResources(
     TypeLegalizationContext* context,
     IROp op,
-    LegalType legalElementType);
+    LegalType legalElementType,
+    IRInst* layoutOperand);
 
 /// Create a uniform buffer type suitable for existential legalization.
 ///
@@ -686,7 +690,8 @@ LegalType createLegalUniformBufferTypeForResources(
 LegalType createLegalUniformBufferTypeForExistentials(
     TypeLegalizationContext* context,
     IROp op,
-    LegalType legalElementType);
+    LegalType legalElementType,
+    IRInst* layoutOperand);
 
 
 void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
