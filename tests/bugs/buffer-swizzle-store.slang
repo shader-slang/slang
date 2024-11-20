@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
+// Slang-RHI/WGPU: Invalid bind group layout entry used #5612
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 //TEST_INPUT: RWTexture2D(format=R16G16_FLOAT, size=4, content = one, mipMaps = 1):name g_test

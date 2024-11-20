@@ -2,6 +2,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+// Not supported in WGSL: Arrays of textures or buffers
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Test that a function that returns a resource type can be

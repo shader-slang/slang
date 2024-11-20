@@ -13,6 +13,7 @@
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 
 // There are still some issues to fix in RHI, see issue #4943
+// WGSL: Aim for getting all GFX tests to pass #4943
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 Texture1D t1D;
