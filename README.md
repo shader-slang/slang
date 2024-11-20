@@ -134,7 +134,7 @@ tracker to make sure that their use cases can be supported.
 License
 -------
 
-The Slang code itself is under the MIT license (see [LICENSE](LICENSE)).
+The Slang code itself is under the Apache 2.0 with LLVM Exception license (see [LICENSE](LICENSE)).
 
 Builds of the core Slang tools depend on the following projects, either automatically or optionally, which may have their own licenses:
 
