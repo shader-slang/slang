@@ -6381,7 +6381,7 @@ __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 void asuint(double value, out uint lowbits, out uint highbits)
-{    
+{
     __target_switch
     {
     case hlsl: __intrinsic_asm "asuint";
@@ -10473,6 +10473,7 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// @param y The second value to compare.
 /// @param z The third value to compare.
 /// @return The smallest of the three values, element-wise if vector typed.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -10539,6 +10540,7 @@ vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
 /// @param y The second value to compare.
 /// @param z The third value to compare.
 /// @return The smallest of the three values, element-wise if vector typed, considering NaN.  If all three values are NaN, NaN is returned. If any value is NaN, the smallest non-NaN value is returned./// @category math
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
