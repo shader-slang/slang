@@ -280,6 +280,8 @@ bool isUniformParameterType(Type* type)
         return true;
     if (as<SamplerStateType>(type))
         return true;
+    if (as<PtrType>(type))
+        return true;
     if (auto arrayType = as<ArrayExpressionType>(type))
         return isUniformParameterType(arrayType->getElementType());
     if (auto modType = as<ModifiedType>(type))
