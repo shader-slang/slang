@@ -299,7 +299,7 @@ Currently support is available in D3D12 via NVAPI, and for Vulkan via the [GL_NV
 
 Slang has preliminary support for `debugBreak()` intrinsic. With the appropriate tooling, when `debugBreak` is hit it will cause execution to halt and display in the attached debugger.
 
-Tihs is not supported on HLSL, GLSL, SPIR-V or Metal backends. Note that on some targets if there isn't an appropriate debugging environment the debugBreak might cause execution to fail or potentially it is ignored.
+This is not supported on HLSL, GLSL, SPIR-V or Metal backends. Note that on some targets if there isn't an appropriate debugging environment the debugBreak might cause execution to fail or potentially it is ignored.
 
 On C++ targets debugBreak is implemented using SLANG_BREAKPOINT defined in "slang-cpp-prelude.h". If there isn't a suitable intrinsic, this will default to attempting to write to `nullptr` leading to a crash.
 
