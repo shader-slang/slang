@@ -1003,6 +1003,8 @@ typedef uint32_t SlangSizeT;
         // Add this new option to the end of the list to avoid breaking ABI as much as possible.
         // Setting of EmitSpirvDirectly or EmitSpirvViaGLSL will turn into this option internally.
         EmitSpirvMethod, // enum SlangEmitSpirvMethod
+
+        EmitReflectionJSON, // bool
         CountOf,
     };
 
@@ -3319,6 +3321,11 @@ struct ShaderReflection
     {
         return (VariableLayoutReflection*)spReflection_getGlobalParamsVarLayout(
             (SlangReflection*)this);
+    }
+
+    SlangResult toJson(ISlangBlob** outBlob)
+    {
+        return spReflection_ToJson((SlangReflection*)this, nullptr, outBlob);
     }
 };
 

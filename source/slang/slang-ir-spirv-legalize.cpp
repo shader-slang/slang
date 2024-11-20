@@ -1465,15 +1465,21 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void maybeHoistConstructInstToGlobalScope(IRInst* inst)
     {
-        // If all of the operands to this instruction are global, we can hoist
-        // this constructor to be a global too. This is important to make sure
+        // If all of the operands to this instruction are global, and are not global
+        // variables, we can hoist this constructor to be a global too.
+        // This is important to make sure
         // that vectors made of constant components end up being emitted as
         // constant vectors (using OpConstantComposite).
         UIndex opIndex = 0;
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount();
              operand++, opIndex++)
+        {
             if (operand->get()->getParent() != m_module->getModuleInst())
                 return;
+
+            if (as<IRGlobalParam>(operand->get()))
+                return;
+        }
         inst->insertAtEnd(m_module->getModuleInst());
     }
 

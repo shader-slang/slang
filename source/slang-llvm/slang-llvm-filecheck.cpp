@@ -9,7 +9,7 @@
 #include <llvm/ADT/SmallString.h>
 #include <llvm/FileCheck/FileCheck.h>
 #include <llvm/Support/raw_ostream.h>
-#include <tools/slang-test/filecheck.h>
+#include <slang-test/filecheck.h>
 
 namespace slang_llvm
 {

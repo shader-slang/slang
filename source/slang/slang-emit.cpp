@@ -30,6 +30,7 @@
 #include "slang-ir-com-interface.h"
 #include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
@@ -88,6 +89,7 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-strip-cached-dict.h"
+#include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-witness-tables.h"
 #include "slang-ir-strip.h"
 #include "slang-ir-synthesize-active-mask.h"
@@ -951,6 +953,11 @@ Result linkAndOptimizeIR(
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
 
+    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
+    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
+        isWGPUTarget(targetRequest))
+        deferBufferLoad(irModule);
+
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
@@ -1412,6 +1419,19 @@ Result linkAndOptimizeIR(
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
     // we will need to disable this pass.
     stripWitnessTables(irModule);
+
+    switch (target)
+    {
+    // On targets that don't support default initialization, remove 'raw' default construct
+    // insts because our code-gen will not have any way to emit them.
+    //
+    case CodeGenTarget::SPIRV:
+        if (targetProgram->shouldEmitSPIRVDirectly())
+            removeRawDefaultConstructors(irModule);
+        break;
+    default:
+        break;
+    }
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER STRIP WITNESS TABLES");

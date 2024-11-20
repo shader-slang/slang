@@ -31,6 +31,7 @@
 #include "slang-parameter-binding.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
+#include "slang-reflection-json.h"
 #include "slang-repro.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
@@ -6857,6 +6858,22 @@ SlangResult EndToEndCompileRequest::compile()
         }
     }
 
+    auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
+    if (reflectionPath.getLength() != 0)
+    {
+        auto bufferWriter = PrettyWriter();
+        emitReflectionJSON(this, this->getReflection(), bufferWriter);
+        if (reflectionPath == "-")
+        {
+            auto builder = bufferWriter.getBuilder();
+            StdWriters::getOut().write(builder.getBuffer(), builder.getLength());
+        }
+        else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
+        {
+            getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, reflectionPath);
+        }
+    }
+
     return res;
 }
 
@@ -6873,7 +6890,7 @@ char const* EndToEndCompileRequest::getDependencyFilePath(int index)
     auto program = frontEndReq->getGlobalAndEntryPointsComponentType();
     SourceFile* sourceFile = program->getFileDependencies()[index];
     return sourceFile->getPathInfo().hasFoundPath()
-               ? sourceFile->getPathInfo().foundPath.getBuffer()
+               ? sourceFile->getPathInfo().getMostUniqueIdentity().getBuffer()
                : "unknown";
 }
 

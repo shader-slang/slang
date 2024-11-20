@@ -1,7 +1,7 @@
 // unit-test-string-escape.cpp
 
 #include "../../source/core/slang-string-escape-util.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 

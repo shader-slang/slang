@@ -1,10 +1,10 @@
 // gui.h
 #pragma once
 
+#include "core/slang-basic.h"
 #include "external/imgui/imgui.h"
 #include "slang-com-ptr.h"
 #include "slang-gfx.h"
-#include "source/core/slang-basic.h"
 #include "vector-math.h"
 #include "window.h"
 

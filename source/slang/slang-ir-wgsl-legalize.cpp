@@ -206,22 +206,54 @@ struct LegalizeWGSLEntryPointContext
 
         switch (result.wgslSystemValueNameEnum)
         {
-        case SystemValueSemanticName::Position:
+
+        case SystemValueSemanticName::CullDistance:
             {
-                result.wgslSystemValueName = toSlice("position");
-                result.permittedTypes.add(builder.getVectorType(
-                    builder.getBasicType(BaseType::Float),
-                    builder.getIntValue(builder.getIntType(), 4)));
-                break;
+                result.isUnsupported = true;
             }
+            break;
+
+        case SystemValueSemanticName::ClipDistance:
+            {
+                // TODO: Implement this based on the 'clip-distances' feature in WGSL
+                // https: // www.w3.org/TR/webgpu/#dom-gpufeaturename-clip-distances
+                result.isUnsupported = true;
+            }
+            break;
+
+        case SystemValueSemanticName::Coverage:
+            {
+                result.wgslSystemValueName = toSlice("sample_mask");
+                result.permittedTypes.add(builder.getUIntType());
+            }
+            break;
+
+        case SystemValueSemanticName::Depth:
+            {
+                result.wgslSystemValueName = toSlice("frag_depth");
+                result.permittedTypes.add(builder.getBasicType(BaseType::Float));
+            }
+            break;
+
+        case SystemValueSemanticName::DepthGreaterEqual:
+        case SystemValueSemanticName::DepthLessEqual:
+            {
+                result.isUnsupported = true;
+            }
+            break;
 
         case SystemValueSemanticName::DispatchThreadID:
             {
                 result.wgslSystemValueName = toSlice("global_invocation_id");
-                IRType* const vec3uType{builder.getVectorType(
+                result.permittedTypes.add(builder.getVectorType(
                     builder.getBasicType(BaseType::UInt),
-                    builder.getIntValue(builder.getIntType(), 3))};
-                result.permittedTypes.add(vec3uType);
+                    builder.getIntValue(builder.getIntType(), 3)));
+            }
+            break;
+
+        case SystemValueSemanticName::DomainLocation:
+            {
+                result.isUnsupported = true;
             }
             break;
 
@@ -231,6 +263,13 @@ struct LegalizeWGSLEntryPointContext
                 result.permittedTypes.add(builder.getVectorType(
                     builder.getBasicType(BaseType::UInt),
                     builder.getIntValue(builder.getIntType(), 3)));
+            }
+            break;
+
+        case SystemValueSemanticName::GroupIndex:
+            {
+                result.wgslSystemValueName = toSlice("local_invocation_index");
+                result.permittedTypes.add(builder.getUIntType());
             }
             break;
 
@@ -250,12 +289,77 @@ struct LegalizeWGSLEntryPointContext
             }
             break;
 
-        case SystemValueSemanticName::GroupIndex:
+        case SystemValueSemanticName::InnerCoverage:
             {
-                result.wgslSystemValueName = toSlice("local_invocation_index");
+                result.isUnsupported = true;
+            }
+            break;
+
+        case SystemValueSemanticName::InstanceID:
+            {
+                result.wgslSystemValueName = toSlice("instance_index");
                 result.permittedTypes.add(builder.getUIntType());
             }
             break;
+
+        case SystemValueSemanticName::IsFrontFace:
+            {
+                result.wgslSystemValueName = toSlice("front_facing");
+                result.permittedTypes.add(builder.getBoolType());
+            }
+            break;
+
+        case SystemValueSemanticName::OutputControlPointID:
+        case SystemValueSemanticName::PointSize:
+            {
+                result.isUnsupported = true;
+            }
+            break;
+
+        case SystemValueSemanticName::Position:
+            {
+                result.wgslSystemValueName = toSlice("position");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::Float),
+                    builder.getIntValue(builder.getIntType(), 4)));
+                break;
+            }
+
+        case SystemValueSemanticName::PrimitiveID:
+        case SystemValueSemanticName::RenderTargetArrayIndex:
+            {
+                result.isUnsupported = true;
+                break;
+            }
+
+        case SystemValueSemanticName::SampleIndex:
+            {
+                result.wgslSystemValueName = toSlice("sample_index");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
+        case SystemValueSemanticName::StencilRef:
+        case SystemValueSemanticName::Target:
+        case SystemValueSemanticName::TessFactor:
+            {
+                result.isUnsupported = true;
+                break;
+            }
+
+        case SystemValueSemanticName::VertexID:
+            {
+                result.wgslSystemValueName = toSlice("vertex_index");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
+        case SystemValueSemanticName::ViewID:
+        case SystemValueSemanticName::ViewportArrayIndex:
+            {
+                result.isUnsupported = true;
+                break;
+            }
 
         default:
             {
@@ -1294,6 +1398,8 @@ struct LegalizeWGSLEntryPointContext
             {
             case kIROp_Var:
             case kIROp_Param:
+            case kIROp_GlobalParam:
+            case kIROp_GlobalVar:
                 continue;
             default:
                 break;

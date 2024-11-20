@@ -853,6 +853,11 @@ extern "C"
 
     // Shader Reflection
 
+    SLANG_API SlangResult spReflection_ToJson(
+        SlangReflection* reflection,
+        SlangCompileRequest* request,
+        ISlangBlob** outBlob);
+
     SLANG_API unsigned spReflection_GetParameterCount(SlangReflection* reflection);
     SLANG_API SlangReflectionParameter* spReflection_GetParameterByIndex(
         SlangReflection* reflection,

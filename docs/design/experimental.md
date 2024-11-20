@@ -31,7 +31,7 @@ Adding Experimental Interfaces
 
 When the above recommendations cannot be followed, as with features that are expected to be iterated on or are regarded as temporary, there are additional recommendations.
 
-Interfaces that are expected to change must be marked "_Experimental" in their class name and in their UUID name.
+Interfaces that are expected to change must be marked `_Experimental` in their class name and in their UUID name.
 
 For example,
 

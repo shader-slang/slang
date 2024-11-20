@@ -21,7 +21,7 @@
 // #include "metal-pipeline-dump-layer.h"
 // #include "metal-helper-functions.h"
 
-#include "source/core/slang-platform.h"
+#include "core/slang-platform.h"
 namespace gfx
 {
 

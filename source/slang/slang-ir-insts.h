@@ -2894,6 +2894,13 @@ struct IRUndefined : IRInst
 {
 };
 
+// Special inst for targets that support default initialization,
+// like the braces '= {}' in C/HLSL
+struct IRDefaultConstruct : IRInst
+{
+    IR_LEAF_ISA(DefaultConstruct)
+};
+
 // A global-scope generic parameter (a type parameter, a
 // constraint parameter, etc.)
 struct IRGlobalGenericParam : IRInst
@@ -4246,7 +4253,17 @@ public:
         UInt elementCount,
         IRInst* const* elementIndices);
 
-    IRInst* emitSwizzle(IRType* type, IRInst* base, UInt elementCount, UInt const* elementIndices);
+    IRInst* emitSwizzle(
+        IRType* type,
+        IRInst* base,
+        UInt elementCount,
+        uint64_t const* elementIndices);
+
+    IRInst* emitSwizzle(
+        IRType* type,
+        IRInst* base,
+        UInt elementCount,
+        uint32_t const* elementIndices);
 
     IRInst* emitSwizzleSet(
         IRType* type,
@@ -4260,7 +4277,14 @@ public:
         IRInst* base,
         IRInst* source,
         UInt elementCount,
-        UInt const* elementIndices);
+        uint64_t const* elementIndices);
+
+    IRInst* emitSwizzleSet(
+        IRType* type,
+        IRInst* base,
+        IRInst* source,
+        UInt elementCount,
+        uint32_t const* elementIndices);
 
     IRInst* emitSwizzledStore(
         IRInst* dest,
@@ -4272,7 +4296,13 @@ public:
         IRInst* dest,
         IRInst* source,
         UInt elementCount,
-        UInt const* elementIndices);
+        uint32_t const* elementIndices);
+
+    IRInst* emitSwizzledStore(
+        IRInst* dest,
+        IRInst* source,
+        UInt elementCount,
+        uint64_t const* elementIndices);
 
 
     IRInst* emitReturn(IRInst* val);

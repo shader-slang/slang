@@ -3,7 +3,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // inf, -inf, nan, finite
 //TEST_INPUT:ubuffer(data=[ 0x7f800000 0xff800000 0x7fffffff 1 ], stride=4):name inputBuffer

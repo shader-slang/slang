@@ -1,7 +1,7 @@
 // unit-test-offset-container.cpp
 
 #include "../../source/core/slang-offset-container.h"
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
