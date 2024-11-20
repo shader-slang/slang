@@ -8245,6 +8245,18 @@ vector<T,N> exp10(vector<T,N> x)
     }
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T,N,M> exp10(matrix<T,N,M> x)
+{
+    __target_switch
+    {
+    default:
+        MATRIX_MAP_UNARY(T, N, M, exp10, x);
+    }
+}
+
 
 /// Convert 16-bit float stored in low bits of integer
 /// @category conversion Conversion functions
