@@ -5860,7 +5860,7 @@ bool all(matrix<T,N,M> x)
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
 void AllMemoryBarrier()
-{   
+{
     __target_switch
     {
     case hlsl: __intrinsic_asm "AllMemoryBarrier";
@@ -6007,7 +6007,7 @@ __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 double asdouble(uint lowbits, uint highbits)
-{    
+{
     __target_switch
     {
     case hlsl: __intrinsic_asm "asdouble";
@@ -6040,7 +6040,7 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
 float asfloat(int x)
-{    
+{
     __target_switch
     {
     case cpp: __intrinsic_asm "$P_asfloat($0)";
@@ -6381,7 +6381,7 @@ __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
 void asuint(double value, out uint lowbits, out uint highbits)
-{    
+{
     __target_switch
     {
     case hlsl: __intrinsic_asm "asuint";
@@ -8242,6 +8242,18 @@ vector<T,N> exp10(vector<T,N> x)
     default:
         const T ln10 = T(2.30258509299); // ln(10)
         return exp(x * ln10);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T,N,M> exp10(matrix<T,N,M> x)
+{
+    __target_switch
+    {
+    default:
+        MATRIX_MAP_UNARY(T, N, M, exp10, x);
     }
 }
 
@@ -10477,6 +10489,7 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// @param y The second value to compare.
 /// @param z The third value to compare.
 /// @return The smallest of the three values, element-wise if vector typed.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -10542,7 +10555,8 @@ vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
 /// @param x The first value to compare.
 /// @param y The second value to compare.
 /// @param z The third value to compare.
-/// @return The smallest of the three values, element-wise if vector typed, considering NaN.  If all three values are NaN, NaN is returned. If any value is NaN, the smallest non-NaN value is returned./// @category math
+/// @return The smallest of the three values, element-wise if vector typed, considering NaN.  If all three values are NaN, NaN is returned. If any value is NaN, the smallest non-NaN value is returned.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]

@@ -6,6 +6,8 @@ Thank you for considering contributing to the Shader-Slang project! We welcome y
 
 This document is to guide you to contribute to the project. This document is intended to be easy to follow without sending the readers to other pages and links. You can simply copy and paste command lines described on this document.
 
+* Contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant the rights to use your contribution.
+* When you submit a pull request, a CLA bot will determine whether you need to sign a CLA. Simply follow the instructions provided.
 * Please read and follow the contributor [Code of Conduct](CODE_OF_CONDUCT.md).
 * Bug reports and feature requests should go through the GitHub issue tracker
 * Changes should ideally come in as small pull requests on top of master, coming from your own personal fork of the project

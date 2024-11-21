@@ -54,7 +54,7 @@ You can use markdown syntax in any part of the comment.
 
 For overloaded functions, only document the first overload. List all parameters from all overloads in the same comment block for the first overload. Documentation on the remaining overloads will be ignored by the tool. If an overloaded decl has differing documentation on different overload candidates, the `slangc` tool will emit a warning.
 
-The following code is an example of how `_Texture.Sample` is documented.
+The following code is an example of how `_Texture.Sample` is documented. Notice that only the first overload is documented, and it also includes documentation for parameters which are only present in subsequent overloads, such as `offset`.
 
 ```csharp
     /// Samples the texture at the given location.
@@ -84,6 +84,15 @@ The following code is an example of how `_Texture.Sample` is documented.
     {
         ...
     }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
+    T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        ...
+    }
+
 ```
 
 Note that unlike doxygen, the directives marks the start of a new section, and applies to all following paragraphs. You don't need to repetitively mark new paragraphs

@@ -2,7 +2,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -gcompute -shaderobj
 //DISABLED://TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -gcompute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-mtl -gcompute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 //TEST_INPUT: Texture2D(size=4, content = one):name tex
 //TEST_INPUT: Sampler:name samp

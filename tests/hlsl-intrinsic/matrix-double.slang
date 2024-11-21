@@ -91,6 +91,7 @@ void test1(inout FloatMatrix ft, inout FloatMatrix f, int idx)
 
     ft += exp2(f);
     ft += exp(f);
+    ft += exp10(f);
 
     ft += frac(f * makeFloatMatrix(3));
     ft += ceil(f * makeFloatMatrix(5) - makeFloatMatrix(3));

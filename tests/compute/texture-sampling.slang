@@ -13,6 +13,7 @@
 //TEST_INPUT: Sampler:name=samplerState
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 // There is no texture_1d_array type in WGSL https://github.com/shader-slang/slang/issues/5223
+// Not supported in WGSL: 1D array texture not supported in WGSL
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 Texture1D t1D;

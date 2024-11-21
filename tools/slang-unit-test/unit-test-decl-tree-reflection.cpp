@@ -242,7 +242,6 @@ SLANG_UNIT_TEST(declTreeReflection)
     {
         auto type = compositeProgram->getLayout()->findTypeByName("MyGenericType<half>");
         SLANG_CHECK(type != nullptr);
-        // SLANG_CHECK(type->getKind() == slang::DeclReflection::Kind::Struct);
         SLANG_CHECK(getTypeFullName(type) == "MyGenericType<half>");
         auto funcReflection = compositeProgram->getLayout()->findFunctionByNameInType(type, "g");
         SLANG_CHECK(funcReflection != nullptr);
@@ -483,6 +482,12 @@ SLANG_UNIT_TEST(declTreeReflection)
             unspecializedMethod->specializeWithArgTypes(argTypes.getCount(), argTypes.getBuffer());
         SLANG_CHECK(specializedMethodWithFloat != nullptr);
         SLANG_CHECK(getTypeFullName(specializedMethodWithFloat->getReturnType()) == "float");
+    }
+
+    // Check getTypeFullName() on nested objects.
+    {
+        auto structType = compositeProgram->getLayout()->findTypeByName("MyNamespace::MyStruct");
+        SLANG_CHECK(getTypeFullName(structType) == "MyNamespace.MyStruct");
     }
 
     // Check iterators

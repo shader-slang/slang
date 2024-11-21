@@ -7,6 +7,7 @@
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+// Not supported in WGSL: Integer matrices, Double and other unsupported scalar types
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -96,6 +97,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     ft += exp2(f);
     ft += exp(f);
+    ft += exp10(f);
                 
     ft += frac(f * makeFloatMatrix(3));
     ft += ceil(f * makeFloatMatrix(5) - makeFloatMatrix(3));

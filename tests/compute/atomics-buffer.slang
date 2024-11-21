@@ -12,6 +12,7 @@
 // RWBuffer does not work with the GFX backend as expected with Metal
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
+// Not supported in WGSL: Use of traditional atomics intrinsics (InterlockedXXX functions)
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 //METALLIB: @computeMain

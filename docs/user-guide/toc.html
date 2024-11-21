@@ -45,7 +45,6 @@
 <li data-link="convenience-features#if-let-syntax"><span>`if_let` syntax</span></li>
 <li data-link="convenience-features#reinterprett-operation"><span>`reinterpret&lt;T&gt;` operation</span></li>
 <li data-link="convenience-features#pointers-limited"><span>Pointers (limited)</span></li>
-<li data-link="convenience-features#struct-inheritance-limited"><span>`struct` inheritance (limited)</span></li>
 <li data-link="convenience-features#extensions"><span>Extensions</span></li>
 <li data-link="convenience-features#multi-level-break"><span>Multi-level break</span></li>
 <li data-link="convenience-features#force-inlining"><span>Force inlining</span></li>
@@ -94,7 +93,7 @@
 <ul class="toc_list">
 <li data-link="autodiff#using-automatic-differentiation-in-slang"><span>Using Automatic Differentiation in Slang</span></li>
 <li data-link="autodiff#mathematic-concepts-and-terminologies"><span>Mathematic Concepts and Terminologies</span></li>
-<li data-link="autodiff#differentiable-types"><span>Differentiable Types</span></li>
+<li data-link="autodiff#differentiable-value-types"><span>Differentiable Value Types</span></li>
 <li data-link="autodiff#forward-derivative-propagation-function"><span>Forward Derivative Propagation Function</span></li>
 <li data-link="autodiff#backward-derivative-propagation-function"><span>Backward Derivative Propagation Function</span></li>
 <li data-link="autodiff#builtin-differentiable-functions"><span>Builtin Differentiable Functions</span></li>
@@ -124,19 +123,6 @@
 <li data-link="reflection#structures"><span>Structures</span></li>
 <li data-link="reflection#entry-points"><span>Entry Points</span></li>
 <li data-link="reflection#function-reflection"><span>Function Reflection</span></li>
-</ul>
-</li>
-<li data-link="targets"><span>Supported Compilation Targets</span>
-<ul class="toc_list">
-<li data-link="targets#background-and-terminology"><span>Background and Terminology</span></li>
-<li data-link="targets#direct3d-11"><span>Direct3D 11</span></li>
-<li data-link="targets#direct3d-12"><span>Direct3D 12</span></li>
-<li data-link="targets#vulkan"><span>Vulkan</span></li>
-<li data-link="targets#opengl"><span>OpenGL</span></li>
-<li data-link="targets#metal"><span>Metal</span></li>
-<li data-link="targets#cuda-and-optix"><span>CUDA and OptiX</span></li>
-<li data-link="targets#cpu-compute"><span>CPU Compute</span></li>
-<li data-link="targets#summary"><span>Summary</span></li>
 </ul>
 </li>
 <li data-link="link-time-specialization"><span>Link-time Specialization and Module Precompilation</span>
@@ -196,8 +182,20 @@
 </li>
 </ul>
 </li>
-<li data-link="a2-target-specific-features"><span>Target-specific features</span>
+<li data-link="reference"><span>Reference</span>
 <ul class="toc_list">
+<li data-link="a3-02-reference-capability-atoms"><span>Capability Atoms</span>
+<ul class="toc_list">
+<li data-link="a3-02-reference-capability-atoms#targets"><span>Targets</span></li>
+<li data-link="a3-02-reference-capability-atoms#stages"><span>Stages</span></li>
+<li data-link="a3-02-reference-capability-atoms#versions"><span>Versions</span></li>
+<li data-link="a3-02-reference-capability-atoms#extensions"><span>Extensions</span></li>
+<li data-link="a3-02-reference-capability-atoms#compound-capabilities"><span>Compound Capabilities</span></li>
+<li data-link="a3-02-reference-capability-atoms#other"><span>Other</span></li>
+</ul>
+</li>
+</ul>
+</li>
 <li data-link="spirv-target-specific"><span>SPIR-V specific functionalities</span>
 <ul class="toc_list">
 <li data-link="spirv-target-specific#experimental-support-for-the-older-versions-of-spir-v"><span>Experimental support for the older versions of SPIR-V</span></li>
@@ -220,22 +218,51 @@
 <li data-link="spirv-target-specific#tessellation"><span>Tessellation</span></li>
 </ul>
 </li>
+<li data-link="metal-target-specific"><span>Metal-specific functionalities</span>
+<ul class="toc_list">
+<li data-link="metal-target-specific#entry-point-parameter-handling"><span>Entry Point Parameter Handling</span></li>
+<li data-link="metal-target-specific#system-value-semantics"><span>System-Value semantics</span></li>
+<li data-link="metal-target-specific#interpolation-modifiers"><span>Interpolation Modifiers</span></li>
+<li data-link="metal-target-specific#resource-types"><span>Resource Types</span></li>
+<li data-link="metal-target-specific#header-inclusions-and-namespace"><span>Header Inclusions and Namespace</span></li>
+<li data-link="metal-target-specific#parameter-blocks-and-argument-buffers"><span>Parameter blocks and Argument Buffers</span></li>
+<li data-link="metal-target-specific#struct-parameter-flattening"><span>Struct Parameter Flattening</span></li>
+<li data-link="metal-target-specific#return-value-handling"><span>Return Value Handling</span></li>
+<li data-link="metal-target-specific#value-type-conversion"><span>Value Type Conversion</span></li>
+<li data-link="metal-target-specific#conservative-rasterization"><span>Conservative Rasterization</span></li>
+<li data-link="metal-target-specific#address-space-assignment"><span>Address Space Assignment</span></li>
 </ul>
 </li>
-<li data-link="reference"><span>Reference</span>
+<li data-link="wgsl-target-specific"><span>WGSL specific functionalities</span>
 <ul class="toc_list">
+<li data-link="wgsl-target-specific#system-value-semantics"><span>System-Value semantics</span></li>
+<li data-link="wgsl-target-specific#supported-hlsl-features-when-targeting-wgsl"><span>Supported HLSL features when targeting WGSL</span></li>
+<li data-link="wgsl-target-specific#supported-atomic-types"><span>Supported atomic types</span></li>
+<li data-link="wgsl-target-specific#constantbuffer-rwrasterizerorderedstructuredbuffer-rwrasterizerorderedbyteaddressbuffer"><span>ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)ByteAddressBuffer</span></li>
+<li data-link="wgsl-target-specific#specialization-constants"><span>Specialization Constants</span></li>
+<li data-link="wgsl-target-specific#interlocked-operations"><span>Interlocked operations</span></li>
+<li data-link="wgsl-target-specific#entry-point-parameter-handling"><span>Entry Point Parameter Handling</span></li>
+<li data-link="wgsl-target-specific#parameter-blocks"><span>Parameter blocks</span></li>
+<li data-link="wgsl-target-specific#pointers"><span>Pointers</span></li>
+<li data-link="wgsl-target-specific#address-space-assignment"><span>Address Space Assignment</span></li>
+<li data-link="wgsl-target-specific#matrix-type-translation"><span>Matrix type translation</span></li>
+</ul>
+</li>
+<li data-link="a2-target-specific-features"><span>Target-specific features</span>
+</li>
 <li data-link="a3-01-reference-capability-profiles"><span>Capability Profiles</span>
 </li>
-<li data-link="a3-02-reference-capability-atoms"><span>Capability Atoms</span>
+<li data-link="targets"><span>Supported Compilation Targets</span>
 <ul class="toc_list">
-<li data-link="a3-02-reference-capability-atoms#targets"><span>Targets</span></li>
-<li data-link="a3-02-reference-capability-atoms#stages"><span>Stages</span></li>
-<li data-link="a3-02-reference-capability-atoms#versions"><span>Versions</span></li>
-<li data-link="a3-02-reference-capability-atoms#extensions"><span>Extensions</span></li>
-<li data-link="a3-02-reference-capability-atoms#compound-capabilities"><span>Compound Capabilities</span></li>
-<li data-link="a3-02-reference-capability-atoms#other"><span>Other</span></li>
-</ul>
-</li>
+<li data-link="targets#background-and-terminology"><span>Background and Terminology</span></li>
+<li data-link="targets#direct3d-11"><span>Direct3D 11</span></li>
+<li data-link="targets#direct3d-12"><span>Direct3D 12</span></li>
+<li data-link="targets#vulkan"><span>Vulkan</span></li>
+<li data-link="targets#opengl"><span>OpenGL</span></li>
+<li data-link="targets#metal"><span>Metal</span></li>
+<li data-link="targets#cuda-and-optix"><span>CUDA and OptiX</span></li>
+<li data-link="targets#cpu-compute"><span>CPU Compute</span></li>
+<li data-link="targets#summary"><span>Summary</span></li>
 </ul>
 </li>
 </ul>
