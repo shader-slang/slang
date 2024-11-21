@@ -10896,7 +10896,60 @@ void checkDerivativeAttributeImpl(
     SemanticsContext::ExprLocalScope scope;
     auto ctx = visitor->withExprLocalScope(&scope);
     auto subVisitor = SemanticsVisitor(ctx);
-    auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
+
+    auto exprToCheck = attr->funcExpr;
+
+    // If this is a generic, we want to wrap the call to the derivative method
+    // with the generic parameters of the source.
+    //
+    if (auto genericDecl = as<GenericDecl>(funcDecl->parentDecl))
+    {
+        auto substArgs = getDefaultSubstitutionArgs(ctx.getASTBuilder(), visitor, genericDecl);
+        auto appExpr = ctx.getASTBuilder()->create<GenericAppExpr>();
+
+        Index count = 0;
+        for (auto member : genericDecl->members)
+        {
+            if (as<GenericTypeParamDecl>(member) || as<GenericValueParamDecl>(member) ||
+                as<GenericTypePackParamDecl>(member))
+                count++;
+        }
+
+        appExpr->functionExpr = attr->funcExpr;
+
+        for (auto arg : substArgs)
+        {
+            if (count == 0)
+                break;
+
+            if (auto declRefType = as<DeclRefType>(arg))
+            {
+                auto baseTypeExpr = ctx.getASTBuilder()->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = declRefType;
+                auto baseTypeType = ctx.getASTBuilder()->getOrCreate<TypeType>(declRefType);
+                baseTypeExpr->type.type = baseTypeType;
+
+                appExpr->arguments.add(baseTypeExpr);
+            }
+            else if (auto genericValParam = as<GenericParamIntVal>(arg))
+            {
+                auto declRef = genericValParam->getDeclRef();
+                appExpr->arguments.add(
+                    subVisitor
+                        .ConstructDeclRefExpr(declRef, nullptr, nullptr, SourceLoc(), nullptr));
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unhandled substitution arg type");
+            }
+
+            count--;
+        }
+
+        exprToCheck = appExpr;
+    }
+
+    auto checkedFuncExpr = visitor->dispatchExpr(exprToCheck, ctx);
     attr->funcExpr = checkedFuncExpr;
     if (attr->args.getCount())
         attr->args[0] = attr->funcExpr;
