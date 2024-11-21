@@ -312,6 +312,25 @@ DeclRefBase* DeclRefBase::getBase()
 }
 void DeclRefBase::toText(StringBuilder& out)
 {
+    if (auto lookupDeclRef = as<LookupDeclRef>(this))
+    {
+        lookupDeclRef->_toTextOverride(out);
+        return;
+    }
+
+    if (as<GenericTypeParamDecl>(this->getDecl()))
+    {
+        SLANG_ASSERT(as<DirectDeclRef>(this));
+        out << this->getDecl()->getName()->text;
+        return;
+    }
+    else if (as<GenericValueParamDecl>(this->getDecl()))
+    {
+        SLANG_ASSERT(as<DirectDeclRef>(this));
+        out << this->getDecl()->getName()->text;
+        return;
+    }
+
     SubstitutionSet substSet(this);
 
     List<Decl*> decls;
