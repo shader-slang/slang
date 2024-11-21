@@ -9,7 +9,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-mtl -compute
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // CPP/CUDA due to natural layout rules will recieve the following ROW matrix:
 // {1,2,3}

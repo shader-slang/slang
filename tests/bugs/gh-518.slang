@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST_DISABLED(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+// Not supported in WGSL: Arrays of textures or buffers
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Note: can't actually test this on Vulkan right now because

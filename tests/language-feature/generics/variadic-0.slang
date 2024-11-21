@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+// WGPU: f16 extension not allowed in current environment #5605
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 //TEST:SIMPLE(filecheck=CHECK): -target glsl

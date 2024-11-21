@@ -9,6 +9,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+// Passing, but: slang-test: Test context Slang session is leaking #5610
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 // First we will define some fake interfaces for testing.

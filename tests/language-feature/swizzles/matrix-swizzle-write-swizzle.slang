@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE: -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE: -vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
+// WGSL: Assign to swizzle expression not allowed #5603
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Test that writing to swizzles of matrix swizzles works correctly
