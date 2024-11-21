@@ -312,7 +312,82 @@ DeclRefBase* DeclRefBase::getBase()
 }
 void DeclRefBase::toText(StringBuilder& out)
 {
-    SLANG_AST_NODE_VIRTUAL_CALL(DeclRefBase, toText, (out));
+    if (auto lookupDeclRef = as<LookupDeclRef>(this))
+    {
+        lookupDeclRef->_toTextOverride(out);
+        return;
+    }
+
+    if (as<GenericTypeParamDecl>(this->getDecl()))
+    {
+        SLANG_ASSERT(as<DirectDeclRef>(this));
+        out << this->getDecl()->getName()->text;
+        return;
+    }
+    else if (as<GenericValueParamDecl>(this->getDecl()))
+    {
+        SLANG_ASSERT(as<DirectDeclRef>(this));
+        out << this->getDecl()->getName()->text;
+        return;
+    }
+
+    SubstitutionSet substSet(this);
+
+    List<Decl*> decls;
+    for (auto dd = getDecl(); dd; dd = dd->parentDecl)
+    {
+        // Skip the top-level decl.
+        if (as<ModuleDecl>(dd))
+            continue;
+
+        // Skip base decls in generic containers. We will handle them when we handle the generic
+        // decl.
+        //
+        if (dd->parentDecl && as<GenericDecl>(dd->parentDecl))
+            continue;
+
+        decls.add(dd);
+    }
+
+    decls.reverse();
+
+    bool first = true;
+    for (auto decl : decls)
+    {
+        if (!first)
+            out << ".";
+        first = false;
+
+        if (auto name = decl->getName())
+        {
+            out << name->text;
+
+            // If there are any specializations for this decl, emit them here:
+            if (auto genericDecl = as<GenericDecl>(decl))
+            {
+                if (auto genericAppDeclRef = substSet.findGenericAppDeclRef(genericDecl))
+                {
+                    Index paramCount = 0;
+                    for (auto member : genericDecl->members)
+                        if (as<GenericTypeParamDeclBase>(member) ||
+                            as<GenericValueParamDecl>(member))
+                            paramCount++;
+                    out << "<";
+                    auto args = genericAppDeclRef->getArgs();
+                    Index argCount = args.getCount();
+                    for (Index aa = 0; aa < Math::Min(paramCount, argCount); ++aa)
+                    {
+                        if (aa != 0)
+                            out << ", ";
+                        args[aa]->toText(out);
+                    }
+                    out << ">";
+                }
+            }
+
+            // TODO: What do we do about extensions?
+        }
+    }
 }
 
 Name* DeclRefBase::getName() const

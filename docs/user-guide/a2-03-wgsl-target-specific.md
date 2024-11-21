@@ -117,6 +117,14 @@ Parameter blocks
 Each `ParameterBlock` is assigned its own bind group in WGSL.
 
 
+Write-only Textures
+---------------
+
+Many image formats supported by WebGPU can only be accessed in compute shader as a write-only image.
+Use `WTexture2D` type (similar to `RWTexture2D`) to write to an image when possible.
+The write-only texture types are also supported when targeting HLSL/GLSL/SPIR-V/Metal and CUDA.
+
+
 Pointers
 --------
 

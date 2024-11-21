@@ -3,7 +3,9 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -mtl
 
 
-//TEST_INPUT: Texture1D(size=4, content = one):name=t1D
+// WebGPU only supports 1 MIP level for 1d textures
+// https://www.w3.org/TR/webgpu/#abstract-opdef-maximum-miplevel-count
+//TEST_INPUT: Texture1D(size=4, content = one, mipMaps=1):name=t1D
 //TEST_INPUT: Texture2D(size=4, content = one):name=t2D
 //TEST_INPUT: Texture3D(size=4, content = one):name=t3D
 //TEST_INPUT: TextureCube(size=4, content = one):name=tCube
@@ -11,10 +13,6 @@
 //TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2):name=tCubeArray
 //TEST_INPUT: Sampler:name=samplerState
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-
-// There are still some issues to fix in RHI, see issue #4943
-// WGSL: Aim for getting all GFX tests to pass #4943
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 Texture1D t1D;
 Texture2D t2D;
