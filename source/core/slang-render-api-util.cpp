@@ -13,7 +13,7 @@ namespace Slang
 /* static */ const RenderApiUtil::Info RenderApiUtil::s_infos[] = {
     {RenderApiType::Vulkan, "vk,vulkan", ""},
     {RenderApiType::D3D12, "dx12,d3d12", ""},
-    {RenderApiType::D3D11, "dx11,d3d11", "hlsl,hlsl-rewrite,slang"},
+    {RenderApiType::D3D11, "dx11,d3d11", "hlsl,hlsl-rewrite,glsl-rewrite,glsl-cross,slang"},
     {RenderApiType::Metal, "mtl,metal", ""},
     {RenderApiType::CPU, "cpu", ""},
     {RenderApiType::CUDA, "cuda", "cuda,ptx"},
