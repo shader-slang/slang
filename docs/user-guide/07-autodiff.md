@@ -167,6 +167,9 @@ interface IDifferentiablePtrType
 }
 ```
 
+> #### Note ####
+> Support for `IDifferentiablePtrType` is still experimental. 
+
 Types should not conform to both `IDifferentiablePtrType` and `IDifferentiable`. Such cases will result in a compiler error.
 
 
