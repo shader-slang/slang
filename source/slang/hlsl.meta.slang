@@ -5511,7 +5511,9 @@ struct TriangleStream
 /// Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 void abort();
 
-/// Absolute value (HLSL SM 1.0)
+/// The abs function returns the absolute value of x.
+/// @param x The input value.
+/// @return The absolute value of x.
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
@@ -5618,7 +5620,11 @@ matrix<T,N,M> abs(matrix<T,N,M> x)
     }
 }
 
-/// Absolute value (HLSL SM 1.0)
+/// Float-point absolute value.
+/// @param x The input value.
+/// @return The absolute value of `x`.
+/// @remarks For metal targets, this function is equivalent to the `fabs` metal intrinsic.
+///          For other targets, this function is equivalent to the `abs` slang function.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -5649,7 +5655,9 @@ vector<T, N> fabs(vector<T, N> x)
 }
 
 
-/// Inverse cosine (HLSL SM 1.0)
+/// Arc cosine. Returns the angle whose cosine is the specified number.
+/// @param x The cosine value.
+/// @return The angle in radians, in the range of [0, pi].
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -5702,7 +5710,9 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
     }
 }
 
-/// Inverse hyperbolic cosine
+/// Arc hyperbolic cosine. Returns the arc hyperbolic cosine of the specified value.
+/// @param x The value.
+/// @return The arc hyperbolic cosine of the specified value.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -5745,7 +5755,7 @@ vector<T,N> acosh(vector<T,N> x)
 }
 
 
-// Test if all components are non-zero (HLSL SM 1.0)
+// Test if all components are non-zero.
 __generic<T : __BuiltinType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
@@ -5845,7 +5855,7 @@ bool all(matrix<T,N,M> x)
     }
 }
 
-/// Barrier for writes to all memory spaces (HLSL SM 5.0)
+/// Barrier for writes to all memory spaces.
 /// @category barrier Memory and control barriers
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
@@ -5865,7 +5875,7 @@ void AllMemoryBarrier()
     }
 }
 
-/// Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
+/// Thread-group sync and barrier for writes to all memory spaces.
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
@@ -5890,7 +5900,7 @@ void AllMemoryBarrierWithGroupSync()
 __intrinsic_op($(kIROp_GetWorkGroupSize))
 int3 WorkgroupSize();
 
-// Test if any components is non-zero (HLSL SM 1.0)
+// Test if any components is non-zero.
 
 __generic<T : __BuiltinType>
 [__readNone]
@@ -5991,7 +6001,7 @@ bool any(matrix<T, N, M> x)
 }
 
 
-/// Reinterpret bits as a double (HLSL SM 5.0)
+/// Reinterpret bits as a double.
 /// @category conversion
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
@@ -6025,7 +6035,7 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
     }
 }
 
-/// Reinterpret bits as a float (HLSL SM 4.0)
+/// Reinterpret bits as a float.
 /// @category conversion
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
@@ -6144,7 +6154,9 @@ __generic<let N : int, let M : int>
 matrix<float,N,M> asfloat(matrix<float,N,M> x)
 { return x; }
 
-/// Inverse sine (HLSL SM 1.0)
+/// Arc sine. Returns the angle whose sine is the specified number.
+/// @param x The sine value.
+/// @return The angle in radians, in the range of [-pi/2, pi/2].
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -6197,7 +6209,9 @@ matrix<T, N, M> asin(matrix<T, N, M> x)
     }
 }
 
-/// Inverse hyperbolic sine.
+/// Arc hyperbolic sine. Returns the arc hyperbolic sine of the specified value.
+/// @param x The hyperbolic sine value.
+/// @return The arc hyperbolic sine of the specified value.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -6239,7 +6253,7 @@ vector<T,N> asinh(vector<T,N> x)
     }
 }
 
-/// Reinterpret bits as an int (HLSL SM 4.0)
+/// Reinterpret bits as an int.
 /// @category conversion
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
@@ -6361,7 +6375,7 @@ __generic<let N : int, let M : int>
 matrix<int,N,M> asint(matrix<int,N,M> x)
 { return x; }
 
-/// Reinterpret bits of double as a uint (HLSL SM 5.0)
+/// Reinterpret bits of double as a uint.
 /// @category conversion
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
@@ -6386,7 +6400,7 @@ void asuint(double value, out uint lowbits, out uint highbits)
     }
 }
 
-// Reinterpret bits as a uint (HLSL SM 4.0)
+// Reinterpret bits as a uint.
 
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
@@ -6706,7 +6720,9 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> va
     }
 }
 
-/// Inverse tangent (HLSL SM 1.0).
+/// Arc tangent. Returns the angle whose tangent is the specified number.
+/// @param x The tangent value.
+/// @return The angle in radians, in the range of [-pi/2, pi/2].
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -6759,7 +6775,10 @@ matrix<T, N, M> atan(matrix<T, N, M> x)
     }
 }
 
-/// Inverse tangent (HLSL SM 1.0).
+/// Arc tangent of y/x. Returns the angle whose tangent is the quotient of two specified numbers.
+/// @param y The numerator.
+/// @param x The denominator.
+/// @return The angle in radians, in the range of [-pi, pi].
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -6812,7 +6831,9 @@ matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
     }
 }
 
-/// Hyperbolic inverse tangent
+/// Hyperbolic arc tangent. Returns the hyperbolic arc tangent of the specified value.
+/// @param x The value.
+/// @return The hyperbolic arc tangent of the specified value.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -6854,7 +6875,9 @@ vector<T,N> atanh(vector<T,N> x)
     }
 }
 
-/// Ceiling (HLSL SM 1.0).
+/// Ceiling. Returns the smallest integer that is greater than or equal to the specified value.
+/// @param x The value.
+/// @return The smallest integer that is greater than or equal to the specified value.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -6907,7 +6930,10 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
     }
 }
 
-// Copy-sign
+/// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
+/// @param x The value to use as the magnitude.
+/// @param y The value to use as the sign.
+/// @return A value whose magnitude is from `x` and whose sign is from `y`.
 /// @category math
 __generic<let N: int>
 [__readNone]
@@ -6921,6 +6947,10 @@ vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
     return reinterpret<vector<half,N>>(newX);
 }
 
+/// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
+/// @param x The value to use as the magnitude.
+/// @param y The value to use as the sign.
+/// @return A value whose magnitude is from `x` and whose sign is from `y`.
 /// @category math
 __generic<let N: int>
 [__readNone]
@@ -6934,6 +6964,10 @@ vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
     return reinterpret<vector<float,N>>(newX);
 }
 
+/// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
+/// @param x The value to use as the magnitude.
+/// @param y The value to use as the sign.
+/// @return A value whose magnitude is from `x` and whose sign is from `y`.
 /// @category math
 __generic<let N: int>
 [__readNone]
@@ -6951,6 +6985,10 @@ __generic<T:__BuiltinFloatingPointType, U:__BuiltinFloatingPointType, let N : in
 __intrinsic_op($(kIROp_FloatCast))
 vector<T,N> __real_cast(vector<U,N> val);
 
+/// Copy-sign. Returns a value whose magnitude is from one operand and whose sign is from another operand.
+/// @param x The value to use as the magnitude.
+/// @param y The value to use as the sign.
+/// @return A value whose magnitude is from x and whose sign is from y.
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
@@ -7003,7 +7041,11 @@ bool CheckAccessFullyMapped(out uint status)
     }
 }
 
-/// Clamp (HLSL SM 1.0).
+/// Clamp. Returns the specified value clamped to the specified minimum and maximum bounds.
+/// @param x The value to clamp.
+/// @param minBound The minimum bound.
+/// @param maxBound The maximum bound.
+/// @return The clamped value.
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
@@ -7156,6 +7198,9 @@ void clip(matrix<T,N,M> x)
     }
 }
 
+/// Cosine. Returns the cosine of the specified angle.
+/// @param x The angle in radians.
+/// @return The cosine of the specified angle.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7208,7 +7253,9 @@ matrix<T, N, M> cos(matrix<T, N, M> x)
     }
 }
 
-/// Hyperbolic cosine.
+/// Hyperbolic cosine. Returns the hyperbolic cosine of the specified value.
+/// @param x The specified value.
+/// @return The hyperbolic cosine of the specified value.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7261,7 +7308,10 @@ matrix<T, N, M> cosh(matrix<T, N, M> x)
     }
 }
 
-/// Compute the cosine of an angle in degrees.
+/// Compute the cosine of pi times the input.
+/// @param x The input value.
+/// @return The cosine of pi times the input.
+/// @remarks This function is equivalent to `cos(PI * x)`. On Metal, this function is implemented using the `cospi` intrinsic.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7342,7 +7392,10 @@ vector<uint, N> countbits(vector<uint, N> value)
     }
 }
 
-/// Cross product
+/// Cross product. Returns the cross product of two 3D vectors.
+/// @param left The first vector.
+/// @param right The second vector.
+/// @return The cross product of `left` and `right`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7580,6 +7633,8 @@ ${{{{
 
 
 /// Convert radians to degrees.
+/// @param x The angle in radians.
+/// @return The angle in degrees.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7631,6 +7686,8 @@ matrix<T, N, M> degrees(matrix<T, N, M> x)
 }
 
 /// Compute matrix determinant.
+/// @param m The matrix.
+/// @return The determinant of the matrix.
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
@@ -7690,7 +7747,11 @@ void DeviceMemoryBarrierWithGroupSync()
     }
 }
 
-// Vector distance
+/// Vector distance. Returns the distance between two points.
+/// @param x The first point.
+/// @param y The second point.
+/// @return The distance between `x` and `y`.
+/// @remarks This function is equivalent to `length(x - y)`. When `x` and `y` are scalars, this function is equivalent to `abs(x - y)`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
@@ -7729,6 +7790,9 @@ T distance(T x, T y)
 }
 
 /// Computes `max(0, x-y)`.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The result of `max(0, x-y)`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7756,7 +7820,10 @@ vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
     }
 }
 
-// divide
+/// Divide values.
+/// @param x The dividend.
+/// @param y The divisor.
+/// @return The result of dividing `x` by `y`, element-wise for vector types.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7784,7 +7851,11 @@ vector<T,N> divide(vector<T,N> x, vector<T,N> y)
     }
 }
 
-/// Vector dot product
+/// Vector dot product. Returns the dot product of two vectors.
+/// @param x The first vector.
+/// @param y The second vector.
+/// @return The dot product of `x` and `y`.
+/// @remarks When `x` and `y` are scalars, this function is equivalent to `x * y`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -7841,7 +7912,8 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
 }
 
-/// Helper for computing distance terms for lighting (obsolete)
+/// Helper for computing distance terms for lighting (obsolete).
+/// Use the subtraction operator '-' instead.
 /// @deprecated
 /// @category math
 __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<T,4> y);
@@ -8014,6 +8086,8 @@ matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset)
 }
 
 /// Computes base-e exponent.
+/// @param x The input value.
+/// @return The base-e exponent of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -8068,7 +8142,9 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
     }
 }
 
-/// Computes base-2 exponent
+/// Computes base-2 exponent.
+/// @param x The input value.
+/// @return The base-2 exponent of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -8137,7 +8213,9 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
     }
 }
 
-/// Computes base-10 exponent
+/// Computes base-10 exponent.
+/// @param x The input value.
+/// @return The base-10 exponent of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -8164,6 +8242,18 @@ vector<T,N> exp10(vector<T,N> x)
     default:
         const T ln10 = T(2.30258509299); // ln(10)
         return exp(x * ln10);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T,N,M> exp10(matrix<T,N,M> x)
+{
+    __target_switch
+    {
+    default:
+        MATRIX_MAP_UNARY(T, N, M, exp10, x);
     }
 }
 
@@ -8347,7 +8437,11 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-/// Flip surface normal to face forward, if needed.
+/// Flip vector to face forward, if needed.
+/// @param n The vector to orient.
+/// @param i The incident vector.
+/// @param ng The geometric normal vector.
+/// @return `n` if the dot product of `ng` and `i` is less than 0, otherwise `-n`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
@@ -8532,7 +8626,9 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
     }
 }
 
-/// Floor (HLSL SM 1.0).
+/// Floor. Returns the largest integer value not greater than `x`.
+/// @param x The input value.
+/// @return The largest integer value not greater than `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -8586,6 +8682,10 @@ matrix<T, N, M> floor(matrix<T, N, M> x)
 }
 
 /// Fused multiply-add.
+/// @param a The first value to multiply.
+/// @param b The second value to multiply.
+/// @param c The value to add to the product of `a` and `b`.
+/// @return The result of `a * b + c`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -8648,6 +8748,9 @@ matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 /// The floating-point remainder is calculated such that x = i * y + f,
 /// where i is an integer, f has the same sign as x, and the absolute value
 /// of f is less than the absolute value of y.
+/// @param x The dividend.
+/// @param y The divisor.
+/// @return The floating-point remainder of x/y.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -8754,6 +8857,8 @@ matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 }
 
 /// Extract the fractional part of a floating-point number.
+/// @param x The input value.
+/// @return The fractional part of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -8801,6 +8906,8 @@ matrix<T, N, M> frac(matrix<T, N, M> x)
 }
 
 /// Extract the fractional part of a floating-point number.
+/// @param x The input value.
+/// @return The fractional part of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -8821,6 +8928,9 @@ vector<T, N> fract(vector<T, N> x)
 }
 
 /// Split float into mantissa and exponent.
+/// @param x The input value.
+/// @param[out] exp The output exponent.
+/// @return The mantissa of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -9341,11 +9451,13 @@ void InterlockedCompareStoreFloatBitwise<T:IAtomicable>(__ref  T dest,  T compar
 }
 
 
-/// Test if a floating-point value finite.
+/// Test if a floating-point value is finite.
+/// @param x The input value.
+/// @return `true` if `x` is finite, `false` otherwise.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 bool isfinite(T x)
 {
     __target_switch
@@ -9363,7 +9475,7 @@ bool isfinite(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<bool, N> isfinite(vector<T, N> x)
 {
     __target_switch
@@ -9381,7 +9493,7 @@ vector<bool, N> isfinite(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 {
     __target_switch
@@ -9392,11 +9504,13 @@ matrix<bool, N, M> isfinite(matrix<T, N, M> x)
     }
 }
 
-/// Test if a floating-point value infinite.
+/// Test if a floating-point value is infinite.
+/// @param x The input value.
+/// @return `true` if `x` is infinite, `false` otherwise.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 bool isinf(T x)
 {
     __target_switch
@@ -9410,12 +9524,14 @@ bool isinf(T x)
         __intrinsic_asm "$P_isinf($0)";
     case spirv:
         return spirv_asm { result:$$bool = OpIsInf $x};
+    case wgsl:
+        __intrinsic_asm "($0 > 0x1.fffffep+127f) || ($0 < -0x1.fffffep+127f)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<bool, N> isinf(vector<T, N> x)
 {
     __target_switch
@@ -9433,7 +9549,7 @@ vector<bool, N> isinf(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 matrix<bool, N, M> isinf(matrix<T, N, M> x)
 {
     __target_switch
@@ -9445,10 +9561,12 @@ matrix<bool, N, M> isinf(matrix<T, N, M> x)
 }
 
 /// Test if a floating-point value is not-a-number.
+/// @param x The input value.
+/// @return `true` if `x` is not-a-number, `false` otherwise.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 bool isnan(T x)
 {
     __target_switch
@@ -9462,12 +9580,14 @@ bool isnan(T x)
         __intrinsic_asm "$P_isnan($0)";
     case spirv:
         return spirv_asm { result:$$bool = OpIsNan $x};
+    case wgsl:
+         __intrinsic_asm "$0 != $0";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<bool, N> isnan(vector<T, N> x)
 {
     __target_switch
@@ -9485,7 +9605,7 @@ vector<bool, N> isnan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 matrix<bool, N, M> isnan(matrix<T, N, M> x)
 {
     __target_switch
@@ -9497,6 +9617,9 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 }
 
 /// Construct float from mantissa and exponent.
+/// @param x The significand.
+/// @param exp The exponent.
+/// @return The floating-point number constructed from `x` and `exp`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -9585,6 +9708,8 @@ vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 
 
 /// Compute the length of a vector.
+/// @param x The input vector.
+/// @return The length of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
@@ -9622,6 +9747,9 @@ T length(T x)
 }
 
 /// Computes linear interpolation.
+/// @param x The starting value.
+/// @param y The ending value.
+/// @param s The interpolation factor.
 /// @return Returns `x+(y-x)*s`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
@@ -9672,7 +9800,12 @@ matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
     }
 }
 
-// Legacy lighting function (obsolete)
+/// Legacy lighting function (obsolete).
+/// @param n_dot_l The dot product of the normal and light vectors.
+/// @param n_dot_h The dot product of the normal and half-angle vectors.
+/// @param m The material shininess factor.
+/// @return The lighting coefficients, (ambient, diffuse, specular, 1.0).
+/// @remarks In HLSL, this function is implemented as an intrinsic. It is emulated for other targets.
 /// @deprecated
 /// @category math
 [__readNone]
@@ -9691,6 +9824,8 @@ float4 lit(float n_dot_l, float n_dot_h, float m)
 }
 
 /// Compute base-e logarithm.
+/// @param x The input value.
+/// @return The natural logarithm of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -9744,6 +9879,8 @@ matrix<T, N, M> log(matrix<T, N, M> x)
 }
 
 /// Compute base-10 logarithm.
+/// @param x The input value.
+/// @return The base-10 logarithm of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -9807,6 +9944,8 @@ matrix<T,N,M> log10(matrix<T,N,M> x)
 }
 
 /// Compute base-2 logarithm.
+/// @param x The input value.
+/// @return The base-2 logarithm of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -9860,6 +9999,10 @@ matrix<T,N,M> log2(matrix<T,N,M> x)
 }
 
 /// Computes multiply-add.
+/// @param mvalue The multiplier.
+/// @param avalue The multiplicand.
+/// @param bvalue The addend.
+/// @return The result of `mvalue * avalue + bvalue`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -9957,7 +10100,10 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
-// maximum
+/// Maximum.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The maximum of `x` and `y`.
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
@@ -10092,6 +10238,11 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
     }
 }
 
+/// Maximum of 3 inputs.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @param z The third value to compare.
+/// @return The largest of the three values, element-wise if vector typed.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -10119,6 +10270,12 @@ vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
+/// Floating-point maximum considering NaN.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @return The larger of the two values, element-wise if vector typed, considering NaN.
+/// @remarks For metal, if either value is NaN, the other value is returned. If both values are NaN, NaN is returned.
+/// For other targets, if `x` is NaN, `y` is returned, otherwise the larger of `x` and `y` is returned.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -10147,6 +10304,11 @@ vector<T,N> fmax(vector<T,N> x, vector<T,N> y)
     }
 }
 
+/// Floating-point maximum of 3 inputs, considering NaN.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @param z The third value to compare.
+/// @return The largest of the three values, element-wise if vector typed, considering NaN.  If all three values are NaN, NaN is returned. If any value is NaN, the largest is returned.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -10195,7 +10357,12 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
-// minimum
+/// Minimum.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @return The smaller of the two values, element-wise if vector typed.
+/// @remarks For HLSL, GLSL, and metal targets, this is implemented with the min() intrinsic.
+/// For SPIR-V, it is implemented with the UMin or SMin instruction, depending on the signedness of the type.
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
@@ -10317,6 +10484,12 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
     }
 }
 
+/// Minimum of 3 inputs.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @param z The third value to compare.
+/// @return The smallest of the three values, element-wise if vector typed.
+/// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
@@ -10344,6 +10517,12 @@ vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
+/// Floating-point minimum considering NaN.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @return The smaller of the two values, element-wise if vector typed, considering NaN.
+/// @remarks For metal, if either value is NaN, the other value is returned. If both values are NaN, NaN is returned.
+/// For other targets, if `x` is NaN, `y` is returned, otherwise the smaller of `x` and `y` is returned.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -10372,6 +10551,11 @@ vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
     }
 }
 
+/// Floating-point minimum of 3 inputs, considering NaN.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @param z The third value to compare.
+/// @return The smallest of the three values, element-wise if vector typed, considering NaN.  If all three values are NaN, NaN is returned. If any value is NaN, the smallest non-NaN value is returned.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -10420,7 +10604,12 @@ vector<T,N> fmin3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
-// Median
+/// Median of 3 values.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @param z The third value to compare.
+/// @return The median of the three values, element-wise if vector typed.
+/// @remarks For metal, this is implemented with the median3 intrinsic which has special handling for NaN.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -10470,6 +10659,12 @@ vector<T,N> median3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
+/// Floating-point median considering NaN.
+/// @param x The first value to compare.
+/// @param y The second value to compare.
+/// @param z The third value to compare.
+/// @return The median of the three values, element-wise if vector typed, considering NaN. If no value is NaN, the median is returned. If any value is NaN, one of the non-NaN values is returned.
+/// @remarks For metal, this is implemented with the fmedian3 intrinsic.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -10514,6 +10709,9 @@ vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 }
 
 /// Split into integer and fractional parts (both with same sign).
+/// @param x The input value.
+/// @param[out] ip The integer part of `x`.
+/// @return The fractional part of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -10593,7 +10791,13 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
     }
 }
 
-// msad4 (whatever that is)
+/// Masked sum of absolute differences of byte alignments.
+/// This function computes the absolute differences of the byte alignments of the reference and source values, and adds them to the accumulated differences.
+/// @param reference The reference 4 bytes packed in a uint.
+/// @param source The source 2 uints packed in a uint2.
+/// @param accum The accumulated differences.
+/// @return The updated accumulated differences.
+/// @remarks In HLSL, this is implemented with the msad4 intrinsic.
 /// @category math
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
@@ -10621,6 +10825,10 @@ uint4 msad4(uint reference, uint2 source, uint4 accum)
 // General inner products
 
 // scalar-scalar
+/// Multiply.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The inner product of `x` and `y`.
 /// @category math
 __generic<T : __BuiltinArithmeticType>
 __intrinsic_op($(kIROp_Mul))
@@ -10971,6 +11179,9 @@ vector<T,N> nextafter(vector<T,N> x, vector<T,N> y)
     }
 }
 
+/// Generate a random number (unsupported).
+/// @param x The seed value.
+/// @remarks This function is not supported in that it always returns 0.
 /// @deprecated
 /// @category math
 [__readNone]
@@ -11031,7 +11242,9 @@ T NonUniformResourceIndex(T index);
 [deprecated("NonUniformResourceIndex on a type other than uint/int is deprecated and has no effect")]
 T NonUniformResourceIndex<T>(T value) { return value; }
 
-// Normalize a vector
+/// Normalize a vector.
+/// @param x The vector to normalize.
+/// @return The normalized vector, `x`/`length(x)`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
@@ -11071,7 +11284,10 @@ T normalize(T x)
     }
 }
 
-// Raise to a power
+/// Raise to a power.
+/// @param x The base value.
+/// @param y The exponent value.
+/// @return The value of `x` raised to the power of `y`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11124,6 +11340,10 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
     }
 }
 
+/// Raise positive base value to a power.
+/// @param x The base value, must be >= 0.
+/// @param y The exponent value.
+/// @return The value of `x` raised to the power of `y`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11264,6 +11484,8 @@ void ProcessTriTessFactorsMin(
     out float UnroundedInsideTessFactors);
 
 /// Convert degrees to radians.
+/// @param x The angle in degrees.
+/// @return The angle in radians.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11315,6 +11537,8 @@ matrix<T, N, M> radians(matrix<T, N, M> x)
 }
 
 /// Compute approximate reciprocal of `x`.
+/// @param x The value to compute the reciprocal of.
+/// @return The approximate reciprocal of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11360,6 +11584,9 @@ matrix<T, N, M> rcp(matrix<T, N, M> x)
 }
 
 /// Reflect incident vector across plane with given normal.
+/// @param i The incident vector.
+/// @param n The normal vector.
+/// @return The reflected vector.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11400,6 +11627,9 @@ vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 }
 
 /// Refract incident vector given surface normal and index of refraction.
+/// @param i The incident vector.
+/// @param n The normal vector.
+/// @param eta The relative refractive index.
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
@@ -11491,6 +11721,8 @@ vector<uint, N> reversebits(vector<uint, N> value)
 }
 
 /// Round even.
+/// @param x The value to round.
+/// @return The value rounded to the nearest integer, with ties rounded to the nearest even integer.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11542,6 +11774,9 @@ vector<T,N> rint(vector<T,N> x)
 }
 
 /// Round-to-nearest.
+/// @param x The value to round.
+/// @return The value rounded to the nearest integer.
+/// @remarks Rounding behavior of .5 is determined by target intrinsic.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11595,6 +11830,8 @@ matrix<T,N,M> round(matrix<T,N,M> x)
 }
 
 /// Reciprocal of square root.
+/// @param x The value to compute the reciprocal square root of.
+/// @return The reciprocal square root of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11648,6 +11885,8 @@ matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 }
 
 /// Clamp value to [0,1] range.
+/// @param x The value to clamp.
+/// @return The clamped value.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11703,6 +11942,8 @@ __intrinsic_op($(kIROp_IntCast))
 vector<T,N> __int_cast(vector<U,N> val);
 
 /// Extract sign of value.
+/// @param x The value to extract the sign of.
+/// @return -1 if `x` is negative, 0 if `x` is zero, and 1 if `x` is positive.
 /// @category math Math functions
 __generic<T : __BuiltinSignedArithmeticType>
 [__readNone]
@@ -11768,7 +12009,9 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
     }
 }
 
-// Sine
+/// Sine.
+/// @param x The angle in radians.
+/// @return The sine of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11821,7 +12064,6 @@ matrix<T, N, M> sin(matrix<T, N, M> x)
     }
 }
 
-// Sine and cosine
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(metal)]
@@ -11844,6 +12086,12 @@ vector<T,N> __sincos_metal(vector<T,N> x, out vector<T,N> c)
     }
 }
 
+/// Sine and cosine.
+/// Calculate both the sine and cosine of `x`.
+/// @param x The angle in radians.
+/// @param[out] s The sine of `x`.
+/// @param[out] c The cosine of `x`.
+/// @return void
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11900,6 +12148,8 @@ void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 }
 
 /// Hyperbolic sine.
+/// @param x The value to compute the hyperbolic sine of.
+/// @return The hyperbolic sine of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11952,7 +12202,9 @@ matrix<T, N, M> sinh(matrix<T, N, M> x)
     }
 }
 
-/// Compute the sine of an angle in degrees.
+/// Compute the sine of `x * pi`.
+/// @param x The value to compute the sine of.
+/// @return The sine of `x * pi`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -11982,6 +12234,10 @@ vector<T,N> sinpi(vector<T,N> x)
 
 
 /// Smooth step (Hermite interpolation).
+/// @param min The lower edge of the interpolation range.
+/// @param max The upper edge of the interpolation range.
+/// @param x The value to interpolate.
+/// @return 0 if `x` is less than `min`, 1 if `x` is greater than `max`, and a smooth interpolation between 0 and 1 otherwise.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -12036,6 +12292,8 @@ matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N
 }
 
 /// Compute the square root of `x`.
+/// @param x The value to compute the square root of.
+/// @return The square root of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -12089,6 +12347,9 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
 }
 
 /// Step function.
+/// @param y The threshold value.
+/// @param x The value to compare against the threshold.
+/// @return 0 if `x` is less than `y`, and 1 otherwise.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -12142,6 +12403,8 @@ matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 }
 
 /// Compute the tangent of `x`.
+/// @param x The angle in radians.
+/// @return The tangent of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -12195,6 +12458,8 @@ matrix<T, N, M> tan(matrix<T, N, M> x)
 }
 
 /// Compute the hyperbolic tangent of `x`.
+/// @param x The value to compute the hyperbolic tangent of, in radians.
+/// @return The hyperbolic tangent of `x`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -12247,7 +12512,9 @@ matrix<T,N,M> tanh(matrix<T,N,M> x)
     }
 }
 
-/// Compute the tangent of `x` in degrees.
+/// Compute the tangent of `x * pi`.
+/// @param x The value to compute the tangent of.
+/// @return The tangent of `x * pi`.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -12277,6 +12544,8 @@ vector<T,N> tanpi(vector<T,N> x)
 
 
 /// Matrix transpose.
+/// @param x The matrix to transpose.
+/// @return The transposed matrix.
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
@@ -20393,4 +20662,23 @@ extension<T, L : IBufferDataLayout> RWStructuredBuffer<T, L> : IRWArray<T>
 extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IRWArray<T>
 {
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+}
+
+//@public:
+
+/// Mark a variable as being workgroup uniform.
+/// @param v The variable to mark as workgroup uniform.
+/// @return The value of `v`.
+/// @remarks This intrinsic maps to `workgroupUniformLoad` when targeting WGSL and is a no-op on other targets.
+/// WGSL is strict on uniformity, and this intrinsic is needed to mark a variable as workgroup uniform in order
+// to silence uniformity errors in certain cases.
+T workgroupUniformLoad<T>(__ref T v)
+{
+    __target_switch
+    {
+    case wgsl:
+        __intrinsic_asm "workgroupUniformLoad(&($0))";
+    default:
+        return v;
+    }
 }

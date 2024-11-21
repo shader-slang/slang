@@ -316,7 +316,7 @@ Metal supports rasterization, compute, and ray tracing pipelines.
 
 The Metal rasterization pipeline includes the following programmable stages:
 
-- The vertex stage transforms vertex data loaded from memory
+- The vertex stage outputs vertex data
 
 - The optional mesh stage allows groups of threads to cooperatively generate geometry
 
