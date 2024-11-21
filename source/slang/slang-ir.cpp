@@ -3046,10 +3046,10 @@ IRWitnessTableIDType* IRBuilder::getWitnessTableIDType(IRType* baseType)
         createIntrinsicInst(nullptr, kIROp_WitnessTableIDType, 1, (IRInst* const*)&baseType);
 }
 
-IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType)
+IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType, IRType* layoutType)
 {
-    IRInst* operands[] = {elementType};
-    return (IRConstantBufferType*)getType(kIROp_ConstantBufferType, 1, operands);
+    IRInst* operands[] = {elementType, layoutType};
+    return (IRConstantBufferType*)getType(kIROp_ConstantBufferType, 2, operands);
 }
 
 IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)

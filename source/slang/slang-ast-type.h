@@ -113,6 +113,36 @@ class BuiltinType : public DeclRefType
     SLANG_ABSTRACT_AST_CLASS(BuiltinType)
 };
 
+class DataLayoutType : public BuiltinType
+{
+    SLANG_ABSTRACT_AST_CLASS(DataLayoutType)
+};
+
+class IBufferDataLayoutType : public BuiltinType
+{
+    SLANG_AST_CLASS(IBufferDataLayoutType)
+};
+
+class DefaultDataLayoutType : public DataLayoutType
+{
+    SLANG_AST_CLASS(DefaultDataLayoutType)
+};
+
+class Std430DataLayoutType : public DataLayoutType
+{
+    SLANG_AST_CLASS(Std430DataLayoutType)
+};
+
+class Std140DataLayoutType : public DataLayoutType
+{
+    SLANG_AST_CLASS(Std140DataLayoutType)
+};
+
+class ScalarDataLayoutType : public DataLayoutType
+{
+    SLANG_AST_CLASS(ScalarDataLayoutType)
+};
+
 class FeedbackType : public BuiltinType
 {
     SLANG_AST_CLASS(FeedbackType)
@@ -374,6 +404,7 @@ class ParameterGroupType : public PointerLikeType
 class UniformParameterGroupType : public ParameterGroupType
 {
     SLANG_AST_CLASS(UniformParameterGroupType)
+    Type* getLayoutType();
 };
 
 class VaryingParameterGroupType : public ParameterGroupType

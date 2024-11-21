@@ -1149,6 +1149,8 @@ public:
     TypeExp TranslateTypeNodeForced(TypeExp const& typeExp);
     TypeExp TranslateTypeNode(TypeExp const& typeExp);
     Type* getRemovedModifierType(ModifiedType* type, ModifierVal* modifier);
+    Type* getConstantBufferType(Type* elementType, Type* layoutType);
+
     DeclRefType* getExprDeclRefType(Expr* expr);
 
     /// Is `decl` usable as a static member?

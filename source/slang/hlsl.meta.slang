@@ -10,12 +10,14 @@ void __requireGLSLExtension(String extensionName);
 /// Represents an interface for buffer data layout.
 /// This interface is used as a base for defining specific data layouts for buffers.
 [sealed]
+__magic_type(IBufferDataLayoutType)
 interface IBufferDataLayout
 {
 }
 
 /// @category misc_types
 __intrinsic_type($(kIROp_DefaultBufferLayoutType))
+__magic_type(DefaultDataLayoutType)
 struct DefaultDataLayout : IBufferDataLayout
 {};
 
@@ -23,6 +25,7 @@ struct DefaultDataLayout : IBufferDataLayout
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
+__magic_type(Std140DataLayoutType)
 struct Std140DataLayout : IBufferDataLayout
 {};
 
@@ -30,11 +33,13 @@ struct Std140DataLayout : IBufferDataLayout
 __intrinsic_type($(kIROp_Std430BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
+__magic_type(Std430DataLayoutType)
 struct Std430DataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
 __intrinsic_type($(kIROp_ScalarBufferLayoutType))
+__magic_type(ScalarDataLayoutType)
 struct ScalarDataLayout : IBufferDataLayout
 {};
 
@@ -20588,13 +20593,15 @@ const char* kDynamicResourceCastableTypes[] = {
 
     "SamplerState", "SamplerComparisonState",
 
-    "ConstantBuffer<T>", "TextureBuffer<T>",
+    "ConstantBuffer<T, L>", "TextureBuffer<T>",
 };
 
 for (auto typeName : kDynamicResourceCastableTypes) {
     auto kind = strstr(typeName, "Sampler") ? "Sampler" : "General";
 
     if (strstr(typeName, "StructuredBuffer<T, L>"))
+        sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
+    else if (strstr(typeName, "ConstantBuffer<T, L>"))
         sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
     else if (strstr(typeName, "Buffer<T>"))
         sb << "__generic<T>\n";

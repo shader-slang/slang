@@ -138,7 +138,7 @@ standard output = {
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
                 }
             }
         },

@@ -527,12 +527,25 @@ static IRType* createBuiltinGenericType(
     return context->getBuilder()->getType(op, 1, operands);
 }
 
+static IRType* createBuiltinGenericType(
+    TypeLegalizationContext* context,
+    IROp op,
+    IRType* elementType,
+    IRInst* layoutOperand)
+{
+    if (!layoutOperand)
+        return createBuiltinGenericType(context, op, elementType);
+    IRInst* operands[] = {elementType, layoutOperand};
+    return context->getBuilder()->getType(op, 2, operands);
+}
+
 // Create a uniform buffer type with a given legalized
 // element type.
 static LegalType createLegalUniformBufferType(
     TypeLegalizationContext* context,
     IROp op,
-    LegalType legalElementType)
+    LegalType legalElementType,
+    IRInst* layoutOperand)
 {
     // We will handle some of the easy/non-interesting
     // cases here in the main routine, but for all
@@ -543,7 +556,7 @@ static LegalType createLegalUniformBufferType(
     switch (legalElementType.flavor)
     {
     default:
-        return context->createLegalUniformBufferType(op, legalElementType);
+        return context->createLegalUniformBufferType(op, legalElementType, layoutOperand);
 
     case LegalType::Flavor::none:
         return LegalType();
@@ -558,7 +571,7 @@ static LegalType createLegalUniformBufferType(
             // an unlikely case in practice.
             //
             return LegalType::simple(
-                createBuiltinGenericType(context, op, legalElementType.getSimple()));
+                createBuiltinGenericType(context, op, legalElementType.getSimple(), layoutOperand));
         }
         break;
 
@@ -581,7 +594,8 @@ static LegalType createLegalUniformBufferType(
             return LegalType::implicitDeref(createLegalUniformBufferType(
                 context,
                 op,
-                legalElementType.getImplicitDeref()->valueType));
+                legalElementType.getImplicitDeref()->valueType,
+                layoutOperand));
         }
         break;
     }
@@ -593,7 +607,8 @@ static LegalType createLegalUniformBufferType(
 LegalType createLegalUniformBufferTypeForResources(
     TypeLegalizationContext* context,
     IROp op,
-    LegalType legalElementType)
+    LegalType legalElementType,
+    IRInst* layoutOperand)
 {
     switch (legalElementType.flavor)
     {
@@ -627,7 +642,8 @@ LegalType createLegalUniformBufferTypeForResources(
             // buffer with the appropriate `op`, so that case
             // is easy:
             //
-            auto ordinaryType = createLegalUniformBufferType(context, op, pairType->ordinaryType);
+            auto ordinaryType =
+                createLegalUniformBufferType(context, op, pairType->ordinaryType, layoutOperand);
 
             // For the special side, we really just want to turn
             // a special field of type `R` into a value of type
@@ -824,7 +840,8 @@ LegalElementWrapping declareStructFields(
 LegalType createLegalUniformBufferTypeForExistentials(
     TypeLegalizationContext* context,
     IROp op,
-    LegalType legalElementType)
+    LegalType legalElementType,
+    IRInst* layoutOperand)
 {
     auto builder = context->getBuilder();
 
@@ -840,7 +857,7 @@ LegalType createLegalUniformBufferTypeForExistentials(
     // (not a `LegalType`) we can go ahead and create an
     // IR uniform buffer type that wraps it.
     //
-    auto bufferType = createBuiltinGenericType(context, op, structType);
+    auto bufferType = createBuiltinGenericType(context, op, structType, layoutOperand);
 
     // The `elementWrapping` computed when we declared all
     // the `struct` fields tells us how to get from the
@@ -859,7 +876,11 @@ static LegalType createLegalUniformBufferType(
     IRUniformParameterGroupType* uniformBufferType,
     LegalType legalElementType)
 {
-    return createLegalUniformBufferType(context, uniformBufferType->getOp(), legalElementType);
+    return createLegalUniformBufferType(
+        context,
+        uniformBufferType->getOp(),
+        legalElementType,
+        uniformBufferType->getDataLayout());
 }
 
 // Create a pointer type with a given legalized value type.
@@ -1141,7 +1162,8 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
                 //
                 return context->createLegalUniformBufferType(
                     uniformBufferType->getOp(),
-                    legalElementType);
+                    legalElementType,
+                    uniformBufferType->getDataLayout());
             }
         }
 

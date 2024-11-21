@@ -1376,7 +1376,25 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
         }
     case kIROp_ConstantBufferType:
     case kIROp_ParameterBlockType:
-        return IRTypeLayoutRules::getStd140();
+        {
+            auto parameterGroupType = as<IRUniformParameterGroupType>(bufferType);
+
+            auto layoutTypeOp = parameterGroupType->getDataLayout()
+                                    ? parameterGroupType->getDataLayout()->getOp()
+                                    : kIROp_DefaultBufferLayoutType;
+            switch (layoutTypeOp)
+            {
+            case kIROp_DefaultBufferLayoutType:
+                return IRTypeLayoutRules::getStd140();
+            case kIROp_Std140BufferLayoutType:
+                return IRTypeLayoutRules::getStd140();
+            case kIROp_Std430BufferLayoutType:
+                return IRTypeLayoutRules::getStd430();
+            case kIROp_ScalarBufferLayoutType:
+                return IRTypeLayoutRules::getNatural();
+            }
+            return IRTypeLayoutRules::getStd140();
+        }
     case kIROp_PtrType:
         return IRTypeLayoutRules::getNatural();
     }
