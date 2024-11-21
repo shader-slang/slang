@@ -3,7 +3,7 @@
 struct Transform
 {
     float4 Tint;
-    float2x2 ScaleRot; // << why u no std430???
+    float2x2 ScaleRot;
     float2 Translation;
 };
 

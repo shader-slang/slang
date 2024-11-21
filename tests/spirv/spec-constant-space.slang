@@ -1,4 +1,4 @@
-// Test that use of specialiation constants does not cause space 0 to be reserved.
+// Test that use of specialization constants does not cause space 0 to be reserved.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 

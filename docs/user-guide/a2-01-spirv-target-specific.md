@@ -162,8 +162,8 @@ Push Constants
 ---------------------
 
 By default, a `uniform` parameter defined in the parameter list of an entrypoint function is translated to a push constant in SPIRV, if the type of the parameter is ordinary data type (no resources/textures).
-All `uniform` parameter defined in global scope are grouped together and placed in a default constant buffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
-on the uniform parameter. All push constants follow the std430 layout by-default.
+All `uniform` parameters defined in global scope are grouped together and placed in a default constant buffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
+on the uniform parameter. All push constants follow the std430 layout by default.
 
 Specialization Constants
 ------------------------
