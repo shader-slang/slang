@@ -3799,6 +3799,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             case LayoutResourceKind::RegisterSpace:
             case LayoutResourceKind::SubElementRegisterSpace:
             case LayoutResourceKind::PushConstantBuffer:
+            case LayoutResourceKind::SpecializationConstant:
                 continue;
             case LayoutResourceKind::Uniform:
                 {
