@@ -32,7 +32,7 @@ License: MIT
 
 Files: external/dxc/dxcapi.h
 Copyright: Microsoft Corporation. All rights reserved.
-License: MIT
+License: UOI-NCSA
 
 Files: source/core/slang-crypto.cpp
 Copyright: 2001 Alexander Peslyak
