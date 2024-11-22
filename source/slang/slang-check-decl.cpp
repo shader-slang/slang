@@ -10902,8 +10902,9 @@ void checkDerivativeAttributeImpl(
     // If this is a generic, we want to wrap the call to the derivative method
     // with the generic parameters of the source.
     //
-    if (auto genericDecl = as<GenericDecl>(funcDecl->parentDecl))
+    if (as<GenericDecl>(funcDecl->parentDecl) && !as<GenericAppExpr>(attr->funcExpr))
     {
+        auto genericDecl = as<GenericDecl>(funcDecl->parentDecl);
         auto substArgs = getDefaultSubstitutionArgs(ctx.getASTBuilder(), visitor, genericDecl);
         auto appExpr = ctx.getASTBuilder()->create<GenericAppExpr>();
 
@@ -11461,6 +11462,26 @@ void checkDerivativeOfAttributeImpl(
     calleeDeclRef = calleeDeclRefExpr->declRef;
 
     auto calleeFunc = as<FunctionDeclBase>(calleeDeclRef.getDecl());
+
+    if (!calleeFunc)
+    {
+        // If we couldn't find a direct function, it might be a generic.
+        if (auto genericDecl = as<GenericDecl>(calleeDeclRef.getDecl()))
+        {
+            calleeFunc = as<FunctionDeclBase>(genericDecl->inner);
+
+            if (as<ErrorType>(resolved->type.type))
+            {
+                // If we can't resolve a type, something went wrong. If we're working with a generic
+                // decl, the most likely cause is a failure of generic argument inference.
+                //
+                visitor->getSink()->diagnose(
+                    derivativeOfAttr,
+                    Diagnostics::cannotResolveGenericArgumentForDerivativeFunction);
+            }
+        }
+    }
+
     if (!calleeFunc)
     {
         visitor->getSink()->diagnose(
