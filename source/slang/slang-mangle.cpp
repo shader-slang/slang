@@ -817,6 +817,7 @@ String getMangledTypeName(ASTBuilder* astBuilder, Type* type)
 {
     SLANG_AST_BUILDER_RAII(astBuilder);
     ManglingContext context(astBuilder);
+    emitRaw(&context, "_ST");
     emitType(&context, type);
     return context.sb.produceString();
 }
