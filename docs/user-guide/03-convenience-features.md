@@ -567,7 +567,7 @@ void test()
 }
 ```
 
-This feature is similar to extensions in Swift and partial classes in C#.
+This feature is similar to extensions in Swift and extension methods in C#.
 
 > #### Note:
 > You can only extend a type with additional methods. Extending with additional data fields is not allowed.
