@@ -23,7 +23,7 @@ jobs:
   build:
     runs-on: [Windows, self-hosted]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: "0"
@@ -39,7 +39,7 @@ jobs:
         run: |
           cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
           cmake --workflow --preset release
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: "shader-slang/MDL-SDK"
           path: "external/MDL-SDK"
