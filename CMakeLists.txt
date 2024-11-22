@@ -102,6 +102,7 @@ option(
 option(
     SLANG_EMBED_CORE_MODULE
     "Build slang with an embedded version of the core module"
+    ON
 )
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
