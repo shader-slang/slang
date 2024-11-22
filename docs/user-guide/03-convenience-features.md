@@ -431,7 +431,7 @@ struct MyType
 
 int useVal(Optional<MyType> p)
 {
-    if (p == none)        // Equivalent to `p.hasValue`
+    if (p == none)        // Equivalent to `!p.hasValue`
         return 0;
     return p.value.val;
 }
