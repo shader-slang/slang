@@ -64,7 +64,7 @@ jobs:
             -DSLANG_ENABLE_CUDA=1
           cmake --workflow --preset "${{matrix.config}}"
 
-      - uses: robinraju/release-downloader@v1.9
+      - uses: robinraju/release-downloader@v1.11
         id: download
         with:
           # The source repository path.
