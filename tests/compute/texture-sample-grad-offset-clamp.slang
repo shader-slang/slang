@@ -1,5 +1,6 @@
 //TEST(compute, vulkan):COMPARE_RENDER_COMPUTE:-vk -shaderobj -render-feature shader-resource-min-lod
 //TEST(compute):COMPARE_RENDER_COMPUTE:-shaderobj -render-feature shader-resource-min-lod
+// WGSL: There is no SampleGrad taking a LOD-clamp parameter in
 
 //TEST_INPUT: Texture2D(size=4, content = one):name=t2D
 //TEST_INPUT: Sampler:name=samplerState
