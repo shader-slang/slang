@@ -1608,7 +1608,9 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
         {
         case slang::ContainerType::ConstantBuffer:
             {
-                ConstantBufferType* cbType = getASTBuilder()->getConstantBufferType(type);
+                SemanticsVisitor visitor(getSemanticsForReflection());
+                auto layoutType = getASTBuilder()->getDefaultLayoutType();
+                Type* cbType = visitor.getConstantBufferType(type, layoutType);
                 containerTypeReflection = cbType;
             }
             break;

@@ -110,6 +110,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkMeshOutputDecl(VarDeclBase* varDecl);
     void maybeApplyLayoutModifier(VarDeclBase* varDecl);
     void checkVarDeclCommon(VarDeclBase* varDecl);
+    void checkPushConstantBufferType(VarDeclBase* varDecl);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -1707,6 +1708,10 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
             addModifier(varDecl, formatAttrib);
         }
     }
+    else
+    {
+        checkPushConstantBufferType(varDecl);
+    }
 }
 
 bool isSpecializationConstant(VarDeclBase* varDecl)
@@ -1719,6 +1724,32 @@ bool isSpecializationConstant(VarDeclBase* varDecl)
             return true;
     }
     return false;
+}
+
+void SemanticsDeclHeaderVisitor::checkPushConstantBufferType(VarDeclBase* varDecl)
+{
+    if (varDecl->findModifier<PushConstantAttribute>())
+    {
+        // If we see a ConstantBuffer<T, DefaultLayout> parameter marked as "push_constant", we need
+        // to set its type to ConstantBuffer<T, Std430>.
+        if (auto cbufferType = as<ConstantBufferType>(varDecl->type))
+        {
+            if (cbufferType->getLayoutType() == m_astBuilder->getDefaultLayoutType())
+            {
+                varDecl->type.type = getConstantBufferType(
+                    cbufferType->getElementType(),
+                    m_astBuilder->getStd430LayoutType());
+            }
+        }
+        else if (isGlobalShaderParameter(varDecl))
+        {
+            // If this is a global variable with [vk::push_constant] attribute,
+            // we need to make sure to wrap it in a `ConstantBuffer`.
+            //
+            varDecl->type.type =
+                getConstantBufferType(varDecl->type, m_astBuilder->getStd430LayoutType());
+        }
+    }
 }
 
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
@@ -1935,20 +1966,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
     }
 
-
     if (as<NamespaceDeclBase>(varDecl->parentDecl))
     {
-        // If this is a global variable with [vk::push_constant] attribute,
-        // we need to make sure to wrap it in a `ConstantBuffer`.
-
-        if (!as<ConstantBufferType>(varDecl->type))
-        {
-            if (varDecl->findModifier<PushConstantAttribute>())
-            {
-                varDecl->type.type = m_astBuilder->getConstantBufferType(varDecl->type);
-            }
-        }
-
         if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
         {
             // If we are in GLSL compatiblity mode, we want to treat all global variables

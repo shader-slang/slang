@@ -3719,7 +3719,7 @@ public:
         return getFuncType(paramTypes.getCount(), paramTypes.getBuffer(), resultType);
     }
 
-    IRConstantBufferType* getConstantBufferType(IRType* elementType);
+    IRConstantBufferType* getConstantBufferType(IRType* elementType, IRType* layout);
 
     IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* valueType);
 

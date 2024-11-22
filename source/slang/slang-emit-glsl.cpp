@@ -478,8 +478,31 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
     {
         // uniform is implicitly read only
         m_writer->emit("layout(");
-        m_writer->emit(
-            getTargetProgram()->getOptionSet().shouldUseScalarLayout() ? "scalar" : "std140");
+        if (getTargetProgram()->getOptionSet().shouldUseScalarLayout())
+            m_writer->emit("scalar");
+        else if (auto cbufferType = as<IRConstantBufferType>(type))
+        {
+            switch (cbufferType->getDataLayout()->getOp())
+            {
+            case kIROp_Std140BufferLayoutType:
+                m_writer->emit("std140");
+                break;
+            case kIROp_Std430BufferLayoutType:
+                m_writer->emit("std430");
+                break;
+            case kIROp_ScalarBufferLayoutType:
+                _requireGLSLExtension(toSlice("GL_EXT_scalar_block_layout"));
+                m_writer->emit("scalar");
+                break;
+            default:
+                m_writer->emit("std140");
+                break;
+            }
+        }
+        else
+        {
+            m_writer->emit("std140");
+        }
         m_writer->emit(") uniform ");
     }
 

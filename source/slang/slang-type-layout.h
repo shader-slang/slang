@@ -1105,7 +1105,9 @@ struct LayoutRulesImpl
 struct LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() = 0;
-    virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) = 0;
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) = 0;
     virtual LayoutRulesImpl* getPushConstantBufferRules() = 0;
     virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) = 0;
     virtual LayoutRulesImpl* getVaryingInputRules() = 0;

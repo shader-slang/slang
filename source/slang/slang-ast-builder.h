@@ -39,6 +39,8 @@ public:
     /// Get the `IDifferentiable` type
     Type* getDiffInterfaceType();
 
+    Type* getIBufferDataLayoutType();
+
     Type* getErrorType();
     Type* getBottomType();
     Type* getInitializerListType();
@@ -89,6 +91,7 @@ protected:
     Type* m_bottomType = nullptr;
     Type* m_initializerListType = nullptr;
     Type* m_overloadedType = nullptr;
+    Type* m_IBufferDataLayoutType = nullptr;
 
     // The following types are created lazily, such that part of their definition
     // can be in the core module.
@@ -482,6 +485,11 @@ public:
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
 
+    Type* getDefaultLayoutType();
+    Type* getStd140LayoutType();
+    Type* getStd430LayoutType();
+    Type* getScalarLayoutType();
+
     Type* getInitializerListType() { return m_sharedASTBuilder->getInitializerListType(); }
     Type* getOverloadedType() { return m_sharedASTBuilder->getOverloadedType(); }
     Type* getErrorType() { return m_sharedASTBuilder->getErrorType(); }
@@ -525,7 +533,10 @@ public:
         IntVal* colCount,
         IntVal* layout);
 
-    ConstantBufferType* getConstantBufferType(Type* elementType);
+    ConstantBufferType* getConstantBufferType(
+        Type* elementType,
+        Type* layoutType,
+        Val* layoutIsILayout);
 
     ParameterBlockType* getParameterBlockType(Type* elementType);
 
