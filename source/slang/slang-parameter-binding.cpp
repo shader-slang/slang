@@ -707,7 +707,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
             // If the target doesn't support specialization constants, then we will
             // layout them as ordinary uniform data.
             specializationConstantRule =
-                rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet());
+                rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet(), type);
         }
         return createTypeLayoutWith(layoutContext, specializationConstantRule, type);
     }
@@ -718,7 +718,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     // shader parameter.
     return createTypeLayoutWith(
         layoutContext,
-        rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet()),
+        rules->getConstantBufferRules(context->getTargetRequest()->getOptionSet(), type),
         type);
 }
 
@@ -2421,11 +2421,21 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         // a uniform shader parameter passed via the implicitly-defined
         // constant buffer (e.g., the `$Params` constant buffer seen in fxc/dxc output).
         //
-        return createTypeLayoutWith(
-            context->layoutContext,
-            context->getRulesFamily()->getConstantBufferRules(
-                context->getTargetRequest()->getOptionSet()),
-            paramType);
+        LayoutRulesImpl* layoutRules = nullptr;
+        if (isKhronosTarget(context->getTargetRequest()))
+        {
+            // For Vulkan, entry point uniform parameters are laid out using push constant buffer
+            // rules (defaults to std430).
+            layoutRules = context->getRulesFamily()->getShaderStorageBufferRules(
+                context->getTargetProgram()->getOptionSet());
+        }
+        else
+        {
+            layoutRules = context->getRulesFamily()->getConstantBufferRules(
+                context->getTargetRequest()->getOptionSet(),
+                paramType);
+        }
+        return createTypeLayoutWith(context->layoutContext, layoutRules, paramType);
     }
     else
     {
@@ -2783,12 +2793,13 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindi
     UInt space = context->shared->defaultSpace;
     auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
-    auto layoutInfo = context->getRulesFamily()
-                          ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
-                          ->GetObjectLayout(
-                              ShaderParameterKind::ConstantBuffer,
-                              context->layoutContext.objectLayoutOptions)
-                          .getSimple();
+    auto layoutInfo =
+        context->getRulesFamily()
+            ->getConstantBufferRules(context->getTargetRequest()->getOptionSet(), nullptr)
+            ->GetObjectLayout(
+                ShaderParameterKind::ConstantBuffer,
+                context->layoutContext.objectLayoutOptions)
+            .getSimple();
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
@@ -2809,7 +2820,9 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
     auto layoutInfo = context->getRulesFamily()
-                          ->getConstantBufferRules(context->getTargetRequest()->getOptionSet())
+                          ->getConstantBufferRules(
+                              context->getTargetRequest()->getOptionSet(),
+                              varLayout->typeLayout ? varLayout->typeLayout->getType() : nullptr)
                           ->GetObjectLayout(
                               ShaderParameterKind::ConstantBuffer,
                               context->layoutContext.objectLayoutOptions)
@@ -3786,6 +3799,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             case LayoutResourceKind::RegisterSpace:
             case LayoutResourceKind::SubElementRegisterSpace:
             case LayoutResourceKind::PushConstantBuffer:
+            case LayoutResourceKind::SpecializationConstant:
                 continue;
             case LayoutResourceKind::Uniform:
                 {

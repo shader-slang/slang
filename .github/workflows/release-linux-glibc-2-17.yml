@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: "0"
@@ -26,7 +26,7 @@ jobs:
 
             cd /home/app
             git config --global --add safe.directory /home/app
-            cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_EMBED_STDLIB=1
+            cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
             cmake --build --preset releaseWithDebugInfo
             cpack --preset releaseWithDebugInfo -G ZIP
             cpack --preset releaseWithDebugInfo -G TGZ

@@ -155,7 +155,9 @@ struct CollectGlobalUniformParametersContext
         IRType* wrapperParamType = wrapperStructType;
         if (globalParameterGroupTypeLayout)
         {
-            auto wrapperParamGroupType = builder->getConstantBufferType(wrapperStructType);
+            auto wrapperParamGroupType = builder->getConstantBufferType(
+                wrapperStructType,
+                builder->getType(kIROp_DefaultBufferLayoutType));
             wrapperParamType = wrapperParamGroupType;
         }
 

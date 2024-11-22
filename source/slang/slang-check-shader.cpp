@@ -79,15 +79,6 @@ static void _collectExistentialSpecializationParamsRec(
             loc);
         return;
     }
-    else if (auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type))
-    {
-        _collectExistentialSpecializationParamsRec(
-            astBuilder,
-            ioSpecializationParams,
-            structuredBufferType->getElementType(),
-            loc);
-        return;
-    }
 
     if (auto declRefType = as<DeclRefType>(type))
     {
@@ -279,6 +270,8 @@ bool isUniformParameterType(Type* type)
     if (as<GLSLShaderStorageBufferType>(type))
         return true;
     if (as<SamplerStateType>(type))
+        return true;
+    if (as<PtrType>(type))
         return true;
     if (auto arrayType = as<ArrayExpressionType>(type))
         return isUniformParameterType(arrayType->getElementType());

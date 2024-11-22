@@ -146,6 +146,16 @@ Type* SharedASTBuilder::getDiffInterfaceType()
     return m_diffInterfaceType;
 }
 
+Type* SharedASTBuilder::getIBufferDataLayoutType()
+{
+    if (!m_IBufferDataLayoutType)
+    {
+        auto decl = findMagicDecl("IBufferDataLayoutType");
+        m_IBufferDataLayoutType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
+    }
+    return m_IBufferDataLayoutType;
+}
+
 Type* SharedASTBuilder::getErrorType()
 {
     if (!m_errorType)
@@ -296,6 +306,23 @@ PtrType* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace)
     return dynamicCast<PtrType>(getPtrType(valueType, addrSpace, "PtrType"));
 }
 
+Type* ASTBuilder::getDefaultLayoutType()
+{
+    return getSpecializedBuiltinType({}, "DefaultDataLayoutType");
+}
+Type* ASTBuilder::getStd140LayoutType()
+{
+    return getSpecializedBuiltinType({}, "Std140DataLayoutType");
+}
+Type* ASTBuilder::getStd430LayoutType()
+{
+    return getSpecializedBuiltinType({}, "Std430DataLayoutType");
+}
+Type* ASTBuilder::getScalarLayoutType()
+{
+    return getSpecializedBuiltinType({}, "ScalarDataLayoutType");
+}
+
 // Construct the type `Out<valueType>`
 OutType* ASTBuilder::getOutType(Type* valueType)
 {
@@ -358,9 +385,15 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         getSpecializedBuiltinType(makeArrayView(args), "ArrayExpressionType"));
 }
 
-ConstantBufferType* ASTBuilder::getConstantBufferType(Type* elementType)
+ConstantBufferType* ASTBuilder::getConstantBufferType(
+    Type* elementType,
+    Type* layoutType,
+    Val* layoutWitness)
 {
-    return as<ConstantBufferType>(getSpecializedBuiltinType(elementType, "ConstantBufferType"));
+    Val* args[] = {elementType, layoutType, layoutWitness};
+
+    return as<ConstantBufferType>(
+        getSpecializedBuiltinType(makeArrayView(args), "ConstantBufferType"));
 }
 
 ParameterBlockType* ASTBuilder::getParameterBlockType(Type* elementType)

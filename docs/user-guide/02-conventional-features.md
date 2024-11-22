@@ -382,7 +382,7 @@ The ordinary unary and binary operators can also be applied to vectors and matri
 
 > #### Note ####
 > In GLSL, most operators apply component-wise to vectors and matrices, but the multiplication operator `*` computes the traditional linear-algebraic product of two matrices, or a matrix and a vector.
-> Where a GLSL programmer would write `m * v` to multiply a `vec3x4` by a `vec3`, a Slang programmer should write `mul(v,m)` to multiply a `float3` by a `float3x4`.
+> Where a GLSL programmer would write `m * v` to multiply a `mat3x4` by a `vec3`, a Slang programmer should write `mul(v,m)` to multiply a `float3` by a `float3x4`.
 > In this example, the order of operands is reversed to account for the difference in row/column conventions.
 
 ### Swizzles
