@@ -145,11 +145,10 @@ struct LegalizeWGSLEntryPointContext
                     structType,
                     mapOldFieldToNewField,
                     semanticInfoToRemove);
+                // Validate/rearange all semantics which overlap in our flat struct.
+                fixFieldSemanticsOfFlatStruct(flattenedStruct);
                 if (flattenedStruct != structType)
                 {
-                    // Validate/rearange all semantics which overlap in our flat struct
-                    fixFieldSemanticsOfFlatStruct(flattenedStruct);
-
                     // Replace the 'old IRParam type' with a 'new IRParam type'
                     param->setFullType(flattenedStruct);
 
