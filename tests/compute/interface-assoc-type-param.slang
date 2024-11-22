@@ -16,7 +16,8 @@ interface IEval
     uint eval();
 }
 
-export struct Impl : IInterface
+//TEST_INPUT: type_conformance Impl:IInterface = 0
+struct Impl : IInterface
 {
     uint val;
     struct TEval : IEval
