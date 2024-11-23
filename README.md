@@ -85,7 +85,7 @@ The following guidelines should be observed by contributors:
 * Changes should ideally come in as small pull requests on top of `master`, coming from your own personal fork of the project
 * Large features that will involve multiple contributors or a long development time should be discussed in issues, and broken down into smaller pieces that can be implemented and checked in in stages
 
-[Contribution guide](CONTRIBUTION.md) describes the workflow for contributors at more detail.
+[Contribution guide](CONTRIBUTING.md) describes the workflow for contributors at more detail.
 
 Limitations and Support
 -----------------------
