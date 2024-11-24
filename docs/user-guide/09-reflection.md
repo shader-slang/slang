@@ -13,7 +13,7 @@ The Slang API allows layout to be queried on any program object represented by a
 slang::ProgramLayout* layout = program->getLayout();
 ```
 
-Please see the [Compiling Code with Slang](/user-guide/compiling) section on creating program objects.
+Please see the [Compiling Code with Slang](compiling) section on creating program objects.
 
 Note that just as with output code, the reflection object (and all other objects queried from it) is guaranteed to live as long as the request is alive, but no longer.
 Unlike the other data, there is no easy way to save the reflection data for later user (we do not currently implement serialization for reflection data).
