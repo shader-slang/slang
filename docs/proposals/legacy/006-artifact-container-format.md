@@ -491,7 +491,7 @@ The grouping - how does it actually work? It might require specifying what group
 
 An advantage to this approach is that policy of how naming works as a user space problem. It is also powerful in that it allows control on compilation that has some independence from the name.
 
-We could have some options that are named, but do not appear as part of the name/path within the container. The purpose of this is to allow customization of a compilation, without that customization necessarily appearing withing the application code. The container could store group of named options that is used, such that it is possible to recreate the compilation or perhaps to detect there is a difference. 
+We could have some options that are named, but do not appear as part of the name/path within the container. The purpose of this is to allow customization of a compilation, without that customization necessarily appearing within the application code. The container could store group of named options that is used, such that it is possible to recreate the compilation or perhaps to detect there is a difference.
 
 ### JSON options
 
@@ -776,7 +776,7 @@ Discussion: Container
 
 A typical container will contain kernels - in effect blobs. The blobs themselves, or the blob names are not going to be sufficient to express the amount of information that is necessary to meet the goals laid out at the start of this document. Some extra information may be user supplied. Some extra information might be user based to know how to classify different kernels. Therefore it is necessary to have some system to handle this metadata. 
 
-As previously discussed the underlying container format is a file system. Some limited information could be infered from the filename. For example a .spv extension file is probably SPIR-V blob. For more rich meta data describing a kernel something more is needed. Two possible approaches could be to have a 'manifest' that described the contents of the container. Another approach would to have a file associated with the kernel that describes it's contents.
+As previously discussed the underlying container format is a file system. Some limited information could be inferred from the filename. For example a .spv extension file is probably SPIR-V blob. For more rich meta data describing a kernel something more is needed. Two possible approaches could be to have a 'manifest' that described the contents of the container. Another approach would to have a file associated with the kernel that describes it's contents.
 
 Single Manifest Pros
 

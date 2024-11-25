@@ -45,7 +45,7 @@ interface IFoo_after_checking_and_lowering
 ### `[TreatAsDifferentiable]`
 In large codebases where some interfaces may have several possible implementations, it may not be reasonable to have to mark all possible implementations with `[Differentiable]`, especially if certain implementations use hacks or workarounds that need additional consideration before they can be marked `[Differentiable]`
 
-In such cases, we provide the `[TreatAsDifferentiable]` decoration (AST node: `TreatAsDifferentiableAttribute`, IR: `OpTreatAsDifferentiableDecoration`), which instructs the auto-diff passes to construct an 'empty' function that returns a 0 (or 0-equivalent) for the derivative values. This allows the signature of a `[TreatAsDifferentiable]` function to match a `[Differentiable]` requirment without actually having to produce a derivative.
+In such cases, we provide the `[TreatAsDifferentiable]` decoration (AST node: `TreatAsDifferentiableAttribute`, IR: `OpTreatAsDifferentiableDecoration`), which instructs the auto-diff passes to construct an 'empty' function that returns a 0 (or 0-equivalent) for the derivative values. This allows the signature of a `[TreatAsDifferentiable]` function to match a `[Differentiable]` requirement without actually having to produce a derivative.
 
 ## Custom derivative decorators
 In many cases, it is desirable to manually specify the derivative code for a method rather than let the auto-diff pass synthesize it from the method body. This is usually desirable if:
@@ -68,7 +68,7 @@ In some cases, we face the opposite problem that inspired custom derivatives. Th
 This frequently occurs with hardware intrinsic operations that are lowered into special op-codes that map to hardware units, such as texture sampling & interpolation operations. 
 However, these operations do have reference 'software' implementations which can be used to produce the derivative.
 
-To allow user code to use the fast hardward intrinsics for the primal pass, but use synthesized derivatives for the derivative pass, we provide decorators `[PrimalSubstitute(ref-fn)]` and `[PrimalSubstituteOf(orig-fn)]` (AST Node: `PrimalSubstituteAttribute`/`PrimalSubstituteOfAttribute`, IR: `OpPrimalSubstituteDecoration`), that can be used to provide a reference implementation for the auto-diff pass.
+To allow user code to use the fast hardware intrinsics for the primal pass, but use synthesized derivatives for the derivative pass, we provide decorators `[PrimalSubstitute(ref-fn)]` and `[PrimalSubstituteOf(orig-fn)]` (AST Node: `PrimalSubstituteAttribute`/`PrimalSubstituteOfAttribute`, IR: `OpPrimalSubstituteDecoration`), that can be used to provide a reference implementation for the auto-diff pass.
 
 Example:
 ```C

@@ -121,7 +121,7 @@ void f( int b[] )
 
 It is allowed to pass a sized array as argument to an unsized array parameter when calling a function.
 
-Array types has a `getCount()` memeber function that returns the length of the array.
+Array types has a `getCount()` member function that returns the length of the array.
 
 ```hlsl
 int f( int b[] )
@@ -974,7 +974,7 @@ int a[2] = {1, 2}
 #### Array Of Aggregate's
 
 ```csharp
-// Equivlent to `float3 a[2]; a[0] = {1,2,3}; b[1] = {4,5,6};`
+// Equivalent to `float3 a[2]; a[0] = {1,2,3}; b[1] = {4,5,6};`
 float3 a[2] = { {1,2,3}, {4,5,6} };
 ```
 #### Flattened Array Initializer
@@ -1048,7 +1048,7 @@ struct GenerateCtor1 : GenerateCtorInner1
 GenerateCtor1 val[2] = { { 3 }, { 2 } };
 ```
 
-In addition, Slang also provides compatbility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-List's) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Struct)
+In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-List's) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Struct)
 
 A struct is considered a C-style struct if:
 1. User never defines a custom constructor with **more than** 0 parameters
@@ -1107,7 +1107,7 @@ float3 val2 = {};
 
 #### Struct Type
 
-1. Atempt to call default constructor (`__init()`) of a `struct`
+1. Attempt to call default constructor (`__init()`) of a `struct`
 
 
 ```csharp

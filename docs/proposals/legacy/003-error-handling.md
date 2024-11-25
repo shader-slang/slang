@@ -43,10 +43,10 @@ Related Work
 In the absence of language support, developers typically signal and propagate errors using *error codes*. The COM `HRESULT` type is a notable example of a well-defined system for using error codes in C/C++ and other languages.
 Error codes have the benefit of being easy to implement, and relatively light-weight.
 The main drawback of error codes is that developers often forget to check and/or propagate them, and when they do remember to do so it adds a lot of boilerplate.
-Additonally, reserving the return value of every function for returning an error code makes code more complex because the *actual* return value must be passed via a function parameter.
+Additionally, reserving the return value of every function for returning an error code makes code more complex because the *actual* return value must be passed via a function parameter.
 
 C++ uses *exceptions* for errors in various categories, including unpredictable but recoverable failures.
-Propagation of errors up the call stack is entirely automatic, with unwinding of call frames and destruction of their local state occuring as part of the search for a handler.
+Propagation of errors up the call stack is entirely automatic, with unwinding of call frames and destruction of their local state occurring as part of the search for a handler.
 Neither functions that may throw nor call sites to such functions are syntactically marked.
 Exceptions in C++ have often been implemented in ways that add overhead and require complicated support in platform ABIs and intermediate languages to support.
 
@@ -66,7 +66,7 @@ Functions that return `X` and those that return `Result<X, ...>` are not directl
 Swift provides more syntactic support for errors than Rust, although the underlying mechanism is similar.
 A Swift function may have `throws` added between the parameter list and return type to indicate that a function may yield an error.
 All errors in Swift must implement the `Error` protocol, and all functions that can `throw` may produce any `Error` (although there are proposals to extend Swift with "typed `throws`").
-Any call site to a `throws` function must have a prefix `try` (e.g., `try f(a, b)`), which works simiarly to Rust's `?`; any error produced by the called function is propagated, and the ordinary result is returned.
+Any call site to a `throws` function must have a prefix `try` (e.g., `try f(a, b)`), which works similarly to Rust's `?`; any error produced by the called function is propagated, and the ordinary result is returned.
 Swift provides an explicit `do { ... } catch ...` construct that allows handlers to be established.
 It also provides for conversion between exceptions and an explicit `Result<T,E>` type, akin to Rust's.
 Higher-order functions may be declared as `rethrows` to indicate that whether or not they throw depends on whether or not any of their function-type parameters is actually a `throws` function at a call site.
@@ -203,7 +203,7 @@ let y : int = 1 + _tmp;
 
 ### Desugar `throw` Expressions
 
-For every `throw` site in a function body, there will either be no in-scope `catch` clause that matches the type thrown, or there will be eactly one most-deeply-nested `catch` that statically matches.
+For every `throw` site in a function body, there will either be no in-scope `catch` clause that matches the type thrown, or there will be exactly one most-deeply-nested `catch` that statically matches.
 Front-end semantic checking should be able to associate each `throw` with the appropriate `catch` if any.
 
 For `throw` sites with no matching `catch`, the operation simply translates to a `return` of the thrown error (because of the way we transformed the function signature).

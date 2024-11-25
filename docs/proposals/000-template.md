@@ -13,7 +13,7 @@ Status
 
 Status: Design Review/Planned/Implementation In-Progress/Implemented/Partially Implemented. Note here whether the proposal is unimplemented, in-progress, has landed, etc.
 
-Implemtation: [PR 000] [PR 001] ... (list links to PRs)
+Implementation: [PR 000] [PR 001] ... (list links to PRs)
 
 Author: authors of the design doc and the implementation.
 

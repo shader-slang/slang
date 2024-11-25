@@ -237,7 +237,7 @@ enum
 
 Note that the type name reflects the plural case, while the cases that represent individual bits are named with a singular prefix.
 
-In public APIs, all `enum`s should use the style of separating the type defintion from the `enum`, and all cases should use `SCREAMING_SNAKE_CASE`:
+In public APIs, all `enum`s should use the style of separating the type definition from the `enum`, and all cases should use `SCREAMING_SNAKE_CASE`:
 
 ```c++
 typedef unsigned int SlangAxes;

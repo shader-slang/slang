@@ -137,7 +137,7 @@ If you have a type layout with kind `Array` you can query information about the 
 ```c++
 size_t arrayElementCount = typeLayout->getElementCount();
 slang::TypeLayoutReflection* elementTypeLayout = typeLayout->getElementTypeLayout();
-sie_t arrayElementStride = typeLayout->getElementStride(category);
+size_t arrayElementStride = typeLayout->getElementStride(category);
 ```
 
 An array of unknown size will currently report zero elements.
@@ -196,7 +196,7 @@ In the case of a compute shader entry point, you can also query the user-specifi
 
 ```c++
 SlangUInt threadGroupSize[3];
-entryPoint->getComputeThreadGruopSize(3, &threadGroupSize[0]);
+entryPoint->getComputeThreadGroupSize(3, &threadGroupSize[0]);
 ```
 
 ## Function Reflection

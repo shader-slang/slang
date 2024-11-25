@@ -293,7 +293,7 @@ The global can now be set from host code via
     }
 ```
 
-In terms of reflection `__global` variables are not visibile. 
+In terms of reflection `__global` variables are not visible.
 
 ## NativeString
 
@@ -309,7 +309,7 @@ TODO(JS): What happens with String with shader compile style on CPU? Shouldn't i
 
 It is currently not possible to step into LLVM-JIT code when using [slang-llvm](#slang-llvm). Fortunately it is possible to step into code compiled via a [regular C/C++ compiler](#regular-cpp). 
 
-Below is a code snippet showing how to swich to a [regular C/C++ compiler](#regular-cpp) at runtime. 
+Below is a code snippet showing how to switch to a [regular C/C++ compiler](#regular-cpp) at runtime.
 
 ```C++
     SlangPassThrough findRegularCppCompiler(slang::IGlobalSession* slangSession)
@@ -401,7 +401,7 @@ struct ComputeVaryingInput
 
 `ComputeVaryingInput` allows specifying a range of groupIDs to execute - all the ids in a grid from startGroup to endGroup, but not including the endGroupIDs. Most compute APIs allow specifying an x,y,z extent on 'dispatch'. This would be equivalent as having startGroupID = { 0, 0, 0} and endGroupID = { x, y, z }. The exported function allows setting a range of groupIDs such that client code could dispatch different parts of the work to different cores. This group range mechanism was chosen as the 'default' mechanism as it is most likely to achieve the best performance.
 
-There are two other functions that consist of the entry point name postfixed with `_Thread` and `_Group`. For the entry point 'computeMain' these functions would be accessable from the shared library interface as `computeMain_Group` and `computeMain_Thread`. `_Group` has the same signature as the listed for computeMain, but it doesn't execute a range, only the single group specified by startGroupID (endGroupID is ignored). That is all of the threads within the group (as specified by `[numthreads]`) will be executed in a single call. 
+There are two other functions that consist of the entry point name postfixed with `_Thread` and `_Group`. For the entry point 'computeMain' these functions would be accessible from the shared library interface as `computeMain_Group` and `computeMain_Thread`. `_Group` has the same signature as the listed for computeMain, but it doesn't execute a range, only the single group specified by startGroupID (endGroupID is ignored). That is all of the threads within the group (as specified by `[numthreads]`) will be executed in a single call.
 
 It may be desirable to have even finer control of how execution takes place down to the level of individual 'thread's and this can be achieved with the `_Thread` style. The signature looks as follows
 
@@ -566,7 +566,7 @@ It may be useful to be able to include `slang-cpp-types.h` in C++ code to access
 
 Would wrap all the Slang prelude types in the namespace `CPPPrelude`, such that say a `StructuredBuffer<int32_t>` could be specified in C++ source code as `CPPPrelude::StructuredBuffer<int32_t>`.
 
-The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
+The code that sets up the prelude for the test infrastructure and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
 The *default* prelude is set to the contents of the files for C++ held in the prelude directory and is held within the Slang shared library. It is therefore typically not necessary to distribute Slang with prelude files.
 
