@@ -1113,38 +1113,38 @@ float3 val2 = {};
 
 1. Atempt to call default constructor (`__init()`) of a `struct`
 
-```csharp
-struct Foo
-{
-    int a;
-    int b;
-    __init()
-    {
-        a = 5;
-        b = 5;
-    }
-};
+   ```csharp
+   struct Foo
+   {
+       int a;
+       int b;
+       __init()
+       {
+           a = 5;
+           b = 5;
+       }
+   };
 
-...
+   ...
 
-// Equivalent to `Foo val = Foo();`
-Foo val = {};
-```
+   // Equivalent to `Foo val = Foo();`
+   Foo val = {};
+   ```
 
 2. As a fallback, zero-initialize the struct
 
-```csharp
-struct Foo
-{
-    int a;
-    int b;
-};
+   ```csharp
+   struct Foo
+   {
+       int a;
+       int b;
+   };
 
-...
+   ...
 
-// Equivalent to `Foo val; val.a = 0; val.b = 0;` 
-Foo val = {};
-```
+   // Equivalent to `Foo val; val.a = 0; val.b = 0;` 
+   Foo val = {};
+   ```
 
 ### Initializer Lists - Other features
 
