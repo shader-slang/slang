@@ -147,6 +147,9 @@ struct LegalizeWGSLEntryPointContext
                     semanticInfoToRemove);
                 // Validate/rearange all semantics which overlap in our flat struct.
                 fixFieldSemanticsOfFlatStruct(flattenedStruct);
+                ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
+                    flattenedStruct,
+                    layout);
                 if (flattenedStruct != structType)
                 {
                     // Replace the 'old IRParam type' with a 'new IRParam type'
@@ -381,7 +384,8 @@ struct LegalizeWGSLEntryPointContext
             semanticName);
     }
 
-    void ensureResultStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
+    template<LayoutResourceKind K>
+    void ensureStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
     {
         // Ensure each field in an output struct type has either a system semantic or a user
         // semantic, so that signature matching can happen correctly.
@@ -415,11 +419,11 @@ struct LegalizeWGSLEntryPointContext
             }
             typeLayout->getFieldLayout(index);
             auto fieldLayout = typeLayout->getFieldLayout(index);
-            if (auto offsetAttr = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+            if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
             {
                 UInt varOffset = 0;
                 if (auto varOffsetAttr =
-                        varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                        varLayout->findOffsetAttr(K))
                     varOffset = varOffsetAttr->getOffset();
                 varOffset += offsetAttr->getOffset();
                 builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
@@ -1101,7 +1105,7 @@ struct LegalizeWGSLEntryPointContext
             }
             // Ensure non-overlapping semantics
             fixFieldSemanticsOfFlatStruct(flattenedStruct);
-            ensureResultStructHasUserSemantic(flattenedStruct, resultLayout);
+            ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(flattenedStruct, resultLayout);
             return;
         }
 
@@ -1121,7 +1125,7 @@ struct LegalizeWGSLEntryPointContext
         auto typeLayout = structTypeLayoutBuilder.build();
         IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
         auto varLayout = varLayoutBuilder.build();
-        ensureResultStructHasUserSemantic(structType, varLayout);
+        ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(structType, varLayout);
 
         _replaceAllReturnInst(
             builder,
