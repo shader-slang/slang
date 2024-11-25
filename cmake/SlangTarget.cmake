@@ -49,6 +49,10 @@ function(slang_add_target dir type)
         DEBUG_DIR
         # Install this target as part of a component
         INSTALL_COMPONENT
+        # Don't install debug info by default for this target and use this
+        # explicit name instead, used for externally built things such as
+        # slang-glslang and slang-llvm which have large pdb files
+        DEBUG_INFO_INSTALL_COMPONENT
     )
     set(multi_value_args
         # Use exactly these sources, instead of globbing from the directory
@@ -408,9 +412,31 @@ function(slang_add_target dir type)
     endmacro()
     if(ARG_INSTALL)
         i()
+        set(pdb_component "debug-info")
     endif()
     if(ARG_INSTALL_COMPONENT)
         i(EXCLUDE_FROM_ALL COMPONENT ${ARG_INSTALL_COMPONENT})
+        set(pdb_component "${ARG_INSTALL_COMPONENT}-debug-info")
+    endif()
+    if(ARG_DEBUG_INFO_INSTALL_COMPONENT)
+        set(pdb_component ${ARG_DEBUG_INFO_INSTALL_COMPONENT})
+    endif()
+    if(MSVC AND DEFINED pdb_component)
+        if(
+            type STREQUAL "EXECUTABLE"
+            OR type STREQUAL "SHARED"
+            OR type STREQUAL "MODULE"
+        )
+            install(
+                FILES $<TARGET_PDB_FILE:${target}>
+                DESTINATION ${runtime_subdir}
+                # Optional, because if we're building without debug info (like
+                # a release build) then we don't want to fail here.
+                OPTIONAL
+                COMPONENT ${pdb_component}
+                EXCLUDE_FROM_ALL
+            )
+        endif()
     endif()
 endfunction()
 
