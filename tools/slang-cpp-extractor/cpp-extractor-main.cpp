@@ -16,12 +16,12 @@
 #include "../../source/core/slang-writer.h"
 #include "../tools/slang-cpp-parser/diagnostics.h"
 #include "../tools/slang-cpp-parser/file-util.h"
-#include "macro-writer.h"
 #include "../tools/slang-cpp-parser/node.h"
 #include "../tools/slang-cpp-parser/options.h"
 #include "../tools/slang-cpp-parser/parser.h"
-#include "slang-com-helper.h"
 #include "../tools/slang-cpp-parser/unit-test.h"
+#include "macro-writer.h"
+#include "slang-com-helper.h"
 
 #include <stdio.h>
 #include <stdlib.h>
