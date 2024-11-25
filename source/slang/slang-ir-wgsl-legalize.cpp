@@ -422,8 +422,7 @@ struct LegalizeWGSLEntryPointContext
             if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
             {
                 UInt varOffset = 0;
-                if (auto varOffsetAttr =
-                        varLayout->findOffsetAttr(K))
+                if (auto varOffsetAttr = varLayout->findOffsetAttr(K))
                     varOffset = varOffsetAttr->getOffset();
                 varOffset += offsetAttr->getOffset();
                 builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
@@ -1105,7 +1104,9 @@ struct LegalizeWGSLEntryPointContext
             }
             // Ensure non-overlapping semantics
             fixFieldSemanticsOfFlatStruct(flattenedStruct);
-            ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(flattenedStruct, resultLayout);
+            ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(
+                flattenedStruct,
+                resultLayout);
             return;
         }
 
