@@ -10,12 +10,13 @@ namespace toc
         {
             StringBuilder sb = new StringBuilder();
             title = title.Trim().ToLower();
+
             foreach (var ch in title)
             {
                 if (ch >= 'a' && ch <= 'z' || ch >= '0' && ch <= '9'
-                    || ch == '-')
+                    || ch == '-'|| ch =='_')
                     sb.Append(ch);
-                else if (ch==' ' || ch =='_')
+                else if (ch == ' ' )
                     sb.Append('-');
             }
             return sb.ToString();
