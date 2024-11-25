@@ -1,9 +1,8 @@
-#ifndef CPP_EXTRACT_FILE_UTIL_H
-#define CPP_EXTRACT_FILE_UTIL_H
+#pragma once
 
 #include "diagnostics.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -29,6 +28,4 @@ struct FileUtil
     static void indent(Index indentCount, StringBuilder& out);
 };
 
-} // namespace CppExtract
-
-#endif
+} // namespace CppParse

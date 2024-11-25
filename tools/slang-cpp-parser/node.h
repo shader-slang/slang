@@ -1,10 +1,9 @@
-#ifndef CPP_EXTRACT_NODE_H
-#define CPP_EXTRACT_NODE_H
+#pragma once
 
 #include "../../source/compiler-core/slang-doc-extractor.h"
 #include "diagnostics.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -420,6 +419,4 @@ T* as(Node* node)
     return (node && T::isOfKind(node->m_kind)) ? static_cast<T*>(node) : nullptr;
 }
 
-} // namespace CppExtract
-
-#endif
+} // namespace CppParse

@@ -9,14 +9,15 @@
 #include "../../source/core/slang-writer.h"
 // #include "../../source/compiler-core/slang-name.h"
 
-#include "diagnostics.h"
-#include "file-util.h"
-#include "node-tree.h"
-#include "options.h"
+#include "../tools/slang-cpp-parser/diagnostics.h"
+#include "../tools/slang-cpp-parser/file-util.h"
+#include "../tools/slang-cpp-parser/node-tree.h"
+#include "../tools/slang-cpp-parser/options.h"
 
 namespace CppExtract
 {
 using namespace Slang;
+using namespace CppParse;
 
 SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out)
 {

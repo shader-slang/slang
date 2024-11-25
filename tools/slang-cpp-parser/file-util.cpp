@@ -2,7 +2,7 @@
 
 #include "../../source/core/slang-io.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -98,4 +98,4 @@ struct DiagnosticReporter
     }
 }
 
-} // namespace CppExtract
+} // namespace CppParse

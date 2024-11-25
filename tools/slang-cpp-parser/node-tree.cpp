@@ -5,7 +5,7 @@
 #include "identifier-lookup.h"
 #include "options.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -173,4 +173,4 @@ SlangResult NodeTree::calcDerivedTypes(DiagnosticSink* sink)
 }
 
 
-} // namespace CppExtract
+} // namespace CppParse

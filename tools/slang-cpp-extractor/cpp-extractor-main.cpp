@@ -14,14 +14,14 @@
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-string.h"
 #include "../../source/core/slang-writer.h"
-#include "diagnostics.h"
-#include "file-util.h"
+#include "../tools/slang-cpp-parser/diagnostics.h"
+#include "../tools/slang-cpp-parser/file-util.h"
 #include "macro-writer.h"
-#include "node.h"
-#include "options.h"
-#include "parser.h"
+#include "../tools/slang-cpp-parser/node.h"
+#include "../tools/slang-cpp-parser/options.h"
+#include "../tools/slang-cpp-parser/parser.h"
 #include "slang-com-helper.h"
-#include "unit-test.h"
+#include "../tools/slang-cpp-parser/unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>

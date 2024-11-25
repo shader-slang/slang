@@ -1,9 +1,8 @@
-#ifndef CPP_EXTRACT_DIAGNOSTICS_H
-#define CPP_EXTRACT_DIAGNOSTICS_H
+#pragma once
 
 #include "../../source/slang/slang-diagnostics.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -14,6 +13,4 @@ namespace CPPDiagnostics
 #include "diagnostic-defs.h"
 
 } // namespace CPPDiagnostics
-} // namespace CppExtract
-
-#endif
+} // namespace CppParse

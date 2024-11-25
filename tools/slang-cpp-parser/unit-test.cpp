@@ -9,7 +9,7 @@
 #include "options.h"
 #include "parser.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -124,4 +124,4 @@ static const char someSource[] = "class ISomeInterface\n"
     return SLANG_OK;
 }
 
-} // namespace CppExtract
+} // namespace CppParse

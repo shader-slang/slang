@@ -49,6 +49,7 @@ generator(
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE
     compiler-core
+    slang-cpp-parser
 )
 generator(slang-embed)
 generator(slang-generate USE_FEWER_WARNINGS)
@@ -66,6 +67,14 @@ generator(
     slang-capability-lookup
     slang-lookup-tables
     Threads::Threads
+)
+
+slang_add_target(
+    slang-cpp-parser
+    STATIC
+    USE_FEWER_WARNINGS
+    LINK_WITH_PRIVATE core compiler-core
+    FOLDER generators
 )
 
 #

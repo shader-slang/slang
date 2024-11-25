@@ -1,14 +1,14 @@
-#ifndef CPP_EXTRACT_MACRO_WRITER_H
-#define CPP_EXTRACT_MACRO_WRITER_H
+#pragma once
 
 #include "../../source/compiler-core/slang-diagnostic-sink.h"
-#include "diagnostics.h"
-#include "node-tree.h"
-#include "options.h"
+#include "../tools/slang-cpp-parser/diagnostics.h"
+#include "../tools/slang-cpp-parser/node-tree.h"
+#include "../tools/slang-cpp-parser/options.h"
 
 namespace CppExtract
 {
 using namespace Slang;
+using namespace CppParse;
 
 /* A class that writes out macros that define type hierarchies, as well as fields of types */
 class MacroWriter
@@ -39,5 +39,3 @@ protected:
 };
 
 } // namespace CppExtract
-
-#endif

@@ -6,7 +6,7 @@
 #include "identifier-lookup.h"
 #include "options.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -2258,4 +2258,4 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
     }
 }
 
-} // namespace CppExtract
+} // namespace CppParse

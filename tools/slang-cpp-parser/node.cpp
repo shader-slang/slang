@@ -4,7 +4,7 @@
 #include "../../source/core/slang-string-util.h"
 #include "file-util.h"
 
-namespace CppExtract
+namespace CppParse
 {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Node Impl
@@ -697,4 +697,4 @@ void ClassLikeNode::dump(int indentCount, StringBuilder& out)
     out << "}\n";
 }
 
-} // namespace CppExtract
+} // namespace CppParse

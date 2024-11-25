@@ -1,9 +1,8 @@
-#ifndef CPP_EXTRACT_IDENTIFIER_LOOKUP_H
-#define CPP_EXTRACT_IDENTIFIER_LOOKUP_H
+#pragma once
 
 #include "diagnostics.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -119,6 +118,4 @@ SLANG_FORCE_INLINE bool hasFlag(IdentifierStyle style, IdentifierFlag::Enum flag
     return (getFlags(style) & flag) != 0;
 }
 
-} // namespace CppExtract
-
-#endif
+} // namespace CppParse
