@@ -799,10 +799,10 @@ Auto-Generated Constructors
 ### Auto-Generated Constructors - Struct
 
 Slang has the following rules:
-1. Auto-generate a `__init()` if not already defined
+1. Auto-generate a `__init()` if not already defined.
 
-Assume:
-```csharp
+   Assume:
+   ```csharp
 struct DontGenerateCtor
 {
     int a;
