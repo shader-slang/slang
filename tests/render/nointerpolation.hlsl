@@ -1,5 +1,8 @@
-//DISABLED_TEST(smoke):COMPARE_HLSL_RENDER:
-//DISABLED_TEST(smoke):COMPARE_HLSL_RENDER: -dx12
+//TEST(smoke):COMPARE_HLSL_RENDER:
+// WGSL: nointerpolate doesn't work #5625
+//DISABLE_TEST(smoke):COMPARE_HLSL_RENDER: -wgpu
+// TODO: Investigate Metal failure
+//DISABLE_TEST(smoke):COMPARE_HLSL_RENDER: -mtl
 
 // Confirm that the `nointerpolation` modifier
 // makes it through Slang codegen with the

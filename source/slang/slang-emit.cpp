@@ -642,6 +642,7 @@ Result linkAndOptimizeIR(
     //
     {
         CollectEntryPointUniformParamsOptions passOptions;
+        passOptions.targetReq = targetRequest;
         switch (target)
         {
         case CodeGenTarget::HostCPPSource:

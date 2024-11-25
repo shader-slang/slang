@@ -1885,7 +1885,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 
 //@ public:
 
-__generic<T>
+__generic<T, L:IBufferDataLayout = DefaultDataLayout>
 __intrinsic_type($(kIROp_ConstantBufferType))
 __magic_type(ConstantBufferType)
 struct ConstantBuffer {}

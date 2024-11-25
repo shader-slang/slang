@@ -110,6 +110,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkMeshOutputDecl(VarDeclBase* varDecl);
     void maybeApplyLayoutModifier(VarDeclBase* varDecl);
     void checkVarDeclCommon(VarDeclBase* varDecl);
+    void checkPushConstantBufferType(VarDeclBase* varDecl);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -1707,6 +1708,10 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
             addModifier(varDecl, formatAttrib);
         }
     }
+    else
+    {
+        checkPushConstantBufferType(varDecl);
+    }
 }
 
 bool isSpecializationConstant(VarDeclBase* varDecl)
@@ -1719,6 +1724,32 @@ bool isSpecializationConstant(VarDeclBase* varDecl)
             return true;
     }
     return false;
+}
+
+void SemanticsDeclHeaderVisitor::checkPushConstantBufferType(VarDeclBase* varDecl)
+{
+    if (varDecl->findModifier<PushConstantAttribute>())
+    {
+        // If we see a ConstantBuffer<T, DefaultLayout> parameter marked as "push_constant", we need
+        // to set its type to ConstantBuffer<T, Std430>.
+        if (auto cbufferType = as<ConstantBufferType>(varDecl->type))
+        {
+            if (cbufferType->getLayoutType() == m_astBuilder->getDefaultLayoutType())
+            {
+                varDecl->type.type = getConstantBufferType(
+                    cbufferType->getElementType(),
+                    m_astBuilder->getStd430LayoutType());
+            }
+        }
+        else if (isGlobalShaderParameter(varDecl))
+        {
+            // If this is a global variable with [vk::push_constant] attribute,
+            // we need to make sure to wrap it in a `ConstantBuffer`.
+            //
+            varDecl->type.type =
+                getConstantBufferType(varDecl->type, m_astBuilder->getStd430LayoutType());
+        }
+    }
 }
 
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
@@ -1935,20 +1966,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
     }
 
-
     if (as<NamespaceDeclBase>(varDecl->parentDecl))
     {
-        // If this is a global variable with [vk::push_constant] attribute,
-        // we need to make sure to wrap it in a `ConstantBuffer`.
-
-        if (!as<ConstantBufferType>(varDecl->type))
-        {
-            if (varDecl->findModifier<PushConstantAttribute>())
-            {
-                varDecl->type.type = m_astBuilder->getConstantBufferType(varDecl->type);
-            }
-        }
-
         if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
         {
             // If we are in GLSL compatiblity mode, we want to treat all global variables
@@ -10896,7 +10915,61 @@ void checkDerivativeAttributeImpl(
     SemanticsContext::ExprLocalScope scope;
     auto ctx = visitor->withExprLocalScope(&scope);
     auto subVisitor = SemanticsVisitor(ctx);
-    auto checkedFuncExpr = visitor->dispatchExpr(attr->funcExpr, ctx);
+
+    auto exprToCheck = attr->funcExpr;
+
+    // If this is a generic, we want to wrap the call to the derivative method
+    // with the generic parameters of the source.
+    //
+    if (as<GenericDecl>(funcDecl->parentDecl) && !as<GenericAppExpr>(attr->funcExpr))
+    {
+        auto genericDecl = as<GenericDecl>(funcDecl->parentDecl);
+        auto substArgs = getDefaultSubstitutionArgs(ctx.getASTBuilder(), visitor, genericDecl);
+        auto appExpr = ctx.getASTBuilder()->create<GenericAppExpr>();
+
+        Index count = 0;
+        for (auto member : genericDecl->members)
+        {
+            if (as<GenericTypeParamDecl>(member) || as<GenericValueParamDecl>(member) ||
+                as<GenericTypePackParamDecl>(member))
+                count++;
+        }
+
+        appExpr->functionExpr = attr->funcExpr;
+
+        for (auto arg : substArgs)
+        {
+            if (count == 0)
+                break;
+
+            if (auto declRefType = as<DeclRefType>(arg))
+            {
+                auto baseTypeExpr = ctx.getASTBuilder()->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = declRefType;
+                auto baseTypeType = ctx.getASTBuilder()->getOrCreate<TypeType>(declRefType);
+                baseTypeExpr->type.type = baseTypeType;
+
+                appExpr->arguments.add(baseTypeExpr);
+            }
+            else if (auto genericValParam = as<GenericParamIntVal>(arg))
+            {
+                auto declRef = genericValParam->getDeclRef();
+                appExpr->arguments.add(
+                    subVisitor
+                        .ConstructDeclRefExpr(declRef, nullptr, nullptr, SourceLoc(), nullptr));
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unhandled substitution arg type");
+            }
+
+            count--;
+        }
+
+        exprToCheck = appExpr;
+    }
+
+    auto checkedFuncExpr = visitor->dispatchExpr(exprToCheck, ctx);
     attr->funcExpr = checkedFuncExpr;
     if (attr->args.getCount())
         attr->args[0] = attr->funcExpr;
@@ -11408,6 +11481,26 @@ void checkDerivativeOfAttributeImpl(
     calleeDeclRef = calleeDeclRefExpr->declRef;
 
     auto calleeFunc = as<FunctionDeclBase>(calleeDeclRef.getDecl());
+
+    if (!calleeFunc)
+    {
+        // If we couldn't find a direct function, it might be a generic.
+        if (auto genericDecl = as<GenericDecl>(calleeDeclRef.getDecl()))
+        {
+            calleeFunc = as<FunctionDeclBase>(genericDecl->inner);
+
+            if (as<ErrorType>(resolved->type.type))
+            {
+                // If we can't resolve a type, something went wrong. If we're working with a generic
+                // decl, the most likely cause is a failure of generic argument inference.
+                //
+                visitor->getSink()->diagnose(
+                    derivativeOfAttr,
+                    Diagnostics::cannotResolveGenericArgumentForDerivativeFunction);
+            }
+        }
+    }
+
     if (!calleeFunc)
     {
         visitor->getSink()->diagnose(

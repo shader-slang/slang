@@ -4016,12 +4016,15 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSimpleType(IRType*) override { return false; }
 
-    LegalType createLegalUniformBufferType(IROp op, LegalType legalElementType) override
+    LegalType createLegalUniformBufferType(
+        IROp op,
+        LegalType legalElementType,
+        IRInst* layoutOperand) override
     {
         // The appropriate strategy for legalizing uniform buffers
         // with resources inside already exists, so we can delegate to it.
         //
-        return createLegalUniformBufferTypeForResources(this, op, legalElementType);
+        return createLegalUniformBufferTypeForResources(this, op, legalElementType, layoutOperand);
     }
 };
 
@@ -4045,7 +4048,10 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSimpleType(IRType*) override { return false; }
 
-    LegalType createLegalUniformBufferType(IROp op, LegalType legalElementType) override
+    LegalType createLegalUniformBufferType(
+        IROp op,
+        LegalType legalElementType,
+        IRInst* layoutOperand) override
     {
         // We'll delegate the logic for creating uniform buffers
         // over a mix of ordinary and existential-box types to
@@ -4054,7 +4060,11 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
         // TODO: We should eventually try to refactor this code
         // so that related functionality is grouped together.
         //
-        return createLegalUniformBufferTypeForExistentials(this, op, legalElementType);
+        return createLegalUniformBufferTypeForExistentials(
+            this,
+            op,
+            legalElementType,
+            layoutOperand);
     }
 };
 
@@ -4090,7 +4100,10 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
         return false;
     }
 
-    LegalType createLegalUniformBufferType(IROp, LegalType) override { return LegalType(); }
+    LegalType createLegalUniformBufferType(IROp, LegalType, IRInst*) override
+    {
+        return LegalType();
+    }
 };
 
 // The main entry points that are used when transforming IR code

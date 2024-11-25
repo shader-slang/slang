@@ -431,7 +431,7 @@ struct MyType
 
 int useVal(Optional<MyType> p)
 {
-    if (p == none)        // Equivalent to `p.hasValue`
+    if (p == none)        // Equivalent to `!p.hasValue`
         return 0;
     return p.value.val;
 }
@@ -567,7 +567,7 @@ void test()
 }
 ```
 
-This feature is similar to extensions in Swift and partial classes in C#.
+This feature is similar to extensions in Swift and extension methods in C#.
 
 > #### Note:
 > You can only extend a type with additional methods. Extending with additional data fields is not allowed.

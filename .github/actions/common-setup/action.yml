@@ -116,7 +116,7 @@ runs:
         echo SCCACHE_IGNORE_SERVER_IO_ERROR=1 >> "$GITHUB_ENV"
 
     # Install swiftshader
-    - uses: robinraju/release-downloader@v1.8
+    - uses: robinraju/release-downloader@v1.11
       continue-on-error: true
       with:
         latest: true

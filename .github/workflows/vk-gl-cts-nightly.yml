@@ -52,7 +52,7 @@ jobs:
             -DSLANG_ENABLE_GFX=1 \
             -DSLANG_ENABLE_TESTS=1
           cmake --workflow --preset "${{matrix.config}}"
-      - uses: robinraju/release-downloader@v1.7
+      - uses: robinraju/release-downloader@v1.11
         with:
           latest: true
           repository: "shader-slang/VK-GL-CTS"

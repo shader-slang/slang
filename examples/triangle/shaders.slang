@@ -57,10 +57,12 @@ VertexStageOutput vertexMain(
 // Fragment Shader
 
 [shader("fragment")]
-float4 fragmentMain(
+Fragment fragmentMain(
     CoarseVertex coarseVertex : CoarseVertex) : SV_Target
 {
     float3 color = coarseVertex.color;
 
-    return float4(color, 1.0);
+    Fragment output;
+    output.color = float4(color, 1.0);
+    return output;
 }

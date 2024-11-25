@@ -403,7 +403,16 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             // If we need a constant buffer, then the global
             // shader parameter will be a `ConstantBuffer<paramStructType>`
             //
-            auto constantBufferType = builder.getConstantBufferType(paramStructType);
+            IRType* layoutType = nullptr;
+
+            if (m_options.targetReq->getOptionSet().getBoolOption(
+                    CompilerOptionName::GLSLForceScalarLayout))
+                layoutType = builder.getType(kIROp_ScalarBufferLayoutType);
+            else if (isKhronosTarget(m_options.targetReq))
+                layoutType = builder.getType(kIROp_Std430BufferLayoutType);
+            else
+                layoutType = builder.getType(kIROp_DefaultBufferLayoutType);
+            auto constantBufferType = builder.getConstantBufferType(paramStructType, layoutType);
             collectedParam = builder.createParam(constantBufferType);
         }
         else
