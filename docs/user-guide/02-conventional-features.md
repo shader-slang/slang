@@ -800,7 +800,8 @@ Auto-Generated Constructors
 
 Slang has the following rules:
 1. Auto-generate a `__init()` if not already defined
-> Assume
+
+Assume:
 ```csharp
 struct DontGenerateCtor
 {
@@ -861,15 +862,17 @@ struct GenerateCtor : GenerateCtorInner
 };
 ```
 3. If not all members have equal visibility, auto-generate a 'member-wise constructor' based on member visibility if not conflicting with a user defined constructor. 
-    * We generate 3 different visibilities of 'member-wise constructor's in order:
-        1. `public` 'member-wise constructor'
-            * Contains members of visibility: `public`
-            * Do not generate if `internal` or `private` member lacks an init expression
-        2. `internal` 'member-wise constructor'
-            * Contains members of visibility: `internal`, `public`
-            * Do not generate if `private` member lacks an init expression
-        3. `private` 'member-wise constructor'
-            * Contains members of visibility: `private`, `internal`, `public`
+
+We generate 3 different visibilities of 'member-wise constructor's in order:
+   1. `public` 'member-wise constructor'
+      - Contains members of visibility: `public`
+      - Do not generate if `internal` or `private` member lacks an init expression
+   2. `internal` 'member-wise constructor'
+      - Contains members of visibility: `internal`, `public`
+      - Do not generate if `private` member lacks an init expression
+   3. `private` 'member-wise constructor'
+      - Contains members of visibility: `private`, `internal`, `public`
+
 ```csharp
 struct GenerateCtorInner1
 {
@@ -1109,7 +1112,6 @@ float3 val2 = {};
 
 1. Atempt to call default constructor (`__init()`) of a `struct`
 
-
 ```csharp
 struct Foo
 {
@@ -1127,6 +1129,7 @@ struct Foo
 // Equivalent to `Foo val = Foo();`
 Foo val = {};
 ```
+
 2. As a fallback, zero-initialize the struct
 
 ```csharp
@@ -1141,6 +1144,7 @@ struct Foo
 // Equivalent to `Foo val; val.a = 0; val.b = 0;` 
 Foo val = {};
 ```
+
 ### Initializer Lists - Other features
 
 Slang allows calling a default-initializer inside a default-constructor.
