@@ -803,34 +803,34 @@ Slang has the following rules:
 
    Assume:
    ```csharp
-struct DontGenerateCtor
-{
-    int a;
-    int b = 5;
+   struct DontGenerateCtor
+   {
+       int a;
+       int b = 5;
 
-    // Since the user has explicitly defined a constructor
-    // here, Slang will not synthesize a conflicting 
-    // constructor.
-    __init()
-    {
-        // b = 5;
-        a = 5;
-        b = 6;
-    }
-};
+       // Since the user has explicitly defined a constructor
+       // here, Slang will not synthesize a conflicting 
+       // constructor.
+       __init()
+       {
+           // b = 5;
+           a = 5;
+           b = 6;
+       }
+   };
 
-struct GenerateCtor
-{
-    int a;
-    int b = 5;
-
-    // Slang will automatically generate an implicit constructor:
-    // __init()
-    // {
-    //     b = 5;
-    // }
-};
-```
+   struct GenerateCtor
+   {
+       int a;
+       int b = 5;
+   
+       // Slang will automatically generate an implicit constructor:
+       // __init()
+       // {
+       //     b = 5;
+       // }
+   };
+   ```
 
 2. If all members have equal visibility, auto-generate a 'member-wise constructor' if not conflicting with a user defined constructor.
 ```csharp
