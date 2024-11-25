@@ -1,6 +1,4 @@
 //TEST(smoke,render):COMPARE_HLSL_RENDER:
-// TODO: Investigate Metal failure
-//DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -mtl
 
 cbuffer Uniforms
 {
