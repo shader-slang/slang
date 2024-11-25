@@ -125,6 +125,19 @@
 <li data-link="reflection#function-reflection"><span>Function Reflection</span></li>
 </ul>
 </li>
+<li data-link="targets"><span>Supported Compilation Targets</span>
+<ul class="toc_list">
+<li data-link="targets#background-and-terminology"><span>Background and Terminology</span></li>
+<li data-link="targets#direct3d-11"><span>Direct3D 11</span></li>
+<li data-link="targets#direct3d-12"><span>Direct3D 12</span></li>
+<li data-link="targets#vulkan"><span>Vulkan</span></li>
+<li data-link="targets#opengl"><span>OpenGL</span></li>
+<li data-link="targets#metal"><span>Metal</span></li>
+<li data-link="targets#cuda-and-optix"><span>CUDA and OptiX</span></li>
+<li data-link="targets#cpu-compute"><span>CPU Compute</span></li>
+<li data-link="targets#summary"><span>Summary</span></li>
+</ul>
+</li>
 <li data-link="link-time-specialization"><span>Link-time Specialization and Module Precompilation</span>
 <ul class="toc_list">
 <li data-link="link-time-specialization#link-time-constants"><span>Link-time Constants</span></li>
@@ -182,20 +195,8 @@
 </li>
 </ul>
 </li>
-<li data-link="reference"><span>Reference</span>
+<li data-link="a2-target-specific-features"><span>Target-specific features</span>
 <ul class="toc_list">
-<li data-link="a3-02-reference-capability-atoms"><span>Capability Atoms</span>
-<ul class="toc_list">
-<li data-link="a3-02-reference-capability-atoms#targets"><span>Targets</span></li>
-<li data-link="a3-02-reference-capability-atoms#stages"><span>Stages</span></li>
-<li data-link="a3-02-reference-capability-atoms#versions"><span>Versions</span></li>
-<li data-link="a3-02-reference-capability-atoms#extensions"><span>Extensions</span></li>
-<li data-link="a3-02-reference-capability-atoms#compound-capabilities"><span>Compound Capabilities</span></li>
-<li data-link="a3-02-reference-capability-atoms#other"><span>Other</span></li>
-</ul>
-</li>
-</ul>
-</li>
 <li data-link="spirv-target-specific"><span>SPIR-V specific functionalities</span>
 <ul class="toc_list">
 <li data-link="spirv-target-specific#experimental-support-for-the-older-versions-of-spir-v"><span>Experimental support for the older versions of SPIR-V</span></li>
@@ -205,17 +206,17 @@
 <li data-link="spirv-target-specific#supported-hlsl-features-when-targeting-spir-v"><span>Supported HLSL features when targeting SPIR-V</span></li>
 <li data-link="spirv-target-specific#unsupported-glsl-keywords-when-targeting-spir-v"><span>Unsupported GLSL keywords when targeting SPIR-V</span></li>
 <li data-link="spirv-target-specific#supported-atomic-types-for-each-target"><span>Supported atomic types for each target</span></li>
-<li data-link="spirv-target-specific#constantbuffer-rwrasterizerorderedstructuredbuffer-rwrasterizerorderedbyteaddressbuffer"><span>ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)ByteAddressBuffer</span></li>
+<li data-link="spirv-target-specific#constantbuffer-structuredbuffer-and-byteaddressbuffer"><span>ConstantBuffer, StructuredBuffer and ByteAddressBuffer</span></li>
 <li data-link="spirv-target-specific#parameterblock-for-spir-v-target"><span>ParameterBlock for SPIR-V target</span></li>
 <li data-link="spirv-target-specific#push-constants"><span>Push Constants</span></li>
 <li data-link="spirv-target-specific#specialization-constants"><span>Specialization Constants</span></li>
-<li data-link="spirv-target-specific#spir-v-specific-compiler-options"><span>SPIR-V specific Compiler options</span></li>
 <li data-link="spirv-target-specific#spir-v-specific-attributes"><span>SPIR-V specific Attributes </span></li>
 <li data-link="spirv-target-specific#multiple-entry-points-support"><span>Multiple entry points support</span></li>
-<li data-link="spirv-target-specific#memory-pointer-is-experimental"><span>Memory pointer is experimental</span></li>
+<li data-link="spirv-target-specific#global-memory-pointers"><span>Global memory pointers</span></li>
 <li data-link="spirv-target-specific#matrix-type-translation"><span>Matrix type translation</span></li>
 <li data-link="spirv-target-specific#legalization"><span>Legalization</span></li>
 <li data-link="spirv-target-specific#tessellation"><span>Tessellation</span></li>
+<li data-link="spirv-target-specific#spir-v-specific-compiler-options"><span>SPIR-V specific Compiler options</span></li>
 </ul>
 </li>
 <li data-link="metal-target-specific"><span>Metal-specific functionalities</span>
@@ -243,26 +244,28 @@
 <li data-link="wgsl-target-specific#interlocked-operations"><span>Interlocked operations</span></li>
 <li data-link="wgsl-target-specific#entry-point-parameter-handling"><span>Entry Point Parameter Handling</span></li>
 <li data-link="wgsl-target-specific#parameter-blocks"><span>Parameter blocks</span></li>
+<li data-link="wgsl-target-specific#write-only-textures"><span>Write-only Textures</span></li>
 <li data-link="wgsl-target-specific#pointers"><span>Pointers</span></li>
 <li data-link="wgsl-target-specific#address-space-assignment"><span>Address Space Assignment</span></li>
 <li data-link="wgsl-target-specific#matrix-type-translation"><span>Matrix type translation</span></li>
 </ul>
 </li>
-<li data-link="a2-target-specific-features"><span>Target-specific features</span>
+</ul>
 </li>
+<li data-link="reference"><span>Reference</span>
+<ul class="toc_list">
 <li data-link="a3-01-reference-capability-profiles"><span>Capability Profiles</span>
 </li>
-<li data-link="targets"><span>Supported Compilation Targets</span>
+<li data-link="a3-02-reference-capability-atoms"><span>Capability Atoms</span>
 <ul class="toc_list">
-<li data-link="targets#background-and-terminology"><span>Background and Terminology</span></li>
-<li data-link="targets#direct3d-11"><span>Direct3D 11</span></li>
-<li data-link="targets#direct3d-12"><span>Direct3D 12</span></li>
-<li data-link="targets#vulkan"><span>Vulkan</span></li>
-<li data-link="targets#opengl"><span>OpenGL</span></li>
-<li data-link="targets#metal"><span>Metal</span></li>
-<li data-link="targets#cuda-and-optix"><span>CUDA and OptiX</span></li>
-<li data-link="targets#cpu-compute"><span>CPU Compute</span></li>
-<li data-link="targets#summary"><span>Summary</span></li>
+<li data-link="a3-02-reference-capability-atoms#targets"><span>Targets</span></li>
+<li data-link="a3-02-reference-capability-atoms#stages"><span>Stages</span></li>
+<li data-link="a3-02-reference-capability-atoms#versions"><span>Versions</span></li>
+<li data-link="a3-02-reference-capability-atoms#extensions"><span>Extensions</span></li>
+<li data-link="a3-02-reference-capability-atoms#compound-capabilities"><span>Compound Capabilities</span></li>
+<li data-link="a3-02-reference-capability-atoms#other"><span>Other</span></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

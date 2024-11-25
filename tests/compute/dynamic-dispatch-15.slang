@@ -14,7 +14,7 @@ interface IInterface
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<float> gOutputBuffer;
 
-//TEST_INPUT: set gObj = dynamic new StructuredBuffer<IInterface>[new FloatVal{1.0}, new Float4Val{{[2.0, 3.0, 4.0, 5.0]}}, new IntVal{6}, new Int4Val{[7,8,9,10]}];
+//TEST_INPUT: set gObj = new StructuredBuffer<IInterface>[new FloatVal{1.0}, new Float4Val{{[2.0, 3.0, 4.0, 5.0]}}, new IntVal{6}, new Int4Val{[7,8,9,10]}];
 RWStructuredBuffer<IInterface> gObj;
 
 [numthreads(1, 1, 1)]

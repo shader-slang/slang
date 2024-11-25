@@ -829,7 +829,7 @@ The details of how Slang computes layout, what guarantees it makes, and how to i
 Because the layout computed for shader parameters may depend on the compilation target, the `getLayout()` method actually takes a `targetIndex` parameter that is the zero-based index of the target for which layout information is being queried.
 This parameter defaults to zero as a convenience for the common case where applications use only a single compilation target at runtime.
 
-See [Using the Reflection API] chapter for more details on the reflection API.
+See [Using the Reflection API](reflection) chapter for more details on the reflection API.
 
 ### Linking
 
