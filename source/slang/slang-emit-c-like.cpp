@@ -1661,7 +1661,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         }
     }
 
-    // For cuda and cpu targets don't support swizzle on the left-hand-side
+    // The cpp, cuda and wgsl targets don't support swizzle on the left-hand-side
     // variable, e.g. vec4.xy = vec2 is not allowed.
     // Therefore, we don't want to fold the right-hand-side expression.
     // Instead, the right-hand-side expression should be generated as a separable
@@ -1669,7 +1669,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // variable per element. E.g. vec4.x = vec2.x; vec4.y = vec2.y.
     if (as<IRSwizzledStore>(user))
     {
-        if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()))
+        if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) || isWGPUTarget(getTargetReq()))
             return false;
     }
 
@@ -3123,9 +3123,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_SwizzledStore:
         {
-            // cpp and cuda target don't support swizzle on the left handside, so we
+            // cpp, cuda and wgsl targets don't support swizzle on the left handside, so we
             // have to assign the element one by one.
-            if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()))
+            if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) || isWGPUTarget(getTargetReq()))
             {
                 _emitSwizzleStorePerElement(inst);
             }
