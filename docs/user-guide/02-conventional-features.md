@@ -80,6 +80,8 @@ The type `vector<T,N>` is a vector of `N` _elements_ (also called _components_) 
 As a convenience, pre-defined vector types exist for each scalar type and valid element count, with a name using the formula `<<scalar-type>><<element-count>>`.
 For example, `float3` is a convenient name for `vector<float,3>`.
 
+> Note: Slang doesn't support vectors longer than 4 elements. They map to native vector types on many platforms, including CUDA, and none of these platforms support vectors longer than 4 elements. If needed, you can use an array like `float myArray[8]`.
+
 ### Matrix Types
 
 Matrix types can be written as `matrix<T,R,C>` where `T` is a scalar type and both `R` and `C` are integers from 2 to 4 (inclusive).
