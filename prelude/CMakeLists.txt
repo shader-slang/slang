@@ -11,7 +11,9 @@ foreach(input ${prelude_headers})
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${input_name}.cpp")
     add_custom_command(
         OUTPUT ${output}
-        COMMAND slang-embed "${input}" "${CMAKE_CURRENT_LIST_DIR}/../include" ${output}
+        COMMAND
+            slang-embed "${input}" "${CMAKE_CURRENT_LIST_DIR}/../include"
+            ${output}
         DEPENDS ${input} slang-embed
         VERBATIM
     )
