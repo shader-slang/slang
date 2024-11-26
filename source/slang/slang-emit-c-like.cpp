@@ -1669,7 +1669,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // variable per element. E.g. vec4.x = vec2.x; vec4.y = vec2.y.
     if (as<IRSwizzledStore>(user))
     {
-        if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) || isWGPUTarget(getTargetReq()))
+        if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
+            isWGPUTarget(getTargetReq()))
             return false;
     }
 
@@ -3125,7 +3126,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         {
             // cpp, cuda and wgsl targets don't support swizzle on the left handside, so we
             // have to assign the element one by one.
-            if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) || isWGPUTarget(getTargetReq()))
+            if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
+                isWGPUTarget(getTargetReq()))
             {
                 _emitSwizzleStorePerElement(inst);
             }
