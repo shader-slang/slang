@@ -352,14 +352,15 @@ configure_package_config_file(
     INSTALL_DESTINATION cmake
 )
 
-install(TARGETS slang EXPORT SlangExportTarget)
-
-install(
-    EXPORT SlangExportTarget
-    FILE ${PROJECT_NAME}Targets.cmake
-    NAMESPACE ${PROJECT_NAME}::
-    DESTINATION cmake
-)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    install(TARGETS slang EXPORT SlangExportTarget)
+    install(
+        EXPORT SlangExportTarget
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION cmake
+    )
+endif()
 
 install(
     FILES
