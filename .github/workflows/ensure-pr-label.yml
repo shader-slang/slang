@@ -4,8 +4,9 @@ on:
     types: [opened, labeled, unlabeled, synchronize]
     paths-ignore:
       - "docs/**"
-      - "LICENCE"
-      - "CONTRIBUTION.md"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
       - "README.md"
 jobs:
   label:

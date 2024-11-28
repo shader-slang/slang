@@ -145,11 +145,13 @@ struct LegalizeWGSLEntryPointContext
                     structType,
                     mapOldFieldToNewField,
                     semanticInfoToRemove);
+                // Validate/rearange all semantics which overlap in our flat struct.
+                fixFieldSemanticsOfFlatStruct(flattenedStruct);
+                ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
+                    flattenedStruct,
+                    layout);
                 if (flattenedStruct != structType)
                 {
-                    // Validate/rearange all semantics which overlap in our flat struct
-                    fixFieldSemanticsOfFlatStruct(flattenedStruct);
-
                     // Replace the 'old IRParam type' with a 'new IRParam type'
                     param->setFullType(flattenedStruct);
 
@@ -382,7 +384,8 @@ struct LegalizeWGSLEntryPointContext
             semanticName);
     }
 
-    void ensureResultStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
+    template<LayoutResourceKind K>
+    void ensureStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
     {
         // Ensure each field in an output struct type has either a system semantic or a user
         // semantic, so that signature matching can happen correctly.
@@ -416,11 +419,10 @@ struct LegalizeWGSLEntryPointContext
             }
             typeLayout->getFieldLayout(index);
             auto fieldLayout = typeLayout->getFieldLayout(index);
-            if (auto offsetAttr = fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+            if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
             {
                 UInt varOffset = 0;
-                if (auto varOffsetAttr =
-                        varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                if (auto varOffsetAttr = varLayout->findOffsetAttr(K))
                     varOffset = varOffsetAttr->getOffset();
                 varOffset += offsetAttr->getOffset();
                 builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
@@ -627,7 +629,10 @@ struct LegalizeWGSLEntryPointContext
         // 2. If IRStructType:
         //  2a. Recurse this function with 'decorations that carry semantic info' from parent.
         // 3. If not IRStructType:
-        //  3a. Emit 'newField' equal to 'oldField', add 'decorations which carry semantic info'.
+        //  3a. Emit 'newField' with 'newKey' equal to 'oldField' and 'oldKey', respectively,
+        //      where 'oldKey' is the key corresponding to 'oldField'.
+        //      Add 'decorations which carry semantic info' to 'newField', and move all decorations
+        //      of 'oldKey' to 'newKey'.
         //  3b. Store a mapping from 'oldField' to 'newField' in 'mapFieldToField'. This info is
         //  needed to copy between types.
         for (auto oldField : src->getFields())
@@ -672,7 +677,7 @@ struct LegalizeWGSLEntryPointContext
 
             // step 3a
             auto newKey = builder.createStructKey();
-            copyNameHintAndDebugDecorations(newKey, oldKey);
+            oldKey->transferDecorationsTo(newKey);
 
             auto newField = builder.createStructField(dst, newKey, oldField->getFieldType());
             copyNameHintAndDebugDecorations(newField, oldField);
@@ -1102,7 +1107,9 @@ struct LegalizeWGSLEntryPointContext
             }
             // Ensure non-overlapping semantics
             fixFieldSemanticsOfFlatStruct(flattenedStruct);
-            ensureResultStructHasUserSemantic(flattenedStruct, resultLayout);
+            ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(
+                flattenedStruct,
+                resultLayout);
             return;
         }
 
@@ -1122,7 +1129,7 @@ struct LegalizeWGSLEntryPointContext
         auto typeLayout = structTypeLayoutBuilder.build();
         IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
         auto varLayout = varLayoutBuilder.build();
-        ensureResultStructHasUserSemantic(structType, varLayout);
+        ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(structType, varLayout);
 
         _replaceAllReturnInst(
             builder,

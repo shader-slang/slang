@@ -5,15 +5,17 @@ on:
     branches: [master]
     paths-ignore:
       - "docs/**"
-      - "LICENCE"
-      - "CONTRIBUTION.md"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
       - "README.md"
   pull_request:
     branches: [master]
     paths-ignore:
       - "docs/**"
-      - "LICENCE"
-      - "CONTRIBUTION.md"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
       - "README.md"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
