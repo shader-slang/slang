@@ -1,10 +1,13 @@
 // Prelude for PyTorch cpp binding.
 
+// clang-format off
+#include <torch/extension.h>
+// clang-format on
+
 #include <ATen/cuda/CUDAContext.h>
 #include <ATen/cuda/CUDAUtils.h>
 #include <stdexcept>
 #include <string>
-#include <torch/extension.h>
 #include <vector>
 
 #ifdef SLANG_LLVM

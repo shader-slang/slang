@@ -1200,6 +1200,15 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             break;
+        case CodeGenTarget::WGSL:
+        case CodeGenTarget::WGSLSPIRV:
+        case CodeGenTarget::WGSLSPIRVAssembly:
+            byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.treatGetEquivalentStructuredBufferAsGetThis = true;
+            byteAddressBufferOptions.translateToStructuredBufferOps = false;
+            byteAddressBufferOptions.lowerBasicTypeOps = true;
+            byteAddressBufferOptions.useBitCastFromUInt = true;
+            break;
         }
 
         // We also need to decide whether to translate
