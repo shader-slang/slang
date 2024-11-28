@@ -62,7 +62,7 @@ fi
 temp_dir=$(mktemp -d)
 trap 'rm -rf "$temp_dir"' EXIT
 
-cd "$project_root/docs" || exit 1
+docs_dir="$project_root/docs"
 
 cat >"$temp_dir/temp_program.cs" <<EOL
 $(cat "$script_dir/scripts/Program.cs")
@@ -100,24 +100,24 @@ if ! mcs -r:System.Core "$temp_dir/temp_program.cs" -out:"$temp_dir/toc-builder.
 fi
 
 for dir in "user-guide" "gfx-user-guide"; do
-  if [ -d "$script_dir/$dir" ]; then
+  if [ -d "$docs_dir/$dir" ]; then
     if [ "$check_only" -eq 1 ]; then
       # Ensure working directory is clean
-      if ! git diff --quiet "$script_dir/$dir/toc.html" 2>/dev/null; then
+      if ! git -C "$project_root" diff --quiet "docs/$dir/toc.html" 2>/dev/null; then
         echo "Working directory not clean, cannot check TOC" >&2
         exit 1
       fi
     fi
 
-    if ! mono "$temp_dir/toc-builder.exe" "$script_dir/$dir"; then
+    if ! mono "$temp_dir/toc-builder.exe" "$docs_dir/$dir"; then
       echo "TOC generation failed for $dir" >&2
       exit 1
     fi
 
     if [ "$check_only" -eq 1 ]; then
-      if ! git diff --quiet "$script_dir/$dir/toc.html" 2>/dev/null; then
-        git diff --color "$script_dir/$dir/toc.html"
-        git checkout -- "$script_dir/$dir/toc.html" 2>/dev/null
+      if ! git -C "$project_root" diff --quiet "docs/$dir/toc.html" 2>/dev/null; then
+        git -C "$project_root" diff --color "docs/$dir/toc.html"
+        git -C "$project_root" checkout -- "docs/$dir/toc.html" 2>/dev/null
         exit 1
       fi
     fi
