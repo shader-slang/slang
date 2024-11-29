@@ -30,14 +30,14 @@ located in `types`, `attributes`, `interfaces` and `global-decls` directory.
 
 Note that the `index.md` in root is not generated.
 
-You should review the generated markdown file to make sure it is formated correctly after making comment edits in the
+You should review the generated markdown file to make sure it is formatted correctly after making comment edits in the
 `*.meta.slang` files.
 
 
 ## Writing and Updating Documentation
 
 The core module documentation is done directly in comments inside `source/slang/*.meta.slang` files.
-A documentation comment should be placed directly above the declaration, either insde a `/**   */` comment block, or
+A documentation comment should be placed directly above the declaration, either inside a `/**   */` comment block, or
 after `///`. The following directives are allowed in comments:
 
 - `@param paramName description` documents a parameter or a generic parameter.
@@ -45,7 +45,7 @@ after `///`. The following directives are allowed in comments:
 - `@see` starts the "See also" section.
 - `@return` starts the `Return value" section.
 - `@example` starts the "Example" section.
-- `@category categoryID Category Name` marks the decl to be in a category. The cateogry name is only required for the first time `categoryID` is used, and omitted for the remaining `@category` lines.
+- `@category categoryID Category Name` marks the decl to be in a category. The category name is only required for the first time `categoryID` is used, and omitted for the remaining `@category` lines.
 - `@internal` marks the declaration as internal.
 - `@experimental` marks the declaration as experimental.
 - `@deprecated` marks the declaration as deprecated.
@@ -105,7 +105,7 @@ as with `@remarks`.
 - Include examples if needed in the examples section.
 - Provide a see also section with links to related declarations.
 
-After updating comments, build `slangc`, and run `slangc -compile-core-module -doc` in `stdlib-reference` diretory to update the markdown files for preview.
+After updating comments, build `slangc`, and run `slangc -compile-core-module -doc` in `stdlib-reference` directory to update the markdown files for preview.
 Your PR only needs to include changes to *.meta.slang files. Once your PR is merged, slang CI will run `slangc` and push the updated markdown files to
 the `stdlib-reference` repo.
 
@@ -113,7 +113,7 @@ the `stdlib-reference` repo.
 
 Use `// @hidden:` to hide all declarations after the line for docgen purpose.
 Use `// @public: ` to stop hiding all declarations after the line. These two special lines act like
-C++'s visiblity modifiers: they apply to everything after it.
+C++'s visibility modifiers: they apply to everything after it.
 
 ## How to preview generated html page locally
 

@@ -53,7 +53,7 @@ When it comes time to generate output code, Slang will output any declarations f
 
 A few other details worth knowing about `import` declarations:
 
-* The name you use on the `import` line gets translated into a file name with some very simple rules. An underscore (`_`) in the name turns into a dash (`-`) in the file name, and dot separators (`.`) turn into directory seprators (`/`). After these substitutions, `.slang` is added to the end of the name.
+* The name you use on the `import` line gets translated into a file name with some very simple rules. An underscore (`_`) in the name turns into a dash (`-`) in the file name, and dot separators (`.`) turn into directory separators (`/`). After these substitutions, `.slang` is added to the end of the name.
 
 * If there are multiple `import` declarations naming the same file, it will only be imported once. This is also true for nested imports.
 
@@ -61,12 +61,12 @@ A few other details worth knowing about `import` declarations:
 
 * If file `A.slang` imports `B.slang`, and then some other file does `import A;`, then only the names from `A.slang` are brought into scope, not those from `B.slang`. This behavior can be controlled by having `A.slang` use `__exported import B;` to also re-export the declarations it imports from `B`.
 
-* An import is *not* like a `#include`, and so the file that does the `import` can't see preprocessor macros defined in the imported file (and vice versa). Think of `import foo;` as closer to `using namspace foo;` in C++ (perhaps without the same baggage).
+* An import is *not* like a `#include`, and so the file that does the `import` can't see preprocessor macros defined in the imported file (and vice versa). Think of `import foo;` as closer to `using namespace foo;` in C++ (perhaps without the same baggage).
 
 ### Explicit Parameter Blocks
 
-One of the most important new features of modern APIs like Direct3D 12 and Vulkan is an interface for providing shader parameters using efficient *parameter blocks* that can be stored in GPU memory (these are implemented as descritpor tables/sets in D3D12/Vulkan, and "attribute buffers" in Metal).
-However, HLSL and GLSL don't support explicit syntax for parmaeter blocks, and so shader programmers are left to manually pack parameters into blocks either using `register`/`layout` modifiers, or with API-based remapping (in the D3D12 case).
+One of the most important new features of modern APIs like Direct3D 12 and Vulkan is an interface for providing shader parameters using efficient *parameter blocks* that can be stored in GPU memory (these are implemented as descriptor tables/sets in D3D12/Vulkan, and "attribute buffers" in Metal).
+However, HLSL and GLSL don't support explicit syntax for parameter blocks, and so shader programmers are left to manually pack parameters into blocks either using `register`/`layout` modifiers, or with API-based remapping (in the D3D12 case).
 
 Slang supports a simple and explicit syntax for exploiting parameter blocks:
 
@@ -190,7 +190,7 @@ interface IMaterial
 What is the type `???` that `evalPattern` should return? We know that it needs to be a type that supports `IBRDF`, but *which* type?
 One material might want to use `DisneyBRDF` while another wants to use `KajiyaKay`.
 
-The solution in Slang, as in modern languages like Swift and Rust, is to use *associated types* to express the depdence of the BRDF type on the material type:
+The solution in Slang, as in modern languages like Swift and Rust, is to use *associated types* to express the dependence of the BRDF type on the material type:
 
 ```hlsl
 interface IMaterial

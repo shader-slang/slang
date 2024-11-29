@@ -92,7 +92,7 @@ public void myFunc()
 }
 ```
 
-## Inferrence of Capability Requirements
+## Inference of Capability Requirements
 
 By default, Slang will infer the capability requirements of a function given its definition, as long as the function has `internal` or `private` visibility. For example, given:
 ```csharp
@@ -110,7 +110,7 @@ Slang will automatically deduce that `myFunc` has capability
 ```
 Since `discard` statement requires capability `fragment`.
 
-## Inferrence on target_switch
+## Inference on target_switch
 
 A `__target_switch` statement will introduce disjunctions in its inferred capability requirement. For example:
 ```csharp
