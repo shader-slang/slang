@@ -1,6 +1,4 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
-// WGSL: No matching overload for operator... #5606
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 enum MyId : uint {}
 extension MyId { uint get() { return (uint)this; } }
