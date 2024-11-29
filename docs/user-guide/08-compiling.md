@@ -956,7 +956,7 @@ meanings of their `CompilerOptionValue` encodings.
 | VulkanUseGLLayout | When set, will use std430 layout instead of D3D buffer layout for raw buffer load/stores. `intValue0` specifies a bool value for the setting. |
 | VulkanEmitReflection | Specifies the `-fspv-reflect` option. When set will include additional reflection instructions in the output SPIRV. `intValue0` specifies a bool value for the setting. |
 | GLSLForceScalarLayout | Specifies the `-force-glsl-scalar-layout` option. When set will use `scalar` layout for all buffers when generating SPIRV. `intValue0` specifies a bool value for the setting. |
-| EnableEffectAnnotations | When set will turn on compatibilty mode to parse legacy HLSL effect annoation syntax. `intValue0` specifies a bool value for the setting. |
+| EnableEffectAnnotations | When set will turn on compatibility mode to parse legacy HLSL effect annotation syntax. `intValue0` specifies a bool value for the setting. |
 | EmitSpirvViaGLSL | When set will emit SPIRV by emitting GLSL first and then use glslang to produce the final SPIRV code. `intValue0` specifies a bool value for the setting. |
 | EmitSpirvDirectly | When set will use Slang's direct-to-SPIRV backend to generate SPIRV directly from Slang IR. `intValue0` specifies a bool value for the setting. |
 | SPIRVCoreGrammarJSON | When set will use the provided SPIRV grammar file to parse SPIRV assembly blocks. `stringValue0` specifies a path to the spirv core grammar json file. |

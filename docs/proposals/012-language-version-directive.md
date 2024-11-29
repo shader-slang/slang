@@ -53,7 +53,7 @@ There are some key lessons from the history of GLSL that are worth paying attent
 
 * When OpenGL ES was introduced, the OpenGL ES Shading Language also used an identical `#version` directive, but the meaning of a given version number was different between GLSL and GLSL ES (that is, different language features/capabilities were implied by the same `#version`, depending on whether one was compiling with a GLSL or GLSL ES compiler). The use of the optional profile name is highly encouraged when there might be differences in capability not encoded by just the version number.
 
-* Initially, the version numbers for OpenGL and GLSL were not aligned. For example, OpenGL 2.0 used GLSL 1.10 by default. This led to confusion for developers, who needed to keep track of what API version coresponded to what language version. The version numbers for OpenGL and GLSL became aligned starting with OpenGL 3.3 and GLSL 3.30.
+* Initially, the version numbers for OpenGL and GLSL were not aligned. For example, OpenGL 2.0 used GLSL 1.10 by default. This led to confusion for developers, who needed to keep track of what API version corresponded to what language version. The version numbers for OpenGL and GLSL became aligned starting with OpenGL 3.3 and GLSL 3.30.
 
 * A common, but minor, gotcha for developers is that the GLSL `#version` directive can only be preceded by trivia (whitespace and comments) and, importantly, cannot be preceded by any other preprocessor directives. This limitation has created problems when applications want to, e.g., prepend a sequence of `#define`s to an existing shader that starts with a `#version`.
 
@@ -106,10 +106,10 @@ We will differentiate between two kinds of versions, which will have aligned num
 This proposal doesn't intend to dictate the format used for version numbers, since that is tied into the release process for the Slang toolset.
 We expect that version numbers will start with a year, so that, e.g., `2025.0`  would be the first release in the year 2025.
 
-A given version of the Slang toolset (e.g, `2024.10`) should always support the matching language verson.
+A given version of the Slang toolset (e.g, `2024.10`) should always support the matching language version.
 
 If this proposal is accepted, we expect releases of the Slang toolset to support a *range* of language versions, ideally covering a full year or more of backwards compatibility.
-This proposal does not seek to make any guarantees about the level of backwards compatiblity, leaving that the Slang project team to determine in collaboration with users.
+This proposal does not seek to make any guarantees about the level of backwards compatibility, leaving that the Slang project team to determine in collaboration with users.
 
 ### `#language` Directives ###
 
@@ -151,7 +151,7 @@ Alternatives Considered
 ### Compiler Options ###
 
 The main alternative here is to allow the language version to be specified via compiler options.
-The exising `-lang` option for `slangc` could be extended to include a language version: e.g., `slang2025.1`.
+The existing `-lang` option for `slangc` could be extended to include a language version: e.g., `slang2025.1`.
 
 This proposal is motivated by extensive experience with the pain points that arise when semantically-significant options, flags, and capabilities required by a project are encoded not in its source code, but only in its build scripts or other configuration files.
 Anybody who has been handed a single `.hlsl` file and asked to simply compile it (e.g., to reproduce a bug or performance issue) likely knows the litany of questions that need to be answered before that file is usable: what is the entry point name? What stage? What shader model?

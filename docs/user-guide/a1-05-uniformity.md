@@ -5,13 +5,13 @@ layout: user-guide
 Uniformity Analysis
 ===========
 
-On certain hardwares, accessing resources with a non-uniform index may lead to significant performance degradation. Developers can often benefit from a compiler warning for unintentional non-uniform resource access.
+On certain hardware, accessing resources with a non-uniform index may lead to significant performance degradation. Developers can often benefit from a compiler warning for unintentional non-uniform resource access.
 
 Starting from v2024.1.0, Slang provides uniformity analysis that can warn users if a non-dynamically-uniform value is being used unintentionally. This feature is not enabled by default but can be turned on with the `-validate-uniformity` commandline option when using `slangc`, or the `CompilerOptionName::ValidateUniformity` compiler option when using the API.
 
 In addition to specifying the compiler option, the source code must be augmented with the `dynamic_uniform` modifier to mark function parameters, struct fields or local variables as expecting a dynamic uniform value.
 
-For example, the following code will triger a warning:
+For example, the following code will trigger a warning:
 ```csharp
 // Indicate that the `v` parameter needs to be dynamic uniform.
 float f(dynamic_uniform float v)

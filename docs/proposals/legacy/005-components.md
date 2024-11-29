@@ -239,7 +239,7 @@ class X
 ```
 
 In the above, an instance of `X` can always find the `Y` it depends on easily and (relatively) efficiently.
-There is no particularly high overhead to having `X` diretly store an indirect reference to `Y` (at least not for coarse-grained units), and it is trivial for multiple units like `X` to all share the same *instance* of `Y` (potentially even including mutable state, for applications that like that sort of thing).
+There is no particularly high overhead to having `X` directly store an indirect reference to `Y` (at least not for coarse-grained units), and it is trivial for multiple units like `X` to all share the same *instance* of `Y` (potentially even including mutable state, for applications that like that sort of thing).
 
 In general most CPU languages (and especially OOP ones) can express the concepts of "is-a" and "has-a" but they often don't distinguish between when "has-as" means "refers-to-and-depends-on-a" vs. when it means "aggregates-and-owns-a".
 This is important when looking at a GPU language like Slang, where "aggergates-and-owns-a" is easy (we have `struct` types), but "refers-to-and-depends-on-a" is harder (not all of our targets can really support pointers).
@@ -279,7 +279,7 @@ interface IMaterialSystem
     void doMaterialStuff();
 }
 
-__component_type DefualtMaterialSystem : IMaterialSystem
+__component_type DefaultMaterialSystem : IMaterialSystem
 {
     __require lighting : ILightingSystem;
 
@@ -365,7 +365,7 @@ At the point where an `__aggregate SomeType` member is declared, the front-end s
 For example, because `DefaultIntegratorSystem` declares `__require IMaterialSystem`, the compiler searches in the current context for a value that can provide that interface.
 It finds a single suitable value: the value implicitly defined by `__aggregate DefaultMaterialSystem`, and thus "wires up" the input dependency of the `DefaultIntegratorSystem`.
 
-It is posible for a `__require` in an `__aggregate`d member to be satisfied via another `__require` of its outer type:
+It is possible for a `__require` in an `__aggregate`d member to be satisfied via another `__require` of its outer type:
 
 ```
 __component_type MyUnit
@@ -384,7 +384,7 @@ While the above examples do not show it, component types should be allowed to co
 Detailed Explanation
 --------------------
 
-Component types need to be restricted in where and how they can be used, to avoid creating situations that would give them all the flexiblity of arbitrary `class`es.
+Component types need to be restricted in where and how they can be used, to avoid creating situations that would give them all the flexibility of arbitrary `class`es.
 The only places where a component type may be used are:
 
 * `__require` and `__aggregate` declarations
@@ -434,7 +434,7 @@ Note that when the generated code invokes an operation through one of the `__agg
 
 Effectively, the compiler generates all of the boilerplate parameter-passing that the programmer would have otherwise had to write by hand.
 
-It might or might not be obvious that the notion of "component type" being described here has a clear correspondance to the `IComponentType` interface provided by the Slang runtime/compilation API.
+It might or might not be obvious that the notion of "component type" being described here has a clear correspondence to the `IComponentType` interface provided by the Slang runtime/compilation API.
 It should be possible for us to provide reflection services that allow a programmer to look up a component type by name and get an `IComponentType`.
 The existing APIs for composing, specializing, and linking `IComponentType`s should Just Work for explicit `__component_type`s.
 Large aggregates akin to `MyProgram` above can be defined entirely via the C++ `IComponentType` API at program runtime.
@@ -456,7 +456,7 @@ That last point is important, since a component type allows users to define a co
 
 ### Can the `__component_type` construct just be subsumed by either `struct` or `class`?
 
-Maybe. The key challenge is that component types need to provide the "look and feel" of by-refernece re-use rather than by-value copying. A `__require T` should effectively act like a `T*` and not a bare `T` value, so I am reluctant to say that should map to `struct`.
+Maybe. The key challenge is that component types need to provide the "look and feel" of by-reference re-use rather than by-value copying. A `__require T` should effectively act like a `T*` and not a bare `T` value, so I am reluctant to say that should map to `struct`.
 
 ### But what about `[mutating]` operations and writing to fields of component types, then?
 
@@ -484,7 +484,7 @@ __component_type C { __require A; ... }
 __component_type D { __require B; __require C; ... }
 ```
 
-The Spark shading language research project used multiple mixin class inheritance to compose units of shader code akin to what are being proposed here as coponent types (hmm... I guess that should go into related work...).
+The Spark shading language research project used multiple mixin class inheritance to compose units of shader code akin to what are being proposed here as component types (hmm... I guess that should go into related work...).
 
 In general, using inheritance to model something that isn't an "is-a" relationship is poor modeling.
 Inheritance as a modelling tool cannot capture some patterns that are possible with `__aggregate` (notably, with mixin inheritance you can't get multiple "copies" of a component).

@@ -15,7 +15,7 @@ We will start by enumerating these goals (and related non-goals) explicitly so t
 
 * As a particular case of analysis and optimization, it should be possible to validate flow-dependent properties of an input function/program (e.g., whether an `[unroll]` loop is actually unrollable) using the IR, and emit meaningful error messages that reference the AST-level names/locations of constructs involved in an error.
 
-* It should be posible to compile modules to the IR separately and then "link" them in a way that depends only on IR-level (not AST-level) constructs. We want to allow changing implementation details of a module without forcing a re-compile of IR code using that module (what counts as "implementation details") is negotiable.
+* It should be possible to compile modules to the IR separately and then "link" them in a way that depends only on IR-level (not AST-level) constructs. We want to allow changing implementation details of a module without forcing a re-compile of IR code using that module (what counts as "implementation details") is negotiable.
 
 * There should be a way to serialize IR modules in a round-trip fashion preserving all of the structure. As a long-term goal, the serialized format should provide stability across compiler versions (working more as an IL than an IR)
 
@@ -81,7 +81,7 @@ The only exception to this rule is instructions that represent literal constants
 
 The in-memory encoding places a few more restrictions on top of this so that, e.g., currently an instruction can either have operands of children, but not both.
 
-Because everything that could be used as an operand is also an instruction, the operands of an instruction are stored in a highly uniform way as a contiguous array of `IRUse` values (even the type is continguous with this array, so that it can be treated as an additional operand when required).
+Because everything that could be used as an operand is also an instruction, the operands of an instruction are stored in a highly uniform way as a contiguous array of `IRUse` values (even the type is contiguous with this array, so that it can be treated as an additional operand when required).
 The `IRUse` type maintains explicit links for use-def information, currently in a slightly bloated fashion (there are well-known techniques for reducing the size of this information).
 
 ### A Class Hierarchy Mirrored in Opcodes
@@ -112,7 +112,7 @@ The idea doesn't really start in Swift, but rather in the existing observation t
 Like Swift, we do not use an explicit CPS representation, but instead find a middle ground of a traditional SSA IR where instead of phi instructions basic blocks have parameters.
 The first N instructions in a Slang basic block are its parameters, each of which is an `IRParam` instruction.
 
-A block that would have had N phi instrutions now has N parameters, but the parameters do not have operands.
+A block that would have had N phi instructions now has N parameters, but the parameters do not have operands.
 Instead, a branch instruction that targets that block will have N *arguments* to match the parameters, representing the values to be assigned to the parameters when this control-flow edge is taken.
 
 This encoding is equivalent in what it represents to traditional phi instructions, but nicely solves the problems outlined above:
@@ -123,7 +123,7 @@ This encoding is equivalent in what it represents to traditional phi instruction
 
 - There is no special work required to track which phi operands come from which predecessor block, since the operands are attached to the terminator instruction of the predecessor block itself. There is no need to update phi instructions after a CFG change that might affect the predecessor list of a block. The trade-off is that any change in the *number* of parameters of a block now requires changes to the terminator of each predecessor, but that is a less common change (isolated to passes that can introduce or eliminate block parameters/phis).
 
-- It it much more clear how to give an operational semantics to a "branch with arguments" instead of phi instructions: compute the target block, copy the argumenst to temporary storage (because of the simultaneity requirement), and then copy the temporaries over the parameters of the target block.
+- It it much more clear how to give an operational semantics to a "branch with arguments" instead of phi instructions: compute the target block, copy the arguments to temporary storage (because of the simultaneity requirement), and then copy the temporaries over the parameters of the target block.
 
 The main caveat of this representation is that it requires branch instructions to have room for arguments to the target block. For an ordinary unconditional branch this is pretty easy: we just put a variable number of arguments after the operand for the target block. For branch instructions like a two-way conditional, we might need to encode two argument lists - one for each target block - and an N-way `switch` branch only gets more complicated.
 
@@ -138,7 +138,7 @@ This constraint could be lifted at some point, but it is important to note that 
 A traditional SSA IR represents a function as a bunch of basic blocks of instructions, where each block ends in a *terminator* instruction.
 Terminators are instructions that can branch to another block, and are only allowed at the end of a block.
 The potential targets of a terminator determine the *successors* of the block where it appears, and contribute to the *predecessors* of any target block.
-The succesor-to-predecessor edges form a graph over the basic blocks called the control-flow graph (CFG).
+The successor-to-predecessor edges form a graph over the basic blocks called the control-flow graph (CFG).
 
 A simple representation of a function would store the CFG explicitly as a graph data structure, but in that case the data structure would need to be updated whenever a change is made to the terminator instruction of a branch in a way that might change the successor/predecessor relationship.
 

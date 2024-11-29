@@ -105,7 +105,7 @@ If the member name of a swizzle consists of a single character, then the express
 
 If the member name of a swizzle consists of `M` characters, then the result is a `vector<T,M>` built from the elements of the base vector with the corresponding indices.
 
-A vector swizzle expression is an l-value if the base expression was an l-value and the list of indices corresponding to the characeters of the member name contains no duplicates.
+A vector swizzle expression is an l-value if the base expression was an l-value and the list of indices corresponding to the characters of the member name contains no duplicates.
 
 ### Matrix Swizzles
 
@@ -224,7 +224,7 @@ A cast expression can perform both built-in type conversions and invoke any sing
 
 ### Compatibility Feature
 
-As a compatiblity feature for older code, Slang supports using a cast where the base expression is an integer literal zero and the target type is a user-defined structure type:
+As a compatibility feature for older code, Slang supports using a cast where the base expression is an integer literal zero and the target type is a user-defined structure type:
 
 ```hlsl
 MyStruct s = (MyStruct) 0;
@@ -338,7 +338,7 @@ With the exception of the assignment operator (`=`), an infix operator expressio
 
 ### Conditional Expression
 
-The conditonal operator, `?:`, is used to select between two expressions based on the value of a condition:
+The conditional operator, `?:`, is used to select between two expressions based on the value of a condition:
 
 ```hlsl
 useNegative ? -1.0f : 1.0f

@@ -5,7 +5,7 @@ permalink: /user-guide/link-time-specialization
 
 # Link-time Specialization and Module Precompilation
 
-Traditionally, graphics developers have been relying on the preprocesor defines to specialize their shader code for high-performance GPU execution.
+Traditionally, graphics developers have been relying on the preprocessor defines to specialize their shader code for high-performance GPU execution.
 While functioning systems can be built around preprocessor macros, overusing them leads to many problems:
 - Long compilation time. With preprocessors defines, specialzation happens before parsing, which is a very early stage in the compilation flow.
   This means that the compiler must redo almost all work from the scratch with every specialized variant, including parsing, type checking, IR generation

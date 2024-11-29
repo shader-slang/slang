@@ -74,9 +74,9 @@ T.Differential dmul<S:__BuiltinRealType>(S s, T.Differential a)
 5. During auto-diff, the compiler can sometimes synthesize new aggregate types. The most common case is the intermediate context type (`kIROp_BackwardDerivativeIntermediateContextType`), which is lowered into a standard struct once the auto-diff pass is complete. It is important to synthesize the `IDifferentiable` conformance for such types since they may be further differentiated (through higher-order differentiation). This implementation is contained in `fillDifferentialTypeImplementationForStruct(...)` and is roughly analogous to the AST-side synthesis.
 
 ### Differentiable Type Dictionaries
-During auto-diff, the IR passes frequently need to perform lookups to check if an `IRType` is differentiable, and retreive references to the corresponding `IDifferentiable` methods. These lookups also need to work on generic parameters (that are defined inside generic containers), and existential types that are interface-typed parameters.
+During auto-diff, the IR passes frequently need to perform lookups to check if an `IRType` is differentiable, and retrieve references to the corresponding `IDifferentiable` methods. These lookups also need to work on generic parameters (that are defined inside generic containers), and existential types that are interface-typed parameters.
 
-To accomodate this range of different type systems, Slang uses a type dictionary system that associates a dictionary of relevant types with each function. This works in the following way:
+To accommodate this range of different type systems, Slang uses a type dictionary system that associates a dictionary of relevant types with each function. This works in the following way:
 1. When `CheckTerm()` is called on an expression within a function that is marked differentiable (`[Differentiable]`), we check if the resolved type conforms to `IDifferentiable`. If so, we add this type to the dictionary along with the witness to its differentiability. The dictionary is currently located on `DifferentiableAttribute` that corresponds to the `[Differentiable]` modifier.
 
 2. When lowering to IR, we create a `DifferentiableTypeDictionaryDecoration` which holds the IR versions of all the types in the dictionary as well as a reference to their `IDifferentiable` witness tables.

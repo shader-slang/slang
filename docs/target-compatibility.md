@@ -91,7 +91,7 @@ tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not 
 
 ## SM6.0 Wave Intrinsics
 
-CUDA has premliminary support for Wave Intrinsics, introduced in [PR #1352](https://github.com/shader-slang/slang/pull/1352). Slang synthesizes the 'WaveMask' based on program flow and the implied 'programmer view' of exectution. This support is built on top of WaveMask intrinsics with Wave Intrinsics being replaced with WaveMask Intrinsic calls with Slang generating the code to calculate the appropriate WaveMasks.
+CUDA has premliminary support for Wave Intrinsics, introduced in [PR #1352](https://github.com/shader-slang/slang/pull/1352). Slang synthesizes the 'WaveMask' based on program flow and the implied 'programmer view' of execution. This support is built on top of WaveMask intrinsics with Wave Intrinsics being replaced with WaveMask Intrinsic calls with Slang generating the code to calculate the appropriate WaveMasks.
 
 Please read [PR #1352](https://github.com/shader-slang/slang/pull/1352) for a better description of the status.
 
@@ -105,7 +105,7 @@ SM6.5 Wave Intrinsics are supported, but requires a downstream DXC compiler that
 
 ## WaveMask Intrinsics
 
-In order to map better to the CUDA sync/mask model Slang supports 'WaveMask' intrinsics. They operate in broadly the same way as the Wave intrinsics, but require the programmer to specify the lanes that are involved. To write code that uses wave intrinsics acrosss targets including CUDA, currently the WaveMask intrinsics must be used. For this to work, the masks passed to the WaveMask functions should exactly match the 'Active lanes' concept that HLSL uses, otherwise the result is undefined.
+In order to map better to the CUDA sync/mask model Slang supports 'WaveMask' intrinsics. They operate in broadly the same way as the Wave intrinsics, but require the programmer to specify the lanes that are involved. To write code that uses wave intrinsics across targets including CUDA, currently the WaveMask intrinsics must be used. For this to work, the masks passed to the WaveMask functions should exactly match the 'Active lanes' concept that HLSL uses, otherwise the result is undefined.
 
 The WaveMask intrinsics are not part of HLSL and are only available on Slang.
 
@@ -243,9 +243,9 @@ On the CPU atomics are not supported, but will be in the future.
 
 The HLSL [sampler feedback feature](https://microsoft.github.io/DirectX-Specs/d3d/SamplerFeedback.html) is available for DirectX12. The features requires shader model 6.5 and therefore a version of [DXC](https://github.com/Microsoft/DirectXShaderCompiler) that supports that model or higher. The Shader Model 6.5 requirement also means only DXIL binary format is supported.
 
-There doesn't not appear to be a similar feature available in Vulkan yet, but when it is available support should be addeed.
+There doesn't not appear to be a similar feature available in Vulkan yet, but when it is available support should be added.
 
-For CPU targets there is the IFeedbackTexture interface that requires an implemention for use. Slang does not currently include CPU implementations for texture types.
+For CPU targets there is the IFeedbackTexture interface that requires an implementation for use. Slang does not currently include CPU implementations for texture types.
 
 <a id="byte-address-atomic"></a>
 
