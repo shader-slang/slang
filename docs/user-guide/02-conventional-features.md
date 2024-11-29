@@ -801,143 +801,147 @@ Auto-Generated Constructors
 ### Auto-Generated Constructors - Struct
 
 Slang has the following rules:
-1. Auto-generate a `__init()` if not already defined
-> Assume
-```csharp
-struct DontGenerateCtor
-{
-    int a;
-    int b = 5;
+1. Auto-generate a `__init()` if not already defined.
 
-    // Since the user has explicitly defined a constructor
-    // here, Slang will not synthesize a conflicting 
-    // constructor.
-    __init()
-    {
-        // b = 5;
-        a = 5;
-        b = 6;
-    }
-};
+   Assume:
+   ```csharp
+   struct DontGenerateCtor
+   {
+       int a;
+       int b = 5;
 
-struct GenerateCtor
-{
-    int a;
-    int b = 5;
+       // Since the user has explicitly defined a constructor
+       // here, Slang will not synthesize a conflicting 
+       // constructor.
+       __init()
+       {
+           // b = 5;
+           a = 5;
+           b = 6;
+       }
+   };
 
-    // Slang will automatically generate an implicit constructor:
-    // __init()
-    // {
-    //     b = 5;
-    // }
-};
-```
+   struct GenerateCtor
+   {
+       int a;
+       int b = 5;
+   
+       // Slang will automatically generate an implicit constructor:
+       // __init()
+       // {
+       //     b = 5;
+       // }
+   };
+   ```
 
 2. If all members have equal visibility, auto-generate a 'member-wise constructor' if not conflicting with a user defined constructor.
-```csharp
-struct GenerateCtorInner
-{
-    int a;
+   ```csharp
+   struct GenerateCtorInner
+   {
+       int a;
 
-    // Slang will automatically generate an implicit
-    // __init(int in_a)
-    // {
-    //     a = in_a;
-    // }
-};
-struct GenerateCtor : GenerateCtorInner
-{
-    int b;
-    int c = 5;
+       // Slang will automatically generate an implicit
+       // __init(int in_a)
+       // {
+       //     a = in_a;
+       // }
+   };
+   struct GenerateCtor : GenerateCtorInner
+   {
+       int b;
+       int c = 5;
 
-    // Slang will automatically generate an implicit
-    // __init(int in_a, int in_b, int in_c)
-    // {
-    //     c = 5;
-    //
-    //     this = GenerateCtorInner(in_a);
-    //
-    //     b = in_b;
-    //     c = in_c;
-    // }
-};
-```
+       // Slang will automatically generate an implicit
+       // __init(int in_a, int in_b, int in_c)
+       // {
+       //     c = 5;
+       //
+       //     this = GenerateCtorInner(in_a);
+       //
+       //     b = in_b;
+       //     c = in_c;
+       // }
+   };
+   ```
+
 3. If not all members have equal visibility, auto-generate a 'member-wise constructor' based on member visibility if not conflicting with a user defined constructor. 
-    * We generate 3 different visibilities of 'member-wise constructor's in order:
-        1. `public` 'member-wise constructor'
-            * Contains members of visibility: `public`
-            * Do not generate if `internal` or `private` member lacks an init expression
-        2. `internal` 'member-wise constructor'
-            * Contains members of visibility: `internal`, `public`
-            * Do not generate if `private` member lacks an init expression
-        3. `private` 'member-wise constructor'
-            * Contains members of visibility: `private`, `internal`, `public`
-```csharp
-struct GenerateCtorInner1
-{
-    internal int a = 0;
+
+   We generate 3 different visibilities of 'member-wise constructor's in order:
+      1. `public` 'member-wise constructor'
+         - Contains members of visibility: `public`
+         - Do not generate if `internal` or `private` member lacks an init expression
+      2. `internal` 'member-wise constructor'
+         - Contains members of visibility: `internal`, `public`
+         - Do not generate if `private` member lacks an init expression
+      3. `private` 'member-wise constructor'
+         - Contains members of visibility: `private`, `internal`, `public`
+
+   ```csharp
+   struct GenerateCtorInner1
+   {
+       internal int a = 0;
     
-    // Slang will automatically generate an implicit
-    // internal __init(int in_a)
-    // {
-    //     a = 0;
-    //
-    //     a = in_a;
-    // }
-};
-struct GenerateCtor1 : GenerateCtorInner1
-{
-    internal int b = 0;
-    public int c;
+       // Slang will automatically generate an implicit
+       // internal __init(int in_a)
+       // {
+       //     a = 0;
+       //
+       //     a = in_a;
+       // }
+   };
+   struct GenerateCtor1 : GenerateCtorInner1
+   {
+       internal int b = 0;
+       public int c;
 
-    // Slang will automatically generate an implicit
-    // internal __init(int in_a, int in_b, int in_c)
-    // {
-    //     b = 0;
-    //
-    //     this = GenerateCtorInner1(in_a);
-    //
-    //     b = in_b;
-    //     c = in_c;
-    // }
-    //
-    // public __init(int in_c)
-    // {
-    //     b = 0;
-    //
-    //     this = GenerateCtorInner1();
-    //
-    //     c = in_c;
-    // }
-};
+       // Slang will automatically generate an implicit
+       // internal __init(int in_a, int in_b, int in_c)
+       // {
+       //     b = 0;
+       //
+       //     this = GenerateCtorInner1(in_a);
+       //
+       //     b = in_b;
+       //     c = in_c;
+       // }
+       //
+       // public __init(int in_c)
+       // {
+       //     b = 0;
+       //
+       //     this = GenerateCtorInner1();
+       //
+       //     c = in_c;
+       // }
+   };
 
-struct GenerateCtorInner2
-{
-    internal int a;
-    // Slang will automatically generate an implicit
-    // internal __init(int in_a)
-    // {
-    //     a = in_a;
-    // }
-};
-struct GenerateCtor2 : GenerateCtorInner2
-{
-    internal int b;
-    public int c;
+   struct GenerateCtorInner2
+   {
+       internal int a;
+       // Slang will automatically generate an implicit
+       // internal __init(int in_a)
+       // {
+       //     a = in_a;
+       // }
+   };
+   struct GenerateCtor2 : GenerateCtorInner2
+   {
+       internal int b;
+       public int c;
 
-    /// Note: `internal b` is missing init expression,
-    // Do not generate a `public` 'member-wise' constructor.
+       /// Note: `internal b` is missing init expression,
+       // Do not generate a `public` 'member-wise' constructor.
 
-    // Slang will automatically generate an implicit
-    // internal __init(int in_a, int in_b, int in_c)
-    // {
-    //     this = GenerateCtorInner2(in_a);
-    //
-    //     b = in_b;
-    //     c = in_c;
-    // }
-};
-```
+       // Slang will automatically generate an implicit
+       // internal __init(int in_a, int in_b, int in_c)
+       // {
+       //     this = GenerateCtorInner2(in_a);
+       //
+       //     b = in_b;
+       //     c = in_c;
+       // }
+   };
+   ```
 
 Initializer Lists
 ----------
@@ -1111,38 +1115,39 @@ float3 val2 = {};
 
 1. Attempt to call default constructor (`__init()`) of a `struct`
 
+   ```csharp
+   struct Foo
+   {
+       int a;
+       int b;
+       __init()
+       {
+           a = 5;
+           b = 5;
+       }
+   };
 
-```csharp
-struct Foo
-{
-    int a;
-    int b;
-    __init()
-    {
-        a = 5;
-        b = 5;
-    }
-};
+   ...
 
-...
+   // Equivalent to `Foo val = Foo();`
+   Foo val = {};
+   ```
 
-// Equivalent to `Foo val = Foo();`
-Foo val = {};
-```
 2. As a fallback, zero-initialize the struct
 
-```csharp
-struct Foo
-{
-    int a;
-    int b;
-};
+   ```csharp
+   struct Foo
+   {
+       int a;
+       int b;
+   };
 
-...
+   ...
 
-// Equivalent to `Foo val; val.a = 0; val.b = 0;` 
-Foo val = {};
-```
+   // Equivalent to `Foo val; val.a = 0; val.b = 0;` 
+   Foo val = {};
+   ```
+
 ### Initializer Lists - Other features
 
 Slang allows calling a default-initializer inside a default-constructor.
