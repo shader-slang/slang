@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../source/compiler-core/slang-lexer.h"
+#include "compiler-core/slang-lexer.h"
 #include "diagnostics.h"
 #include "identifier-lookup.h"
 #include "node.h"

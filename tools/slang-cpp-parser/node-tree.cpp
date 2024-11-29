@@ -1,7 +1,7 @@
 #include "node-tree.h"
 
-#include "../../source/compiler-core/slang-name-convention-util.h"
-#include "../../source/core/slang-io.h"
+#include "compiler-core/slang-name-convention-util.h"
+#include "core/slang-io.h"
 #include "identifier-lookup.h"
 #include "options.h"
 

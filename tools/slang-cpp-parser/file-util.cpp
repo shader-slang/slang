@@ -1,6 +1,6 @@
 #include "file-util.h"
 
-#include "../../source/core/slang-io.h"
+#include "core/slang-io.h"
 
 namespace CppParse
 {

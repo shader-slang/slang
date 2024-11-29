@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../source/compiler-core/slang-doc-extractor.h"
+#include "compiler-core/slang-doc-extractor.h"
 #include "diagnostics.h"
 
 namespace CppParse

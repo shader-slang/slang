@@ -1,7 +1,7 @@
 #include "node.h"
 
-#include "../../source/core/slang-string-escape-util.h"
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
 #include "file-util.h"
 
 namespace CppParse

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../source/compiler-core/slang-diagnostic-sink.h"
-#include "../tools/slang-cpp-parser/diagnostics.h"
-#include "../tools/slang-cpp-parser/node-tree.h"
-#include "../tools/slang-cpp-parser/options.h"
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "slang-cpp-parser/diagnostics.h"
+#include "slang-cpp-parser/node-tree.h"
+#include "slang-cpp-parser/options.h"
 
 namespace CppExtract
 {

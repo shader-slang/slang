@@ -74,6 +74,7 @@ slang_add_target(
     STATIC
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core
+    INCLUDE_DIRECTORIES_PUBLIC .
     FOLDER generators
 )
 

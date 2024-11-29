@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../source/slang/slang-diagnostics.h"
+#include "slang/slang-diagnostics.h"
 
 namespace CppParse
 {
