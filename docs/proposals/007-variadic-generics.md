@@ -212,7 +212,7 @@ void k<each T, let i : int>() {} // Error.
 void h<U = int, each T>() {} // OK.
 ```
 
-Addtionally, we establish these restrictions on how `expand` and `each` maybe used:
+Additionally, we establish these restrictions on how `expand` and `each` maybe used:
 - The pattern type of an `expand` type expression must capture at least one generic type pack parameter in an `each` expression.
 - The type expression after `each` must refer to a generic type pack parameter, and the `each` expression can only appear inside an `expand` expression.
 
@@ -222,7 +222,7 @@ Similarly, when using `expand` and `each` on values, we require that:
 - The pattern expression of an `expand` expression must capture at least one value whose type is a generic type pack parameter.
 - The expression after `each` must refer to a value whose type is a generic type pack parameter, and the `each` expression can only appear inside an `expand` expression.
 
-Combined with type euqality constriants, variadic generic type pack can be used to define homogeneously typed parameter pack:
+Combined with type euqality constraints, variadic generic type pack can be used to define homogeneously typed parameter pack:
 ```
 void calcInts<each T>(expand each T values) where T == int
 {
@@ -653,8 +653,8 @@ by packing up all the values computed at each "loop iteration" in an `IRMakeValu
 }
 ```
 
-With this, we can replace the original `IRExpand` inst with `%expand` and specailization is done. The specialized instructions like `IRGetTupleElement(%v, 0)` will be picked up
-in the follow-up step during specalization and replaced with the actual value at the specified index since `%v` is a known value pack represented by `IRMakeValuePack`. So after
+With this, we can replace the original `IRExpand` inst with `%expand` and specialization is done. The specialized instructions like `IRGetTupleElement(%v, 0)` will be picked up
+in the follow-up step during specialization and replaced with the actual value at the specified index since `%v` is a known value pack represented by `IRMakeValuePack`. So after
 folding and other simplifications, we should result in
 ```
 %expand = IRMakeValuePack(2,3,4)
@@ -673,7 +673,7 @@ After the specialization pass, there should be no more `IRExpand` and `IRExpandT
 Alternatives Considered
 -----------------------
 
-We considered the C++ `...` oeprator syntax and Swift's `repeat each` syntax and ended up picking Swift's design because it is easier to parse and is less ambiguous. Swift is strict about requiring `each` to precede a generic type pack parameter so `void f<each T>(T v)` is not a valid syntax to prevent confusion on what `T` is in this context. In Slang we don't require this because `expand each T` is always simplified down to `T`, and refer to the type pack.
+We considered the C++ `...` operator syntax and Swift's `repeat each` syntax and ended up picking Swift's design because it is easier to parse and is less ambiguous. Swift is strict about requiring `each` to precede a generic type pack parameter so `void f<each T>(T v)` is not a valid syntax to prevent confusion on what `T` is in this context. In Slang we don't require this because `expand each T` is always simplified down to `T`, and refer to the type pack.
 
 We also considered not adding variadic generics support to the language at all, and just implement `Tuple` and `IFunc` as special system builtin types, like how it is done in C#. However we
 believe that this approach is too limited when it comes to what the user can do with tuples and `IFunc`. Given Slang's position as a high performance GPU-first language, it is more important for Slang than other CPU languages to have a powerful type system that can provide zero-cost abstraction for meta-programming tasks. That lead us to believe that the language and the users can benefit from proper support of variadic generics.

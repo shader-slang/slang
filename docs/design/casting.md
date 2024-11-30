@@ -146,9 +146,5 @@ The following code shows the change in behavior of 'as' is based on the source *
     SLANG_ASSERT(as<NamedExpression>(exprType) == nullptr);
     
     // dynamicCast is always the same object returned, so must match
-    SLANG_ASSERT(dynamcCast<NamedExpression(exprType) == exprType);
+    SLANG_ASSERT(dynamicCast<NamedExpression>(exprType) == exprType);
 ```
-    
-    
-    
-    

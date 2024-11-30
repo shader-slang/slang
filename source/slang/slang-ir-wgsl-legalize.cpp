@@ -1429,6 +1429,30 @@ struct LegalizeWGSLEntryPointContext
         }
     }
 
+    void legalizeFunc(IRFunc* func)
+    {
+        // Insert casts to convert integer return types
+        auto funcReturnType = func->getResultType();
+        if (isIntegralType(funcReturnType))
+        {
+            for (auto block : func->getBlocks())
+            {
+                if (auto returnInst = as<IRReturn>(block->getTerminator()))
+                {
+                    auto returnedValue = returnInst->getOperand(0);
+                    auto returnedValueType = returnedValue->getDataType();
+                    if (isIntegralType(returnedValueType))
+                    {
+                        IRBuilder builder(returnInst);
+                        builder.setInsertBefore(returnInst);
+                        auto newOp = builder.emitCast(funcReturnType, returnedValue);
+                        builder.replaceOperand(returnInst->getOperands(), newOp);
+                    }
+                }
+            }
+        }
+    }
+
     void legalizeSwitch(IRSwitch* switchInst)
     {
         // WGSL Requires all switch statements to contain a default case.
@@ -1491,6 +1515,28 @@ struct LegalizeWGSLEntryPointContext
                 inst->getOperand(0));
             builder.replaceOperand(inst->getOperands(), newLhs);
         }
+        else if (
+            isIntegralType(inst->getOperand(0)->getDataType()) &&
+            isIntegralType(inst->getOperand(1)->getDataType()))
+        {
+            // If integer operands differ in signedness, convert the signed one to unsigned.
+            // We're assuming that the cases where this is bad have already been caught by
+            // common validation checks.
+            IntInfo opIntInfo[2] = {
+                getIntTypeInfo(inst->getOperand(0)->getDataType()),
+                getIntTypeInfo(inst->getOperand(1)->getDataType())};
+            if (opIntInfo[0].isSigned != opIntInfo[1].isSigned)
+            {
+                int signedOpIndex = (int)opIntInfo[1].isSigned;
+                opIntInfo[signedOpIndex].isSigned = false;
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                auto newOp = builder.emitCast(
+                    builder.getType(getIntTypeOpFromInfo(opIntInfo[signedOpIndex])),
+                    inst->getOperand(signedOpIndex));
+                builder.replaceOperand(inst->getOperands() + signedOpIndex, newOp);
+            }
+        }
     }
 
     void processInst(IRInst* inst)
@@ -1529,6 +1575,9 @@ struct LegalizeWGSLEntryPointContext
             legalizeBinaryOp(inst);
             break;
 
+        case kIROp_Func:
+            legalizeFunc(static_cast<IRFunc*>(inst));
+            [[fallthrough]];
         default:
             for (auto child : inst->getModifiableChildren())
             {

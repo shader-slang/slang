@@ -24,7 +24,7 @@ We could imagine a mechanism that saved off each instance, by writing off the ad
 
 * If we try to read back on a different machine, with a different pointer size, the object layout will be incompatible
 * If we try to read back on the same machine where the source is compiled by a different compiler, the object layout might be incompatible (say bool or enum are different size)
-* Endianess might be different
+* Endianness might be different
 * Knowing where all the pointers are and what they point to and therefore what to serialize is far from simple. 
 * The alignment of types might be different across different processors and different compilers 
 
@@ -304,7 +304,7 @@ Riff Container
 
 [Riff](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format) is used as a mechanism to store binary sections. The format allows for a hierarchy of `chunks` that hold binary data. How the data is interpreted depends on the [FOURCC](https://en.wikipedia.org/wiki/FourCC) associated with each chunk. 
 
-As previously touched on there are multiple different mechanisms used for serialization. IR serialization, generalized serialization, SourceLoc serialization - there are also other uses, such as serializing of entry point information. Riff is used to combine all of these incompatible binary parts togther such that they can be stored together. 
+As previously touched on there are multiple different mechanisms used for serialization. IR serialization, generalized serialization, SourceLoc serialization - there are also other uses, such as serializing of entry point information. Riff is used to combine all of these incompatible binary parts together such that they can be stored together.
 
 The handling of these riff containers is held within the `SerialContainerUtil` class. 
 
