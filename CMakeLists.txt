@@ -339,6 +339,7 @@ install(DIRECTORY "${slang_SOURCE_DIR}/include" DESTINATION .)
 
 include(CPack)
 
+# Write basic package config version file using standard CMakePackageConfigHelpers utility
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
     "${PROJECT_NAME}ConfigVersion.cmake"
@@ -346,12 +347,21 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
+# Write SlangConfig.cmake which should allow find_pacakage(SLANG) to work correctly
+# SlangConfig.cmake will define slang::slang target that can be linked with using
+# target_link_libraries. It will also define SLANG_EXECUTABLE export variable that
+# should point to slangc if SLANG_ENABLE_SLANGC is ON.
 configure_package_config_file(
     "${PROJECT_SOURCE_DIR}/cmake/SlangConfig.cmake.in"
     "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
     INSTALL_DESTINATION cmake
 )
 
+# Conditionally handle the case for Emscripten where slang does not create linkable
+# targets. In this case do not export the targets. Otherwise, just export the 
+# slang target, as this is the library that is required to use the compiler. This possibly
+# should later be expanded to include slang-rhi targets if some program intends to use them, 
+# but possibly wait for a future request before expanding this export set.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     install(TARGETS slang EXPORT SlangExportTarget)
     install(
