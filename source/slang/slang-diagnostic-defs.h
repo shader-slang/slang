@@ -1574,6 +1574,12 @@ DIAGNOSTIC(
     Error,
     invalidFloatingPointLiteralSuffix,
     "invalid suffix '$0' on floating-point literal")
+DIAGNOSTIC(
+    39999,
+    Warning,
+    decimalIntegerLiteralTooLarge,
+    "decimal integer literal is too large to represented as a signed integer, representing as "
+    "unsigned")
 
 DIAGNOSTIC(
     39999,

@@ -3136,8 +3136,7 @@ static Modifier* ParseSemantic(Parser* parser)
         BitFieldModifier* bitWidthMod = parser->astBuilder->create<BitFieldModifier>();
         parser->FillPosition(bitWidthMod);
         const auto token = parser->tokenReader.advanceToken();
-        UnownedStringSlice suffix;
-        bitWidthMod->width = getIntegerLiteralValue(token, &suffix);
+        bitWidthMod->width = getIntegerLiteralValue(token);
         return bitWidthMod;
     }
     else if (parser->LookAheadToken(TokenType::CompletionRequest))
@@ -6638,6 +6637,59 @@ static IntegerLiteralValue _fixIntegerLiteral(
     return value;
 }
 
+static BaseType _determineNonSuffixedIntegerLiteralType(
+    IntegerLiteralValue value,
+    int base,
+    Token* token,
+    DiagnosticSink* sink)
+{
+    const uint64_t rawValue = (uint64_t)value;
+    const bool decimalBase = (base == 10);
+
+    /// Non-suffixed integer literal types
+    ///
+    /// The type is the first from the following list in which the value can fit:
+    /// - For decimal bases:
+    ///     - `int`
+    ///     - `int64_t`
+    /// - For non-decimal bases:
+    ///     - `int`
+    ///     - `uint`
+    ///     - `int64_t`
+    ///     - `uint64_t`
+    BaseType baseType;
+    if (rawValue <= (uint64_t)INT32_MAX)
+    {
+        baseType = BaseType::Int;
+    }
+    else if ((rawValue <= (uint64_t)UINT32_MAX) && !decimalBase)
+    {
+        baseType = BaseType::UInt;
+    }
+    else if (rawValue <= (uint64_t)INT64_MAX)
+    {
+        baseType = BaseType::Int64;
+    }
+    else
+    {
+        baseType = BaseType::UInt64;
+
+        if (decimalBase)
+        {
+            // Decimal integer is too large to be represented as signed.
+            // Output warning that it is represented as unsigned instead.
+            sink->diagnose(
+                *token,
+                Diagnostics::decimalIntegerLiteralTooLarge,
+                token->getContent(),
+                BaseTypeInfo::asText(baseType),
+                rawValue);
+        }
+    }
+
+    return baseType;
+}
+
 static bool _isCast(Parser* parser, Expr* expr)
 {
     if (as<PointerTypeExpr>(expr))
@@ -6925,20 +6977,18 @@ static Expr* parseAtomicExpr(Parser* parser)
             constExpr->token = token;
 
             UnownedStringSlice suffix;
-            IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix);
+            int base;
+            IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix, &base);
 
             // Look at any suffix on the value
             char const* suffixCursor = suffix.begin();
             const char* const suffixEnd = suffix.end();
+            const bool suffixExists = (suffixCursor != suffixEnd);
 
-            // If no suffix is defined go with the default
-            BaseType suffixBaseType = BaseType::Int;
-
-            if (suffixCursor < suffixEnd)
+            // Mark as void, taken as an error
+            BaseType suffixBaseType = BaseType::Void;
+            if (suffixExists)
             {
-                // Mark as void, taken as an error
-                suffixBaseType = BaseType::Void;
-
                 int lCount = 0;
                 int uCount = 0;
                 int zCount = 0;
@@ -7007,6 +7057,11 @@ static Expr* parseAtomicExpr(Parser* parser)
                     parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
                     suffixBaseType = BaseType::Int;
                 }
+            }
+            else
+            {
+                suffixBaseType =
+                    _determineNonSuffixedIntegerLiteralType(value, base, &token, parser->sink);
             }
 
             value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
