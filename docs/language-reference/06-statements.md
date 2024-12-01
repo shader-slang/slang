@@ -3,7 +3,7 @@
 Statements
 ==========
 
-Statements are used to define the bodies of functions and deterine order of evaluation and control flow for an entire program.
+Statements are used to define the bodies of functions and determine order of evaluation and control flow for an entire program.
 Statements are distinct from expressions in that statements do not yield results and do not have types.
 
 This section lists the kinds of statements supported by Slang.
@@ -101,7 +101,7 @@ default:
     break;
 ```
 
-A _case label_ consists of the keyword `case` followed by an expresison and a colon (`:`).
+A _case label_ consists of the keyword `case` followed by an expressions and a colon (`:`).
 The expression must evaluate to a compile-time constant integer.
 
 A _default label_ consists of the keyword `default` followed by a colon (`:`).
@@ -203,7 +203,7 @@ The value returned must be able to coerce to the result type of the lexically en
 
 ### Discard Statement
 
-A `discard` statement can only be used in the context of a fragment shader, in which case it causes the current invocation to terminate and the graphics system to discard the corresponding fragment so that it does not get combined with the framebuffer pixel at its coordintes.
+A `discard` statement can only be used in the context of a fragment shader, in which case it causes the current invocation to terminate and the graphics system to discard the corresponding fragment so that it does not get combined with the framebuffer pixel at its coordinates.
 
 Operations with side effects that were executed by the invocation before a `discard` will still be performed and their results will become visible according to the rules of the platform.
 

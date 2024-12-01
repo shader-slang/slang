@@ -1,7 +1,8 @@
 ﻿using System;
-using System.IO;
-using System.Text;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 namespace toc
 {
     public class Builder
@@ -128,7 +129,7 @@ namespace toc
         {
             StringBuilder outputSB = new StringBuilder();
             outputSB.AppendFormat("Building table of contents from {0}...\n", path);
-            var files = System.IO.Directory.EnumerateFiles(path, "*.md");
+            var files = System.IO.Directory.EnumerateFiles(path, "*.md").OrderBy(f => System.IO.Path.GetFileName(f));
             List<Node> nodes = new List<Node>();
             foreach (var f in files)
             {

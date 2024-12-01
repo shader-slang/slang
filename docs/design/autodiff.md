@@ -201,7 +201,7 @@ DP<float> f_SSA_Proped(DP<float> dpa, DP<float> dpb)
     }
 
     // Note here that we have to 'store' all the intermediaries 
-    // _t1, _t2, _q4, _t3, _q5, _t3_d, _t4 and _q1. This is fundementally
+    // _t1, _t2, _q4, _t3, _q5, _t3_d, _t4 and _q1. This is fundamentally
     // the tradeoff between fwd_mode and rev_mode
 
     if (_b1)
@@ -288,7 +288,7 @@ void f_SSA_Rev(inout DP<float> dpa, inout DP<float> dpb, float dout)
     }
 
     // Note here that we have to 'store' all the intermediaries 
-    // _t1, _t2, _q4, _t3, _q5, _t3_d, _t4 and _q1. This is fundementally
+    // _t1, _t2, _q4, _t3, _q5, _t3_d, _t4 and _q1. This is fundamentally
     // the tradeoff between fwd_mode and rev_mode
 
     if (_b1)

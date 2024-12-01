@@ -63,6 +63,7 @@ struct App
 {
     char const* appName = "slang-embed";
     char const* inputPath = nullptr;
+    char const* includeDir = nullptr;
     char const* outputPath = nullptr;
     Slang::HashSet<Slang::String> includedFiles;
 
@@ -85,13 +86,19 @@ struct App
 
         if (argc > 0)
         {
+            includeDir = *argv++;
+            argc--;
+        }
+
+        if (argc > 0)
+        {
             outputPath = *argv++;
             argc--;
         }
 
         if (!inputPath || (argc != 0))
         {
-            fprintf(stderr, "usage: %s inputPath [outputPath]\n", appName);
+            fprintf(stderr, "usage: %s inputPath includeDir [outputPath]\n", appName);
             exit(1);
         }
     }
@@ -137,7 +144,13 @@ struct App
                 auto path =
                     Slang::Path::combine(Slang::Path::getParentDirectory(inputPath), fileName);
                 if (!Slang::File::exists(path))
-                    goto normalProcess;
+                {
+                    // Try looking in the include directory.
+                    path = Slang::Path::combine(includeDir, fileName);
+
+                    if (!Slang::File::exists(path))
+                        goto normalProcess;
+                }
                 processInputFile(outputFile, path.getUnownedSlice());
                 continue;
             }

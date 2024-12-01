@@ -9,7 +9,7 @@ Status
 
 Status: Design Review.
 
-Implemtation: N/A
+Implementation: N/A
 
 Author: Yong He
 

@@ -1,35 +1,44 @@
 # Helper function to download and extract an archive
 function(download_and_extract archive_name url)
-    get_filename_component(extension ${url} EXT)
-    set(archive_path "${CMAKE_CURRENT_BINARY_DIR}/${archive_name}${extension}")
-    set(extract_dir "${CMAKE_CURRENT_BINARY_DIR}/${archive_name}")
+    cmake_path(GET url FILENAME filename_with_ext)
+    cmake_path(GET url STEM LAST_ONLY file_stem)
+    set(archive_path "${CMAKE_CURRENT_BINARY_DIR}/${filename_with_ext}")
+    set(extract_dir "${CMAKE_CURRENT_BINARY_DIR}/${file_stem}")
 
-    if(EXISTS ${url})
-        message(STATUS "Using local file for ${archive_name}: ${url}")
-        set(archive_path ${url})
+    # Check if already extracted
+    file(GLOB EXTRACT_DIR_CONTENTS "${extract_dir}/*")
+    if(EXTRACT_DIR_CONTENTS)
+        message(STATUS "Using existing extracted files in ${extract_dir}")
     else()
-        message(STATUS "Fetching ${archive_name} from ${url}")
-        file(
-            DOWNLOAD ${url} ${archive_path}
-            # SHOW_PROGRESS
-            STATUS status
-        )
-
-        list(GET status 0 status_code)
-        list(GET status 1 status_string)
-        if(NOT status_code EQUAL 0)
+        # Check if archive already exists
+        if(EXISTS ${url})
+            message(STATUS "Using local file for ${archive_name}: ${url}")
+            set(archive_path ${url})
+        elseif(EXISTS ${archive_path})
             message(
-                WARNING
-                "Failed to download ${archive_name} from ${url}: ${status_string}"
+                STATUS
+                "Using existing archive for ${archive_name}: ${archive_path}"
             )
-            return()
+        else()
+            message(STATUS "Fetching ${archive_name} from ${url}")
+            file(DOWNLOAD ${url} ${archive_path} STATUS status)
+
+            list(GET status 0 status_code)
+            list(GET status 1 status_string)
+            if(NOT status_code EQUAL 0)
+                message(
+                    WARNING
+                    "Failed to download ${archive_name} from ${url}: ${status_string}"
+                )
+                return()
+            endif()
         endif()
+
+        file(ARCHIVE_EXTRACT INPUT ${archive_path} DESTINATION ${extract_dir})
+        message(STATUS "${archive_name} extracted to ${extract_dir}")
     endif()
 
-    file(ARCHIVE_EXTRACT INPUT ${archive_path} DESTINATION ${extract_dir})
-
     set(${archive_name}_SOURCE_DIR ${extract_dir} PARENT_SCOPE)
-    message(STATUS "${archive_name} downloaded and extracted to ${extract_dir}")
 endfunction()
 
 # Add rules to copy & install shared library of name 'library_name' in the 'module_subdir' directory.

@@ -829,7 +829,7 @@ The details of how Slang computes layout, what guarantees it makes, and how to i
 Because the layout computed for shader parameters may depend on the compilation target, the `getLayout()` method actually takes a `targetIndex` parameter that is the zero-based index of the target for which layout information is being queried.
 This parameter defaults to zero as a convenience for the common case where applications use only a single compilation target at runtime.
 
-See [Using the Reflection API] chapter for more details on the reflection API.
+See [Using the Reflection API](reflection) chapter for more details on the reflection API.
 
 ### Linking
 
@@ -956,7 +956,7 @@ meanings of their `CompilerOptionValue` encodings.
 | VulkanUseGLLayout | When set, will use std430 layout instead of D3D buffer layout for raw buffer load/stores. `intValue0` specifies a bool value for the setting. |
 | VulkanEmitReflection | Specifies the `-fspv-reflect` option. When set will include additional reflection instructions in the output SPIRV. `intValue0` specifies a bool value for the setting. |
 | GLSLForceScalarLayout | Specifies the `-force-glsl-scalar-layout` option. When set will use `scalar` layout for all buffers when generating SPIRV. `intValue0` specifies a bool value for the setting. |
-| EnableEffectAnnotations | When set will turn on compatibilty mode to parse legacy HLSL effect annoation syntax. `intValue0` specifies a bool value for the setting. |
+| EnableEffectAnnotations | When set will turn on compatibility mode to parse legacy HLSL effect annotation syntax. `intValue0` specifies a bool value for the setting. |
 | EmitSpirvViaGLSL | When set will emit SPIRV by emitting GLSL first and then use glslang to produce the final SPIRV code. `intValue0` specifies a bool value for the setting. |
 | EmitSpirvDirectly | When set will use Slang's direct-to-SPIRV backend to generate SPIRV directly from Slang IR. `intValue0` specifies a bool value for the setting. |
 | SPIRVCoreGrammarJSON | When set will use the provided SPIRV grammar file to parse SPIRV assembly blocks. `stringValue0` specifies a path to the spirv core grammar json file. |

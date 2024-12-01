@@ -19,7 +19,7 @@ Either the entire `Decl` hierarchy of the AST is deserialized and turned into in
 Similarly, we can either construct the `IRInst` hierarchy for an entire module, or none of it.
 
 Releases of the Slang compiler typically included a serialized form of the core module, and the runtime cost of deserializing this module has proven to be a problem for users of the compiler.
-Becuse parts of the Slang compiler are not fully thread-safe/reentrant, the core module must be deserialized for each "global session," so that deserialization cost is incurred per-thread in scenarios with thread pools.
+Because parts of the Slang compiler are not fully thread-safe/reentrant, the core module must be deserialized for each "global session," so that deserialization cost is incurred per-thread in scenarios with thread pools.
 Even in single-threaded scenarios, the deserialization step adds significantly to the startup time for the compiler, making single-file compiles less efficient than compiling large batches of files in a single process.
 
 Overview of Proposed Solution
@@ -49,7 +49,7 @@ The linker creates a *fresh* `IRModule` for the linked result, and clones/copies
 
 1. Given an instruction in an input module to be copied over, use an `IRBuilder` on the output module to create a deep copy of that instruction and its children.
 
-2. Whenever an instruction being copied over references another top-level instruction local to the same input module (that is, one without a linkage decoration), either construct a deep copy of the refereneced instruction in the output module, or find and re-use a copy that was made previously.
+2. Whenever an instruction being copied over references another top-level instruction local to the same input module (that is, one without a linkage decoration), either construct a deep copy of the referenced instruction in the output module, or find and re-use a copy that was made previously.
 
 3. Whenever an instruction being copied over references a top-level instruction that might be resolved to come from another module (that is, one with a linkage decoration), use the mangled name on the linkage decoration to search *all* of the input modules for candidate instructions that match. Use some fancy logic to pick one of them (the details aren't relevant at this exact moment) and then copy the chosen instruction over, more or less starting at (1) above.
 
@@ -117,7 +117,7 @@ The two main ways that the child declarations are accessed are:
 Currently the `memberDictionary` field is private, and has access go through methods that check whether the dictionary needs to be rebuilt.
 The `members` field should also be made private, so that we can carefully intercept any code that wants to enumerate all members of a declaration.
 
-We should probably also make the `memberDictionary` field map from a name to the *index* of a declaration in `members`, instead of direclty to a `Decl*`.
+We should probably also make the `memberDictionary` field map from a name to the *index* of a declaration in `members`, instead of directly to a `Decl*`.
 
 > Note: We're ignoring the `ContainerDecl::transparentMembers` field here, but it does need to be taken into account in the actual implementation.
 
@@ -137,7 +137,7 @@ The `members` array will either be empty, or will be correctly-sized for the num
 The entries in `members` may be null, however, if the corresponding child declaration has not been deserialized.
 
 We will need to attach a pointer to information related to lazy-loading to the `ContainerDecl`.
-The simplest approach would be to add a field to `ContainerDecl`, but we could also consider using a custom `Modifier` if we are concerend about bloat.
+The simplest approach would be to add a field to `ContainerDecl`, but we could also consider using a custom `Modifier` if we are concerned about bloat.
 
 #### Enumeration
 
@@ -187,7 +187,7 @@ These complications lead to two big consequences for the encoding:
 
 * The array of *AST entries* will not just contain the entries for top-level `Decl`s. It needs to contain an entry for each `Decl` that might be referenced from elsewhere in the AST. For simplicity, it will probably contain *all* `Decl`s that are not explicitly stripped as part of producing the serialized AST.
 
-* The array won't even consist of just `Decl`s. It will also need to have entries for things like `DeclRef`s and `Type`s that can also be referened as operands of AST nodes.
+* The array won't even consist of just `Decl`s. It will also need to have entries for things like `DeclRef`s and `Type`s that can also be referenced as operands of AST nodes.
 
 As a stab at a simple representation, each AST entry should include:
 
@@ -195,7 +195,7 @@ As a stab at a simple representation, each AST entry should include:
 
 * A range of bytes in the raw data that holds the serialized representation of that node (e.g., its operands)
 
-An entry for a `ContainerDecl` should include (whether direclty or encoded in the raw data...)
+An entry for a `ContainerDecl` should include (whether directly or encoded in the raw data...)
 
 * A contiguous range of AST entry indices that represent the direct children of the node, in declaration order (the order they'd appear in `ContainerDecl::members`)
 
@@ -208,7 +208,7 @@ Given the above representation, there is no need to explicitly encode the parent
 Given an AST entry index for a `Decl`, we can find its parent by recursing through the hierarchy starting at the root, and doing a binary search at each hierarchy level to find the (unique) child declaration at that level which contains that index in its range of descendents.
 
 When there is a request to on-demand deserialize a `Decl` based on its AST entry index, we would need to first deserialize each of its ancestors, up the hierarchy.
-That on-demand deserialization of the ancestors can follow the flow given above for recursively walking the hirarchy to find which declaration at each level contains the given index.
+That on-demand deserialization of the ancestors can follow the flow given above for recursively walking the hierarchy to find which declaration at each level contains the given index.
 
 In order to support lookup of members of a declaration by name, we propose the following:
 
