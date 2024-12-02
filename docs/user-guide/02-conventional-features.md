@@ -39,11 +39,11 @@ The following integer types are provided:
 
 All targets support the 32-bit `int` and `uint` types, but support for the other types depends on the capabilities of each target platform.
 
-Integer literals can be both decimal and hexadecimal. The type of a decimal non-suffixed integer literal is the first integer type from
-the list [`int`, `int64_t`] which can represent the specified literal value. If the value cannot fit, the literal is  represented as a `uint64_t` and a warning is given. The type of hexadecimal non-suffixed integer literal 
-is the first type from the list [`int`, `uint`, `int64_t`, `uint64_t`] that can
-represent the specified literal value. A literal can be explicitly made unsigned with a `u` suffix, and explicitly made 64-bit 
-with the `ll` suffix. For more information on 64 bit integer literals see (../64bit-type-support.md).
+Integer literals can be both decimal and hexadecimal. An integer literal can be explicitly made unsigned 
+with a `u` suffix, and explicitly made 64-bit with the `ll` suffix. The type of a decimal non-suffixed integer literal is the first integer type from
+the list [`int`, `int64_t`] which can represent the specified literal value. If the value cannot fit, the literal is represented as 
+an `uint64_t` and a warning is given. The type of hexadecimal non-suffixed integer literal is the first type from the list 
+[`int`, `uint`, `int64_t`, `uint64_t`] that can represent the specified literal value. For more information on 64 bit integer literals see (../64bit-type-support.md).
 
 The following floating-point type are provided:
 
