@@ -81,7 +81,7 @@ C# is broadly similar, but uses multiple `where` clauses, one per constraint:
 
 While Haskell is a quite different language from the others mentioned here, Haskell typeclasses have  undeniably influenced the concept of traits/protocols in Rust/Swift.
 
-In Haskell a typeclass is not somethign a type "inherits" from, and instead uses type parameter for even the `This` type.
+In Haskell a typeclass is not something a type "inherits" from, and instead uses type parameter for even the `This` type.
 Type parameters in Haskell are also introduced implicitly rather than explicitly.
 The `resolve` example above would become something like:
 
@@ -89,7 +89,7 @@ The `resolve` example above would become something like:
         ResolutionContext u -> List t -> v
 
 We see here that the constraints are all grouped together in the `(...) =>` clause before the actual type signature of the function.
-That clause serves a simlar semantic role to `where` clauses in these other languages.
+That clause serves a similar semantic role to `where` clauses in these other languages.
 
 Proposed Approach
 -----------------
@@ -223,7 +223,7 @@ Technically it was already possible to have redundancy in a constraint by using 
     void f<T : IBase & IDerived>( ... )
     { ... }
 
-One question that is raised by the possiblity of redundant constraints is whether the compiler should produce a diagnostic for them and, if so, whether it should be a warning or an error.
+One question that is raised by the possibility of redundant constraints is whether the compiler should produce a diagnostic for them and, if so, whether it should be a warning or an error.
 While it may seem obvious that redundant constraints are to be avoided, it is possible that refactoring of `interface` hierarchies could change whether existing constraints are redundant or not, potentially forcing widespread edits to code that is semantically unambiguous (and just a little more verbose than necessary).
 We propose that redundant constraints should probably produce a warning, with a way to silence that warning easily.
 
@@ -231,7 +231,7 @@ We propose that redundant constraints should probably produce a warning, with a 
 
 The long and short of the above section is that there can be multiple ways to write semantically equivalent generic declarations, by changing the form, order, etc. of constraints.
 We want the signature of a function (and its mangled name, etc.) to be identical for semantically equivalent declaration syntax.
-In order to ensure that a declaration's mangled name is indepenent of the form of its constraints, we must have a way to *canonicalize* those constraints.
+In order to ensure that a declaration's mangled name is independent of the form of its constraints, we must have a way to *canonicalize* those constraints.
 
 The Swift compiler codebase includes a document that details the rules used for canonicalization of constraints for that compiler, and we can take inspiration from it.
 Our constraints are currently much more restricted, so canonicalization can follow a much simpler process, such as:
@@ -288,7 +288,7 @@ In the context of `class`-based hierarchies, we can also consider having constra
 
 ### Allow `where` clauses on non-generic declarations
 
-We could consider allowing `where` clauses to appear on any declaration nested under a generic, such that those declarations are only usable when certain additinal constraints are met.
+We could consider allowing `where` clauses to appear on any declaration nested under a generic, such that those declarations are only usable when certain additional constraints are met.
 E.g.,:
 
     struct MyDictionary<K,V>

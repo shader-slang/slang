@@ -29,7 +29,7 @@ We know that we cannot remove support for difficult cases, but it would be good 
 Related Work
 ------------
 
-There are obviously far too many C/C++ APIs and approachs to design for C/C++ APIs for us to review them all.
+There are obviously far too many C/C++ APIs and approaches to design for C/C++ APIs for us to review them all.
 We will simply note a few key examples that can be relevant for comparison.
 
 The gold standard for C/C++ APIs is ultimately plain C. Plain C is easy for most systems programmers to understand and benefits from having a well-defined ABI on almost every interesting platform. FFI systems for other languages tend to work with plain C APIs. Clarity around ABI makes it easy to know what changes/additions to a plain C API will and will not break binary compatibility. The Cg compiler API and the Vulkan GPU API are good examples of C-based APIs in the same domains as Slang and GFX, respectively. These APIs reveal some of the challenges of using plain C for large and complicated APIs:
@@ -64,7 +64,7 @@ Across such APIs, we see a wide variety of strategies to dealing with extensibil
 
 * Vulkan uses "desc" structures (usually called "info" or "create info" structures), which contain a baseline set of state/fields, along with a linked list of dynamically-typed/-tagged extension structures. New functionality that only requires changes to "desc" structures can be added by defining a new tag and extension structure. New operations are added in a manner similar to OpenGL.
 
-* D3D12 also uses COM interfaces and "desc" structures (although now officialy called "descriptions" to not overload the use of "descriptor" in descriptor tables), much like D3D11, and sometimes uses the same approach to extensibility (e.g., there are currently `ID3D12Device`, `ID3D12Device`, ... `ID2D12Device9`). In addition, D3D12 has also added two variations on Vulkan-like models for creating pipeline state (`ID3D12Device2::CreatePipelineState` and `ID3D12Device5::CreateStateObject`), using a notion of more fine-grained "subojects" that are dynamically-typed/-tagged and each have their own "desc".
+* D3D12 also uses COM interfaces and "desc" structures (although now officially called "descriptions" to not overload the use of "descriptor" in descriptor tables), much like D3D11, and sometimes uses the same approach to extensibility (e.g., there are currently `ID3D12Device`, `ID3D12Device`, ... `ID2D12Device9`). In addition, D3D12 has also added two variations on Vulkan-like models for creating pipeline state (`ID3D12Device2::CreatePipelineState` and `ID3D12Device5::CreateStateObject`), using a notion of more fine-grained "subojects" that are dynamically-typed/-tagged and each have their own "desc".
 
 It is important to note that even with the nominal flexibility that COM provides around versioning, D3D12 has opted for a more fine-grained approach when dealing with something as complicated as GPU pipeline state.
 
@@ -91,7 +91,7 @@ At the end of this document there is a lengthy code block that sketches a possib
 Questions
 ---------
 
-### Will we generate all or some of the API header? If so, what will be the "ground truth" verison?
+### Will we generate all or some of the API header? If so, what will be the "ground truth" version?
 
 Note that Vulkan and SPIR-V benefit from having ground-truth computer-readable definitions, allowing both header files and tooling code to be generated.
 
@@ -278,7 +278,7 @@ namespace slang
         members initializers in `slang::SessionDesc`, but it *will* compile
         under C++14 and later.
 
-        If we want to deal with C++11 compatiblity in that case, we can, but
+        If we want to deal with C++11 compatibility in that case, we can, but
         it would slightly clutter up the way we declare these things. Realistically,
         we'd just split the two types:
 
@@ -325,7 +325,7 @@ namespace slang
 
         struct SessionDesc0 { ... the original ... };
         struct SessionDesc1 { ... the new one ... };
-        typedef SessionDesc SesssionDesc1;
+        typedef SessionDesc SessionDesc1;
 
     At the point where we introduce a second version, it is probably the right time
     to enable developers to lock in to any version they choose. In the code above
@@ -334,7 +334,7 @@ namespace slang
     at the point they compile.
 
     (If we wanted to get really "future-proof" we'd define every struct with the `0`
-    prefix right out of the gate, and always have the `typedef` in place. I'm not conviced
+    prefix right out of the gate, and always have the `typedef` in place. I'm not convinced
     that would ever pay off.)
     
     I expect most of this to be a non-issue if we are zealous about using fine-grained
@@ -368,7 +368,7 @@ namespace slang
             UUID const&         uuid,
             void**              outObject) = 0;
 
-        /* Instead, most users will direclty call the operations only through
+        /* Instead, most users will directly call the operations only through
         wrappers that provide conveniently type-safe behavior:
         */
         inline Result createCompileRequest(
@@ -574,7 +574,7 @@ extern "C"
     and also to provide versioning support.
 
     We could define the same set of overloads here, with the same names, for
-    use by clients who don't actually care about C compatiblity but just like
+    use by clients who don't actually care about C compatibility but just like
     a C-style API. That is probably worth doing.
 
     Otherwise, we realistically need to start defining some de-facto naming
@@ -612,7 +612,7 @@ extern "C"
 
     /* Finally, the C API level is where we should define the core factory entry
     point for creating and initializing the Slang global session (just like
-    in the current header). Here we jsut generalize it for creaitng "any" global
+    in the current header). Here we just generalize it for creaitng "any" global
     object, based on a UUID and a bunch of descs.
     */
     SLANG_API SlangResult slang_createObject(
@@ -645,7 +645,7 @@ generating as much of the API as possible anyway.
 
 /* Basic Types */
 
-    /* We just define the basic types direclty, without the indirection
+    /* We just define the basic types directly, without the indirection
     through the declarations in the `slang::` namespace.
     */
 
@@ -846,7 +846,7 @@ use of exceptions instead of `Result`s:
         SLANG_SMART_PTR(ICompileRequest) createCompileRequest(
             CompileRequestDesc const& desc)
         {
-            SLANG_SMART_PTR(ICompileReqest) compileRequest;
+            SLANG_SMART_PTR(ICompileRequest) compileRequest;
             SLANG_THROW_IF_FAIL(_createCompileRequest(
                 &desc, 1, SLANG_UUID_OF(IComileRequest), comileRequest.writeRef()));
             return compileRequest;
@@ -857,7 +857,7 @@ use of exceptions instead of `Result`s:
 #endif
     }
 
-Both for the sake of C API and especialy for gfx (both C and C++), we should consider
+Both for the sake of C API and especially for gfx (both C and C++), we should consider
 defining some coarse-grained aggregate desc types as utilities:
 
     struct SimpleRasterizationPipelineStateDesc
@@ -886,7 +886,7 @@ defining some coarse-grained aggregate desc types as utilities:
         // List<T> members for attachments, etc. rather than just pointer-and-count:
 
         private: List<AttachmentDesc> colorAttachments;
-        public: AttachmentDesc& addColorAttachement();
+        public: AttachmentDesc& addColorAttachment();
 
         // There should also be convenience constructors common cases
         // (especially relevant for things like textures).
@@ -924,7 +924,7 @@ defining some coarse-grained aggregate desc types as utilities:
     };
 
 While the implementation of this monolithic desc types would not necessarily be pretty,
-it would enable users who want the benefits of the "one big struct" appraoch to get
+it would enable users who want the benefits of the "one big struct" approach to get
 what they seem to want.
 
 The next step down this road is to take these aggregate desc types and turn them into

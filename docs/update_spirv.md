@@ -95,7 +95,7 @@ cmake.exe --build build --config Release
 ## Copy the generated files from `spirv-tools` to `spirv-tools-generated`
 
 Copy some of generated files from `external/spirv-tools/build/` to `external/spirv-tools-generated/`.
-The following files are ones you need to copy at the momment, but the list may change in the future.
+The following files are ones you need to copy at the moment, but the list may change in the future.
 ```
 DebugInfo.h
 NonSemanticShaderDebugInfo100.h
@@ -166,7 +166,7 @@ git submodule update --init --recursive
 ```
 
 You need to stage and commit the latest commit IDs of spirv-tools and spirv-headers.
-Note that when you want to use a new commit IDs of the submodules, you have to stage with git-add command for the directy of the submodule itself.
+Note that when you want to use a new commit IDs of the submodules, you have to stage with git-add command for the directly of the submodule itself.
 ```
 cd external
 

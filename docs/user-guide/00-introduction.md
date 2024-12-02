@@ -66,7 +66,7 @@ Who is this guide for?
 ----------------------
 
 The content of this guide is written for real-time graphics programmers with a moderate or higher experience level.
-It assumes the reader has previously used a real-time shading langauge like HLSL, GLSL, or MetalSL together with an API like Direct3D 11/12, Vulkan, or Metal.
+It assumes the reader has previously used a real-time shading language like HLSL, GLSL, or MetalSL together with an API like Direct3D 11/12, Vulkan, or Metal.
 We also assume that the reader is familiar enough with C/C++ to understand code examples and API signatures in those languages.
 
 If you are new to programming entirely, this guide is unlikely to be helpful.

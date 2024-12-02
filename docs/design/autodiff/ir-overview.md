@@ -17,7 +17,7 @@ At this step, there are 2 other variants that can appear `IRBackwardDifferentiat
 4. This process from (1.) is run in a loop. This is because we can have nested differentiation requests such as `IRForwardDifferentiate(IRBackwardDifferentiate(a : IRFuncType))`. The inner request is processed in the first pass, and the outer request gets processed in the next pass.
 
 ## Auto-Diff Passes for `IRForwardDifferentiate`
-For forward-mode derivatives, we only require a single pass implemented wholly in `ForwardDiffTranscriber`. This implementes the linearization algorithm, which roughly follows this logic:
+For forward-mode derivatives, we only require a single pass implemented wholly in `ForwardDiffTranscriber`. This implements the linearization algorithm, which roughly follows this logic:
 
 1. Create a clone of the original function
 2. Perform pre-autodiff transformations, the most  
@@ -357,7 +357,7 @@ The unzipping pass uses the decorations from the linearization step to figure ou
 The separation process uses the following high-level logic:
 1. Create two clones of all the blocks in the provided function (one for primal insts, one for differential insts), and hold a mapping between each original (mixed) block to each primal and differential block. The return statement of the current final block is **removed**. 
 2. Process each instruction of each block: instructions marked as **primal** are moved to the corresponding **primal block**, instructions marked **differential** are moved to the corresponding **differential block**.
-3. Instructions marked **mixed** need op-specific handling, and so are dispatched to the appropriate splitting function. For instance, block parameters that are holding differential-pair values are split into parameters for holding primal and differential values (the exception is function parameters, which are not affected). Simlarly, `IRVar`s, `IRTerminatorInst`s (control-flow) and `IRCall`s are all split into multiple insts.
+3. Instructions marked **mixed** need op-specific handling, and so are dispatched to the appropriate splitting function. For instance, block parameters that are holding differential-pair values are split into parameters for holding primal and differential values (the exception is function parameters, which are not affected). Similarly, `IRVar`s, `IRTerminatorInst`s (control-flow) and `IRCall`s are all split into multiple insts.
 4. Except for `IRReturn`, all other control-flow insts are effectively duplicated so that the control-flow between the primal blocks and differential blocks both follow the original blocks' control-flow. The main difference is that PHI arguments are split (primal blocks carry primal values in their PHI arguments, and differential blocks carry diff values) between the two. Note that condition values (i.e. booleans) are used by both the primal and differential control-flow insts. However, since booleans are always primal values, they are always defined in the primal blocks.
 
 
@@ -522,7 +522,7 @@ We synthesize a CFG that satisfies this property through the following steps:
         %da_rev = OpAdd %da_rev_1 %da_rev_2 : %float
         ```
 
-        Derivative accumulation is acheived through two ways: 
+        Derivative accumulation is achieved through two ways:
         
         **Within** a block, we keep a list all the reverse derivative insts for each inst and only **materialize** the total derivative when it is required as an operand. This is the most efficient way to do this, because we can apply certain optimizations for composite types (derivative of an array element, vector element, struct field, etc..).
         
@@ -756,12 +756,12 @@ After AD passes, this results in the following code:
 { /*...*/ }
 ```
 
-4. Construct the reverse control-flow (`reveseCFGRegion()`) by going through the reference forward-mode blocks, and cloning the control-flow onto the reverse-mode blocks, but in reverse. This is acheived by running `reverseCFGRegion()` recursively on each sub-region, where a *region* is defined as a set of blocks with a single entry block and a single exit block. This definition of a region only works because we normalized the CFG into this form. 
+4. Construct the reverse control-flow (`reveseCFGRegion()`) by going through the reference forward-mode blocks, and cloning the control-flow onto the reverse-mode blocks, but in reverse. This is achieved by running `reverseCFGRegion()` recursively on each sub-region, where a *region* is defined as a set of blocks with a single entry block and a single exit block. This definition of a region only works because we normalized the CFG into this form.
 
     The reversal logic follows these general rules:
     1. **Unconditional Branch**: For an unconditional branch from `A->B` we simply have to map the reverse version of B with that of A. i.e. `rev[B] -> rev[A]`
     2. **If-Else**: For an if-else of the form `A->[true = T->...->T_last->M, false = F->...->F_last->M]`, we construct `rev[M]->[true = rev[T_last]->...->rev[T_last]->rev[A], false = rev[F_last]->...->rev[F]->rev[A]]`. That is, we reverse each sub-region, and start from the merge block and end at the split block.
-    Note that we need to identify `T_last` and `F_last` i.e. the last two blocks in the true and false regions. We make the last block in the region an additional return value of `reverseCFGRegion()`, so that when reversing the true and false sub-regions, we also get the relevent last block as an additional output. Also note that additional empty blocks may be inserted to carry derivatives of the phi arguments, but this does not alter the control-flow.
+    Note that we need to identify `T_last` and `F_last` i.e. the last two blocks in the true and false regions. We make the last block in the region an additional return value of `reverseCFGRegion()`, so that when reversing the true and false sub-regions, we also get the relevant last block as an additional output. Also note that additional empty blocks may be inserted to carry derivatives of the phi arguments, but this does not alter the control-flow.
     3. **Switch-case**: Proceeds in exactly the same way as `if-else` reversal, but with multiple cases instead of just 2.
     4. **Loop**: After normalization, all (non-trivial) loops are of the form: `A->C->[true = T->...->T_last->C, false=B->...->M]`. We reverse this loop into `rev[M]->...rev[B]->rev[C]->[true=rev[T_last]->...->rev[T]->rev[C], false=rev[A]]`. The actual reversal logic also handles some corner cases by inserting additional blank blocks to avoid situations where regions may share the same merge block.
 
@@ -975,12 +975,12 @@ When storing values this way, we must consider that instructions within loops ca
 
     **Indexed Region Processing:** In order to be able to allocate the right array and use the right indices, we need information about which blocks are part of which loop (and loops can be nested, so blocks can be part of multiple loops). To do this, we run a pre-processing step that maps all blocks to all relevant loop regions, the corresponding index variables and the inferred iteration limits (maximum times a loop can run). Note that if an instruction appears in a nested block, we create a multi-dimensional array and use multiple indices.
 
-    **Loop State Variables:** Certain variables cannot be classified as recompute. Major examples are loop state variables which are defined as variables that are read from and written to within the loop. In practice, they appear as phi-variables on the first loop block after SSA simplification. Their uses _must_ be classifed as 'store', because recomputing them requires duplicating the primal loop within the differential loop. This is because the differential loop runs backwards so the state of a primal variable at loop index $N$ cannot be recomputed when the loop is running backwards ($N+1 \to N \to N-1$), and involves running the primal loop up to $N$ times within the current iteration of the differential loop. In terms of complexity, this turns an $O(N)$ loop into an $O(N^2)$ loop, and so we disallow this. 
+    **Loop State Variables:** Certain variables cannot be classified as recompute. Major examples are loop state variables which are defined as variables that are read from and written to within the loop. In practice, they appear as phi-variables on the first loop block after SSA simplification. Their uses _must_ be classified as 'store', because recomputing them requires duplicating the primal loop within the differential loop. This is because the differential loop runs backwards so the state of a primal variable at loop index $N$ cannot be recomputed when the loop is running backwards ($N+1 \to N \to N-1$), and involves running the primal loop up to $N$ times within the current iteration of the differential loop. In terms of complexity, this turns an $O(N)$ loop into an $O(N^2)$ loop, and so we disallow this.
     It is possible that the resulting $O(N^2)$ loop may end up being faster in practice due to reduced memory requirements, but we currently lack the infrastructure to robustly allow such loop duplication while keeping the user informed of the potentially drastic complexity issues.
 
 3. **Process 'Recompute' insts:** Insert a copy of the primal instruction into a corresponding 'recomputation' block that is inserted into the differential control-flow so that it dominates the use-site. 
 
-    **Insertion of Recompute Blocks:** In order to accomodate recomputation, we first preprocess the function, by going through each **breakable (i.e. loop) region** in the differential blocks, looking up the corresponding **primal region** and cloning all the primal blocks into the beginning of the differential region. Note that this cloning process does not actually clone the instructions within each block, only the control-flow (i.e. terminator) insts. This way, there is a 1:1 mapping between the primal blocks and the newly created **recompute blocks**, This way, if we decide to 'recompute' an instruction, we can simply clone it into the corresponding recompute block, and we have a guarantee that the definition and use-site are within the same loop scope, and that the definition comes before the use. 
+    **Insertion of Recompute Blocks:** In order to accommodate recomputation, we first preprocess the function, by going through each **breakable (i.e. loop) region** in the differential blocks, looking up the corresponding **primal region** and cloning all the primal blocks into the beginning of the differential region. Note that this cloning process does not actually clone the instructions within each block, only the control-flow (i.e. terminator) insts. This way, there is a 1:1 mapping between the primal blocks and the newly created **recompute blocks**, This way, if we decide to 'recompute' an instruction, we can simply clone it into the corresponding recompute block, and we have a guarantee that the definition and use-site are within the same loop scope, and that the definition comes before the use.
     
     **Legalizing Accesses from Branches:** Our per-loop-region recompute blocks ensure that the recomputed inst is always within the same region as its uses, but it can still be out-of-scope if it is defined within a branch (i.e. if-else). We therefore still run a light-weight hoisting pass that detects these uses, inserts an `IRVar` at the immediate dominator of the def and use, and inserts loads and stores accordingly. Since they occur within the same loop region, there is no need to worry about arrays/indices (unlike the 'store' case).
     
@@ -1363,7 +1363,7 @@ struct f_Intermediates
 };
 
 
-// After extraction: primal context funtion
+// After extraction: primal context function
 float s_primal_ctx_f(float x, out f_Intermediates ctx)
 {
     //

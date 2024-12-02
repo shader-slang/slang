@@ -9601,3 +9601,14 @@ public bool allInvocationsEqual(bool value)
 {
     return WaveActiveAllEqual(value);
 }
+
+
+/// extensions
+/// https://github.com/KhronosGroup/GLSL/blob/main/extensions/ext/GL_EXT_nonuniform_qualifier.txt
+
+__generic<T:__BuiltinArithmeticType>
+__intrinsic_op($(kIROp_NonUniformResourceIndex))
+[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+public T nonuniformEXT(T index);
+
+
