@@ -2076,6 +2076,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_GetArrayLength:
     case kIROp_SizeOf:
     case kIROp_AlignOf:
+    case kIROp_Printf:
         return transcribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,
