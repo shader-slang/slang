@@ -14,7 +14,7 @@
 // for any arguments.
 
 #ifndef DIAGNOSTIC
-#error Need to #define DIAGNOSTIC(...) before including "slang-cpp-extractor-diagnostics-defs.h"
+#error Need to #define DIAGNOSTIC(...) before including "slang-cpp-parser/diagnostics-defs.h"
 #define DIAGNOSTIC(id, severity, name, messageFormat) /* */
 #endif
 
