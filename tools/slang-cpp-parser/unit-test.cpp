@@ -1,15 +1,15 @@
 #include "unit-test.h"
 
-#include "../../source/compiler-core/slang-lexer.h"
-#include "../../source/compiler-core/slang-name-convention-util.h"
-#include "../../source/compiler-core/slang-source-loc.h"
-#include "../../source/core/slang-io.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-name-convention-util.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-io.h"
 #include "identifier-lookup.h"
 #include "node-tree.h"
 #include "options.h"
 #include "parser.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -124,4 +124,4 @@ static const char someSource[] = "class ISomeInterface\n"
     return SLANG_OK;
 }
 
-} // namespace CppExtract
+} // namespace CppParse
