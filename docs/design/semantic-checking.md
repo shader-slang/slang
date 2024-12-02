@@ -22,7 +22,7 @@ Checking Terms
 
 ### Some Terminology for Terms
 
-We use the word "term" to refer genericaly to something that can be evaluated to produce a result, but where we do not yet know if the result will be a type or a value. For example, `Texture2D` might be a term that results in a type, while `main` might be a term that results in a value (of function type), but both start out as a `NameExpr` in the AST. Thus the AST uses the class hierarchy under `Expr` to represent terms, whether they evaluate to values or types.
+We use the word "term" to refer generically to something that can be evaluated to produce a result, but where we do not yet know if the result will be a type or a value. For example, `Texture2D` might be a term that results in a type, while `main` might be a term that results in a value (of function type), but both start out as a `NameExpr` in the AST. Thus the AST uses the class hierarchy under `Expr` to represent terms, whether they evaluate to values or types.
 
 There is also the `Type` hierarchy, but it is important to understand that `Type` represents types as their logical immutable selves, while `Expr`s that evaluate to types are *type expressions* which can be concretely pointed to in the user's code. Type expressions have source locations, because they represent something the user wrote in their code, while `Type`s don't have singular locations by default.
 
@@ -67,7 +67,7 @@ If we can't reasonably form an expression to return *at all* then we will return
 These classes are designed to make sure that subsequent code won't crash on them (since we have non-null objects), but to help avoid cascading errors.
 Some semantic checking logic will detect `ErrorType`s on sub-expressions and skip its own checking logic (e.g., this happens for function overload resolution), producing an `ErrorType` further up.
 In other cases, expressions with `ErrorType` can be silently consumed.
-For example, an errorneous expression is implicitly convertible to *any* type, which means that assignment of an error expression to a local variable will always succeed, regardless of variable's type.
+For example, an erroneous expression is implicitly convertible to *any* type, which means that assignment of an error expression to a local variable will always succeed, regardless of variable's type.
 
 ### Overload Resolution
 
@@ -139,14 +139,14 @@ Checking of declarations is the most complicated and involved part of semantic c
 
 Simple approaches to semantic checking of declarations fall into two camps:
 
-1. One can define a total ordering on declarations (usually textual order in the source file) and only allow dependecies to follow that order, so that checking can follow the same order. This is the style of C/C++, which is inherited from the legacy of traditional single-pass compilers.
+1. One can define a total ordering on declarations (usually textual order in the source file) and only allow dependencies to follow that order, so that checking can follow the same order. This is the style of C/C++, which is inherited from the legacy of traditional single-pass compilers.
 
 2. One can define a total ordering on *phases* of semantic checking, so that every declaration in the file is checked at phase N before any is checked at phase N+1. E.g., the types of all variables and functions must be determined before any expressions that use those variables/functions can be checked. This is the style of, e.g., Java and C#, which put a premium on defining context-free languages that don't dictate order of declaration.
 
 Slang tries to bridge these two worlds: it has inherited features from HLSL that were inspired by C/C++, while it also strives to support out-of-order declarations like Java/C#.
-Unsurprisngly, this leads to unique challenges.
+Unsurprisingly, this leads to unique challenges.
 
-Supporting out-of-order declarations meeans that there is no simple total order on declarations (we can have mutually recursive function or type declarations), and supporting generics with value parameters means there is no simple total order on phases.
+Supporting out-of-order declarations means that there is no simple total order on declarations (we can have mutually recursive function or type declarations), and supporting generics with value parameters means there is no simple total order on phases.
 For that last part observe that:
 
 * Resolving an overloaded function call requires knowing the types of the parameters for candidate functions.
@@ -191,13 +191,13 @@ As a programmer contributing to the semantic checking infrastructure, the declar
 Name Lookup
 -----------
 
-Lookup is the processing of resolving the contextual meaning of names either in a lexical scope (e.g., the user wrote `foo` in a function body - what does it refer to?) or in the scope of scome type (e.g., the user wrote `obj.foo` for some value `obj` of type `T` - what does it refer to?).
+Lookup is the processing of resolving the contextual meaning of names either in a lexical scope (e.g., the user wrote `foo` in a function body - what does it refer to?) or in the scope of some type (e.g., the user wrote `obj.foo` for some value `obj` of type `T` - what does it refer to?).
 
 Lookup can be tied to semantic analysis quite deeply.
 In order to know what a member reference like `obj.foo` refers to, we not only need to know the type of `obj`, but we may also need to know what interfaces that type conforms to (e.g., it might be a type parameter `T` with a constraint `T : IFoo`).
 In order to support lookup in the presence of our declaration-checking strategy described above, the lookup logic may be passed a `SemanticsVisitor` that it can use to `ensureDecl()` declarations before it relies on their properties.
 
-However, lookup also currently gets used during parsing, and in those cases it may need ot be applied without access to the semantics-checking infrastructure (since we currently separate parsing and semantic analysis).
+However, lookup also currently gets used during parsing, and in those cases it may need to be applied without access to the semantics-checking infrastructure (since we currently separate parsing and semantic analysis).
 In those cases a null `SemanticsVisitor` is passed in, and the lookup process will avoid using lookup approaches that rely on derived semantic information.
 This is fine in practice because the main thing that gets looked up during parsing are names of `SyntaxDecl`s (which are all global) and also global type/function/variable names.
 
@@ -210,7 +210,7 @@ Just like a C/C++ parser, the Slang parser sometimes needs to disambiguate wheth
 
 Ideally the way forward is some combination of the following two strategies:
 
-* We should strive to make parsing at the "global scope" fully context-insensitive (e.g., by using similar lookahead heuristics to C#). We are already close to this goal today, but will need to be careful that we do not introduce regressions compared to the old parser (perhaps a "compatiblity" mode for legacy HLSL code is needed?)
+* We should strive to make parsing at the "global scope" fully context-insensitive (e.g., by using similar lookahead heuristics to C#). We are already close to this goal today, but will need to be careful that we do not introduce regressions compared to the old parser (perhaps a "compatibility" mode for legacy HLSL code is needed?)
 
 * We should delay the parsing of nested scopes (both function and type bodies bracketed with `{}`) until later steps of the compiler. Ideally, parsing of function bodies can be done in a context-sensitive manner that interleaves with semantic checking, closer to the traditional C/C++ model (since we don't care about out-of-order declarations in function bodies).
 

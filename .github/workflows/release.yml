@@ -8,8 +8,9 @@ on:
       - master
     paths-ignore:
       - "docs/**"
-      - "LICENCE"
-      - "CONTRIBUTION.md"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
       - "README.md"
     tags:
       - "v*"

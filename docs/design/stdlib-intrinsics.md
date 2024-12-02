@@ -21,7 +21,7 @@ Looking at these files will demonstrate the features in use.
 
 Most of the intrinsics and attributes have names that indicate that they are not for normal use. This is typically via a `__` prefix.
 
-The `.meta.slang` files look largely like Slang source files, but their contents can also be generated programatically with C++ code. A section of code can drop into `C++` code if it is proceeded by `${{{{`. The C++ section is closed with a closing `}}}}`. This mechanism is typically used to generate different versions of a similar code sequence. Values from the C++ code can be accessed via the `$()`, where the contents of the brackets specifies something that can be calculated from within the C++ code.
+The `.meta.slang` files look largely like Slang source files, but their contents can also be generated programmatically with C++ code. A section of code can drop into `C++` code if it is proceeded by `${{{{`. The C++ section is closed with a closing `}}}}`. This mechanism is typically used to generate different versions of a similar code sequence. Values from the C++ code can be accessed via the `$()`, where the contents of the brackets specifies something that can be calculated from within the C++ code.
 
 As an example, to produce an an array with values 0 to 9 we could write...
 

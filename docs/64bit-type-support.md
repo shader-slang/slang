@@ -7,7 +7,7 @@ Slang 64-bit Type Support
   * 64 bit integers generally require later APIs/shader models
 * When specifying 64 bit literals *always* use the type suffixes (ie `L`, `ULL`, `LL`) 
 * GPU target/s generally do not support all double intrinsics 
-  * Typically missing are trascendentals (sin, cos etc), logarithm and exponental functions
+  * Typically missing are trascendentals (sin, cos etc), logarithm and exponential functions
   * CUDA is the exception supporting nearly all double intrinsics
 * D3D 
   * D3D targets *appear* to support double intrinsics (like sin, cos, log etc), but behind the scenes they are actually being converted to float
@@ -26,7 +26,7 @@ The Slang language supports 64 bit built in types. Such as
 
 This also applies to vector and matrix versions of these types. 
 
-Unfortunately if a specific target supports the type or the typical HLSL instrinsic functions (such as sin/cos/max/min etc) depends very much on the target. 
+Unfortunately if a specific target supports the type or the typical HLSL intrinsic functions (such as sin/cos/max/min etc) depends very much on the target.
 
 Special attention has to be made with respect to literal 64 bit types. By default float and integer literals if they do not have an explicit suffix are assumed to be 32 bit. There is a variety of reasons for this design choice - the main one being around by default behavior of getting good performance. The suffixes required for 64 bit types are as follows
 
@@ -107,7 +107,7 @@ On dxc the following intrinsics are available with double::
 
 These are tested in the test `tests/hlsl-intrinsic/scalar-double-d3d-intrinsic.slang`.
 
-There is no suport for transcendentals (`sin`, `cos` etc) or `log`/`exp`. More surprising is that`sqrt`, `rsqrt`, `frac`, `ceil`, `floor`, `trunc`, `step`, `lerp`, `smoothstep` are also not supported.
+There is no support for transcendentals (`sin`, `cos` etc) or `log`/`exp`. More surprising is that `sqrt`, `rsqrt`, `frac`, `ceil`, `floor`, `trunc`, `step`, `lerp`, `smoothstep` are also not supported.
 
 uint64_t and int64_t Support
 ============================

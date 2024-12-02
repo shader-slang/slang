@@ -85,7 +85,7 @@ var y = 9.0;
 A `let` declaration introduces an immutable variable, which may not be assigned to or used as the argument for an `in out` or `out` parameter.
 A `var` declaration introduces a mutable variable.
 
-An explicit type may be given for a variable by placing it afte the variable name and a colon (`:`):
+An explicit type may be given for a variable by placing it after the variable name and a colon (`:`):
 
 ```hlsl
 let x : int = 7;
@@ -160,7 +160,7 @@ A global shader parameter may include an initial-value epxression, but such an e
 
 ### Variables at Function Scope
 
-Variables declared at _function scope_ (in the body of a function, initializer, subscript acessor, etc.) may be either a function-scope constant, function-scope static variable, or a local variable.
+Variables declared at _function scope_ (in the body of a function, initializer, subscript accessor, etc.) may be either a function-scope constant, function-scope static variable, or a local variable.
 
 #### Function-Scope Constants
 
@@ -216,7 +216,7 @@ The available directions are:
 * `in out` or `inout` indicates pass-by-value-result (copy-in and copy-out) semantics. The callee receives a copy of the argument passed by the caller, it may manipulate the copy, and then when the call returns the final value is copied back to the argument of the caller.
 
 An implementation may assume that at every call site the arguments for `out` or `in out` parameters never alias.
-Under those assumptions, the `out` and `inout` cases may be optimized to use pass-by-refernece instead of copy-in and copy-out.
+Under those assumptions, the `out` and `inout` cases may be optimized to use pass-by-reference instead of copy-in and copy-out.
 
 > Note: Applications that rely on the precise order in which write-back for `out` and `in out` parameters is performed are already on shaky semantic ground.
 
@@ -332,7 +332,7 @@ struct Things { ... }
 
 When a structure declarations ends without a semicolon, the closing curly brace (`}`) must be the last non-comment, non-whitespace token on its line.
 
-For compatiblity with C-style code, a structure type declaration may be used as the type specifier in a traditional-style variable declaration:
+For compatibility with C-style code, a structure type declaration may be used as the type specifier in a traditional-style variable declaration:
 
 ```hlsl
 struct Association
@@ -372,7 +372,7 @@ An optional trailing comma may terminate the lis of cases.
 
 A _case declaration_ consists of the name of the case, along with an optional initial-value expression that specifies the _tag value_ for that case.
 If the first case declaration in the body elides an initial-value expression, the value `0` is used for the tag value.
-If any other case decalration elides an initial-value expresison, its tag value is one greater than the tag value of the immediately preceding case declaration.
+If any other case declaration elides an initial-value expressions, its tag value is one greater than the tag value of the immediately preceding case declaration.
 
 An enumeration case is referred to as if it were a `static` member of the enumeration type (e.g., `Color.Red`).
 
@@ -429,7 +429,7 @@ typedef int Height;
 Constant Buffers and Texture Buffers
 ------------------------------------
 
-As a compatiblity feature, the `cbuffer` and `tbuffer` keywords can be used to introduce variable declarations.
+As a compatibility feature, the `cbuffer` and `tbuffer` keywords can be used to introduce variable declarations.
 
 A declaration of the form:
 
@@ -528,7 +528,7 @@ It is an error to declare an associated type anywhere other than the body of an 
 
 An associated type declaration may have an inheritance clause.
 The inheritance clause of an associated type may only list interfaces; these are the _required interfaces_ for the associated type.
-A concrete type that is used to satisfy an associated type requirement must conform to all of the required interaces of the associated type.
+A concrete type that is used to satisfy an associated type requirement must conform to all of the required interfaces of the associated type.
 
 Initializers
 ------------
@@ -599,7 +599,7 @@ MyVector v = ...;
 float f = v[0];
 ```
 
-A subscript declaration lists one or more parameters inside parantheses, followed by a result type clause starting with `->`.
+A subscript declaration lists one or more parameters inside parentheses, followed by a result type clause starting with `->`.
 The result type clause of a subscript declaration cannot be elided.
 
 The body of a subscript declaration consists of _accessor declarations_.

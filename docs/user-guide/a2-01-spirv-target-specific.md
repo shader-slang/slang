@@ -60,7 +60,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_SampleIndex`              | `BuiltIn SampleId`                |
 | `SV_ShadingRate`              | `BuiltIn PrimitiveShadingRateKHR` |
 | `SV_StartVertexLocation`      | `*Not supported*                  |
-| `SV_StartInstanceLocation`    | `*Not suported*                   |
+| `SV_StartInstanceLocation`    | `*Not supported*                  |
 | `SV_StencilRef`               | `BuiltIn FragStencilRefEXT`       |
 | `SV_Target<N>`                | `Location`                        |
 | `SV_TessFactor`               | `BuiltIn TessLevelOuter`          |
@@ -139,7 +139,7 @@ StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer
 RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` access.
 RasterizerOrderedStructuredBuffer and RasterizerOrderedByteAddressBuffer will use an extension, `SPV_EXT_fragment_shader_interlock`.
 
-If you need to apply a different buffer layout for indivisual `ConstantBuffer` or `StructuredBuffer`, you can specify the layout as a second generic argument. E.g., `ConstantBuffer<T, Std430DataLayout>`, `StructuredBuffer<T, Std140DataLayout>`, `StructuredBuffer<T, Std430DataLayout>` or `StructuredBuffer<T, ScalarDataLayout>`.
+If you need to apply a different buffer layout for individual `ConstantBuffer` or `StructuredBuffer`, you can specify the layout as a second generic argument. E.g., `ConstantBuffer<T, Std430DataLayout>`, `StructuredBuffer<T, Std140DataLayout>`, `StructuredBuffer<T, Std430DataLayout>` or `StructuredBuffer<T, ScalarDataLayout>`.
 
 Note that there are compiler options, "-fvk-use-scalar-layout" / "-force-glsl-scalar-layout" and "-fvk-use-dx-layout".
 These options do the same but they are applied globally.
@@ -153,7 +153,7 @@ In contrast to `ConstantBuffer`, a `ParameterBlock<T>` introduces a new descript
 
 `ParameterBlock` is designed specifically for D3D12/Vulkan/Metal/WebGPU, so that parameters defined in `T` can be placed into an independent descriptor table/descriptor set/argument buffer/binding group.
 
-For example, when targeting Vulkan, when a ParameterBlock doesn't contain nested parameter block fields, it will always map to a single descriptor set, with a dedicated set number and every resources is placed into the set with binding index starting from 0. This allows the user application to create and pre-populate the descriptor set and reuse it during command encoding, without explicilty specifying the binding index for each individual parameter.
+For example, when targeting Vulkan, when a ParameterBlock doesn't contain nested parameter block fields, it will always map to a single descriptor set, with a dedicated set number and every resources is placed into the set with binding index starting from 0. This allows the user application to create and pre-populate the descriptor set and reuse it during command encoding, without explicitly specifying the binding index for each individual parameter.
 
 When both ordinary data fields and resource typed fields exist in a parameter block, all ordinary data fields will be grouped together into a uniform buffer and appear as a binding 0 of the resulting descriptor set.
 
@@ -237,7 +237,7 @@ To generate a valid SPIR-V with multiple entry points, use `-fvk-use-entrypoint-
 Global memory pointers
 ------------------------------
 
-Slang supports global memory pointers when targetting SPIRV. See [an example and explanation](convenience-features.html#pointers-limited).
+Slang supports global memory pointers when targeting SPIRV. See [an example and explanation](convenience-features.html#pointers-limited).
 
 `float4*` in user code will be translated to a pointer in PhysicalStorageBuffer storage class in SPIRV.
 When a slang module uses a pointer type, the resulting SPIRV will be using the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules without use of pointers will use SpvAddressingModelLogical addressing mode.

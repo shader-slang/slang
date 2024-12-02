@@ -156,6 +156,13 @@ function(slang_add_target dir type)
         return()
     endif()
 
+    # Enable link-time optimization for release builds
+    # See: https://cmake.org/cmake/help/latest/prop_tgt/INTERPROCEDURAL_OPTIMIZATION.html
+    set_target_properties(
+        ${target}
+        PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+    )
+
     #
     # Set the output directory
     #

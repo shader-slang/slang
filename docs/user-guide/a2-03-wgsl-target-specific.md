@@ -43,7 +43,7 @@ The system-value semantics are translated to the following WGSL code.
 | SV_SampleIndex | `@builtin(sample_index)` |
 | SV_ShadingRate | *Not supported* |
 | SV_StartVertexLocation | *Not supported* |
-| SV_StartInstanceLocation | *Not suported* |
+| SV_StartInstanceLocation | *Not supported* |
 | SV_StencilRef | *Not supported* |
 | SV_Target<N> | *Not supported* |
 | SV_TessFactor | *Not supported* |

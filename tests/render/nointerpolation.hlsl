@@ -1,6 +1,4 @@
 //TEST(smoke):COMPARE_HLSL_RENDER:
-// WGSL: nointerpolate doesn't work #5625
-//DISABLE_TEST(smoke):COMPARE_HLSL_RENDER: -wgpu
 // TODO: Investigate Metal failure
 //DISABLE_TEST(smoke):COMPARE_HLSL_RENDER: -mtl
 

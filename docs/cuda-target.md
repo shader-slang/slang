@@ -30,7 +30,7 @@ The following are a work in progress or not implemented but are planned to be so
 
 For producing PTX binaries Slang uses [NVRTC](https://docs.nvidia.com/cuda/nvrtc/index.html). NVRTC dll/shared library has to be available to Slang (for example in the appropriate PATH for example) for it to be able to produce PTX.
 
-The NVRTC compiler can be accessed directly via the pass through mechanism and is identifed by the enum value `SLANG_PASS_THROUGH_NVRTC`.
+The NVRTC compiler can be accessed directly via the pass through mechanism and is identified by the enum value `SLANG_PASS_THROUGH_NVRTC`.
 
 Much like other targets that use downstream compilers Slang can be used to compile CUDA source directly to PTX via the pass through mechansism. The Slang command line options will broadly be mapped down to the appropriate options for the NVRTC compilation. In the API the `SlangCompileTarget` for CUDA is `SLANG_CUDA_SOURCE` and for PTX is `SLANG_PTX`. These can also be specified on the Slang command line as `-target cuda` and `-target ptx`.
 
@@ -126,11 +126,11 @@ The UniformState and UniformEntryPointParams struct typically vary by shader. Un
 
 Read only textures will be bound as the opaque CUDA type CUtexObject. This type is the combination of both a texture AND a sampler. This is somewhat different from HLSL, where there can be separate `SamplerState` variables. This allows access of a single texture binding with different types of sampling.
 
-If code relys on this behavior it will be necessary to bind multiple CtexObjects with different sampler settings, accessing the same texture data.
+If code relies on this behavior it will be necessary to bind multiple CtexObjects with different sampler settings, accessing the same texture data.
 
 Slang has some preliminary support for TextureSampler type - a combined Texture and SamplerState. To write Slang code that can target CUDA and other platforms using this mechanism will expose the semantics appropriately within the source.
 
-Load is only supported for Texture1D, and the mip map selection argument is ignored. This is because there is tex1Dfetch and no higher dimensional equivalents. CUDA also only allows such access if the backing array is linear memory - meaning the bound texture cannot have mip maps - thus making the mip map parameter superflous anyway. RWTexture does allow Load on other texture types.
+Load is only supported for Texture1D, and the mip map selection argument is ignored. This is because there is tex1Dfetch and no higher dimensional equivalents. CUDA also only allows such access if the backing array is linear memory - meaning the bound texture cannot have mip maps - thus making the mip map parameter superfluous anyway. RWTexture does allow Load on other texture types.
 
 ## RWTexture
 
@@ -239,7 +239,7 @@ That for pass-through usage, prelude is not pre-pended, preludes are for code ge
 void setDownstreamCompilerPrelude(SlangPassThrough passThrough, const char* preludeText);
 ```
 
-The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
+The code that sets up the prelude for the test infrastructure and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
 Half Support
 ============
@@ -292,7 +292,7 @@ Will require 3 times as many steps as the earlier scalar example just using a si
 
 ## WaveGetLaneIndex
 
-'WaveGetLaneIndex' defaults to `(threadIdx.x & SLANG_CUDA_WARP_MASK)`. Depending on how the kernel is launched this could be incorrect. There other ways to get lane index, for example using inline assembly. This mechanism though is apparently slower than the simple method used here. There is support for using the asm mechnism in the CUDA prelude using the `SLANG_USE_ASM_LANE_ID` preprocessor define to enable the feature.
+'WaveGetLaneIndex' defaults to `(threadIdx.x & SLANG_CUDA_WARP_MASK)`. Depending on how the kernel is launched this could be incorrect. There are other ways to get lane index, for example using inline assembly. This mechanism though is apparently slower than the simple method used here. There is support for using the asm mechanism in the CUDA prelude using the `SLANG_USE_ASM_LANE_ID` preprocessor define to enable the feature.
 
 There is potential to calculate the lane id using the [numthreads] markup in Slang/HLSL, but that also requires some assumptions of how that maps to a lane index.
 

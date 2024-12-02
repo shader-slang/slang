@@ -232,7 +232,7 @@ These would be the first `interface`s officially exposed by the core module.
 While most of our existing code written in Slang uses an `I` prefix as the naming convention for `interface`s (e.g., `IThing`), we have never really discussed that choice in detail.
 Whatever we decide to expose for this stuff is likely to become the de facto convention for Slang code.
 
-The `I` prefix is precedented in COM and C#/.net/CLR, which are likely to be familiar to many devleopers using Slang.
+The `I` prefix is precedented in COM and C#/.net/CLR, which are likely to be familiar to many developers using Slang.
 Because of COM, it is also the convention used in the C++ API headers for Slang and GFX.
 
 The Rust/Swift languages do not distinguish between traits/protocols and other types.
