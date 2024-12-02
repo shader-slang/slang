@@ -1,9 +1,8 @@
-#ifndef CPP_EXTRACT_OPTIONS_H
-#define CPP_EXTRACT_OPTIONS_H
+#pragma once
 
-#include "../../source/slang/slang-diagnostics.h"
+#include "slang/slang-diagnostics.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -61,7 +60,4 @@ struct OptionsParser
     DiagnosticSink* m_sink;
 };
 
-
-} // namespace CppExtract
-
-#endif
+} // namespace CppParse
