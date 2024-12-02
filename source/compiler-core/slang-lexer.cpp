@@ -673,7 +673,7 @@ static int _readOptionalBase(char const** ioCursor)
 }
 
 
-IntegerLiteralValue getIntegerLiteralValue(Token const& token, UnownedStringSlice* outSuffix, int* outBase)
+IntegerLiteralValue getIntegerLiteralValue(Token const& token, UnownedStringSlice* outSuffix, bool* outIsDecimalBase)
 {
     IntegerLiteralValue value = 0;
 
@@ -698,9 +698,9 @@ IntegerLiteralValue getIntegerLiteralValue(Token const& token, UnownedStringSlic
         *outSuffix = UnownedStringSlice(cursor, end);
     }
 
-    if(outBase)
+    if(outIsDecimalBase)
     {
-        *outBase = base;
+        *outIsDecimalBase = (base == 10);
     }
 
     return value;

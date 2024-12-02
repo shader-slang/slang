@@ -172,7 +172,10 @@ String getFileNameTokenValue(Token const& token);
 typedef int64_t IntegerLiteralValue;
 typedef double FloatingPointLiteralValue;
 
-IntegerLiteralValue getIntegerLiteralValue(Token const& token, UnownedStringSlice* outSuffix = 0, int* outBase = 0);
+IntegerLiteralValue getIntegerLiteralValue(
+    Token const& token,
+    UnownedStringSlice* outSuffix = 0,
+    bool* outIsDecimalBase = 0);
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix = 0);

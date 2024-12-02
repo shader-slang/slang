@@ -1577,8 +1577,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     39999,
     Warning,
-    decimalIntegerLiteralTooLarge,
-    "decimal integer literal is too large to represented as a signed integer, representing as "
+    integerLiteralTooLarge,
+    "integer literal is too large to be represented in a signed integer type, interpreting as "
     "unsigned")
 
 DIAGNOSTIC(

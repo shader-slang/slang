@@ -6639,12 +6639,11 @@ static IntegerLiteralValue _fixIntegerLiteral(
 
 static BaseType _determineNonSuffixedIntegerLiteralType(
     IntegerLiteralValue value,
-    int base,
+    bool isDecimalBase,
     Token* token,
     DiagnosticSink* sink)
 {
     const uint64_t rawValue = (uint64_t)value;
-    const bool decimalBase = (base == 10);
 
     /// Non-suffixed integer literal types
     ///
@@ -6657,16 +6656,19 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
     ///     - `uint`
     ///     - `int64_t`
     ///     - `uint64_t`
+    ///
+    /// The lexer scans the negative(-) part of literal separately, and the value part here
+    /// is always positive hence it is sufficient to only compare with the maximum limits.
     BaseType baseType;
-    if (rawValue <= (uint64_t)INT32_MAX)
+    if (rawValue <= INT32_MAX)
     {
         baseType = BaseType::Int;
     }
-    else if ((rawValue <= (uint64_t)UINT32_MAX) && !decimalBase)
+    else if ((rawValue <= UINT32_MAX) && !isDecimalBase)
     {
         baseType = BaseType::UInt;
     }
-    else if (rawValue <= (uint64_t)INT64_MAX)
+    else if (rawValue <= INT64_MAX)
     {
         baseType = BaseType::Int64;
     }
@@ -6674,13 +6676,13 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
     {
         baseType = BaseType::UInt64;
 
-        if (decimalBase)
+        if (isDecimalBase)
         {
             // Decimal integer is too large to be represented as signed.
             // Output warning that it is represented as unsigned instead.
             sink->diagnose(
                 *token,
-                Diagnostics::decimalIntegerLiteralTooLarge,
+                Diagnostics::integerLiteralTooLarge,
                 token->getContent(),
                 BaseTypeInfo::asText(baseType),
                 rawValue);
@@ -6977,8 +6979,8 @@ static Expr* parseAtomicExpr(Parser* parser)
             constExpr->token = token;
 
             UnownedStringSlice suffix;
-            int base;
-            IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix, &base);
+            bool isDecimalBase;
+            IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix, &isDecimalBase);
 
             // Look at any suffix on the value
             char const* suffixCursor = suffix.begin();
@@ -7060,8 +7062,11 @@ static Expr* parseAtomicExpr(Parser* parser)
             }
             else
             {
-                suffixBaseType =
-                    _determineNonSuffixedIntegerLiteralType(value, base, &token, parser->sink);
+                suffixBaseType = _determineNonSuffixedIntegerLiteralType(
+                    value,
+                    isDecimalBase,
+                    &token,
+                    parser->sink);
             }
 
             value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
