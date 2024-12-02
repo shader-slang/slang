@@ -5,7 +5,12 @@ Slang 64-bit Type Support
 
 * Not all targets support 64 bit types, or all 64 bit types 
   * 64 bit integers generally require later APIs/shader models
-* When specifying 64 bit literals *always* use the type suffixes (ie `L`, `ULL`, `LL`) 
+* When specifying 64 bit floating-point literals *always* use the type suffixes (ie `L`) 
+* Integer literals can automatically be interpreted as 64 bit. 
+  * For decimal integer literals, the type is the first from the list [`int`, `int64_t`] which can represent the specified 
+    literal value. 
+  * For hexadecimal integer literals, the type is the first from the list [`int`, `uint`, `int64_t`, `uint64_t`] that can 
+    represent the specified literal value.
 * GPU target/s generally do not support all double intrinsics 
   * Typically missing are trascendentals (sin, cos etc), logarithm and exponential functions
   * CUDA is the exception supporting nearly all double intrinsics
@@ -28,7 +33,7 @@ This also applies to vector and matrix versions of these types.
 
 Unfortunately if a specific target supports the type or the typical HLSL intrinsic functions (such as sin/cos/max/min etc) depends very much on the target.
 
-Special attention has to be made with respect to literal 64 bit types. By default float and integer literals if they do not have an explicit suffix are assumed to be 32 bit. There is a variety of reasons for this design choice - the main one being around by default behavior of getting good performance. The suffixes required for 64 bit types are as follows
+Special attention has to be made with respect to literal 64 bit types. By default float literals if they do not have an explicit suffix are assumed to be 32 bit. There is a variety of reasons for this design choice - the main one being around by default behavior of getting good performance. The suffixes required for 64 bit types are as follows
 
 ```
 // double - 'l' or 'L'
@@ -40,26 +45,45 @@ double b = 1.34e-200;
 // int64_t - 'll' or 'LL' (or combination of upper/lower)
 
 int64_t c = -5436365345345234ll;
-// WRONG!: This is the same as d = int64_t(int32_t(-5436365345345234)) which means d ! = -5436365345345234LL. 
-// Will produce a warning.
-int64_t d = -5436365345345234;      
 
 int64_t e = ~0LL;       // Same as 0xffffffffffffffff
-// Does produce the same result as 'e' because equivalent int64_t(~int32_t(0))
-int64_t f = ~0;         
 
 // uint64_t - 'ull' or 'ULL' (or combination of upper/lower)
 
 uint64_t g = 0x8000000000000000ull; 
-// WRONG!: This is the same as h = uint64_t(uint32_t(0x8000000000000000)) which means h = 0
-// Will produce a warning.
-uint64_t h = 0x8000000000000000u;   
 
 uint64_t i = ~0ull;       // Same as 0xffffffffffffffff
 uint64_t j = ~0;          // Equivalent to 'i' because uint64_t(int64_t(~int32_t(0)));
 ```
 
 These issues are discussed more on issue [#1185](https://github.com/shader-slang/slang/issues/1185)
+
+The type of a decimal non-suffixed integer literal is the first integer type from the list [`int`, `int64_t`] 
+which can represent the specified literal value. If the value cannot fit, the literal is  represented as a `uint64_t` 
+and a warning is given.
+The type of hexadecimal non-suffixed integer literal  is the first type from the list [`int`, `uint`, `int64_t`, `uint64_t`] 
+that can represent the specified literal value. A non-suffixed integer literal will be 64 bit if it cannot fit in 32 bits.
+```
+// Same as int64_t a = int(1), as 1 can fit into a 32 bit integer.
+int64_t a = 1;
+
+// Same as int64_t b = int64_t(2147483648), as The value cannot fit into a 32 bit integer.
+int64_t b = 2147483648;
+
+// Same as int64_t c = uint64_t(18446744073709551615). The value is larger than the maximum value of a signed 32 bit
+// integer. Warning is given.
+uint64_t c = 18446744073709551615;
+
+// Same as uint64_t = int(0x7FFFFFFF). The value can fit into a 32 bit integer.
+uint64_t d = 0x7FFFFFFF;
+
+// Same as uint64_t = int64_t(0x7FFFFFFFFFFFFFFF). The value cannot fit into an unsigned 32 bit integer but
+// can fit into a signed 64 bit integer.
+uint64_t e = 0x7FFFFFFFFFFFFFFF;
+
+// Same as uint64_t = uint64_t(0xFFFFFFFFFFFFFFFF). The value cannot fit into a signed 64 bit integer.
+uint64_t f = 0xFFFFFFFFFFFFFFFF;
+```
 
 Double support
 ==============
