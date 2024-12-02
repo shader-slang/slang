@@ -4267,6 +4267,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_mesh_shader"));
                     break;
                 case Stage::Hull:
+                case Stage::Domain:
                     {
                         requireSPIRVCapability(SpvCapabilityTessellation);
 
@@ -4288,10 +4289,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                     arg);
                         }
                         requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
-                        break;
                     }
-                case Stage::Domain:
-                    requireSPIRVCapability(SpvCapabilityTessellation);
                     break;
                 default:
                     break;

@@ -129,9 +129,9 @@ The D3D11 rasterization pipeline can include up to five programmable stages, alt
 Shader parameters are passed to each D3D11 stage via slots.
 Each stage has its own slots of the following types:
 
-- **Constant buffers** are used for passing relatively small (4KB or less) amounts of data that will be read by GPU code. Constant bufers are passed via `b` registers.
+- **Constant buffers** are used for passing relatively small (4KB or less) amounts of data that will be read by GPU code. Constant buffers are passed via `b` registers.
 
-- **Shader resource views** (SRVs) include most textures, buffers, and other opaque resource types thare are read or sampled by GPU code. SRVs use `t` registers.
+- **Shader resource views** (SRVs) include most textures, buffers, and other opaque resource types there are read or sampled by GPU code. SRVs use `t` registers.
 
 - **Unordered access views** (UAVs) include textures, buffers, and other opaque resource types used for write or read-write operations in GPU code. UAVs use `u` registers.
 
@@ -221,7 +221,7 @@ A D3D12 pipeline layout can specify that certain root parameters or certain slot
 The D3D12 ray tracing pipeline adds a new mechanism for passing shader parameters.
 In addition to allowing shader parameters to be passed to the entire pipeline via root parameters, each shader table entry provides storage space for passing argument data specific to that entry.
 
-Similar to the use of a pipline layout (root signature) to configure the use of root parameters, each kernel used within shader entries must be configured with a "local root signature" that defines how the storage space in the shader table entry is to be used.
+Similar to the use of a pipeline layout (root signature) to configure the use of root parameters, each kernel used within shader entries must be configured with a "local root signature" that defines how the storage space in the shader table entry is to be used.
 Shader parameters are still bound to registers and spaces as for non-ray-tracing code, and the local root signature simply allows those same registers/spaces to be associated with locations in a shader table entry.
 
 One important detail is that some shader table entries are associated with a kernel for a single stage (e.g., a single miss shader), while other shader table entries are associated with a "hit group" consisting of up to one each of an intersection, any-hit, and closest-hit kernel.
@@ -411,6 +411,47 @@ Slang's CPU compute target supports only a compute pipeline.
 ### Parameter Passing
 
 Because CPU target support flexible pointer-based addressing and large low-latency caches, a compute kernel can simply be passed a small fixed number of pointers and be relied upon to load parameter values of any types via indirection through those pointers.
+
+## WebGPU
+
+> #### Note
+>
+> Slang support for WebGPU is work in progress.
+
+WebGPU is a graphics and compute API.
+It is similar in spirit to modern APIs, like Metal, Direct3D 12 and Vulkan, but with concessions to portability and privacy.
+
+WebGPU is available both in browsers as a JavaScript API, and natively as a C/C++ API.
+[Dawn](https://github.com/google/dawn), is a native WebGPU implementation used by the Chrome browser.
+
+By combining Slang, [Dawn](https://github.com/google/dawn) and [Emscripten](https://emscripten.org/),
+an application can easily target any native API, and the web, with a single codebase consisting of C++ and Slang code.
+
+WebGPU shader modules are created from WGSL (WebGPU Shading Language) source files.
+WebGPU does not use an intermediate representation - WGSL code is compiled to backend-specific code by
+compilers provided by the WebGPU implementation.
+
+### Pipelines
+
+WebGPU supports render and compute pipelines.
+
+The WebGPU render pipeline includes the following programmable stages:
+
+- The vertex stage outputs vertex data
+
+- The fragment stage outputs fragments
+
+### Parameter Passing
+
+WebGPU uses groups of bindings called bind groups to bind things like textures, buffers and samplers.
+Bind group objects are passed as arguments when encoding bind group setting commands.
+
+There is a notion of equivalence for bind groups, and a notion of equivalence for pipelines defined in
+terms of bind group equivalence.
+This equivalence allows an application to save some bind group setting commands, when switching between
+pipelines, if bindings are grouped together appropriately.
+
+Which bindings are grouped together can be controlled using Slang's `ParameterBlock` generic type.
 
 ## Summary
 

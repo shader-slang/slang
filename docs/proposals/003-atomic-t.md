@@ -143,7 +143,7 @@ For non-WGSL/Metal targets, we can simply lower the type out of existence into i
 
 `Atomic<T>` type exists in almost all CPU programming languages and is the proven way to express atomic operations over different
 architectures that have different memory models. WGSL and Metal follows this trend to require atomic operations being expressed
-this way. This proposal is to make Slang follow this trend and make `Atomic<T>` the recommened way to express atomic operation
+this way. This proposal is to make Slang follow this trend and make `Atomic<T>` the recommended way to express atomic operation
 going forward.
 
 # Future Work

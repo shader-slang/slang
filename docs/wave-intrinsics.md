@@ -31,7 +31,7 @@ Using WaveMask intrinsics is generally more verbose and prone to error than the 
 * Might allow for higher performance (for example it gives more control of divergence)
 * Maps most closely to CUDA
 
-On D3D12 and Vulkan the WaveMask instrinsics can be used, but the mask is effectively ignored. For this to work across targets including CUDA, the mask must be calculated such that it exactly matches that of HLSL defined 'active' lanes, else the behavior is undefined. 
+On D3D12 and Vulkan the WaveMask intrinsics can be used, but the mask is effectively ignored. For this to work across targets including CUDA, the mask must be calculated such that it exactly matches that of HLSL defined 'active' lanes, else the behavior is undefined.
 
 The WaveMask intrinsics are a non standard Slang feature, and may change in the future. 
 
@@ -41,7 +41,7 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    // It is the programmers responsibility to determine the inital mask, and that is dependent on the launch
+    // It is the programmers responsibility to determine the initial mask, and that is dependent on the launch
     // It's common to launch such that all lanes are active - with CUDA this would mean 32 lanes. 
     // Here the launch only has 4 lanes active, and so the initial mask is 0xf.
     const WaveMask mask0 = 0xf;
@@ -212,7 +212,7 @@ T WaveBroadcastLaneAt<T>(T value, constexpr int lane);
 ```
 
 All lanes receive the value specified in lane. Lane must be an active lane, otherwise the result is undefined. 
-This is a more restricive version of `WaveReadLaneAt` - which can take a non constexpr lane, *but* must be the same value for all lanes in the warp. Or 'dynamically uniform' as described in the HLSL documentation. 
+This is a more restrictive version of `WaveReadLaneAt` - which can take a non constexpr lane, *but* must be the same value for all lanes in the warp. Or 'dynamically uniform' as described in the HLSL documentation.
 
 ```
 T WaveShuffle<T>(T value, int lane);
@@ -220,7 +220,7 @@ T WaveShuffle<T>(T value, int lane);
 
 Shuffle is a less restrictive version of `WaveReadLaneAt` in that it has no restriction on the lane value - it does *not* require the value to be same on all lanes. 
 
-There isn't explicit support for WaveShuffle in HLSL, and for now it will emit `WaveReadLaneAt`. As it turns out for a sizable set of hardware WaveReadLaneAt does work correctly when the lane is not 'dynamically uniform'. This is not necessarily the case for hardware general though, so if targetting HLSL it is important to make sure that this does work correctly on your target hardware.
+There isn't explicit support for WaveShuffle in HLSL, and for now it will emit `WaveReadLaneAt`. As it turns out for a sizable set of hardware WaveReadLaneAt does work correctly when the lane is not 'dynamically uniform'. This is not necessarily the case for hardware general though, so if targeting HLSL it is important to make sure that this does work correctly on your target hardware.
 
 Our intention is that Slang will support the appropriate HLSL mechanism that makes this work on all hardware when it's available.  
 
@@ -338,5 +338,3 @@ T WaveMaskReadLaneAt<T>(WaveMask mask, T value, int lane);
 
 T WaveMaskShuffle<T>(WaveMask mask, T value, int lane);
 ```
-
- 

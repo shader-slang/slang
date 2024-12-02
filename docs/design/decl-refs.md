@@ -25,7 +25,7 @@ Why do we need `DeclRef`s?
 --------------------------
 
 In a compiler for a simple language, we might represent a reference to a declaration as simply a pointer to the AST node for the declaration, or some kind of handle/ID that references that AST node.
-A reprsentation like that will work in simple cases, for example:
+A representation like that will work in simple cases, for example:
 
 ```hlsl
 struct Cell { int value };

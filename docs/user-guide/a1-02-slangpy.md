@@ -308,7 +308,7 @@ float computeOutputPixel(TensorView<float> input, uint2 pixelLoc)
         }
     }
 
-    // Comptue the average value.
+    // Compute the average value.
     sumValue /= count;
 
     return sumValue;
@@ -390,7 +390,7 @@ float computeOutputPixel(
         }
     }
 
-    // Comptue the average value.
+    // Compute the average value.
     sumValue /= count;
 
     return sumValue;
@@ -494,7 +494,7 @@ TorchTensor<float> square(TorchTensor<float> input)
 ```
 
 Here, we mark the function with the `[TorchEntryPoint]` attribute, so it will be compiled to C++ and exported as a python callable. 
-Since this is a host function, we can perform tensor allocations. For instnace, `square()` calls `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
+Since this is a host function, we can perform tensor allocations. For instance, `square()` calls `TorchTensor<float>.zerosLike` to allocate a 2D-tensor that has the same size as the input.
 `zerosLike` returns a `TorchTensor<float>` object that represents a CPU handle of a PyTorch tensor.
 
 Then we launch `square_kernel` with the `__dispatch_kernel` syntax. Note that we can directly pass
@@ -729,7 +729,7 @@ Marks a function for export to Python. Functions marked with `[TorchEntryPoint]`
 Marks a function as a CUDA device function, and ensures the compiler to include it in the generated CUDA source.
 
 #### `[AutoPyBindCUDA]` attribute
-Markes a cuda kernel for automatic binding generation so that it may be invoked from python without having to hand-code the torch entry point. The marked function **must** also be marked with `[CudaKernel]`. If the marked function is also marked with `[Differentiable]`, this will also generate bindings for the derivative methods.
+Marks a cuda kernel for automatic binding generation so that it may be invoked from python without having to hand-code the torch entry point. The marked function **must** also be marked with `[CudaKernel]`. If the marked function is also marked with `[Differentiable]`, this will also generate bindings for the derivative methods.
 
 Restriction: methods marked with `[AutoPyBindCUDA]` will not operate 
 

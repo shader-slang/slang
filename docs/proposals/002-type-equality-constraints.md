@@ -20,7 +20,7 @@ As of proposal [001](001-where-clauses.md), Slang allows for generic declaration
 
 Currently, the language only accepts *conformance* constraints of the form `T : IFoo`, where `T` is one of the parameters of the generic, and `IFoo` is either an `interface` or a conjunction of interfaces, which indicate that the type `T` must conform to `IFoo`.
 
-This proposal is motivated by the observation that when an interface has associated types, there is currently no way for a programmer to introduce a generic that is only applicable when an associated type satisfies certain constriants.
+This proposal is motivated by the observation that when an interface has associated types, there is currently no way for a programmer to introduce a generic that is only applicable when an associated type satisfies certain constraints.
 
 As an example, consider an interface for types that can be "packed" into a smaller representation for in-memory storage (instead of a default representation optimized for access from registers):
 
@@ -146,7 +146,7 @@ The choice of how to represent equality constraints is more subtle.
 One option is to lower an equality constraint to *nothing* at the IR level, under the assumption that the casts that reference these constraints should lower to nothing.
 Doing so would introduce yet another case where the IR we generate doesn't "type-check."
 The other option is to lower a type equality constraint to an explicit generic parameter which is then applied via an explicit op to convert between the associated type and its known concrete equivalent.
-The representation of the witnesses required to provide *arguments* for such parameters is something that hasn't been fully explored, so for now we prpose to take the first (easier) option.
+The representation of the witnesses required to provide *arguments* for such parameters is something that hasn't been fully explored, so for now we propose to take the first (easier) option.
 
 ### Canonicalization
 
@@ -156,7 +156,7 @@ Conformane constraints involving associated types should already be order-able a
 We propose the following approach:
 
 * Take all of the equality constraints that arise after any expansion steps
-* Divide the types named on either side of any equality constraint into *equivalence classes*, where if `X == Y` is a constraint, then `X` and `Y` must in teh same equivalence class
+* Divide the types named on either side of any equality constraint into *equivalence classes*, where if `X == Y` is a constraint, then `X` and `Y` must in the same equivalence class
   * Each type in an equivalence class will either be an associated type of the form `T.A.B...Z`, derived from a generic type parameter, or a *independent* type, which here means anything other than those associated types.
   * Because of the rules enforced during semantic checking, each equivalence class must have at least one associated type in it.
   * Each equivalence class may have zero or more independent types in it.

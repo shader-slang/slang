@@ -19,6 +19,11 @@ jobs:
                 "command": "format",
                 "permission": "none",
                 "issue_type": "pull-request"
+              },
+              {
+                "command": "regenerate-toc",
+                "permission": "none",
+                "issue_type": "pull-request"
               }
             ]
 

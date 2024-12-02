@@ -34,7 +34,7 @@ The implementation of Slang has so far focused heavily on the needs of Falcor.
 
 ### Won't we all just be using C/C++ for shaders soon?
 
-The great thing about both Vulkan and D3D12 moving to publicly-documented binary intermediate langugaes (SPIR-V and DXIL, respectively) is that there is plenty of room for language innovation on top of these interfaces.
+The great thing about both Vulkan and D3D12 moving to publicly-documented binary intermediate languages (SPIR-V and DXIL, respectively) is that there is plenty of room for language innovation on top of these interfaces.
 
 Having support for writing GPU shaders in a reasonably-complete C/C++ language would be great.
 We are supportive of efforts in the "C++ for shaders" direction.

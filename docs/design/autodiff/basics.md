@@ -4,7 +4,7 @@ This documentation is intended for Slang contributors and is written from a comp
 
 ## What is Automatic Differentiation?
 
-Before diving into the design of the automatic differentiation (for brevity, we will call it 'auto-diff') passes, it is important to understand the end goal of what auto-diff tries to acheive. 
+Before diving into the design of the automatic differentiation (for brevity, we will call it 'auto-diff') passes, it is important to understand the end goal of what auto-diff tries to achieve.
 
 The over-arching goal of Slang's auto-diff is to enable the user to compute derivatives of a given shader program or function's output w.r.t its input parameters. This critical compiler feature enables users to quickly use their shaders with gradient-based parameter optimization algorithms, which forms the backbone of modern machine learning systems. It enables users to train and deploy graphics systems that contain ML primitives (like multi-layer perceptron's or MLPs) or use their shader programs as differentiable primitives within larger ML pipelines.
 
@@ -60,7 +60,7 @@ DifferentialPair<float> fwd_f(DifferentialPair<float> dpx)
 }
 ```
 
-Note that `(2 * x)` is the multiplier corresponding to $Df(x)$. We refer to $x$ and $f(x)$ as "*primal*" values and the pertubations $dx$ and $Df(x)\cdot dx$ as "*differential*" values. The reason for this separation is that the "*differential*" output values are always linear w.r.t their "*differential*" inputs.
+Note that `(2 * x)` is the multiplier corresponding to $Df(x)$. We refer to $x$ and $f(x)$ as "*primal*" values and the perturbations $dx$ and $Df(x)\cdot dx$ as "*differential*" values. The reason for this separation is that the "*differential*" output values are always linear w.r.t their "*differential*" inputs.
 
 As the name implies, `DifferentialPair<T>` is a special pair type used by Slang to hold values and their corresponding differentials.
 
@@ -256,7 +256,7 @@ void rev_f(inout DifferentialPair<float> dpx, inout DifferentialPair<float> dpy,
 
 Note that `rev_f` accepts derivatives w.r.t the output value as the input, and returns derivatives w.r.t inputs as its output (through `inout` parameters). `rev_f` still needs the primal values `x` and `y` to compute the derivatives, so those are still passed in as an input through the primal part of the differential pair. 
 
-Also note that the reverse-mode derivative function does not have to compute the primal result value (its return is void). The reason for this is a matter of convenience: reverse-mode derivatives are often invoked after all the primal fuctions, and there is typically no need for these values. We go into more detail on this topic in the checkpointing chapter.
+Also note that the reverse-mode derivative function does not have to compute the primal result value (its return is void). The reason for this is a matter of convenience: reverse-mode derivatives are often invoked after all the primal functions, and there is typically no need for these values. We go into more detail on this topic in the checkpointing chapter.
 
 The reverse mode function can be used to compute both `dOutput/dx` and `dOutput/dy` with a single invocation (unlike the forward-mode case where we had to invoke `fwd_f` once for each input)
 

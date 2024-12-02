@@ -1,5 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+//TEST:SIMPLE(filecheck=METAL): -target metal
+//TEST:SIMPLE(filecheck=METAL-ASM): -target metallib
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry fragmentMain -stage fragment
 
 struct NestedReturn
 {
@@ -14,11 +15,16 @@ struct Output
     float4 Material : SV_Target2;
 }
 
-// CHECK-ASM: define {{.*}} @fragmentMain
-// CHECK: color(0)
-// CHECK: color(1)
-// CHECK-DAG: color(3)
-// CHECK-DAG: color(2)
+// METAL-ASM: define {{.*}} @fragmentMain
+// METAL: color(0)
+// METAL: color(1)
+// METAL-DAG: color(3)
+// METAL-DAG: color(2)
+
+// WGSL-DAG: location(0)
+// WGSL-DAG: location(1)
+// WGSL-DAG: location(3)
+// WGSL-DAG: location(2)
 
 [shader("fragment")]
 Output fragmentMain()
