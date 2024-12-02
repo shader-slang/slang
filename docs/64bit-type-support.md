@@ -6,7 +6,7 @@ Slang 64-bit Type Support
 * Not all targets support 64 bit types, or all 64 bit types 
   * 64 bit integers generally require later APIs/shader models
 * When specifying 64 bit floating-point literals *always* use the type suffixes (ie `L`) 
-* An integer literal will be interpreted as 64 bits if it is large enough
+* An integer literal will be interpreted as 64 bits if it cannot fit in a 32 bit value.
 * GPU target/s generally do not support all double intrinsics 
   * Typically missing are trascendentals (sin, cos etc), logarithm and exponential functions
   * CUDA is the exception supporting nearly all double intrinsics
@@ -57,7 +57,7 @@ These issues are discussed more on issue [#1185](https://github.com/shader-slang
 The type of a decimal non-suffixed integer literal is the first integer type from the list [`int`, `int64_t`] 
 which can represent the specified literal value. If the value cannot fit, the literal is  represented as an `uint64_t` 
 and a warning is given.
-The type of hexadecimal non-suffixed integer literal  is the first type from the list [`int`, `uint`, `int64_t`, `uint64_t`] 
+The type of a hexadecimal non-suffixed integer literal  is the first type from the list [`int`, `uint`, `int64_t`, `uint64_t`] 
 that can represent the specified literal value. A non-suffixed integer literal will be 64 bit if it cannot fit in 32 bits.
 ```
 // Same as int64_t a = int(1), the value can fit into a 32 bit integer.
@@ -66,8 +66,8 @@ int64_t a = 1;
 // Same as int64_t b = int64_t(2147483648), the value cannot fit into a 32 bit integer.
 int64_t b = 2147483648;
 
-// Same as int64_t c = uint64_t(18446744073709551615), the value is larger than the maximum value of a signed 32 bit
-// integer. Warning is given.
+// Same as int64_t c = uint64_t(18446744073709551615), the value is larger than the maximum value of a signed 64 bit
+// integer, and is interpreted as an unsigned 64 bit integer. Warning is given.
 uint64_t c = 18446744073709551615;
 
 // Same as uint64_t = int(0x7FFFFFFF), the value can fit into a 32 bit integer.
@@ -77,7 +77,8 @@ uint64_t d = 0x7FFFFFFF;
 // can fit into a signed 64 bit integer.
 uint64_t e = 0x7FFFFFFFFFFFFFFF;
 
-// Same as uint64_t = uint64_t(0xFFFFFFFFFFFFFFFF), the value cannot fit into a signed 64 bit integer.
+// Same as uint64_t = uint64_t(0xFFFFFFFFFFFFFFFF), the value cannot fit into a signed 64 bit integer, and
+// is interpreted as an unsigned 64 bit integer.
 uint64_t f = 0xFFFFFFFFFFFFFFFF;
 ```
 
