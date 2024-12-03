@@ -101,7 +101,7 @@ extern "C"
         int targetIndex,
         bool val);
 
-    /*! @see slang::ICompileRequest::setIngoreCapabilityCheck */
+    /*! @see slang::ICompileRequest::setIgnoreCapabilityCheck */
     SLANG_API void spSetIgnoreCapabilityCheck(slang::ICompileRequest* request, bool val);
 
     /*! @see slang::ICompileRequest::setCodeGenTarget */
@@ -936,11 +936,11 @@ extern "C"
     /// Count should *NOT* include terminating zero.
     SLANG_API SlangUInt32 spComputeStringHash(const char* chars, size_t count);
 
-    /// Get a type layout representing reflection information for the global-scope prameters.
+    /// Get a type layout representing reflection information for the global-scope parameters.
     SLANG_API SlangReflectionTypeLayout* spReflection_getGlobalParamsTypeLayout(
         SlangReflection* reflection);
 
-    /// Get a variable layout representing reflection information for the global-scope prameters.
+    /// Get a variable layout representing reflection information for the global-scope parameters.
     SLANG_API SlangReflectionVariableLayout* spReflection_getGlobalParamsVarLayout(
         SlangReflection* reflection);
 
@@ -1409,7 +1409,7 @@ struct ICompileRequest : public ISlangUnknown
     virtual SLANG_NO_THROW void const* SLANG_MCALL getCompileRequestCode(size_t* outSize) = 0;
 
     /** Get the compilation result as a file system.
-    The result is not written to the actual OS file system, but is made avaiable as an
+    The result is not written to the actual OS file system, but is made available as an
     in memory representation.
     */
     virtual SLANG_NO_THROW ISlangMutableFileSystem* SLANG_MCALL
