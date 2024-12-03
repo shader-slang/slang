@@ -5977,7 +5977,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             IRSizeAndAlignment sizeAndAlignment;
             if (auto alignedAttr = inst->findAttr<IRAlignedAttr>())
             {
-                sizeAndAlignment.alignment = getIntVal(alignedAttr->getAlignment());
+                sizeAndAlignment.alignment = (int)getIntVal(alignedAttr->getAlignment());
             }
             else
             {
@@ -6008,7 +6008,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             IRSizeAndAlignment sizeAndAlignment;
             if (auto alignedAttr = inst->findAttr<IRAlignedAttr>())
             {
-                sizeAndAlignment.alignment = getIntVal(alignedAttr->getAlignment());
+                sizeAndAlignment.alignment = (int)getIntVal(alignedAttr->getAlignment());
             }
             else
             {
