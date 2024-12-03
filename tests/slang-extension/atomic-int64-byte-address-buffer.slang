@@ -32,6 +32,6 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     // Bit logical
     outputBuffer.InterlockedOrU64((idx << 3), (uint64_t(2) << 32) | (tid << 4));
     outputBuffer.InterlockedXorU64((idx << 3), tid << 8);
-    outputBuffer.InterlockedAndU64((idx << 3), (uint64_t(tid | 2) << 32) |  0xffffffff);
+    outputBuffer.InterlockedAndU64((idx << 3), (uint64_t(tid | 2) << 32) |  0xffffffffffffffff);
 }
 
