@@ -6679,20 +6679,16 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
         if (isDecimalBase)
         {
             // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
-            // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is valid.
-            // Unfortunately because the lexer handles the negative(-) part of the literal separately
-            // it is impossible to know whether the literal has a negative sign or not.
-            // We emit the warning and initially process it as a uint64 anyways, and the negative sign
-            // will be properly parsed and the value will still be properly stored as a negative INT64_MIN.
+            // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
+            // valid. Unfortunately because the lexer handles the negative(-) part of the literal
+            // separately it is impossible to know whether the literal has a negative sign or not.
+            // We emit the warning and initially process it as a uint64 anyways, and the negative
+            // sign will be properly parsed and the value will still be properly stored as a
+            // negative INT64_MIN.
 
             // Decimal integer is too large to be represented as signed.
             // Output warning that it is represented as unsigned instead.
-            sink->diagnose(
-                *token,
-                Diagnostics::integerLiteralTooLarge,
-                token->getContent(),
-                BaseTypeInfo::asText(baseType),
-                rawValue);
+            sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
         }
     }
 
