@@ -4,7 +4,7 @@
 // This file will be parsed and processed by the slang-capability-generator
 // tool during the build process to produce slang-generated-capability-defs.h
 // and slang-generated-capability-defs-impl.h files that constitute the final
-// C++ source of the compiler. New capabilties should be added by editing
+// C++ source of the compiler. New capabilities should be added by editing
 // this file instead of the generated .h files.
 //
 // A capability atom represent a basic unit that characterizes a single code-gen target or
@@ -1885,7 +1885,7 @@ alias subgroup_arithmetic = GL_KHR_shader_subgroup_arithmetic | _sm_6_0 | _cuda_
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle'
 /// [Compound]
 alias subgroup_shuffle = GL_KHR_shader_subgroup_shuffle | _sm_6_0 | _cuda_sm_7_0;
-/// Capabilities required to use GLSL-style subgroup operations 'subgroup_shufle_relative'
+/// Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle_relative'
 /// [Compound]
 alias subgroup_shufflerelative = GL_KHR_shader_subgroup_shuffle_relative | _sm_6_0 | _cuda_sm_7_0;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_clustered'
