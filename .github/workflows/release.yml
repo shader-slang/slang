@@ -152,32 +152,55 @@ jobs:
       - name: Package Slang
         id: package
         run: |
-          # For the release, also generate a tar.gz file
+          # Package main binaries
           cpack --preset "$config" -G ZIP
           cpack --preset "$config" -G TGZ
+
+          # Package debug info
+          cpack --preset "$config-debug-info" -G ZIP
+          cpack --preset "$config-debug-info" -G TGZ
+
           triggering_ref=${{ github.ref_name }}
           base=slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
+
+          # Move main packages
           mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
 
-          # For some reason, the binaries packed by cpack for macos is modified
-          # by cpack and considered damanged by macos. For now we workaround this
-          # by repacking all the binaries into the release package.
+          # Move debug info packages
+          mv "$(pwd)/build/dist-${config}-debug-info/slang-debug-info.zip" "${base}-debug-info.zip"
+          echo "SLANG_DEBUG_INFO_ARCHIVE_ZIP=${base}-debug-info.zip" >> "$GITHUB_OUTPUT"
+          mv "$(pwd)/build/dist-${config}-debug-info/slang-debug-info.tar.gz" "${base}-debug-info.tar.gz"
+          echo "SLANG_DEBUG_INFO_ARCHIVE_TAR=${base}-debug-info.tar.gz" >> "$GITHUB_OUTPUT"
+
+          # MacOS specific handling
           if [[ "${{ matrix.os }}"  == "macos" ]]; then
             mkdir ./ttmp
             unzip "${base}.zip" -d ./ttmp
+            mkdir ./ttmp-debug
+            unzip "${base}-debug-info.zip" -d ./ttmp-debug
 
             /bin/cp -rf build/$cmake_config/bin/* ./ttmp/bin/
             /bin/cp -rf build/$cmake_config/lib/* ./ttmp/lib/
+
             rm ${base}.zip
             rm ${base}.tar.gz
+            rm ${base}-debug-info.zip
+            rm ${base}-debug-info.tar.gz
+
             cd ./ttmp
             7z a ../${base}.zip .
             tar -czvf ../${base}.tar.gz .
             cd ../
+
+            cd ./ttmp-debug
+            7z a ../${base}-debug-info.zip .
+            tar -czvf ../${base}-debug-info.tar.gz .
+            cd ../
           fi
+
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
@@ -191,6 +214,8 @@ jobs:
           files: |
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_ZIP }}
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+            ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_ZIP }}
+            ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_TAR }}
             ${{ steps.notarize.outputs.SLANG_NOTARIZED_DIST }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
