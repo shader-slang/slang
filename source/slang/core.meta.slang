@@ -1064,6 +1064,7 @@ T loadAligned<int alignment, T>(T* ptr)
 /// Aligned stores are more efficient than unaligned stores on some platforms.
 /// @param alignment The alignment of the store operation.
 /// @param ptr The pointer to store value to.
+/// @param value The value to store.
 /// @remarks When targeting SPIRV, this function maps to an `OpStore` instruction with the `Aligned` memory operand.
 /// The functions maps to normal store operation on other targets.
 ///
