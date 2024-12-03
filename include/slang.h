@@ -823,8 +823,8 @@ typedef uint32_t SlangSizeT;
     enum SlangDebugInfoFormat : SlangDebugInfoFormatIntegral
     {
         SLANG_DEBUG_INFO_FORMAT_DEFAULT, ///< Use the default debugging format for the target
-        SLANG_DEBUG_INFO_FORMAT_C7, ///< CodeView C7 format (typically means debugging information is
-                                    ///< embedded in the binary)
+        SLANG_DEBUG_INFO_FORMAT_C7,  ///< CodeView C7 format (typically means debugging information
+                                     ///< is embedded in the binary)
         SLANG_DEBUG_INFO_FORMAT_PDB, ///< Program database
 
         SLANG_DEBUG_INFO_FORMAT_STABS, ///< Stabs
