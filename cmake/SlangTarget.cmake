@@ -1,5 +1,5 @@
 #
-# A function to make target creation a little more declarative
+# A function to make target specification a little more declarative
 #
 # See the comments on the options below for usage
 #
@@ -21,6 +21,8 @@ function(slang_add_target dir type)
         # Don't include any source in this target, this is a complement to
         # EXPLICIT_SOURCE, and doesn't interact with EXTRA_SOURCE_DIRS
         NO_SOURCE
+        # Don't generate split debug info for this target
+        NO_SPLIT_DEBUG_INFO
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -49,7 +51,7 @@ function(slang_add_target dir type)
         DEBUG_DIR
         # Install this target as part of a component
         INSTALL_COMPONENT
-        # Don't install debug info by default for this target and use this
+        # Override the debug info component name for installation
         # explicit name instead, used for externally built things such as
         # slang-glslang and slang-llvm which have large pdb files
         DEBUG_INFO_INSTALL_COMPONENT
@@ -198,6 +200,15 @@ function(slang_add_target dir type)
             PDB_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
     )
 
+    if(NOT MSVC)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                COMPILE_OPTIONS
+                    "$<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:-fdebug-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=${output_dir}>"
+        )
+    endif()
+
     #
     # Set common compile options and properties
     #
@@ -207,6 +218,65 @@ function(slang_add_target dir type)
         set_default_compile_options(${target} USE_FEWER_WARNINGS)
     else()
         set_default_compile_options(${target})
+    endif()
+
+    # Set debug info options if not disabled
+    # Determine if this target produces a binary that can have debug info
+    if(type MATCHES "^(EXECUTABLE|SHARED|MODULE)$")
+        set(can_have_debug_info TRUE)
+    else()
+        set(can_have_debug_info FALSE)
+    endif()
+
+    if(NOT ARG_NO_SPLIT_DEBUG_INFO AND can_have_debug_info)
+        if(MSVC)
+            target_compile_options(
+                ${target}
+                PRIVATE $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
+            )
+            set_target_properties(
+                ${target}
+                PROPERTIES
+                    COMPILE_PDB_NAME "${target}"
+                    COMPILE_PDB_OUTPUT_DIRECTORY "${output_dir}"
+            )
+        else()
+            # GCC/Clang debug info handling
+            if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+                target_compile_options(
+                    ${target}
+                    PRIVATE
+                        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
+                        -g
+                        -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
+                        -fdebug-prefix-map=${CMAKE_BINARY_DIR}=.
+                        >
+                )
+                target_link_options(
+                    ${target}
+                    PRIVATE
+                        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
+                        -Wl,--build-id=sha1
+                        >
+                )
+                # debug info splitting
+                add_custom_command(
+                    TARGET ${target}
+                    POST_BUILD
+                    COMMAND
+                        ${CMAKE_OBJCOPY} --only-keep-debug
+                        $<TARGET_FILE:${target}> $<TARGET_FILE:${target}>.debug
+                    COMMAND
+                        ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:${target}>
+                    COMMAND
+                        ${CMAKE_OBJCOPY}
+                        --add-gnu-debuglink=$<TARGET_FILE:${target}>.debug
+                        $<TARGET_FILE:${target}>
+                    WORKING_DIRECTORY ${output_dir}
+                    VERBATIM
+                )
+            endif()
+        endif()
     endif()
 
     set_target_properties(
@@ -429,30 +499,57 @@ function(slang_add_target dir type)
             PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} ${ARGN}
         )
     endmacro()
+
+    if(ARG_INSTALL)
+        i()
+        if(DEFINED ARG_DEBUG_INFO_INSTALL_COMPONENT)
+            set(debug_component "${ARG_DEBUG_INFO_INSTALL_COMPONENT}")
+        else()
+            set(debug_component "debug-info")
+        endif()
+    endif()
+
     if(ARG_INSTALL_COMPONENT)
         i(EXCLUDE_FROM_ALL COMPONENT ${ARG_INSTALL_COMPONENT})
-        set(pdb_component "${ARG_INSTALL_COMPONENT}-debug-info")
-    elseif(ARG_INSTALL)
-        i()
-        set(pdb_component "debug-info")
+        if(DEFINED ARG_DEBUG_INFO_INSTALL_COMPONENT)
+            set(debug_component "${ARG_DEBUG_INFO_INSTALL_COMPONENT}")
+        else()
+            set(debug_component "${ARG_INSTALL_COMPONENT}-debug-info")
+        endif()
     endif()
-    if(ARG_DEBUG_INFO_INSTALL_COMPONENT)
-        set(pdb_component ${ARG_DEBUG_INFO_INSTALL_COMPONENT})
-    endif()
-    if(MSVC AND DEFINED pdb_component)
-        if(
-            type STREQUAL "EXECUTABLE"
-            OR type STREQUAL "SHARED"
-            OR type STREQUAL "MODULE"
-        )
+
+    # Install debug info only if target is being installed
+    if(
+        (ARG_INSTALL OR ARG_INSTALL_COMPONENT)
+        AND NOT ARG_NO_SPLIT_DEBUG_INFO
+        AND can_have_debug_info
+    )
+        if(MSVC)
+            # Install PDB files for MSVC
             install(
                 FILES $<TARGET_PDB_FILE:${target}>
                 DESTINATION ${runtime_subdir}
-                # Optional, because if we're building without debug info (like
-                # a release build) then we don't want to fail here.
+                CONFIGURATIONS Debug RelWithDebInfo
                 OPTIONAL
-                COMPONENT ${pdb_component}
+                COMPONENT ${debug_component}
                 EXCLUDE_FROM_ALL
+            )
+        else()
+            # Determine correct destination based on target type
+            if(type STREQUAL "EXECUTABLE")
+                set(debug_dest ${runtime_subdir})
+            else()
+                set(debug_dest ${library_subdir})
+            endif()
+
+            # Install split debug files for GCC/Clang
+            install(
+                FILES "$<TARGET_FILE:${target}>.debug"
+                DESTINATION ${debug_dest}
+                CONFIGURATIONS Debug RelWithDebInfo
+                COMPONENT ${debug_component}
+                EXCLUDE_FROM_ALL
+                OPTIONAL
             )
         endif()
     endif()
