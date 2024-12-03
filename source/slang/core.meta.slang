@@ -1047,7 +1047,6 @@ struct Ptr
 /// The functions maps to normal load operation on other targets.
 ///
 [__NoSideEffect]
-[__readNone]
 T loadAligned<int alignment, T>(T* ptr)
 {
     __target_switch
