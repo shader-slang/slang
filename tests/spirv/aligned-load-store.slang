@@ -8,6 +8,6 @@ uniform float4* data;
 [numthreads(1,1,1)]
 void computeMain()
 {
-    var v = loadAligned<8>(data);
-    storeAligned<16>(data+1, v);
+    var v = loadAligned<8>((float2x4*)data);
+    storeAligned<16>((float2x4*)data+1, v);
 }

@@ -1038,6 +1038,18 @@ struct Ptr
     }
 };
 
+//@hidden:
+__intrinsic_op($(kIROp_AlignedAttr))
+void __align_attr(int alignment);
+
+__intrinsic_op($(kIROp_Load))
+T __load_aligned<T, U>(T* ptr, U alignmentAttr);
+
+__intrinsic_op($(kIROp_Store))
+void __store_aligned<T, U>(T* ptr, T value, U alignmentAttr);
+
+//@public:
+
 /// Load a value from a pointer with a known alignment.
 /// Aligned loads are more efficient than unaligned loads on some platforms.
 /// @param alignment The alignment of the load operation.
@@ -1047,17 +1059,10 @@ struct Ptr
 /// The functions maps to normal load operation on other targets.
 ///
 [__NoSideEffect]
+[ForceInline]
 T loadAligned<int alignment, T>(T* ptr)
 {
-    __target_switch
-    {
-    case spirv:
-        return spirv_asm {
-            result = OpLoad $$T $ptr Aligned !alignment;
-        };
-    default:
-        return *ptr;
-    }
+    return __load_aligned(ptr, __align_attr(alignment));
 }
 
 /// Store a value to a pointer with a known alignment.
@@ -1068,19 +1073,10 @@ T loadAligned<int alignment, T>(T* ptr)
 /// @remarks When targeting SPIRV, this function maps to an `OpStore` instruction with the `Aligned` memory operand.
 /// The functions maps to normal store operation on other targets.
 ///
+[ForceInline]
 void storeAligned<int alignment, T>(T* ptr, T value)
 {
-    __target_switch
-    {
-    case spirv:
-        spirv_asm {
-            OpStore $ptr $value Aligned !alignment;
-        };
-        return;
-    default:
-        *ptr = value;
-        return;
-    }
+    __store_aligned(ptr, value, __align_attr(alignment));
 }
 
 //@hidden:

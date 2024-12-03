@@ -5975,10 +5975,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                            SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                m_targetProgram->getOptionSet(),
-                ptrType->getValueType(),
-                &sizeAndAlignment);
+            if (auto alignedAttr = inst->findAttr<IRAlignedAttr>())
+            {
+                sizeAndAlignment.alignment = getIntVal(alignedAttr->getAlignment());
+            }
+            else
+            {
+                getNaturalSizeAndAlignment(
+                    m_targetProgram->getOptionSet(),
+                    ptrType->getValueType(),
+                    &sizeAndAlignment);
+            }
             return emitOpLoadAligned(
                 parent,
                 inst,
@@ -5999,10 +6006,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                            SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                m_targetProgram->getOptionSet(),
-                ptrType->getValueType(),
-                &sizeAndAlignment);
+            if (auto alignedAttr = inst->findAttr<IRAlignedAttr>())
+            {
+                sizeAndAlignment.alignment = getIntVal(alignedAttr->getAlignment());
+            }
+            else
+            {
+                getNaturalSizeAndAlignment(
+                    m_targetProgram->getOptionSet(),
+                    ptrType->getValueType(),
+                    &sizeAndAlignment);
+            }
             return emitOpStoreAligned(
                 parent,
                 inst,
