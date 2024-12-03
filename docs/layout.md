@@ -46,7 +46,7 @@ The order of parameters in the user's code is derived by "walking" through the c
 
 * Walk through each source file of a translation unit in the order they were added/listed
 
-* Walk through global-scope shader paramter declarations (global variables, `cbuffer`s, etc.) in the order they are listed in the (preprocessed) file.
+* Walk through global-scope shader parameter declarations (global variables, `cbuffer`s, etc.) in the order they are listed in the (preprocessed) file.
 
 * After all global parameters for a translation unit have been walked, walk through any entry points in the translation unit.
 
@@ -64,7 +64,7 @@ Computing Resource Requirements
 
 Each shader parameter computes its resource requirements based on its type, and how it is declared.
 
-* Global-scope parameters, entry point `uniform` parameters, and `cbuffer` decalrations all use the "default" layout rules
+* Global-scope parameters, entry point `uniform` parameters, and `cbuffer` declarations all use the "default" layout rules
 
 * Entry point non-`uniform` parameters use "varying" layout rules, either input or output
 

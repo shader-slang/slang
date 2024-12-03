@@ -8,7 +8,7 @@ Status
 
 Status: Design Approved, implementation in-progress.
 
-Implemtation: N/A
+Implementation: N/A
 
 Author: Yong He
 
@@ -29,7 +29,7 @@ C++ has many different ways and syntax to initialize an object: through explicit
 A variable in C++ can also be in an uninitialized state after its declaration. HLSL inherits most of these behvior from C++ by allowing variables to be uninitialized.
 
 On the other hand, languages like C# and Swift has a set of well defined rules to ensure every variable is initialized after its declaration.
-C++ allows using the initilization list syntax to initialize an object. The semantics of initialization lists depends on whether or not explicit constructors
+C++ allows using the initialization list syntax to initialize an object. The semantics of initialization lists depends on whether or not explicit constructors
 are defined on the type.
 
 Proposed Approach
@@ -92,10 +92,10 @@ void foo<T>()
 
 ### Synthesis of constructors for member initialization
 
-If a type already defines any explicit constructors, do not synthesize any constructors for initializer list call. An intializer list expression
+If a type already defines any explicit constructors, do not synthesize any constructors for initializer list call. An initializer list expression
 for the type must exactly match one of the explicitly defined constructors.
 
-If the type doesn't provide any explicit constructors, the compiler need to synthesize the constructors for the calls that that the intializer
+If the type doesn't provide any explicit constructors, the compiler need to synthesize the constructors for the calls that that the initializer
 lists translate into, so that an initializer list expression can be used to initialize a variable of the type.
 
 For each type, we will synthesize one constructor at the same visibility of the type itself:
@@ -110,7 +110,7 @@ If `member0`'s type is not default initializable and the the member doesn't prov
 
 The synthesized constructor will be marked as `[Synthesized]` by the compiler, so the call site can inject additional compatibility logic when calling a synthesized constructor.
 
-The body of the constructor will initialize each member with the value comming from the corresponding constructor argument if such argument exists,
+The body of the constructor will initialize each member with the value coming from the corresponding constructor argument if such argument exists,
 otherwise the member will be initialized to its default value either defined by the init expr of the member, or the default value of the type if the 
 type is default-initializable. If the member type is not default-initializable and a default value isn't provided on the member, then such the constructor
 synthesis will fail and the constructor will not be added to the type. Failure to synthesis a constructor is not an error, and an error will appear
@@ -149,7 +149,7 @@ S obj = {};
 S obj = S();
 ```
 
-Note that initializer list of a single argument does not translate into a type cast, unlike the constructor call syntax. Initializing with a single element in the intializer list always translates directly into a constructor call. For example:
+Note that initializer list of a single argument does not translate into a type cast, unlike the constructor call syntax. Initializing with a single element in the initializer list always translates directly into a constructor call. For example:
 ```csharp
 void test()
 {
@@ -359,7 +359,7 @@ internal struct Visibility4
 {
   // Visibility4 type is considered as C-style struct.
   // And we still synthesize a ctor for member initialization.
-  // Because Visiblity4 has no public members, the synthesized
+  // Because Visibility4 has no public members, the synthesized
   // ctor will take 0 arguments.
   internal int x = 1;
   internal int y = 2;
@@ -398,7 +398,7 @@ so implicit initialization for these variables can come with serious performance
 
 ### Should `out` parameters be default initialized?
 
-Following the same philosphy of not initializing any declarations, `out` parameters are also not default-initialized.
+Following the same philosophy of not initializing any declarations, `out` parameters are also not default-initialized.
 
 Alternatives Considered
 -----------------------

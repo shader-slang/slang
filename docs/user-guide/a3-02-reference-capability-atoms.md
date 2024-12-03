@@ -1046,7 +1046,7 @@ Compound Capabilities
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle'
 
 `subgroup_shufflerelative`
-> Capabilities required to use GLSL-style subgroup operations 'subgroup_shufle_relative'
+> Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle_relative'
 
 `subgroup_clustered`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_clustered'

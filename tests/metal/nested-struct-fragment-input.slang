@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage fragment -entry fragmentMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage fragment -entry fragmentMain
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage fragment -entry fragmentMain
 
 // METAL: COARSEVERTEX_7
 // METAL: COARSEVERTEX_6
@@ -62,6 +63,16 @@ float4 fragmentMain(FragmentStageInput input)
     // METAL-DAG: {{.*}}->p3{{.*}}->p1{{.*}}=
     // METAL-DAG: {{.*}}->p3{{.*}}->p2{{.*}}->p1{{.*}}=
     // METAL-DAG: {{.*}}->p3{{.*}}->p3{{.*}}->p1{{.*}}=
+
+    // WGSL-DAG: {{.*}}._S{{.*}}=
+
+    // WGSL-DAG: {{.*}}.p2{{.*}}._S{{.*}}=
+    // WGSL-DAG: {{.*}}.p2{{.*}}.p2{{.*}}._S{{.*}}=
+    // WGSL-DAG: {{.*}}.p2{{.*}}.p3{{.*}}._S{{.*}}=
+
+    // WGSL-DAG: {{.*}}.p3{{.*}}._S{{.*}}=
+    // WGSL-DAG: {{.*}}.p3{{.*}}.p2{{.*}}._S{{.*}}=
+    // WGSL-DAG: {{.*}}.p3{{.*}}.p3{{.*}}._S{{.*}}=
 
     outputBuffer[0] = input.coarseVertex.p1 + input.coarseVertex.p2.p1 + +input.coarseVertex.p3.p1;
     return float4(0, 0, 0, 0);

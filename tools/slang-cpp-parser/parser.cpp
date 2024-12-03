@@ -1,12 +1,12 @@
 #include "parser.h"
 
-#include "../../source/compiler-core/slang-name-convention-util.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-string-util.h"
+#include "compiler-core/slang-name-convention-util.h"
+#include "core/slang-io.h"
+#include "core/slang-string-util.h"
 #include "identifier-lookup.h"
 #include "options.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -2258,4 +2258,4 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
     }
 }
 
-} // namespace CppExtract
+} // namespace CppParse
