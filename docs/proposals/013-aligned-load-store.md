@@ -49,7 +49,7 @@ GLSL supports the `align` layout on a `buffer_reference` block to specify the al
 
 ### SPIRV ###
 
-In SPIRV, the alignment can either be encoded as a deocration on the pointer type, or as a memory operand on the OpLoad and OpStore operations.
+In SPIRV, the alignment can either be encoded as a decoration on the pointer type, or as a memory operand on the OpLoad and OpStore operations.
 
 ### Other Languages ###
 
