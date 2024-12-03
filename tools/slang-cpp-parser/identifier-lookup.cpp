@@ -1,6 +1,6 @@
 #include "identifier-lookup.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -174,4 +174,4 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
     }
 }
 
-} // namespace CppExtract
+} // namespace CppParse

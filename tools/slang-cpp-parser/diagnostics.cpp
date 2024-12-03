@@ -1,6 +1,6 @@
 #include "diagnostics.h"
 
-namespace CppExtract
+namespace CppParse
 {
 
 namespace CPPDiagnostics
@@ -12,4 +12,4 @@ using namespace Slang;
 #include "diagnostic-defs.h"
 } // namespace CPPDiagnostics
 
-} // namespace CppExtract
+} // namespace CppParse

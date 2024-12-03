@@ -412,6 +412,47 @@ Slang's CPU compute target supports only a compute pipeline.
 
 Because CPU target support flexible pointer-based addressing and large low-latency caches, a compute kernel can simply be passed a small fixed number of pointers and be relied upon to load parameter values of any types via indirection through those pointers.
 
+## WebGPU
+
+> #### Note
+>
+> Slang support for WebGPU is work in progress.
+
+WebGPU is a graphics and compute API.
+It is similar in spirit to modern APIs, like Metal, Direct3D 12 and Vulkan, but with concessions to portability and privacy.
+
+WebGPU is available both in browsers as a JavaScript API, and natively as a C/C++ API.
+[Dawn](https://github.com/google/dawn), is a native WebGPU implementation used by the Chrome browser.
+
+By combining Slang, [Dawn](https://github.com/google/dawn) and [Emscripten](https://emscripten.org/),
+an application can easily target any native API, and the web, with a single codebase consisting of C++ and Slang code.
+
+WebGPU shader modules are created from WGSL (WebGPU Shading Language) source files.
+WebGPU does not use an intermediate representation - WGSL code is compiled to backend-specific code by
+compilers provided by the WebGPU implementation.
+
+### Pipelines
+
+WebGPU supports render and compute pipelines.
+
+The WebGPU render pipeline includes the following programmable stages:
+
+- The vertex stage outputs vertex data
+
+- The fragment stage outputs fragments
+
+### Parameter Passing
+
+WebGPU uses groups of bindings called bind groups to bind things like textures, buffers and samplers.
+Bind group objects are passed as arguments when encoding bind group setting commands.
+
+There is a notion of equivalence for bind groups, and a notion of equivalence for pipelines defined in
+terms of bind group equivalence.
+This equivalence allows an application to save some bind group setting commands, when switching between
+pipelines, if bindings are grouped together appropriately.
+
+Which bindings are grouped together can be controlled using Slang's `ParameterBlock` generic type.
+
 ## Summary
 
 This chapter has reviewed the main target platforms supported by the Slang compiler and runtime system.
