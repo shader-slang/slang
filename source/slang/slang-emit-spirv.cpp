@@ -4467,7 +4467,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (t == "triangle")
                         m = SpvExecutionModeOutputTrianglesEXT;
                     else if (t == "line")
-                        m = SpvExecutionModeOutputTrianglesEXT;
+                        m = SpvExecutionModeOutputLinesEXT;
                     else if (t == "point")
                         m = SpvExecutionModeOutputPoints;
                 }
@@ -5975,10 +5975,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                            SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                m_targetProgram->getOptionSet(),
-                ptrType->getValueType(),
-                &sizeAndAlignment);
+            if (auto alignedAttr = inst->findAttr<IRAlignedAttr>())
+            {
+                sizeAndAlignment.alignment = (int)getIntVal(alignedAttr->getAlignment());
+            }
+            else
+            {
+                getNaturalSizeAndAlignment(
+                    m_targetProgram->getOptionSet(),
+                    ptrType->getValueType(),
+                    &sizeAndAlignment);
+            }
             return emitOpLoadAligned(
                 parent,
                 inst,
@@ -5999,10 +6006,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                            SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                m_targetProgram->getOptionSet(),
-                ptrType->getValueType(),
-                &sizeAndAlignment);
+            if (auto alignedAttr = inst->findAttr<IRAlignedAttr>())
+            {
+                sizeAndAlignment.alignment = (int)getIntVal(alignedAttr->getAlignment());
+            }
+            else
+            {
+                getNaturalSizeAndAlignment(
+                    m_targetProgram->getOptionSet(),
+                    ptrType->getValueType(),
+                    &sizeAndAlignment);
+            }
             return emitOpStoreAligned(
                 parent,
                 inst,

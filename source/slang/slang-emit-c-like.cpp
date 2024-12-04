@@ -2948,6 +2948,13 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             break;
         }
+    case kIROp_RequirePrelude:
+        {
+            auto preludeTextInst = as<IRStringLit>(inst->getOperand(0));
+            if (preludeTextInst)
+                m_requiredPreludes.add(preludeTextInst);
+            break;
+        }
     case kIROp_RequireGLSLExtension:
         {
             break; // should already have set requirement; case covered for empty intrinsic block

@@ -3,20 +3,8 @@ name: CI
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - "docs/**"
-      - "LICENSES/**"
-      - "LICENSE"
-      - "CONTRIBUTING.md"
-      - "README.md"
   pull_request:
     branches: [master]
-    paths-ignore:
-      - "docs/**"
-      - "LICENSES/**"
-      - "LICENSE"
-      - "CONTRIBUTING.md"
-      - "README.md"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -91,7 +79,24 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "0"
+      - id: filter
+        run: |
+          # This step prevents subsequent steps from running if only documentation was changed
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            BASE=origin/${{ github.base_ref }}
+          else
+            BASE=HEAD^1
+          fi
+          if git diff --name-only -z $BASE...HEAD | 
+            grep --null-data -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
+            echo "should-run=true" >> $GITHUB_OUTPUT
+          else
+            echo "Only documentation files changed, skipping remaining steps"
+            echo "should-run=false" >> $GITHUB_OUTPUT
+          fi
       - name: Setup
+        if: steps.filter.outputs.should-run == 'true'
         uses: ./.github/actions/common-setup
         with:
           os: ${{matrix.os}}
@@ -100,6 +105,7 @@ jobs:
           config: ${{matrix.config}}
           build-llvm: ${{ matrix.platform != 'wasm' }}
       - name: Build Slang
+        if: steps.filter.outputs.should-run == 'true'
         run: |
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
@@ -138,7 +144,7 @@ jobs:
             fi
           fi
       - name: Test Slang
-        if: ${{ matrix.platform != 'wasm' }}
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -164,7 +170,7 @@ jobs:
               -expected-failure-list tests/expected-failure-record-replay-tests.txt
           fi
       - name: Test Slang via glsl
-        if: ${{ matrix.full-gpu-tests && matrix.platform != 'wasm' }}
+        if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -176,7 +182,7 @@ jobs:
             -api vk \
             -expected-failure-list tests/expected-failure.txt
       - uses: actions/upload-artifact@v3
-        if: ${{ ! matrix.full-gpu-tests }}
+        if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           # The install directory used in the packaging step
