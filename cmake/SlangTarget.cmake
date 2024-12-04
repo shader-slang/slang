@@ -222,13 +222,17 @@ function(slang_add_target dir type)
 
     # Set debug info options if not disabled
     # Determine if this target produces a binary that can have debug info
-    if(type MATCHES "^(EXECUTABLE|SHARED|MODULE)$")
-        set(can_have_debug_info TRUE)
+    if(
+        NOT ARG_NO_SPLIT_DEBUG_INFO
+        AND type MATCHES "^(EXECUTABLE|SHARED|MODULE)$"
+        AND SLANG_ENABLE_SPLIT_DEBUG_INFO
+    )
+        set(generate_split_debug_info TRUE)
     else()
-        set(can_have_debug_info FALSE)
+        set(generate_split_debug_info FALSE)
     endif()
 
-    if(NOT ARG_NO_SPLIT_DEBUG_INFO AND can_have_debug_info)
+    if(generate_split_debug_info)
         if(MSVC)
             # MSVC handling
             target_compile_options(
@@ -531,11 +535,7 @@ function(slang_add_target dir type)
     endif()
 
     # Install debug info only if target is being installed
-    if(
-        (ARG_INSTALL OR ARG_INSTALL_COMPONENT)
-        AND NOT ARG_NO_SPLIT_DEBUG_INFO
-        AND can_have_debug_info
-    )
+    if((ARG_INSTALL OR ARG_INSTALL_COMPONENT) AND generate_split_debug_info)
         # Determine correct destination based on target type
         if(type STREQUAL "EXECUTABLE" OR WIN32)
             set(debug_dest ${runtime_subdir})
