@@ -1598,6 +1598,21 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         virtual bool isInlinableGlobalInstForTarget(IRInst* inst) =0;
         virtual bool shouldBeInlinedForTarget(IRInst* user) =0;
 
+        static void setInsertBeforeOutsideASM(IRBuilder& builder, IRInst* beforeInst)
+        {
+            auto parent = beforeInst->getParent();
+            while (parent)
+            {
+                if (as<IRSPIRVAsm>(parent))
+                {
+                    builder.setInsertBefore(parent);
+                    return;
+                }
+                parent = parent->getParent();
+            }
+            builder.setInsertBefore(beforeInst);
+        }
+
         // Inline global values that can't represented by the target to their use sites.
         void inlineGlobalValues(IRModule * module)
         {
@@ -2026,21 +2041,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             }
         }
-    }
-
-    static void setInsertBeforeOutsideASM(IRBuilder& builder, IRInst* beforeInst)
-    {
-        auto parent = beforeInst->getParent();
-        while (parent)
-        {
-            if (as<IRSPIRVAsm>(parent))
-            {
-                builder.setInsertBefore(parent);
-                return;
-            }
-            parent = parent->getParent();
-        }
-        builder.setInsertBefore(beforeInst);
     }
 
     void determineSpirvVersion()
