@@ -1677,9 +1677,6 @@ ImageFormat inferImageFormatFromTextureType(
                 case 2:
                     format = ImageFormat::rg32f;
                     break;
-                case 4:
-                    format = ImageFormat::rgba32f;
-                    break;
                 }
                 break;
             }
