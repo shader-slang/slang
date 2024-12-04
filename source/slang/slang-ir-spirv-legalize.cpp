@@ -1598,6 +1598,35 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         virtual bool isInlinableGlobalInstForTarget(IRInst* inst) =0;
         virtual bool shouldBeInlinedForTarget(IRInst* user) =0;
 
+        // Inline global values that can't represented by the target to their use sites.
+        void inlineGlobalValues(IRModule * module)
+        {
+            List<IRUse*> globalInstUsesToInline;
+
+            for (auto globalInst : module->getGlobalInsts())
+            {
+                if (isInlinableGlobalInst(globalInst))
+                {
+                    for (auto use = globalInst->firstUse; use; use = use->nextUse)
+                    {
+                        if (getParentFunc(use->getUser()) != nullptr)
+                            globalInstUsesToInline.add(use);
+                    }
+                }
+            }
+
+            for (auto use : globalInstUsesToInline)
+            {
+                auto user = use->getUser();
+                IRBuilder builder(user);
+                setInsertBeforeOutsideASM(builder, user);
+                IRCloneEnv cloneEnv;
+                auto val = maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
+                if (val != use->get())
+                    builder.replaceOperand(use, val);
+            }
+        }
+
         // Opcodes that can exist in global scope, as long as the operands are.
         bool isLegalGlobalInst(IRInst* inst)
         {
@@ -2139,39 +2168,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     };
 
-    // Inline global values that can't represented by SPIRV constant inst
-    // to their use sites.
-    void inlineGlobalValues()
-    {
-        List<IRUse*> globalInstUsesToInline;
-        GlobalInstInliningContext globalInstInliningContext;
-
-        for (auto globalInst : m_module->getGlobalInsts())
-        {
-
-            if (globalInstInliningContext.isInlinableGlobalInst(globalInst))
-            {
-                for (auto use = globalInst->firstUse; use; use = use->nextUse)
-                {
-                    if (getParentFunc(use->getUser()) != nullptr)
-                        globalInstUsesToInline.add(use);
-                }
-            }
-        }
-
-        for (auto use : globalInstUsesToInline)
-        {
-            auto user = use->getUser();
-            IRBuilder builder(user);
-            setInsertBeforeOutsideASM(builder, user);
-            IRCloneEnv cloneEnv;
-            auto val = globalInstInliningContext
-                           .maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
-            if (val != use->get())
-                builder.replaceOperand(use, val);
-        }
-    }
-
     void processModule()
     {
         determineSpirvVersion();
@@ -2242,7 +2238,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
         }
 
-        inlineGlobalValues();
+        GlobalInstInliningContext().inlineGlobalValues(m_module);
 
         // Some legalization processing may change the function parameter types,
         // so we need to update the function types to match that.
