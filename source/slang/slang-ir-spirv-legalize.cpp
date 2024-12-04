@@ -2160,11 +2160,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             t->replaceUsesWith(lowered);
         }
 
-        // Inline global values that can't represented by SPIRV constant inst
-        // to their use sites.
-        List<IRUse*> globalInstUsesToInline;
-        GlobalInstInliningContext globalInstInliningContext;
-
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto func = as<IRFunc>(globalInst))
@@ -2178,7 +2173,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // true.
                 sortBlocksInFunc(func);
             }
+        }
 
+        // Inline global values that can't represented by SPIRV constant inst
+        // to their use sites.
+        List<IRUse*> globalInstUsesToInline;
+        GlobalInstInliningContext globalInstInliningContext;
+
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
             if (globalInstInliningContext.isInlinableGlobalInst(globalInst))
             {
                 for (auto use = globalInst->firstUse; use; use = use->nextUse)
