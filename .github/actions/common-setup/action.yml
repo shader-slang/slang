@@ -16,7 +16,6 @@ inputs:
 runs:
   using: composite
   steps:
-
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
       with:
