@@ -230,6 +230,7 @@ function(slang_add_target dir type)
 
     if(NOT ARG_NO_SPLIT_DEBUG_INFO AND can_have_debug_info)
         if(MSVC)
+            # MSVC handling
             target_compile_options(
                 ${target}
                 PRIVATE $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
@@ -241,17 +242,28 @@ function(slang_add_target dir type)
                     COMPILE_PDB_OUTPUT_DIRECTORY "${output_dir}"
             )
         else()
-            # GCC/Clang debug info handling
-            if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-                target_compile_options(
-                    ${target}
-                    PRIVATE
-                        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
-                        -g
-                        -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
-                        -fdebug-prefix-map=${CMAKE_BINARY_DIR}=.
-                        >
+            # Common debug flags for GCC/Clang
+            target_compile_options(
+                ${target}
+                PRIVATE
+                    $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
+                    -g
+                    -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
+                    -fdebug-prefix-map=${CMAKE_BINARY_DIR}=.
+                    >
+            )
+
+            if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+                # macOS - use dsymutil
+                add_custom_command(
+                    TARGET ${target}
+                    POST_BUILD
+                    COMMAND dsymutil $<TARGET_FILE:${target}>
+                    WORKING_DIRECTORY ${output_dir}
+                    VERBATIM
                 )
+            else()
+                # Linux/Unix - use GNU debug info splitting
                 target_link_options(
                     ${target}
                     PRIVATE
@@ -259,13 +271,13 @@ function(slang_add_target dir type)
                         -Wl,--build-id=sha1
                         >
                 )
-                # debug info splitting
                 add_custom_command(
                     TARGET ${target}
                     POST_BUILD
                     COMMAND
                         ${CMAKE_OBJCOPY} --only-keep-debug
                         $<TARGET_FILE:${target}> $<TARGET_FILE:${target}>.debug
+                    COMMAND chmod 644 $<TARGET_FILE:${target}>.debug
                     COMMAND
                         ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:${target}>
                     COMMAND
@@ -524,25 +536,34 @@ function(slang_add_target dir type)
         AND NOT ARG_NO_SPLIT_DEBUG_INFO
         AND can_have_debug_info
     )
+        # Determine correct destination based on target type
+        if(type STREQUAL "EXECUTABLE" OR WIN32)
+            set(debug_dest ${runtime_subdir})
+        else()
+            set(debug_dest ${library_subdir})
+        endif()
         if(MSVC)
             # Install PDB files for MSVC
             install(
                 FILES $<TARGET_PDB_FILE:${target}>
-                DESTINATION ${runtime_subdir}
+                DESTINATION ${debug_dest}
                 CONFIGURATIONS Debug RelWithDebInfo
-                OPTIONAL
                 COMPONENT ${debug_component}
                 EXCLUDE_FROM_ALL
+                OPTIONAL
+            )
+        elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+            # macOS dSYM installation
+            install(
+                DIRECTORY "$<TARGET_FILE:${target}>.dSYM"
+                DESTINATION ${debug_dest}
+                CONFIGURATIONS Debug RelWithDebInfo
+                COMPONENT ${debug_component}
+                EXCLUDE_FROM_ALL
+                OPTIONAL
             )
         else()
-            # Determine correct destination based on target type
-            if(type STREQUAL "EXECUTABLE")
-                set(debug_dest ${runtime_subdir})
-            else()
-                set(debug_dest ${library_subdir})
-            endif()
-
-            # Install split debug files for GCC/Clang
+            # Linux/Unix debug file installation
             install(
                 FILES "$<TARGET_FILE:${target}>.debug"
                 DESTINATION ${debug_dest}
