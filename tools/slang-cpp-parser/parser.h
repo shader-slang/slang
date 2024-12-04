@@ -1,13 +1,12 @@
-#ifndef CPP_EXTRACT_PARSER_H
-#define CPP_EXTRACT_PARSER_H
+#pragma once
 
-#include "../../source/compiler-core/slang-lexer.h"
+#include "compiler-core/slang-lexer.h"
 #include "diagnostics.h"
 #include "identifier-lookup.h"
 #include "node-tree.h"
 #include "node.h"
 
-namespace CppExtract
+namespace CppParse
 {
 using namespace Slang;
 
@@ -110,6 +109,4 @@ protected:
     const Options* m_options;
 };
 
-} // namespace CppExtract
-
-#endif
+} // namespace CppParse
