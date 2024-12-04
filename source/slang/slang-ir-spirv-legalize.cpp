@@ -1590,9 +1590,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    struct GlobalInstInliningContext
+    struct GlobalInstInliningContextGeneric
     {
         Dictionary<IRInst*, bool> m_mapGlobalInstToShouldInline;
+
+        virtual bool isLegalGlobalInstForTarget(IRInst* inst) =0;
+        virtual bool isInlinableGlobalInstForTarget(IRInst* inst) =0;
+        virtual bool shouldBeInlinedForTarget(IRInst* user) =0;
 
         // Opcodes that can exist in global scope, as long as the operands are.
         bool isLegalGlobalInst(IRInst* inst)
@@ -1610,7 +1614,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             default:
                 if (as<IRConstant>(inst))
                     return true;
-                if (as<IRSPIRVAsmOperand>(inst))
+                if (isLegalGlobalInstForTarget(inst))
                     return true;
                 return false;
             }
@@ -1676,12 +1680,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_Neq:
             case kIROp_Eql:
             case kIROp_Call:
-            case kIROp_SPIRVAsm:
                 return true;
             default:
-                if (as<IRSPIRVAsmInst>(inst))
-                    return true;
-                if (as<IRSPIRVAsmOperand>(inst))
+                if (isInlinableGlobalInstForTarget(inst))
                     return true;
                 return false;
             }
@@ -1767,9 +1768,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 bool shouldWrapGlobalRef = true;
                 if (!isLegalGlobalInst(user) && !getIROpInfo(user->getOp()).isHoistable())
                     shouldWrapGlobalRef = false;
-                else if (as<IRSPIRVAsmOperand>(user) && as<IRSPIRVAsmOperandInst>(user))
-                    shouldWrapGlobalRef = false;
-                else if (as<IRSPIRVAsmInst>(user))
+                else if (shouldBeInlinedForTarget(user))
                     shouldWrapGlobalRef = false;
                 if (shouldWrapGlobalRef)
                     result = builder.emitGlobalValueRef(inst);
@@ -1781,6 +1780,41 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // then copy it to the local scope.
             return inlineInst(builder, cloneEnv, inst);
         }
+    };
+
+    struct GlobalInstInliningContext: public GlobalInstInliningContextGeneric
+    {
+        bool isLegalGlobalInstForTarget(IRInst* inst) override
+        {
+            return as<IRSPIRVAsmOperand>(inst);
+        }
+
+        bool isInlinableGlobalInstForTarget(IRInst* inst) override
+        {
+            switch (inst->getOp())
+            {
+                case kIROp_SPIRVAsm:
+                    return true;
+                default:
+                    break;
+            }
+
+            if (as<IRSPIRVAsmInst>(inst))
+                return true;
+            if (as<IRSPIRVAsmOperand>(inst))
+                return true;
+            return false;
+        }
+
+        bool shouldBeInlinedForTarget(IRInst* user) override
+        {
+            if (as<IRSPIRVAsmOperand>(user) && as<IRSPIRVAsmOperandInst>(user))
+                return true;
+            else if (as<IRSPIRVAsmInst>(user))
+                return true;
+            return false;
+        }
+
     };
 
     void processBranch(IRInst* branch) { addToWorkList(branch->getOperand(0)); }
