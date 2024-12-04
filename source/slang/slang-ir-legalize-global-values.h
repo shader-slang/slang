@@ -17,6 +17,7 @@ struct GlobalInstInliningContextGeneric
     virtual bool isLegalGlobalInstForTarget(IRInst* inst) =0;
     virtual bool isInlinableGlobalInstForTarget(IRInst* inst) =0;
     virtual bool shouldBeInlinedForTarget(IRInst* user) =0;
+    virtual IRInst* getOutsideASM(IRInst* beforeInst) =0;
 
     // Inline global values that can't represented by the target to their use sites.
     void inlineGlobalValues(IRModule * module);

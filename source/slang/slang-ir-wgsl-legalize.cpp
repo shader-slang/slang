@@ -1609,6 +1609,12 @@ struct GlobalInstInliningContext: public GlobalInstInliningContextGeneric
         // WGSL doesn't do any extra inlining beyond what is generically done by default.
         return false;
     }
+
+    IRInst* getOutsideASM(IRInst* beforeInst) override
+    {
+        // Not needed for WGSL, check e.g. the SPIR-V case to see why this is used.
+        return beforeInst;
+    }
 };
 
 void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)

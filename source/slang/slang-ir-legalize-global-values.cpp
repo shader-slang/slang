@@ -3,26 +3,6 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
 
-namespace
-{
-using namespace Slang;
-void setInsertBeforeOutsideASM(
-    IRBuilder& builder, IRInst* beforeInst)
-{
-    auto parent = beforeInst->getParent();
-    while (parent)
-    {
-        if (as<IRSPIRVAsm>(parent))
-        {
-            builder.setInsertBefore(parent);
-            return;
-        }
-        parent = parent->getParent();
-    }
-    builder.setInsertBefore(beforeInst);
-}
-} // namespace
-
 namespace Slang
 {
 
@@ -46,7 +26,7 @@ void GlobalInstInliningContextGeneric::inlineGlobalValues(IRModule * module)
     {
         auto user = use->getUser();
         IRBuilder builder(user);
-        setInsertBeforeOutsideASM(builder, user);
+        builder.setInsertBefore(getOutsideASM(user));
         IRCloneEnv cloneEnv;
         auto val = maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
         if (val != use->get())
@@ -176,7 +156,7 @@ IRInst* GlobalInstInliningContextGeneric::inlineInst(IRBuilder& builder, IRClone
     {
         auto operand = inst->getOperand(i);
         IRBuilder operandBuilder(builder);
-        setInsertBeforeOutsideASM(operandBuilder, builder.getInsertLoc().getInst());
+        operandBuilder.setInsertBefore(getOutsideASM(builder.getInsertLoc().getInst()));
         maybeInlineGlobalValue(operandBuilder, inst, operand, cloneEnv);
     }
     result = cloneInstAndOperands(&cloneEnv, &builder, inst);

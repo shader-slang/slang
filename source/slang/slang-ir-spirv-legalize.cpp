@@ -1624,6 +1624,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return false;
         }
 
+        IRInst* getOutsideASM(IRInst* beforeInst) override
+        {
+            auto parent = beforeInst->getParent();
+            while (parent)
+            {
+                if (as<IRSPIRVAsm>(parent))
+                {
+                    return parent;
+                }
+                parent = parent->getParent();
+            }
+            return beforeInst;
+        }
     };
 
     void processBranch(IRInst* branch) { addToWorkList(branch->getOperand(0)); }
