@@ -31,6 +31,8 @@ only.
 > Due to reliability issues, we are not currently using sccache, this is
 > historical/aspirational.
 
+blah blah
+
 The CI actions use sccache, keyed on compiler and platform, this runs on all
 configurations and significantly speeds up small source change builds. This
 cache can be safely missed without a large impact on build times.
