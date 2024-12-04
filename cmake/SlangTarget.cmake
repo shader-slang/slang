@@ -234,7 +234,6 @@ function(slang_add_target dir type)
 
     if(generate_split_debug_info)
         if(MSVC)
-            # MSVC handling
             target_compile_options(
                 ${target}
                 PRIVATE $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
@@ -258,35 +257,31 @@ function(slang_add_target dir type)
             )
 
             if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-                # macOS - use dsymutil
+                # macOS - use dsymutil with --flat to create separate debug file
                 add_custom_command(
                     TARGET ${target}
                     POST_BUILD
-                    COMMAND dsymutil $<TARGET_FILE:${target}>
+                    COMMAND
+                        dsymutil --flat $<TARGET_FILE:${target}> -o
+                        $<TARGET_FILE:${target}>.dwarf
+                    COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                    COMMAND ${CMAKE_STRIP} -S $<TARGET_FILE:${target}>
                     WORKING_DIRECTORY ${output_dir}
                     VERBATIM
                 )
             else()
-                # Linux/Unix - use GNU debug info splitting
-                target_link_options(
-                    ${target}
-                    PRIVATE
-                        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
-                        -Wl,--build-id=sha1
-                        >
-                )
                 add_custom_command(
                     TARGET ${target}
                     POST_BUILD
                     COMMAND
                         ${CMAKE_OBJCOPY} --only-keep-debug
-                        $<TARGET_FILE:${target}> $<TARGET_FILE:${target}>.debug
-                    COMMAND chmod 644 $<TARGET_FILE:${target}>.debug
+                        $<TARGET_FILE:${target}> $<TARGET_FILE:${target}>.dwarf
+                    COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
                     COMMAND
                         ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:${target}>
                     COMMAND
                         ${CMAKE_OBJCOPY}
-                        --add-gnu-debuglink=$<TARGET_FILE:${target}>.debug
+                        --add-gnu-debuglink=$<TARGET_FILE:${target}>.dwarf
                         $<TARGET_FILE:${target}>
                     WORKING_DIRECTORY ${output_dir}
                     VERBATIM
@@ -536,43 +531,26 @@ function(slang_add_target dir type)
 
     # Install debug info only if target is being installed
     if((ARG_INSTALL OR ARG_INSTALL_COMPONENT) AND generate_split_debug_info)
-        # Determine correct destination based on target type
         if(type STREQUAL "EXECUTABLE" OR WIN32)
             set(debug_dest ${runtime_subdir})
         else()
             set(debug_dest ${library_subdir})
         endif()
+
         if(MSVC)
-            # Install PDB files for MSVC
-            install(
-                FILES $<TARGET_PDB_FILE:${target}>
-                DESTINATION ${debug_dest}
-                CONFIGURATIONS Debug RelWithDebInfo
-                COMPONENT ${debug_component}
-                EXCLUDE_FROM_ALL
-                OPTIONAL
-            )
-        elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-            # macOS dSYM installation
-            install(
-                DIRECTORY "$<TARGET_FILE:${target}>.dSYM"
-                DESTINATION ${debug_dest}
-                CONFIGURATIONS Debug RelWithDebInfo
-                COMPONENT ${debug_component}
-                EXCLUDE_FROM_ALL
-                OPTIONAL
-            )
+            set(debug_file $<TARGET_PDB_FILE:${target}>)
         else()
-            # Linux/Unix debug file installation
-            install(
-                FILES "$<TARGET_FILE:${target}>.debug"
-                DESTINATION ${debug_dest}
-                CONFIGURATIONS Debug RelWithDebInfo
-                COMPONENT ${debug_component}
-                EXCLUDE_FROM_ALL
-                OPTIONAL
-            )
+            set(debug_file "$<TARGET_FILE:${target}>.dwarf")
         endif()
+
+        install(
+            FILES ${debug_file}
+            DESTINATION ${debug_dest}
+            CONFIGURATIONS Debug RelWithDebInfo
+            COMPONENT ${debug_component}
+            EXCLUDE_FROM_ALL
+            OPTIONAL
+        )
     endif()
 endfunction()
 
