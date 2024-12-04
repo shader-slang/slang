@@ -2,6 +2,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-varying-params.h"
+#include "slang-ir-legalize-global-values.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-parameter-binding.h"
@@ -1587,6 +1588,29 @@ struct LegalizeWGSLEntryPointContext
     }
 };
 
+struct GlobalInstInliningContext: public GlobalInstInliningContextGeneric
+{
+    bool isLegalGlobalInstForTarget(IRInst* /* inst */) override
+    {
+        // The global instructions that are generically considered legal are fine for
+        // WGSL.
+        return false;
+    }
+
+    bool isInlinableGlobalInstForTarget(IRInst* /* inst */) override
+    {
+        // The global instructions that are generically considered inlineable are fine
+        // for WGSL.
+        return false;
+    }
+
+    bool shouldBeInlinedForTarget(IRInst* /* user */) override
+    {
+        // WGSL doesn't do any extra inlining beyond what is generically done by default.
+        return false;
+    }
+};
+
 void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
@@ -1612,6 +1636,8 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
 
     // Go through every instruction in the module and legalize them as needed.
     context.processInst(module->getModuleInst());
+
+    GlobalInstInliningContext().inlineGlobalValues(module);
 }
 
 } // namespace Slang
