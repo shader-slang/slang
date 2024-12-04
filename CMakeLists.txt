@@ -185,6 +185,12 @@ enum_option(
     "Build slang as a static library"
 )
 
+option(
+    SLANG_ENABLE_SPLIT_DEBUG_INFO
+    "Generate split debug info for debug builds"
+    ON
+)
+
 set(SLANG_GENERATORS_PATH
     ""
     CACHE PATH
