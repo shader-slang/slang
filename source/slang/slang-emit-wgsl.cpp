@@ -1,4 +1,5 @@
 #include "slang-emit-wgsl.h"
+#include "slang-ir-util.h"
 
 // A note on row/column "terminology reversal".
 //
@@ -378,7 +379,32 @@ static const char* getWgslImageFormat(IRTextureTypeBase* type)
     case ImageFormat::rgba32f:
         return "rgba32float";
     case ImageFormat::unknown:
-        // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
+        // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown" so we try to infer as best as possible.
+        auto elementType = type->getElementType();
+        Int vectorWidth = 1;
+        if (auto vectorType = as<IRVectorType>(elementType)) {
+            if (auto intLitVal = as<IRIntLit>(vectorType->getElementCount())) {
+                vectorWidth = intLitVal->getValue();
+            }
+        }
+        elementType = getVectorElementType((IRType*) elementType);
+        if (auto basicType = as<IRBasicType>(elementType))
+        {
+            switch (basicType->getBaseType())
+            {
+            case BaseType::Float:
+                switch (vectorWidth)
+                {
+                case 1:
+                    return "r32float";
+                case 2:
+                    return "rg32float";
+                case 4:
+                    return "rgba32float";
+                }
+                break;
+            }
+        }
         return "rgba32float";
     default:
         // We may need to print a warning for types WGSL doesn't support

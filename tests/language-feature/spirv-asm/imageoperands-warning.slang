@@ -10,7 +10,7 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK-NEXT: 1
 
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D
-Texture2D t2D;
+Texture2D<float> t2D;
 //TEST_INPUT: Sampler:name samplerState
 SamplerState samplerState;
 
@@ -28,7 +28,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float r = spirv_asm
     {
         // The type of our sampled image
-        %sampledImageType = OpTypeSampledImage $$Texture2D;
+        %sampledImageType = OpTypeSampledImage $$Texture2D<float>;
         // Combine the image with the sampler
         %sampledImage : %sampledImageType = OpSampledImage $t2D $samplerState;
         // Perform a sample

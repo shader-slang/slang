@@ -1668,17 +1668,6 @@ ImageFormat inferImageFormatFromTextureType(
                     break;
                 }
                 break;
-            case BaseType::Float:
-                switch (vectorWidth)
-                {
-                case 1:
-                    format = ImageFormat::r32f;
-                    break;
-                case 2:
-                    format = ImageFormat::rg32f;
-                    break;
-                }
-                break;
             }
         }
     }
