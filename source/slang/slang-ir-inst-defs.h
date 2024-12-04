@@ -1250,6 +1250,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST(SNormAttr, snorm, 0, HOISTABLE)
     INST(NoDiffAttr, no_diff, 0, HOISTABLE)
     INST(NonUniformAttr, nonuniform, 0, HOISTABLE)
+    INST(AlignedAttr, Aligned, 1, HOISTABLE)
 
     /* SemanticAttr */
         INST(UserSemanticAttr, userSemantic, 2, HOISTABLE)
@@ -1260,6 +1261,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
         INST(VarOffsetAttr, offset, 2, HOISTABLE)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
     INST(FuncThrowTypeAttr, FuncThrowType, 1, HOISTABLE)
+    
 INST_RANGE(Attr, PendingLayoutAttr, FuncThrowTypeAttr)
 
 /* Liveness */

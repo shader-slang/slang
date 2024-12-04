@@ -2389,6 +2389,12 @@ struct IRCall : IRInst
     void setArg(UInt index, IRInst* arg) { setOperand(index + 1, arg); }
 };
 
+struct IRAlignedAttr : IRAttr
+{
+    IR_LEAF_ISA(AlignedAttr)
+    IRInst* getAlignment() { return getOperand(0); }
+};
+
 struct IRLoad : IRInst
 {
     IRUse ptr;

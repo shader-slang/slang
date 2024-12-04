@@ -1039,6 +1039,47 @@ struct Ptr
 };
 
 //@hidden:
+__intrinsic_op($(kIROp_AlignedAttr))
+void __align_attr(int alignment);
+
+__intrinsic_op($(kIROp_Load))
+T __load_aligned<T, U>(T* ptr, U alignmentAttr);
+
+__intrinsic_op($(kIROp_Store))
+void __store_aligned<T, U>(T* ptr, T value, U alignmentAttr);
+
+//@public:
+
+/// Load a value from a pointer with a known alignment.
+/// Aligned loads are more efficient than unaligned loads on some platforms.
+/// @param alignment The alignment of the load operation.
+/// @param ptr The pointer to load from.
+/// @return The value loaded from the pointer.
+/// @remarks When targeting SPIRV, this function maps to an `OpLoad` instruction with the `Aligned` memory operand.
+/// The functions maps to normal load operation on other targets.
+///
+[__NoSideEffect]
+[ForceInline]
+T loadAligned<int alignment, T>(T* ptr)
+{
+    return __load_aligned(ptr, __align_attr(alignment));
+}
+
+/// Store a value to a pointer with a known alignment.
+/// Aligned stores are more efficient than unaligned stores on some platforms.
+/// @param alignment The alignment of the store operation.
+/// @param ptr The pointer to store value to.
+/// @param value The value to store.
+/// @remarks When targeting SPIRV, this function maps to an `OpStore` instruction with the `Aligned` memory operand.
+/// The functions maps to normal store operation on other targets.
+///
+[ForceInline]
+void storeAligned<int alignment, T>(T* ptr, T value)
+{
+    __store_aligned(ptr, value, __align_attr(alignment));
+}
+
+//@hidden:
 __intrinsic_op($(kIROp_Load))
 T __load<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr);
 
