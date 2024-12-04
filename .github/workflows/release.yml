@@ -109,23 +109,18 @@ jobs:
           brew install Bearer/tap/gon
           security find-identity -v
           brew install coreutils
-
           # create variables
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
           # import certificate and provisioning profile from secrets
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode --output "$CERTIFICATE_PATH"
-
           # create temporary keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
           # import certificate to keychain
           security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH"
-
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "$KEYCHAIN_PATH"
 
           binaries=(
@@ -137,6 +132,8 @@ jobs:
             "${bin_dir}/slangd"
             "${bin_dir}/slangc"
           )
+
+          # Sign main binaries
           for b in "${binaries[@]}"; do
             if [[ -f "$b" ]]; then
               echo "Signing binary '$b'..."
@@ -155,7 +152,6 @@ jobs:
           # Package main binaries
           cpack --preset "$config" -G ZIP
           cpack --preset "$config" -G TGZ
-
           # Package debug info
           cpack --preset "$config-debug-info" -G ZIP
           cpack --preset "$config-debug-info" -G TGZ
@@ -174,32 +170,6 @@ jobs:
           echo "SLANG_DEBUG_INFO_ARCHIVE_ZIP=${base}-debug-info.zip" >> "$GITHUB_OUTPUT"
           mv "$(pwd)/build/dist-${config}-debug-info/slang-debug-info.tar.gz" "${base}-debug-info.tar.gz"
           echo "SLANG_DEBUG_INFO_ARCHIVE_TAR=${base}-debug-info.tar.gz" >> "$GITHUB_OUTPUT"
-
-          # MacOS specific handling
-          if [[ "${{ matrix.os }}"  == "macos" ]]; then
-            mkdir ./ttmp
-            unzip "${base}.zip" -d ./ttmp
-            mkdir ./ttmp-debug
-            unzip "${base}-debug-info.zip" -d ./ttmp-debug
-
-            /bin/cp -rf build/$cmake_config/bin/* ./ttmp/bin/
-            /bin/cp -rf build/$cmake_config/lib/* ./ttmp/lib/
-
-            rm ${base}.zip
-            rm ${base}.tar.gz
-            rm ${base}-debug-info.zip
-            rm ${base}-debug-info.tar.gz
-
-            cd ./ttmp
-            7z a ../${base}.zip .
-            tar -czvf ../${base}.tar.gz .
-            cd ../
-
-            cd ./ttmp-debug
-            7z a ../${base}-debug-info.zip .
-            tar -czvf ../${base}-debug-info.tar.gz .
-            cd ../
-          fi
 
       - name: File check
         run: |
