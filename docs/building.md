@@ -110,6 +110,31 @@ cmake --build --preset emscripten --target slang-wasm
 > Note: If the last build step fails, try running the command that `emcmake`
 > outputs, directly.
 
+## Installing
+
+Build targets may be installed using cmake:
+
+```bash
+cmake --build . --target install
+```
+
+This should install `SlangConfig.cmake` that should allow `find_package` to work.
+SlangConfig.cmake defines `SLANG_EXECUTABLE` variable that will point to `slangc`
+executable and also define `slang::slang` target to be linked to.
+
+For now, `slang::slang` is the only exported target defined in the config which can
+be linked to.
+
+Example usage
+
+```cmake
+find_package(slang REQUIRED PATHS ${your_cmake_install_prefix_path} NO_DEFAULT_PATH)
+# slang_FOUND should be automatically set
+target_link_libraries(yourLib PUBLIC
+  slang::slang
+)
+```
+
 ## Testing
 
 ```bash

@@ -8789,7 +8789,8 @@ void SemanticsDeclHeaderVisitor::checkMeshOutputDecl(VarDeclBase* varDecl)
         nullptr,
         ConstantFoldingKind::LinkTime,
         getSink());
-
+    if (!index)
+        return;
     Type* d = m_astBuilder->getMeshOutputTypeFromModifier(modifier, base, index);
     varDecl->type.type = d;
 }
