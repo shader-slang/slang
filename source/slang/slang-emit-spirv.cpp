@@ -4467,7 +4467,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (t == "triangle")
                         m = SpvExecutionModeOutputTrianglesEXT;
                     else if (t == "line")
-                        m = SpvExecutionModeOutputTrianglesEXT;
+                        m = SpvExecutionModeOutputLinesEXT;
                     else if (t == "point")
                         m = SpvExecutionModeOutputPoints;
                 }
