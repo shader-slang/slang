@@ -6,5 +6,6 @@ if(SLANG_ENABLE_SLANGC)
         DEBUG_DIR ${slang_SOURCE_DIR}
         LINK_WITH_PRIVATE core slang Threads::Threads
         INSTALL
+        EXPORT_SET_NAME SlangTargets
     )
 endif()
