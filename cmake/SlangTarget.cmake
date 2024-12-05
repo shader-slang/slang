@@ -234,13 +234,55 @@ function(slang_add_target dir type)
 
     if(generate_split_debug_info)
         if(MSVC)
-            target_compile_options(
+            get_target_property(
+                c_compiler_launcher
                 ${target}
-                PRIVATE $<$<CONFIG:Debug,RelWithDebInfo>:/Z7>
+                C_COMPILER_LAUNCHER
             )
+            get_target_property(
+                cxx_compiler_launcher
+                ${target}
+                CXX_COMPILER_LAUNCHER
+            )
+
+            if(
+                c_compiler_launcher MATCHES "ccache"
+                OR cxx_compiler_launcher MATCHES "ccache"
+            )
+                message(
+                    WARNING
+                    "(s)ccache detected for target ${target}. Removing launcher as it's incompatible with split debug info compiled with MSVC."
+                )
+                set_target_properties(
+                    ${target}
+                    PROPERTIES C_COMPILER_LAUNCHER "" CXX_COMPILER_LAUNCHER ""
+                )
+            endif()
+
+            get_target_property(
+                msvc_debug_information_format
+                ${target}
+                MSVC_DEBUG_INFORMATION_FORMAT
+            )
+            if(
+                NOT msvc_debug_information_format
+                    MATCHES
+                    "(ProgramDatabase|EditAndContinue)"
+            )
+                message(
+                    WARNING
+                    "Debug format must be ProgramDatabase or EditAndContinue to generate split debug info with MSVC"
+                )
+            endif()
+
             set_target_properties(
                 ${target}
                 PROPERTIES
+                    # While it would be nice to set this here, we don't know if
+                    # the user wants ProgramDatabase or EditAndContinue, so
+                    # just check above
+                    # MSVC_DEBUG_INFORMATION_FORMAT
+                    #     "$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>"
                     COMPILE_PDB_NAME "${target}"
                     COMPILE_PDB_OUTPUT_DIRECTORY "${output_dir}"
             )
