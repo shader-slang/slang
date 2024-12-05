@@ -334,8 +334,16 @@ install(
     COMPONENT metadata
     EXCLUDE_FROM_ALL
 )
-install(DIRECTORY "${slang_SOURCE_DIR}/docs/" DESTINATION share/doc/slang)
-install(DIRECTORY "${slang_SOURCE_DIR}/include" DESTINATION .)
+install(
+    DIRECTORY "${slang_SOURCE_DIR}/docs/"
+    DESTINATION share/doc/slang
+    PATTERN ".*" EXCLUDE
+)
+install(
+    DIRECTORY "${slang_SOURCE_DIR}/include"
+    DESTINATION .
+    PATTERN ".*" EXCLUDE
+)
 
 include(CPack)
 
