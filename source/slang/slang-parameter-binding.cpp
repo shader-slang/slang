@@ -1073,7 +1073,7 @@ static void addExplicitParameterBindings_GLSL(
     // so that we are able to distinguish between
     // Vulkan and OpenGL as targets.
     //
-    if (!isKhronosTarget(context->getTargetRequest()))
+    if (!isKhronosTarget(context->getTargetRequest()) && !isWGPUTarget(context->getTargetRequest()))
         return;
 
     auto typeLayout = varLayout->typeLayout;

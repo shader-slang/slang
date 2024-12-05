@@ -663,7 +663,7 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
             EmitVarChain chain = {};
             chain.varLayout = layout;
-            auto space = getBindingSpaceForKinds(&chain, kind);
+            auto space = getBindingSpaceForKinds(&chain, LayoutResourceKindFlag::make(kind));
             m_writer->emit("@group(");
             m_writer->emit(space);
             m_writer->emit(") ");
