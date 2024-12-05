@@ -53,6 +53,8 @@ function(slang_add_target dir type)
         # explicit name instead, used for externally built things such as
         # slang-glslang and slang-llvm which have large pdb files
         DEBUG_INFO_INSTALL_COMPONENT
+        # The name of the Export set to associate with this installed target
+        EXPORT_SET_NAME
     )
     set(multi_value_args
         # Use exactly these sources, instead of globbing from the directory
@@ -408,22 +410,31 @@ function(slang_add_target dir type)
     # Mark for installation
     #
     macro(i)
+        if(ARG_EXPORT_SET_NAME)
+            set(export_args EXPORT ${ARG_EXPORT_SET_NAME})
+        else()
+            if(type MATCHES "^(EXECUTABLE|SHARED|MODULE)$")
+                message(
+                    WARNING
+                    "Target ${target} is set to be INSTALLED but EXPORT_SET_NAME wasn't specified"
+                )
+            endif()
+            set(export_args)
+        endif()
         install(
-            TARGETS ${target}
-            EXPORT SlangTargets
+            TARGETS ${target} ${export_args}
             ARCHIVE DESTINATION ${archive_subdir} ${ARGN}
             LIBRARY DESTINATION ${library_subdir} ${ARGN}
             RUNTIME DESTINATION ${runtime_subdir} ${ARGN}
             PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} ${ARGN}
         )
     endmacro()
-    if(ARG_INSTALL)
-        i()
-        set(pdb_component "debug-info")
-    endif()
     if(ARG_INSTALL_COMPONENT)
         i(EXCLUDE_FROM_ALL COMPONENT ${ARG_INSTALL_COMPONENT})
         set(pdb_component "${ARG_INSTALL_COMPONENT}-debug-info")
+    elseif(ARG_INSTALL)
+        i()
+        set(pdb_component "debug-info")
     endif()
     if(ARG_DEBUG_INFO_INSTALL_COMPONENT)
         set(pdb_component ${ARG_DEBUG_INFO_INSTALL_COMPONENT})
