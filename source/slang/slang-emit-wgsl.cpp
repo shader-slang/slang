@@ -1,5 +1,7 @@
 #include "slang-emit-wgsl.h"
 
+#include "slang-ir-util.h"
+
 // A note on row/column "terminology reversal".
 //
 // This is an "terminology reversing" implementation in the sense that
@@ -343,6 +345,38 @@ static const char* getWgslImageFormat(IRTextureTypeBase* type)
     //
     ImageFormat imageFormat =
         type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
+
+    if (imageFormat == ImageFormat::unknown)
+    {
+        // WGSL doesn't have a texel format for "unknown" so we try to infer float types that
+        // normally just resolve to unknown.
+        auto elementType = type->getElementType();
+        Int vectorWidth = 1;
+        if (auto vectorType = as<IRVectorType>(elementType);
+            auto intLitVal = as<IRIntLit>(vectorType->getElementCount()))
+        {
+            vectorWidth = intLitVal->getValue();
+        }
+        elementType = getVectorElementType((IRType*)elementType);
+        if (auto basicType = as<IRBasicType>(elementType))
+        {
+            switch (basicType->getBaseType())
+            {
+            case BaseType::Float:
+                switch (vectorWidth)
+                {
+                case 1:
+                    return "r32float";
+                case 2:
+                    return "rg32float";
+                case 4:
+                    return "rgba32float";
+                }
+                break;
+            }
+        }
+    }
+
     switch (imageFormat)
     {
     case ImageFormat::rgba8:
