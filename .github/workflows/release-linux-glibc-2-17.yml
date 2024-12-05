@@ -52,8 +52,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
-          draft: contains(github.ref, 'draft')
-          prerelease: contains(github.ref, 'draft')
+          draft: ${{contains(github.ref, 'draft')}}
+          prerelease: ${{contains(github.ref, 'draft')}}
           files: |
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_ZIP }}
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
