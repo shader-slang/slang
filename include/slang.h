@@ -273,7 +273,7 @@ convention for interface methods.
 #endif
 
 // Microsoft VC specific
-#if SLANG_MICROSOFT_FAMILY
+#if SLANG_VC
     #define SLANG_NO_INLINE __declspec(noinline)
     #define SLANG_FORCE_INLINE __forceinline
     #define SLANG_BREAKPOINT(id) __debugbreak();
