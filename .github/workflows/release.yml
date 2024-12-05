@@ -177,8 +177,15 @@ jobs:
           if [[ "${{ matrix.os }}"  == "macos" ]]; then
             mkdir ./ttmp
             unzip "${base}.zip" -d ./ttmp
-            /bin/cp -rf build/$cmake_config/bin/* ./ttmp/bin/
-            /bin/cp -rf build/$cmake_config/lib/* ./ttmp/lib/
+
+            # Copy only existing files from build directory
+            find ./ttmp/{bin,lib} -type f | while read -r file; do
+              src_file="build/$cmake_config/${file#./ttmp/}"
+              if [ -f "$src_file" ]; then
+                cp "$src_file" "$file"
+              fi
+            done
+
             rm ${base}.zip
             rm ${base}.tar.gz
             cd ./ttmp
