@@ -171,6 +171,22 @@ jobs:
           mv "$(pwd)/build/dist-${config}-debug-info/slang-debug-info.tar.gz" "${base}-debug-info.tar.gz"
           echo "SLANG_DEBUG_INFO_ARCHIVE_TAR=${base}-debug-info.tar.gz" >> "$GITHUB_OUTPUT"
 
+          # For some reason, the binaries packed by cpack for macos is modified
+          # by cpack and considered damanged by macos. For now we workaround this
+          # by repacking all the binaries into the release package.
+          if [[ "${{ matrix.os }}"  == "macos" ]]; then
+            mkdir ./ttmp
+            unzip "${base}.zip" -d ./ttmp
+            /bin/cp -rf build/$cmake_config/bin/* ./ttmp/bin/
+            /bin/cp -rf build/$cmake_config/lib/* ./ttmp/lib/
+            rm ${base}.zip
+            rm ${base}.tar.gz
+            cd ./ttmp
+            7z a ../${base}.zip .
+            tar -czvf ../${base}.tar.gz .
+            cd ../
+          fi
+
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
