@@ -10,5 +10,10 @@ if(SLANG_ENABLE_SLANGRT)
         EXPORT_MACRO_PREFIX SLANG_RT
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include
         INSTALL
+        # This depends on unordered_dense in the header, so we can't export
+        # this via cmake without obligating ourselves to also install our
+        # bundled version of unordered_dense, give it this different export set
+        # name so we don't attempt to export it
+        EXPORT_SET_NAME SlangRTTargets
     )
 endif()

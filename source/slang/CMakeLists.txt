@@ -233,6 +233,8 @@ set(slang_public_lib_args
     $<IF:$<BOOL:${SLANG_EMBED_CORE_MODULE}>,slang-embedded-core-module,slang-no-embedded-core-module>
     $<IF:$<BOOL:${SLANG_EMBED_CORE_MODULE_SOURCE}>,slang-embedded-core-module-source,slang-no-embedded-core-module-source>
     INSTALL
+    EXPORT_SET_NAME
+    SlangTargets
 )
 
 #
@@ -284,6 +286,7 @@ else()
         OUTPUT_DIR generators
         FOLDER generators
         INSTALL_COMPONENT generators
+        EXPORT_SET_NAME SlangGeneratorTargets
     )
     slang_add_target(
         .

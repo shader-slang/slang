@@ -365,15 +365,12 @@ configure_package_config_file(
     INSTALL_DESTINATION cmake
 )
 
-# Conditionally handle the case for Emscripten where slang does not create linkable
-# targets. In this case do not export the targets. Otherwise, just export the 
-# slang target, as this is the library that is required to use the compiler. This possibly
-# should later be expanded to include slang-rhi targets if some program intends to use them, 
-# but possibly wait for a future request before expanding this export set.
+# Conditionally handle the case for Emscripten where slang does not create
+# linkable targets. In this case do not export the targets. Otherwise, just
+# export the slang targets. 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    install(TARGETS slang EXPORT SlangExportTarget)
     install(
-        EXPORT SlangExportTarget
+        EXPORT SlangTargets
         FILE ${PROJECT_NAME}Targets.cmake
         NAMESPACE ${PROJECT_NAME}::
         DESTINATION cmake

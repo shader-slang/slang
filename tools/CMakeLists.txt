@@ -39,6 +39,7 @@ function(generator dir)
             REQUIRED_BY all-generators
             FOLDER generators
             INSTALL_COMPONENT generators
+            EXPORT_SET_NAME SlangGeneratorTargets
             ${ARGN}
         )
     endif()
@@ -93,6 +94,7 @@ if(SLANG_ENABLE_SLANGD)
             slang-capability-defs
             Threads::Threads
         INSTALL
+        EXPORT_SET_NAME SlangTargets
     )
 endif()
 
@@ -152,6 +154,7 @@ if(SLANG_ENABLE_GFX)
             ${slang_SOURCE_DIR}/include
         REQUIRES copy-gfx-slang-modules
         INSTALL
+        EXPORT_SET_NAME SlangTargets
         FOLDER gfx
     )
     set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
