@@ -20,7 +20,8 @@ struct GlobalInstInliningContextGeneric
     virtual IRInst* getOutsideASM(IRInst* beforeInst) =0;
 
     // Inline global values that can't represented by the target to their use sites.
-    void inlineGlobalValues(IRModule * module);
+    // If this leaves any global unused, then remove it.
+    void inlineGlobalValuesAndRemoveIfUnused(IRModule * module);
 
     // Opcodes that can exist in global scope, as long as the operands are.
     bool isLegalGlobalInst(IRInst* inst);

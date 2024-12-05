@@ -1643,7 +1643,9 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
     // Go through every instruction in the module and legalize them as needed.
     context.processInst(module->getModuleInst());
 
-    GlobalInstInliningContext().inlineGlobalValues(module);
+    // Some global insts are illegal, e.g. function calls.
+    // We need to inline and remove those.
+    GlobalInstInliningContext().inlineGlobalValuesAndRemoveIfUnused(module);
 }
 
 } // namespace Slang

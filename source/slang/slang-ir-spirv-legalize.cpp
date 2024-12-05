@@ -2016,7 +2016,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
         }
 
-        GlobalInstInliningContext().inlineGlobalValues(m_module);
+        GlobalInstInliningContext().inlineGlobalValuesAndRemoveIfUnused(m_module);
 
         // Some legalization processing may change the function parameter types,
         // so we need to update the function types to match that.

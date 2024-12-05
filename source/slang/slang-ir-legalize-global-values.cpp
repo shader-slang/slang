@@ -6,7 +6,7 @@
 namespace Slang
 {
 
-void GlobalInstInliningContextGeneric::inlineGlobalValues(IRModule * module)
+void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRModule* module)
 {
     List<IRUse*> globalInstUsesToInline;
 
@@ -22,6 +22,7 @@ void GlobalInstInliningContextGeneric::inlineGlobalValues(IRModule * module)
         }
     }
 
+    HashSet<IRInst*> globalInstsToConsiderDeleting;
     for (auto use : globalInstUsesToInline)
     {
         auto user = use->getUser();
@@ -30,7 +31,21 @@ void GlobalInstInliningContextGeneric::inlineGlobalValues(IRModule * module)
         IRCloneEnv cloneEnv;
         auto val = maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
         if (val != use->get())
+        {
+            // Since certain globals that appear in the IR are considered illegal for all targets,
+            // e.g. calls to functions, we delete the globals we've inlined.
+            // Note that the inlining is done such that none of the descendants of the global will
+            // have any uses either.
+            globalInstsToConsiderDeleting.add(use->usedValue);
+
             builder.replaceOperand(use, val);
+        }
+    }
+
+    for (auto globalInst : globalInstsToConsiderDeleting)
+    {
+        if (!globalInst->hasUses())
+            globalInst->removeAndDeallocate();
     }
 }
 
@@ -124,6 +139,14 @@ bool GlobalInstInliningContextGeneric::isInlinableGlobalInst(IRInst* inst)
 
 bool GlobalInstInliningContextGeneric::shouldInlineInstImpl(IRInst* inst)
 {
+    // If 'inst' has an ancestor that is currently being inlined, then we
+    // better inline it since we'll be removing the ancestor.
+    bool ancestorShouldBeInlined = false;
+    for (IRInst* ancestor = inst->parent; ancestor != nullptr; ancestor = ancestor->parent)
+        if (m_mapGlobalInstToShouldInline.tryGetValue(inst, ancestorShouldBeInlined) &&
+            ancestorShouldBeInlined)
+            return true;
+
     if (!isInlinableGlobalInst(inst))
         return false;
     if (isLegalGlobalInst(inst))
@@ -148,6 +171,9 @@ bool GlobalInstInliningContextGeneric::shouldInlineInst(IRInst* inst)
 
 IRInst* GlobalInstInliningContextGeneric::inlineInst(IRBuilder& builder, IRCloneEnv& cloneEnv, IRInst* inst)
 {
+    // We rely on this dictionary in order to force inlining of any nodes with that should be inlined
+    SLANG_ASSERT(m_mapGlobalInstToShouldInline[inst]);
+
     IRInst* result;
     if (cloneEnv.mapOldValToNew.tryGetValue(inst, result))
         return result;
@@ -169,6 +195,7 @@ IRInst* GlobalInstInliningContextGeneric::inlineInst(IRBuilder& builder, IRClone
     }
     for (auto child : inst->getChildren())
     {
+        m_mapGlobalInstToShouldInline[child] = true;
         inlineInst(subBuilder, cloneEnv, child);
     }
     return result;
