@@ -205,7 +205,7 @@ function(slang_add_target dir type)
             ${target}
             PROPERTIES
                 COMPILE_OPTIONS
-                    "$<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:-fdebug-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=${output_dir}>"
+                    "$<$<CONFIG:Debug,RelWithDebInfo>:-fdebug-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=${output_dir}>"
         )
     endif()
 
@@ -236,7 +236,7 @@ function(slang_add_target dir type)
         if(MSVC)
             target_compile_options(
                 ${target}
-                PRIVATE $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
+                PRIVATE $<$<CONFIG:Debug,RelWithDebInfo>:/Z7>
             )
             set_target_properties(
                 ${target}
@@ -249,7 +249,7 @@ function(slang_add_target dir type)
             target_compile_options(
                 ${target}
                 PRIVATE
-                    $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
+                    $<$<CONFIG:Debug,RelWithDebInfo>:
                     -g
                     -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
                     -fdebug-prefix-map=${CMAKE_BINARY_DIR}=.
@@ -511,22 +511,16 @@ function(slang_add_target dir type)
         )
     endmacro()
 
-    if(ARG_INSTALL)
-        i()
-        if(DEFINED ARG_DEBUG_INFO_INSTALL_COMPONENT)
-            set(debug_component "${ARG_DEBUG_INFO_INSTALL_COMPONENT}")
-        else()
-            set(debug_component "debug-info")
-        endif()
-    endif()
-
     if(ARG_INSTALL_COMPONENT)
         i(EXCLUDE_FROM_ALL COMPONENT ${ARG_INSTALL_COMPONENT})
-        if(DEFINED ARG_DEBUG_INFO_INSTALL_COMPONENT)
-            set(debug_component "${ARG_DEBUG_INFO_INSTALL_COMPONENT}")
-        else()
-            set(debug_component "${ARG_INSTALL_COMPONENT}-debug-info")
-        endif()
+        set(debug_component "${ARG_INSTALL_COMPONENT}-debug-info")
+    elseif(ARG_INSTALL)
+        i()
+        set(debug_component "debug-info")
+    endif()
+
+    if(DEFINED ARG_DEBUG_INFO_INSTALL_COMPONENT)
+        set(debug_component "${ARG_DEBUG_INFO_INSTALL_COMPONENT}")
     endif()
 
     # Install debug info only if target is being installed
