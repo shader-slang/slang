@@ -1,7 +1,17 @@
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
+
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -allow-glsl
 //TEST:SIMPLE(filecheck=GLSL): -target glsl
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+
+// WGSL-DAG: @id(0) override constValue0{{.*}} = {{.*}}
+
+// WGSL-DAG: @id(7) override constValue1{{.*}} = {{.*}}
+
+// WGSL-DAG: @id(1) override constValue2{{.*}} = {{.*}}
+
+// WGSL-DAG: @id(9) override constValue3{{.*}} = {{.*}}
 
 // CHECK-DAG: OpDecorate %[[C0:[0-9A-Za-z_]+]] SpecId 0
 // CHECK-DAG: %[[C0]] = OpSpecConstant %int 1
