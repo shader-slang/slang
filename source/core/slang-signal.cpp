@@ -6,7 +6,7 @@
 namespace Slang
 {
 
-static String s_lastSignalMessage;
+thread_local String g_lastSignalMessage;
 
 static const char* _getSignalTypeAsText(SignalType type)
 {
@@ -56,7 +56,7 @@ String _getMessage(SignalType type, char const* message)
         printf("%s\n", _getMessage(type, message).getBuffer());
     }
 
-    s_lastSignalMessage = _getMessage(type, message);
+    g_lastSignalMessage = _getMessage(type, message);
 
 #if SLANG_HAS_EXCEPTIONS
     switch (type)
@@ -81,7 +81,7 @@ String _getMessage(SignalType type, char const* message)
 
 const char* getLastSignalMessage()
 {
-    return s_lastSignalMessage.getBuffer();
+    return g_lastSignalMessage.getBuffer();
 }
 
 } // namespace Slang
