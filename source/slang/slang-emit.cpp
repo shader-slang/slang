@@ -22,7 +22,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
-#include "slang-ir-check-recursive-type.h"
+#include "slang-ir-check-recursion.h"
 #include "slang-ir-check-shader-parameter-type.h"
 #include "slang-ir-check-unsupported-inst.h"
 #include "slang-ir-cleanup-void.h"
@@ -884,6 +884,7 @@ Result linkAndOptimizeIR(
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
         checkForRecursiveTypes(irModule, sink);
+        checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
 
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
