@@ -267,3 +267,11 @@ Metal requires explicit address space qualifiers. Slang automatically assigns ap
 | RW/Structured Buffers | `device`            |
 | Group Shared          | `threadgroup`       |
 | Parameter Blocks      | `constant`          |
+
+## Explicit Parameter Binding
+
+The HLSL `:register()` semantic is respected when emitting Metal code.
+
+Since metal does not differentiate a constant buffer, a shader resource (read-only) buffer and an unordered access buffer, Slang will map `register(tN)`, `register(uN)` and `register(bN)` to `[[buffer(N)]]` when such `register` semantic is declared on a buffer typed parameter.
+
+`spaceN` specifiers inside `register` semantics are ignored.

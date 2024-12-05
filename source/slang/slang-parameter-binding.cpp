@@ -984,7 +984,8 @@ static void addExplicitParameterBindings_HLSL(
     //
     // For now we do the filtering on target in a very direct fashion:
     //
-    if (!isD3DTarget(context->getTargetRequest()) && !isMetalTarget(context->getTargetRequest()))
+    bool isMetal = isMetalTarget(context->getTargetRequest());
+    if (!isD3DTarget(context->getTargetRequest()) && !isMetal)
         return;
 
     auto typeLayout = varLayout->typeLayout;
@@ -1018,6 +1019,7 @@ static void addExplicitParameterBindings_HLSL(
         if (kind == LayoutResourceKind::None)
             continue;
 
+
         // TODO: need to special-case when this is a `c` register binding...
 
         // Find the appropriate resource-binding information
@@ -1025,6 +1027,19 @@ static void addExplicitParameterBindings_HLSL(
         // of the given kind.
 
         auto typeRes = typeLayout->FindResourceInfo(kind);
+        if (isMetal && !typeRes)
+        {
+            // Metal doesn't distinguish a unordered access and a readonly/uniform buffer.
+            switch (kind)
+            {
+            case LayoutResourceKind::UnorderedAccess:
+            case LayoutResourceKind::ShaderResource:
+                semanticInfo.kind = LayoutResourceKind::MetalBuffer;
+                typeRes = typeLayout->FindResourceInfo(LayoutResourceKind::MetalBuffer);
+                break;
+            }
+        }
+
         LayoutSize count = 0;
         if (typeRes)
         {
