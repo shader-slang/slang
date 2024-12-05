@@ -75,6 +75,13 @@ jobs:
         shell: bash
 
     steps:
+      - name: Add bash to PATH
+        shell: pwsh
+        if: ${{matrix.os == 'windows'}}
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
