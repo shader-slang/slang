@@ -22,7 +22,7 @@ int test(int inVal)
 	return x * 16;
 }
 
-RWStructuredBuffer<int> outputBuffer : register(u0);
+RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

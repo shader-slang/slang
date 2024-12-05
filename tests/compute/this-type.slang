@@ -36,7 +36,7 @@ int test(int value)
 }
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
-RWStructuredBuffer<int> outputBuffer : register(u0);
+RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

@@ -3,11 +3,9 @@
 //TEST_INPUT: Texture2D(size=16, content=chessboard, format=R32_FLOAT):name g_texture
 //TEST_INPUT: Sampler :name g_sampler
 
-[vk::binding(0, 0)]
-Texture2D<float> g_texture : register(t0);
+Texture2D<float> g_texture;
 
-[vk::binding(1, 0)]
-SamplerState g_sampler : register(s0);
+SamplerState g_sampler;
 
 cbuffer Uniforms
 {
