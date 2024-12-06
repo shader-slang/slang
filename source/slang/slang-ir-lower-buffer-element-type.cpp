@@ -901,28 +901,6 @@ struct LoweredElementTypeContext
                         {
                             builder.setInsertBefore(ptrVal);
                             auto newArrayPtrVal = fieldAddr->getBase();
-                            // Is base a pointer to an empty struct? If so, don't offset it.
-                            // For example, if the user has written:
-                            // ```
-                            // struct S {int arr[]};
-                            // uniform S* p;
-                            // void test() { p->arr[1]; }
-                            // ```
-                            // Then `S` will become an empty struct after we remove `arr[]`.
-                            // And `p` will be come a `void*`.
-                            // We don't want to offset `p` to `p+1` to get the starting address of
-                            // the array in this case.
-                            IRSizeAndAlignment parentStructSize = {};
-                            getNaturalSizeAndAlignment(
-                                target->getOptionSet(),
-                                tryGetPointedToType(&builder, fieldAddr->getBase()->getDataType()),
-                                &parentStructSize);
-                            if (parentStructSize.size != 0)
-                            {
-                                newArrayPtrVal = builder.emitGetOffsetPtr(
-                                    fieldAddr->getBase(),
-                                    builder.getIntValue(builder.getIntType(), 1));
-                            }
                             auto loweredInnerType =
                                 getLoweredTypeInfo(unsizedArrayType->getElementType(), layoutRules);
 

@@ -21,7 +21,6 @@ float4 fragment(): SV_Target
 }
 
 // CHECK: OpDecorate %_ptr_PhysicalStorageBuffer_Descriptors_natural ArrayStride 4
-// CHECK: %{{.*}} = OpPtrAccessChain %_ptr_PhysicalStorageBuffer_Descriptors_natural %{{.*}} %int_1
 // CHECK: OpBitcast %ulong
 // CHECK: OpIAdd %ulong %{{.*}} %ulong_4
 // CHECK: OpBitcast %_ptr_PhysicalStorageBuffer

@@ -76,6 +76,12 @@ struct ShaderOutputPlan
     List<Item> items;
 };
 
+// A context for hodling resources allocated for a test.
+struct TestResourceContext
+{
+    List<ComPtr<IResource>> resources;
+};
+
 class RenderTestApp
 {
 public:
@@ -134,6 +140,7 @@ protected:
     Options m_options;
 
     ShaderOutputPlan m_outputPlan;
+    TestResourceContext m_resourceContext;
 };
 
 struct AssignValsFromLayoutContext
@@ -141,6 +148,7 @@ struct AssignValsFromLayoutContext
     IDevice* device;
     slang::ISession* slangSession;
     ShaderOutputPlan& outputPlan;
+    TestResourceContext& resourceContext;
     slang::ProgramLayout* slangReflection;
     IAccelerationStructure* accelerationStructure;
 
@@ -148,11 +156,13 @@ struct AssignValsFromLayoutContext
         IDevice* device,
         slang::ISession* slangSession,
         ShaderOutputPlan& outputPlan,
+        TestResourceContext& resourceContext,
         slang::ProgramLayout* slangReflection,
         IAccelerationStructure* accelerationStructure)
         : device(device)
         , slangSession(slangSession)
         , outputPlan(outputPlan)
+        , resourceContext(resourceContext)
         , slangReflection(slangReflection)
         , accelerationStructure(accelerationStructure)
     {
@@ -204,12 +214,23 @@ struct AssignValsFromLayoutContext
             bufferData.add(0);
 
         ComPtr<IBuffer> bufferResource;
+
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBuffer(
             srcBuffer,
             /*entry.isOutput,*/ bufferSize,
             bufferData.getBuffer(),
             device,
             bufferResource));
+
+        if (dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
+        {
+            // dstCursor is pointer to an ordinary uniform data field,
+            // we should write bufferResource as a pointer.
+            uint64_t addr = bufferResource->getDeviceAddress();
+            dstCursor.setData(&addr, sizeof(addr));
+            resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+            return SLANG_OK;
+        }
 
         ComPtr<IBuffer> counterResource;
         const auto explicitCounterCursor = dstCursor.getExplicitCounter();
@@ -488,11 +509,17 @@ SlangResult _assignVarsFromLayout(
     IShaderObject* shaderObject,
     ShaderInputLayout const& layout,
     ShaderOutputPlan& ioOutputPlan,
+    TestResourceContext& ioResourceContext,
     slang::ProgramLayout* slangReflection,
     IAccelerationStructure* accelerationStructure)
 {
-    AssignValsFromLayoutContext
-        context(device, slangSession, ioOutputPlan, slangReflection, accelerationStructure);
+    AssignValsFromLayoutContext context(
+        device,
+        slangSession,
+        ioOutputPlan,
+        ioResourceContext,
+        slangReflection,
+        accelerationStructure);
     ShaderCursor rootCursor = ShaderCursor(shaderObject);
     return context.assign(rootCursor, layout.rootVal);
 }
@@ -510,6 +537,7 @@ Result RenderTestApp::applyBinding(IShaderObject* rootObject)
         rootObject,
         m_compilationOutput.layout,
         m_outputPlan,
+        m_resourceContext,
         slangReflection,
         m_topLevelAccelerationStructure);
 }
