@@ -200,11 +200,26 @@ function(slang_add_target dir type)
             PDB_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
     )
 
-    if(NOT MSVC)
+    set(debug_configs "Debug,RelWithDebInfo")
+    if(SLANG_ENABLE_RELEASE_DEBUG_INFO)
+        set(debug_configs "Debug,RelWithDebInfo,Release")
+    endif()
+
+    set_target_properties(
+        ${target}
+        PROPERTIES
+            MSVC_DEBUG_INFORMATION_FORMAT
+                "$<$<CONFIG:${debug_configs}>:Embedded>"
+    )
+    if(MSVC)
+        target_link_options(
+            ${target}
+            PRIVATE "$<$<CONFIG:${debug_configs}>:/DEBUG>"
+        )
+    else()
         target_compile_options(
             ${target}
-            PRIVATE
-                "$<$<CONFIG:Debug,RelWithDebInfo>:-fdebug-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=${output_dir}>"
+            PRIVATE "$<$<CONFIG:${debug_configs}>:-g>"
         )
     endif()
 
@@ -240,17 +255,6 @@ function(slang_add_target dir type)
                     COMPILE_PDB_OUTPUT_DIRECTORY "${output_dir}"
             )
         else()
-            # Common debug flags for GCC/Clang
-            target_compile_options(
-                ${target}
-                PRIVATE
-                    $<$<CONFIG:Debug,RelWithDebInfo>:
-                    -g
-                    -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
-                    -fdebug-prefix-map=${CMAKE_BINARY_DIR}=.
-                    >
-            )
-
             if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
                 # macOS - use dsymutil with --flat to create separate debug file
                 add_custom_command(
@@ -535,7 +539,6 @@ function(slang_add_target dir type)
         install(
             FILES ${debug_file}
             DESTINATION ${debug_dest}
-            CONFIGURATIONS Debug RelWithDebInfo
             COMPONENT ${debug_component}
             EXCLUDE_FROM_ALL
             OPTIONAL
