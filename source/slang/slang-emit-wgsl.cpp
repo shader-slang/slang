@@ -643,6 +643,21 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
+void WGSLSourceEmitter::emitGlobalParamDefaultVal(IRGlobalParam* varDecl)
+{
+    auto layout = getVarLayout(varDecl);
+    if (!layout)
+        return;
+    if (layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+    {
+        if (auto defaultValDecor = varDecl->findDecoration<IRDefaultValueDecoration>())
+        {
+            m_writer->emit(" = ");
+            emitInstExpr(defaultValDecor->getOperand(0), EmitOpInfo());
+        }
+    }
+}
+
 void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 {
 
@@ -666,6 +681,14 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
             auto space = getBindingSpaceForKinds(&chain, LayoutResourceKindFlag::make(kind));
             m_writer->emit("@group(");
             m_writer->emit(space);
+            m_writer->emit(") ");
+
+            return;
+        }
+        else if (kind == LayoutResourceKind::SpecializationConstant)
+        {
+            m_writer->emit("@id(");
+            m_writer->emit(attr->getOffset());
             m_writer->emit(") ");
 
             return;
@@ -708,7 +731,15 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     case kIROp_GlobalParam:
     case kIROp_GlobalVar:
     case kIROp_Var:
-        m_writer->emit("var");
+        {
+            auto layout = getVarLayout(varDecl);
+            if (layout && layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+            {
+                m_writer->emit("override");
+                break;
+            }
+            m_writer->emit("var");
+        }
         break;
     default:
         if (isStaticConst(varDecl))

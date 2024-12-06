@@ -162,3 +162,19 @@ Since the WGSL matrix multiplication convention is the normal one, where inner p
 The `[vk::binding(index,set)]` attribute is respected when emitting WGSL code, and will translate to `@binding(index) @group(set)` in WGSL.
 
 If the `[vk::binding()]` attribute is not specified by a `:register()` semantic is present, Slang will derive the binding from the `register` semantic the same way as the SPIRV and GLSL backends.
+
+## Specialization Constants
+
+Specialization constants declared with the `[SpecializationConstant]` or `[vk::constant_id]` attribute will be translated into a global `override` declaration when generating WGSL source.
+For example:
+
+```csharp
+[vk::constant_id(7)]
+const int a = 2;
+```
+
+Translates to:
+
+```wgsl
+@id(7) override a : i32 = 2;
+```

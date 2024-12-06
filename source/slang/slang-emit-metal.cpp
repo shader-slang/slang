@@ -1331,9 +1331,53 @@ bool MetalSourceEmitter::_emitUserSemantic(
     return false;
 }
 
+bool MetalSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
+{
+    auto layout = getVarLayout(varDecl);
+    if (!layout)
+        return false;
+    if (auto specConstLayout = layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+    {
+        // Emit specialization constant.
+        auto name = getName(varDecl);
+        auto prefixName = "fc_" + name;
+        auto defaultVal = varDecl->findDecoration<IRDefaultValueDecoration>();
+
+        m_writer->emit("constant ");
+        emitType(varType, prefixName);
+        m_writer->emit(" ");
+        m_writer->emit("[[function_constant(");
+        m_writer->emit(specConstLayout->getOffset());
+        m_writer->emit(")]];\n");
+
+        m_writer->emit("constant ");
+        emitType(varType, name);
+        m_writer->emit(" = ");
+        if (defaultVal)
+        {
+            m_writer->emit("is_function_constant_defined(");
+            m_writer->emit(prefixName);
+            m_writer->emit(") ? ");
+            m_writer->emit(prefixName);
+            m_writer->emit(" : ");
+            emitVal(defaultVal->getOperand(0), getInfo(EmitOp::General));
+        }
+        else
+        {
+            m_writer->emit(prefixName);
+        }
+        m_writer->emit(";\n");
+        return true;
+    }
+    return false;
+}
+
 void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 {
     SLANG_UNUSED(allowOffsets);
+
+    auto varLayout = findVarLayout(inst);
+
     if (inst->getOp() == kIROp_StructKey)
     {
         // Only emit [[attribute(n)]] on struct keys.
@@ -1341,7 +1385,6 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         if (maybeEmitSystemSemantic(inst))
             return;
 
-        auto varLayout = findVarLayout(inst);
         bool hasSemantic = false;
 
         if (varLayout)
@@ -1378,6 +1421,7 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
                     semanticDecor->getSemanticIndex());
             }
         }
+        return;
     }
 }
 
