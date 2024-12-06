@@ -3890,6 +3890,8 @@ enum class TypeCastStyle
 };
 static TypeCastStyle _getTypeStyleId(IRType* type)
 {
+    type = (IRType*)unwrapAttributedType(type);
+
     if (auto vectorType = as<IRVectorType>(type))
     {
         return _getTypeStyleId(vectorType->getElementType());

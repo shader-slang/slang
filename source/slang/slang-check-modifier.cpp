@@ -720,11 +720,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
         else
         {
-            auto cint = checkConstantIntVal(attr->args[0]);
-            if (cint)
-            {
-                maxItersAttrs->value = (int32_t)cint->getValue();
-            }
+            maxItersAttrs->value = checkLinkTimeConstantIntVal(attr->args[0]);
         }
     }
     else if (const auto userDefAttr = as<UserDefinedAttribute>(attr))
