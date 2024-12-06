@@ -2013,7 +2013,7 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getVaryingOutputRules()
 
 LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kGLSLSpecializationConstantLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)

@@ -3,6 +3,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -39,7 +40,8 @@ struct IntroduceExplicitGlobalContextPass
     class ExplicitContextPolicy
     {
     public:
-        ExplicitContextPolicy(CodeGenTarget target)
+        ExplicitContextPolicy(CodeGenTarget inTarget)
+            : target(inTarget)
         {
             switch (target)
             {
@@ -74,7 +76,7 @@ struct IntroduceExplicitGlobalContextPass
             return (UInt)hoistableGlobalObjectKind & (UInt)hoistable;
         }
 
-        bool canHoistGlobalVar(IRGlobalVar* inst)
+        bool canHoistGlobalVar(IRInst* inst)
         {
             if (!((UInt)hoistGlobalVarOptions & (UInt)HoistGlobalVarOptions::SharedGlobal) &&
                 as<IRGroupSharedRate>(inst->getRate()))
@@ -99,6 +101,19 @@ struct IntroduceExplicitGlobalContextPass
                 }
             }
 
+            // Do not move specialization constants to context.
+            switch (target)
+            {
+            case CodeGenTarget::Metal:
+            case CodeGenTarget::MetalLib:
+            case CodeGenTarget::MetalLibAssembly:
+                {
+                    auto varLayout = findVarLayout(inst);
+                    if (varLayout &&
+                        varLayout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+                        return false;
+                }
+            }
             return true;
         }
 
@@ -111,6 +126,7 @@ struct IntroduceExplicitGlobalContextPass
         GlobalObjectKind hoistableGlobalObjectKind = GlobalObjectKind::All;
         bool requiresFuncTypeCorrectionPass = false;
         AddressSpace addressSpaceOfLocals = AddressSpace::ThreadLocal;
+        CodeGenTarget target;
     };
 
     IntroduceExplicitGlobalContextPass(IRModule* module, CodeGenTarget target)
@@ -134,7 +150,7 @@ struct IntroduceExplicitGlobalContextPass
 
     bool canHoistType(GlobalObjectKind hoistable) { return m_options.canHoistType(hoistable); }
 
-    bool canHoistGlobalVar(IRGlobalVar* inst) { return m_options.canHoistGlobalVar(inst); }
+    bool canHoistGlobalVar(IRInst* inst) { return m_options.canHoistGlobalVar(inst); }
 
     void processModule()
     {
@@ -183,6 +199,8 @@ struct IntroduceExplicitGlobalContextPass
                     //
                     auto globalParam = cast<IRGlobalParam>(inst);
 
+                    if (!canHoistGlobalVar(globalParam))
+                        continue;
 
                     // One detail we need to be careful about is that as a result
                     // of legalizing the varying parameters of compute kernels to

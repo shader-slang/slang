@@ -3035,13 +3035,6 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     static const int access = $(kCoreModule_ResourceAccessReadOnly);
 //@public:
     [__readNone]
-    [require(glsl, texture_sm_4_1_samplerless)]
-    T __glsl_load(vector<int, Shape.dimensions+isArray> location)
-    {
-        __intrinsic_asm "$ctexelFetch($0, ($1), 0)$z";
-    }
-
-    [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
@@ -3235,7 +3228,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 case glsl:
                     if (isCombined == 0)
                         __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
-                    return __glsl_load(location);
+
+                    return Load(__makeVector(location, 0));
                 case spirv:
                     if (isCombined != 0)
                     {

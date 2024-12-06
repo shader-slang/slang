@@ -9,7 +9,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-check-differentiability.h"
-#include "slang-ir-check-recursive-type.h"
+#include "slang-ir-check-recursion.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"

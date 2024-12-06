@@ -88,6 +88,7 @@ function(fetch_or_build_slang_llvm)
             EXPORT_MACRO_PREFIX SLANG
             INSTALL
             INSTALL_COMPONENT slang-llvm
+            EXPORT_SET_NAME SlangTargets
         )
         # If we don't include this, then the symbols in the LLVM linked here may
         # conflict with those of other LLVMs linked at runtime, for instance in mesa.
