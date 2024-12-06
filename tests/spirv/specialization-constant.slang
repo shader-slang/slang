@@ -1,9 +1,18 @@
+//TEST:SIMPLE(filecheck=METAL): -target metal
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
-
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -allow-glsl
 //TEST:SIMPLE(filecheck=GLSL): -target glsl
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+
+// METAL-DAG: constant bool fc_constValue2{{.*}} {{\[\[}}function_constant(1){{\]\]}};
+// METAL-DAG: constant bool constValue2{{.*}} = is_function_constant_defined(fc_constValue2{{.*}}) ? fc_constValue2{{.*}} : true;
+
+// METAL-DAG: constant float fc_constValue1{{.*}} {{\[\[}}function_constant(7){{\]\]}};
+
+// METAL-DAG: constant int fc_constValue0{{.*}} {{\[\[}}function_constant(0){{\]\]}};
+
+// METAL-DAG: constant int fc_constValue3{{.*}} {{\[\[}}function_constant(9){{\]\]}};
 
 // WGSL-DAG: @id(0) override constValue0{{.*}} = {{.*}}
 
