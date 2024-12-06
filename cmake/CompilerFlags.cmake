@@ -152,8 +152,14 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
-    # Don't assume that symbols will be resolved at runtime
-    add_supported_cxx_linker_flags(${target} PRIVATE "-Wl,--no-undefined")
+    add_supported_cxx_linker_flags(
+        ${target}
+        PRIVATE
+        # Don't assume that symbols will be resolved at runtime
+        "-Wl,--no-undefined"
+        # No reason not to do this? Useful when using split debug info
+        "-Wl,--build-id"
+    )
 
     set_target_properties(
         ${target}
