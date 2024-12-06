@@ -168,7 +168,9 @@ function(slang_add_target dir type)
     # See: https://cmake.org/cmake/help/latest/prop_tgt/INTERPROCEDURAL_OPTIMIZATION.html
     set_target_properties(
         ${target}
-        PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+        PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+            INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
     )
 
     #
