@@ -35,6 +35,8 @@ enum class SignalType
     ::Slang::handleSignal(::Slang::SignalType::AbortCompilation, msg)
 
 
+const char* getLastSignalMessage();
+
 } // namespace Slang
 
 #endif

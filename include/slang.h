@@ -4415,6 +4415,10 @@ SLANG_API ISlangBlob* slang_getEmbeddedCoreModule();
  */
 SLANG_EXTERN_C SLANG_API void slang_shutdown();
 
+/* Return the last signaled internal error message.
+ */
+SLANG_EXTERN_C SLANG_API const char* slang_getLastInternalErrorMessage();
+
 namespace slang
 {
 inline SlangResult createGlobalSession(slang::IGlobalSession** outGlobalSession)
@@ -4424,6 +4428,10 @@ inline SlangResult createGlobalSession(slang::IGlobalSession** outGlobalSession)
 inline void shutdown()
 {
     slang_shutdown();
+}
+inline const char* getLastInternalErrorMessage()
+{
+    return slang_getLastInternalErrorMessage();
 }
 } // namespace slang
 
