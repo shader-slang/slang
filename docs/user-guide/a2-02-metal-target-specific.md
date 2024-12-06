@@ -275,3 +275,20 @@ The HLSL `:register()` semantic is respected when emitting Metal code.
 Since metal does not differentiate a constant buffer, a shader resource (read-only) buffer and an unordered access buffer, Slang will map `register(tN)`, `register(uN)` and `register(bN)` to `[[buffer(N)]]` when such `register` semantic is declared on a buffer typed parameter.
 
 `spaceN` specifiers inside `register` semantics are ignored.
+
+## Specialization Constants
+
+Specialization constants declared with the `[SpecializationConstant]` or `[vk::constant_id]` attribute will be translated into a `function_constant` when generating Metal source.
+For example:
+
+```csharp
+[vk::constant_id(7)]
+const int a = 2;
+```
+
+Translates to:
+
+```metal
+constant int fc_a_0 [[function_constant(7)]];
+constant int a_0 = is_function_constant_defined(fc_a_0) ? fc_a_0 : 2;
+```
