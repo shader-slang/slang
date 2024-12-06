@@ -27,9 +27,9 @@ jobs:
             cd /home/app
             git config --global --add safe.directory /home/app
             cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
-            cmake --build --preset releaseWithDebugInfo
-            cpack --preset releaseWithDebugInfo -G ZIP
-            cpack --preset releaseWithDebugInfo -G TGZ
+            cmake --build --preset release
+            cpack --preset release -G ZIP
+            cpack --preset release -G TGZ
 
       - name: Package Slang
         id: package
@@ -38,15 +38,15 @@ jobs:
           version=${triggering_ref#v}
           base=$(pwd)/slang-${version}-linux-x86_64-glibc-2.17
 
-          sudo mv "$(pwd)/build/dist-releaseWithDebugInfo/slang.zip" "${base}.zip"
+          sudo mv "$(pwd)/build/dist-release/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
 
-          sudo mv "$(pwd)/build/dist-releaseWithDebugInfo/slang.tar.gz" "${base}.tar.gz"
+          sudo mv "$(pwd)/build/dist-release/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: File check
         run: |
-          find "build/dist-releaseWithDebugInfo" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
+          find "build/dist-release" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
 
       - name: UploadBinary
         uses: softprops/action-gh-release@v1

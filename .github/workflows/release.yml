@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         os: [linux, macos, windows]
-        config: [releaseWithDebugInfo]
+        config: [release]
         platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
