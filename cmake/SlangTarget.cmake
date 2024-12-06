@@ -201,11 +201,10 @@ function(slang_add_target dir type)
     )
 
     if(NOT MSVC)
-        set_target_properties(
+        target_compile_options(
             ${target}
-            PROPERTIES
-                COMPILE_OPTIONS
-                    "$<$<CONFIG:Debug,RelWithDebInfo>:-fdebug-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=${output_dir}>"
+            PRIVATE
+                "$<$<CONFIG:Debug,RelWithDebInfo>:-fdebug-prefix-map=${CMAKE_CURRENT_BINARY_DIR}=${output_dir}>"
         )
     endif()
 
