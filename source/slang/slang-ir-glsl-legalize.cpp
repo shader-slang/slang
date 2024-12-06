@@ -623,6 +623,11 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_PointSize";
         requiredType = builder->getBasicType(BaseType::Float);
     }
+    else if (semanticName == "sv_drawindex")
+    {
+        name = "gl_DrawID";
+        requiredType = builder->getBasicType(BaseType::Int);
+    }
     else if (semanticName == "sv_primitiveid")
     {
         // uint in hlsl, int in glsl
