@@ -186,6 +186,12 @@ enum_option(
 )
 
 option(
+    SLANG_ENABLE_RELEASE_DEBUG_INFO
+    "Generate debug info for Release builds"
+    ON
+)
+
+option(
     SLANG_ENABLE_SPLIT_DEBUG_INFO
     "Generate split debug info for debug builds"
     ON
