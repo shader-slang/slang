@@ -336,8 +336,10 @@ void DeclRefBase::toText(StringBuilder& out)
     List<Decl*> decls;
     for (auto dd = getDecl(); dd; dd = dd->parentDecl)
     {
-        // Skip the top-level decl.
-        if (as<ModuleDecl>(dd))
+        // Skip the module, file & include decls since their names are
+        // considered "transparent"
+        //
+        if (as<ModuleDecl>(dd) || as<FileDecl>(dd) || as<IncludeDecl>(dd))
             continue;
 
         // Skip base decls in generic containers. We will handle them when we handle the generic
