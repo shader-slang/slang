@@ -3,6 +3,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-rtti-info.h"
 #include "../core/slang-shared-library.h"
+#include "../core/slang-signal.h"
 #include "../slang-record-replay/record/slang-global-session.h"
 #include "../slang-record-replay/util/record-utility.h"
 #include "slang-capability.h"
@@ -171,6 +172,11 @@ SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
 
     *outGlobalSession = result.detach();
     return SLANG_OK;
+}
+
+SLANG_API const char* slang_getLastInternalErrorMessage()
+{
+    return Slang::getLastSignalMessage();
 }
 
 SLANG_API void spDestroySession(SlangSession* inSession)
