@@ -222,7 +222,7 @@ struct AssignValsFromLayoutContext
             device,
             bufferResource));
 
-        if (dstCursor.getTypeLayout()->getSize() != 0)
+        if (dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
         {
             // dstCursor is pointer to an ordinary uniform data field,
             // we should write bufferResource as a pointer.
