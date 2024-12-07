@@ -24,6 +24,7 @@ bool isFromCoreModule(Decl* decl);
 void registerBuiltinDecls(Session* session, Decl* decl);
 
 Type* unwrapArrayType(Type* type);
+Type* unwrapModifiedType(Type* type);
 
 OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
     ASTBuilder* builder,

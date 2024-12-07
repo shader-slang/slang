@@ -2307,7 +2307,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
     bool needDeref = false;
-    auto baseExpr = checkBaseForMemberExpr(subscriptExpr->baseExpression, needDeref);
+    auto baseExpr = checkBaseForMemberExpr(
+        subscriptExpr->baseExpression,
+        CheckBaseContext::Subscript,
+        needDeref);
 
     // If the base expression is a type, it means that this is an array declaration,
     // then we should disable short-circuit in case there is logical expression in
@@ -4070,16 +4073,17 @@ Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)
         if (auto pointerLikeType = as<PointerLikeType>(baseType))
         {
             elementType = QualType(pointerLikeType->getElementType());
+            elementType.isLeftValue = baseType.isLeftValue;
+            elementType.hasReadOnlyOnTarget = baseType.hasReadOnlyOnTarget;
+            elementType.isWriteOnly = baseType.isWriteOnly;
         }
         else if (auto ptrType = as<PtrType>(baseType))
         {
             elementType = QualType(ptrType->getValueType());
+            elementType.isLeftValue = true;
         }
         if (elementType.type)
         {
-            elementType.isLeftValue = baseType.isLeftValue;
-            elementType.hasReadOnlyOnTarget = baseType.hasReadOnlyOnTarget;
-            elementType.isWriteOnly = baseType.isWriteOnly;
             auto derefExpr = m_astBuilder->create<DerefExpr>();
             derefExpr->base = expr;
             derefExpr->type = elementType;
@@ -4840,10 +4844,21 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(Expr* baseExpr, bool&
     return baseExpr;
 }
 
-Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr, bool& outNeedDeref)
+Expr* SemanticsVisitor::checkBaseForMemberExpr(
+    Expr* inBaseExpr,
+    CheckBaseContext checkBaseContext,
+    bool& outNeedDeref)
 {
     auto baseExpr = inBaseExpr;
     baseExpr = CheckTerm(baseExpr);
+
+    // Do not insert implicit deref/open existential for Ptr.operator[].
+    if (checkBaseContext == CheckBaseContext::Subscript &&
+        as<PtrType>(unwrapModifiedType(baseExpr->type.type)))
+    {
+        outNeedDeref = false;
+        return baseExpr;
+    }
     return maybeInsertImplicitOpForMemberBase(baseExpr, outNeedDeref);
 }
 
@@ -4867,7 +4882,8 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
     bool needDeref = false;
-    expr->baseExpression = checkBaseForMemberExpr(expr->baseExpression, needDeref);
+    expr->baseExpression =
+        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, needDeref);
 
     if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
     {

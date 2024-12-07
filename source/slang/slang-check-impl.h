@@ -2696,7 +2696,15 @@ public:
 
     /// Perform checking operations required for the "base" expression of a member-reference like
     /// `base.someField`
-    Expr* checkBaseForMemberExpr(Expr* baseExpr, bool& outNeedDeref);
+    enum class CheckBaseContext
+    {
+        Member,
+        Subscript,
+    };
+    Expr* checkBaseForMemberExpr(
+        Expr* baseExpr,
+        CheckBaseContext checkBaseContext,
+        bool& outNeedDeref);
 
     /// Prepare baseExpr for use as the base of a member expr.
     /// This include inserting implicit open-existential operations as needed.

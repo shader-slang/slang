@@ -3105,6 +3105,17 @@ Type* unwrapArrayType(Type* type)
     }
 }
 
+Type* unwrapModifiedType(Type* type)
+{
+    for (;;)
+    {
+        if (auto modType = as<ModifiedType>(type))
+            type = modType->getBase();
+        else
+            return type;
+    }
+}
+
 void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)
 {
     if (auto extDecl = as<ExtensionDecl>(parent))
