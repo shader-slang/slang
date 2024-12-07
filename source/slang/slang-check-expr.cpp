@@ -2954,7 +2954,10 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         auto operatorName = getName("()");
 
         bool needDeref = false;
-        expr->functionExpr = maybeInsertImplicitOpForMemberBase(expr->functionExpr, needDeref);
+        expr->functionExpr = maybeInsertImplicitOpForMemberBase(
+            expr->functionExpr,
+            CheckBaseContext::Member,
+            needDeref);
 
         LookupResult lookupResult = lookUpMember(
             m_astBuilder,
@@ -4063,7 +4066,7 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     }
 }
 
-Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)
+Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBaseContext)
 {
     Expr* expr = inExpr;
     for (;;)
@@ -4079,6 +4082,8 @@ Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)
         }
         else if (auto ptrType = as<PtrType>(baseType))
         {
+            if (checkBaseContext == CheckBaseContext::Subscript)
+                return expr;
             elementType = QualType(ptrType->getValueType());
             elementType.isLeftValue = true;
         }
@@ -4761,7 +4766,7 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     expr->baseExpression = CheckTerm(expr->baseExpression);
 
     // Not sure this is needed -> but guess someone could do
-    expr->baseExpression = MaybeDereference(expr->baseExpression);
+    expr->baseExpression = maybeDereference(expr->baseExpression, CheckBaseContext::Member);
 
     // If the base of the member lookup has an interface type
     // *without* a suitable this-type substitution, then we are
@@ -4789,9 +4794,12 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     return expr;
 }
 
-Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(Expr* baseExpr, bool& outNeedDeref)
+Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
+    Expr* baseExpr,
+    CheckBaseContext checkBaseContext,
+    bool& outNeedDeref)
 {
-    auto derefExpr = MaybeDereference(baseExpr);
+    auto derefExpr = maybeDereference(baseExpr, checkBaseContext);
 
     if (derefExpr != baseExpr)
         outNeedDeref = true;
@@ -4852,14 +4860,7 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     auto baseExpr = inBaseExpr;
     baseExpr = CheckTerm(baseExpr);
 
-    // Do not insert implicit deref/open existential for Ptr.operator[].
-    if (checkBaseContext == CheckBaseContext::Subscript &&
-        as<PtrType>(unwrapModifiedType(baseExpr->type.type)))
-    {
-        outNeedDeref = false;
-        return baseExpr;
-    }
-    return maybeInsertImplicitOpForMemberBase(baseExpr, outNeedDeref);
+    return maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outNeedDeref);
 }
 
 Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)

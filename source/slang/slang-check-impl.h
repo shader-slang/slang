@@ -2654,8 +2654,6 @@ public:
     //
     //
 
-    Expr* MaybeDereference(Expr* inExpr);
-
     Expr* CheckMatrixSwizzleExpr(
         MemberExpr* memberRefExpr,
         Type* baseElementType,
@@ -2706,9 +2704,14 @@ public:
         CheckBaseContext checkBaseContext,
         bool& outNeedDeref);
 
+    Expr* maybeDereference(Expr* inExpr, CheckBaseContext checkBaseContext);
+
     /// Prepare baseExpr for use as the base of a member expr.
     /// This include inserting implicit open-existential operations as needed.
-    Expr* maybeInsertImplicitOpForMemberBase(Expr* baseExpr, bool& outNeedDeref);
+    Expr* maybeInsertImplicitOpForMemberBase(
+        Expr* baseExpr,
+        CheckBaseContext checkBaseContext,
+        bool& outNeedDeref);
 
     Expr* lookupMemberResultFailure(
         DeclRefExpr* expr,
