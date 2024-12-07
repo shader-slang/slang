@@ -11384,6 +11384,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
+        // We don't allow recursive types.
+        checkForRecursiveTypes(module, compileRequest->getSink());
+
+        if (compileRequest->getSink()->getErrorCount() != 0)
+            return module;
+
         // Propagate `constexpr`-ness through the dataflow graph (and the
         // call graph) based on constraints imposed by different instructions.
         propagateConstExpr(module, compileRequest->getSink());
@@ -11395,10 +11401,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // instructions remain.
 
         checkForMissingReturns(module, compileRequest->getSink());
-
-        // We don't allow recursive types.
-        checkForRecursiveTypes(module, compileRequest->getSink());
-
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 
