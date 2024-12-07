@@ -52,6 +52,13 @@ generator(
     compiler-core
     slang-cpp-parser
 )
+generator(
+    slang-binding-generator
+    USE_FEWER_WARNINGS
+    LINK_WITH_PRIVATE
+    compiler-core
+    slang-cpp-parser
+)
 generator(slang-embed)
 generator(slang-generate USE_FEWER_WARNINGS)
 generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
