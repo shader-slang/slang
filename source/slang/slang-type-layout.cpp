@@ -4763,7 +4763,16 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         ptrLayout->addResourceUsage(info.kind, info.size);
 
-        const auto valueTypeLayout = _createTypeLayout(context, ptrType->getValueType());
+        TypeLayoutResult valueTypeLayout;
+        if (context.rules != &kScalarLayoutRulesImpl_)
+        {
+            valueTypeLayout =
+                _createTypeLayout(context.with(&kScalarLayoutRulesImpl_), ptrType->getValueType());
+        }
+        else
+        {
+            valueTypeLayout = _createTypeLayout(context, ptrType->getValueType());
+        }
 
         ptrLayout->valueTypeLayout = valueTypeLayout.layout;
 
