@@ -4766,8 +4766,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         TypeLayoutResult valueTypeLayout;
         if (context.rules != &kScalarLayoutRulesImpl_)
         {
-            valueTypeLayout =
-                _createTypeLayout(context.with(&kScalarLayoutRulesImpl_), ptrType->getValueType());
+            auto subContext = context.with(&kScalarLayoutRulesImpl_);
+            valueTypeLayout = _createTypeLayout(subContext, ptrType->getValueType());
         }
         else
         {
