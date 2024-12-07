@@ -5796,6 +5796,9 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     else if (as<TypeDefDecl>(decl))
     {
     }
+    else if (as<UsingDecl>(decl))
+    {
+    }
     else
     {
         sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
