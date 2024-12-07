@@ -4066,13 +4066,20 @@ Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)
     for (;;)
     {
         auto baseType = expr->type;
+        QualType elementType;
         if (auto pointerLikeType = as<PointerLikeType>(baseType))
         {
-            auto elementType = QualType(pointerLikeType->getElementType());
+            elementType = QualType(pointerLikeType->getElementType());
+        }
+        else if (auto ptrType = as<PtrType>(baseType))
+        {
+            elementType = QualType(ptrType->getValueType());
+        }
+        if (elementType.type)
+        {
             elementType.isLeftValue = baseType.isLeftValue;
             elementType.hasReadOnlyOnTarget = baseType.hasReadOnlyOnTarget;
             elementType.isWriteOnly = baseType.isWriteOnly;
-
             auto derefExpr = m_astBuilder->create<DerefExpr>();
             derefExpr->base = expr;
             derefExpr->type = elementType;
@@ -4080,7 +4087,6 @@ Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)
             expr = derefExpr;
             continue;
         }
-
         // Default case: just use the expression as-is
         return expr;
     }

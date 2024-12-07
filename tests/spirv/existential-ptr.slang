@@ -1,8 +1,8 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -target spirv -emit-spirv-directly -output-using-type
-//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -target wgpu
-//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -target d3d12
-//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -target d3d11
-//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -target metal
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly -output-using-type
+//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12
+//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d11
+//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal
 
 interface IFoo
 {
@@ -27,7 +27,7 @@ struct Bar : IFoo
 uniform IFoo* pFoo;
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4);
-RWStructuredBuffer<int> outputBuffer;
+RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1,1,1)]
 void computeMain()
