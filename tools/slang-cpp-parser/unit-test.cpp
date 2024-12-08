@@ -91,16 +91,6 @@ static const char someSource[] = "class ISomeInterface\n"
 
         Parser parser(&tree, &state.m_sink);
 
-
-        {
-            const Node::Kind enableKinds[] = {
-                Node::Kind::Enum,
-                Node::Kind::EnumClass,
-                Node::Kind::EnumCase,
-                Node::Kind::TypeDef};
-            parser.setKindsEnabled(enableKinds, SLANG_COUNT_OF(enableKinds));
-        }
-
         SlangResult res = parser.parse(sourceOrigin, &state.m_options);
 
         if (state.m_sink.outputBuffer.getLength())
