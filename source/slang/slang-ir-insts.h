@@ -3894,7 +3894,7 @@ public:
     IRInst* emitGlobalValueRef(IRInst* globalInst);
 
     IRInst* emitBitfieldExtract(IRType* type, IRInst* op0, IRInst* op1, IRInst* op2);
-    
+
     IRInst* emitBitfieldInsert(IRType* type, IRInst* op0, IRInst* op1, IRInst* op2, IRInst* op3);
 
     IRInst* emitPackAnyValue(IRType* type, IRInst* value);

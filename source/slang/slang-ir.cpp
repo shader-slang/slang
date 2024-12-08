@@ -1938,29 +1938,30 @@ static T* createInst(IRBuilder* builder, IROp op, IRType* type, IRInst* arg1, IR
 }
 
 template<typename T>
-static T* createInst(IRBuilder* builder, IROp op, IRType* type, IRInst* arg1, IRInst* arg2, IRInst* arg3)
+static T* createInst(
+    IRBuilder* builder,
+    IROp op,
+    IRType* type,
+    IRInst* arg1,
+    IRInst* arg2,
+    IRInst* arg3)
 {
     IRInst* args[] = {arg1, arg2, arg3};
     return createInstImpl<T>(builder, op, type, 3, &args[0]);
 }
-  
+
 template<typename T>
 static T* createInst(
     IRBuilder* builder,
-    IROp            op,
+    IROp op,
     IRType* type,
     IRInst* arg1,
     IRInst* arg2,
     IRInst* arg3,
     IRInst* arg4)
 {
-    IRInst* args[] = { arg1, arg2, arg3, arg4 };
-    return createInstImpl<T>(
-        builder,
-        op,
-        type,
-        4,
-        &args[0]);
+    IRInst* args[] = {arg1, arg2, arg3, arg4};
+    return createInstImpl<T>(builder, op, type, 4, &args[0]);
 }
 
 template<typename T>
@@ -3637,7 +3638,7 @@ IRInst* IRBuilder::emitLookupInterfaceMethodInst(
 
 IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
 {
-    auto inst = createInst<IRAlloca>(this, kIROp_GetSequentialID, getUIntType(), rttiObj); 
+    auto inst = createInst<IRAlloca>(this, kIROp_GetSequentialID, getUIntType(), rttiObj);
     addInst(inst);
     return inst;
 }
@@ -3649,7 +3650,12 @@ IRInst* IRBuilder::emitBitfieldExtract(IRType* type, IRInst* value, IRInst* offs
     return inst;
 }
 
-IRInst* IRBuilder::emitBitfieldInsert(IRType* type, IRInst* base, IRInst* insert, IRInst* offset, IRInst* bits)
+IRInst* IRBuilder::emitBitfieldInsert(
+    IRType* type,
+    IRInst* base,
+    IRInst* insert,
+    IRInst* offset,
+    IRInst* bits)
 {
     auto inst = createInst<IRInst>(this, kIROp_BitfieldInsert, type, base, insert, offset, bits);
     addInst(inst);

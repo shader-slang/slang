@@ -615,7 +615,7 @@ protected:
         SLANG_UNUSED(baseName);
     }
 
-    bool tryGetIntInfo(IRType* elementType, bool &isSigned, int &bitWidth);
+    bool tryGetIntInfo(IRType* elementType, bool& isSigned, int& bitWidth);
     void emitVecNOrScalar(IRVectorType* vectorType, std::function<void()> func);
     virtual void emitBitfieldExtractImpl(IRInst* inst);
     virtual void emitBitfieldInsertImpl(IRInst* inst);

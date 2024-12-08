@@ -919,7 +919,8 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
 void MetalSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    // NM: Passing count here, as Metal 64-bit vector type names do not match their scalar equivalents.
+    // NM: Passing count here, as Metal 64-bit vector type names do not match their scalar
+    // equivalents.
     emitSimpleTypeKnowingCount(elementType, elementCount);
 
     switch (elementType->getOp())
@@ -1042,10 +1043,10 @@ void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 
 void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue elementCount)
 {
-    // NM: note, "ulong/ushort" is only type that works for i16/i64 vec, but can't be used for scalars.
-    // (See metal specification pg 26)
+    // NM: note, "ulong/ushort" is only type that works for i16/i64 vec, but can't be used for
+    // scalars. (See metal specification pg 26)
     
-  switch (type->getOp())
+    switch (type->getOp())
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
@@ -1063,7 +1064,7 @@ void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue
     case kIROp_Int64Type:
         m_writer->emit("long");
         return;
-    case kIROp_UInt64Type:        
+    case kIROp_UInt64Type:
         if (elementCount > 1) 
             m_writer->emit("ulong");
         else
@@ -1073,7 +1074,7 @@ void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue
         m_writer->emit("short");
         return;
     case kIROp_UInt16Type:
-        if (elementCount > 1) 
+        if (elementCount > 1)
             m_writer->emit("ushort");
         else
             m_writer->emit("uint16_t");
@@ -1082,7 +1083,7 @@ void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue
         m_writer->emit("long");
         return;
     case kIROp_UIntPtrType:
-        if (elementCount > 1) 
+        if (elementCount > 1)
             m_writer->emit("ulong");
         else
             m_writer->emit("uint64_t");

@@ -6527,17 +6527,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto dataType = inst->getDataType();
         IRVectorType* vectorType = as<IRVectorType>(dataType);
         Slang::IRType* elementType = dataType;
-        if (vectorType) 
+        if (vectorType)
             elementType = vectorType->getElementType();
         
         const IntInfo i = getIntTypeInfo(elementType);
 
-        // NM: technically, using bitfield intrinsics for anything non-32-bit goes against 
-        // VK specification: VUID-StandaloneSpirv-Base-04781. However, it works on at least 
-        // NVIDIA HW. 
+        // NM: technically, using bitfield intrinsics for anything non-32-bit goes against
+        // VK specification: VUID-StandaloneSpirv-Base-04781. However, it works on at least
+        // NVIDIA HW.
         SpvOp opcode = i.isSigned ? SpvOpBitFieldSExtract : SpvOpBitFieldUExtract;
-        return emitInst(parent, inst, opcode, inst->getFullType(), kResultID, 
-                    inst->getOperand(0), inst->getOperand(1), inst->getOperand(2));
+        return emitInst(
+            parent,
+            inst,
+            opcode,
+            inst->getFullType(),
+            kResultID,
+            inst->getOperand(0),
+            inst->getOperand(1),
+            inst->getOperand(2));
     }
 
     SpvInst* emitBitfieldInsert(SpvInstParent* parent, IRInst* inst)
@@ -6545,20 +6552,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto dataType = inst->getDataType();
         IRVectorType* vectorType = as<IRVectorType>(dataType);
         Slang::IRType* elementType = dataType;
-        if (vectorType) 
+        if (vectorType)
             elementType = vectorType->getElementType();
         
         const IntInfo i = getIntTypeInfo(elementType);
 
-        if (i.width == 64) 
+        if (i.width == 64)
             requireSPIRVCapability(SpvCapabilityInt64);
         if (i.width == 16)
             requireSPIRVCapability(SpvCapabilityInt16);
         if (i.width == 8)
             requireSPIRVCapability(SpvCapabilityInt8);
 
-        return emitInst(parent, inst, SpvOpBitFieldInsert, inst->getFullType(), kResultID, 
-                inst->getOperand(0), inst->getOperand(1), inst->getOperand(2), inst->getOperand(3));
+        return emitInst(
+            parent,
+            inst,
+            SpvOpBitFieldInsert,
+            inst->getFullType(),
+            kResultID,
+            inst->getOperand(0),
+            inst->getOperand(1),
+            inst->getOperand(2),
+            inst->getOperand(3));
     }
 
     template<typename T, typename Ts>
