@@ -693,6 +693,27 @@ class UncheckedAttribute : public AttributeBase
     Scope* scope = nullptr;
 };
 
+class UncheckedGLSLLayoutAttribute : public AttributeBase
+{
+    SLANG_AST_CLASS(UncheckedGLSLLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLBindingLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLBindingLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLOffsetLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLOffsetLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
 // A `[name(arg0, ...)]` style attribute that has been validated.
 class Attribute : public AttributeBase
 {
@@ -852,6 +873,14 @@ class GLSLOffsetLayoutAttribute : public Attribute
     SLANG_AST_CLASS(GLSLOffsetLayoutAttribute)
 
     int64_t offset;
+};
+
+// Implicitly added offset qualifier when no offset is specified.
+class GLSLImplicitOffsetLayoutAttribute : public AttributeBase
+{
+    SLANG_AST_CLASS(GLSLImplicitOffsetLayoutAttribute)
+
+    SLANG_UNREFLECTED
 };
 
 class GLSLSimpleIntegerLayoutAttribute : public Attribute
