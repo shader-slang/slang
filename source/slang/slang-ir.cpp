@@ -3656,17 +3656,6 @@ IRInst* IRBuilder::emitBitfieldInsert(IRType* type, IRInst* base, IRInst* insert
     return inst;
 }
 
-IRInst* IRBuilder::emitPackAnyValue(IRType* type, IRInst* value)
-{
-    auto inst = createInst<IRPackAnyValue>(
-        this,
-        kIROp_PackAnyValue,
-        type,
-        value);
-    addInst(inst);
-    return inst;
-}
-
 IRInst* IRBuilder::emitAlloca(IRInst* type, IRInst* rttiObjPtr)
 {
     auto inst = createInst<IRAlloca>(this, kIROp_Alloca, (IRType*)type, rttiObjPtr);
