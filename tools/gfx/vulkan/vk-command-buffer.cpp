@@ -24,10 +24,15 @@ ICommandBuffer* CommandBufferImpl::getInterface(const Guid& guid)
     return nullptr;
 }
 
-void CommandBufferImpl::comFree() { m_transientHeap.breakStrongReference(); }
+void CommandBufferImpl::comFree()
+{
+    m_transientHeap.breakStrongReference();
+}
 
 Result CommandBufferImpl::init(
-    DeviceImpl* renderer, VkCommandPool pool, TransientResourceHeapImpl* transientHeap)
+    DeviceImpl* renderer,
+    VkCommandPool pool,
+    TransientResourceHeapImpl* transientHeap)
 {
     m_renderer = renderer;
     m_transientHeap = transientHeap;
@@ -89,7 +94,9 @@ VkCommandBuffer CommandBufferImpl::getPreCommandBuffer()
 }
 
 void CommandBufferImpl::encodeRenderCommands(
-    IRenderPassLayout* renderPass, IFramebuffer* framebuffer, IRenderCommandEncoder** outEncoder)
+    IRenderPassLayout* renderPass,
+    IFramebuffer* framebuffer,
+    IRenderCommandEncoder** outEncoder)
 {
     if (!m_renderCommandEncoder)
     {

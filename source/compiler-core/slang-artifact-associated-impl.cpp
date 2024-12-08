@@ -1,30 +1,28 @@
 // slang-artifact-associated-impl.cpp
 #include "slang-artifact-associated-impl.h"
 
-#include "../core/slang-file-system.h"
-
-#include "../core/slang-type-text-util.h"
-#include "../core/slang-io.h"
 #include "../core/slang-array-view.h"
-
 #include "../core/slang-char-util.h"
-
+#include "../core/slang-file-system.h"
+#include "../core/slang-io.h"
+#include "../core/slang-type-text-util.h"
 #include "slang-artifact-diagnostic-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnostics !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-ArtifactDiagnostics::ArtifactDiagnostics(const ThisType& rhs):
-    ComBaseObject(),
-    m_result(rhs.m_result),
-    m_diagnostics(rhs.m_diagnostics),
-    m_raw(rhs.m_raw.getLength() + 1)
+ArtifactDiagnostics::ArtifactDiagnostics(const ThisType& rhs)
+    : ComBaseObject()
+    , m_result(rhs.m_result)
+    , m_diagnostics(rhs.m_diagnostics)
+    , m_raw(rhs.m_raw.getLength() + 1)
 {
     // We need to be careful with raw, we want a new *copy* not a non atomic ref counting
     // In initialization we should have enough space
     m_raw.append(rhs.m_raw.getUnownedSlice());
-    
+
     // Reallocate all the strings
     for (auto& diagnostic : m_diagnostics)
     {
@@ -41,17 +39,15 @@ void* ArtifactDiagnostics::clone(const Guid& guid)
     {
         return ptr;
     }
-    // If the cast fails, we delete the item. 
+    // If the cast fails, we delete the item.
     delete copy;
     return nullptr;
 }
 
 void* ArtifactDiagnostics::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
-        guid == IClonable::getTypeGuid() ||
-        guid == IArtifactDiagnostics::getTypeGuid())
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
+        guid == IClonable::getTypeGuid() || guid == IArtifactDiagnostics::getTypeGuid())
     {
         return static_cast<IArtifactDiagnostics*>(this);
     }
@@ -108,7 +104,7 @@ void ArtifactDiagnostics::appendRaw(const CharSlice& slice)
     m_raw << asStringSlice(slice);
 }
 
-Count ArtifactDiagnostics::getCountAtLeastSeverity(Diagnostic::Severity severity) 
+Count ArtifactDiagnostics::getCountAtLeastSeverity(Diagnostic::Severity severity)
 {
     Index count = 0;
     for (const auto& msg : m_diagnostics)
@@ -140,7 +136,9 @@ bool ArtifactDiagnostics::hasOfAtLeastSeverity(Diagnostic::Severity severity)
     return false;
 }
 
-Count ArtifactDiagnostics::getCountByStage(Diagnostic::Stage stage, Count outCounts[Int(Diagnostic::Severity::CountOf)])
+Count ArtifactDiagnostics::getCountByStage(
+    Diagnostic::Stage stage,
+    Count outCounts[Int(Diagnostic::Severity::CountOf)])
 {
     Int count = 0;
     ::memset(outCounts, 0, sizeof(Index) * Int(Diagnostic::Severity::CountOf));
@@ -174,7 +172,7 @@ void ArtifactDiagnostics::maybeAddNote(const CharSlice& in)
     ArtifactDiagnosticUtil::maybeAddNote(asStringSlice(in), this);
 }
 
-void ArtifactDiagnostics::requireErrorDiagnostic() 
+void ArtifactDiagnostics::requireErrorDiagnostic()
 {
     // If we find an error, we don't need to add a generic diagnostic
     for (const auto& msg : m_diagnostics)
@@ -193,19 +191,25 @@ void ArtifactDiagnostics::requireErrorDiagnostic()
     m_diagnostics.add(diagnostic);
 }
 
-/* static */UnownedStringSlice _getSeverityText(ArtifactDiagnostic::Severity severity)
+/* static */ UnownedStringSlice _getSeverityText(ArtifactDiagnostic::Severity severity)
 {
     typedef ArtifactDiagnostic::Severity Severity;
     switch (severity)
     {
-        default:                return UnownedStringSlice::fromLiteral("Unknown");
-        case Severity::Info:    return UnownedStringSlice::fromLiteral("Info");
-        case Severity::Warning: return UnownedStringSlice::fromLiteral("Warning");
-        case Severity::Error:   return UnownedStringSlice::fromLiteral("Error");
+    default:
+        return UnownedStringSlice::fromLiteral("Unknown");
+    case Severity::Info:
+        return UnownedStringSlice::fromLiteral("Info");
+    case Severity::Warning:
+        return UnownedStringSlice::fromLiteral("Warning");
+    case Severity::Error:
+        return UnownedStringSlice::fromLiteral("Error");
     }
 }
 
-static void _appendCounts(const Index counts[Int(ArtifactDiagnostic::Severity::CountOf)], StringBuilder& out)
+static void _appendCounts(
+    const Index counts[Int(ArtifactDiagnostic::Severity::CountOf)],
+    StringBuilder& out)
 {
     typedef ArtifactDiagnostic::Severity Severity;
 
@@ -218,7 +222,9 @@ static void _appendCounts(const Index counts[Int(ArtifactDiagnostic::Severity::C
     }
 }
 
-static void _appendSimplified(const Index counts[Int(ArtifactDiagnostic::Severity::CountOf)], StringBuilder& out)
+static void _appendSimplified(
+    const Index counts[Int(ArtifactDiagnostic::Severity::CountOf)],
+    StringBuilder& out)
 {
     typedef ArtifactDiagnostic::Severity Severity;
     for (Index i = 0; i < Int(Severity::CountOf); i++)
@@ -276,8 +282,7 @@ void ArtifactDiagnostics::calcSimplifiedSummary(ISlangBlob** outBlob)
 
 void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
         guid == IArtifactPostEmitMetadata::getTypeGuid())
     {
         return static_cast<IArtifactPostEmitMetadata*>(this);
@@ -304,13 +309,35 @@ void* ArtifactPostEmitMetadata::castAs(const Guid& guid)
 }
 
 Slice<ShaderBindingRange> ArtifactPostEmitMetadata::getUsedBindingRanges()
-{ 
-    return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount()); 
+{
+    return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount());
 }
 
 Slice<String> ArtifactPostEmitMetadata::getExportedFunctionMangledNames()
 {
-    return Slice<String>(m_exportedFunctionMangledNames.getBuffer(), m_exportedFunctionMangledNames.getCount());
+    return Slice<String>(
+        m_exportedFunctionMangledNames.getBuffer(),
+        m_exportedFunctionMangledNames.getCount());
 }
+
+SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
+    SlangParameterCategory category,
+    SlangUInt spaceIndex,
+    SlangUInt registerIndex,
+    bool& outUsed)
+{
+    for (const auto& range : getUsedBindingRanges())
+    {
+        if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
+        {
+            outUsed = true;
+            return SLANG_OK;
+        }
+    }
+
+    outUsed = false;
+    return SLANG_OK;
+}
+
 
 } // namespace Slang

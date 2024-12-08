@@ -3,35 +3,35 @@
 // Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
-
-#include "../core/slang-string-util.h"
-#include "../core/slang-char-util.h"
-
-#include "../core/slang-string-escape-util.h"
-
 #include "../core/slang-blob.h"
+#include "../core/slang-char-util.h"
 #include "../core/slang-io.h"
+#include "../core/slang-string-escape-util.h"
+#include "../core/slang-string-util.h"
 
 namespace Slang
 {
 
-namespace { // anonymous
+namespace
+{ // anonymous
 typedef SourceEmbedUtil::Style Style;
-} // anonymous
+} // namespace
 
-static const NamesDescriptionValue kSourceEmbedStyleInfos[] =
-{
-    { ValueInt(Style::None),         "none",     "No source level embedding" },
-    { ValueInt(Style::Default),      "default",  "The default embedding for the type to be embedded"},
-    { ValueInt(Style::Text),         "text",     "Embed as text. May change line endings. If output isn't text will use 'default'. Size will *not* contain terminating 0." },
-    { ValueInt(Style::BinaryText),   "binary-text", "Embed as text assuming contents is binary. "},
-    { ValueInt(Style::U8),           "u8",       "Embed as unsigned bytes."},
-    { ValueInt(Style::U16),          "u16",      "Embed as uint16_t."},
-    { ValueInt(Style::U32),          "u32",      "Embed as uint32_t."},
-    { ValueInt(Style::U64),          "u64",      "Embed as uint64_t."},
+static const NamesDescriptionValue kSourceEmbedStyleInfos[] = {
+    {ValueInt(Style::None), "none", "No source level embedding"},
+    {ValueInt(Style::Default), "default", "The default embedding for the type to be embedded"},
+    {ValueInt(Style::Text),
+     "text",
+     "Embed as text. May change line endings. If output isn't text will use 'default'. Size will "
+     "*not* contain terminating 0."},
+    {ValueInt(Style::BinaryText), "binary-text", "Embed as text assuming contents is binary. "},
+    {ValueInt(Style::U8), "u8", "Embed as unsigned bytes."},
+    {ValueInt(Style::U16), "u16", "Embed as uint16_t."},
+    {ValueInt(Style::U32), "u32", "Embed as uint32_t."},
+    {ValueInt(Style::U64), "u64", "Embed as uint64_t."},
 };
 
-/* static */ConstArrayView<NamesDescriptionValue> SourceEmbedUtil::getStyleInfos()
+/* static */ ConstArrayView<NamesDescriptionValue> SourceEmbedUtil::getStyleInfos()
 {
     return makeConstArrayView(kSourceEmbedStyleInfos);
 }
@@ -44,14 +44,11 @@ static const NamesDescriptionValue kSourceEmbedStyleInfos[] =
 static bool _isHeaderExtension(const UnownedStringSlice& in)
 {
     // Some "typical" header extensions
-    return in == toSlice("h") ||
-        in == toSlice("hpp") ||
-        in == toSlice("hxx") ||
-        in == toSlice("h++") ||
-        in == toSlice("hh");
+    return in == toSlice("h") || in == toSlice("hpp") || in == toSlice("hxx") ||
+           in == toSlice("h++") || in == toSlice("hh");
 }
 
-/* static */String SourceEmbedUtil::getPath(const String& path, const Options& options)
+/* static */ String SourceEmbedUtil::getPath(const String& path, const Options& options)
 {
     if (!isSupported(options.language))
     {
@@ -73,10 +70,10 @@ static bool _isHeaderExtension(const UnownedStringSlice& in)
     // Assume it's a header, and just use the .h extension
     StringBuilder buf;
     buf << path << toSlice(".h");
-    return std::move(buf);
+    return buf;
 }
 
-/* static */SourceEmbedUtil::Style SourceEmbedUtil::getDefaultStyle(const ArtifactDesc& desc)
+/* static */ SourceEmbedUtil::Style SourceEmbedUtil::getDefaultStyle(const ArtifactDesc& desc)
 {
     if (ArtifactDescUtil::isText(desc))
     {
@@ -97,7 +94,7 @@ static bool _isHeaderExtension(const UnownedStringSlice& in)
     return Style::U8;
 }
 
-// True if we need to copy into a buffer. Necessary if there is an alignement 
+// True if we need to copy into a buffer. Necessary if there is an alignement
 // issue or if there is a partial entry
 static bool _needsCopy(const uint8_t* cur, Count bytesPerElement, Count bytesPerLine)
 {
@@ -105,8 +102,13 @@ static bool _needsCopy(const uint8_t* cur, Count bytesPerElement, Count bytesPer
 }
 
 // NOTE! Assumes T is an unsigned type. Behavior will be incorrect if it is not.
-template <typename T>
-static void _appendHex(const T* in, ArrayView<char> elementWork, char* dst, size_t bytesForLine, StringBuilder& out)
+template<typename T>
+static void _appendHex(
+    const T* in,
+    ArrayView<char> elementWork,
+    char* dst,
+    size_t bytesForLine,
+    StringBuilder& out)
 {
     // Check that T is unsigned
     SLANG_COMPILE_TIME_ASSERT((T(~T(0))) > T(0));
@@ -138,10 +140,13 @@ static void _appendHex(const T* in, ArrayView<char> elementWork, char* dst, size
     }
 }
 
-static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayView<uint8_t> data, StringBuilder& buf)
+static SlangResult _append(
+    const SourceEmbedUtil::Options& options,
+    ConstArrayView<uint8_t> data,
+    StringBuilder& buf)
 {
     const uint8_t* cur = data.begin();
-    
+
     const auto prefix = toSlice("0x");
     const auto suffix = toSlice(", ");
     UnownedStringSlice literalSuffix;
@@ -152,42 +157,43 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
 
     switch (options.style)
     {
-        case Style::U8:
+    case Style::U8:
         {
             elementType = toSlice("unsigned char");
             bytesPerElement = 1;
             break;
         }
-        case Style::U16:
+    case Style::U16:
         {
             elementType = toSlice("uint16_t");
             bytesPerElement = 2;
             break;
         }
-        case Style::U32:
+    case Style::U32:
         {
             elementType = toSlice("uint32_t");
             bytesPerElement = 4;
             break;
         }
-        case Style::U64:
+    case Style::U64:
         {
             elementType = toSlice("uint64_t");
             bytesPerElement = 8;
-            // On testing on GCC/CLANG/Recent VS, there is no warning/error without suffix, so 
+            // On testing on GCC/CLANG/Recent VS, there is no warning/error without suffix, so
             // will leave off for now.
             // literalSuffix = toSlice("ULL");
             break;
         }
-        default: return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     // Output the variable
 
     buf << "const " << elementType << " " << options.variableName << "[] = \n";
     buf << "{\n";
-    
-    // Work out the element work 
+
+    // Work out the element work
     char work[80];
     Count elementSizeInChars;
     {
@@ -227,7 +233,7 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
         // We copy if we want alignment of if we hit a partial at the end
         if (_needsCopy(lineBytes, bytesPerElement, bytesForLine))
         {
-            // Make sure the last element is zeroed, before copying 
+            // Make sure the last element is zeroed, before copying
             // Needed if the last element is partial.
             alignedElements[Index(bytesForLine / sizeof(uint64_t))] = 0;
 
@@ -242,10 +248,18 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
 
         switch (bytesPerElement)
         {
-            case 1: _appendHex<uint8_t>(lineBytes, workView, dstChars, bytesForLine, buf); break;
-            case 2: _appendHex<uint16_t>((const uint16_t*)lineBytes, workView, dstChars, bytesForLine, buf); break;
-            case 4: _appendHex<uint32_t>((const uint32_t*)lineBytes, workView, dstChars, bytesForLine, buf); break;
-            case 8: _appendHex<uint64_t>((const uint64_t*)lineBytes, workView, dstChars, bytesForLine, buf); break;
+        case 1:
+            _appendHex<uint8_t>(lineBytes, workView, dstChars, bytesForLine, buf);
+            break;
+        case 2:
+            _appendHex<uint16_t>((const uint16_t*)lineBytes, workView, dstChars, bytesForLine, buf);
+            break;
+        case 4:
+            _appendHex<uint32_t>((const uint32_t*)lineBytes, workView, dstChars, bytesForLine, buf);
+            break;
+        case 8:
+            _appendHex<uint64_t>((const uint64_t*)lineBytes, workView, dstChars, bytesForLine, buf);
+            break;
         }
 
         buf << "\n";
@@ -256,7 +270,10 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
     return SLANG_OK;
 }
 
-/* static */SlangResult SourceEmbedUtil::createEmbedded(IArtifact* artifact, const Options& inOptions, ComPtr<IArtifact>& outArtifact)
+/* static */ SlangResult SourceEmbedUtil::createEmbedded(
+    IArtifact* artifact,
+    const Options& inOptions,
+    ComPtr<IArtifact>& outArtifact)
 {
     if (!isSupported(inOptions.language))
     {
@@ -270,10 +287,9 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
 
     Options options(inOptions);
 
-    // If the style is text, but the artifact *isn't* a text type, we'll 
+    // If the style is text, but the artifact *isn't* a text type, we'll
     // use 'default' for the type
-    if (options.style == Style::Text && 
-        !ArtifactDescUtil::isText(desc))
+    if (options.style == Style::Text && !ArtifactDescUtil::isText(desc))
     {
         options.style = Style::Default;
     }
@@ -282,7 +298,7 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
     {
         options.style = getDefaultStyle(desc);
     }
-    
+
     // If there is no style there is nothing to do
     if (options.style == Style::None)
     {
@@ -299,10 +315,10 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
     ConstArrayView<uint8_t> data((const uint8_t*)blob->getBufferPointer(), blob->getBufferSize());
 
     size_t totalSizeInBytes = data.getCount();
-    
+
     switch (options.style)
     {
-        case Style::Text:
+    case Style::Text:
         {
             totalSizeInBytes = 0;
 
@@ -321,8 +337,8 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
 
                 handler->appendEscaped(line, buf);
 
-                // Work out the total size, taking into account we may encode line endings and \0 differently
-                // The +1 is for \n
+                // Work out the total size, taking into account we may encode line endings and \0
+                // differently The +1 is for \n
                 totalSizeInBytes += line.getLength() + 1;
 
                 buf << "\\n\"\n";
@@ -331,7 +347,7 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
             buf << ";\n";
             break;
         }
-        case Style::BinaryText:
+    case Style::BinaryText:
         {
             auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
 
@@ -340,10 +356,10 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
             // We could encode everything and then split
             // but if we do that we probably want to not split across an escaped character,
             // although that may be handled correctly.
-            
+
             // The other way to this is incrementally, so that's what we will do here
             UnownedStringSlice text((const char*)data.begin(), data.getCount());
-            
+
             auto cur = text.begin();
             auto end = text.end();
 
@@ -358,8 +374,7 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
                 {
                     handler->appendEscaped(UnownedStringSlice(cur, 1), buf);
                     cur++;
-                }
-                while (buf.getLength() - startOffset < options.lineLength - 1);
+                } while (buf.getLength() - startOffset < options.lineLength - 1);
 
                 buf << "\"\n";
             }
@@ -367,24 +382,26 @@ static SlangResult _append(const SourceEmbedUtil::Options& options, ConstArrayVi
             buf << ";\n";
             break;
         }
-        case Style::U8:
-        case Style::U16:
-        case Style::U32:
-        case Style::U64:
+    case Style::U8:
+    case Style::U16:
+    case Style::U32:
+    case Style::U64:
         {
             SLANG_RETURN_ON_FAIL(_append(options, data, buf));
             break;
         }
-        default: 
+    default:
         {
             return SLANG_E_NOT_IMPLEMENTED;
         }
     }
 
-    buf << "const size_t " << options.variableName << "_sizeInBytes = " << uint64_t(totalSizeInBytes) << ";\n\n"; 
+    buf << "const size_t " << options.variableName
+        << "_sizeInBytes = " << uint64_t(totalSizeInBytes) << ";\n\n";
 
     // Make into an artifact
-    ArtifactPayload payload = options.language == SLANG_SOURCE_LANGUAGE_C ? ArtifactPayload::C : ArtifactPayload::Cpp;
+    ArtifactPayload payload =
+        options.language == SLANG_SOURCE_LANGUAGE_C ? ArtifactPayload::C : ArtifactPayload::Cpp;
     auto dstDesc = ArtifactDesc::make(ArtifactKind::Source, payload);
 
     auto dstArtifact = ArtifactUtil::createArtifact(dstDesc);

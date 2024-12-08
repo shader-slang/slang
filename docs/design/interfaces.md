@@ -13,7 +13,7 @@ Introduction
 The basic problem here is not unique to shader programming: you want to write code that accomplished one task, while abstracting over how to accomplish another task.
 As an example, we might want to write code to integrate incident radiance over a list of lights, while not concerning ourself with how to evaluate a reflectance function at each of those lights.
 
-If we were doing this task on a CPU, and performance wasn't critical, we could probably handle this with higher-order functions or an equivalent mechansim like function pointers:
+If we were doing this task on a CPU, and performance wasn't critical, we could probably handle this with higher-order functions or an equivalent mechanism like function pointers:
 
     float4 integrateLighting(
     	Light[] lights,
@@ -38,8 +38,8 @@ Depending on the scenario, we might be able to generate statically specialized c
     	// ...
     }
 
-Current shading langauges support neither higher-order functions nor templates/generics, so neither of these options is viable.
-Instead practicioners typically use preprocessor techniques to either stich together the final code, or to substitute in different function/type definitions to make a definition like `integrateLighting` reusable.
+Current shading languages support neither higher-order functions nor templates/generics, so neither of these options is viable.
+Instead practitioners typically use preprocessor techniques to either stich together the final code, or to substitute in different function/type definitions to make a definition like `integrateLighting` reusable.
 
 These ad hoc approaches actually work well in practice; we aren't proposing to replace them *just* to make code abstractly "cleaner."
 Rather, we've found that the ad hoc approaches end up interacting poorly with the resource binding model in modern APIs, so that *something* less ad hoc is required to achieve our performance goals.
@@ -48,7 +48,7 @@ At that point, we might as well ensure that the mechanism we introduce is also a
 Overview
 --------
 
-The baisc idea for our approach is as follows:
+The basic idea for our approach is as follows:
 
 - Start with the general *semantics* of a generic-based ("template") approach
 
@@ -63,7 +63,7 @@ Interfaces
 ----------
 
 An **interface** in Slang is akin to a `protocol` in Swift or a `trait` in Rust.
-The choice of the `interface` keyword is to hilight the overlap with the conceptually similar construct that appeared in Cg, and then later in HLSL.
+The choice of the `interface` keyword is to highlight the overlap with the conceptually similar construct that appeared in Cg, and then later in HLSL.
 
 ### Declaring an interface
 
@@ -163,7 +163,7 @@ That is intentional, because at the most basic level, interfaces are designed to
 
 ### Generic Declarations
 
-The Slang compiler currently has some ad hoc support for generic declarations that it uses to implement the HLSL standard library (which has a few generic types).
+The Slang compiler currently has some ad hoc support for generic declarations that it uses to implement the HLSL standard module (which has a few generic types).
 The syntax for those is currently very bad, and it makes sense to converge on the style for generic declarations used by C# and Swift:
 
     float myGenericFunc<T>(T someValue);
@@ -263,7 +263,7 @@ Then what should `BRDFParams` be? The two-parameter or six-parameter case?
 
 An **associated type** is a concept that solves exactly this problem.
 We don't care *what* the concrete type of `BRDFParams` is, so long as *every* implementation of `Material` has one.
-The exact `BRDFParams` type can be different for each implementation of `Material`; the type is *assocaited* with a particular implementation.
+The exact `BRDFParams` type can be different for each implementation of `Material`; the type is *associated* with a particular implementation.
 
 We will crib our syntax for this entirely from Swift, where it is verbose but explicit:
 
@@ -276,7 +276,7 @@ We will crib our syntax for this entirely from Swift, where it is verbose but ex
     	float3 evaluateBRDF(BRDFParams param, float3 wi, float3 wo);
     }
 
-In this example we've added an assocaited type requirement so that every implementation of `Material` must supply a type named `BRDFParams` as a member.
+In this example we've added an associated type requirement so that every implementation of `Material` must supply a type named `BRDFParams` as a member.
 We've also added a requirement that is a function to evaluate the BRDF given its parameters and incoming/outgoing directions.
 
 Using this declaration one can now define a generic function that works on any material:
@@ -300,7 +300,7 @@ Some quick notes:
 
 - The use of `associatedtype` (for associated types) and `typealias` (for `typedef`-like definitions) as distinct keywords in Swift was well motivated by their experience (they used to use `typealias` for both). I would avoid having the two cases be syntactically identical.
 
-- Swift has a pretty involved inference system where a type doesn't actually need to explicitly provide a type member with the chosen name. Instead, if you have a required method that takes or returns the assocaited type, then the compiler can infer what the type is by looking at the signature of the methods that meet other requirements. This is a complex and magical feature, and we shouldn't try to duplicate it.
+- Swift has a pretty involved inference system where a type doesn't actually need to explicitly provide a type member with the chosen name. Instead, if you have a required method that takes or returns the associated type, then the compiler can infer what the type is by looking at the signature of the methods that meet other requirements. This is a complex and magical feature, and we shouldn't try to duplicate it.
 
 - Both Rust and Swift call this an "associated type." They are related to "virtual types" in things like Scala (which are in turn related to virtual classes in beta/gbeta). There are similar ideas that arise in Haskell-like languages with type classes (IIRC, the term "functional dependencies" is relevant).
 
@@ -308,7 +308,7 @@ Some quick notes:
 
 I want to point out a few alternatives to the `Material` design above, just to show that associated types seem to be an elegant solution compared to the alternatives.
 
-First, note that we could break `Material` into two interfaces, so long as we are allowed to place type constraints on assocaited types:
+First, note that we could break `Material` into two interfaces, so long as we are allowed to place type constraints on associated types:
 
     interface BRDF
     {
@@ -412,7 +412,7 @@ can in principle be desugared into:
     }
 
 with particular loss in what can be expressed.
-The same desugaring appraoch should apply to global-scope functions that want to return an existential type (just with a global `typealias` instead of an `associatedtype`).
+The same desugaring approach should apply to global-scope functions that want to return an existential type (just with a global `typealias` instead of an `associatedtype`).
 
 
 It might be inconvenient for the user to have to explicitly write the type-level expression that yields the result type (consider cases where C++ template metaprogrammers would use `auto` as a result type), but there is really no added power.
@@ -434,12 +434,12 @@ The intent seems to be clear if we instead write:
 
 We could consider the latter to be sugar for the former, and allow users to write in familiar syntax akin to what ws already supported in Cg.
 
-We'd have to be careful with such sugar, though, because there is a real and menaingful difference between saying:
+We'd have to be careful with such sugar, though, because there is a real and meaningful difference between saying:
 
 - "`material` has type `Material` which is an interface type"
 - "`material` has type `M` where `M` implements `Material`"
 
-In particular, if we start to work with assocaited types:
+In particular, if we start to work with associated types:
 
     let b = material.evaluatePattern(...);
 

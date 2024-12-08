@@ -1,10 +1,10 @@
 #include "slang-http.h"
 
+#include "slang-process.h"
 #include "slang-string-util.h"
 
-#include "slang-process.h"
-
-namespace Slang {
+namespace Slang
+{
 
 static const UnownedStringSlice g_headerEnd = UnownedStringSlice::fromLiteral("\r\n\r\n");
 static const UnownedStringSlice g_contentLength = UnownedStringSlice::fromLiteral("Content-Length");
@@ -25,11 +25,11 @@ void HTTPHeader::reset()
     m_arena.deallocateAll();
 }
 
-/* static */SlangResult HTTPHeader::readHeaderText(BufferedReadStream* stream, Index& outEndIndex)
+/* static */ SlangResult HTTPHeader::readHeaderText(BufferedReadStream* stream, Index& outEndIndex)
 {
     // https://microsoft.github.io/language-server-protocol/specifications/specification-current/
 
-    while(true)
+    while (true)
     {
         SLANG_RETURN_ON_FAIL(stream->update());
 
@@ -49,9 +49,10 @@ void HTTPHeader::reset()
     }
 }
 
-/* static */Index HTTPHeader::findHeaderEnd(BufferedReadStream* stream)
+/* static */ Index HTTPHeader::findHeaderEnd(BufferedReadStream* stream)
 {
-    // This could be more efficient - it just searches until there are enough bytes to have termination
+    // This could be more efficient - it just searches until there are enough bytes to have
+    // termination
     auto bytes = stream->getView();
     UnownedStringSlice input((const char*)bytes.begin(), (const char*)bytes.end());
 
@@ -59,7 +60,7 @@ void HTTPHeader::reset()
     return (index >= 0) ? (index + g_headerEnd.getLength()) : index;
 }
 
-/* static */SlangResult HTTPHeader::parse(const UnownedStringSlice& inSlice, HTTPHeader& out)
+/* static */ SlangResult HTTPHeader::parse(const UnownedStringSlice& inSlice, HTTPHeader& out)
 {
     out.reset();
 
@@ -70,8 +71,11 @@ void HTTPHeader::reset()
         {
             slice = slice.head(slice.getLength() - g_headerEnd.getLength());
         }
-        // Allocate on on the arena, so when we reference other slices, they are part of this allocation.
-        out.m_header = UnownedStringSlice(out.m_arena.allocateString(slice.begin(), slice.getLength()), slice.getLength());
+        // Allocate on on the arena, so when we reference other slices, they are part of this
+        // allocation.
+        out.m_header = UnownedStringSlice(
+            out.m_arena.allocateString(slice.begin(), slice.getLength()),
+            slice.getLength());
     }
 
     // Okay, we need to split into lines, and then examine the contents
@@ -88,7 +92,7 @@ void HTTPHeader::reset()
         const UnownedStringSlice value = line.tail(index + 1).trim();
 
         // Add the pair
-        Pair pair{ key, value };
+        Pair pair{key, value};
 
         // We could check if key is already used. Some values can be repeated I believe.
         // So we just allow for now.
@@ -138,7 +142,7 @@ void HTTPHeader::reset()
     return SLANG_OK;
 }
 
-/* static */SlangResult HTTPHeader::read(BufferedReadStream* stream, HTTPHeader& out)
+/* static */ SlangResult HTTPHeader::read(BufferedReadStream* stream, HTTPHeader& out)
 {
     Index endIndex;
     SLANG_RETURN_ON_FAIL(readHeaderText(stream, endIndex));
@@ -167,8 +171,10 @@ void HTTPHeader::append(StringBuilder& out) const
 
         // https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
 
-        auto mimeType = m_mimeType.getLength() ? m_mimeType : UnownedStringSlice::fromLiteral("text/plain");
-        auto encoding = m_encoding.getLength() ? m_encoding : UnownedStringSlice::fromLiteral("UTF-8");
+        auto mimeType =
+            m_mimeType.getLength() ? m_mimeType : UnownedStringSlice::fromLiteral("text/plain");
+        auto encoding =
+            m_encoding.getLength() ? m_encoding : UnownedStringSlice::fromLiteral("UTF-8");
 
         out << mimeType << "; ";
         out << "charset=" << encoding;
@@ -195,11 +201,11 @@ void HTTPHeader::append(StringBuilder& out) const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HTTPPacketConnection !!!!!!!!!!!!!!!!!!!!!!! */
 
-HTTPPacketConnection::HTTPPacketConnection(BufferedReadStream* readStream, Stream* writeStream) :
-    m_readStream(readStream),
-    m_writeStream(writeStream),
-    m_readState(ReadState::Header),
-    m_readResult(SLANG_OK)
+HTTPPacketConnection::HTTPPacketConnection(BufferedReadStream* readStream, Stream* writeStream)
+    : m_readStream(readStream)
+    , m_writeStream(writeStream)
+    , m_readState(ReadState::Header)
+    , m_readResult(SLANG_OK)
 {
 }
 
@@ -241,11 +247,14 @@ SlangResult HTTPPacketConnection::update()
 {
     switch (m_readState)
     {
-        case ReadState::Closed: return SLANG_OK;
-        case ReadState::Error: return m_readResult;
-        default: break;
+    case ReadState::Closed:
+        return SLANG_OK;
+    case ReadState::Error:
+        return m_readResult;
+    default:
+        break;
     }
-    
+
     SLANG_RETURN_ON_FAIL(_updateReadResult(m_readStream->update()));
 
     // Note will only indicate end if the buffer *and* backing stream are end/empty
@@ -266,7 +275,7 @@ SlangResult HTTPPacketConnection::update()
 
     switch (m_readState)
     {
-        case ReadState::Header:
+    case ReadState::Header:
         {
             SLANG_RETURN_ON_FAIL(_handleHeader());
             // We might be able to progress through content, if we have the header
@@ -276,19 +285,21 @@ SlangResult HTTPPacketConnection::update()
             }
             break;
         }
-        case ReadState::Content:
+    case ReadState::Content:
         {
             _handleContent();
             break;
         }
-        default: break;
+    default:
+        break;
     }
 
     return m_readResult;
 }
 
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 // Handles binary backoff like sleeping mechanism.
 struct SleepState
@@ -315,7 +326,8 @@ struct SleepState
         // If we hit the count change the interval
         if (m_count >= countThreshold)
         {
-            m_intervalInMs = (m_intervalInMs == 0) ? 1 : Math::Min(m_intervalInMs * 2, maxIntervalInMs);
+            m_intervalInMs =
+                (m_intervalInMs == 0) ? 1 : Math::Min(m_intervalInMs * 2, maxIntervalInMs);
             // Reset the count
             m_count = 0;
         }
@@ -325,7 +337,7 @@ struct SleepState
     Int m_count = 0;
 };
 
-} // anonymous
+} // namespace
 
 SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 {
@@ -342,8 +354,7 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 
     SleepState sleepState;
 
-    while (m_readState == ReadState::Header ||
-        m_readState == ReadState::Content)
+    while (m_readState == ReadState::Header || m_readState == ReadState::Content)
     {
         const auto prevCount = m_readStream->getCount();
 

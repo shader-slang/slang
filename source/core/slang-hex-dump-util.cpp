@@ -1,14 +1,12 @@
 // slang-hex-dump-util.cpp
 #include "slang-hex-dump-util.h"
 
+#include "slang-char-util.h"
+#include "slang-com-helper.h"
 #include "slang-common.h"
+#include "slang-hash.h"
 #include "slang-string-util.h"
 #include "slang-writer.h"
-
-#include "slang-char-util.h"
-
-#include "slang-com-helper.h"
-#include "slang-hash.h"
 
 namespace Slang
 {
@@ -17,19 +15,26 @@ static const UnownedStringSlice s_start = UnownedStringSlice::fromLiteral("--STA
 static const UnownedStringSlice s_end = UnownedStringSlice::fromLiteral("--END--");
 static const char s_hex[] = "0123456789abcdef";
 
-/* static */SlangResult HexDumpUtil::dumpWithMarkers(const List<uint8_t>& data, int maxBytesPerLine, ISlangWriter* writer)
+/* static */ SlangResult HexDumpUtil::dumpWithMarkers(
+    const List<uint8_t>& data,
+    int maxBytesPerLine,
+    ISlangWriter* writer)
 {
     return dumpWithMarkers(data.getBuffer(), data.getCount(), maxBytesPerLine, writer);
 }
 
-/* static */SlangResult HexDumpUtil::dumpWithMarkers(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
+/* static */ SlangResult HexDumpUtil::dumpWithMarkers(
+    const uint8_t* data,
+    size_t dataCount,
+    int maxBytesPerLine,
+    ISlangWriter* writer)
 {
     WriterHelper helper(writer);
     SLANG_RETURN_ON_FAIL(helper.write(s_start.begin(), s_start.getLength()));
     SLANG_RETURN_ON_FAIL(helper.print(" %zu", dataCount));
 
     const StableHashCode32 hash = getStableHashCode32((const char*)data, dataCount);
-    SLANG_RETURN_ON_FAIL(helper.print(" %d\n", hash.hash ));
+    SLANG_RETURN_ON_FAIL(helper.print(" %d\n", hash.hash));
 
     SLANG_RETURN_ON_FAIL(dump(data, dataCount, maxBytesPerLine, writer));
 
@@ -38,7 +43,7 @@ static const char s_hex[] = "0123456789abcdef";
     return SLANG_OK;
 }
 
-/* static */void HexDumpUtil::dump(uint32_t value, ISlangWriter* writer)
+/* static */ void HexDumpUtil::dump(uint32_t value, ISlangWriter* writer)
 {
     char c[9];
     for (int i = 0; i < 8; ++i)
@@ -50,12 +55,19 @@ static const char s_hex[] = "0123456789abcdef";
 }
 
 
-/* static */SlangResult HexDumpUtil::dump(const List<uint8_t>& data, int maxBytesPerLine, ISlangWriter* writer)
+/* static */ SlangResult HexDumpUtil::dump(
+    const List<uint8_t>& data,
+    int maxBytesPerLine,
+    ISlangWriter* writer)
 {
     return dump(data.getBuffer(), data.getCount(), maxBytesPerLine, writer);
 }
 
-SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
+SlangResult HexDumpUtil::dumpSourceBytes(
+    const uint8_t* data,
+    size_t dataCount,
+    int maxBytesPerLine,
+    ISlangWriter* writer)
 {
     const uint8_t* cur = data;
     const uint8_t* end = data + dataCount;
@@ -95,13 +107,17 @@ SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, 
     return SLANG_OK;
 }
 
-/* static */SlangResult HexDumpUtil::dump(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
+/* static */ SlangResult HexDumpUtil::dump(
+    const uint8_t* data,
+    size_t dataCount,
+    int maxBytesPerLine,
+    ISlangWriter* writer)
 {
     int maxCharsPerLine = 2 * maxBytesPerLine + 1 + maxBytesPerLine + 1;
 
     const uint8_t* cur = data;
     const uint8_t* end = data + dataCount;
-    
+
     while (cur < end)
     {
         size_t count = size_t(end - cur);
@@ -121,7 +137,7 @@ SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, 
         for (size_t i = count; i < size_t(maxBytesPerLine); ++i)
         {
             *dst++ = ' ';
-            *dst++ = ' '; 
+            *dst++ = ' ';
         }
 
         *dst++ = ' ';
@@ -130,9 +146,7 @@ SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, 
         {
             char c = char(cur[i]);
 
-            if ((c >= '0' && c <= '9') ||
-                (c >= 'a' && c <= 'z') ||
-                (c >= 'A' && c <= 'Z') ||
+            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                 (c >= 32 && (c & 0x80) == 0))
             {
             }
@@ -154,7 +168,9 @@ SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, 
     return SLANG_OK;
 }
 
-/* static */SlangResult HexDumpUtil::parse(const UnownedStringSlice& lines, List<uint8_t>& outBytes)
+/* static */ SlangResult HexDumpUtil::parse(
+    const UnownedStringSlice& lines,
+    List<uint8_t>& outBytes)
 {
     outBytes.clear();
 
@@ -164,7 +180,7 @@ SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, 
         const char* cur = line.begin();
         const char* end = line.end();
 
-        while(cur + 2 <= end)
+        while (cur + 2 <= end)
         {
             const char c = cur[0];
             if (c == ' ' || c == '\n' || c == '\r' || c == '\t')
@@ -188,7 +204,10 @@ SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, 
     return SLANG_OK;
 }
 
-static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice& ioRemaining, UnownedStringSlice& outLine)
+static SlangResult _findLine(
+    const UnownedStringSlice& find,
+    UnownedStringSlice& ioRemaining,
+    UnownedStringSlice& outLine)
 {
     // Find the start line
     UnownedStringSlice line;
@@ -203,7 +222,10 @@ static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice&
     return SLANG_FAIL;
 }
 
-/* static */SlangResult HexDumpUtil::findStartAndEndLines(const UnownedStringSlice& lines, UnownedStringSlice& outStart, UnownedStringSlice& outEnd)
+/* static */ SlangResult HexDumpUtil::findStartAndEndLines(
+    const UnownedStringSlice& lines,
+    UnownedStringSlice& outStart,
+    UnownedStringSlice& outEnd)
 {
     UnownedStringSlice remaining(lines);
     SLANG_RETURN_ON_FAIL(_findLine(s_start, remaining, outStart));
@@ -211,7 +233,9 @@ static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice&
     return SLANG_OK;
 }
 
-/* static */SlangResult HexDumpUtil::parseWithMarkers(const UnownedStringSlice& lines, List<uint8_t>& outBytes)
+/* static */ SlangResult HexDumpUtil::parseWithMarkers(
+    const UnownedStringSlice& lines,
+    List<uint8_t>& outBytes)
 {
     UnownedStringSlice startLine, endLine;
     SLANG_RETURN_ON_FAIL(findStartAndEndLines(lines, startLine, endLine));
@@ -234,7 +258,8 @@ static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice&
     SLANG_RETURN_ON_FAIL(parse(UnownedStringSlice(startLine.end(), endLine.begin()), outBytes));
 
     // Calc the hash
-    const StableHashCode32 readHash = getStableHashCode32((const char*)outBytes.begin(), outBytes.getCount());
+    const StableHashCode32 readHash =
+        getStableHashCode32((const char*)outBytes.begin(), outBytes.getCount());
 
     if (readHash != hash || size_t(outBytes.getCount()) != size)
     {
@@ -243,4 +268,4 @@ static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice&
     return SLANG_OK;
 }
 
-}
+} // namespace Slang

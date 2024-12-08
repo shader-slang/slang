@@ -29,7 +29,8 @@ ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     }
 }
 
-Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(slang::TypeLayoutReflection* typeLayout)
+Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
+    slang::TypeLayoutReflection* typeLayout)
 {
     typeLayout = _unwrapParameterGroups(typeLayout, m_containerType);
 
@@ -138,7 +139,9 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(slang::TypeLayoutRe
             SLANG_ASSERT(descriptorSetIndex == 0);
 
             SlangInt descriptorRangeIndex = typeLayout->getBindingRangeFirstDescriptorRangeIndex(r);
-            auto registerOffset = typeLayout->getDescriptorSetDescriptorRangeIndexOffset(descriptorSetIndex, descriptorRangeIndex);
+            auto registerOffset = typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
+                descriptorSetIndex,
+                descriptorRangeIndex);
 
             bindingRangeInfo.registerOffset = (uint32_t)registerOffset;
         }
@@ -173,18 +176,18 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(slang::TypeLayoutRe
         switch (slangBindingType)
         {
         default:
-        {
-            // In the case of `ConstantBuffer<X>` or `ParameterBlock<X>`
-            // we can construct a layout from the element type directly.
-            //
-            auto elementTypeLayout = slangLeafTypeLayout->getElementTypeLayout();
-            createForElementType(
-                m_renderer,
-                m_session,
-                elementTypeLayout,
-                subObjectLayout.writeRef());
-        }
-        break;
+            {
+                // In the case of `ConstantBuffer<X>` or `ParameterBlock<X>`
+                // we can construct a layout from the element type directly.
+                //
+                auto elementTypeLayout = slangLeafTypeLayout->getElementTypeLayout();
+                createForElementType(
+                    m_renderer,
+                    m_session,
+                    elementTypeLayout,
+                    subObjectLayout.writeRef());
+            }
+            break;
 
         case slang::BindingType::ExistentialValue:
             // In the case of an interface-type sub-object range, we can only
@@ -207,8 +210,9 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(slang::TypeLayoutRe
                 // increase the size of the ordinary data buffer we need to
                 // allocate for the parent object.
                 //
-                uint32_t ordinaryDataEnd = subObjectRange.offset.pendingOrdinaryData
-                    + (uint32_t)bindingRange.count * subObjectRange.stride.pendingOrdinaryData;
+                uint32_t ordinaryDataEnd =
+                    subObjectRange.offset.pendingOrdinaryData +
+                    (uint32_t)bindingRange.count * subObjectRange.stride.pendingOrdinaryData;
 
                 if (ordinaryDataEnd > m_totalOrdinaryDataSize)
                 {
@@ -225,8 +229,7 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(slang::TypeLayoutRe
 
 SlangResult ShaderObjectLayoutImpl::Builder::build(ShaderObjectLayoutImpl** outLayout)
 {
-    auto layout =
-        RefPtr<ShaderObjectLayoutImpl>(new ShaderObjectLayoutImpl());
+    auto layout = RefPtr<ShaderObjectLayoutImpl>(new ShaderObjectLayoutImpl());
     SLANG_RETURN_ON_FAIL(layout->_init(this));
 
     returnRefPtrMove(outLayout, layout);
@@ -276,14 +279,17 @@ Result RootShaderObjectLayoutImpl::Builder::build(RootShaderObjectLayoutImpl** o
     return SLANG_OK;
 }
 
-void RootShaderObjectLayoutImpl::Builder::addGlobalParams(slang::VariableLayoutReflection* globalsLayout)
+void RootShaderObjectLayoutImpl::Builder::addGlobalParams(
+    slang::VariableLayoutReflection* globalsLayout)
 {
     setElementTypeLayout(globalsLayout->getTypeLayout());
     m_pendingDataOffset = BindingOffset(globalsLayout).pending;
 }
 
 void RootShaderObjectLayoutImpl::Builder::addEntryPoint(
-    SlangStage stage, ShaderObjectLayoutImpl* entryPointLayout, slang::EntryPointLayout* slangEntryPoint)
+    SlangStage stage,
+    ShaderObjectLayoutImpl* entryPointLayout,
+    slang::EntryPointLayout* slangEntryPoint)
 {
     EntryPointInfo info;
     info.layout = entryPointLayout;
@@ -306,7 +312,10 @@ Result RootShaderObjectLayoutImpl::create(
         auto slangEntryPoint = programLayout->getEntryPointByIndex(e);
         RefPtr<ShaderObjectLayoutImpl> entryPointLayout;
         SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
-            renderer, program->getSession(), slangEntryPoint->getTypeLayout(), entryPointLayout.writeRef()));
+            renderer,
+            program->getSession(),
+            slangEntryPoint->getTypeLayout(),
+            entryPointLayout.writeRef()));
         builder.addEntryPoint(slangEntryPoint->getStage(), entryPointLayout, slangEntryPoint);
     }
 

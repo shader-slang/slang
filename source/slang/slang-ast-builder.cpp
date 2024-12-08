@@ -1,16 +1,16 @@
 // slang-ast-builder.cpp
 #include "slang-ast-builder.h"
-#include <assert.h>
 
 #include "slang-compiler.h"
 
-namespace Slang {
+#include <assert.h>
+
+namespace Slang
+{
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SharedASTBuilder::SharedASTBuilder()
-{    
-}
+SharedASTBuilder::SharedASTBuilder() {}
 
 void SharedASTBuilder::init(Session* session)
 {
@@ -90,7 +90,8 @@ Type* SharedASTBuilder::getNativeStringType()
     if (!m_nativeStringType)
     {
         auto nativeStringTypeDecl = findMagicDecl("NativeStringType");
-        m_nativeStringType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(nativeStringTypeDecl));
+        m_nativeStringType =
+            DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(nativeStringTypeDecl));
     }
     return m_nativeStringType;
 }
@@ -145,6 +146,16 @@ Type* SharedASTBuilder::getDiffInterfaceType()
     return m_diffInterfaceType;
 }
 
+Type* SharedASTBuilder::getIBufferDataLayoutType()
+{
+    if (!m_IBufferDataLayoutType)
+    {
+        auto decl = findMagicDecl("IBufferDataLayoutType");
+        m_IBufferDataLayoutType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
+    }
+    return m_IBufferDataLayoutType;
+}
+
 Type* SharedASTBuilder::getErrorType()
 {
     if (!m_errorType)
@@ -190,7 +201,9 @@ void SharedASTBuilder::registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modi
     m_builtinTypes[Index(modifier->tag)] = type;
 }
 
-void SharedASTBuilder::registerBuiltinRequirementDecl(Decl* decl, BuiltinRequirementModifier* modifier)
+void SharedASTBuilder::registerBuiltinRequirementDecl(
+    Decl* decl,
+    BuiltinRequirementModifier* modifier)
 {
     m_builtinRequirementDecls[modifier->kind] = decl;
 }
@@ -221,22 +234,20 @@ Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
-    m_sharedASTBuilder(sharedASTBuilder),
-    m_name(name),
-    m_id(sharedASTBuilder->m_id++),
-    m_arena(2097152)
+ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name)
+    : m_sharedASTBuilder(sharedASTBuilder)
+    , m_name(name)
+    , m_id(sharedASTBuilder->m_id++)
+    , m_arena(2097152)
 {
     SLANG_ASSERT(sharedASTBuilder);
     // Copy Val deduplication map over so we don't create duplicate Vals that are already
-    // existent in the stdlib.
+    // existent in the core module.
     m_cachedNodes = sharedASTBuilder->getInnerASTBuilder()->m_cachedNodes;
 }
 
-ASTBuilder::ASTBuilder():
-    m_sharedASTBuilder(nullptr),
-    m_id(-1),
-    m_arena(2097152)
+ASTBuilder::ASTBuilder()
+    : m_sharedASTBuilder(nullptr), m_id(-1), m_arena(2097152)
 {
     m_name = "SharedASTBuilder::m_astBuilder";
 }
@@ -265,7 +276,7 @@ void ASTBuilder::incrementEpoch()
 NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
 {
     const ReflectClassInfo* info = ASTClassInfo::getInfo(nodeType);
-    
+
     auto createFunc = info->m_createFunc;
     SLANG_ASSERT(createFunc);
     if (!createFunc)
@@ -293,6 +304,23 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
 PtrType* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace)
 {
     return dynamicCast<PtrType>(getPtrType(valueType, addrSpace, "PtrType"));
+}
+
+Type* ASTBuilder::getDefaultLayoutType()
+{
+    return getSpecializedBuiltinType({}, "DefaultDataLayoutType");
+}
+Type* ASTBuilder::getStd140LayoutType()
+{
+    return getSpecializedBuiltinType({}, "Std140DataLayoutType");
+}
+Type* ASTBuilder::getStd430LayoutType()
+{
+    return getSpecializedBuiltinType({}, "Std430DataLayoutType");
+}
+Type* ASTBuilder::getScalarLayoutType()
+{
+    return getSpecializedBuiltinType({}, "ScalarDataLayoutType");
 }
 
 // Construct the type `Out<valueType>`
@@ -327,9 +355,12 @@ PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
     return as<PtrTypeBase>(getSpecializedBuiltinType(valueType, ptrTypeName));
 }
 
-PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName)
+PtrTypeBase* ASTBuilder::getPtrType(
+    Type* valueType,
+    AddressSpace addrSpace,
+    char const* ptrTypeName)
 {
-    Val* args[] = { valueType, getIntVal(getUInt64Type(), (IntegerLiteralValue)addrSpace) };
+    Val* args[] = {valueType, getIntVal(getUInt64Type(), (IntegerLiteralValue)addrSpace)};
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
@@ -350,12 +381,19 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         }
     }
     Val* args[] = {elementType, elementCount};
-    return as<ArrayExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "ArrayExpressionType"));
+    return as<ArrayExpressionType>(
+        getSpecializedBuiltinType(makeArrayView(args), "ArrayExpressionType"));
 }
 
-ConstantBufferType* ASTBuilder::getConstantBufferType(Type* elementType)
+ConstantBufferType* ASTBuilder::getConstantBufferType(
+    Type* elementType,
+    Type* layoutType,
+    Val* layoutWitness)
 {
-    return as<ConstantBufferType>(getSpecializedBuiltinType(elementType, "ConstantBufferType"));
+    Val* args[] = {elementType, layoutType, layoutWitness};
+
+    return as<ConstantBufferType>(
+        getSpecializedBuiltinType(makeArrayView(args), "ConstantBufferType"));
 }
 
 ParameterBlockType* ASTBuilder::getParameterBlockType(Type* elementType)
@@ -365,12 +403,14 @@ ParameterBlockType* ASTBuilder::getParameterBlockType(Type* elementType)
 
 HLSLStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
 {
-    return as<HLSLStructuredBufferType>(getSpecializedBuiltinType(elementType, "HLSLStructuredBufferType"));
+    return as<HLSLStructuredBufferType>(
+        getSpecializedBuiltinType(elementType, "HLSLStructuredBufferType"));
 }
 
 HLSLRWStructuredBufferType* ASTBuilder::getRWStructuredBufferType(Type* elementType)
 {
-    return as<HLSLRWStructuredBufferType>(getSpecializedBuiltinType(elementType, "HLSLRWStructuredBufferType"));
+    return as<HLSLRWStructuredBufferType>(
+        getSpecializedBuiltinType(elementType, "HLSLRWStructuredBufferType"));
 }
 
 SamplerStateType* ASTBuilder::getSamplerStateType()
@@ -378,20 +418,23 @@ SamplerStateType* ASTBuilder::getSamplerStateType()
     return as<SamplerStateType>(getSpecializedBuiltinType(nullptr, "HLSLStructuredBufferType"));
 }
 
-VectorExpressionType* ASTBuilder::getVectorType(
-    Type*    elementType,
-    IntVal*  elementCount)
+VectorExpressionType* ASTBuilder::getVectorType(Type* elementType, IntVal* elementCount)
 {
     // Canonicalize constant elementCount to int.
     if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
     {
         elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
     }
-    Val* args[] = { elementType, elementCount };
-    return as<VectorExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "VectorExpressionType"));
+    Val* args[] = {elementType, elementCount};
+    return as<VectorExpressionType>(
+        getSpecializedBuiltinType(makeArrayView(args), "VectorExpressionType"));
 }
 
-MatrixExpressionType* ASTBuilder::getMatrixType(Type* elementType, IntVal* rowCount, IntVal* colCount, IntVal* layout)
+MatrixExpressionType* ASTBuilder::getMatrixType(
+    Type* elementType,
+    IntVal* rowCount,
+    IntVal* colCount,
+    IntVal* layout)
 {
     // Canonicalize constant size arguments to int.
     if (auto rowCountConstantInt = as<ConstantIntVal>(rowCount))
@@ -402,21 +445,38 @@ MatrixExpressionType* ASTBuilder::getMatrixType(Type* elementType, IntVal* rowCo
     {
         colCount = getIntVal(getIntType(), colCountConstantInt->getValue());
     }
-    Val* args[] = { elementType, rowCount, colCount, layout };
-    return as<MatrixExpressionType>(getSpecializedBuiltinType(makeArrayView(args), "MatrixExpressionType"));
+    Val* args[] = {elementType, rowCount, colCount, layout};
+    return as<MatrixExpressionType>(
+        getSpecializedBuiltinType(makeArrayView(args), "MatrixExpressionType"));
 }
 
-DifferentialPairType* ASTBuilder::getDifferentialPairType(
-    Type* valueType,
-    Witness* primalIsDifferentialWitness)
+DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witness* diffTypeWitness)
 {
-    Val* args[] = { valueType, primalIsDifferentialWitness };
-    return as<DifferentialPairType>(getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
+    Val* args[] = {valueType, diffTypeWitness};
+    return as<DifferentialPairType>(
+        getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
+}
+
+DifferentialPtrPairType* ASTBuilder::getDifferentialPtrPairType(
+    Type* valueType,
+    Witness* diffRefTypeWitness)
+{
+    Val* args[] = {valueType, diffRefTypeWitness};
+    return as<DifferentialPtrPairType>(
+        getSpecializedBuiltinType(makeArrayView(args), "DifferentialPtrPairType"));
 }
 
 DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterfaceDecl()
 {
-    DeclRef<InterfaceDecl> declRef = DeclRef<InterfaceDecl>(getBuiltinDeclRef("DifferentiableType", nullptr));
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("DifferentiableType", nullptr));
+    return declRef;
+}
+
+DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableRefInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("DifferentiablePtrType", nullptr));
     return declRef;
 }
 
@@ -427,12 +487,15 @@ bool ASTBuilder::isDifferentiableInterfaceAvailable()
 
 DeclRef<InterfaceDecl> ASTBuilder::getDefaultInitializableTypeInterfaceDecl()
 {
-    DeclRef<InterfaceDecl> declRef = DeclRef<InterfaceDecl>(getBuiltinDeclRef("DefaultInitializableType", nullptr));
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("DefaultInitializableType", nullptr));
     return declRef;
 }
 Type* ASTBuilder::getDefaultInitializableType()
 {
-    return DeclRefType::create(m_sharedASTBuilder->m_astBuilder, getDefaultInitializableTypeInterfaceDecl());
+    return DeclRefType::create(
+        m_sharedASTBuilder->m_astBuilder,
+        getDefaultInitializableTypeInterfaceDecl());
 }
 
 MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
@@ -444,13 +507,13 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
     SLANG_ASSERT(elementType);
     SLANG_ASSERT(maxElementCount);
 
-    const char* declName
-        = as<HLSLVerticesModifier>(modifier) ? "VerticesType"
-        : as<HLSLIndicesModifier>(modifier) ? "IndicesType"
-        : as<HLSLPrimitivesModifier>(modifier) ? "PrimitivesType"
-        : (SLANG_UNEXPECTED("Unhandled mesh output modifier"), nullptr);
+    const char* declName = as<HLSLVerticesModifier>(modifier)  ? "VerticesType"
+                           : as<HLSLIndicesModifier>(modifier) ? "IndicesType"
+                           : as<HLSLPrimitivesModifier>(modifier)
+                               ? "PrimitivesType"
+                               : (SLANG_UNEXPECTED("Unhandled mesh output modifier"), nullptr);
 
-    Val* args[] = { elementType, maxElementCount };
+    Val* args[] = {elementType, maxElementCount};
     return as<MeshOutputType>(getSpecializedBuiltinType(makeArrayView(args), declName));
 }
 
@@ -459,12 +522,18 @@ Type* ASTBuilder::getDifferentiableInterfaceType()
     return DeclRefType::create(this, getDifferentiableInterfaceDecl());
 }
 
+Type* ASTBuilder::getDifferentiableRefInterfaceType()
+{
+    return DeclRefType::create(this, getDifferentiableRefInterfaceDecl());
+}
+
 DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, Val* genericArg)
 {
     auto decl = m_sharedASTBuilder->findMagicDecl(builtinMagicTypeName);
     if (auto genericDecl = as<GenericDecl>(decl))
     {
-        auto declRef = getGenericAppDeclRef(makeDeclRef(genericDecl), makeConstArrayViewSingle(genericArg));
+        auto declRef =
+            getGenericAppDeclRef(makeDeclRef(genericDecl), makeConstArrayViewSingle(genericArg));
         return declRef;
     }
     else
@@ -474,7 +543,9 @@ DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, Va
     return makeDeclRef(decl);
 }
 
-DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, ArrayView<Val*> genericArgs)
+DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(
+    const char* builtinMagicTypeName,
+    ArrayView<Val*> genericArgs)
 {
     auto decl = m_sharedASTBuilder->findMagicDecl(builtinMagicTypeName);
     if (auto genericDecl = as<GenericDecl>(decl))
@@ -525,8 +596,9 @@ FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Typ
 
 TupleType* ASTBuilder::getTupleType(ArrayView<Type*> types)
 {
-    // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl, ConcreteTypePack(types...))).
-    // If `types` is already a single ConcreteTypePack, then we can use that directly.
+    // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl,
+    // ConcreteTypePack(types...))). If `types` is already a single ConcreteTypePack, then we can
+    // use that directly.
     if (types.getCount() == 1)
     {
         if (isTypePack(types[0]))
@@ -553,7 +625,8 @@ Type* ASTBuilder::getEachType(Type* baseType)
         return expandType->getPatternType();
     }
 
-    // each Tuple<X> ==> each X, because we know that Tuple type must be in the form of Tuple<ConcreteTypePack<...>>.
+    // each Tuple<X> ==> each X, because we know that Tuple type must be in the form of
+    // Tuple<ConcreteTypePack<...>>.
     if (auto tupleType = as<TupleType>(baseType))
     {
         return getEachType(tupleType->getTypePack());
@@ -594,20 +667,23 @@ ConcreteTypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
     return getOrCreate<ConcreteTypePack>(flattenedTypes.getArrayView().arrayView);
 }
 
-TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(
-    Type* type)
+TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(Type* type)
 {
     return getOrCreate<TypeEqualityWitness>(type, type);
 }
 
 TypePackSubtypeWitness* ASTBuilder::getSubtypeWitnessPack(
-    Type* subType, Type* superType, ArrayView<SubtypeWitness*> witnesses)
+    Type* subType,
+    Type* superType,
+    ArrayView<SubtypeWitness*> witnesses)
 {
     return getOrCreate<TypePackSubtypeWitness>(subType, superType, witnesses);
 }
 
 SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(
-    Type* subType, Type* superType, SubtypeWitness* patternWitness)
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
 {
     if (auto eachWitness = as<EachSubtypeWitness>(patternWitness))
         return eachWitness->getPatternTypeWitness();
@@ -615,7 +691,9 @@ SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(
 }
 
 SubtypeWitness* ASTBuilder::getEachSubtypeWitness(
-    Type* subType, Type* superType, SubtypeWitness* patternWitness)
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
 {
     if (auto expandWitness = as<ExpandSubtypeWitness>(patternWitness))
         return expandWitness->getPatternTypeWitness();
@@ -623,12 +701,11 @@ SubtypeWitness* ASTBuilder::getEachSubtypeWitness(
 }
 
 DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
-    Type*                   subType,
-    Type*                   superType,
-    DeclRef<Decl> const&    declRef)
+    Type* subType,
+    Type* superType,
+    DeclRef<Decl> const& declRef)
 {
-    auto witness = getOrCreate<DeclaredSubtypeWitness>(
-        subType, superType, declRef.declRefBase);
+    auto witness = getOrCreate<DeclaredSubtypeWitness>(subType, superType, declRef.declRefBase);
     return witness;
 }
 
@@ -647,7 +724,7 @@ top:
     //
     // If `a == b`, then the `b <: c` witness is also a witness of `a <: c`.
     //
-    if(as<TypeEqualityWitness>(aIsSubtypeOfBWitness))
+    if (as<TypeEqualityWitness>(aIsSubtypeOfBWitness))
     {
         return bIsSubtypeOfCWitness;
     }
@@ -675,9 +752,8 @@ top:
         // We can recursively call this operation to produce a witness that
         // `a <: x`, based on the witnesses we already have for `a <: b` and `b <: x`:
         //
-        auto aIsSubtypeOfXWitness = getTransitiveSubtypeWitness(
-            aIsSubtypeOfBWitness,
-            bIsSubtypeOfXWitness);
+        auto aIsSubtypeOfXWitness =
+            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfXWitness);
 
         // Now we can perform a "tail recursive" call to this function (via `goto`
         // to combine the `a <: x` witness with our `x <: c` witness:
@@ -695,7 +771,7 @@ top:
     // and we'd rather form a conjunction witness for `A <: C`
     // that is of the form `(A <: X)&(A <: Y)`.
     //
-    if(auto bIsSubtypeOfXAndY = as<ConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
+    if (auto bIsSubtypeOfXAndY = as<ConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
     {
         auto bIsSubtypeOfXWitness = bIsSubtypeOfXAndY->getLeftWitness();
         auto bIsSubtypeOfYWitness = bIsSubtypeOfXAndY->getRightWitness();
@@ -711,7 +787,8 @@ top:
     // `W` is a witness that `B <: X&Y&...` for some conjunction, where `C`
     // is one component of that conjunction.
     //
-    if(auto bIsSubtypeViaExtraction = as<ExtractFromConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
+    if (auto bIsSubtypeViaExtraction =
+            as<ExtractFromConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
     {
         // We decompose the witness `extract(i, W)` to get both
         // the witness `W` that `B <: X&Y&...` as well as the index
@@ -742,12 +819,10 @@ top:
         List<SubtypeWitness*> newWitnesses;
         for (Index i = 0; i < witnessPack->getCount(); i++)
         {
-            newWitnesses.add(getTransitiveSubtypeWitness(witnessPack->getWitness(i), bIsSubtypeOfCWitness));
+            newWitnesses.add(
+                getTransitiveSubtypeWitness(witnessPack->getWitness(i), bIsSubtypeOfCWitness));
         }
-        return getSubtypeWitnessPack(
-            aType,
-            cType,
-            newWitnesses.getArrayView());
+        return getSubtypeWitnessPack(aType, cType, newWitnesses.getArrayView());
     }
 
     // If left hand is a ExpandSubtypeWitness, then we want to perform the transitive lookup
@@ -755,7 +830,9 @@ top:
     //
     if (auto expandWitness = as<ExpandSubtypeWitness>(aIsSubtypeOfBWitness))
     {
-        auto innerTransitiveWitness = getTransitiveSubtypeWitness(expandWitness->getPatternTypeWitness(), bIsSubtypeOfCWitness);
+        auto innerTransitiveWitness = getTransitiveSubtypeWitness(
+            expandWitness->getPatternTypeWitness(),
+            bIsSubtypeOfCWitness);
         return getExpandSubtypeWitness(expandWitness->getSub(), cType, innerTransitiveWitness);
     }
 
@@ -768,8 +845,12 @@ top:
         {
             if (declRefType->getDeclRef().as<GenericTypePackParamDecl>())
             {
-                auto newLeftHandWitness = getEachSubtypeWitness(getEachType(declaredWitness->getSub()), declaredWitness->getSup(), declaredWitness);
-                auto transitiveWitness = getTransitiveSubtypeWitness(newLeftHandWitness, bIsSubtypeOfCWitness);
+                auto newLeftHandWitness = getEachSubtypeWitness(
+                    getEachType(declaredWitness->getSub()),
+                    declaredWitness->getSup(),
+                    declaredWitness);
+                auto transitiveWitness =
+                    getTransitiveSubtypeWitness(newLeftHandWitness, bIsSubtypeOfCWitness);
                 return getExpandSubtypeWitness(aType, cType, transitiveWitness);
             }
         }
@@ -794,10 +875,10 @@ top:
 }
 
 SubtypeWitness* ASTBuilder::getExtractFromConjunctionSubtypeWitness(
-    Type*           subType,
-    Type*           superType,
+    Type* subType,
+    Type* superType,
     SubtypeWitness* conjunctionWitness,
-    int             indexOfSuperTypeInConjunction)
+    int indexOfSuperTypeInConjunction)
 {
     // We are taking a witness `W` for `S <: L&R` and
     // using it to produce a witness for `S <: L`
@@ -826,8 +907,8 @@ SubtypeWitness* ASTBuilder::getExtractFromConjunctionSubtypeWitness(
 }
 
 SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
-    Type*           sub,
-    Type*           lAndR,
+    Type* sub,
+    Type* lAndR,
     SubtypeWitness* subIsLWitness,
     SubtypeWitness* subIsRWitness)
 {
@@ -839,10 +920,9 @@ SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
     //
     auto lExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsLWitness);
     auto rExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsRWitness);
-    if(lExtract && rExtract)
+    if (lExtract && rExtract)
     {
-        if (lExtract->getIndexInConjunction() == 0
-            && rExtract->getIndexInConjunction() == 1)
+        if (lExtract->getIndexInConjunction() == 0 && rExtract->getIndexInConjunction() == 1)
         {
             auto lInner = lExtract->getConjunctionWitness();
             auto rInner = rExtract->getConjunctionWitness();
@@ -864,11 +944,7 @@ SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
     // witness) deeper, so that we have more chances to expose a
     // conjunction witness at higher levels.
 
-    auto witness = getOrCreate<ConjunctionSubtypeWitness>(
-        sub,
-        lAndR,
-        subIsLWitness,
-        subIsRWitness);
+    auto witness = getOrCreate<ConjunctionSubtypeWitness>(sub, lAndR, subIsLWitness, subIsRWitness);
     return witness;
 }
 

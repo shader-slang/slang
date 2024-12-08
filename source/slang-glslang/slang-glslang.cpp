@@ -1,19 +1,16 @@
 // slang-glslang.cpp
 #include "slang-glslang.h"
 
-
-#include "glslang/Public/ResourceLimits.h"
-#include "glslang/Public/ShaderLang.h"
 #include "SPIRV/GlslangToSpv.h"
 #include "SPIRV/disassemble.h"
-
+#include "glslang/Public/ResourceLimits.h"
+#include "glslang/Public/ShaderLang.h"
 #include "slang.h"
-
-#include "spirv-tools/optimizer.hpp"
 #include "spirv-tools/libspirv.h"
+#include "spirv-tools/optimizer.hpp"
 
 #ifdef _WIN32
-#   include <windows.h>
+#include <windows.h>
 #endif
 
 #include <memory>
@@ -29,16 +26,16 @@ static TBuiltInResource _calcBuiltinResources()
 {
     // NOTE! This is a bit of a hack - to set all the fields to true/UNLIMITED.
     // Care must be taken if new variables are introduced, the default may not be appropriate.
-    
-    // We are relying on limits being after the other fields. 
+
+    // We are relying on limits being after the other fields.
     SLANG_COMPILE_TIME_ASSERT(SLANG_OFFSET_OF(TBuiltInResource, limits) > 0);
     // We are relying on maxLights being the first parameter, and all values will have the same type
     SLANG_COMPILE_TIME_ASSERT(SLANG_OFFSET_OF(TBuiltInResource, maxLights) == 0);
-    
+
     TBuiltInResource resource;
     // Set up all the integer values.
     {
-        
+
         auto* dst = &resource.maxLights;
         const size_t count = SLANG_OFFSET_OF(TBuiltInResource, limits) / sizeof(*dst);
         for (size_t i = 0; i < count; ++i)
@@ -67,13 +64,13 @@ static TBuiltInResource _calcBuiltinResources()
 static TBuiltInResource gResources = _calcBuiltinResources();
 
 static void dump(
-    void const*         data,
-    size_t              size,
-    glslang_OutputFunc  outputFunc,
-    void*               outputUserData,
-    FILE*               fallbackStream)
+    void const* data,
+    size_t size,
+    glslang_OutputFunc outputFunc,
+    void* outputUserData,
+    FILE* fallbackStream)
 {
-    if( outputFunc )
+    if (outputFunc)
     {
         outputFunc(data, size, outputUserData);
     }
@@ -83,17 +80,16 @@ static void dump(
 
         // also output it for debug purposes
         std::string str((char const*)data, size);
-    #ifdef _WIN32
+#ifdef _WIN32
         OutputDebugStringA(str.c_str());
-    #else
-        fprintf(stderr, "%s\n", str.c_str());;
-    #endif
+#else
+        fprintf(stderr, "%s\n", str.c_str());
+        ;
+#endif
     }
 }
 
-static void dumpDiagnostics(
-    const glslang_CompileRequest_1_2& request,
-    std::string const&      log)
+static void dumpDiagnostics(const glslang_CompileRequest_1_2& request, std::string const& log)
 {
     dump(log.c_str(), log.length(), request.diagnosticFunc, request.diagnosticUserData, stderr);
 }
@@ -106,20 +102,20 @@ struct SPIRVOptimizationDiagnostic
 
         switch (level)
         {
-            case SPV_MSG_FATAL:
-            case SPV_MSG_INTERNAL_ERROR:
-            case SPV_MSG_ERROR:
-                out << "error: ";
-                break;
-            case SPV_MSG_WARNING:
-                out << "warning: ";
-                break;
-            case SPV_MSG_INFO:
-            case SPV_MSG_DEBUG:
-                out << "info: ";
-                break;
-            default:
-                break;
+        case SPV_MSG_FATAL:
+        case SPV_MSG_INTERNAL_ERROR:
+        case SPV_MSG_ERROR:
+            out << "error: ";
+            break;
+        case SPV_MSG_WARNING:
+            out << "warning: ";
+            break;
+        case SPV_MSG_INFO:
+        case SPV_MSG_DEBUG:
+            out << "info: ";
+            break;
+        default:
+            break;
         }
         if (source.length())
         {
@@ -141,8 +137,11 @@ struct SPIRVOptimizationDiagnostic
 };
 
 // TODO: the actual printing should happen on the application side.
-static void validationMessageConsumer(spv_message_level_t level, const char*,
-    const spv_position_t& position, const char* message)
+static void validationMessageConsumer(
+    spv_message_level_t level,
+    const char*,
+    const spv_position_t& position,
+    const char* message)
 {
     switch (level)
     {
@@ -165,11 +164,11 @@ static void validationMessageConsumer(spv_message_level_t level, const char*,
 // Validate the given SPIRV-ASM instructions.
 extern "C"
 #ifdef _MSC_VER
-_declspec(dllexport)
+    _declspec(dllexport)
 #else
-__attribute__((__visibility__("default")))
+    __attribute__((__visibility__("default")))
 #endif
-bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+        bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
 {
     spv_target_env target_env = SPV_ENV_VULKAN_1_3;
 
@@ -184,7 +183,11 @@ bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_CompileRequest_1_2& request, std::vector<SPIRVOptimizationDiagnostic>& outDiags, std::vector<unsigned int>& ioSpirv)
+static void glslang_optimizeSPIRV(
+    spv_target_env targetEnv,
+    const glslang_CompileRequest_1_2& request,
+    std::vector<SPIRVOptimizationDiagnostic>& outDiags,
+    std::vector<unsigned int>& ioSpirv)
 {
     const auto optimizationLevel = request.optimizationLevel;
 
@@ -199,7 +202,11 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
     spvtools::Optimizer optimizer(targetEnv);
 
     optimizer.SetMessageConsumer(
-        [&](spv_message_level_t level, const char* source, const spv_position_t& position, const char* message) {
+        [&](spv_message_level_t level,
+            const char* source,
+            const spv_position_t& position,
+            const char* message)
+        {
             SPIRVOptimizationDiagnostic diag;
             diag.level = level;
             if (source)
@@ -239,8 +246,8 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
     // TODO confirm which passes we want to invoke for each level
     switch (optimizationLevel)
     {
-        default:
-        case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
+    default:
+    case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
         {
             // Use a minimal set of performance settings
             // If we run CreateInlineExhaustivePass, We need to run CreateMergeReturnPass first.
@@ -255,21 +262,21 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
 #elif 1
-            // 6Mb 27 secs (all passes up to 9) 
+            // 6Mb 27 secs (all passes up to 9)
             // 9Mb 25 secs (all passes up to 7)
             // 8Mb 15 secs (all passes) -(5,6,7)
-            // 6Mb 15 secs (all passes) -(6,7) 
+            // 6Mb 15 secs (all passes) -(6,7)
 
             // This list of passes takes the previous 'default optimization'
-            // passes (as listed above) and tries to combine them in order with the 'new' passes below.
-            // The issue with the passes below is that although it produces smaller SPIR-V fairly quickly
-            // it can cause serious problem on some drivers.
-            // 
-            // Across a wide range of compilations this produced SPIR-V that is less than half size of the
-            // previous -O1 passes above.
+            // passes (as listed above) and tries to combine them in order with the 'new' passes
+            // below. The issue with the passes below is that although it produces smaller SPIR-V
+            // fairly quickly it can cause serious problem on some drivers.
+            //
+            // Across a wide range of compilations this produced SPIR-V that is less than half size
+            // of the previous -O1 passes above.
 
-            optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());           // 1
-            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());       // 2
+            optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());     // 1
+            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass()); // 2
 
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
@@ -281,10 +288,10 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
 
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
 
-            optimizer.RegisterPass(spvtools::CreateCCPPass());                  // 4 *
-            optimizer.RegisterPass(spvtools::CreateSimplificationPass());       // 5
-            //optimizer.RegisterPass(spvtools::CreateIfConversionPass());         // 6
-            //optimizer.RegisterPass(spvtools::CreateBlockMergePass());           // 7 *
+            optimizer.RegisterPass(spvtools::CreateCCPPass());            // 4 *
+            optimizer.RegisterPass(spvtools::CreateSimplificationPass()); // 5
+            // optimizer.RegisterPass(spvtools::CreateIfConversionPass());         // 6
+            // optimizer.RegisterPass(spvtools::CreateBlockMergePass());           // 7 *
 
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
 
@@ -292,18 +299,21 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
 
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
 
-            optimizer.RegisterPass(spvtools::CreateVectorDCEPass());            // 9
+            optimizer.RegisterPass(spvtools::CreateVectorDCEPass()); // 9
 
 #else
             // The following selection of passes was created by
             // 1) Taking the list of passes from optimizer.RegisterSizePasses
-            // 2) Disable/enable passes to try to produce some reasonable combination of low SPIR-V output size and compilation speed
-            // 
-            // For a particularly difficult glsl shader this produced 1/3 SPIR-V code (against previous -O1), in around 13th the time (against -O3 option)
-            // Over a wide range of compiles the SPIR-V is around 6% larger than -O3
+            // 2) Disable/enable passes to try to produce some reasonable combination of low SPIR-V
+            // output size and compilation speed
+            //
+            // For a particularly difficult glsl shader this produced 1/3 SPIR-V code (against
+            // previous -O1), in around 13th the time (against -O3 option) Over a wide range of
+            // compiles the SPIR-V is around 6% larger than -O3
 
-            // The following comments describe the path to finding this combination. The original compilation produces 18Mb SPIR-V binaries
-            // in around 3 1/2 mins. The integer number increases with the ordering of the test.
+            // The following comments describe the path to finding this combination. The original
+            // compilation produces 18Mb SPIR-V binaries in around 3 1/2 mins. The integer number
+            // increases with the ordering of the test.
             //
             // With 5 47s
             // With 6 we have 6Mb, and 38 seconds
@@ -319,51 +329,52 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
             // Without any SSA rewrite we are up to 6Mb. 48
             //
             // So (for test case) approximately 13x compilation speed.
-            // Binary twice the size of smallest SPIR-V size and 1/3 the size of the previous -O size 
+            // Binary twice the size of smallest SPIR-V size and 1/3 the size of the previous -O
+            // size
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
-            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());     // 15
+            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass()); // 15
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 9
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
-            //optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));   // 12
-            //optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
+            // optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));   // 12
+            // optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateCCPPass());
-            //optimizer.RegisterPass(spvtools::CreateLoopUnrollPass(true));     // 1
-            //optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());     // 4
-            //optimizer.RegisterPass(spvtools::CreateSimplificationPass());       // 11
+            // optimizer.RegisterPass(spvtools::CreateLoopUnrollPass(true));     // 1
+            // optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());     // 4
+            // optimizer.RegisterPass(spvtools::CreateSimplificationPass());       // 11
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));
-            //optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
-            //optimizer.RegisterPass(spvtools::CreateIfConversionPass());       // 7
-            optimizer.RegisterPass(spvtools::CreateSimplificationPass());       // 13
-            //optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());      // 10
-            //optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());         // 6 + 15
-            //optimizer.RegisterPass(spvtools::CreateBlockMergePass());             // 8
+            // optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+            // optimizer.RegisterPass(spvtools::CreateIfConversionPass());       // 7
+            optimizer.RegisterPass(spvtools::CreateSimplificationPass()); // 13
+            // optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());      // 10
+            // optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());         // 6 + 15
+            // optimizer.RegisterPass(spvtools::CreateBlockMergePass());             // 8
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());        // 5
-            //optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());          // 1
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass()); // 5
+            // optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());          // 1
             optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
             optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
             optimizer.RegisterPass(spvtools::CreateEliminateDeadMembersPass());
-            //optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
-            //optimizer.RegisterPass(spvtools::CreateBlockMergePass());                 // 3
-            //optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());        // 2
-            //optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
-            optimizer.RegisterPass(spvtools::CreateSimplificationPass());             // 14
+            // optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+            // optimizer.RegisterPass(spvtools::CreateBlockMergePass());                 // 3
+            // optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());        // 2
+            // optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+            optimizer.RegisterPass(spvtools::CreateSimplificationPass()); // 14
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateCFGCleanupPass());
 #endif
 
             break;
         }
-        // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize 'in a reasonable time' for
-        // a better optimization, and 'maximal' meant compilation might take a really long time... so only use it if it's really
-        // needed.
-        //
-        // Currently we just have high have the same meaning as 'maximal'.
-        case SLANG_OPTIMIZATION_LEVEL_HIGH:
-        case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
+    // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize
+    // 'in a reasonable time' for a better optimization, and 'maximal' meant compilation might
+    // take a really long time... so only use it if it's really needed.
+    //
+    // Currently we just have high have the same meaning as 'maximal'.
+    case SLANG_OPTIMIZATION_LEVEL_HIGH:
+    case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
         {
             // Use the same passes when specifying the "-O" flag in spirv-opt
             // Roughly equivalent to `RegisterPerformancePasses`
@@ -421,8 +432,8 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
             optimizer.RegisterPass(spvtools::CreateBlockMergePass());
             optimizer.RegisterPass(spvtools::CreateSimplificationPass());
 
-            // We again run compaction to try and ensure the final output uses ids that are in range.
-            // On a complex shader, this reduced the amount ids by 5.
+            // We again run compaction to try and ensure the final output uses ids that are in
+            // range. On a complex shader, this reduced the amount ids by 5.
             optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
 
             break;
@@ -461,7 +472,10 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
     glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
     if (request.outputFunc)
     {
-        request.outputFunc(spirvBuffer.data(), spirvBuffer.size() * sizeof(uint32_t), request.outputUserData);
+        request.outputFunc(
+            spirvBuffer.data(),
+            spirvBuffer.size() * sizeof(uint32_t),
+            request.outputUserData);
     }
     if (request.diagnosticFunc)
     {
@@ -476,9 +490,12 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
     return SLANG_OK;
 }
 
-static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)
+static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(
+    int majorVersion,
+    int minorVersion)
 {
-    return glslang::EShTargetLanguageVersion((uint32_t(majorVersion) << 16) | (uint32_t(minorVersion) << 8));
+    return glslang::EShTargetLanguageVersion(
+        (uint32_t(majorVersion) << 16) | (uint32_t(minorVersion) << 8));
 }
 
 static glsl_SPIRVVersion _toSPIRVVersion(glslang::EShTargetLanguageVersion version)
@@ -492,7 +509,8 @@ static glsl_SPIRVVersion _toSPIRVVersion(glslang::EShTargetLanguageVersion versi
 
 // For working out the targets based on SPIR-V target strings
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct SPRIVTargetInfo
 {
@@ -500,33 +518,32 @@ struct SPRIVTargetInfo
     spv_target_env targetEnv;
 };
 
-} // anonymous
+} // namespace
 
-static const SPRIVTargetInfo kSpirvTargetInfos[] =
-{
-    {"1.0",         SPV_ENV_UNIVERSAL_1_0},
-    {"vk1.0",       SPV_ENV_VULKAN_1_0},
-    {"1.1",         SPV_ENV_UNIVERSAL_1_1}, 
-    {"cl2.1",       SPV_ENV_OPENCL_2_1},
-    {"cl2.2",       SPV_ENV_OPENCL_2_2}, 
-    {"gl4.0",       SPV_ENV_OPENGL_4_0},
-    {"gl4.1",       SPV_ENV_OPENGL_4_1},
-    {"gl4.2",       SPV_ENV_OPENGL_4_2},
-    {"gl4.3",       SPV_ENV_OPENGL_4_3},
-    {"gl4.5",       SPV_ENV_OPENGL_4_5},
-    {"1.2",         SPV_ENV_UNIVERSAL_1_2}, 
-    {"cl1.2",       SPV_ENV_OPENCL_1_2}, 
-    {"cl_emb1.2",   SPV_ENV_OPENCL_EMBEDDED_1_2},
-    {"cl2.0",       SPV_ENV_OPENCL_2_0},
-    {"cl_emb2.0",   SPV_ENV_OPENCL_EMBEDDED_2_0},
-    {"cl_emb2.1",   SPV_ENV_OPENCL_EMBEDDED_2_1},
-    {"cl_emb2.2",   SPV_ENV_OPENCL_EMBEDDED_2_2},
-    {"1.3",         SPV_ENV_UNIVERSAL_1_3},
-    {"vk1.1",       SPV_ENV_VULKAN_1_1},
-    {"web_gpu1.0",  SPV_ENV_WEBGPU_0},
-    {"1.4",         SPV_ENV_UNIVERSAL_1_4},
+static const SPRIVTargetInfo kSpirvTargetInfos[] = {
+    {"1.0", SPV_ENV_UNIVERSAL_1_0},
+    {"vk1.0", SPV_ENV_VULKAN_1_0},
+    {"1.1", SPV_ENV_UNIVERSAL_1_1},
+    {"cl2.1", SPV_ENV_OPENCL_2_1},
+    {"cl2.2", SPV_ENV_OPENCL_2_2},
+    {"gl4.0", SPV_ENV_OPENGL_4_0},
+    {"gl4.1", SPV_ENV_OPENGL_4_1},
+    {"gl4.2", SPV_ENV_OPENGL_4_2},
+    {"gl4.3", SPV_ENV_OPENGL_4_3},
+    {"gl4.5", SPV_ENV_OPENGL_4_5},
+    {"1.2", SPV_ENV_UNIVERSAL_1_2},
+    {"cl1.2", SPV_ENV_OPENCL_1_2},
+    {"cl_emb1.2", SPV_ENV_OPENCL_EMBEDDED_1_2},
+    {"cl2.0", SPV_ENV_OPENCL_2_0},
+    {"cl_emb2.0", SPV_ENV_OPENCL_EMBEDDED_2_0},
+    {"cl_emb2.1", SPV_ENV_OPENCL_EMBEDDED_2_1},
+    {"cl_emb2.2", SPV_ENV_OPENCL_EMBEDDED_2_2},
+    {"1.3", SPV_ENV_UNIVERSAL_1_3},
+    {"vk1.1", SPV_ENV_VULKAN_1_1},
+    {"web_gpu1.0", SPV_ENV_WEBGPU_0},
+    {"1.4", SPV_ENV_UNIVERSAL_1_4},
     {"vk1.1_spirv1.4", SPV_ENV_VULKAN_1_1_SPIRV_1_4},
-    {"1.5",         SPV_ENV_UNIVERSAL_1_5},             
+    {"1.5", SPV_ENV_UNIVERSAL_1_5},
 };
 
 static int _findTargetIndex(const char* name)
@@ -551,15 +568,22 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
 
     switch (ver)
     {
-        case 0x100:     return SPV_ENV_UNIVERSAL_1_0;
-        case 0x101:     return SPV_ENV_UNIVERSAL_1_1;
-        case 0x102:     return SPV_ENV_UNIVERSAL_1_2;
-        case 0x103:     return SPV_ENV_UNIVERSAL_1_3;
-        case 0x104:     return SPV_ENV_UNIVERSAL_1_4;
-        case 0x105:     return SPV_ENV_UNIVERSAL_1_5;
-        case 0x106:     return SPV_ENV_UNIVERSAL_1_6;
-        default:
-        {            
+    case 0x100:
+        return SPV_ENV_UNIVERSAL_1_0;
+    case 0x101:
+        return SPV_ENV_UNIVERSAL_1_1;
+    case 0x102:
+        return SPV_ENV_UNIVERSAL_1_2;
+    case 0x103:
+        return SPV_ENV_UNIVERSAL_1_3;
+    case 0x104:
+        return SPV_ENV_UNIVERSAL_1_4;
+    case 0x105:
+        return SPV_ENV_UNIVERSAL_1_5;
+    case 0x106:
+        return SPV_ENV_UNIVERSAL_1_6;
+    default:
+        {
             if (ver > 0x106)
             {
                 // This is the highest we known for now..., so try that
@@ -578,25 +602,28 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
     assert(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
 
     EShLanguage glslangStage;
-    switch( request.slangStage )
+    switch (request.slangStage)
     {
-#define CASE(SP, GL) case SLANG_STAGE_##SP: glslangStage = EShLang##GL; break
-    CASE(VERTEX,    Vertex);
-    CASE(FRAGMENT,  Fragment);
-    CASE(GEOMETRY,  Geometry);
-    CASE(HULL,      TessControl);
-    CASE(DOMAIN,    TessEvaluation);
-    CASE(COMPUTE,   Compute);
+#define CASE(SP, GL)                \
+    case SLANG_STAGE_##SP:          \
+        glslangStage = EShLang##GL; \
+        break
+        CASE(VERTEX, Vertex);
+        CASE(FRAGMENT, Fragment);
+        CASE(GEOMETRY, Geometry);
+        CASE(HULL, TessControl);
+        CASE(DOMAIN, TessEvaluation);
+        CASE(COMPUTE, Compute);
 
-    CASE(RAY_GENERATION,    RayGenNV);
-    CASE(INTERSECTION,      IntersectNV);
-    CASE(ANY_HIT,           AnyHitNV);
-    CASE(CLOSEST_HIT,       ClosestHitNV);
-    CASE(MISS,              MissNV);
-    CASE(CALLABLE,          CallableNV);
+        CASE(RAY_GENERATION, RayGenNV);
+        CASE(INTERSECTION, IntersectNV);
+        CASE(ANY_HIT, AnyHitNV);
+        CASE(CLOSEST_HIT, ClosestHitNV);
+        CASE(MISS, MissNV);
+        CASE(CALLABLE, CallableNV);
 
-    CASE(MESH,          Mesh);
-    CASE(AMPLIFICATION, Task);
+        CASE(MESH, Mesh);
+        CASE(AMPLIFICATION, Task);
 #undef CASE
 
     default:
@@ -621,10 +648,12 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
         }
     }
 
-    // If a version is specified, and no target language is specified, set to universal version of that SPIR-V version
+    // If a version is specified, and no target language is specified, set to universal version of
+    // that SPIR-V version
     if (request.spirvVersion.major != 0 && targetLanguage == glslang::EShTargetLanguageVersion(0))
     {
-        targetLanguage = _makeTargetLanguageVersion(request.spirvVersion.major, request.spirvVersion.minor);
+        targetLanguage =
+            _makeTargetLanguageVersion(request.spirvVersion.major, request.spirvVersion.minor);
     }
 
     // If we don't have a target, but do have a language, use that to determine a universal target
@@ -633,7 +662,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
         // We can just use the appropriate universal based on the target language
         targetEnv = _getUniversalTargetEnv(targetLanguage);
     }
-    
+
     // TODO: compute glslang stage to use
 
     glslang::TShader* shader = new glslang::TShader(glslangStage);
@@ -654,11 +683,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
     int sourceTextLength = (int)(sourceTextEnd - sourceText);
 
     shader->setPreamble("#extension GL_GOOGLE_cpp_style_line_directive : require\n");
-    shader->setStringsWithLengthsAndNames(
-        &sourceText,
-        &sourceTextLength,
-        &request.sourcePath,
-        1);
+    shader->setStringsWithLengthsAndNames(&sourceText, &sourceTextLength, &request.sourcePath, 1);
 
     // Options for compilation of glsl to Spv
 
@@ -710,10 +735,10 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
         }
     }
 
-    for(int stage = 0; stage < EShLangCount; ++stage)
+    for (int stage = 0; stage < EShLangCount; ++stage)
     {
         auto stageIntermediate = program->getIntermediate((EShLanguage)stage);
-        if(!stageIntermediate)
+        if (!stageIntermediate)
             continue;
         if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
         {
@@ -723,7 +748,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
         std::vector<unsigned int> spirv;
         spv::SpvBuildLogger logger;
 
-        // Copy options to make sure spvOptions not altered 
+        // Copy options to make sure spvOptions not altered
         glslang::SpvOptions copySpvOptions(spvOptions);
 
         glslang::GlslangToSpv(*stageIntermediate, spirv, &logger, &copySpvOptions);
@@ -741,18 +766,28 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
                     // Count the number of errors
                     optErrorCount += int(diag.level <= SPV_MSG_ERROR);
 
-                    // Note this string does not have \n. 
+                    // Note this string does not have \n.
                     std::string diagString = diag.toString();
 
                     // Dump
-                    dump(diagString.c_str(), diagString.length(), request.diagnosticFunc, request.diagnosticUserData, stderr);
+                    dump(
+                        diagString.c_str(),
+                        diagString.length(),
+                        request.diagnosticFunc,
+                        request.diagnosticUserData,
+                        stderr);
                 }
             }
         }
 
         dumpDiagnostics(request, logger.getAllMessages());
 
-        dump(spirv.data(), spirv.size() * sizeof(unsigned int), request.outputFunc, request.outputUserData, stdout);
+        dump(
+            spirv.data(),
+            spirv.size() * sizeof(unsigned int),
+            request.outputFunc,
+            request.outputUserData,
+            stdout);
 
         if (optErrorCount > 0)
         {
@@ -775,7 +810,10 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_2& request)
 
     std::string result;
     spvtools::SpirvTools spirvTools(SPV_ENV_UNIVERSAL_1_5);
-    spirvTools.Disassemble(spirv, &result, SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES | SPV_BINARY_TO_TEXT_OPTION_COMMENT);
+    spirvTools.Disassemble(
+        spirv,
+        &result,
+        SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES | SPV_BINARY_TO_TEXT_OPTION_COMMENT);
 
     dump(result.c_str(), result.length(), request.outputFunc, request.outputUserData, stdout);
     return 0;
@@ -785,10 +823,7 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_2& request)
 class ProcessInitializer
 {
 public:
-    ProcessInitializer()
-    {
-        m_isInitialized = false;
-    }
+    ProcessInitializer() { m_isInitialized = false; }
 
     bool init()
     {
@@ -822,21 +857,21 @@ static int _compile(const glslang_CompileRequest_1_2& request)
     int result = 0;
     switch (request.action)
     {
-        default:
-            result = 1;
-            break;
+    default:
+        result = 1;
+        break;
 
-        case GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV:
-            result = glslang_compileGLSLToSPIRV(request);
-            break;
+    case GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV:
+        result = glslang_compileGLSLToSPIRV(request);
+        break;
 
-        case GLSLANG_ACTION_DISSASSEMBLE_SPIRV:
-            result = glslang_dissassembleSPIRV(request);
-            break;
-        
-        case GLSLANG_ACTION_OPTIMIZE_SPIRV:
-            result = spirv_Optimize_1_2(request);
-            break;
+    case GLSLANG_ACTION_DISSASSEMBLE_SPIRV:
+        result = glslang_dissassembleSPIRV(request);
+        break;
+
+    case GLSLANG_ACTION_OPTIMIZE_SPIRV:
+        result = spirv_Optimize_1_2(request);
+        break;
     }
 
     return result;
@@ -844,11 +879,11 @@ static int _compile(const glslang_CompileRequest_1_2& request)
 
 extern "C"
 #ifdef _MSC_VER
-_declspec(dllexport)
+    _declspec(dllexport)
 #else
-__attribute__((__visibility__("default")))
+    __attribute__((__visibility__("default")))
 #endif
-int glslang_compile_1_2(glslang_CompileRequest_1_2 * inRequest)
+        int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
 {
     static ProcessInitializer g_processInitializer;
     if (!g_processInitializer.init())
@@ -871,7 +906,8 @@ int glslang_compile_1_2(glslang_CompileRequest_1_2 * inRequest)
         glslang_CompileRequest_1_2 request;
 
         // Copy into request
-        const size_t copySize = (inRequest->sizeInBytes > sizeof(request)) ? sizeof(request) : inRequest->sizeInBytes;
+        const size_t copySize =
+            (inRequest->sizeInBytes > sizeof(request)) ? sizeof(request) : inRequest->sizeInBytes;
         ::memcpy(&request, inRequest, copySize);
         // Zero any remaining members
         memset(((uint8_t*)&request) + copySize, 0, sizeof(request) - copySize);
@@ -882,11 +918,11 @@ int glslang_compile_1_2(glslang_CompileRequest_1_2 * inRequest)
 
 extern "C"
 #ifdef _MSC_VER
-_declspec(dllexport)
+    _declspec(dllexport)
 #else
-__attribute__((__visibility__("default")))
+    __attribute__((__visibility__("default")))
 #endif
-int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
+        int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
 {
     glslang_CompileRequest_1_2 request;
     memset(&request, 0, sizeof(request));
@@ -897,11 +933,11 @@ int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
 
 extern "C"
 #ifdef _MSC_VER
-_declspec(dllexport)
+    _declspec(dllexport)
 #else
-__attribute__((__visibility__("default")))
+    __attribute__((__visibility__("default")))
 #endif
-int glslang_compile(glslang_CompileRequest_1_0* inRequest)
+        int glslang_compile(glslang_CompileRequest_1_0* inRequest)
 {
     glslang_CompileRequest_1_1 request;
     memset(&request, 0, sizeof(request));

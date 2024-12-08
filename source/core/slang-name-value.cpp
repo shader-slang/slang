@@ -2,12 +2,16 @@
 
 #include "slang-name-value.h"
 
-#include "slang-string-util.h"
 #include "slang-char-util.h"
+#include "slang-string-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
-/* static */ValueInt NameValueUtil::findValue(const ConstArrayView<NameValue>& opts, const UnownedStringSlice& slice, ValueInt defaultValue)
+/* static */ ValueInt NameValueUtil::findValue(
+    const ConstArrayView<NameValue>& opts,
+    const UnownedStringSlice& slice,
+    ValueInt defaultValue)
 {
     for (const auto& opt : opts)
     {
@@ -19,7 +23,10 @@ namespace Slang {
     return defaultValue;
 }
 
-/* static */ValueInt NameValueUtil::findValue(const ConstArrayView<NamesValue>& opts, const UnownedStringSlice& slice, ValueInt defaultValue)
+/* static */ ValueInt NameValueUtil::findValue(
+    const ConstArrayView<NamesValue>& opts,
+    const UnownedStringSlice& slice,
+    ValueInt defaultValue)
 {
     for (const auto& opt : opts)
     {
@@ -33,7 +40,10 @@ namespace Slang {
     return defaultValue;
 }
 
-/* static */ValueInt NameValueUtil::findValue(const ConstArrayView<NamesDescriptionValue>& opts, const UnownedStringSlice& slice, ValueInt defaultValue)
+/* static */ ValueInt NameValueUtil::findValue(
+    const ConstArrayView<NamesDescriptionValue>& opts,
+    const UnownedStringSlice& slice,
+    ValueInt defaultValue)
 {
     for (const auto& opt : opts)
     {
@@ -46,7 +56,10 @@ namespace Slang {
     return defaultValue;
 }
 
-/* static */ UnownedStringSlice NameValueUtil::findName(const ConstArrayView<NameValue>& opts, ValueInt value, const UnownedStringSlice& defaultName)
+/* static */ UnownedStringSlice NameValueUtil::findName(
+    const ConstArrayView<NameValue>& opts,
+    ValueInt value,
+    const UnownedStringSlice& defaultName)
 {
     for (const auto& opt : opts)
     {
@@ -58,7 +71,10 @@ namespace Slang {
     return defaultName;
 }
 
-/* static */ UnownedStringSlice NameValueUtil::findName(const ConstArrayView<NamesValue>& opts, ValueInt value, const UnownedStringSlice& defaultName)
+/* static */ UnownedStringSlice NameValueUtil::findName(
+    const ConstArrayView<NamesValue>& opts,
+    ValueInt value,
+    const UnownedStringSlice& defaultName)
 {
     for (const auto& opt : opts)
     {
@@ -72,7 +88,10 @@ namespace Slang {
     return defaultName;
 }
 
-/* static */ UnownedStringSlice NameValueUtil::findName(const ConstArrayView<NamesDescriptionValue>& opts, ValueInt value, const UnownedStringSlice& defaultName)
+/* static */ UnownedStringSlice NameValueUtil::findName(
+    const ConstArrayView<NamesDescriptionValue>& opts,
+    ValueInt value,
+    const UnownedStringSlice& defaultName)
 {
     for (const auto& opt : opts)
     {
@@ -87,7 +106,10 @@ namespace Slang {
 }
 
 
-/* static */UnownedStringSlice NameValueUtil::findDescription(const ConstArrayView<NamesDescriptionValue>& opts, ValueInt value, const UnownedStringSlice& defaultDescription)
+/* static */ UnownedStringSlice NameValueUtil::findDescription(
+    const ConstArrayView<NamesDescriptionValue>& opts,
+    ValueInt value,
+    const UnownedStringSlice& defaultDescription)
 {
     for (const auto& opt : opts)
     {
@@ -100,7 +122,10 @@ namespace Slang {
     return defaultDescription;
 }
 
-/* static */ void NameValueUtil::appendNames(NameKind kind, const ConstArrayView<NameValue>& opts, List<UnownedStringSlice>& out)
+/* static */ void NameValueUtil::appendNames(
+    NameKind kind,
+    const ConstArrayView<NameValue>& opts,
+    List<UnownedStringSlice>& out)
 {
     SLANG_UNUSED(kind);
     for (auto& opt : opts)
@@ -109,7 +134,10 @@ namespace Slang {
     }
 }
 
-static void _appendNames(NameValueUtil::NameKind kind, const char* names, List<UnownedStringSlice>& out)
+static void _appendNames(
+    NameValueUtil::NameKind kind,
+    const char* names,
+    List<UnownedStringSlice>& out)
 {
     if (kind == NameValueUtil::NameKind::All)
     {
@@ -121,7 +149,10 @@ static void _appendNames(NameValueUtil::NameKind kind, const char* names, List<U
     }
 }
 
-/* static */ void NameValueUtil::appendNames(NameKind kind, const ConstArrayView<NamesValue>& opts, List<UnownedStringSlice>& out)
+/* static */ void NameValueUtil::appendNames(
+    NameKind kind,
+    const ConstArrayView<NamesValue>& opts,
+    List<UnownedStringSlice>& out)
 {
     for (auto& opt : opts)
     {
@@ -129,7 +160,10 @@ static void _appendNames(NameValueUtil::NameKind kind, const char* names, List<U
     }
 }
 
-/* static */ void NameValueUtil::appendNames(NameKind kind, const ConstArrayView<NamesDescriptionValue>& opts, List<UnownedStringSlice>& out)
+/* static */ void NameValueUtil::appendNames(
+    NameKind kind,
+    const ConstArrayView<NamesDescriptionValue>& opts,
+    List<UnownedStringSlice>& out)
 {
     for (auto& opt : opts)
     {
@@ -137,21 +171,27 @@ static void _appendNames(NameValueUtil::NameKind kind, const char* names, List<U
     }
 }
 
-/* static */ List<UnownedStringSlice> NameValueUtil::getNames(NameKind kind, const ConstArrayView<NameValue>& opts)
+/* static */ List<UnownedStringSlice> NameValueUtil::getNames(
+    NameKind kind,
+    const ConstArrayView<NameValue>& opts)
 {
     List<UnownedStringSlice> names;
     appendNames(kind, opts, names);
     return names;
 }
 
-/* static */ List<UnownedStringSlice> NameValueUtil::getNames(NameKind kind, const ConstArrayView<NamesValue>& opts)
+/* static */ List<UnownedStringSlice> NameValueUtil::getNames(
+    NameKind kind,
+    const ConstArrayView<NamesValue>& opts)
 {
     List<UnownedStringSlice> names;
     appendNames(kind, opts, names);
     return names;
 }
 
-/* static */ List<UnownedStringSlice> NameValueUtil::getNames(NameKind kind, const ConstArrayView<NamesDescriptionValue>& opts)
+/* static */ List<UnownedStringSlice> NameValueUtil::getNames(
+    NameKind kind,
+    const ConstArrayView<NamesDescriptionValue>& opts)
 {
     List<UnownedStringSlice> names;
     appendNames(kind, opts, names);
@@ -159,5 +199,3 @@ static void _appendNames(NameValueUtil::NameKind kind, const char* names, List<U
 }
 
 } // namespace Slang
-
-

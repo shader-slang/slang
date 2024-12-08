@@ -6,6 +6,8 @@
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
 //metal currently does not support `double` 
 //DISABLE_TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl -output-using-type
+// Not supported in WGSL: Double and other unsupported scalar types
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // BUF:      type: int32_t
 // BUF-NEXT: 1

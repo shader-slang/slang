@@ -65,7 +65,8 @@ VkDescriptorType ShaderObjectLayoutImpl::Builder::_mapDescriptorType(
 /// sub-object described by `typeLayout`, at the given `offset`.
 
 void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
-    slang::TypeLayoutReflection* typeLayout, BindingOffset const& offset)
+    slang::TypeLayoutReflection* typeLayout,
+    BindingOffset const& offset)
 {
     // First we will scan through all the descriptor sets that the Slang reflection
     // information believes go into making up the given type.
@@ -126,7 +127,8 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
         {
             Index descriptorRangeIndex = firstDescriptorRangeIndex + j;
             auto slangDescriptorType = typeLayout->getDescriptorSetDescriptorRangeType(
-                slangDescriptorSetIndex, descriptorRangeIndex);
+                slangDescriptorSetIndex,
+                descriptorRangeIndex);
 
             // Certain kinds of descriptor ranges reflected by Slang do not
             // manifest as descriptors at the Vulkan level, so we will skip those.
@@ -145,10 +147,12 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
             VkDescriptorSetLayoutBinding vkBindingRangeDesc = {};
             vkBindingRangeDesc.binding =
                 offset.binding + (uint32_t)typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
-                                     slangDescriptorSetIndex, descriptorRangeIndex);
+                                     slangDescriptorSetIndex,
+                                     descriptorRangeIndex);
             vkBindingRangeDesc.descriptorCount =
                 (uint32_t)typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(
-                    slangDescriptorSetIndex, descriptorRangeIndex);
+                    slangDescriptorSetIndex,
+                    descriptorRangeIndex);
             vkBindingRangeDesc.descriptorType = vkDescriptorType;
             vkBindingRangeDesc.stageFlags = VK_SHADER_STAGE_ALL;
 
@@ -221,7 +225,9 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
                 elementOffset += BindingOffset(elementVarLayout);
 
                 _addDescriptorRangesAsConstantBuffer(
-                    elementTypeLayout, containerOffset, elementOffset);
+                    elementTypeLayout,
+                    containerOffset,
+                    elementOffset);
             }
             break;
 
@@ -252,7 +258,9 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
                 elementOffset += BindingOffset(elementVarLayout);
 
                 _addDescriptorRangesAsPushConstantBuffer(
-                    elementTypeLayout, containerOffset, elementOffset);
+                    elementTypeLayout,
+                    containerOffset,
+                    elementOffset);
             }
             break;
         }
@@ -416,7 +424,8 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
 
             auto set = typeLayout->getDescriptorSetSpaceOffset(descriptorSetIndex);
             auto bindingOffset = typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
-                descriptorSetIndex, descriptorRangeIndex);
+                descriptorSetIndex,
+                descriptorRangeIndex);
 
             bindingRangeInfo.setOffset = uint32_t(set);
             bindingRangeInfo.bindingOffset = uint32_t(bindingOffset);
@@ -449,7 +458,10 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
                 auto varLayout = slangLeafTypeLayout->getElementVarLayout();
                 auto subTypeLayout = varLayout->getTypeLayout();
                 ShaderObjectLayoutImpl::createForElementType(
-                    m_renderer, m_session, subTypeLayout, subObjectLayout.writeRef());
+                    m_renderer,
+                    m_session,
+                    subTypeLayout,
+                    subObjectLayout.writeRef());
             }
             break;
 
@@ -457,7 +469,10 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
             if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
             {
                 ShaderObjectLayoutImpl::createForElementType(
-                    m_renderer, m_session, pendingTypeLayout, subObjectLayout.writeRef());
+                    m_renderer,
+                    m_session,
+                    pendingTypeLayout,
+                    subObjectLayout.writeRef());
             }
             break;
         }
@@ -602,7 +617,9 @@ Result ShaderObjectLayoutImpl::createForElementType(
     // since that is how things will be laid out inside the parameter block.
     //
     builder._addDescriptorRangesAsConstantBuffer(
-        builder.m_elementTypeLayout, containerOffset, elementOffset);
+        builder.m_elementTypeLayout,
+        containerOffset,
+        elementOffset);
     return builder.build(outLayout);
 }
 
@@ -611,7 +628,9 @@ ShaderObjectLayoutImpl::~ShaderObjectLayoutImpl()
     for (auto& descSetInfo : m_descriptorSetInfos)
     {
         getDevice()->m_api.vkDestroyDescriptorSetLayout(
-            getDevice()->m_api.m_device, descSetInfo.descriptorSetLayout, nullptr);
+            getDevice()->m_api.m_device,
+            descSetInfo.descriptorSetLayout,
+            nullptr);
     }
 }
 
@@ -645,7 +664,10 @@ Result ShaderObjectLayoutImpl::_init(Builder const* builder)
         createInfo.bindingCount = (uint32_t)descriptorSetInfo.vkBindings.getCount();
         VkDescriptorSetLayout vkDescSetLayout;
         SLANG_RETURN_ON_FAIL(renderer->m_api.vkCreateDescriptorSetLayout(
-            renderer->m_api.m_device, &createInfo, nullptr, &vkDescSetLayout));
+            renderer->m_api.m_device,
+            &createInfo,
+            nullptr,
+            &vkDescSetLayout));
         descriptorSetInfo.descriptorSetLayout = vkDescSetLayout;
     }
     return SLANG_OK;
@@ -693,7 +715,9 @@ RootShaderObjectLayout::~RootShaderObjectLayout()
     if (m_pipelineLayout)
     {
         m_renderer->m_api.vkDestroyPipelineLayout(
-            m_renderer->m_api.m_device, m_pipelineLayout, nullptr);
+            m_renderer->m_api.m_device,
+            m_pipelineLayout,
+            nullptr);
     }
 }
 
@@ -790,7 +814,10 @@ Result RootShaderObjectLayout::_init(Builder const* builder)
         pipelineLayoutCreateInfo.pPushConstantRanges = m_allPushConstantRanges.getBuffer();
     }
     SLANG_RETURN_ON_FAIL(m_renderer->m_api.vkCreatePipelineLayout(
-        m_renderer->m_api.m_device, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout));
+        m_renderer->m_api.m_device,
+        &pipelineLayoutCreateInfo,
+        nullptr,
+        &m_pipelineLayout));
     return SLANG_OK;
 }
 

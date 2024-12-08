@@ -2,7 +2,6 @@
 #include "gpu-printing.h"
 
 #include <assert.h>
-
 #include <string.h>
 
 // This file implements the CPU side of a simple GPU printing
@@ -39,7 +38,7 @@ void GPUPrinting::loadStrings(slang::ProgramLayout* slangReflection)
     // that appear in the linked program.
     //
     SlangUInt hashedStringCount = slangReflection->getHashedStringCount();
-    for( SlangUInt ii = 0; ii < hashedStringCount; ++ii )
+    for (SlangUInt ii = 0; ii < hashedStringCount; ++ii)
     {
         // For each string we can fetch its bytes from the Slang
         // reflection data.
@@ -59,7 +58,8 @@ void GPUPrinting::loadStrings(slang::ProgramLayout* slangReflection)
         // The `GPUPrinting` implementation will store the mapping
         // from hash codes back to strings in a simple STL `map`.
         //
-        m_hashedStrings.insert(std::make_pair(hash, std::string(stringData, stringData + stringSize)));
+        m_hashedStrings.insert(
+            std::make_pair(hash, std::string(stringData, stringData + stringSize)));
     }
 }
 
@@ -73,12 +73,12 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
     // a granularity of 32-bits words, so we start by computing
     // how many words, total, will fit in the buffer.
     //
-    uint32_t dataWordCount = uint32_t(dataSize/ sizeof(uint32_t));
+    uint32_t dataWordCount = uint32_t(dataSize / sizeof(uint32_t));
     //
     // If the buffer doesn't even have enough space for the leading counter,
     // then there is nothing to print.
     //
-    if( dataWordCount < 1 )
+    if (dataWordCount < 1)
     {
         fprintf(stderr, "error: expected at least 4 bytes in GPU printing buffer\n");
         return;
@@ -87,7 +87,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
     // Otherwise, we set ourselves up to start reading data from the buffer
     // at a granularity of 32-bit words.
     //
-    const uint32_t* dataCursor = (const uint32_t*) data;
+    const uint32_t* dataCursor = (const uint32_t*)data;
 
     // The first word of a printing buffer gives us the total number of
     // words that were appended by GPU printing operations.
@@ -106,20 +106,25 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
     // larger buffer.
     //
     size_t totalBytesWritten = sizeof(uint32_t) * (wordsAppended + 1);
-    if( totalBytesWritten > dataSize )
+    if (totalBytesWritten > dataSize)
     {
-        fprintf(stderr, "warning: GPU code attempted to write %llu bytes to the printing buffer, but only %llu bytes were available\n", (unsigned long long)totalBytesWritten, (unsigned long long)dataSize);
+        fprintf(
+            stderr,
+            "warning: GPU code attempted to write %llu bytes to the printing buffer, but only %llu "
+            "bytes were available\n",
+            (unsigned long long)totalBytesWritten,
+            (unsigned long long)dataSize);
 
         // If the buffer is full, then we only want to read through
         // to the end of what is available.
         //
-        dataEnd = ((const uint32_t*) data) + dataWordCount;
+        dataEnd = ((const uint32_t*)data) + dataWordCount;
     }
 
     // We will now proceed to read off "commands" from the buffer,
     // and execute those commands to print things to `stdout`.
     //
-    while( dataCursor < dataEnd )
+    while (dataCursor < dataEnd)
     {
         // The first word of each command is encoded to hold both
         // an "opcode" for the command, and the number of "payload"
@@ -135,7 +140,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
         // avoid crashes from a command trying to fetch data past
         // the end of the buffer.
         //
-        if( payloadWordCount > size_t(dataCursor - dataEnd) )
+        if (payloadWordCount > size_t(dataCursor - dataEnd))
         {
             break;
         }
@@ -149,7 +154,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
         dataCursor += payloadWordCount;
 
         // What to do with a command depends a lot on which "op" was selected.
-        switch( op )
+        switch (op)
         {
         default:
             // If we encounter an op that we don't understand, there is a change
@@ -176,21 +181,21 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
             // We will use a macro to avoid duplication the code shared
             // between these cases.
             //
-    #define CASE(OP, FORMAT, TYPE)                                              \
-        case GPUPrintingOp::OP:                                                 \
-            {                                                                   \
-                TYPE value;                                                     \
-                assert(payloadWordCount >= (sizeof(value) / sizeof(uint32_t))); \
-                memcpy(&value, payloadWords, sizeof(value));                    \
-                printf(FORMAT, value);                                          \
-            }                                                                   \
-            break
+#define CASE(OP, FORMAT, TYPE)                                              \
+    case GPUPrintingOp::OP:                                                 \
+        {                                                                   \
+            TYPE value;                                                     \
+            assert(payloadWordCount >= (sizeof(value) / sizeof(uint32_t))); \
+            memcpy(&value, payloadWords, sizeof(value));                    \
+            printf(FORMAT, value);                                          \
+        }                                                                   \
+        break
 
-        CASE(Int32,     "%d", int);
-        CASE(UInt32,    "%u", unsigned int);
-        CASE(Float32,   "%f", float);
+            CASE(Int32, "%d", int);
+            CASE(UInt32, "%u", unsigned int);
+            CASE(Float32, "%f", float);
 
-    #undef CASE
+#undef CASE
 
         case GPUPrintingOp::String:
             {
@@ -214,7 +219,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                 // to appear in the GPU code.
                 //
                 auto iter = m_hashedStrings.find(hash);
-                if(iter == m_hashedStrings.end())
+                if (iter == m_hashedStrings.end())
                 {
                     // If we didn't have a string to match that hash code in
                     // our map, we can continue trying to print, but it is
@@ -230,7 +235,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                 //
                 // TODO: This code isn't robust against strings with
                 // embeded null bytes.
-                //s
+                // s
                 printf("%s", iter->second.c_str());
             }
             break;
@@ -248,7 +253,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                 StringHash formatHash = *payloadWords++;
 
                 auto iter = m_hashedStrings.find(formatHash);
-                if(iter == m_hashedStrings.end())
+                if (iter == m_hashedStrings.end())
                 {
                     // If we didn't have a string to match that hash code in
                     // our map, we can continue trying to print, but it is
@@ -270,14 +275,14 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                 //
                 const char* cursor = format.c_str();
                 const char* end = cursor + format.length();
-                while( cursor != end )
+                while (cursor != end)
                 {
                     int c = *cursor++;
 
                     // If we see a byte other than `%`, then we can just
                     // output it directly and keep scanning the format string.
                     //
-                    if( c != '%' )
+                    if (c != '%')
                     {
                         putchar(c);
                         continue;
@@ -289,7 +294,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                     // If we are somehow at the end of the format
                     // string, then the format was bad.
                     //
-                    if( cursor == end )
+                    if (cursor == end)
                     {
                         fprintf(stderr, "error: unexpected '%%' at and of format string\n");
                         break;
@@ -299,7 +304,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                     // the `%` character, then it is an escaped
                     // `%` so we should just emit it as-is and move along.
                     //
-                    if( *cursor == '%' )
+                    if (*cursor == '%')
                     {
                         putchar(*cursor++);
                         continue;
@@ -317,52 +322,56 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                     // read a single-byte specifier.
                     //
                     int specifier = *cursor++;
-                    switch( specifier )
+                    switch (specifier)
                     {
                     default:
-                        fprintf(stderr, "error: unexpected format specifier '%c' (0x%X)\n", specifier, specifier);
+                        fprintf(
+                            stderr,
+                            "error: unexpected format specifier '%c' (0x%X)\n",
+                            specifier,
+                            specifier);
                         break;
 
 
-                    // When processing each format speecifier, we will
-                    // read words from the payload, as necessary
-                    // to yield a value of the expected type.
-                    //
-                    // To reduce the amount of boilerplate, we will
-                    // use a macro to capture the shared code for
-                    // common cases.
-                    //
-                #define CASE(CHAR, FORMAT, TYPE)                                \
-                    case CHAR:                                                  \
-                        {                                                       \
-                            assert(payloadWords != payloadWordsEnd);            \
-                            TYPE value;                                         \
-                            memcpy(&value, payloadWords, sizeof(value));        \
-                            payloadWords += sizeof(value) / sizeof(uint32_t);   \
-                            printf(FORMAT, value);                              \
-                        }                                                       \
-                        break
+                        // When processing each format speecifier, we will
+                        // read words from the payload, as necessary
+                        // to yield a value of the expected type.
+                        //
+                        // To reduce the amount of boilerplate, we will
+                        // use a macro to capture the shared code for
+                        // common cases.
+                        //
+#define CASE(CHAR, FORMAT, TYPE)                              \
+    case CHAR:                                                \
+        {                                                     \
+            assert(payloadWords != payloadWordsEnd);          \
+            TYPE value;                                       \
+            memcpy(&value, payloadWords, sizeof(value));      \
+            payloadWords += sizeof(value) / sizeof(uint32_t); \
+            printf(FORMAT, value);                            \
+        }                                                     \
+        break
 
                     case 'i': // `%i` is just an alias for `%d`
-                    CASE('d', "%d", int);
-                    CASE('u', "%u", unsigned int);
-                    CASE('x', "%x", unsigned int);
-                    CASE('X', "%X", unsigned int);
+                        CASE('d', "%d", int);
+                        CASE('u', "%u", unsigned int);
+                        CASE('x', "%x", unsigned int);
+                        CASE('X', "%X", unsigned int);
 
-                    // Note: all of our printing support for floating-point
-                    // values will use the `float` type instead of `double`.
-                    // This isn't compatible with C rules, but makes more sense
-                    // for GPU code.
-                    //
-                    CASE('f', "%f", float);
-                    CASE('F', "%F", float);
-                    CASE('e', "%e", float);
-                    CASE('E', "%E", float);
-                    CASE('g', "%g", float);
-                    CASE('G', "%G", float);
-                    CASE('c', "%c", int);
+                        // Note: all of our printing support for floating-point
+                        // values will use the `float` type instead of `double`.
+                        // This isn't compatible with C rules, but makes more sense
+                        // for GPU code.
+                        //
+                        CASE('f', "%f", float);
+                        CASE('F', "%F", float);
+                        CASE('e', "%e", float);
+                        CASE('E', "%E", float);
+                        CASE('g', "%g", float);
+                        CASE('G', "%G", float);
+                        CASE('c', "%c", int);
 
-                #undef CASE
+#undef CASE
 
                     case 's':
                         {
@@ -373,7 +382,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                             assert(payloadWords != payloadWordsEnd);
                             StringHash hash = *payloadWords++;
                             auto iter = m_hashedStrings.find(hash);
-                            if(iter == m_hashedStrings.end())
+                            if (iter == m_hashedStrings.end())
                             {
                                 fprintf(stderr, "error: string with unknown hash 0x%x\n", hash);
                                 continue;
@@ -387,6 +396,4 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
             break;
         }
     }
-
-
 }

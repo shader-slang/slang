@@ -3,10 +3,11 @@ on:
   pull_request:
     types: [opened, labeled, unlabeled, synchronize]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
+      - "README.md"
 jobs:
   label:
     runs-on: ubuntu-latest

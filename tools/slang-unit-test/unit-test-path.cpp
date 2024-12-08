@@ -1,8 +1,7 @@
 // unit-test-path.cpp
 
 #include "../../source/core/slang-io.h"
-
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
@@ -37,7 +36,9 @@ SLANG_UNIT_TEST(path)
 
         SLANG_CHECK(Path::simplify("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\") == "a:/../this");
 
-        SLANG_CHECK(Path::simplify("tests/preprocessor/.\\pragma-once-a.h") == "tests/preprocessor/pragma-once-a.h");
+        SLANG_CHECK(
+            Path::simplify("tests/preprocessor/.\\pragma-once-a.h") ==
+            "tests/preprocessor/pragma-once-a.h");
 
 
         SLANG_CHECK(Path::hasRelativeElement("."));
@@ -55,8 +56,5 @@ SLANG_UNIT_TEST(path)
         SLANG_CHECK(Path::hasRelativeElement("a:/what/.././../is/./../this/./"));
 
         SLANG_CHECK(Path::hasRelativeElement("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\"));
-
-
     }
 }
-

@@ -1,7 +1,6 @@
 // debug-helper-functions.h
 #pragma once
 #include "debug-base.h"
-
 #include "debug-buffer.h"
 #include "debug-command-buffer.h"
 #include "debug-command-queue.h"
@@ -29,13 +28,13 @@ namespace debug
 {
 
 #ifdef __FUNCSIG__
-#    define SLANG_FUNC_SIG __FUNCSIG__
+#define SLANG_FUNC_SIG __FUNCSIG__
 #elif defined(__PRETTY_FUNCTION__)
-#    define SLANG_FUNC_SIG __FUNCSIG__
+#define SLANG_FUNC_SIG __FUNCSIG__
 #elif defined(__FUNCTION__)
-#    define SLANG_FUNC_SIG __FUNCTION__
+#define SLANG_FUNC_SIG __FUNCTION__
 #else
-#    define SLANG_FUNC_SIG "UnknownFunction"
+#define SLANG_FUNC_SIG "UnknownFunction"
 #endif
 
 extern thread_local const char* _currentFunctionName;
@@ -50,12 +49,12 @@ struct SetCurrentFuncRAII
 /// Returns the public API function name from a `SLANG_FUNC_SIG` string.
 String _gfxGetFuncName(const char* input);
 
-template <typename... TArgs>
+template<typename... TArgs>
 char* _gfxDiagnoseFormat(
-    char* buffer, // Initial buffer to output formatted string.
-    size_t shortBufferSize, // Size of the initial buffer.
+    char* buffer,            // Initial buffer to output formatted string.
+    size_t shortBufferSize,  // Size of the initial buffer.
     List<char>& bufferArray, // A list for allocating a large buffer if needed.
-    const char* format, // The format string.
+    const char* format,      // The format string.
     TArgs... args)
 {
     int length = sprintf_s(buffer, shortBufferSize, format, args...);
@@ -70,7 +69,7 @@ char* _gfxDiagnoseFormat(
     return buffer;
 }
 
-template <typename... TArgs>
+template<typename... TArgs>
 void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args)
 {
     char shortBuffer[256];
@@ -103,7 +102,11 @@ void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args)
         char shortBuffer[256];                                                            \
         List<char> bufferArray;                                                           \
         auto message = _gfxDiagnoseFormat(                                                \
-            shortBuffer, sizeof(shortBuffer), bufferArray, format, __VA_ARGS__);          \
+            shortBuffer,                                                                  \
+            sizeof(shortBuffer),                                                          \
+            bufferArray,                                                                  \
+            format,                                                                       \
+            __VA_ARGS__);                                                                 \
         _gfxDiagnoseImpl(                                                                 \
             type,                                                                         \
             "%s: %s",                                                                     \
@@ -117,16 +120,16 @@ void _gfxDiagnoseImpl(DebugMessageType type, const char* format, TArgs... args)
     I##typeName* Debug##typeName::getInterface(const Slang::Guid& guid)                 \
     {                                                                                   \
         return (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_I##typeName) \
-                    ? static_cast<I##typeName*>(this)                                   \
-                    : nullptr;                                                          \
+                   ? static_cast<I##typeName*>(this)                                    \
+                   : nullptr;                                                           \
     }
 #define SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(typeName, parentType)                   \
     I##typeName* Debug##typeName::getInterface(const Slang::Guid& guid)                   \
     {                                                                                     \
         return (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_I##typeName || \
                 guid == GfxGUID::IID_I##parentType)                                       \
-                    ? static_cast<I##typeName*>(this)                                     \
-                    : nullptr;                                                            \
+                   ? static_cast<I##typeName*>(this)                                      \
+                   : nullptr;                                                             \
     }
 
 // Utility conversion functions to get Debug* object or the inner object from a user provided

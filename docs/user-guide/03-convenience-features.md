@@ -431,7 +431,7 @@ struct MyType
 
 int useVal(Optional<MyType> p)
 {
-    if (p == none)        // Equivalent to `p.hasValue`
+    if (p == none)        // Equivalent to `!p.hasValue`
         return 0;
     return p.value.val;
 }
@@ -537,45 +537,6 @@ Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is e
 
 - Slang currently does not support pointers to immutable values, i.e. `const T*`.
 
-## `struct` inheritance (limited)
-
-Slang supports a limited form of inheritance. A derived `struct` type has all the members defined in the base type it is inherited from:
-
-```csharp
-struct Base
-{
-    int a;
-    void method() {}
-} 
-
-struct Derived : Base { int b; }
-
-void test()
-{
-    Derived c;
-    c.a = 1;  // OK, a is inherited from `Base`.
-    c.b = 2;
-    c.method(); // OK, `method` is inherited from `Base`.
-}
-```
-
-A derived type can be implicitly casted to its base type:
-```csharp
-void acceptBase(Base b) { ... }
-void test()
-{
-    Derived c;
-    acceptBase(c); // OK, c is implicitly casted to `Base`.    
-}
-```
-
-Slang supports controlling whether a type can be inherited from with `[sealed]` and `[open]` attributes on types.
-If a base type is marked as `[sealed]`, then inheritance from the type is not allowed anywhere outside the same module (file) that is defining the base type. If a base type is marked as `[open]`, then inheritance is allowed regardless of the location of the derived type. By default, a type is `[sealed]` if no attributes are declared, which means the type can only be inherited by other types in the same module.
-
-### Limitations
-
-Please note that the support for inheritance is currently very limited. Common features that come with inheritance, such as `virtual` functions and multiple inheritance are not supported by the Slang compiler. Implicit down-casting to the base type and use the result as a `mutable` argument in a function call is also not supported.
-
 Extensions
 --------------------
 Slang allows defining additional methods for a type outside its initial definition. For example, suppose we already have a type defined:
@@ -606,7 +567,7 @@ void test()
 }
 ```
 
-This feature is similar to extensions in Swift and partial classes in C#.
+This feature is similar to extensions in Swift and extension methods in C#.
 
 > #### Note:
 > You can only extend a type with additional methods. Extending with additional data fields is not allowed.
@@ -711,7 +672,7 @@ struct MaxValueAttribute
 uniform int scaleFactor;
 ```
 
-In the above code, the `MaxValueAttribute` struct type is decorated with the `[__AttributeUsage]` attribute, which informs that `MaxValueAttribute` type should be interpreted as a definiton for a user-defined attribute, `[MaxValue]`, that can be used to decorate all variables or fields. The members of the struct defines the argument list for the attribute.
+In the above code, the `MaxValueAttribute` struct type is decorated with the `[__AttributeUsage]` attribute, which informs that `MaxValueAttribute` type should be interpreted as a definition for a user-defined attribute, `[MaxValue]`, that can be used to decorate all variables or fields. The members of the struct defines the argument list for the attribute.
 
 The `scaleFactor` uniform parameter is declared with the user defined `[MaxValue]` attribute, providing two arguments for `value` and `description`.
 

@@ -1,4 +1,5 @@
 #include "example-base.h"
+
 #include <chrono>
 
 #ifdef _WIN32
@@ -6,7 +7,7 @@
 #endif
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "external/stb/stb_image.h"
+#include "stb_image.h"
 
 using namespace Slang;
 using namespace gfx;
@@ -123,7 +124,11 @@ void WindowedAppBase::offlineRender()
     gTransientHeaps[0]->finish();
 }
 
-void WindowedAppBase::createFramebuffers(uint32_t width, uint32_t height, gfx::Format colorFormat, uint32_t frameBufferCount)
+void WindowedAppBase::createFramebuffers(
+    uint32_t width,
+    uint32_t height,
+    gfx::Format colorFormat,
+    uint32_t frameBufferCount)
 {
     for (uint32_t i = 0; i < frameBufferCount; i++)
     {
@@ -150,7 +155,8 @@ void WindowedAppBase::createFramebuffers(uint32_t width, uint32_t height, gfx::F
             colorBufferDesc.size.depth = 1;
             colorBufferDesc.format = colorFormat;
             colorBufferDesc.defaultState = ResourceState::RenderTarget;
-            colorBufferDesc.allowedStates = ResourceStateSet(ResourceState::RenderTarget, ResourceState::CopyDestination);
+            colorBufferDesc.allowedStates =
+                ResourceStateSet(ResourceState::RenderTarget, ResourceState::CopyDestination);
             colorBuffer = gDevice->createTextureResource(colorBufferDesc, nullptr);
         }
         else
@@ -194,14 +200,21 @@ void WindowedAppBase::createOfflineFramebuffers()
 void WindowedAppBase::createSwapchainFramebuffers()
 {
     gFramebuffers.clear();
-    createFramebuffers(gSwapchain->getDesc().width, gSwapchain->getDesc().height,
-                        gSwapchain->getDesc().format, kSwapchainImageCount);
+    createFramebuffers(
+        gSwapchain->getDesc().width,
+        gSwapchain->getDesc().height,
+        gSwapchain->getDesc().format,
+        kSwapchainImageCount);
 }
 
-ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(String fileName, int& textureWidth, int& textureHeight)
+ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(
+    String fileName,
+    int& textureWidth,
+    int& textureHeight)
 {
     int channelsInFile = 0;
-    auto textureContent = stbi_load(fileName.getBuffer(), &textureWidth, &textureHeight, &channelsInFile, 4);
+    auto textureContent =
+        stbi_load(fileName.getBuffer(), &textureWidth, &textureHeight, &channelsInFile, 4);
     gfx::ITextureResource::Desc textureDesc = {};
     textureDesc.allowedStates.add(ResourceState::ShaderResource);
     textureDesc.format = gfx::Format::R8G8B8A8_UNORM;
@@ -222,9 +235,22 @@ ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(String fileNam
     subresData[0].strideZ = textureWidth * textureHeight * 4;
 
     // Build mipmaps.
-    struct RGBA { uint8_t v[4]; };
-    auto castToRGBA = [](uint32_t v) { RGBA result; memcpy(&result, &v, 4); return result; };
-    auto castToUint = [](RGBA v) { uint32_t result; memcpy(&result, &v, 4); return result; };
+    struct RGBA
+    {
+        uint8_t v[4];
+    };
+    auto castToRGBA = [](uint32_t v)
+    {
+        RGBA result;
+        memcpy(&result, &v, 4);
+        return result;
+    };
+    auto castToUint = [](RGBA v)
+    {
+        uint32_t result;
+        memcpy(&result, &v, 4);
+        return result;
+    };
 
     int lastMipWidth = textureWidth;
     int lastMipHeight = textureHeight;
@@ -248,7 +274,8 @@ ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(String fileNam
                 RGBA pix;
                 for (int c = 0; c < 4; c++)
                 {
-                    pix.v[c] = (uint8_t)(((uint32_t)pix1.v[c] + pix2.v[c] + pix3.v[c] + pix4.v[c]) / 4);
+                    pix.v[c] =
+                        (uint8_t)(((uint32_t)pix1.v[c] + pix2.v[c] + pix3.v[c] + pix4.v[c]) / 4);
                 }
                 mipMapData[m][y * w + x] = castToUint(pix);
             }
@@ -286,15 +313,21 @@ void WindowedAppBase::windowSizeChanged()
     }
 }
 
-int64_t getCurrentTime() { return std::chrono::high_resolution_clock::now().time_since_epoch().count(); }
+int64_t getCurrentTime()
+{
+    return std::chrono::high_resolution_clock::now().time_since_epoch().count();
+}
 
-int64_t getTimerFrequency() { return std::chrono::high_resolution_clock::period::den; }
+int64_t getTimerFrequency()
+{
+    return std::chrono::high_resolution_clock::period::den;
+}
 
 class DebugCallback : public IDebugCallback
 {
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL
-        handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) override
+    handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) override
     {
         const char* typeStr = "";
         switch (type)
@@ -338,5 +371,8 @@ void initDebugCallback()
 }
 
 #ifdef _WIN32
-void _Win32OutputDebugString(const char* str) { OutputDebugStringW(Slang::String(str).toWString().begin()); }
+void _Win32OutputDebugString(const char* str)
+{
+    OutputDebugStringW(Slang::String(str).toWString().begin());
+}
 #endif

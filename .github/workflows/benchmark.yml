@@ -4,17 +4,19 @@ on:
   push:
     branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
+      - "README.md"
   pull_request:
     branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
+      - "README.md"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -23,10 +25,10 @@ jobs:
   build:
     runs-on: [Windows, self-hosted]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
-          fetch-depth: '0'
+          submodules: "recursive"
+          fetch-depth: "0"
       - name: Common setup
         uses: ./.github/actions/common-setup
         with:
@@ -39,10 +41,10 @@ jobs:
         run: |
           cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
           cmake --workflow --preset release
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          repository: 'shader-slang/MDL-SDK'
-          path: 'external/MDL-SDK'
+          repository: "shader-slang/MDL-SDK"
+          path: "external/MDL-SDK"
       - name: Run benchmark
         run: |
           cd tools/benchmark

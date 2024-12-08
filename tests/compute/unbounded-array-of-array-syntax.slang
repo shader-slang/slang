@@ -1,6 +1,6 @@
 //IGNORE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
-//TEST:CROSS_COMPILE:-target dxbc-assembly -entry computeMain -profile cs_5_1
+//TEST:SIMPLE(filecheck=DXIL):-target dxbc-assembly -entry computeMain -profile cs_5_1
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry computeMain -profile cs_5_1 -emit-spirv-via-glsl
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
@@ -16,6 +16,7 @@ RWStructuredBuffer<int> g_aoa[];
 [numthreads(8, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    // DXIL: cs_5_1
     // CHECK: OpCapability {{(ShaderNonUniform|StorageBufferArrayNonUniformIndexing)}}
     // CHECK: OpCapability {{(ShaderNonUniform|StorageBufferArrayNonUniformIndexing)}}
     // CHECK-DAG: OpDecorate %[[N1:[a-zA-Z0-9_]+]] NonUniform

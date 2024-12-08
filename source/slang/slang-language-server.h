@@ -1,13 +1,14 @@
 #pragma once
-#include <chrono>
-#include "slang.h"
-#include "../core/slang-range.h"
-#include "../compiler-core/slang-json-rpc.h"
 #include "../compiler-core/slang-json-rpc-connection.h"
-#include "slang-workspace-version.h"
-#include "slang-language-server-completion.h"
+#include "../compiler-core/slang-json-rpc.h"
+#include "../core/slang-range.h"
 #include "slang-language-server-auto-format.h"
+#include "slang-language-server-completion.h"
 #include "slang-language-server-inlay-hints.h"
+#include "slang-workspace-version.h"
+#include "slang.h"
+
+#include <chrono>
 
 namespace Slang
 {
@@ -18,7 +19,8 @@ struct Command
     PersistentJSONValue id;
     String method;
 
-    template <typename T> struct Optional
+    template<typename T>
+    struct Optional
     {
     public:
         T* value = nullptr;
@@ -84,11 +86,8 @@ struct LanguageServerStartupOptions
     SLANG_API void parse(int argc, const char* const* argv);
 };
 
-class LanguageServer
+class LanguageServerCore
 {
-private:
-    static const int kConfigResponseId = 0x1213;
-    
 public:
     enum class TraceOptions
     {
@@ -96,24 +95,104 @@ public:
         Messages,
         Verbose
     };
-    bool m_initialized = false;
-    TraceOptions m_traceOptions = TraceOptions::Off;
     CommitCharacterBehavior m_commitCharacterBehavior = CommitCharacterBehavior::MembersOnly;
-    RefPtr<JSONRPCConnection> m_connection;
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
-    Dictionary<String, String> m_lastPublishedDiagnostics;
-    std::chrono::time_point<std::chrono::system_clock> m_lastDiagnosticUpdateTime;
     FormatOptions m_formatOptions;
     Slang::InlayHintOptions m_inlayHintOptions;
-    bool m_quit = false;
     List<LanguageServerProtocol::WorkspaceFolder> m_workspaceFolders;
-    RttiTypeFuncsMap m_typeMap;
     LanguageServerStartupOptions m_options;
 
-    LanguageServer(LanguageServerStartupOptions options)
+    LanguageServerCore(LanguageServerStartupOptions options)
         : m_options(options)
-    {}
+    {
+    }
+
+    SlangResult init(const LanguageServerProtocol::InitializeParams& args);
+    SlangResult didOpenTextDocument(const LanguageServerProtocol::DidOpenTextDocumentParams& args);
+    SlangResult didCloseTextDocument(
+        const LanguageServerProtocol::DidCloseTextDocumentParams& args);
+    SlangResult didChangeTextDocument(
+        const LanguageServerProtocol::DidChangeTextDocumentParams& args);
+    LanguageServerResult<LanguageServerProtocol::Hover> hover(
+        const LanguageServerProtocol::HoverParams& args);
+    LanguageServerResult<List<LanguageServerProtocol::Location>> gotoDefinition(
+        const LanguageServerProtocol::DefinitionParams& args);
+
+    LanguageServerResult<CompletionResult> completion(
+        const LanguageServerProtocol::CompletionParams& args);
+    LanguageServerResult<LanguageServerProtocol::CompletionItem> completionResolve(
+        const LanguageServerProtocol::CompletionItem& args,
+        const LanguageServerProtocol::TextEditCompletionItem& editItem);
+    LanguageServerResult<LanguageServerProtocol::SemanticTokens> semanticTokens(
+        const LanguageServerProtocol::SemanticTokensParams& args);
+    LanguageServerResult<LanguageServerProtocol::SignatureHelp> signatureHelp(
+        const LanguageServerProtocol::SignatureHelpParams& args);
+    LanguageServerResult<List<LanguageServerProtocol::DocumentSymbol>> documentSymbol(
+        const LanguageServerProtocol::DocumentSymbolParams& args);
+    LanguageServerResult<List<LanguageServerProtocol::InlayHint>> inlayHint(
+        const LanguageServerProtocol::InlayHintParams& args);
+    LanguageServerResult<List<LanguageServerProtocol::TextEdit>> formatting(
+        const LanguageServerProtocol::DocumentFormattingParams& args);
+    LanguageServerResult<List<LanguageServerProtocol::TextEdit>> rangeFormatting(
+        const LanguageServerProtocol::DocumentRangeFormattingParams& args);
+    LanguageServerResult<List<LanguageServerProtocol::TextEdit>> onTypeFormatting(
+        const LanguageServerProtocol::DocumentOnTypeFormattingParams& args);
+    String getExprDeclSignature(
+        Expr* expr,
+        String* outDocumentation,
+        List<Slang::Range<Index>>* outParamRanges);
+    String getDeclRefSignature(
+        DeclRef<Decl> declRef,
+        String* outDocumentation,
+        List<Slang::Range<Index>>* outParamRanges);
+
+private:
+    slang::IGlobalSession* getOrCreateGlobalSession();
+
+    FormatOptions getFormatOptions(Workspace* workspace, FormatOptions inOptions);
+    LanguageServerResult<LanguageServerProtocol::Hover> tryGetMacroHoverInfo(
+        WorkspaceVersion* version,
+        DocumentVersion* doc,
+        Index line,
+        Index col);
+    LanguageServerResult<List<LanguageServerProtocol::Location>> tryGotoMacroDefinition(
+        WorkspaceVersion* version,
+        DocumentVersion* doc,
+        Index line,
+        Index col);
+    LanguageServerResult<List<LanguageServerProtocol::Location>> tryGotoFileInclude(
+        WorkspaceVersion* version,
+        DocumentVersion* doc,
+        Index line);
+};
+
+class LanguageServer
+{
+private:
+    static const int kConfigResponseId = 0x1213;
+
+public:
+    enum class TraceOptions
+    {
+        Off,
+        Messages,
+        Verbose
+    };
+
+    bool m_quit = false;
+    LanguageServerCore m_core;
+    RefPtr<JSONRPCConnection> m_connection;
+    RttiTypeFuncsMap m_typeMap;
+    bool m_initialized = false;
+    TraceOptions m_traceOptions = TraceOptions::Off;
+    std::chrono::time_point<std::chrono::system_clock> m_lastDiagnosticUpdateTime;
+    Dictionary<String, String> m_lastPublishedDiagnostics;
+
+    LanguageServer(LanguageServerStartupOptions options)
+        : m_core(options)
+    {
+    }
 
     SlangResult init(const LanguageServerProtocol::InitializeParams& args);
     SlangResult execute();
@@ -128,37 +207,51 @@ public:
         const LanguageServerProtocol::DidChangeConfigurationParams& args);
     SlangResult hover(const LanguageServerProtocol::HoverParams& args, const JSONValue& responseId);
     SlangResult gotoDefinition(
-        const LanguageServerProtocol::DefinitionParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DefinitionParams& args,
+        const JSONValue& responseId);
     SlangResult completion(
-        const LanguageServerProtocol::CompletionParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::CompletionParams& args,
+        const JSONValue& responseId);
     SlangResult completionResolve(
-        const LanguageServerProtocol::CompletionItem& args, const LanguageServerProtocol::TextEditCompletionItem& editItem, const JSONValue& responseId);
+        const LanguageServerProtocol::CompletionItem& args,
+        const LanguageServerProtocol::TextEditCompletionItem& editItem,
+        const JSONValue& responseId);
     SlangResult semanticTokens(
-        const LanguageServerProtocol::SemanticTokensParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::SemanticTokensParams& args,
+        const JSONValue& responseId);
     SlangResult signatureHelp(
-        const LanguageServerProtocol::SignatureHelpParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::SignatureHelpParams& args,
+        const JSONValue& responseId);
     SlangResult documentSymbol(
-        const LanguageServerProtocol::DocumentSymbolParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DocumentSymbolParams& args,
+        const JSONValue& responseId);
     SlangResult inlayHint(
-        const LanguageServerProtocol::InlayHintParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::InlayHintParams& args,
+        const JSONValue& responseId);
     SlangResult formatting(
-        const LanguageServerProtocol::DocumentFormattingParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DocumentFormattingParams& args,
+        const JSONValue& responseId);
     SlangResult rangeFormatting(
-        const LanguageServerProtocol::DocumentRangeFormattingParams& args, const JSONValue& responseId);
+        const LanguageServerProtocol::DocumentRangeFormattingParams& args,
+        const JSONValue& responseId);
     SlangResult onTypeFormatting(
-        const LanguageServerProtocol::DocumentOnTypeFormattingParams& args, const JSONValue& responseId);
-    String getExprDeclSignature(Expr* expr, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges);
-    String getDeclRefSignature(DeclRef<Decl> declRef, String* outDocumentation, List<Slang::Range<Index>>* outParamRanges);
+        const LanguageServerProtocol::DocumentOnTypeFormattingParams& args,
+        const JSONValue& responseId);
+
 private:
     SlangResult parseNextMessage();
-    slang::IGlobalSession* getOrCreateGlobalSession();
     void resetDiagnosticUpdateTime();
     void publishDiagnostics();
     void updatePredefinedMacros(const JSONValue& macros);
     void updateSearchPaths(const JSONValue& value);
     void updateSearchInWorkspace(const JSONValue& value);
     void updateCommitCharacters(const JSONValue& value);
-    void updateFormattingOptions(const JSONValue& clangFormatLoc, const JSONValue& clangFormatStyle, const JSONValue& clangFormatFallbackStyle, const JSONValue& allowLineBreakOnType, const JSONValue& allowLineBreakInRange);
+    void updateFormattingOptions(
+        const JSONValue& clangFormatLoc,
+        const JSONValue& clangFormatStyle,
+        const JSONValue& clangFormatFallbackStyle,
+        const JSONValue& allowLineBreakOnType,
+        const JSONValue& allowLineBreakInRange);
     void updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames);
     void updateTraceOptions(const JSONValue& value);
 
@@ -166,24 +259,6 @@ private:
     void registerCapability(const char* methodName);
     void logMessage(int type, String message);
 
-    FormatOptions getFormatOptions(Workspace* workspace, FormatOptions inOptions);
-    SlangResult tryGetMacroHoverInfo(
-        WorkspaceVersion* version,
-        DocumentVersion* doc,
-        Index line,
-        Index col,
-        JSONValue responseId);
-    SlangResult tryGotoMacroDefinition(
-        WorkspaceVersion* version,
-        DocumentVersion* doc,
-        Index line,
-        Index col,
-        JSONValue responseId);
-    SlangResult tryGotoFileInclude(
-        WorkspaceVersion* version,
-        DocumentVersion* doc,
-        Index line,
-        JSONValue responseId);
     List<Command> commands;
     SlangResult queueJSONCall(JSONRPCCall call);
     SlangResult runCommand(Command& cmd);

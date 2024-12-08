@@ -5,6 +5,7 @@
 //TEST(smoke,compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -render-feature hardware-device
 //TEST(smoke,compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
+//TEST(smoke,compute):COMPARE_COMPUTE:-wgpu -slang -compute -shaderobj -output-using-type
 
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D
 Texture2D<float> t2D;

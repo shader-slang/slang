@@ -3,12 +3,11 @@
 
 #include "debug-buffer.h"
 #include "debug-command-buffer.h"
+#include "debug-helper-functions.h"
 #include "debug-pipeline-state.h"
 #include "debug-query.h"
 #include "debug-resource-views.h"
 #include "debug-texture.h"
-
-#include "debug-helper-functions.h"
 
 namespace gfx
 {
@@ -40,7 +39,8 @@ Result DebugComputeCommandEncoder::bindPipeline(
 }
 
 Result DebugComputeCommandEncoder::bindPipelineWithRootObject(
-    IPipelineState* state, IShaderObject* rootObject)
+    IPipelineState* state,
+    IShaderObject* rootObject)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
@@ -53,7 +53,8 @@ Result DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 }
 
 Result DebugComputeCommandEncoder::dispatchComputeIndirect(
-    IBufferResource* cmdBuffer, Offset offset)
+    IBufferResource* cmdBuffer,
+    Offset offset)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->dispatchComputeIndirect(getInnerObj(cmdBuffer), offset);
@@ -82,7 +83,8 @@ Result DebugRenderCommandEncoder::bindPipeline(
 }
 
 Result DebugRenderCommandEncoder::bindPipelineWithRootObject(
-    IPipelineState* state, IShaderObject* rootObject)
+    IPipelineState* state,
+    IShaderObject* rootObject)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
@@ -123,7 +125,9 @@ void DebugRenderCommandEncoder::setVertexBuffers(
 }
 
 void DebugRenderCommandEncoder::setIndexBuffer(
-    IBufferResource* buffer, Format indexFormat, Offset offset)
+    IBufferResource* buffer,
+    Format indexFormat,
+    Offset offset)
 {
     SLANG_GFX_API_FUNC;
     auto innerBuffer = static_cast<DebugBufferResource*>(buffer)->baseObject.get();
@@ -137,7 +141,9 @@ Result DebugRenderCommandEncoder::draw(GfxCount vertexCount, GfxIndex startVerte
 }
 
 Result DebugRenderCommandEncoder::drawIndexed(
-    GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
+    GfxCount indexCount,
+    GfxIndex startIndex,
+    GfxIndex baseVertex)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->drawIndexed(indexCount, startIndex, baseVertex);
@@ -152,7 +158,11 @@ Result DebugRenderCommandEncoder::drawIndirect(
 {
     SLANG_GFX_API_FUNC;
     return baseObject->drawIndirect(
-        maxDrawCount, getInnerObj(argBuffer), argOffset, getInnerObj(countBuffer), countOffset);
+        maxDrawCount,
+        getInnerObj(argBuffer),
+        argOffset,
+        getInnerObj(countBuffer),
+        countOffset);
 }
 
 Result DebugRenderCommandEncoder::drawIndexedIndirect(
@@ -164,7 +174,11 @@ Result DebugRenderCommandEncoder::drawIndexedIndirect(
 {
     SLANG_GFX_API_FUNC;
     return baseObject->drawIndexedIndirect(
-        maxDrawCount, getInnerObj(argBuffer), argOffset, getInnerObj(countBuffer), countOffset);
+        maxDrawCount,
+        getInnerObj(argBuffer),
+        argOffset,
+        getInnerObj(countBuffer),
+        countOffset);
 }
 
 void DebugRenderCommandEncoder::setStencilReference(uint32_t referenceValue)
@@ -174,7 +188,9 @@ void DebugRenderCommandEncoder::setStencilReference(uint32_t referenceValue)
 }
 
 Result DebugRenderCommandEncoder::setSamplePositions(
-    GfxCount samplesPerPixel, GfxCount pixelCount, const SamplePosition* samplePositions)
+    GfxCount samplesPerPixel,
+    GfxCount pixelCount,
+    const SamplePosition* samplePositions)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->setSamplePositions(samplesPerPixel, pixelCount, samplePositions);
@@ -187,8 +203,8 @@ Result DebugRenderCommandEncoder::drawInstanced(
     GfxIndex startInstanceLocation)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->drawInstanced(
-        vertexCount, instanceCount, startVertex, startInstanceLocation);
+    return baseObject
+        ->drawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
 }
 
 Result DebugRenderCommandEncoder::drawIndexedInstanced(
@@ -200,7 +216,11 @@ Result DebugRenderCommandEncoder::drawIndexedInstanced(
 {
     SLANG_GFX_API_FUNC;
     return baseObject->drawIndexedInstanced(
-        indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+        indexCount,
+        instanceCount,
+        startIndexLocation,
+        baseVertexLocation,
+        startInstanceLocation);
 }
 
 Result DebugRenderCommandEncoder::drawMeshTasks(int x, int y, int z)
@@ -232,8 +252,8 @@ void DebugResourceCommandEncoderImpl::copyBuffer(
     SLANG_GFX_API_FUNC;
     auto dstImpl = static_cast<DebugBufferResource*>(dst);
     auto srcImpl = static_cast<DebugBufferResource*>(src);
-    getBaseResourceEncoder()->copyBuffer(
-        dstImpl->baseObject, dstOffset, srcImpl->baseObject, srcOffset, size);
+    getBaseResourceEncoder()
+        ->copyBuffer(dstImpl->baseObject, dstOffset, srcImpl->baseObject, srcOffset, size);
 }
 
 void DebugResourceCommandEncoderImpl::uploadBufferData(
@@ -272,7 +292,7 @@ void DebugResourceCommandEncoderImpl::bufferBarrier(
     SLANG_GFX_API_FUNC;
 
     List<IBufferResource*> innerBuffers;
-    for(GfxIndex i = 0; i < count; i++)
+    for (GfxIndex i = 0; i < count; i++)
     {
         innerBuffers.add(static_cast<DebugBufferResource*>(buffers[i])->baseObject.get());
     }
@@ -313,11 +333,18 @@ void DebugResourceCommandEncoderImpl::uploadTextureData(
 {
     SLANG_GFX_API_FUNC;
     getBaseResourceEncoder()->uploadTextureData(
-        getInnerObj(dst), subResourceRange, offset, extent, subResourceData, subResourceDataCount);
+        getInnerObj(dst),
+        subResourceRange,
+        offset,
+        extent,
+        subResourceData,
+        subResourceDataCount);
 }
 
 void DebugResourceCommandEncoderImpl::clearResourceView(
-    IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
+    IResourceView* view,
+    ClearValue* clearValue,
+    ClearResourceViewFlags::Enum flags)
 {
     SLANG_GFX_API_FUNC;
     switch (view->getViewDesc()->type)
@@ -345,14 +372,24 @@ void DebugResourceCommandEncoderImpl::resolveResource(
 {
     SLANG_GFX_API_FUNC;
     getBaseResourceEncoder()->resolveResource(
-        getInnerObj(source), sourceState, sourceRange, getInnerObj(dest), destState, destRange);
+        getInnerObj(source),
+        sourceState,
+        sourceRange,
+        getInnerObj(dest),
+        destState,
+        destRange);
 }
 
 void DebugResourceCommandEncoderImpl::resolveQuery(
-    IQueryPool* queryPool, GfxIndex index, GfxCount count, IBufferResource* buffer, Offset offset)
+    IQueryPool* queryPool,
+    GfxIndex index,
+    GfxCount count,
+    IBufferResource* buffer,
+    Offset offset)
 {
     SLANG_GFX_API_FUNC;
-    getBaseResourceEncoder()->resolveQuery(getInnerObj(queryPool), index, count, getInnerObj(buffer), offset);
+    getBaseResourceEncoder()
+        ->resolveQuery(getInnerObj(queryPool), index, count, getInnerObj(buffer), offset);
 }
 
 void DebugResourceCommandEncoderImpl::copyTextureToBuffer(
@@ -368,7 +405,15 @@ void DebugResourceCommandEncoderImpl::copyTextureToBuffer(
 {
     SLANG_GFX_API_FUNC;
     getBaseResourceEncoder()->copyTextureToBuffer(
-        getInnerObj(dst), dstOffset, dstSize, dstRowStride, getInnerObj(src), srcState, srcSubresource, srcOffset, extent);
+        getInnerObj(dst),
+        dstOffset,
+        dstSize,
+        dstRowStride,
+        getInnerObj(src),
+        srcState,
+        srcSubresource,
+        srcOffset,
+        extent);
 }
 
 void DebugResourceCommandEncoderImpl::textureSubresourceBarrier(
@@ -378,8 +423,8 @@ void DebugResourceCommandEncoderImpl::textureSubresourceBarrier(
     ResourceState dst)
 {
     SLANG_GFX_API_FUNC;
-    getBaseResourceEncoder()->textureSubresourceBarrier(
-        getInnerObj(texture), subresourceRange, src, dst);
+    getBaseResourceEncoder()
+        ->textureSubresourceBarrier(getInnerObj(texture), subresourceRange, src, dst);
 }
 
 void DebugResourceCommandEncoderImpl::beginDebugEvent(const char* name, float rgbColor[3])
@@ -418,7 +463,9 @@ void DebugRayTracingCommandEncoder::buildAccelerationStructure(
     }
     validateAccelerationStructureBuildInputs(desc.inputs);
     baseObject->buildAccelerationStructure(
-        innerDesc, propertyQueryCount, innerQueryDescs.getBuffer());
+        innerDesc,
+        propertyQueryCount,
+        innerQueryDescs.getBuffer());
 }
 
 void DebugRayTracingCommandEncoder::copyAccelerationStructure(
@@ -451,7 +498,10 @@ void DebugRayTracingCommandEncoder::queryAccelerationStructureProperties(
         innerQueryDesc.queryPool = getInnerObj(innerQueryDesc.queryPool);
     }
     baseObject->queryAccelerationStructureProperties(
-        accelerationStructureCount, innerAS.getBuffer(), queryCount, innerQueryDescs.getBuffer());
+        accelerationStructureCount,
+        innerAS.getBuffer(),
+        queryCount,
+        innerQueryDescs.getBuffer());
 }
 
 void DebugRayTracingCommandEncoder::serializeAccelerationStructure(
@@ -471,7 +521,8 @@ void DebugRayTracingCommandEncoder::deserializeAccelerationStructure(
 }
 
 Result DebugRayTracingCommandEncoder::bindPipeline(
-    IPipelineState* state, IShaderObject** outRootObject)
+    IPipelineState* state,
+    IShaderObject** outRootObject)
 {
     SLANG_GFX_API_FUNC;
     auto innerPipeline = getInnerObj(state);
@@ -484,7 +535,8 @@ Result DebugRayTracingCommandEncoder::bindPipeline(
 }
 
 Result DebugRayTracingCommandEncoder::bindPipelineWithRootObject(
-    IPipelineState* state, IShaderObject* rootObject)
+    IPipelineState* state,
+    IShaderObject* rootObject)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->bindPipelineWithRootObject(getInnerObj(state), getInnerObj(rootObject));
@@ -498,7 +550,8 @@ Result DebugRayTracingCommandEncoder::dispatchRays(
     GfxCount depth)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->dispatchRays(rayGenShaderIndex, getInnerObj(shaderTable), width, height, depth);
+    return baseObject
+        ->dispatchRays(rayGenShaderIndex, getInnerObj(shaderTable), width, height, depth);
 }
 
 } // namespace debug

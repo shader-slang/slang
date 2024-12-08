@@ -19,7 +19,7 @@ Index DownstreamCompilerSet::_findIndex(const DownstreamCompilerDesc& desc) cons
 {
     const Index count = m_compilers.getCount();
     for (Index i = 0; i < count; ++i)
-    { 
+    {
         if (m_compilers[i]->getDesc() == desc)
         {
             return i;
@@ -28,7 +28,8 @@ Index DownstreamCompilerSet::_findIndex(const DownstreamCompilerDesc& desc) cons
     return -1;
 }
 
-IDownstreamCompiler* DownstreamCompilerSet::getCompiler(const DownstreamCompilerDesc& compilerDesc) const
+IDownstreamCompiler* DownstreamCompilerSet::getCompiler(
+    const DownstreamCompilerDesc& compilerDesc) const
 {
     const Index index = _findIndex(compilerDesc);
     return index >= 0 ? m_compilers[index] : nullptr;
@@ -37,13 +38,14 @@ IDownstreamCompiler* DownstreamCompilerSet::getCompiler(const DownstreamCompiler
 void DownstreamCompilerSet::getCompilers(List<IDownstreamCompiler*>& outCompilers) const
 {
     outCompilers.clear();
-    outCompilers.addRange((IDownstreamCompiler*const*)m_compilers.begin(), m_compilers.getCount());
+    outCompilers.addRange((IDownstreamCompiler* const*)m_compilers.begin(), m_compilers.getCount());
 }
 
 bool DownstreamCompilerSet::hasSharedLibrary(ISlangSharedLibrary* lib)
 {
-    const Index foundIndex = m_sharedLibraries.findFirstIndex([lib](ISlangSharedLibrary* inLib) -> bool { return lib == inLib;  });
-    return(foundIndex >= 0);
+    const Index foundIndex = m_sharedLibraries.findFirstIndex(
+        [lib](ISlangSharedLibrary* inLib) -> bool { return lib == inLib; });
+    return (foundIndex >= 0);
 }
 
 void DownstreamCompilerSet::addSharedLibrary(ISlangSharedLibrary* lib)
@@ -94,4 +96,4 @@ void DownstreamCompilerSet::addCompiler(IDownstreamCompiler* compiler)
     }
 }
 
-}
+} // namespace Slang

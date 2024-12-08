@@ -1,9 +1,9 @@
 // slang-ir-dce.cpp
 #include "slang-ir-dce.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -16,9 +16,9 @@ struct DeadCodeEliminationContext
     // the parameters that were passed to the top-level
     // `eliminateDeadCode` function.
     //
-    IRModule*                       module;
+    IRModule* module;
 
-    IRDeadCodeEliminationOptions    options;
+    IRDeadCodeEliminationOptions options;
 
     // If we removed an inst, there may be still "weak references" to the inst.
     // These uses will be replaced with `undefInst`.
@@ -36,7 +36,8 @@ struct DeadCodeEliminationContext
     //
     bool isInstAlive(IRInst* inst)
     {
-        if (!inst) return false;
+        if (!inst)
+            return false;
         return inst->scratchData != 0;
     }
 
@@ -64,7 +65,8 @@ struct DeadCodeEliminationContext
         // Again, we safeguard against null instructions
         // just in case.
         //
-        if(!inst) return;
+        if (!inst)
+            return;
 
         if (!inst->scratchData)
         {
@@ -212,10 +214,7 @@ struct DeadCodeEliminationContext
     // dive into the task of actually finding all
     // the live code in a module.
     //
-    bool processModule()
-    {
-        return processInst(module->getModuleInst());
-    }
+    bool processModule() { return processInst(module->getModuleInst()); }
 
     bool eliminateDeadInstsRec(IRInst* inst)
     {
@@ -225,7 +224,7 @@ struct DeadCodeEliminationContext
         //
         // The easy case is if `inst` is dead (that is, not live).
         //
-        if( !isInstAlive(inst) )
+        if (!isInstAlive(inst))
         {
             // We can simply remove and deallocate `inst` because it is
             // dead, and not worry about any of its descendents,
@@ -261,7 +260,7 @@ struct DeadCodeEliminationContext
             List<IRInst*> children;
             for (auto child : inst->getDecorationsAndChildren())
                 children.add(child);
-            for(IRInst* child : children)
+            for (IRInst* child : children)
             {
                 changed |= eliminateDeadInstsRec(child);
             }
@@ -294,6 +293,235 @@ bool isFirstBlock(IRInst* inst)
     return block->getParent()->getFirstBlock() == block;
 }
 
+bool isPtrUsed(IRInst* ptrInst)
+{
+    for (auto use = ptrInst->firstUse; use; use = use->nextUse)
+    {
+        if (as<IRLoad>(use->getUser()))
+            return true;
+        else if (as<IRCall>(use->getUser())) // TODO: narrow this case to 'inout' parameters only.
+            return true;
+        else if (as<IRPtrTypeBase>(use->getUser()->getDataType()) && isPtrUsed(use->getUser()))
+            return true;
+    }
+
+    return false;
+}
+
+bool isFieldUsed(IRStructField* fieldInst)
+{
+    auto structKey = fieldInst->getKey();
+    for (auto use = structKey->firstUse; use; use = use->nextUse)
+    {
+        if (as<IRPtrTypeBase>(use->getUser()->getDataType()) && isPtrUsed(use->getUser()))
+            return true;
+
+        if (as<IRFieldExtract>(use->getUser()))
+            return true;
+    }
+
+    // Check fields that have this field as a sub-field.
+    auto parentType = cast<IRStructType>(fieldInst->getParent());
+
+    if (as<IRModuleInst>(parentType->getParent()))
+    {
+        for (auto use = parentType->firstUse; use; use = use->nextUse)
+        {
+            auto useField = as<IRStructField>(use->getUser());
+            if (useField && isFieldUsed(useField))
+                return true;
+        }
+    }
+    else if (as<IRBlock>(parentType->getParent()))
+    {
+        if (auto genericParentType = as<IRGeneric>(parentType->getParent()))
+        {
+            List<IRSpecialize*> specInsts;
+            for (auto use = genericParentType->firstUse; use; use = use->nextUse)
+            {
+                if (auto specInst = as<IRSpecialize>(use->getUser()))
+                    specInsts.add(specInst);
+            }
+
+            for (auto specInst : specInsts)
+            {
+                for (auto use = specInst->firstUse; use; use = use->nextUse)
+                {
+                    auto useField = as<IRStructField>(use->getUser());
+                    if (useField && isFieldUsed(useField))
+                        return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+bool removeStoresIntoInst(IRInst* ptrInst)
+{
+    bool changed = false;
+
+    List<IRInst*> storesToRemove;
+    for (auto use = ptrInst->firstUse; use; use = use->nextUse)
+    {
+        // If this is a store, remove it.
+        if (auto store = as<IRStore>(use->getUser()))
+        {
+            if (store->getPtr() == ptrInst)
+                storesToRemove.add(store);
+        }
+
+        // If there are any stores into a 'sub-object' of the pointer,
+        // remove them.
+        //
+
+        if (auto subAddr = as<IRFieldAddress>(use->getUser()))
+            changed |= removeStoresIntoInst(subAddr);
+
+        if (auto subIndex = as<IRGetElementPtr>(use->getUser()))
+            changed |= removeStoresIntoInst(subIndex);
+    }
+
+    for (auto store : storesToRemove)
+    {
+        changed = true;
+        store->removeAndDeallocate();
+    }
+
+    return changed;
+}
+
+bool removeStoresIntoField(IRStructField* field)
+{
+    return removeStoresIntoInst(field->getKey());
+}
+
+bool trimMakeStructOperands(IRStructField* field)
+{
+    // TODO: This can be sped up by considering the full set of fields instead
+    // of one at a time.
+
+    bool changed = false;
+    auto structType = cast<IRStructType>(field->getParent());
+
+    UIndex indexInStruct = 0;
+    for (auto _field : structType->getFields())
+    {
+        if (field == _field)
+            break;
+        indexInStruct++;
+    }
+
+    List<IRInst*> workList;
+    for (auto use = structType->firstUse; use; use = use->nextUse)
+    {
+        if (use->getUser()->getOp() == kIROp_MakeStruct)
+        {
+            workList.add(use->getUser());
+        }
+    }
+
+    IRBuilder builder(field->getModule());
+
+    for (auto makeStruct : workList)
+    {
+        // Make a replacement list of operands.
+        List<IRInst*> newOperands;
+        for (UInt index = 0; index < makeStruct->getOperandCount(); ++index)
+        {
+            if (index == indexInStruct)
+            {
+                // skip..
+                changed = true;
+                continue;
+            }
+            else
+            {
+                newOperands.add(makeStruct->getOperand(index));
+            }
+        }
+
+        builder.setInsertAfter(makeStruct);
+        auto newMakeStruct = builder.emitMakeStruct(makeStruct->getFullType(), newOperands);
+        makeStruct->replaceUsesWith(newMakeStruct);
+    }
+
+    for (auto makeStruct : workList)
+    {
+        makeStruct->removeAndDeallocate();
+    }
+
+    return changed;
+}
+
+bool isStructEmpty(IRType* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return false;
+
+    UCount nonEmptyFieldCount = 0;
+    for (auto field : structType->getFields())
+    {
+        if (as<IRVoidType>(field->getFieldType()))
+            continue;
+        if (isStructEmpty(field->getFieldType()))
+            continue;
+        nonEmptyFieldCount++;
+    }
+
+    return nonEmptyFieldCount == 0;
+}
+
+bool trimOptimizableType(IRStructType* type)
+{
+    bool changed = false;
+    List<IRStructField*> fieldsToRemove;
+    for (auto field : type->getFields())
+    {
+        // We'll ignore void-type fields, since they're handled differently.
+        if (as<IRVoidType>(field->getFieldType()))
+            continue;
+
+        // ... same for empty struct fields.
+        if (as<IRStructType>(field->getFieldType()) && isStructEmpty(field->getFieldType()))
+            continue;
+
+        if (!isFieldUsed(field))
+            fieldsToRemove.add(field);
+    }
+
+    for (auto field : fieldsToRemove)
+    {
+        changed |= removeStoresIntoField(field);
+        changed |= trimMakeStructOperands(field);
+        field->removeFromParent();
+    }
+
+    for (auto field : fieldsToRemove)
+    {
+        changed = true;
+        field->removeAndDeallocate();
+    }
+
+    return changed;
+}
+
+bool trimOptimizableTypes(IRModule* module)
+{
+    bool changed = false;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto type = as<IRStructType>(inst))
+        {
+            if (type->findDecoration<IROptimizableTypeDecoration>())
+                changed |= trimOptimizableType(type);
+        }
+    }
+    return changed;
+}
+
 bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options)
 {
     // The main source of confusion/complexity here is that
@@ -308,8 +536,8 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
     // when it is executed, then we should keep it around.
     //
     SideEffectAnalysisOptions sideEffectOptions = options.useFastAnalysis
-        ? SideEffectAnalysisOptions::None
-        : SideEffectAnalysisOptions::UseDominanceTree;
+                                                      ? SideEffectAnalysisOptions::None
+                                                      : SideEffectAnalysisOptions::UseDominanceTree;
 
     if (inst->mightHaveSideEffects(sideEffectOptions))
     {
@@ -463,9 +691,7 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
 // is straighforward. We set up the context object
 // and then defer to it for the real work.
 //
-bool eliminateDeadCode(
-    IRModule*                           module,
-    IRDeadCodeEliminationOptions const& options)
+bool eliminateDeadCode(IRModule* module, IRDeadCodeEliminationOptions const& options)
 {
     DeadCodeEliminationContext context;
     context.module = module;
@@ -473,9 +699,7 @@ bool eliminateDeadCode(
     return context.processModule();
 }
 
-bool eliminateDeadCode(
-    IRInst* root,
-    IRDeadCodeEliminationOptions const& options)
+bool eliminateDeadCode(IRInst* root, IRDeadCodeEliminationOptions const& options)
 {
     DeadCodeEliminationContext context;
     context.module = root->getModule();
@@ -483,4 +707,4 @@ bool eliminateDeadCode(
     return context.processInst(root);
 }
 
-}
+} // namespace Slang

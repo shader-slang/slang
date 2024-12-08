@@ -12,7 +12,7 @@ float get_thread_5_value(float v, uint group_thread_id)
     if(group_thread_id == 5)
     {
         s_shared = detach(v);
-        // CHECK: tests/autodiff/warn-on-prefer-recompute-side-effects.slang(10): warning 42050: get_thread_5_value has [PreferRecompute] and may have side effects. side effects may execute multiple times. use [PreferRecompute(SideEffectBehavior.Allow)], or mark function with [NoSideEffect]
+        // CHECK: tests/autodiff/warn-on-prefer-recompute-side-effects.slang(10): warning 42050: get_thread_5_value has [PreferRecompute] and may have side effects. side effects may execute multiple times. use [PreferRecompute(SideEffectBehavior.Allow)], or mark function with [__NoSideEffect]
         // CHECK: float get_thread_5_value(float v, uint group_thread_id)
         // CHECK:       ^~~~~~~~~~~~~~~~~~
     }

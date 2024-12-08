@@ -17,7 +17,6 @@ interface IInterface
 RWStructuredBuffer<int> gOutputBuffer;
 //TEST_INPUT: set gCb = new StructuredBuffer<IInterface>{new MyImpl{1}};
 RWStructuredBuffer<IInterface> gCb;
-// Add two elements into the structured buffer to prevent specialization.
 //TEST_INPUT: set gCb1 = new StructuredBuffer<IInterface>{new MyImpl{1}, new MyImpl2{2}};
 RWStructuredBuffer<IInterface> gCb1;
 

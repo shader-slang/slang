@@ -1,8 +1,8 @@
 #include "slang-ir-user-type-hint.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -25,10 +25,13 @@ void addUserTypeHintDecorations(IRModule* module)
             if (sb.getLength())
             {
                 IRBuilder builder(inst);
-                builder.addDecoration(inst, kIROp_UserTypeNameDecoration, builder.getStringValue(sb.produceString().getUnownedSlice()));
+                builder.addDecoration(
+                    inst,
+                    kIROp_UserTypeNameDecoration,
+                    builder.getStringValue(sb.produceString().getUnownedSlice()));
             }
         }
     }
 }
 
-}
+} // namespace Slang

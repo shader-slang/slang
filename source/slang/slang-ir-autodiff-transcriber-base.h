@@ -1,10 +1,10 @@
 // slang-ir-autodiff-transcriber-base.h
 #pragma once
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
 #include "slang-compiler.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -13,30 +13,28 @@ struct AutoDiffTranscriberBase
 {
     // Stores the mapping of arbitrary 'R-value' instructions to instructions that represent
     // their differential values.
-    Dictionary<IRInst*, IRInst*>            instMapD;
+    Dictionary<IRInst*, IRInst*> instMapD;
 
     // Set of insts currently being transcribed. Used to avoid infinite loops.
-    HashSet<IRInst*>                        instsInProgress;
+    HashSet<IRInst*> instsInProgress;
 
     // Cloning environment to hold mapping from old to new copies for the primal
     // instructions.
-    IRCloneEnv                              cloneEnv;
+    IRCloneEnv cloneEnv;
 
     // Diagnostic sink for error messages.
-    DiagnosticSink*                         sink;
+    DiagnosticSink* sink;
 
     // Type conformance information.
-    AutoDiffSharedContext*                  autoDiffSharedContext;
+    AutoDiffSharedContext* autoDiffSharedContext;
 
     // Builder to help with creating and accessing the 'DifferentiablePair<T>' struct
-    DifferentialPairTypeBuilder*            pairBuilder;
+    DifferentialPairTypeBuilder* pairBuilder;
 
-    DifferentiableTypeConformanceContext    differentiableTypeConformanceContext;
+    DifferentiableTypeConformanceContext differentiableTypeConformanceContext;
 
     AutoDiffTranscriberBase(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
-        : autoDiffSharedContext(shared)
-        , differentiableTypeConformanceContext(shared)
-        , sink(inSink)
+        : autoDiffSharedContext(shared), differentiableTypeConformanceContext(shared), sink(inSink)
     {
         cloneEnv.squashChildrenMapping = true;
     }
@@ -45,7 +43,7 @@ struct AutoDiffTranscriberBase
 
     // Returns "dp<var-name>" to use as a name hint for parameters.
     // If no primal name is available, returns a blank string.
-    // 
+    //
     String makeDiffPairName(IRInst* origVar);
 
     void mapDifferentialInst(IRInst* origInst, IRInst* diffInst);
@@ -89,9 +87,14 @@ struct AutoDiffTranscriberBase
 
     InstPair transcribeExtractExistentialWitnessTable(IRBuilder* builder, IRInst* origInst);
 
-    void maybeMigrateDifferentiableDictionaryFromDerivativeFunc(IRBuilder* builder, IRInst* origFunc);
+    void maybeMigrateDifferentiableDictionaryFromDerivativeFunc(
+        IRBuilder* builder,
+        IRInst* origFunc);
 
-    IRInst* tryGetDifferentiableWitness(IRBuilder* builder, IRInst* originalType);
+    IRInst* tryGetDifferentiableWitness(
+        IRBuilder* builder,
+        IRInst* originalType,
+        DiffConformanceKind kind);
 
     IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness);
 
@@ -99,7 +102,10 @@ struct AutoDiffTranscriberBase
 
     IRType* differentiateType(IRBuilder* builder, IRType* origType);
 
-    IRType* differentiateExtractExistentialType(IRBuilder* builder, IRExtractExistentialType* origType, IRInst*& witnessTable);
+    IRType* differentiateExtractExistentialType(
+        IRBuilder* builder,
+        IRExtractExistentialType* origType,
+        IRInst*& witnessTable);
 
     IRType* tryGetDiffPairType(IRBuilder* builder, IRType* primalType);
 
@@ -111,11 +117,17 @@ struct AutoDiffTranscriberBase
 
     InstPair transcribeParam(IRBuilder* builder, IRParam* origParam);
 
-    virtual InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType) = 0;
+    virtual InstPair transcribeFuncParam(
+        IRBuilder* builder,
+        IRParam* origParam,
+        IRInst* primalType) = 0;
 
     InstPair transcribeLookupInterfaceMethod(IRBuilder* builder, IRLookupWitnessMethod* lookupInst);
 
-    InstPair transcribeBlockImpl(IRBuilder* builder, IRBlock* origBlock, HashSet<IRInst*>& instsToSkip);
+    InstPair transcribeBlockImpl(
+        IRBuilder* builder,
+        IRBlock* origBlock,
+        HashSet<IRInst*>& instsToSkip);
 
     InstPair transcribeBlock(IRBuilder* builder, IRBlock* origBlock)
     {
@@ -133,18 +145,24 @@ struct AutoDiffTranscriberBase
     InstPair transcribeGeneric(IRBuilder* inBuilder, IRGeneric* origGeneric);
 
     IRInst* transcribe(IRBuilder* builder, IRInst* origInst);
-    
+
     InstPair transcribeInst(IRBuilder* builder, IRInst* origInst);
 
     IRType* _differentiateTypeImpl(IRBuilder* builder, IRType* origType);
 
     bool isExistentialType(IRType* type);
 
-    void _markInstAsDifferential(IRBuilder* builder, IRInst* diffInst, IRInst* primalInst = nullptr);
+    void _markInstAsDifferential(
+        IRBuilder* builder,
+        IRInst* diffInst,
+        IRInst* primalInst = nullptr);
 
     void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc);
 
-    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) = 0;
+    virtual IRFuncType* differentiateFunctionType(
+        IRBuilder* builder,
+        IRInst* func,
+        IRFuncType* funcType) = 0;
 
     // Create an empty func to represent the transcribed func of `origFunc`.
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) = 0;
@@ -152,6 +170,10 @@ struct AutoDiffTranscriberBase
     virtual InstPair transcribeInstImpl(IRBuilder* builder, IRInst* origInst) = 0;
 
     virtual IROp getInterfaceRequirementDerivativeDecorationOp() = 0;
+
+    void markDiffTypeInst(IRBuilder* builder, IRInst* inst, IRType* primalType);
+
+    void markDiffPairTypeInst(IRBuilder* builder, IRInst* inst, IRType* primalType);
 };
 
-}
+} // namespace Slang

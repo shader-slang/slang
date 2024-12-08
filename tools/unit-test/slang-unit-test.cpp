@@ -1,6 +1,7 @@
 #include "slang-unit-test.h"
+
+#include "core/slang-basic.h"
 #include "slang.h"
-#include "source/core/slang-basic.h"
 
 struct SlangUnitTest
 {
@@ -14,10 +15,7 @@ public:
     Slang::List<SlangUnitTest> tests;
     ITestReporter* testReporter = nullptr;
 
-    virtual SLANG_NO_THROW SlangInt SLANG_MCALL getTestCount() override
-    {
-        return tests.getCount();
-    }
+    virtual SLANG_NO_THROW SlangInt SLANG_MCALL getTestCount() override { return tests.getCount(); }
     virtual SLANG_NO_THROW const char* SLANG_MCALL getTestName(SlangInt index) override
     {
         return tests[index].name;
@@ -33,11 +31,7 @@ public:
         testReporter = reporter;
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL destroy() override
-    {
-        tests = decltype(tests)();
-    }
-
+    virtual SLANG_NO_THROW void SLANG_MCALL destroy() override { tests = decltype(tests)(); }
 };
 
 SlangUnitTestModule* _getTestModule()
@@ -53,13 +47,13 @@ ITestReporter* getTestReporter()
 
 extern "C"
 {
-SLANG_DLL_EXPORT IUnitTestModule* slangUnitTestGetModule()
-{
-    return _getTestModule();
-}
+    SLANG_DLL_EXPORT IUnitTestModule* slangUnitTestGetModule()
+    {
+        return _getTestModule();
+    }
 }
 
 UnitTestRegisterHelper::UnitTestRegisterHelper(const char* name, UnitTestFunc testFunc)
 {
-    _getTestModule()->tests.add(SlangUnitTest{ name, testFunc });
+    _getTestModule()->tests.add(SlangUnitTest{name, testFunc});
 }

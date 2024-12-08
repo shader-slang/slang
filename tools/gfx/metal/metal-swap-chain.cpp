@@ -1,8 +1,8 @@
 // metal-swap-chain.cpp
 #include "metal-swap-chain.h"
 
-#include "metal-util.h"
 #include "../apple/cocoa-util.h"
+#include "metal-util.h"
 
 namespace gfx
 {
@@ -31,7 +31,10 @@ void SwapchainImpl::createImages()
     {
         ITextureResource::Desc imageDesc = {};
         imageDesc.allowedStates = ResourceStateSet(
-            ResourceState::Present, ResourceState::RenderTarget, ResourceState::CopyDestination, ResourceState::CopySource);
+            ResourceState::Present,
+            ResourceState::RenderTarget,
+            ResourceState::CopyDestination,
+            ResourceState::CopySource);
         imageDesc.type = IResource::Type::Texture2D;
         imageDesc.arraySize = 0;
         imageDesc.format = m_desc.format;
@@ -40,7 +43,10 @@ void SwapchainImpl::createImages()
         imageDesc.size.depth = 1;
         imageDesc.numMipLevels = 1;
         imageDesc.defaultState = ResourceState::Present;
-        m_device->createTextureResource(imageDesc, nullptr, (gfx::ITextureResource**)m_images[i].writeRef());
+        m_device->createTextureResource(
+            imageDesc,
+            nullptr,
+            (gfx::ITextureResource**)m_images[i].writeRef());
     }
 }
 
@@ -105,7 +111,9 @@ Result SwapchainImpl::present()
 
     MTL::CommandBuffer* commandBuffer = m_device->m_commandQueue->commandBuffer();
     MTL::BlitCommandEncoder* encoder = commandBuffer->blitCommandEncoder();
-    encoder->copyFromTexture(m_images[m_currentImageIndex]->m_texture.get(), m_currentDrawable->texture());
+    encoder->copyFromTexture(
+        m_images[m_currentImageIndex]->m_texture.get(),
+        m_currentDrawable->texture());
     encoder->endEncoding();
     commandBuffer->presentDrawable(m_currentDrawable.get());
     commandBuffer->commit();
@@ -146,5 +154,5 @@ Result SwapchainImpl::setFullScreenMode(bool mode)
     return SLANG_E_NOT_AVAILABLE;
 }
 
-} // namespace metal 
+} // namespace metal
 } // namespace gfx

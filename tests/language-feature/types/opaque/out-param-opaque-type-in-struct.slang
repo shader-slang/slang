@@ -5,7 +5,6 @@
 
 //TEST(compute):COMPARE_COMPUTE:
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-
 struct Things
 {
     int first;

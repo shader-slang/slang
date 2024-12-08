@@ -1,8 +1,11 @@
 #include "test-base.h"
 
 #ifdef _WIN32
-#include <windows.h>
-#include <shellapi.h>
+// clang-format off
+// include ordering sensitive
+#    include <windows.h>
+#    include <shellapi.h>
+// clang-format on
 #endif
 
 int TestBase::parseOption(int argc, char** argv)
@@ -27,23 +30,30 @@ int TestBase::parseOption(int argc, char** argv)
     return 0;
 }
 
-void TestBase::printEntrypointHashes(int entryPointCount, int targetCount, ComPtr<slang::IComponentType>& composedProgram)
+void TestBase::printEntrypointHashes(
+    int entryPointCount,
+    int targetCount,
+    ComPtr<slang::IComponentType>& composedProgram)
 {
     for (int targetIndex = 0; targetIndex < targetCount; targetIndex++)
     {
         for (int entryPointIndex = 0; entryPointIndex < entryPointCount; entryPointIndex++)
         {
             ComPtr<slang::IBlob> entryPointHashBlob;
-            composedProgram->getEntryPointHash(entryPointIndex, targetIndex, entryPointHashBlob.writeRef());
+            composedProgram->getEntryPointHash(
+                entryPointIndex,
+                targetIndex,
+                entryPointHashBlob.writeRef());
 
             Slang::StringBuilder strBuilder;
-            strBuilder << "callIdx: " << m_globalCounter << ", entrypoint: "<< entryPointIndex << ", target: " << targetIndex << ", hash: ";
+            strBuilder << "callIdx: " << m_globalCounter << ", entrypoint: " << entryPointIndex
+                       << ", target: " << targetIndex << ", hash: ";
             m_globalCounter++;
 
             uint8_t* buffer = (uint8_t*)entryPointHashBlob->getBufferPointer();
             for (size_t i = 0; i < entryPointHashBlob->getBufferSize(); i++)
             {
-                strBuilder<<Slang::StringUtil::makeStringWithFormat("%.2X", buffer[i]);
+                strBuilder << Slang::StringUtil::makeStringWithFormat("%.2X", buffer[i]);
             }
             fprintf(stdout, "%s\n", strBuilder.begin());
         }

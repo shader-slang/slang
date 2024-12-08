@@ -16,6 +16,18 @@
       }
     },
     {
+      "name": "emscripten",
+      "description": "Emscripten-based Wasm build",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build.em",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "CMAKE_C_FLAGS_INIT": "-fwasm-exceptions -Os",
+        "CMAKE_CXX_FLAGS_INIT": "-fwasm-exceptions -Os",
+        "CMAKE_EXE_LINKER_FLAGS": "-sASSERTIONS -sALLOW_MEMORY_GROWTH -fwasm-exceptions --export=__cpp_exception"
+      }
+    },
+    {
       "name": "msvc-base",
       "hidden": true,
       "inherits": "default",
@@ -59,7 +71,8 @@
       "inherits": "default",
       "description": "Build the compile time generators used in building Slang",
       "cacheVariables": {
-        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE"
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "SLANG_ENABLE_SLANG_RHI": false
       }
     }
   ],
@@ -75,20 +88,27 @@
       "configuration": "Release"
     },
     {
+      "name": "releaseWithDebugInfo",
+      "configurePreset": "default",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "emscripten",
+      "configurePreset": "emscripten",
+      "configuration": "Release",
+      "targets": ["slang-wasm"]
+    },
+    {
       "name": "generators",
       "inherits": "release",
       "configurePreset": "generators",
-      "targets": [
-        "all-generators"
-      ]
+      "targets": ["all-generators"]
     },
     {
       "name": "slang-llvm",
       "inherits": "release",
       "configurePreset": "slang-llvm",
-      "targets": [
-        "slang-llvm"
-      ]
+      "targets": ["slang-llvm"]
     }
   ],
   "packagePresets": [
@@ -96,29 +116,55 @@
       "name": "base",
       "hidden": true,
       "configurePreset": "default",
-      "generators": [
-        "ZIP"
-      ],
+      "generators": ["ZIP"],
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang",
         "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
       }
     },
     {
+      "name": "base-debug-info",
+      "inherits": "base",
+      "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang-debug-info",
+        "CPACK_COMPONENTS_ALL": "debug-info"
+      }
+    },
+    {
       "name": "release",
       "inherits": "base",
-      "configurations": [
-        "Release"
-      ],
+      "configurations": ["Release"],
       "packageDirectory": "dist-release"
+    },
+    {
+      "name": "releaseWithDebugInfo",
+      "inherits": "base",
+      "configurations": ["RelWithDebInfo"],
+      "packageDirectory": "dist-releaseWithDebugInfo"
     },
     {
       "name": "debug",
       "inherits": "base",
-      "configurations": [
-        "Debug"
-      ],
+      "configurations": ["Debug"],
       "packageDirectory": "dist-debug"
+    },
+    {
+      "name": "release-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["Release"],
+      "packageDirectory": "dist-release-debug-info"
+    },
+    {
+      "name": "releaseWithDebugInfo-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["RelWithDebInfo"],
+      "packageDirectory": "dist-releaseWithDebugInfo-debug-info"
+    },
+    {
+      "name": "debug-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["Debug"],
+      "packageDirectory": "dist-debug-debug-info"
     },
     {
       "name": "generators",
@@ -171,6 +217,23 @@
         {
           "type": "package",
           "name": "release"
+        }
+      ]
+    },
+    {
+      "name": "releaseWithDebugInfo",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "releaseWithDebugInfo"
+        },
+        {
+          "type": "package",
+          "name": "releaseWithDebugInfo"
         }
       ]
     },

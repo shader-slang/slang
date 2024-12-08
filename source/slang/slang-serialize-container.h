@@ -3,11 +3,12 @@
 #define SLANG_SERIALIZE_CONTAINER_H
 
 #include "../core/slang-riff.h"
-#include "slang-serialize-types.h"
 #include "slang-ir-insts.h"
 #include "slang-profile.h"
+#include "slang-serialize-types.h"
 
-namespace Slang {
+namespace Slang
+{
 
 class EndToEndCompileRequest;
 
@@ -32,9 +33,9 @@ struct SerialContainerBinary
 
 struct SerialContainerDataModule
 {
-    RefPtr<IRModule> irModule;              ///< The IR for the module
-    RefPtr<ASTBuilder> astBuilder;          ///< The astBuilder that owns the astRootNode
-    NodeBase* astRootNode = nullptr;        ///< The module decl
+    RefPtr<IRModule> irModule;       ///< The IR for the module
+    RefPtr<ASTBuilder> astBuilder;   ///< The astBuilder that owns the astRootNode
+    NodeBase* astRootNode = nullptr; ///< The module decl
     List<String> dependentFiles;
     SHA1::Digest digest;
 };
@@ -44,12 +45,12 @@ struct SerialContainerData
 {
     struct Target
     {
-        CodeGenTarget       codeGenTarget = CodeGenTarget::Unknown;
-        SlangTargetFlags    flags = kDefaultTargetFlags;
-        Profile             profile;
-        FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
+        CodeGenTarget codeGenTarget = CodeGenTarget::Unknown;
+        SlangTargetFlags flags = kDefaultTargetFlags;
+        Profile profile;
+        FloatingPointMode floatingPointMode = FloatingPointMode::Default;
     };
-    
+
     struct TargetComponent
     {
         // IR module for a specific compilation target
@@ -82,9 +83,14 @@ struct SerialContainerUtil
 {
     struct WriteOptions
     {
-        SerialCompressionType compressionType = SerialCompressionType::VariableByteLite;                ///< If compression is used what type to use (only some parts can be compressed)
-        SerialOptionFlags optionFlags = SerialOptionFlag::ASTModule | SerialOptionFlag::IRModule;       ///< Flags controlling what is written
-        SourceManager* sourceManager = nullptr;                                                         ///< The source manager used for the SourceLoc in the input
+        SerialCompressionType compressionType =
+            SerialCompressionType::VariableByteLite; ///< If compression is used what type to use
+                                                     ///< (only some parts can be compressed)
+        SerialOptionFlags optionFlags =
+            SerialOptionFlag::ASTModule |
+            SerialOptionFlag::IRModule; ///< Flags controlling what is written
+        SourceManager* sourceManager =
+            nullptr; ///< The source manager used for the SourceLoc in the input
     };
 
     struct ReadOptions
@@ -93,36 +99,61 @@ struct SerialContainerUtil
         SourceManager* sourceManager = nullptr;
         NamePool* namePool = nullptr;
         SharedASTBuilder* sharedASTBuilder = nullptr;
-        ASTBuilder* astBuilder = nullptr; // Optional. If not provided will create one in SerialContainerData.
+        ASTBuilder* astBuilder =
+            nullptr; // Optional. If not provided will create one in SerialContainerData.
         Linkage* linkage = nullptr;
         DiagnosticSink* sink = nullptr;
         bool readHeaderOnly = false;
         String modulePath;
     };
 
-        /// Add module to outData
-    static SlangResult addModuleToData(Module* module, const WriteOptions& options, SerialContainerData& outData);
+    /// Add module to outData
+    static SlangResult addModuleToData(
+        Module* module,
+        const WriteOptions& options,
+        SerialContainerData& outData);
 
-        /// Get the serializable contents of the request as data
-    static SlangResult addEndToEndRequestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& outData);
+    /// Get the serializable contents of the request as data
+    static SlangResult addEndToEndRequestToData(
+        EndToEndCompileRequest* request,
+        const WriteOptions& options,
+        SerialContainerData& outData);
 
-        /// Convert front end request into something serializable
-    static SlangResult addFrontEndRequestToData(FrontEndCompileRequest* request, const WriteOptions& options, SerialContainerData& outData);
+    /// Convert front end request into something serializable
+    static SlangResult addFrontEndRequestToData(
+        FrontEndCompileRequest* request,
+        const WriteOptions& options,
+        SerialContainerData& outData);
 
-        /// Write the data into the container
-    static SlangResult write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container);
+    /// Write the data into the container
+    static SlangResult write(
+        const SerialContainerData& data,
+        const WriteOptions& options,
+        RiffContainer* container);
 
-        /// Read the container into outData
-    static SlangResult read(RiffContainer* container, const ReadOptions& options, const LoadedModuleDictionary* additionalLoadedModules, SerialContainerData& outData);
+    /// Read the container into outData
+    static SlangResult read(
+        RiffContainer* container,
+        const ReadOptions& options,
+        const LoadedModuleDictionary* additionalLoadedModules,
+        SerialContainerData& outData);
 
-        /// Verify IR serialization
-    static SlangResult verifyIRSerialize(IRModule* module, Session* session, const WriteOptions& options);
+    /// Verify IR serialization
+    static SlangResult verifyIRSerialize(
+        IRModule* module,
+        Session* session,
+        const WriteOptions& options);
 
-        /// Write the request to the stream
-    static SlangResult write(FrontEndCompileRequest* frontEndReq, const WriteOptions& options, Stream* stream);
-    static SlangResult write(EndToEndCompileRequest* request, const WriteOptions& options, Stream* stream);
+    /// Write the request to the stream
+    static SlangResult write(
+        FrontEndCompileRequest* frontEndReq,
+        const WriteOptions& options,
+        Stream* stream);
+    static SlangResult write(
+        EndToEndCompileRequest* request,
+        const WriteOptions& options,
+        Stream* stream);
     static SlangResult write(Module* module, const WriteOptions& options, Stream* stream);
-
 };
 
 } // namespace Slang

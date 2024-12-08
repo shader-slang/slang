@@ -8,21 +8,24 @@
 
 namespace Slang
 {
-    class DiagnosticSink;
-    class EntryPoint;
-    class Linkage;
-    class Module;
-    class ShaderCompiler;
-    class ShaderLinkInfo;
-    class ShaderSymbol;
+class DiagnosticSink;
+class EntryPoint;
+class Linkage;
+class Module;
+class ShaderCompiler;
+class ShaderLinkInfo;
+class ShaderSymbol;
 
-    class TranslationUnitRequest;
+class TranslationUnitRequest;
 
-    bool isGlobalShaderParameter(VarDeclBase* decl);
-    bool isFromStdLib(Decl* decl);
+bool isGlobalShaderParameter(VarDeclBase* decl);
+bool isFromCoreModule(Decl* decl);
 
-    void registerBuiltinDecls(Session* session, Decl* decl);
+void registerBuiltinDecls(Session* session, Decl* decl);
 
-    OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
-        ASTBuilder* builder, DeclRef<ContainerDecl> genericDecl);
-}
+Type* unwrapArrayType(Type* type);
+
+OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
+    ASTBuilder* builder,
+    DeclRef<ContainerDecl> genericDecl);
+} // namespace Slang

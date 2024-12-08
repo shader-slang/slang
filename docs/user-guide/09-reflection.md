@@ -13,7 +13,7 @@ The Slang API allows layout to be queried on any program object represented by a
 slang::ProgramLayout* layout = program->getLayout();
 ```
 
-Please see the [Compiling Code with Slang](/user-guide/compiling) section on creating program objects.
+Please see the [Compiling Code with Slang](compiling) section on creating program objects.
 
 Note that just as with output code, the reflection object (and all other objects queried from it) is guaranteed to live as long as the request is alive, but no longer.
 Unlike the other data, there is no easy way to save the reflection data for later user (we do not currently implement serialization for reflection data).
@@ -137,7 +137,7 @@ If you have a type layout with kind `Array` you can query information about the 
 ```c++
 size_t arrayElementCount = typeLayout->getElementCount();
 slang::TypeLayoutReflection* elementTypeLayout = typeLayout->getElementTypeLayout();
-sie_t arrayElementStride = typeLayout->getElementStride(category);
+size_t arrayElementStride = typeLayout->getElementStride(category);
 ```
 
 An array of unknown size will currently report zero elements.
@@ -196,7 +196,7 @@ In the case of a compute shader entry point, you can also query the user-specifi
 
 ```c++
 SlangUInt threadGroupSize[3];
-entryPoint->getComputeThreadGruopSize(3, &threadGroupSize[0]);
+entryPoint->getComputeThreadGroupSize(3, &threadGroupSize[0]);
 ```
 
 ## Function Reflection

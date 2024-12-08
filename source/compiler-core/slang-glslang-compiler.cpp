@@ -1,35 +1,28 @@
 // slang-glslang-compiler.cpp
 #include "slang-glslang-compiler.h"
 
-#include "../core/slang-common.h"
-#include "slang-com-helper.h"
-
 #include "../core/slang-blob.h"
-
-#include "../core/slang-string-util.h"
-#include "../core/slang-string-slice-pool.h"
-
-#include "../core/slang-io.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-semantic-version.h"
 #include "../core/slang-char-util.h"
-
+#include "../core/slang-common.h"
+#include "../core/slang-io.h"
+#include "../core/slang-semantic-version.h"
+#include "../core/slang-shared-library.h"
+#include "../core/slang-string-slice-pool.h"
+#include "../core/slang-string-util.h"
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-desc-util.h"
-
+#include "slang-com-helper.h"
 #include "slang-include-system.h"
 #include "slang-source-loc.h"
-
-#include "../core/slang-shared-library.h"
 
 // Enable calling through to `glslang` on
 // all platforms.
 #ifndef SLANG_ENABLE_GLSLANG_SUPPORT
-#   define SLANG_ENABLE_GLSLANG_SUPPORT 1
+#define SLANG_ENABLE_GLSLANG_SUPPORT 1
 #endif
 
 #if SLANG_ENABLE_GLSLANG_SUPPORT
-#   include "../slang-glslang/slang-glslang.h"
+#include "../slang-glslang/slang-glslang.h"
 #endif
 
 namespace Slang
@@ -43,24 +36,31 @@ public:
     typedef DownstreamCompilerBase Super;
 
     // IDownstreamCompiler
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile(const CompileOptions& options, IArtifact** outResult) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    compile(const CompileOptions& options, IArtifact** outResult) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW bool SLANG_MCALL
+    canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
+        SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
 
-        /// Must be called before use
+    /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
 
-    GlslangDownstreamCompiler(SlangPassThrough compilerType) : m_compilerType(compilerType) {}
-    
-protected:
+    GlslangDownstreamCompiler(SlangPassThrough compilerType)
+        : m_compilerType(compilerType)
+    {
+    }
 
+protected:
     SlangResult _invoke(glslang_CompileRequest_1_2& request);
 
-    glslang_CompileFunc_1_0 m_compile_1_0 = nullptr; 
-    glslang_CompileFunc_1_1 m_compile_1_1 = nullptr; 
+    glslang_CompileFunc_1_0 m_compile_1_0 = nullptr;
+    glslang_CompileFunc_1_1 m_compile_1_1 = nullptr;
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
     glslang_ValidateSPIRVFunc m_validate = nullptr;
 
@@ -135,7 +135,11 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_2& reque
     return err ? SLANG_FAIL : SLANG_OK;
 }
 
-static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseDiagnosticLine(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& line,
+    List<UnownedStringSlice>& lineSlices,
+    ArtifactDiagnostic& outDiagnostic)
 {
     /* ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token */
 
@@ -160,7 +164,9 @@ static SlangResult _parseDiagnosticLine(SliceAllocator& allocator, const Unowned
     return SLANG_OK;
 }
 
-SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, IArtifact** outArtifact)
+SlangResult GlslangDownstreamCompiler::compile(
+    const CompileOptions& inOptions,
+    IArtifact** outArtifact)
 {
     if (!isVersionCompatible(inOptions))
     {
@@ -186,14 +192,10 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
 
     StringBuilder diagnosticOutput;
     auto diagnosticOutputFunc = [](void const* data, size_t size, void* userData)
-    {
-        (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size);
-    };
+    { (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size); };
     List<uint8_t> spirv;
     auto outputFunc = [](void const* data, size_t size, void* userData)
-    {
-        ((List<uint8_t>*)userData)->addRange((uint8_t*)data, size);
-    };
+    { ((List<uint8_t>*)userData)->addRange((uint8_t*)data, size); };
 
     ComPtr<ISlangBlob> sourceBlob;
     SLANG_RETURN_ON_FAIL(sourceArtifact->loadBlob(ArtifactKeep::Yes, sourceBlob.writeRef()));
@@ -270,7 +272,12 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& inOptions, 
 
         SliceAllocator allocator;
 
-        SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(allocator, diagnosticOutput.getUnownedSlice(), 1, _parseDiagnosticLine, diagnostics);
+        SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(
+            allocator,
+            diagnosticOutput.getUnownedSlice(),
+            1,
+            _parseDiagnosticLine,
+            diagnostics);
         SLANG_UNUSED(diagnosticParseRes);
 
         diagnostics->requireErrorDiagnostic();
@@ -301,10 +308,15 @@ SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int co
 bool GlslangDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // Can only disassemble blobs that are SPIR-V
-    return ArtifactDescUtil::isDisassembly(from, to) && from.payload == ArtifactPayload::SPIRV;
+    return ArtifactDescUtil::isDisassembly(from, to) &&
+           ((from.payload == ArtifactPayload::SPIRV) ||
+            (from.payload == ArtifactPayload::WGSL_SPIRV));
 }
 
-SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) 
+SlangResult GlslangDownstreamCompiler::convert(
+    IArtifact* from,
+    const ArtifactDesc& to,
+    IArtifact** outArtifact)
 {
     if (!canConvert(from->getDesc(), to))
     {
@@ -315,11 +327,9 @@ SlangResult GlslangDownstreamCompiler::convert(IArtifact* from, const ArtifactDe
     SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::No, blob.writeRef()));
 
     StringBuilder builder;
-    
+
     auto outputFunc = [](void const* data, size_t size, void* userData)
-    {
-        (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size);
-    };
+    { (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size); };
 
     glslang_CompileRequest_1_2 request;
     memset(&request, 0, sizeof(request));
@@ -364,14 +374,18 @@ SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersio
     {
         return SLANG_FAIL;
     }
-    
+
     auto timestampString = String(timestamp);
     ComPtr<ISlangBlob> version = StringBlob::create(timestampString.getBuffer());
     *outVersionString = version.detach();
     return SLANG_OK;
 }
 
-static SlangResult locateGlslangSpirvDownstreamCompiler(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set, SlangPassThrough compilerType)
+static SlangResult locateGlslangSpirvDownstreamCompiler(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set,
+    SlangPassThrough compilerType)
 {
     ComPtr<ISlangSharedLibrary> library;
 
@@ -379,18 +393,23 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(const String& path, ISla
     // On unix systems we need to ensure pthread is loaded first.
     // TODO(JS):
     // There is an argument that this should be performed through the loader....
-    // NOTE! We don't currently load through a dependent library, as it is *assumed* something as core as 'ptheads'
-    // isn't going to be distributed with the shader compiler. 
+    // NOTE! We don't currently load through a dependent library, as it is *assumed* something as
+    // core as 'ptheads' isn't going to be distributed with the shader compiler.
     ComPtr<ISlangSharedLibrary> pthreadLibrary;
     DefaultSharedLibraryLoader::load(loader, path, "pthread", pthreadLibrary.writeRef());
     if (!pthreadLibrary.get())
     {
-        DefaultSharedLibraryLoader::load(loader, path, "libpthread.so.0", pthreadLibrary.writeRef());
+        DefaultSharedLibraryLoader::load(
+            loader,
+            path,
+            "libpthread.so.0",
+            pthreadLibrary.writeRef());
     }
 
 #endif
 
-    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "slang-glslang", library));
+    SLANG_RETURN_ON_FAIL(
+        DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "slang-glslang", library));
 
     SLANG_ASSERT(library);
     if (!library)
@@ -406,24 +425,36 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(const String& path, ISla
     return SLANG_OK;
 }
 
-SlangResult GlslangDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+SlangResult GlslangDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
 {
     return locateGlslangSpirvDownstreamCompiler(path, loader, set, SLANG_PASS_THROUGH_GLSLANG);
 }
 
-SlangResult SpirvOptDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+SlangResult SpirvOptDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
 {
     return locateGlslangSpirvDownstreamCompiler(path, loader, set, SLANG_PASS_THROUGH_SPIRV_OPT);
 }
 
-SlangResult SpirvDisDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+SlangResult SpirvDisDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
 {
     return locateGlslangSpirvDownstreamCompiler(path, loader, set, SLANG_PASS_THROUGH_SPIRV_DIS);
 }
 
 #else // SLANG_ENABLE_GLSLANG_SUPPORT
 
-/* static */SlangResult GlslangDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+/* static */ SlangResult GlslangDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
 {
     SLANG_UNUSED(path);
     SLANG_UNUSED(loader);
@@ -433,4 +464,4 @@ SlangResult SpirvDisDownstreamCompilerUtil::locateCompilers(const String& path, 
 
 #endif // SLANG_ENABLE_GLSLANG_SUPPORT
 
-}
+} // namespace Slang

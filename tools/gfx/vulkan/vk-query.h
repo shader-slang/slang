@@ -20,7 +20,7 @@ public:
 
 public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getResult(GfxIndex index, GfxCount count, uint64_t* data) override;
+    getResult(GfxIndex index, GfxCount count, uint64_t* data) override;
 
 public:
     VkQueryPool m_pool;
@@ -28,7 +28,10 @@ public:
 };
 
 void _writeTimestamp(
-    VulkanApi* api, VkCommandBuffer vkCmdBuffer, IQueryPool* queryPool, SlangInt index);
+    VulkanApi* api,
+    VkCommandBuffer vkCmdBuffer,
+    IQueryPool* queryPool,
+    SlangInt index);
 
 } // namespace vk
 } // namespace gfx

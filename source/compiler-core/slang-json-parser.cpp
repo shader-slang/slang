@@ -1,15 +1,15 @@
 // slang-json-parser.cpp
 #include "slang-json-parser.h"
 
-#include "slang-json-diagnostics.h"
-
 #include "../core/slang-string-escape-util.h"
+#include "slang-json-diagnostics.h"
 
 /*
 https://www.json.org/json-en.html
 */
 
-namespace Slang {
+namespace Slang
+{
 
 SlangResult JSONParser::_parseObject()
 {
@@ -92,32 +92,35 @@ SlangResult JSONParser::_parseValue()
 {
     switch (m_lexer->peekType())
     {
-        case JSONTokenType::True:
-        case JSONTokenType::False:
-        case JSONTokenType::Null:
-        case JSONTokenType::IntegerLiteral:
-        case JSONTokenType::FloatLiteral:
-        case JSONTokenType::StringLiteral:
+    case JSONTokenType::True:
+    case JSONTokenType::False:
+    case JSONTokenType::Null:
+    case JSONTokenType::IntegerLiteral:
+    case JSONTokenType::FloatLiteral:
+    case JSONTokenType::StringLiteral:
         {
             const JSONToken& tok = m_lexer->peekToken();
             m_listener->addLexemeValue(tok.type, m_lexer->peekLexeme(), tok.loc);
             m_lexer->advance();
             return SLANG_OK;
         }
-        case JSONTokenType::LBracket:
+    case JSONTokenType::LBracket:
         {
             return _parseArray();
         }
-        case JSONTokenType::LBrace:
+    case JSONTokenType::LBrace:
         {
             return _parseObject();
         }
-        default:
+    default:
         {
-            m_sink->diagnose(m_lexer->peekLoc(), JSONDiagnostics::unexpectedToken, getJSONTokenAsText(m_lexer->peekType()));
+            m_sink->diagnose(
+                m_lexer->peekLoc(),
+                JSONDiagnostics::unexpectedToken,
+                getJSONTokenAsText(m_lexer->peekType()));
             return SLANG_FAIL;
         }
-        case JSONTokenType::Invalid:
+    case JSONTokenType::Invalid:
         {
             // It's a lex error, so just fail
             return SLANG_FAIL;
@@ -125,7 +128,11 @@ SlangResult JSONParser::_parseValue()
     }
 }
 
-SlangResult JSONParser::parse(JSONLexer* lexer, SourceView* sourceView, JSONListener* listener, DiagnosticSink* sink)
+SlangResult JSONParser::parse(
+    JSONLexer* lexer,
+    SourceView* sourceView,
+    JSONListener* listener,
+    DiagnosticSink* sink)
 {
     m_sourceView = sourceView;
     m_lexer = lexer;
@@ -180,7 +187,8 @@ void JSONWriter::_nextLine()
 
 void JSONWriter::_maybeNextLine()
 {
-    // Nothing has been emitted, because nothing has been indented, and we must indent before an emit
+    // Nothing has been emitted, because nothing has been indented, and we must indent before an
+    // emit
     if (m_emittedIndent < 0)
     {
     }
@@ -194,13 +202,13 @@ void JSONWriter::_handleFormat(Location loc)
 {
     switch (m_format)
     {
-        case IndentationStyle::Allman:
+    case IndentationStyle::Allman:
         {
             if (isComma(loc))
             {
                 _maybeNextLine();
             }
-            else 
+            else
             {
                 if (isBefore(loc))
                 {
@@ -221,7 +229,7 @@ void JSONWriter::_handleFormat(Location loc)
             }
             break;
         }
-        case IndentationStyle::KNR:
+    case IndentationStyle::KNR:
         {
             if (isComma(loc))
             {
@@ -231,7 +239,7 @@ void JSONWriter::_handleFormat(Location loc)
                     _maybeNextLine();
                 }
             }
-            else 
+            else
             {
                 if (isBefore(loc))
                 {
@@ -321,7 +329,7 @@ void JSONWriter::startArray(SourceLoc loc)
 
     _handleFormat(Location::BeforeOpenArray);
     _maybeEmitIndent();
-    m_builder << "[";    
+    m_builder << "[";
     _handleFormat(Location::AfterOpenArray);
 
     m_state.m_flags |= State::Flag::HasPrevious;
@@ -352,7 +360,8 @@ void JSONWriter::endArray(SourceLoc loc)
 void JSONWriter::addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc)
 {
     SLANG_UNUSED(loc);
-    SLANG_ASSERT(m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
+    SLANG_ASSERT(
+        m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
 
     _maybeEmitFieldComma();
     _maybeEmitIndent();
@@ -371,7 +380,8 @@ void JSONWriter::addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc)
 void JSONWriter::addQuotedKey(const UnownedStringSlice& key, SourceLoc loc)
 {
     SLANG_UNUSED(loc);
-    SLANG_ASSERT(m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
+    SLANG_ASSERT(
+        m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
 
     // It should be quoted
     SLANG_ASSERT(key.getLength() >= 2 && key[0] == '"' && key[key.getLength() - 1] == '"');
@@ -412,29 +422,29 @@ void JSONWriter::addLexemeValue(JSONTokenType type, const UnownedStringSlice& va
 
     switch (type)
     {
-        case JSONTokenType::IntegerLiteral:
-        case JSONTokenType::FloatLiteral:
-        case JSONTokenType::StringLiteral:
+    case JSONTokenType::IntegerLiteral:
+    case JSONTokenType::FloatLiteral:
+    case JSONTokenType::StringLiteral:
         {
             m_builder << value;
             break;
         }
-        case JSONTokenType::True:
+    case JSONTokenType::True:
         {
             m_builder << UnownedStringSlice::fromLiteral("true");
             break;
         }
-        case JSONTokenType::False:
+    case JSONTokenType::False:
         {
             m_builder << UnownedStringSlice::fromLiteral("false");
             break;
         }
-        case JSONTokenType::Null:
+    case JSONTokenType::Null:
         {
             m_builder << UnownedStringSlice::fromLiteral("null");
             break;
         }
-        default:
+    default:
         {
             SLANG_ASSERT(!"Can only emit values");
         }
@@ -460,7 +470,8 @@ void JSONWriter::addFloatValue(double value, SourceLoc loc)
 void JSONWriter::addBoolValue(bool inValue, SourceLoc loc)
 {
     _preValue(loc);
-    const UnownedStringSlice slice = inValue ? UnownedStringSlice::fromLiteral("true") : UnownedStringSlice::fromLiteral("false");
+    const UnownedStringSlice slice = inValue ? UnownedStringSlice::fromLiteral("true")
+                                             : UnownedStringSlice::fromLiteral("false");
     m_builder << slice;
     _postValue();
 }

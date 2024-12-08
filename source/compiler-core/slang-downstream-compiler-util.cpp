@@ -1,29 +1,28 @@
 // slang-downstream-compiler.cpp
 #include "slang-downstream-compiler-util.h"
 
-#include "../core/slang-common.h"
-#include "slang-com-helper.h"
-#include "../core/slang-string-util.h"
-
-#include "../core/slang-type-text-util.h"
-
-#include "../core/slang-io.h"
-#include "../core/slang-shared-library.h"
 #include "../core/slang-blob.h"
 #include "../core/slang-char-util.h"
+#include "../core/slang-common.h"
+#include "../core/slang-io.h"
+#include "../core/slang-shared-library.h"
+#include "../core/slang-string-util.h"
+#include "../core/slang-type-text-util.h"
+#include "slang-com-helper.h"
 
 #ifdef SLANG_VC
-#   include "windows/slang-win-visual-studio-util.h"
+#include "windows/slang-win-visual-studio-util.h"
 #endif
 
-#include "slang-visual-studio-compiler-util.h"
-#include "slang-gcc-compiler-util.h"
-#include "slang-nvrtc-compiler.h"
-#include "slang-fxc-compiler.h"
 #include "slang-dxc-compiler.h"
+#include "slang-fxc-compiler.h"
+#include "slang-gcc-compiler-util.h"
 #include "slang-glslang-compiler.h"
 #include "slang-llvm-compiler.h"
 #include "slang-metal-compiler.h"
+#include "slang-nvrtc-compiler.h"
+#include "slang-tint-compiler.h"
+#include "slang-visual-studio-compiler-util.h"
 
 namespace Slang
 {
@@ -45,10 +44,14 @@ struct DownstreamCompilerInfos
 
     DownstreamCompilerInfos infos;
 
-    infos.infos[int(SLANG_PASS_THROUGH_CLANG)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
-    infos.infos[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
-    infos.infos[int(SLANG_PASS_THROUGH_GCC)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
-    infos.infos[int(SLANG_PASS_THROUGH_LLVM)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_CLANG)] =
+        Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] =
+        Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_GCC)] =
+        Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_LLVM)] =
+        Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
 
     infos.infos[int(SLANG_PASS_THROUGH_NVRTC)] = Info(SourceLanguageFlag::CUDA);
 
@@ -60,16 +63,20 @@ struct DownstreamCompilerInfos
     return infos;
 }
 
-/* static */DownstreamCompilerInfos DownstreamCompilerInfos::s_infos = DownstreamCompilerInfos::_calcInfos();
+/* static */ DownstreamCompilerInfos DownstreamCompilerInfos::s_infos =
+    DownstreamCompilerInfos::_calcInfos();
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerInfo !!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */const DownstreamCompilerInfo& DownstreamCompilerInfo::getInfo(SlangPassThrough compiler)
+/* static */ const DownstreamCompilerInfo& DownstreamCompilerInfo::getInfo(
+    SlangPassThrough compiler)
 {
     return DownstreamCompilerInfos::s_infos.infos[int(compiler)];
 }
 
-/* static */bool DownstreamCompilerInfo::canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage)
+/* static */ bool DownstreamCompilerInfo::canCompile(
+    SlangPassThrough compiler,
+    SlangSourceLanguage sourceLanguage)
 {
     const auto& info = getInfo(compiler);
     return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
@@ -90,7 +97,8 @@ static DownstreamCompilerMatchVersion _calcCompiledVersion()
     matchVersion.type = SLANG_PASS_THROUGH_GCC;
     matchVersion.matchVersion.set(Index(__GNUC__), Index(__GNUC_MINOR__));
 #else
-    // TODO(JS): Hmmm None is not quite the same as unknown. It works for now, but we might want to have a distinct enum for unknown.
+    // TODO(JS): Hmmm None is not quite the same as unknown. It works for now, but we might want to
+    // have a distinct enum for unknown.
     matchVersion.type = SLANG_PASS_THROUGH_NONE;
 #endif
 
@@ -104,14 +112,20 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     return s_version;
 }
 
-/* static */IDownstreamCompiler* DownstreamCompilerUtil::findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompilerDesc& desc)
+/* static */ IDownstreamCompiler* DownstreamCompilerUtil::findCompiler(
+    const DownstreamCompilerSet* set,
+    MatchType matchType,
+    const DownstreamCompilerDesc& desc)
 {
     List<IDownstreamCompiler*> compilers;
     set->getCompilers(compilers);
     return findCompiler(compilers, matchType, desc);
 }
 
-/* static */IDownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<IDownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompilerDesc& desc)
+/* static */ IDownstreamCompiler* DownstreamCompilerUtil::findCompiler(
+    const List<IDownstreamCompiler*>& compilers,
+    MatchType matchType,
+    const DownstreamCompilerDesc& desc)
 {
     if (compilers.getCount() <= 0)
     {
@@ -144,7 +158,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
             const Int versionValue = compilerDesc.getVersionValue();
             switch (matchType)
             {
-                case MatchType::MinGreaterEqual:
+            case MatchType::MinGreaterEqual:
                 {
                     auto diff = descVersionValue - versionValue;
                     if (diff >= 0 && diff < minVersionDiff)
@@ -154,7 +168,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
                     }
                     break;
                 }
-                case MatchType::MinAbsolute:
+            case MatchType::MinAbsolute:
                 {
                     auto diff = descVersionValue - versionValue;
                     diff = (diff >= 0) ? diff : -diff;
@@ -165,7 +179,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
                     }
                     break;
                 }
-                case MatchType::Newest:
+            case MatchType::Newest:
                 {
                     if (versionValue > maxVersionValue)
                     {
@@ -181,7 +195,9 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     return (bestIndex >= 0) ? compilers[bestIndex] : nullptr;
 }
 
-/* static */IDownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<IDownstreamCompiler*>& compilers, const DownstreamCompilerDesc& desc)
+/* static */ IDownstreamCompiler* DownstreamCompilerUtil::findCompiler(
+    const List<IDownstreamCompiler*>& compilers,
+    const DownstreamCompilerDesc& desc)
 {
     for (auto compiler : compilers)
     {
@@ -193,15 +209,21 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     return nullptr;
 }
 
-/* static */IDownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<IDownstreamCompiler*>& compilers, SlangPassThrough type, const SemanticVersion& version)
+/* static */ IDownstreamCompiler* DownstreamCompilerUtil::findCompiler(
+    const List<IDownstreamCompiler*>& compilers,
+    SlangPassThrough type,
+    const SemanticVersion& version)
 {
     DownstreamCompilerDesc desc;
     desc.type = type;
-    desc.version = version; 
+    desc.version = version;
     return findCompiler(compilers, desc);
 }
 
-/* static */void DownstreamCompilerUtil::findVersions(const List<IDownstreamCompiler*>& compilers, SlangPassThrough type, List<SemanticVersion>& outVersions)
+/* static */ void DownstreamCompilerUtil::findVersions(
+    const List<IDownstreamCompiler*>& compilers,
+    SlangPassThrough type,
+    List<SemanticVersion>& outVersions)
 {
     for (auto compiler : compilers)
     {
@@ -214,7 +236,9 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     }
 }
 
-/* static */IDownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const List<IDownstreamCompiler*>& compilers, const DownstreamCompilerMatchVersion& matchVersion)
+/* static */ IDownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(
+    const List<IDownstreamCompiler*>& compilers,
+    const DownstreamCompilerMatchVersion& matchVersion)
 {
     List<SemanticVersion> versions;
 
@@ -229,7 +253,10 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
         }
 
         // Okay lets find the best one
-        auto bestVersion = MatchSemanticVersion::findAnyBest(versions.getBuffer(), versions.getCount(), matchVersion.matchVersion);
+        auto bestVersion = MatchSemanticVersion::findAnyBest(
+            versions.getBuffer(),
+            versions.getCount(),
+            matchVersion.matchVersion);
 
         // If one is found use it
         if (bestVersion.isSet())
@@ -240,14 +267,13 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
 
     {
         // TODO(JS):
-        // NOTE! This may not really be appropriate, because LLVM is *not* interchangable with 
+        // NOTE! This may not really be appropriate, because LLVM is *not* interchangable with
         // a 'normal' C++ compiler as cannot access standard libraries/headers.
         // So `slang-llvm` can't be used for 'host' code.
 
-        // These compilers should be usable interchangably. The order is important, as the first one that matches will
-        // be used, so LLVM is used before CLANG or GCC if appropriate
-        const SlangPassThrough compatiblePassThroughs[] =
-        {
+        // These compilers should be usable interchangably. The order is important, as the first one
+        // that matches will be used, so LLVM is used before CLANG or GCC if appropriate
+        const SlangPassThrough compatiblePassThroughs[] = {
             SLANG_PASS_THROUGH_LLVM,
             SLANG_PASS_THROUGH_CLANG,
             SLANG_PASS_THROUGH_GCC,
@@ -265,7 +291,8 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
                 if (versions.getCount() > 0)
                 {
                     // Get the latest version (as we have no way to really compare)
-                    auto latestVersion = SemanticVersion::getLatest(versions.getBuffer(), versions.getCount());
+                    auto latestVersion =
+                        SemanticVersion::getLatest(versions.getBuffer(), versions.getCount());
                     return findCompiler(compilers, matchVersion.type, latestVersion);
                 }
             }
@@ -275,21 +302,25 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     return nullptr;
 }
 
-/* static */IDownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(const DownstreamCompilerSet* set, const DownstreamCompilerMatchVersion& matchVersion)
+/* static */ IDownstreamCompiler* DownstreamCompilerUtil::findClosestCompiler(
+    const DownstreamCompilerSet* set,
+    const DownstreamCompilerMatchVersion& matchVersion)
 {
     List<IDownstreamCompiler*> compilers;
     set->getCompilers(compilers);
     return findClosestCompiler(compilers, matchVersion);
 }
 
-/* static */void DownstreamCompilerUtil::updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage)
+/* static */ void DownstreamCompilerUtil::updateDefault(
+    DownstreamCompilerSet* set,
+    SlangSourceLanguage sourceLanguage)
 {
     IDownstreamCompiler* compiler = nullptr;
 
     switch (sourceLanguage)
     {
-        case SLANG_SOURCE_LANGUAGE_CPP:
-        case SLANG_SOURCE_LANGUAGE_C:
+    case SLANG_SOURCE_LANGUAGE_CPP:
+    case SLANG_SOURCE_LANGUAGE_C:
         {
             // Find the compiler closest to the compiler this was compiled with
             if (!compiler)
@@ -298,20 +329,21 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
             }
             break;
         }
-        case SLANG_SOURCE_LANGUAGE_CUDA:
+    case SLANG_SOURCE_LANGUAGE_CUDA:
         {
             DownstreamCompilerDesc desc;
             desc.type = SLANG_PASS_THROUGH_NVRTC;
             compiler = findCompiler(set, MatchType::Newest, desc);
             break;
         }
-        default: break;
+    default:
+        break;
     }
 
     set->setDefaultCompiler(sourceLanguage, compiler);
 }
 
-/* static */void DownstreamCompilerUtil::updateDefaults(DownstreamCompilerSet* set)
+/* static */ void DownstreamCompilerUtil::updateDefaults(DownstreamCompilerSet* set)
 {
     for (Index i = 0; i < Index(SLANG_SOURCE_LANGUAGE_COUNT_OF); ++i)
     {
@@ -319,7 +351,8 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     }
 }
 
-/* static */void DownstreamCompilerUtil::setDefaultLocators(DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)])
+/* static */ void DownstreamCompilerUtil::setDefaultLocators(
+    DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)])
 {
     outFuncs[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = &VisualStudioCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_CLANG)] = &GCCDownstreamCompilerUtil::locateClangCompilers;
@@ -332,6 +365,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     outFuncs[int(SLANG_PASS_THROUGH_LLVM)] = &LLVMDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_SPIRV_DIS)] = &SpirvDisDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_METAL)] = &MetalDownstreamCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_TINT)] = &TintDownstreamCompilerUtil::locateCompilers;
 }
 
 static String _getParentPath(const String& path)
@@ -348,7 +382,11 @@ static String _getParentPath(const String& path)
     }
 }
 
-static SlangResult _findPaths(const String& path, const char* libraryName, String& outParentPath, String& outLibraryPath)
+static SlangResult _findPaths(
+    const String& path,
+    const char* libraryName,
+    String& outParentPath,
+    String& outLibraryPath)
 {
     // Try to determine what the path is by looking up the path type
     SlangPathType pathType;
@@ -370,14 +408,17 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
         return SLANG_OK;
     }
 
-    // If this failed the path could be to a shared library, but we may need to convert to the shared library filename first
+    // If this failed the path could be to a shared library, but we may need to convert to the
+    // shared library filename first
     const String sharedLibraryFilePath = SharedLibrary::calcPlatformPath(path.getUnownedSlice());
-    if (SLANG_SUCCEEDED(Path::getPathType(sharedLibraryFilePath, &pathType)) && pathType == SLANG_PATH_TYPE_FILE)
+    if (SLANG_SUCCEEDED(Path::getPathType(sharedLibraryFilePath, &pathType)) &&
+        pathType == SLANG_PATH_TYPE_FILE)
     {
-        // We pass in the shared library path, as canonical paths can sometimes only apply to pre-existing objects. 
+        // We pass in the shared library path, as canonical paths can sometimes only apply to
+        // pre-existing objects.
         outParentPath = _getParentPath(sharedLibraryFilePath);
-        // The original path should work as is for the SharedLibrary load. Notably we don't use the sharedLibraryFilePath
-        // as this is the wrong name to do a SharedLibrary load with.
+        // The original path should work as is for the SharedLibrary load. Notably we don't use the
+        // sharedLibraryFilePath as this is the wrong name to do a SharedLibrary load with.
         outLibraryPath = path;
 
         return SLANG_OK;
@@ -386,7 +427,12 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
     return SLANG_FAIL;
 }
 
-/* static */SlangResult DownstreamCompilerUtil::loadSharedLibrary(const String& path, ISlangSharedLibraryLoader* loader, const char*const* dependentNames, const char* inLibraryName, ComPtr<ISlangSharedLibrary>& outSharedLib)
+/* static */ SlangResult DownstreamCompilerUtil::loadSharedLibrary(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    const char* const* dependentNames,
+    const char* inLibraryName,
+    ComPtr<ISlangSharedLibrary>& outSharedLib)
 {
     String parentPath;
     String libraryPath;
@@ -397,19 +443,21 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
         if (SLANG_FAILED(_findPaths(path, inLibraryName, parentPath, libraryPath)))
         {
             // We have a few scenarios here.
-            // 1) The path could be the shared library/dll filename, that will be found through some operating system mechanism
-            // 2) That the shared library is *NOT* on the filesystem directly (the loader does something different)
-            // 3) Permissions or some other mechanism stops the lookup from working
+            // 1) The path could be the shared library/dll filename, that will be found through some
+            // operating system mechanism 2) That the shared library is *NOT* on the filesystem
+            // directly (the loader does something different) 3) Permissions or some other mechanism
+            // stops the lookup from working
 
             // We should probably assume that the path means something, else why set it.
-            // It's probably less likely that it is a directory that we can't detect - as if it's a directory as part of an app
-            // it's permissions should allow detection, or be made to allow it.
+            // It's probably less likely that it is a directory that we can't detect - as if it's a
+            // directory as part of an app it's permissions should allow detection, or be made to
+            // allow it.
 
             // All this being the case we should probably assume that it is the shared library name.
             libraryPath = path;
 
-            // Attempt to get a parent. If there isn't one this will be empty, which will mean it will be ignored, which is probably
-            // what we want if path is just a shared library name
+            // Attempt to get a parent. If there isn't one this will be empty, which will mean it
+            // will be ignored, which is probably what we want if path is just a shared library name
             parentPath = Path::getParentDirectory(libraryPath);
         }
     }
@@ -420,7 +468,7 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
     // Try to load any dependent libs from the parent path
     if (dependentNames)
     {
-        for (const char*const* cur = dependentNames; *cur; ++cur)
+        for (const char* const* cur = dependentNames; *cur; ++cur)
         {
             const char* dependentName = *cur;
             ComPtr<ISlangSharedLibrary> lib;
@@ -453,7 +501,9 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
     }
 }
 
-/* static */void DownstreamCompilerUtil::appendAsText(const DownstreamCompilerDesc& desc, StringBuilder& out)
+/* static */ void DownstreamCompilerUtil::appendAsText(
+    const DownstreamCompilerDesc& desc,
+    StringBuilder& out)
 {
     out << TypeTextUtil::getPassThroughAsHumanText(desc.type);
 
@@ -467,4 +517,4 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
     }
 }
 
-}
+} // namespace Slang

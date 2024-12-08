@@ -5,9 +5,9 @@
 
 namespace Slang
 {
-    struct IRModule;
+struct IRModule;
 
-    // Turn array-typed return values into `out` parameters for backends that does not
-    // support arrays in return values.
-    void legalizeArrayReturnType(IRModule* module);
-}
+// Turn array-typed return values into `out` parameters for backends that does not
+// support arrays in return values.
+void legalizeArrayReturnType(IRModule* module);
+} // namespace Slang

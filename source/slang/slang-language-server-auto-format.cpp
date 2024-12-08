@@ -1,7 +1,7 @@
 #include "slang-language-server-auto-format.h"
-#include "../core/slang-char-util.h"
-#include "../compiler-core/slang-lexer.h"
 
+#include "../compiler-core/slang-lexer.h"
+#include "../core/slang-char-util.h"
 #include "../core/slang-file-system.h"
 
 namespace Slang
@@ -18,7 +18,8 @@ String findClangFormatTool()
     if (Process::create(cmdLine, 0, proc) == SLANG_OK)
     {
         auto inStream = proc->getStream(StdStreamType::In);
-        if (inStream) inStream->close();
+        if (inStream)
+            inStream->close();
         proc->kill(0);
         return processName;
     }
@@ -32,7 +33,8 @@ String findClangFormatTool()
     Index vsCodeLoc = dirName.indexOf(extensionsStr);
     if (vsCodeLoc != -1)
     {
-        // If we still cannot find clang-format, try to use the clang-format bundled with VSCode's C++ extension.
+        // If we still cannot find clang-format, try to use the clang-format bundled with VSCode's
+        // C++ extension.
         String vsCodeExtDir = dirName.subString(0, vsCodeLoc + extensionsStr.getLength());
         struct CallbackContext
         {
@@ -42,16 +44,23 @@ String findClangFormatTool()
         } callbackContext;
         callbackContext.processName = processName;
         callbackContext.parentDir = vsCodeExtDir;
-        OSFileSystem::getExtSingleton()->enumeratePathContents(vsCodeExtDir.getBuffer(), [](SlangPathType /*pathType*/, const char* name, void* userData)
-        {
-            CallbackContext* context = (CallbackContext*)userData;
-            if (UnownedStringSlice(name).indexOf(UnownedStringSlice("ms-vscode.cpptools-")) != -1)
+        OSFileSystem::getExtSingleton()->enumeratePathContents(
+            vsCodeExtDir.getBuffer(),
+            [](SlangPathType /*pathType*/, const char* name, void* userData)
             {
-                String candidateFileName = Path::combine(Path::combine(context->parentDir, name, "LLVM"), "bin", context->processName);
-                if (File::exists(candidateFileName))
-                    context->foundPath = candidateFileName;
-            }
-        }, & callbackContext);
+                CallbackContext* context = (CallbackContext*)userData;
+                if (UnownedStringSlice(name).indexOf(UnownedStringSlice("ms-vscode.cpptools-")) !=
+                    -1)
+                {
+                    String candidateFileName = Path::combine(
+                        Path::combine(context->parentDir, name, "LLVM"),
+                        "bin",
+                        context->processName);
+                    if (File::exists(candidateFileName))
+                        context->foundPath = candidateFileName;
+                }
+            },
+            &callbackContext);
         if (callbackContext.foundPath.getLength())
             return callbackContext.foundPath;
     }
@@ -79,11 +88,12 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
         auto headerToken = lexer.lexToken();
         if (headerToken.type == TokenType::EndOfFile)
             break;
-        if (headerToken.type != TokenType::Identifier || headerToken.getContent() != toSlice("spirv_asm"))
+        if (headerToken.type != TokenType::Identifier ||
+            headerToken.getContent() != toSlice("spirv_asm"))
         {
             continue;
         }
-        
+
         // We have found a spirv-asm block, now find the end of it.
         int braceCounter = 0;
         Token endToken;
@@ -121,7 +131,7 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
                 break;
             }
         }
-        breakLabel:;
+    breakLabel:;
         if (endToken.type == TokenType::RBrace)
         {
             TextRange range;
@@ -227,7 +237,13 @@ bool shouldUseFallbackStyle(const FormatOptions& options)
     return true;
 }
 
-List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd, Index cursorOffset, const List<TextRange>& exclusionRanges, const FormatOptions& options)
+List<Edit> formatSource(
+    UnownedStringSlice text,
+    Index lineStart,
+    Index lineEnd,
+    Index cursorOffset,
+    const List<TextRange>& exclusionRanges,
+    const FormatOptions& options)
 {
     List<Edit> edits;
 
@@ -247,7 +263,8 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
     }
     cmdLine.addArg("--output-replacements-xml");
     // clang-format does not allow non-builtin style for `fallback-style`.
-    // We detect if clang format file exists, and if not set style directly to user specified fallback style.
+    // We detect if clang format file exists, and if not set style directly to user specified
+    // fallback style.
     if (shouldUseFallbackStyle(options))
     {
         if (options.fallbackStyle.getLength())
@@ -307,7 +324,9 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
         pos = line.indexOf(lengthStr);
         if (pos == -1)
             continue;
-        Index exclusionRangeId = exclusionRanges.binarySearch(edt.offset, [](TextRange range, Index offset)
+        Index exclusionRangeId = exclusionRanges.binarySearch(
+            edt.offset,
+            [](TextRange range, Index offset)
             {
                 if (range.offsetEnd <= offset)
                     return -1;
@@ -335,7 +354,8 @@ List<Edit> formatSource(UnownedStringSlice text, Index lineStart, Index lineEnd,
         if (cursorOffset != -1 && edt.offset >= cursorOffset)
             break;
         // Never allow clang-format to put the semicolon after `}` in its own line.
-        if (edt.offset < text.getLength() && edt.length == 0 && text[edt.offset] == ';' && edt.offset >0 && text[edt.offset - 1] == '}')
+        if (edt.offset < text.getLength() && edt.length == 0 && text[edt.offset] == ';' &&
+            edt.offset > 0 && text[edt.offset - 1] == '}')
             continue;
         // If need to preserve line break, turn all edits with a line break into a space.
         if (options.behavior == FormatBehavior::PreserveLineBreak)

@@ -2,9 +2,8 @@
 #include "debug-swap-chain.h"
 
 #include "debug-command-queue.h"
-#include "debug-texture.h"
-
 #include "debug-helper-functions.h"
+#include "debug-texture.h"
 
 namespace gfx
 {

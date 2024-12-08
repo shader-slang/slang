@@ -60,7 +60,7 @@ void CommandBufferImpl::init(
     reinit();
 
     m_cmdList->QueryInterface<ID3D12GraphicsCommandList6>(m_cmdList6.writeRef());
-if (m_cmdList6)
+    if (m_cmdList6)
     {
         m_cmdList4 = m_cmdList6;
         m_cmdList1 = m_cmdList6;
@@ -84,7 +84,9 @@ void CommandBufferImpl::encodeResourceCommands(IResourceCommandEncoder** outEnco
 }
 
 void CommandBufferImpl::encodeRenderCommands(
-    IRenderPassLayout* renderPass, IFramebuffer* framebuffer, IRenderCommandEncoder** outEncoder)
+    IRenderPassLayout* renderPass,
+    IFramebuffer* framebuffer,
+    IRenderCommandEncoder** outEncoder)
 {
     m_renderCommandEncoder.init(
         m_renderer,
@@ -107,11 +109,14 @@ void CommandBufferImpl::encodeRayTracingCommands(IRayTracingCommandEncoder** out
     m_rayTracingCommandEncoder.init(this);
     *outEncoder = &m_rayTracingCommandEncoder;
 #else
-    * outEncoder = nullptr;
+    *outEncoder = nullptr;
 #endif
 }
 
-void CommandBufferImpl::close() { m_cmdList->Close(); }
+void CommandBufferImpl::close()
+{
+    m_cmdList->Close();
+}
 
 } // namespace d3d12
 } // namespace gfx

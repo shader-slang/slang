@@ -1,12 +1,12 @@
 // slang-capability.h
 #pragma once
 
+#include "../core/slang-dictionary.h"
 #include "../core/slang-list.h"
 #include "../core/slang-string.h"
-#include "../core/slang-dictionary.h"
 
-#include <stdint.h>
 #include <optional>
+#include <stdint.h>
 
 namespace Slang
 {
@@ -58,14 +58,14 @@ struct CapabilityAtomSet : UIntSet
 struct CapabilityTargetSet;
 typedef Dictionary<CapabilityAtom, CapabilityTargetSet> CapabilityTargetSets;
 
-/// CapabilityStageSet encapsulates all capabilities of a specific shader stage for a specific target.
-/// Capabilities may be disjoint, but only in rare cases: 
+/// CapabilityStageSet encapsulates all capabilities of a specific shader stage for a specific
+/// target. Capabilities may be disjoint, but only in rare cases:
 /// {{glsl, _GLSL_130, GL_EXT_FOO1}, {glsl, _GLSL_130, _GLSL_140, _GLSL_150}}
 struct CapabilityStageSet
 {
     CapabilityAtom stage{};
 
-    /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.  
+    /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.
     std::optional<CapabilityAtomSet> atomSet{};
 
     void addNewSet(CapabilityAtomSet&& setToAdd)
@@ -159,41 +159,59 @@ public:
     /// `this` may be made invalid if other is fully disjoint.
     void join(const CapabilitySet& other);
 
-    /// Join two capability sets to form ('this' & 'other'). 
+    /// Join two capability sets to form ('this' & 'other').
     /// If a target/set has an incompatible atom, do not destroy the target/set.
     void nonDestructiveJoin(const CapabilitySet& other);
 
     /// Add all targets/sets of 'other' into 'this'. Overlapping sets are removed.
     void unionWith(const CapabilitySet& other);
 
-    /// Return a capability set of 'target' atoms 'this' has, but 'other' does not. 
+    /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
     CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other);
 
-        /// Are these two capability sets equal?
+    /// Are these two capability sets equal?
     bool operator==(CapabilitySet const& that) const;
 
     void addCapability(List<List<CapabilityAtom>>& atomLists);
-    /// Calculate a list of "compacted" atoms, which excludes any atoms from the expanded list that are implies by another item in the list.
+    /// Calculate a list of "compacted" atoms, which excludes any atoms from the expanded list that
+    /// are implies by another item in the list.
 
     /// returns true if 'this' is a better target for 'targetCaps' than 'that'
     /// isEqual: is `this` and `that` equal
-    bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps, bool& isEqual) const;
+    bool isBetterForTarget(
+        CapabilitySet const& that,
+        CapabilitySet const& targetCaps,
+        bool& isEqual) const;
 
-    /// Find any capability sets which are in 'available' but not in 'required'. Return false if this situation occurs. 
-    static bool checkCapabilityRequirement(CapabilitySet const& available, CapabilitySet const& required, CapabilityAtomSet& outFailedAvailableSet);
+    /// Find any capability sets which are in 'available' but not in 'required'. Return false if
+    /// this situation occurs.
+    static bool checkCapabilityRequirement(
+        CapabilitySet const& available,
+        CapabilitySet const& required,
+        CapabilityAtomSet& outFailedAvailableSet);
 
-    // For each element in `elementsToPermutateWith`, create and add a different conjunction permutation by adding to `setToPermutate`. 
+    // For each element in `elementsToPermutateWith`, create and add a different conjunction
+    // permutation by adding to `setToPermutate`.
     template<CapabilityName keyholeAtomToPermuteWith>
-    void addPermutationsOfConjunctionForEachInContainer(CapabilityAtomSet& setToPermutate, const CapabilityAtomSet& elementsToPermutateWith, CapabilityAtom knownTargetAtom, CapabilityAtom knownStageAtom);
-    // This is used for adding conjunctions directly and efficently, this is not functionally a join.
-    // if `knownStage`/`knownTarget` is not CapabilityAtom::Invalid, the given atom will be assumed as an assigned key atom (faster)
-    inline void addConjunction(CapabilityAtomSet conjunction, CapabilityAtom knownTarget, CapabilityAtom knownStage);
+    void addPermutationsOfConjunctionForEachInContainer(
+        CapabilityAtomSet& setToPermutate,
+        const CapabilityAtomSet& elementsToPermutateWith,
+        CapabilityAtom knownTargetAtom,
+        CapabilityAtom knownStageAtom);
+    // This is used for adding conjunctions directly and efficently, this is not functionally a
+    // join. if `knownStage`/`knownTarget` is not CapabilityAtom::Invalid, the given atom will be
+    // assumed as an assigned key atom (faster)
+    inline void addConjunction(
+        CapabilityAtomSet conjunction,
+        CapabilityAtom knownTarget,
+        CapabilityAtom knownStage);
     inline void addUnexpandedCapabilites(CapabilityName atom);
-    
+
     CapabilityTargetSets& getCapabilityTargetSets() { return m_targetSets; }
     const CapabilityTargetSets& getCapabilityTargetSets() const { return m_targetSets; }
 
-    // If this capability set uniquely implies one stage atom, return it. Otherwise returns CapabilityAtom::Invalid.
+    // If this capability set uniquely implies one stage atom, return it. Otherwise returns
+    // CapabilityAtom::Invalid.
     CapabilityAtom getUniquelyImpliedStageAtom() const;
 
     struct AtomSets
@@ -207,38 +225,24 @@ public:
             const std::optional<CapabilityAtomSet>* atomSetNode = {};
 
         public:
-            operator bool() const
-            {
-                return (atomSetNode) ? atomSetNode->has_value() : false;
-            }
-            const CapabilityAtomSet& operator*() const
-            {
-                return *(*this->atomSetNode);
-            }
-            const CapabilityAtomSet* operator->() const
-            {
-                return &(*(*this->atomSetNode));
-            }
+            operator bool() const { return (atomSetNode) ? atomSetNode->has_value() : false; }
+            const CapabilityAtomSet& operator*() const { return *(*this->atomSetNode); }
+            const CapabilityAtomSet* operator->() const { return &(*(*this->atomSetNode)); }
             bool operator==(const Iterator& other) const
             {
-                return other.context == this->context
-                    && other.targetNode == this->targetNode
-                    && other.stageNode == this->stageNode
-                    ;
+                return other.context == this->context && other.targetNode == this->targetNode &&
+                       other.stageNode == this->stageNode;
             }
-            bool operator!=(const Iterator& other) const
-            {
-                return !(other == *this);
-            }
+            bool operator!=(const Iterator& other) const { return !(other == *this); }
 
             Iterator& operator++()
             {
-                for(;;)
+                for (;;)
                 {
                     this->stageNode++;
                     if (this->stageNode == (*this->targetNode).second.shaderStageSets.end())
                     {
-                        for(;;)
+                        for (;;)
                         {
                             this->targetNode++;
                             if (this->targetNode == this->context->end())
@@ -260,10 +264,7 @@ public:
                 }
                 return *this;
             }
-            Iterator& operator++(int)
-            {
-                return ++(*this);
-            }
+            Iterator& operator++(int) { return ++(*this); }
             Iterator begin() const
             {
                 Iterator tmp(this->context);
@@ -289,23 +290,21 @@ public:
                 tmp.targetNode = this->context->end();
                 return tmp;
             }
-            Iterator(const CapabilityTargetSets* mainContext)
-            {
-                context = mainContext;
-            }
+            Iterator(const CapabilityTargetSets* mainContext) { context = mainContext; }
         };
     };
     /// Get access to the raw atomic capabilities that define this set.
     /// Get all bottom level UIntSets for each CapabilityTargetSet.
     CapabilitySet::AtomSets::Iterator getAtomSets() const;
 
-    /// Add spirv version capabilities from 'spirv CapabilityTargetSet' as glsl_spirv version capability in 'glsl CapabilityTargetSet'
+    /// Add spirv version capabilities from 'spirv CapabilityTargetSet' as glsl_spirv version
+    /// capability in 'glsl CapabilityTargetSet'
     void addSpirvVersionFromOtherAsGlslSpirvVersion(CapabilitySet& other);
 
     /// Gets the first valid compile-target found in the CapabilitySet
     CapabilityAtom getCompileTarget()
     {
-        if(isEmpty() || isInvalid())
+        if (isEmpty() || isInvalid())
             return CapabilityAtom::Invalid;
         return (*m_targetSets.begin()).first;
     }
@@ -313,7 +312,7 @@ public:
     /// Gets the first valid stage found in the CapabilitySet
     CapabilityAtom getTargetStage()
     {
-        if(isEmpty() || isInvalid())
+        if (isEmpty() || isInvalid())
             return CapabilityAtom::Invalid;
         return (*(*m_targetSets.begin()).second.shaderStageSets.begin()).first;
     }
@@ -334,13 +333,13 @@ private:
     ImpliesReturnFlags _implies(CapabilitySet const& other, ImpliesFlags flags) const;
 };
 
-    /// Returns true if atom is derived from base
+/// Returns true if atom is derived from base
 bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base);
 
-    /// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
+/// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
 CapabilityName findCapabilityName(UnownedStringSlice const& name);
 
-    /// Check if 'name' is an '_Internal' or 'External' capability.
+/// Check if 'name' is an '_Internal' or 'External' capability.
 bool isInternalCapabilityName(CapabilityName name);
 
 CapabilityAtom getLatestSpirvAtom();
@@ -354,7 +353,7 @@ inline CapabilityAtom asAtom(T name)
     return CapabilityAtom(name);
 }
 
-    /// Gets the capability names.
+/// Gets the capability names.
 void getCapabilityNames(List<UnownedStringSlice>& ioNames);
 
 UnownedStringSlice capabilityNameToString(CapabilityName name);
@@ -362,7 +361,7 @@ UnownedStringSlice capabilityNameToString(CapabilityName name);
 bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 
 
-    /// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
+/// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
 bool isTargetVersionAtom(CapabilityAtom name);
 bool isSpirvExtensionAtom(CapabilityAtom name);
 
@@ -376,9 +375,9 @@ bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom);
 
 void freeCapabilityDefs();
 
-//#define UNIT_TEST_CAPABILITIES
+// #define UNIT_TEST_CAPABILITIES
 #ifdef UNIT_TEST_CAPABILITIES
 void TEST_CapabilitySet();
 #endif
 
-}
+} // namespace Slang

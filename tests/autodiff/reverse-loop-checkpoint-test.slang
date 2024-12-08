@@ -1,5 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
+//DISABLE_TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -44,13 +48,18 @@ float3 infinitesimal(float3 x)
     return x - detach(x);
 }
 
+//CHK: note: checkpointing context of 20 bytes associated with function: 'computeLoop'
 [BackwardDifferentiable]
 [PreferRecompute]
 float3 computeLoop(float y)
 {
+    //CHK: note: 4 bytes (float) used to checkpoint the following item:
     float w = 0;
+
+    //CHK: note: 12 bytes (Vector<float, 3> ) used to checkpoint the following item:
     float3 w3 = float3(0, 0, 0);
 
+    //CHK: note: 4 bytes (int32_t) used for a loop counter here:
     for (int i = 0; i < 8; i++)
     {
         float k = compute(i, y);
@@ -93,3 +102,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     outputBuffer[2] = computeLoop(1.0).x;
 }
+
+//CHK-NOT: note

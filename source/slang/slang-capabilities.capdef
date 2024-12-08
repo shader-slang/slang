@@ -4,7 +4,7 @@
 // This file will be parsed and processed by the slang-capability-generator
 // tool during the build process to produce slang-generated-capability-defs.h
 // and slang-generated-capability-defs-impl.h files that constitute the final
-// C++ source of the compiler. New capabilties should be added by editing
+// C++ source of the compiler. New capabilities should be added by editing
 // this file instead of the generated .h files.
 //
 // A capability atom represent a basic unit that characterizes a single code-gen target or
@@ -254,6 +254,10 @@ alias cpp_cuda = cpp | cuda;
 /// [Compound]
 alias cpp_cuda_spirv = cpp | cuda | spirv;
 
+/// CUDA and SPIRV code-gen targets
+/// [Compound]
+alias cuda_spirv = cuda | spirv;
+
 /// CPP, CUDA, GLSL and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
@@ -265,6 +269,10 @@ alias cpp_cuda_glsl_hlsl = cpp | cuda | glsl | hlsl;
 /// CPP, CUDA, GLSL, HLSL, and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;
+
+/// CPP, CUDA, GLSL, HLSL, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_spirv_wgsl = cpp | cuda | glsl | hlsl | spirv | wgsl;
 
 /// CPP, CUDA, GLSL, HLSL, Metal and SPIRV code-gen targets
 /// [Compound]
@@ -294,9 +302,17 @@ alias cpp_glsl = cpp | glsl;
 /// [Compound]
 alias cpp_glsl_hlsl_spirv = cpp | glsl | hlsl | spirv;
 
+/// CPP, GLSL, HLSL, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_spirv_wgsl = cpp | glsl | hlsl | spirv | wgsl;
+
 /// CPP, GLSL, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cpp_glsl_hlsl_metal_spirv = cpp | glsl | hlsl | metal | spirv;
+
+/// CPP, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_metal_spirv_wgsl = cpp | glsl | hlsl | metal | spirv | wgsl;
 
 /// CPP, and HLSL code-gen targets
 /// [Compound]
@@ -318,6 +334,10 @@ alias cuda_glsl_hlsl_spirv = cuda | glsl | hlsl | spirv;
 /// [Compound]
 alias cuda_glsl_hlsl_metal_spirv = cuda | glsl | hlsl | metal | spirv;
 
+/// CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cuda_glsl_hlsl_metal_spirv_wgsl = cuda | glsl | hlsl | metal | spirv | wgsl;
+
 /// CUDA, GLSL, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_glsl_spirv = cuda | glsl | spirv;
@@ -325,6 +345,10 @@ alias cuda_glsl_spirv = cuda | glsl | spirv;
 /// CUDA, GLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_glsl_metal_spirv = cuda | glsl | metal | spirv;
+
+/// CUDA, GLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias cuda_glsl_metal_spirv_wgsl = cuda | glsl | metal | spirv | wgsl;
 
 /// CUDA, and HLSL code-gen targets
 /// [Compound]
@@ -338,13 +362,25 @@ alias cuda_hlsl_spirv = cuda | hlsl | spirv;
 /// [Compound]
 alias glsl_hlsl_spirv = glsl | hlsl | spirv;
 
+/// GLSL, HLSL, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias glsl_hlsl_spirv_wgsl = glsl | hlsl | spirv | wgsl;
+
 /// GLSL, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias glsl_hlsl_metal_spirv = glsl | hlsl | metal | spirv;
 
+/// GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias glsl_hlsl_metal_spirv_wgsl = glsl | hlsl | metal | spirv | wgsl;
+
 /// GLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias glsl_metal_spirv = glsl | metal | spirv;
+
+/// GLSL, Metal, SPIRV and WGSL code-gen targets
+/// [Compound]
+alias glsl_metal_spirv_wgsl = glsl | metal | spirv | wgsl;
 
 /// GLSL, and SPIRV code-gen targets
 /// [Compound]
@@ -490,6 +526,10 @@ def spvAtomicFloat32AddEXT : SPV_EXT_shader_atomic_float_add;
 /// [EXT]
 def spvAtomicFloat16AddEXT : SPV_EXT_shader_atomic_float16_add;
 
+/// Represents the SPIR-V capability for atomic float 64 add operations.
+/// [EXT]
+def spvAtomicFloat64AddEXT : SPV_EXT_shader_atomic_float_add;
+
 /// Represents the SPIR-V capability for 64-bit integer atomics.
 /// [EXT]
 def spvInt64Atomics : _spirv_1_0;
@@ -501,6 +541,10 @@ def spvAtomicFloat32MinMaxEXT : SPV_EXT_shader_atomic_float_min_max;
 /// Represents the SPIR-V capability for atomic float 16 min/max operations.
 /// [EXT]
 def spvAtomicFloat16MinMaxEXT : SPV_EXT_shader_atomic_float_min_max;
+
+/// Represents the SPIR-V capability for atomic float 64 min/max operations.
+/// [EXT]
+def spvAtomicFloat64MinMaxEXT : SPV_EXT_shader_atomic_float_min_max;
 
 /// Represents the SPIR-V capability for 'derivative control' operations.
 /// [EXT]
@@ -1207,6 +1251,7 @@ alias sm_4_1_version = _sm_4_1
              | spirv_1_0
              | _cuda_sm_6_0
              | metal
+             | wgsl
              | cpp
              ;
 /// HLSL shader model 4.1 and related capabilities of other targets.
@@ -1226,6 +1271,7 @@ alias sm_5_0_version = _sm_5_0
              | spirv_1_0
              | _cuda_sm_9_0
              | metal
+             | wgsl
              | cpp
              ;
 /// HLSL shader model 5.0 and related capabilities of other targets.
@@ -1695,6 +1741,7 @@ alias fragmentprocessing = fragment + _sm_5_0
                          | fragment + metal
                          | fragment + cpp
                          | fragment + cuda
+                         | fragment + wgsl
                          ;
 /// Capabilities required to use fragment derivative operations (with GLSL derivativecontrol)
 /// [Compound]
@@ -1710,11 +1757,11 @@ alias getattributeatvertex = fragment + _sm_6_1 | fragment + GL_EXT_fragment_sha
 alias memorybarrier = sm_5_0_version;
 /// Capabilities required to use sm_4_0 texture operations
 /// [Compound]
-alias texture_sm_4_0 = sm_4_0_version | GL_ARB_sparse_texture_clamp + GL_EXT_texture_query_lod
+alias texture_sm_4_0 = sm_4_0_version
                      ;
 /// Capabilities required to use sm_4_1 texture operations
 /// [Compound]
-alias texture_sm_4_1 = sm_4_1_version | GL_ARB_sparse_texture_clamp + GL_EXT_texture_query_lod
+alias texture_sm_4_1 = sm_4_1_version
                      ;
 /// Capabilities required to use sm_4_1 samplerless texture operations
 /// [Compound]
@@ -1838,7 +1885,7 @@ alias subgroup_arithmetic = GL_KHR_shader_subgroup_arithmetic | _sm_6_0 | _cuda_
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle'
 /// [Compound]
 alias subgroup_shuffle = GL_KHR_shader_subgroup_shuffle | _sm_6_0 | _cuda_sm_7_0;
-/// Capabilities required to use GLSL-style subgroup operations 'subgroup_shufle_relative'
+/// Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle_relative'
 /// [Compound]
 alias subgroup_shufflerelative = GL_KHR_shader_subgroup_shuffle_relative | _sm_6_0 | _cuda_sm_7_0;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_clustered'

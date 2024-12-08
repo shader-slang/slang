@@ -7,13 +7,12 @@
 // The goal is to demonstrate how to use the Slang API to cross compile
 // shader code.
 //
-#include "slang.h"
-#include "slang-com-ptr.h"
-
-#include "vulkan-api.h"
+#include "core/slang-string-util.h"
 #include "examples/example-base/example-base.h"
 #include "examples/example-base/test-base.h"
-#include "source/core/slang-string-util.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
+#include "vulkan-api.h"
 
 using Slang::ComPtr;
 
@@ -65,7 +64,6 @@ struct HelloWorldExample : public TestBase
     int run();
 
     ~HelloWorldExample();
-
 };
 
 int main(int argc, char* argv[])
@@ -102,8 +100,7 @@ int HelloWorldExample::initVulkanInstanceAndDevice()
     poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolCreateInfo.queueFamilyIndex = vkAPI.queueFamilyIndex;
-    RETURN_ON_FAIL(vkAPI.vkCreateCommandPool(
-        vkAPI.device, &poolCreateInfo, nullptr, &commandPool));
+    RETURN_ON_FAIL(vkAPI.vkCreateCommandPool(vkAPI.device, &poolCreateInfo, nullptr, &commandPool));
 
     vkAPI.vkGetDeviceQueue(vkAPI.device, vkAPI.queueFamilyIndex, 0, &queue);
     return 0;
@@ -120,10 +117,18 @@ int HelloWorldExample::createComputePipelineFromShader()
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = slangGlobalSession->findProfile("spirv_1_5");
-    targetDesc.flags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+    targetDesc.flags = 0;
+
 
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
+
+    std::vector<slang::CompilerOptionEntry> options;
+    options.push_back(
+        {slang::CompilerOptionName::EmitSpirvDirectly,
+         {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}});
+    sessionDesc.compilerOptionEntries = options.data();
+    sessionDesc.compilerOptionEntryCount = options.size();
 
     ComPtr<slang::ISession> session;
     RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, session.writeRef()));
@@ -204,7 +209,10 @@ int HelloWorldExample::createComputePipelineFromShader()
     {
         ComPtr<slang::IBlob> diagnosticsBlob;
         SlangResult result = composedProgram->getEntryPointCode(
-            0, 0, spirvCode.writeRef(), diagnosticsBlob.writeRef());
+            0,
+            0,
+            spirvCode.writeRef(),
+            diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         RETURN_ON_FAIL(result);
 
@@ -238,13 +246,19 @@ int HelloWorldExample::createComputePipelineFromShader()
     }
     descSetLayoutCreateInfo.pBindings = bindings;
     RETURN_ON_FAIL(vkAPI.vkCreateDescriptorSetLayout(
-        vkAPI.device, &descSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
+        vkAPI.device,
+        &descSetLayoutCreateInfo,
+        nullptr,
+        &descriptorSetLayout));
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
     RETURN_ON_FAIL(vkAPI.vkCreatePipelineLayout(
-        vkAPI.device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+        vkAPI.device,
+        &pipelineLayoutCreateInfo,
+        nullptr,
+        &pipelineLayout));
 
     // Next we create a shader module from the compiled SPIRV code.
     VkShaderModuleCreateInfo shaderCreateInfo = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
@@ -263,7 +277,12 @@ int HelloWorldExample::createComputePipelineFromShader()
     pipelineCreateInfo.stage.pName = "main";
     pipelineCreateInfo.layout = pipelineLayout;
     RETURN_ON_FAIL(vkAPI.vkCreateComputePipelines(
-        vkAPI.device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline));
+        vkAPI.device,
+        VK_NULL_HANDLE,
+        1,
+        &pipelineCreateInfo,
+        nullptr,
+        &pipeline));
 
     // We can destroy shader module now since it will no longer be used.
     vkAPI.vkDestroyShaderModule(vkAPI.device, vkShaderModule, nullptr);
@@ -287,7 +306,8 @@ int HelloWorldExample::createInOutBuffers()
         vkAPI.vkGetBufferMemoryRequirements(vkAPI.device, inOutBuffers[i], &memoryReqs);
 
         int memoryTypeIndex = vkAPI.findMemoryTypeIndex(
-            memoryReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            memoryReqs.memoryTypeBits,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         assert(memoryTypeIndex >= 0);
 
         VkMemoryPropertyFlags actualMemoryProperites =
@@ -347,7 +367,10 @@ int HelloWorldExample::createInOutBuffers()
     commandBufferAllocInfo.commandBufferCount = 1;
     commandBufferAllocInfo.commandPool = commandPool;
     commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    RETURN_ON_FAIL(vkAPI.vkAllocateCommandBuffers(vkAPI.device, &commandBufferAllocInfo, &uploadCommandBuffer));
+    RETURN_ON_FAIL(vkAPI.vkAllocateCommandBuffers(
+        vkAPI.device,
+        &commandBufferAllocInfo,
+        &uploadCommandBuffer));
 
     VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkAPI.vkBeginCommandBuffer(uploadCommandBuffer, &beginInfo);
@@ -378,7 +401,10 @@ int HelloWorldExample::dispatchCompute()
     descriptorPoolCreateInfo.flags = 0;
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
     RETURN_ON_FAIL(vkAPI.vkCreateDescriptorPool(
-        vkAPI.device, &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+        vkAPI.device,
+        &descriptorPoolCreateInfo,
+        nullptr,
+        &descriptorPool));
 
     // Allocate descriptor set.
     VkDescriptorSetAllocateInfo descSetAllocInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};

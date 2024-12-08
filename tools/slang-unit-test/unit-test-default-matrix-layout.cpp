@@ -1,24 +1,23 @@
 // unit-test-default-matrix-layout.cpp
 
+#include "../../source/core/slang-list.h"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
+#include "unit-test/slang-unit-test.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "tools/unit-test/slang-unit-test.h"
-
-#include "slang.h"
-#include "slang-com-helper.h"
-#include "slang-com-ptr.h"
-
-#include "../../source/core/slang-list.h"
-
-namespace {
+namespace
+{
 
 using namespace Slang;
 
 struct DefaultMatrixLayoutTestContext
 {
-    DefaultMatrixLayoutTestContext(UnitTestContext* context):
-        m_unitTestContext(context)
+    DefaultMatrixLayoutTestContext(UnitTestContext* context)
+        : m_unitTestContext(context)
     {
         slang::IGlobalSession* slangSession = m_unitTestContext->slangGlobalSession;
     }
@@ -36,7 +35,9 @@ struct DefaultMatrixLayoutTestContext
         sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
         SLANG_RETURN_ON_FAIL(slangSession->createSession(sessionDesc, session.writeRef()));
 
-        auto module = session->loadModuleFromSourceString("mymodule", "mymodule.slang",
+        auto module = session->loadModuleFromSourceString(
+            "mymodule",
+            "mymodule.slang",
             R"(
             RWStructuredBuffer<float> output;
             [numthreads(1,1,1)] [shader("compute")]
@@ -53,9 +54,10 @@ struct DefaultMatrixLayoutTestContext
         if (!entryPoint)
             return SLANG_FAIL;
 
-        slang::IComponentType* components[] = { module, entryPoint.get() };
+        slang::IComponentType* components[] = {module, entryPoint.get()};
         ComPtr<slang::IComponentType> composedProgram;
-        SLANG_RETURN_ON_FAIL(session->createCompositeComponentType(components, 2, composedProgram.writeRef()));
+        SLANG_RETURN_ON_FAIL(
+            session->createCompositeComponentType(components, 2, composedProgram.writeRef()));
 
         ComPtr<slang::IComponentType> linkedProgram;
         SLANG_RETURN_ON_FAIL(composedProgram->link(linkedProgram.writeRef()));
@@ -72,13 +74,13 @@ struct DefaultMatrixLayoutTestContext
     UnitTestContext* m_unitTestContext;
 };
 
-} // anonymous
+} // namespace
 
 SLANG_UNIT_TEST(defaultMatrixLayout)
 {
     DefaultMatrixLayoutTestContext context(unitTestContext);
 
     const auto result = context.runTests();
-    
+
     SLANG_CHECK(SLANG_SUCCEEDED(result));
 }

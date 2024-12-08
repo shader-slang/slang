@@ -190,8 +190,8 @@ VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
         return VK_PIPELINE_STAGE_TRANSFER_BIT;
     case ResourceState::Present:
         return src ? VkPipelineStageFlagBits(
-            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT)
-            : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+                         VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT)
+                   : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     case ResourceState::General:
         return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     case ResourceState::AccelerationStructure:
@@ -215,7 +215,7 @@ VkAccessFlags translateAccelerationStructureAccessFlag(AccessFlag access)
     VkAccessFlags result = 0;
     if ((uint32_t)access & (uint32_t)AccessFlag::Read)
         result |= VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_SHADER_READ_BIT |
-        VK_ACCESS_TRANSFER_READ_BIT;
+                  VK_ACCESS_TRANSFER_READ_BIT;
     if ((uint32_t)access & (uint32_t)AccessFlag::Write)
         result |= VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
     return result;
@@ -236,18 +236,18 @@ VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
     case ResourceState::RenderTarget:
     case ResourceState::DepthRead:
     case ResourceState::DepthWrite:
-    {
-        assert(!"Invalid resource state for buffer resource.");
-        return VkBufferUsageFlagBits(0);
-    }
+        {
+            assert(!"Invalid resource state for buffer resource.");
+            return VkBufferUsageFlagBits(0);
+        }
     case ResourceState::UnorderedAccess:
-        return (
-            VkBufferUsageFlagBits)(VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT |
+                                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::ShaderResource:
     case ResourceState::NonPixelShaderResource:
     case ResourceState::PixelShaderResource:
-        return (
-            VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
+                                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::CopySource:
         return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::CopyDestination:
@@ -305,10 +305,10 @@ VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
     case ResourceState::General:
         return (VkImageUsageFlagBits)0;
     default:
-    {
-        assert(!"Unsupported");
-        return VkImageUsageFlagBits(0);
-    }
+        {
+            assert(!"Unsupported");
+            return VkImageUsageFlagBits(0);
+        }
     }
 }
 
@@ -323,15 +323,15 @@ VkImageViewType _calcImageViewType(ITextureResource::Type type, const ITextureRe
     case IResource::Type::TextureCube:
         return desc.arraySize > 1 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
     case IResource::Type::Texture3D:
-    {
-        // Can't have an array and 3d texture
-        assert(desc.arraySize <= 1);
-        if (desc.arraySize <= 1)
         {
-            return VK_IMAGE_VIEW_TYPE_3D;
+            // Can't have an array and 3d texture
+            assert(desc.arraySize <= 1);
+            if (desc.arraySize <= 1)
+            {
+                return VK_IMAGE_VIEW_TYPE_3D;
+            }
+            break;
         }
-        break;
-    }
     default:
         break;
     }
@@ -352,7 +352,9 @@ VkImageUsageFlagBits _calcImageUsageFlags(ResourceStateSet states)
 }
 
 VkImageUsageFlags _calcImageUsageFlags(
-    ResourceStateSet states, MemoryType memoryType, const void* initData)
+    ResourceStateSet states,
+    MemoryType memoryType,
+    const void* initData)
 {
     VkImageUsageFlags usage = _calcImageUsageFlags(states);
 
@@ -455,8 +457,8 @@ AdapterLUID getAdapterLUID(VulkanApi api, VkPhysicalDevice physicalDevice)
 {
     AdapterLUID luid = {};
 
-    VkPhysicalDeviceIDPropertiesKHR idProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES_KHR };
-    VkPhysicalDeviceProperties2 props = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+    VkPhysicalDeviceIDPropertiesKHR idProps = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES_KHR};
+    VkPhysicalDeviceProperties2 props = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
     props.pNext = &idProps;
     SLANG_ASSERT(api.vkGetPhysicalDeviceFeatures2);
     api.vkGetPhysicalDeviceProperties2(physicalDevice, &props);
@@ -487,7 +489,7 @@ Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters)
         if (api.initGlobalProcs(module) != SLANG_OK)
             continue;
 
-        VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+        VkInstanceCreateInfo instanceCreateInfo = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
         const char* instanceExtensions[] = {
             VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
 #if SLANG_APPLE_FAMILY
@@ -509,18 +511,25 @@ Result SLANG_MCALL getVKAdapters(List<AdapterInfo>& outAdapters)
         if (api.vkEnumeratePhysicalDevices || api.vkGetPhysicalDeviceProperties)
         {
             uint32_t numPhysicalDevices = 0;
-            SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
+            SLANG_VK_RETURN_ON_FAIL(
+                api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
 
             List<VkPhysicalDevice> physicalDevices;
             physicalDevices.setCount(numPhysicalDevices);
-            SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.getBuffer()));
+            SLANG_VK_RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(
+                instance,
+                &numPhysicalDevices,
+                physicalDevices.getBuffer()));
 
             for (const auto& physicalDevice : physicalDevices)
             {
                 VkPhysicalDeviceProperties props;
                 api.vkGetPhysicalDeviceProperties(physicalDevice, &props);
                 AdapterInfo info = {};
-                memcpy(info.name, props.deviceName, Math::Min(strlen(props.deviceName), sizeof(AdapterInfo::name) - 1));
+                memcpy(
+                    info.name,
+                    props.deviceName,
+                    Math::Min(strlen(props.deviceName), sizeof(AdapterInfo::name) - 1));
                 info.vendorID = props.vendorID;
                 info.deviceID = props.deviceID;
                 info.luid = vk::getAdapterLUID(api, physicalDevice);

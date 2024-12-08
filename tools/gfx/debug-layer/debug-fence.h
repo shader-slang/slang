@@ -17,7 +17,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentValue(uint64_t* outValue) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL setCurrentValue(uint64_t value) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    getNativeHandle(InteropHandle* outNativeHandle) override;
+
 public:
     uint64_t maxValueToSignal = 0;
 };

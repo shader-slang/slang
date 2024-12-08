@@ -2,12 +2,14 @@
 
 namespace SlangRecord
 {
-    static Slang::String SlangCompileTargetToString(const SlangCompileTarget target)
-    {
-#define CASE(x) case x: return #x
+static Slang::String SlangCompileTargetToString(const SlangCompileTarget target)
+{
+#define CASE(x) \
+    case x:     \
+        return #x
 
-        switch(target)
-        {
+    switch (target)
+    {
         CASE(SLANG_TARGET_UNKNOWN);
         CASE(SLANG_GLSL);
         CASE(SLANG_GLSL_VULKAN_DEPRECATED);
@@ -36,91 +38,93 @@ namespace SlangRecord
         CASE(SLANG_HOST_SHARED_LIBRARY);
         CASE(SLANG_WGSL);
         CASE(SLANG_TARGET_COUNT_OF);
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangCompileTarget: " << static_cast<uint32_t>(target);
-            return str.toString();
-        }
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangCompileTarget: " << static_cast<uint32_t>(target);
+        return str.toString();
+    }
 #undef CASE
-    }
+}
 
-    static Slang::String SlangProfileIDToString(const SlangProfileID profile)
+static Slang::String SlangProfileIDToString(const SlangProfileID profile)
+{
+    switch (profile)
     {
-        switch(profile)
-        {
-        case SLANG_PROFILE_UNKNOWN:
-            return "SLANG_PROFILE_UNKNOWN";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangProfileID: " << static_cast<uint32_t>(profile);
-            return str.toString();
-        }
+    case SLANG_PROFILE_UNKNOWN:
+        return "SLANG_PROFILE_UNKNOWN";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangProfileID: " << static_cast<uint32_t>(profile);
+        return str.toString();
     }
+}
 
-    static Slang::String SlangTargetFlagsToString(const SlangTargetFlags flags)
+static Slang::String SlangTargetFlagsToString(const SlangTargetFlags flags)
+{
+    switch (flags)
     {
-        switch(flags)
-        {
-        case SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES:
-            return "SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES";
-        case SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM:
-            return "SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM";
-        case SLANG_TARGET_FLAG_DUMP_IR:
-            return "SLANG_TARGET_FLAG_DUMP_IR";
-        case SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY:
-            return "SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangTargetFlags: " << static_cast<uint32_t>(flags);
-            return str.toString();
-        }
+    case SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES:
+        return "SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES";
+    case SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM:
+        return "SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM";
+    case SLANG_TARGET_FLAG_DUMP_IR:
+        return "SLANG_TARGET_FLAG_DUMP_IR";
+    case SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY:
+        return "SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangTargetFlags: " << static_cast<uint32_t>(flags);
+        return str.toString();
     }
+}
 
-    static Slang::String SlangFloatingPointModeToString(const SlangFloatingPointMode mode)
+static Slang::String SlangFloatingPointModeToString(const SlangFloatingPointMode mode)
+{
+    switch (mode)
     {
-        switch(mode)
-        {
-        case SLANG_FLOATING_POINT_MODE_DEFAULT:
-            return "SLANG_FLOATING_POINT_MODE_DEFAULT";
-        case SLANG_FLOATING_POINT_MODE_FAST:
-            return "SLANG_FLOATING_POINT_MODE_FAST";
-        case SLANG_FLOATING_POINT_MODE_PRECISE:
-            return "SLANG_FLOATING_POINT_MODE_PRECISE";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangFloatingPointMode: " << static_cast<uint32_t>(mode);
-            return str.toString();
-        }
+    case SLANG_FLOATING_POINT_MODE_DEFAULT:
+        return "SLANG_FLOATING_POINT_MODE_DEFAULT";
+    case SLANG_FLOATING_POINT_MODE_FAST:
+        return "SLANG_FLOATING_POINT_MODE_FAST";
+    case SLANG_FLOATING_POINT_MODE_PRECISE:
+        return "SLANG_FLOATING_POINT_MODE_PRECISE";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangFloatingPointMode: " << static_cast<uint32_t>(mode);
+        return str.toString();
     }
+}
 
-    static Slang::String SlangLineDirectiveModeToString(const SlangLineDirectiveMode mode)
+static Slang::String SlangLineDirectiveModeToString(const SlangLineDirectiveMode mode)
+{
+    switch (mode)
     {
-        switch(mode)
-        {
-        case SLANG_LINE_DIRECTIVE_MODE_DEFAULT:
-            return "SLANG_LINE_DIRECTIVE_MODE_DEFAULT";
-        case SLANG_LINE_DIRECTIVE_MODE_NONE:
-            return "SLANG_LINE_DIRECTIVE_MODE_NONE";
-        case SLANG_LINE_DIRECTIVE_MODE_STANDARD:
-            return "SLANG_LINE_DIRECTIVE_MODE_STANDARD";
-        case SLANG_LINE_DIRECTIVE_MODE_GLSL:
-            return "SLANG_LINE_DIRECTIVE_MODE_GLSL";
-        case SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP:
-            return "SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangLineDirectiveMode: " << static_cast<uint32_t>(mode);
-            return str.toString();
-        }
+    case SLANG_LINE_DIRECTIVE_MODE_DEFAULT:
+        return "SLANG_LINE_DIRECTIVE_MODE_DEFAULT";
+    case SLANG_LINE_DIRECTIVE_MODE_NONE:
+        return "SLANG_LINE_DIRECTIVE_MODE_NONE";
+    case SLANG_LINE_DIRECTIVE_MODE_STANDARD:
+        return "SLANG_LINE_DIRECTIVE_MODE_STANDARD";
+    case SLANG_LINE_DIRECTIVE_MODE_GLSL:
+        return "SLANG_LINE_DIRECTIVE_MODE_GLSL";
+    case SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP:
+        return "SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangLineDirectiveMode: " << static_cast<uint32_t>(mode);
+        return str.toString();
     }
+}
 
-    static Slang::String CompilerOptionNameToString(const slang::CompilerOptionName name)
+static Slang::String CompilerOptionNameToString(const slang::CompilerOptionName name)
+{
+#define CASE(x)                 \
+    case CompilerOptionName::x: \
+        return #x
+
+    using namespace slang;
+    switch (name)
     {
-#define CASE(x) case CompilerOptionName::x: return #x
-
-        using namespace slang;
-        switch(name)
-        {
         CASE(MacroDefine);
         CASE(DepFile);
         CASE(EntryPointName);
@@ -149,6 +153,7 @@ namespace SlangRecord
         CASE(EmitIr);
         CASE(ReportDownstreamTime);
         CASE(ReportPerfBenchmark);
+        CASE(ReportCheckpointIntermediates);
         CASE(SkipSPIRVValidation);
         CASE(SourceEmbedStyle);
         CASE(SourceEmbedName);
@@ -214,13 +219,13 @@ namespace SlangRecord
         CASE(ValidateUniformity);
         CASE(AllowGLSL);
         CASE(ArchiveType);
-        CASE(CompileStdLib);
+        CASE(CompileCoreModule);
         CASE(Doc);
         CASE(IrCompression);
-        CASE(LoadStdLib);
+        CASE(LoadCoreModule);
         CASE(ReferenceModule);
-        CASE(SaveStdLib);
-        CASE(SaveStdLibBinSource);
+        CASE(SaveCoreModule);
+        CASE(SaveCoreModuleBinSource);
         CASE(TrackLiveness);
         CASE(LoopInversion);
         CASE(CountOfParsableOptions);
@@ -229,63 +234,69 @@ namespace SlangRecord
         CASE(GenerateWholeProgram);
         CASE(UseUpToDateBinaryModule);
         CASE(CountOf);
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown CompilerOptionName: " << static_cast<uint32_t>(name);
-            return str.toString();
-        }
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown CompilerOptionName: " << static_cast<uint32_t>(name);
+        return str.toString();
+    }
 #undef CASE
-    }
+}
 
-    static Slang::String CompilerOptionValueKindToString(const slang::CompilerOptionValueKind kind)
+static Slang::String CompilerOptionValueKindToString(const slang::CompilerOptionValueKind kind)
+{
+    using namespace slang;
+    switch (kind)
     {
-        using namespace slang;
-        switch(kind)
-        {
-        case CompilerOptionValueKind::Int:
-            return "Int";
-        case CompilerOptionValueKind::String:
-            return "String";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown CompilerOptionValueKind: " << static_cast<uint32_t>(kind);
-            return str.toString();
-        }
+    case CompilerOptionValueKind::Int:
+        return "Int";
+    case CompilerOptionValueKind::String:
+        return "String";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown CompilerOptionValueKind: " << static_cast<uint32_t>(kind);
+        return str.toString();
     }
+}
 
-    static Slang::String SessionFlagsToString(const slang::SessionFlags flags)
+static Slang::String SessionFlagsToString(const slang::SessionFlags flags)
+{
+    using namespace slang;
+    switch (flags)
     {
-        using namespace slang;
-        switch(flags)
-        {
-        case kSessionFlags_None: return "kSessionFlags_None";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SessionFlags: " << static_cast<uint32_t>(flags);
-            return str.toString();
-        }
+    case kSessionFlags_None:
+        return "kSessionFlags_None";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SessionFlags: " << static_cast<uint32_t>(flags);
+        return str.toString();
     }
+}
 
-    static Slang::String SlangMatrixLayoutModeToString(const SlangMatrixLayoutMode mode)
+static Slang::String SlangMatrixLayoutModeToString(const SlangMatrixLayoutMode mode)
+{
+    switch (mode)
     {
-        switch(mode)
-        {
-        case SLANG_MATRIX_LAYOUT_MODE_UNKNOWN: return "SLANG_MATRIX_LAYOUT_MODE_UNKNOWN";
-        case SLANG_MATRIX_LAYOUT_ROW_MAJOR: return "SLANG_MATRIX_LAYOUT_ROW_MAJOR";
-        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR: return "SLANG_MATRIX_LAYOUT_COLUMN_MAJOR";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangMatrixLayoutMode: " << static_cast<uint32_t>(mode);
-            return str.toString();
-        }
+    case SLANG_MATRIX_LAYOUT_MODE_UNKNOWN:
+        return "SLANG_MATRIX_LAYOUT_MODE_UNKNOWN";
+    case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+        return "SLANG_MATRIX_LAYOUT_ROW_MAJOR";
+    case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+        return "SLANG_MATRIX_LAYOUT_COLUMN_MAJOR";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangMatrixLayoutMode: " << static_cast<uint32_t>(mode);
+        return str.toString();
     }
+}
 
-    static Slang::String SlangPassThroughToString(const SlangPassThrough passThrough)
+static Slang::String SlangPassThroughToString(const SlangPassThrough passThrough)
+{
+#define CASE(x) \
+    case x:     \
+        return #x
+
+    switch (passThrough)
     {
-#define CASE(x) case x: return #x
-
-        switch(passThrough)
-        {
         CASE(SLANG_PASS_THROUGH_NONE);
         CASE(SLANG_PASS_THROUGH_FXC);
         CASE(SLANG_PASS_THROUGH_DXC);
@@ -300,20 +311,22 @@ namespace SlangRecord
         CASE(SLANG_PASS_THROUGH_SPIRV_OPT);
         CASE(SLANG_PASS_THROUGH_METAL);
         CASE(SLANG_PASS_THROUGH_COUNT_OF);
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangPassThrough: " << static_cast<uint32_t>(passThrough);
-            return str.toString();
-        }
-#undef CASE
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangPassThrough: " << static_cast<uint32_t>(passThrough);
+        return str.toString();
     }
+#undef CASE
+}
 
-    static Slang::String SlangSourceLanguageToString(const SlangSourceLanguage language)
+static Slang::String SlangSourceLanguageToString(const SlangSourceLanguage language)
+{
+#define CASE(x) \
+    case x:     \
+        return #x
+
+    switch (language)
     {
-#define CASE(x) case x: return #x
-
-        switch(language)
-        {
         CASE(SLANG_SOURCE_LANGUAGE_UNKNOWN);
         CASE(SLANG_SOURCE_LANGUAGE_SLANG);
         CASE(SLANG_SOURCE_LANGUAGE_HLSL);
@@ -324,78 +337,87 @@ namespace SlangRecord
         CASE(SLANG_SOURCE_LANGUAGE_SPIRV);
         CASE(SLANG_SOURCE_LANGUAGE_METAL);
         CASE(SLANG_SOURCE_LANGUAGE_COUNT_OF);
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangSourceLanguage: " << static_cast<uint32_t>(language);
-            return str.toString();
-        }
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangSourceLanguage: " << static_cast<uint32_t>(language);
+        return str.toString();
     }
+}
 
-    static Slang::String CompileStdLibFlagsToString(const slang::CompileStdLibFlags flags)
+static Slang::String CompileCoreModuleFlagsToString(const slang::CompileCoreModuleFlags flags)
+{
+    using namespace slang;
+    switch (flags)
     {
-        using namespace slang;
-        switch(flags)
-        {
-        case CompileStdLibFlag::WriteDocumentation: return "WriteDocumentation";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown CompileStdLibFlags: " << static_cast<uint32_t>(flags);
-            return str.toString();
-        }
+    case CompileCoreModuleFlag::WriteDocumentation:
+        return "WriteDocumentation";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown CompileCoreModuleFlags: " << static_cast<uint32_t>(flags);
+        return str.toString();
     }
+}
 
-    static Slang::String SlangArchiveTypeToString(const SlangArchiveType type)
+static Slang::String SlangArchiveTypeToString(const SlangArchiveType type)
+{
+#define CASE(x) \
+    case x:     \
+        return #x
+    switch (type)
     {
-#define CASE(x) case x: return #x
-        switch(type)
-        {
-            CASE(SLANG_ARCHIVE_TYPE_UNDEFINED);
-            CASE(SLANG_ARCHIVE_TYPE_ZIP);
-            CASE(SLANG_ARCHIVE_TYPE_RIFF);
-            CASE(SLANG_ARCHIVE_TYPE_RIFF_DEFLATE);
-            CASE(SLANG_ARCHIVE_TYPE_RIFF_LZ4);
-            CASE(SLANG_ARCHIVE_TYPE_COUNT_OF);
-            default:
-                Slang::StringBuilder str;
-                str << "Unknown SlangArchiveType: " << static_cast<uint32_t>(type);
-                return str.toString();
-        }
+        CASE(SLANG_ARCHIVE_TYPE_UNDEFINED);
+        CASE(SLANG_ARCHIVE_TYPE_ZIP);
+        CASE(SLANG_ARCHIVE_TYPE_RIFF);
+        CASE(SLANG_ARCHIVE_TYPE_RIFF_DEFLATE);
+        CASE(SLANG_ARCHIVE_TYPE_RIFF_LZ4);
+        CASE(SLANG_ARCHIVE_TYPE_COUNT_OF);
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangArchiveType: " << static_cast<uint32_t>(type);
+        return str.toString();
     }
+}
 
-    static Slang::String SpecializationArgKindToString(const slang::SpecializationArg::Kind kind)
+static Slang::String SpecializationArgKindToString(const slang::SpecializationArg::Kind kind)
+{
+    using namespace slang;
+    switch (kind)
     {
-        using namespace slang;
-        switch(kind)
-        {
-        case SpecializationArg::Kind::Unknown: return "Unknown";
-        case SpecializationArg::Kind::Type: return "Type";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SpecializationArg::Kind: " << static_cast<uint32_t>(kind);
-            return str.toString();
-        }
+    case SpecializationArg::Kind::Unknown:
+        return "Unknown";
+    case SpecializationArg::Kind::Type:
+        return "Type";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SpecializationArg::Kind: " << static_cast<uint32_t>(kind);
+        return str.toString();
     }
+}
 
-    static Slang::String LayoutRulesToString(const slang::LayoutRules rules)
+static Slang::String LayoutRulesToString(const slang::LayoutRules rules)
+{
+    using namespace slang;
+    switch (rules)
     {
-        using namespace slang;
-        switch(rules)
-        {
-        case LayoutRules::Default: return "Default";
-        case LayoutRules::MetalArgumentBufferTier2: return "MetalArgumentBufferTier2";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown LayoutRules: " << static_cast<uint32_t>(rules);
-            return str.toString();
-        }
+    case LayoutRules::Default:
+        return "Default";
+    case LayoutRules::MetalArgumentBufferTier2:
+        return "MetalArgumentBufferTier2";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown LayoutRules: " << static_cast<uint32_t>(rules);
+        return str.toString();
     }
+}
 
-    static Slang::String SlangStageToString(const SlangStage stage)
+static Slang::String SlangStageToString(const SlangStage stage)
+{
+#define CASE(x) \
+    case x:     \
+        return #x
+
+    switch (stage)
     {
-#define CASE(x) case x: return #x
-
-        switch(stage)
-        {
         CASE(SLANG_STAGE_NONE);
         CASE(SLANG_STAGE_VERTEX);
         CASE(SLANG_STAGE_HULL);
@@ -411,28 +433,33 @@ namespace SlangRecord
         CASE(SLANG_STAGE_CALLABLE);
         CASE(SLANG_STAGE_MESH);
         CASE(SLANG_STAGE_AMPLIFICATION);
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown SlangStage: " << static_cast<uint32_t>(stage);
-            return str.toString();
-        }
-#undef CASE
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown SlangStage: " << static_cast<uint32_t>(stage);
+        return str.toString();
     }
+#undef CASE
+}
 
-    static Slang::String ContainerTypeToString(const slang::ContainerType type)
+static Slang::String ContainerTypeToString(const slang::ContainerType type)
+{
+    using namespace slang;
+    switch (type)
     {
-        using namespace slang;
-        switch(type)
-        {
-        case ContainerType::None: return "None";
-        case ContainerType::UnsizedArray: return "UnsizedArray";
-        case ContainerType::StructuredBuffer: return "StructuredBuffer";
-        case ContainerType::ConstantBuffer: return "ConstantBuffer";
-        case ContainerType::ParameterBlock: return "ParameterBlock";
-        default:
-            Slang::StringBuilder str;
-            str << "Unknown ContainerType: " << static_cast<uint32_t>(type);
-            return str.toString();
-        }
+    case ContainerType::None:
+        return "None";
+    case ContainerType::UnsizedArray:
+        return "UnsizedArray";
+    case ContainerType::StructuredBuffer:
+        return "StructuredBuffer";
+    case ContainerType::ConstantBuffer:
+        return "ConstantBuffer";
+    case ContainerType::ParameterBlock:
+        return "ParameterBlock";
+    default:
+        Slang::StringBuilder str;
+        str << "Unknown ContainerType: " << static_cast<uint32_t>(type);
+        return str.toString();
     }
 }
+} // namespace SlangRecord

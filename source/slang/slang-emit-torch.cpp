@@ -2,7 +2,6 @@
 #include "slang-emit-torch.h"
 
 #include "../core/slang-writer.h"
-
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
 
@@ -54,9 +53,9 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
         m_writer->emit("kBool");
         break;
     default:
-        SLANG_UNEXPECTED((
-            std::string("unknown scalar type in allocTorchTensor: ") + 
-            std::string(getIROpInfo(type->getOp()).name)).c_str());
+        SLANG_UNEXPECTED((std::string("unknown scalar type in allocTorchTensor: ") +
+                          std::string(getIROpInfo(type->getOp()).name))
+                             .c_str());
         break;
     }
 }
@@ -96,7 +95,7 @@ bool TorchCppSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("((cudaStream_t)");
             emitOperand(inst->getOperand(4), getInfo(EmitOp::General));
             m_writer->emit(")));\n");
-        
+
             return true;
         }
     }
@@ -107,100 +106,104 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
     switch (inst->getOp())
     {
     default:
-    {
-        return Super::tryEmitInstExprImpl(inst, inOuterPrec);
-    }
+        {
+            return Super::tryEmitInstExprImpl(inst, inOuterPrec);
+        }
     case kIROp_MakeTensorView:
-    {
-        m_writer->emit("make_tensor_view(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitStringLiteral(getUnmangledName(inst->getOperand(0)));
-        m_writer->emit(", ");
-        emitTorchScalarTypeName(m_writer, inst->getOperand(0)->getDataType());
-        m_writer->emit(", ");
-
-        auto tensorViewType = as<IRTensorViewType>(inst->getDataType());
-        if (as<IRVectorType>(tensorViewType->getElementType()))
-            m_writer->emit("true");
-        else
-            m_writer->emit("false");
-            
-        m_writer->emit(")");
-        return true;
-    }
-    case kIROp_TorchGetCudaStream:
-    {
-        m_writer->emit("at::cuda::getCurrentCUDAStream()");
-        return true;
-    }
-    case kIROp_AllocateTorchTensor:
-    {
-        if (as<IRTorchTensorType>(inst->getOperand(0)->getDataType()))
         {
-            /*
-            Emit something like:
-                ```
-                torch::Tensor out = torch::empty_like(other);
-                ```
-            */
-            m_writer->emit("torch::empty_like(");
+            m_writer->emit("make_tensor_view(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(", torch::TensorOptions().device(torch::kCUDA).dtype(");
-            emitTorchScalarTypeName(m_writer, inst->getDataType());
-            m_writer->emit("))");
+            m_writer->emit(", ");
+            emitStringLiteral(getUnmangledName(inst->getOperand(0)));
+            m_writer->emit(", ");
+            emitTorchScalarTypeName(m_writer, inst->getOperand(0)->getDataType());
+            m_writer->emit(", ");
+
+            auto tensorViewType = as<IRTensorViewType>(inst->getDataType());
+            if (as<IRVectorType>(tensorViewType->getElementType()))
+                m_writer->emit("true");
+            else
+                m_writer->emit("false");
+
+            m_writer->emit(")");
+            return true;
         }
-        else
+    case kIROp_TorchGetCudaStream:
         {
-            /*
-            Emit something like:
-                ```
-                torch::Tensor out = torch::empty({ dimX, dimY, dimZ, ... },
-                    torch::TensorOptions().device(torch::kCUDA).dtype(torch::kFloat32));
-                ```
-            */
-            m_writer->emit("torch::empty({ ");
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-            {
-                if (i > 0)
-                    m_writer->emit(", ");
-                auto arg = inst->getOperand(i);
-                emitOperand(arg, getInfo(EmitOp::General));
-            }
-            if (as<IRTorchTensorType>(inst->getDataType()))
-            {
-                if (auto vectorType = as<IRVectorType>(inst->getDataType()->getOperand(0)))
-                {
-                    // If the element type of the tensor is a vector, we need to add the vector size to the shape.
-                    m_writer->emit(", ");
-                    emitOperand(vectorType->getElementCount(), getInfo(EmitOp::General));
-                }
-            }
-            m_writer->emit("}, torch::TensorOptions().device(torch::kCUDA).dtype(");
-            emitTorchScalarTypeName(m_writer, inst->getDataType());
-            m_writer->emit("))");
+            m_writer->emit("at::cuda::getCurrentCUDAStream()");
+            return true;
         }
-        return true;
-    }
+    case kIROp_AllocateTorchTensor:
+        {
+            if (as<IRTorchTensorType>(inst->getOperand(0)->getDataType()))
+            {
+                /*
+                Emit something like:
+                    ```
+                    torch::Tensor out = torch::empty_like(other);
+                    ```
+                */
+                m_writer->emit("torch::empty_like(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(", torch::TensorOptions().device(torch::kCUDA).dtype(");
+                emitTorchScalarTypeName(m_writer, inst->getDataType());
+                m_writer->emit("))");
+            }
+            else
+            {
+                /*
+                Emit something like:
+                    ```
+                    torch::Tensor out = torch::empty({ dimX, dimY, dimZ, ... },
+                        torch::TensorOptions().device(torch::kCUDA).dtype(torch::kFloat32));
+                    ```
+                */
+                m_writer->emit("torch::empty({ ");
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    if (i > 0)
+                        m_writer->emit(", ");
+                    auto arg = inst->getOperand(i);
+                    emitOperand(arg, getInfo(EmitOp::General));
+                }
+                if (as<IRTorchTensorType>(inst->getDataType()))
+                {
+                    if (auto vectorType = as<IRVectorType>(inst->getDataType()->getOperand(0)))
+                    {
+                        // If the element type of the tensor is a vector, we need to add the vector
+                        // size to the shape.
+                        m_writer->emit(", ");
+                        emitOperand(vectorType->getElementCount(), getInfo(EmitOp::General));
+                    }
+                }
+                m_writer->emit("}, torch::TensorOptions().device(torch::kCUDA).dtype(");
+                emitTorchScalarTypeName(m_writer, inst->getDataType());
+                m_writer->emit("))");
+            }
+            return true;
+        }
     }
 }
 
-SlangResult TorchCppSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
+SlangResult TorchCppSourceEmitter::calcTypeName(
+    IRType* type,
+    CodeGenTarget target,
+    StringBuilder& out)
 {
     switch (type->getOp())
     {
     default:
         return Super::calcTypeName(type, target, out);
     case kIROp_TensorViewType:
-    {
-        out << "TensorView";
-        return SLANG_OK;
-    }
+        {
+            out << "TensorView";
+            return SLANG_OK;
+        }
     case kIROp_TorchTensorType:
-    {
-        out << "torch::Tensor";
-        return SLANG_OK;
-    }
+        {
+            out << "torch::Tensor";
+            return SLANG_OK;
+        }
     }
 }
 
@@ -214,9 +217,11 @@ void TorchCppSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sin
     for (auto inst : module->getGlobalInsts())
     {
         auto func = as<IRFunc>(inst);
-        if (!func) continue;
+        if (!func)
+            continue;
         auto decor = func->findDecoration<IRTorchEntryPointDecoration>();
-        if (!decor) continue;
+        if (!decor)
+            continue;
         m_writer->emit("m.def(");
         emitStringLiteral(decor->getFunctionName());
         m_writer->emit(", &");
@@ -227,7 +232,6 @@ void TorchCppSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sin
     }
     m_writer->dedent();
     m_writer->emit("}\n");
-
 }
 
 } // namespace Slang

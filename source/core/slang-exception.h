@@ -6,61 +6,55 @@
 
 namespace Slang
 {
-    // NOTE!
-    // Exceptions should not generally be used in core/compiler-core, use the 'signal' mechanism
-    // ideally using the macros in the slang-signal.h such as `SLANG_UNEXPECTED`
-    //
-    // If core/compiler-core libraries are compiled with SLANG_DISABLE_EXCEPTIONS,
-    // these classes will *never* be thrown.
-    
-	class Exception
-	{
-	public:
-		String Message;
-		Exception()
-		{}
-		Exception(const String & message)
-			: Message(message)
-		{
-		}
+// NOTE!
+// Exceptions should not generally be used in core/compiler-core, use the 'signal' mechanism
+// ideally using the macros in the slang-signal.h such as `SLANG_UNEXPECTED`
+//
+// If core/compiler-core libraries are compiled with SLANG_DISABLE_EXCEPTIONS,
+// these classes will *never* be thrown.
 
-        virtual ~Exception()
-        {}
-	};
-
-	class InvalidOperationException : public Exception
-	{
-	public:
-		InvalidOperationException()
-		{}
-		InvalidOperationException(const String & message)
-			: Exception(message)
-		{
-		}
-
-	};
-	
-	class InternalError : public Exception
-	{
-	public:
-		InternalError()
-		{}
-		InternalError(const String & message)
-			: Exception(message)
-		{
-		}
-	};
-
-    class AbortCompilationException : public Exception
+class Exception
+{
+public:
+    String Message;
+    Exception() {}
+    Exception(const String& message)
+        : Message(message)
     {
-    public:
-        AbortCompilationException()
-        {}
-        AbortCompilationException(const String & message)
-            : Exception(message)
-        {
-        }
-    };
-}
+    }
+
+    virtual ~Exception() {}
+};
+
+class InvalidOperationException : public Exception
+{
+public:
+    InvalidOperationException() {}
+    InvalidOperationException(const String& message)
+        : Exception(message)
+    {
+    }
+};
+
+class InternalError : public Exception
+{
+public:
+    InternalError() {}
+    InternalError(const String& message)
+        : Exception(message)
+    {
+    }
+};
+
+class AbortCompilationException : public Exception
+{
+public:
+    AbortCompilationException() {}
+    AbortCompilationException(const String& message)
+        : Exception(message)
+    {
+    }
+};
+} // namespace Slang
 
 #endif

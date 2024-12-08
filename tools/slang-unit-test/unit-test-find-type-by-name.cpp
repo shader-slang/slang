@@ -1,21 +1,19 @@
 // unit-test-find-type-by-name.cpp
 
 #include "slang.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
 SLANG_UNIT_TEST(findTypeByName)
 {
-    const char* testSource =
-        "struct TestStruct {"
-        "   int member0;"
-        "   Texture2D texture1;"
-        "};";
+    const char* testSource = "struct TestStruct {"
+                             "   int member0;"
+                             "   Texture2D texture1;"
+                             "};";
     auto session = spCreateSession();
     auto request = spCreateCompileRequest(session);
     spAddCodeGenTarget(request, SLANG_DXBC);
@@ -44,7 +42,8 @@ SLANG_UNIT_TEST(findTypeByName)
         auto paramBlockElementType = paramBlockType->getElementType();
         SLANG_CHECK_ABORT(paramBlockElementType != nullptr);
         auto paramBlockElementTypeName = paramBlockElementType->getName();
-        SLANG_CHECK_ABORT(paramBlockElementTypeName && strcmp(paramBlockElementTypeName, "TestStruct") == 0);
+        SLANG_CHECK_ABORT(
+            paramBlockElementTypeName && strcmp(paramBlockElementTypeName, "TestStruct") == 0);
     };
 
     testBody();
@@ -52,4 +51,3 @@ SLANG_UNIT_TEST(findTypeByName)
     spDestroyCompileRequest(request);
     spDestroySession(session);
 }
-

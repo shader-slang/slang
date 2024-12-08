@@ -9,7 +9,7 @@ RWStructuredBuffer<float> outputBuffer;
 //SPV:OpExtension "SPV_KHR_relaxed_extended_instruction"
 //SPV: [[STRING_float:%[1-9][0-9]*]] = OpString "float"
 //SPV: [[STRING_pValue:%[1-9][0-9]*]] = OpString "pValue"
-//SPV: [[STRING_LinkedNode:%[1-9][0-9]*]] = OpString "LinkedNode"
+//SPV: [[STRING_LinkedNode:%[1-9][0-9]*]] = OpString "LinkedNode{{.*}}"
 //SPV: [[STRING_pNext:%[1-9][0-9]*]] = OpString "pNext"
 
 struct LinkedNode
@@ -32,7 +32,6 @@ struct LinkedNode
 
 float test(LinkedNode *pNode)
 {
-    //SPV: DebugValue %pNodeNext
     LinkedNode *pNodeNext = pNode->pNext;
     return *(pNode->pValue) + pNodeNext->value;
 }

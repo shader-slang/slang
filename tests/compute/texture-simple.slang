@@ -9,6 +9,9 @@
 //DISABLE_TEST_INPUT: Texture1D(format=R_Float32, size=4, content = one, mipMaps=1):name tLoad1D
 //Texture1D<float> tLoad1D;
 
+// Not supported in WGSL: 1D array texture not supported in WGSL
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
+
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
 Texture1D<float> t1D;
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D

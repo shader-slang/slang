@@ -1,16 +1,16 @@
 // slang-artifact-desc-util.cpp
 #include "slang-artifact-desc-util.h"
 
+#include "../core/slang-io.h"
+#include "../core/slang-type-text-util.h"
+#include "slang-artifact-impl.h"
 #include "slang-artifact-representation.h"
 
-#include "slang-artifact-impl.h"
+namespace Slang
+{
 
-#include "../core/slang-type-text-util.h"
-#include "../core/slang-io.h"
-
-namespace Slang {
-
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct HierarchicalEnumEntry
 {
@@ -61,7 +61,7 @@ static bool _isHierarchicalEnumOk(ConstArrayView<HierarchicalEnumEntry> entries,
     return true;
 }
 
-template <typename T>
+template<typename T>
 struct HierarchicalEnumTable
 {
     HierarchicalEnumTable(ConstArrayView<HierarchicalEnumEntry> entries)
@@ -86,7 +86,7 @@ struct HierarchicalEnumTable
             m_names[value] = UnownedStringSlice(entry.name);
         }
 
-        // TODO(JS): NOTE! If we wanted to use parent to indicate if a value was *invalid* 
+        // TODO(JS): NOTE! If we wanted to use parent to indicate if a value was *invalid*
         // we would want the Parent of Base to be Base.
         //
         // Base parent should be invalid
@@ -95,17 +95,10 @@ struct HierarchicalEnumTable
         SLANG_ASSERT(getParent(T::Invalid) == T::Invalid);
     }
 
-    T getParent(T kind) const
-    {
-        return (kind >= T::CountOf) ?
-            T::Invalid :
-            m_parents[Index(kind)];
-    }
+    T getParent(T kind) const { return (kind >= T::CountOf) ? T::Invalid : m_parents[Index(kind)]; }
     UnownedStringSlice getName(T kind) const
     {
-        return (kind >= T::CountOf) ?
-            UnownedStringSlice() :
-            m_names[Index(kind)];
+        return (kind >= T::CountOf) ? UnownedStringSlice() : m_names[Index(kind)];
     }
 
     bool isDerivedFrom(T type, T base) const
@@ -132,28 +125,38 @@ protected:
     UnownedStringSlice m_names[Count(T::CountOf)];
 };
 
-} // anonymous
+} // namespace
 
 // Macro utils to create "enum hierarchy" tables
 
-#define SLANG_HIERARCHICAL_ENUM_GET_VALUES(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_ENTRY_MACRO) \
-static ConstArrayView<HierarchicalEnumEntry> _getEntries##ENUM_TYPE() \
-{ \
-    static const HierarchicalEnumEntry values[] = { ENUM_TYPE_MACRO(ENUM_ENTRY_MACRO) }; \
-    return makeConstArrayView(values); \
-}
+#define SLANG_HIERARCHICAL_ENUM_GET_VALUES(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_ENTRY_MACRO)   \
+    static ConstArrayView<HierarchicalEnumEntry> _getEntries##ENUM_TYPE()                  \
+    {                                                                                      \
+        static const HierarchicalEnumEntry values[] = {ENUM_TYPE_MACRO(ENUM_ENTRY_MACRO)}; \
+        return makeConstArrayView(values);                                                 \
+    }
 
-#define SLANG_HIERARCHICAL_ENUM(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_VALUE_MACRO) \
-SLANG_HIERARCHICAL_ENUM_GET_VALUES(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_VALUE_MACRO) \
-\
-static const HierarchicalEnumTable<ENUM_TYPE> g_table##ENUM_TYPE(_getEntries##ENUM_TYPE()); \
-\
-ENUM_TYPE getParent(ENUM_TYPE kind) { return g_table##ENUM_TYPE.getParent(kind); } \
-UnownedStringSlice getName(ENUM_TYPE kind) { return g_table##ENUM_TYPE.getName(kind); } \
-bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base) { return g_table##ENUM_TYPE.isDerivedFrom(kind, base); }
+#define SLANG_HIERARCHICAL_ENUM(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_VALUE_MACRO)                   \
+    SLANG_HIERARCHICAL_ENUM_GET_VALUES(ENUM_TYPE, ENUM_TYPE_MACRO, ENUM_VALUE_MACRO)            \
+                                                                                                \
+    static const HierarchicalEnumTable<ENUM_TYPE> g_table##ENUM_TYPE(_getEntries##ENUM_TYPE()); \
+                                                                                                \
+    ENUM_TYPE getParent(ENUM_TYPE kind)                                                         \
+    {                                                                                           \
+        return g_table##ENUM_TYPE.getParent(kind);                                              \
+    }                                                                                           \
+    UnownedStringSlice getName(ENUM_TYPE kind)                                                  \
+    {                                                                                           \
+        return g_table##ENUM_TYPE.getName(kind);                                                \
+    }                                                                                           \
+    bool isDerivedFrom(ENUM_TYPE kind, ENUM_TYPE base)                                          \
+    {                                                                                           \
+        return g_table##ENUM_TYPE.isDerivedFrom(kind, base);                                    \
+    }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactKind !!!!!!!!!!!!!!!!!!!!!!! */
 
+// clang-format off
 #define SLANG_ARTIFACT_KIND(x) \
     x(Invalid, Invalid) \
     x(Base, Invalid) \
@@ -205,6 +208,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(PTX, KernelLike) \
             x(CuBin, KernelLike) \
             x(MetalAIR, KernelLike) \
+            x(WGSL_SPIRV, KernelLike) \
         x(CPULike, Base) \
             x(UnknownCPU, CPULike) \
             x(X86, CPULike) \
@@ -243,113 +247,171 @@ SLANG_HIERARCHICAL_ENUM(ArtifactPayload, SLANG_ARTIFACT_PAYLOAD, SLANG_ARTIFACT_
         x(CodeLike, Base) \
             x(Kernel, CodeLike) \
             x(Host, CodeLike) \
-        x(Obfuscated, Base) 
+        x(Obfuscated, Base)
+// clang-format on
 
-#define SLANG_ARTIFACT_STYLE_ENTRY(TYPE, PARENT) { Index(ArtifactStyle::TYPE), Index(ArtifactStyle::PARENT), #TYPE },
+#define SLANG_ARTIFACT_STYLE_ENTRY(TYPE, PARENT) \
+    {Index(ArtifactStyle::TYPE), Index(ArtifactStyle::PARENT), #TYPE},
 
 SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYLE_ENTRY)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDescUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */ArtifactDesc ArtifactDescUtil::makeDescForCompileTarget(SlangCompileTarget target)
+/* static */ ArtifactDesc ArtifactDescUtil::makeDescForCompileTarget(SlangCompileTarget target)
 {
     switch (target)
     {
-        case SLANG_TARGET_UNKNOWN:                return Desc::make(Kind::Unknown, Payload::None, Style::Unknown, 0);
-        case SLANG_TARGET_NONE:                   return Desc::make(Kind::None, Payload::None, Style::Unknown, 0);
-        case SLANG_GLSL:
+    case SLANG_TARGET_UNKNOWN:
+        return Desc::make(Kind::Unknown, Payload::None, Style::Unknown, 0);
+    case SLANG_TARGET_NONE:
+        return Desc::make(Kind::None, Payload::None, Style::Unknown, 0);
+    case SLANG_GLSL:
         {
             // For the moment we Desc::make all just map to GLSL, but we could use flags
             // or some other mechanism to distinguish the types
             return Desc::make(Kind::Source, Payload::GLSL, Style::Kernel, 0);
         }
-        case SLANG_HLSL:                    return Desc::make(Kind::Source, Payload::HLSL, Style::Kernel, 0);
-        case SLANG_SPIRV:                   return Desc::make(Kind::Executable, Payload::SPIRV, Style::Kernel, 0);
-        case SLANG_SPIRV_ASM:               return Desc::make(Kind::Assembly, Payload::SPIRV, Style::Kernel, 0);
-        case SLANG_DXBC:                    return Desc::make(Kind::Executable, Payload::DXBC, Style::Kernel, 0);
-        case SLANG_DXBC_ASM:                return Desc::make(Kind::Assembly, Payload::DXBC, Style::Kernel, 0);
-        case SLANG_DXIL:                    return Desc::make(Kind::Executable, Payload::DXIL, Style::Kernel, 0);
-        case SLANG_DXIL_ASM:                return Desc::make(Kind::Assembly, Payload::DXIL, Style::Kernel, 0);
-        case SLANG_C_SOURCE:                return Desc::make(Kind::Source, Payload::C, Style::Kernel, 0);
-        case SLANG_CPP_SOURCE:              return Desc::make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
-        case SLANG_HOST_CPP_SOURCE:         return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
-        case SLANG_CPP_PYTORCH_BINDING:     return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
-        case SLANG_HOST_EXECUTABLE:         return Desc::make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
-        case SLANG_HOST_SHARED_LIBRARY:     return Desc::make(Kind::SharedLibrary, Payload::HostCPU, Style::Host, 0);
-        case SLANG_SHADER_SHARED_LIBRARY:   return Desc::make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
-        case SLANG_SHADER_HOST_CALLABLE:    return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
-        case SLANG_CUDA_SOURCE:             return Desc::make(Kind::Source, Payload::CUDA, Style::Kernel, 0);
-            // TODO(JS):
-            // Not entirely clear how best to represent PTX here. We could mark as 'Assembly'. Saying it is 
-            // 'Executable' implies it is Binary (which PTX isn't). Executable also implies 'complete for executation', 
-            // irrespective of it being text.
-        case SLANG_PTX:                     return Desc::make(Kind::Executable, Payload::PTX, Style::Kernel, 0);
-        case SLANG_OBJECT_CODE:             return Desc::make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
-        case SLANG_HOST_HOST_CALLABLE:      return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
-        case SLANG_METAL:                   return Desc::make(Kind::Source, Payload::Metal, Style::Kernel, 0);
-        case SLANG_METAL_LIB:               return Desc::make(Kind::Executable, Payload::MetalAIR, Style::Kernel, 0);
-        case SLANG_METAL_LIB_ASM:           return Desc::make(Kind::Assembly, Payload::MetalAIR, Style::Kernel, 0);
-        case SLANG_WGSL:                    return Desc::make(Kind::Source, Payload::WGSL, Style::Kernel, 0);
-        default: break;
+    case SLANG_HLSL:
+        return Desc::make(Kind::Source, Payload::HLSL, Style::Kernel, 0);
+    case SLANG_SPIRV:
+        return Desc::make(Kind::ObjectCode, Payload::SPIRV, Style::Kernel, 0);
+    case SLANG_SPIRV_ASM:
+        return Desc::make(Kind::Assembly, Payload::SPIRV, Style::Kernel, 0);
+    case SLANG_DXBC:
+        return Desc::make(Kind::ObjectCode, Payload::DXBC, Style::Kernel, 0);
+    case SLANG_DXBC_ASM:
+        return Desc::make(Kind::Assembly, Payload::DXBC, Style::Kernel, 0);
+    case SLANG_DXIL:
+        return Desc::make(Kind::ObjectCode, Payload::DXIL, Style::Kernel, 0);
+    case SLANG_DXIL_ASM:
+        return Desc::make(Kind::Assembly, Payload::DXIL, Style::Kernel, 0);
+    case SLANG_C_SOURCE:
+        return Desc::make(Kind::Source, Payload::C, Style::Kernel, 0);
+    case SLANG_CPP_SOURCE:
+        return Desc::make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
+    case SLANG_HOST_CPP_SOURCE:
+        return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
+    case SLANG_CPP_PYTORCH_BINDING:
+        return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
+    case SLANG_HOST_EXECUTABLE:
+        return Desc::make(Kind::Executable, Payload::HostCPU, Style::Host, 0);
+    case SLANG_HOST_SHARED_LIBRARY:
+        return Desc::make(Kind::SharedLibrary, Payload::HostCPU, Style::Host, 0);
+    case SLANG_SHADER_SHARED_LIBRARY:
+        return Desc::make(Kind::SharedLibrary, Payload::HostCPU, Style::Kernel, 0);
+    case SLANG_SHADER_HOST_CALLABLE:
+        return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
+    case SLANG_CUDA_SOURCE:
+        return Desc::make(Kind::Source, Payload::CUDA, Style::Kernel, 0);
+        // TODO(JS):
+        // Not entirely clear how best to represent PTX here. We could mark as 'Assembly'.
+        // Saying it is 'Executable' implies it is Binary (which PTX isn't). Executable also
+        // implies 'complete for executation', irrespective of it being text.
+    case SLANG_PTX:
+        return Desc::make(Kind::ObjectCode, Payload::PTX, Style::Kernel, 0);
+    case SLANG_OBJECT_CODE:
+        return Desc::make(Kind::ObjectCode, Payload::HostCPU, Style::Kernel, 0);
+    case SLANG_HOST_HOST_CALLABLE:
+        return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
+    case SLANG_METAL:
+        return Desc::make(Kind::Source, Payload::Metal, Style::Kernel, 0);
+    case SLANG_METAL_LIB:
+        return Desc::make(Kind::ObjectCode, Payload::MetalAIR, Style::Kernel, 0);
+    case SLANG_METAL_LIB_ASM:
+        return Desc::make(Kind::Assembly, Payload::MetalAIR, Style::Kernel, 0);
+    case SLANG_WGSL:
+        return Desc::make(Kind::Source, Payload::WGSL, Style::Kernel, 0);
+    case SLANG_WGSL_SPIRV_ASM:
+        return Desc::make(Kind::Assembly, Payload::WGSL_SPIRV, Style::Kernel, 0);
+    case SLANG_WGSL_SPIRV:
+        return Desc::make(Kind::ObjectCode, Payload::WGSL_SPIRV, Style::Kernel, 0);
+    default:
+        break;
     }
 
     SLANG_UNEXPECTED("Unhandled type");
 }
 
 
-/* static */ArtifactPayload ArtifactDescUtil::getPayloadForSourceLanaguage(SlangSourceLanguage language)
+/* static */ ArtifactPayload ArtifactDescUtil::getPayloadForSourceLanaguage(
+    SlangSourceLanguage language)
 {
     switch (language)
     {
-        default:
-        case SLANG_SOURCE_LANGUAGE_UNKNOWN:         return Payload::Unknown;
-        case SLANG_SOURCE_LANGUAGE_SLANG:           return Payload::Slang;
-        case SLANG_SOURCE_LANGUAGE_HLSL:            return Payload::HLSL;
-        case SLANG_SOURCE_LANGUAGE_GLSL:            return Payload::GLSL;
-        case SLANG_SOURCE_LANGUAGE_C:               return Payload::C;
-        case SLANG_SOURCE_LANGUAGE_CPP:             return Payload::Cpp;
-        case SLANG_SOURCE_LANGUAGE_CUDA:            return Payload::CUDA;
+    default:
+    case SLANG_SOURCE_LANGUAGE_UNKNOWN:
+        return Payload::Unknown;
+    case SLANG_SOURCE_LANGUAGE_SLANG:
+        return Payload::Slang;
+    case SLANG_SOURCE_LANGUAGE_HLSL:
+        return Payload::HLSL;
+    case SLANG_SOURCE_LANGUAGE_GLSL:
+        return Payload::GLSL;
+    case SLANG_SOURCE_LANGUAGE_C:
+        return Payload::C;
+    case SLANG_SOURCE_LANGUAGE_CPP:
+        return Payload::Cpp;
+    case SLANG_SOURCE_LANGUAGE_CUDA:
+        return Payload::CUDA;
     }
 }
 
-/* static */ArtifactDesc ArtifactDescUtil::makeDescForSourceLanguage(SlangSourceLanguage language)
+/* static */ ArtifactDesc ArtifactDescUtil::makeDescForSourceLanguage(SlangSourceLanguage language)
 {
     return Desc::make(Kind::Source, getPayloadForSourceLanaguage(language), Style::Unknown, 0);
 }
 
-/* static */SlangCompileTarget ArtifactDescUtil::getCompileTargetFromDesc(const ArtifactDesc& desc)
+/* static */ SlangCompileTarget ArtifactDescUtil::getCompileTargetFromDesc(const ArtifactDesc& desc)
 {
     switch (desc.kind)
     {
-        case ArtifactKind::None:            return SLANG_TARGET_NONE;
-        case ArtifactKind::Source:
+    case ArtifactKind::None:
+        return SLANG_TARGET_NONE;
+    case ArtifactKind::Source:
         {
             switch (desc.payload)
             {
-                case Payload::HLSL:         return SLANG_HLSL;
-                case Payload::GLSL:         return SLANG_GLSL;
-                case Payload::C:            return SLANG_C_SOURCE;
-                case Payload::Cpp:          return (desc.style == Style::Host) ? SLANG_HOST_CPP_SOURCE : SLANG_CPP_SOURCE;
-                case Payload::CUDA:         return SLANG_CUDA_SOURCE;
-                case Payload::Metal:        return SLANG_METAL;
-                case Payload::WGSL:         return SLANG_WGSL;
-                default: break;
+            case Payload::HLSL:
+                return SLANG_HLSL;
+            case Payload::GLSL:
+                return SLANG_GLSL;
+            case Payload::C:
+                return SLANG_C_SOURCE;
+            case Payload::Cpp:
+                return (desc.style == Style::Host) ? SLANG_HOST_CPP_SOURCE : SLANG_CPP_SOURCE;
+            case Payload::CUDA:
+                return SLANG_CUDA_SOURCE;
+            case Payload::Metal:
+                return SLANG_METAL;
+            case Payload::WGSL:
+                return SLANG_WGSL;
+            default:
+                break;
             }
             break;
         }
-        case ArtifactKind::Assembly:
+    case ArtifactKind::Assembly:
         {
             switch (desc.payload)
             {
-                case Payload::SPIRV:        return SLANG_SPIRV_ASM;
-                case Payload::DXIL:         return SLANG_DXIL_ASM;
-                case Payload::DXBC:         return SLANG_DXBC_ASM;
-                case Payload::PTX:          return SLANG_PTX;
-                case Payload::MetalAIR:     return SLANG_METAL_LIB_ASM;
-                default: break;
+            case Payload::SPIRV:
+                return SLANG_SPIRV_ASM;
+            case Payload::DXIL:
+                return SLANG_DXIL_ASM;
+            case Payload::DXBC:
+                return SLANG_DXBC_ASM;
+            case Payload::PTX:
+                return SLANG_PTX;
+            case Payload::MetalAIR:
+                return SLANG_METAL_LIB_ASM;
+            case Payload::WGSL_SPIRV:
+                return SLANG_WGSL_SPIRV_ASM;
+            default:
+                break;
             }
         }
-        default: break;
+    default:
+        break;
     }
 
     if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
@@ -358,23 +420,38 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         {
             switch (desc.kind)
             {
-                case Kind::Executable:              return SLANG_HOST_EXECUTABLE;
-                case Kind::SharedLibrary:           return desc.style == ArtifactStyle::Host ? SLANG_HOST_SHARED_LIBRARY : SLANG_SHADER_SHARED_LIBRARY;
-                case Kind::HostCallable:            return desc.style == ArtifactStyle::Host ? SLANG_HOST_HOST_CALLABLE : SLANG_SHADER_HOST_CALLABLE;
-                case Kind::ObjectCode:              return SLANG_OBJECT_CODE;
-                default: break;
+            case Kind::Executable:
+                return SLANG_HOST_EXECUTABLE;
+            case Kind::SharedLibrary:
+                return desc.style == ArtifactStyle::Host ? SLANG_HOST_SHARED_LIBRARY
+                                                         : SLANG_SHADER_SHARED_LIBRARY;
+            case Kind::HostCallable:
+                return desc.style == ArtifactStyle::Host ? SLANG_HOST_HOST_CALLABLE
+                                                         : SLANG_SHADER_HOST_CALLABLE;
+            case Kind::ObjectCode:
+                return SLANG_OBJECT_CODE;
+            default:
+                break;
             }
         }
         else
         {
             switch (desc.payload)
             {
-                case Payload::SPIRV:        return SLANG_SPIRV;
-                case Payload::DXIL:         return SLANG_DXIL;
-                case Payload::DXBC:         return SLANG_DXBC;
-                case Payload::PTX:          return SLANG_PTX;
-                case Payload::MetalAIR:     return SLANG_METAL_LIB_ASM;
-                default: break;
+            case Payload::SPIRV:
+                return SLANG_SPIRV;
+            case Payload::DXIL:
+                return SLANG_DXIL;
+            case Payload::DXBC:
+                return SLANG_DXBC;
+            case Payload::PTX:
+                return SLANG_PTX;
+            case Payload::MetalAIR:
+                return SLANG_METAL_LIB_ASM;
+            case Payload::WGSL_SPIRV:
+                return SLANG_WGSL_SPIRV;
+            default:
+                break;
             }
         }
     }
@@ -383,35 +460,31 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
 }
 
 
-namespace { // anonymous
+namespace
+{ // anonymous
 struct KindExtension
 {
     ArtifactKind kind;
     UnownedStringSlice ext;
 };
-} // anonymous
+} // namespace
 
-#define SLANG_KIND_EXTENSION(kind, ext) \
-    { ArtifactKind::kind, toSlice(ext) },
+#define SLANG_KIND_EXTENSION(kind, ext) {ArtifactKind::kind, toSlice(ext)},
 
-static const KindExtension g_cpuKindExts[] =
-{
+static const KindExtension g_cpuKindExts[] = {
 #if SLANG_WINDOWS_FAMILY
-    SLANG_KIND_EXTENSION(Library, "lib")
-    SLANG_KIND_EXTENSION(ObjectCode, "obj")
-    SLANG_KIND_EXTENSION(Executable, "exe")
-    SLANG_KIND_EXTENSION(SharedLibrary, "dll")
-#else 
-    SLANG_KIND_EXTENSION(Library, "a")
-    SLANG_KIND_EXTENSION(ObjectCode, "o")
-    SLANG_KIND_EXTENSION(Executable, "")
+    SLANG_KIND_EXTENSION(Library, "lib") SLANG_KIND_EXTENSION(ObjectCode, "obj")
+        SLANG_KIND_EXTENSION(Executable, "exe") SLANG_KIND_EXTENSION(SharedLibrary, "dll")
+#else
+    SLANG_KIND_EXTENSION(Library, "a") SLANG_KIND_EXTENSION(ObjectCode, "o")
+        SLANG_KIND_EXTENSION(Executable, "")
 
 #if __CYGWIN__
-    SLANG_KIND_EXTENSION(SharedLibrary, "dll")
+            SLANG_KIND_EXTENSION(SharedLibrary, "dll")
 #elif SLANG_APPLE_FAMILY
-    SLANG_KIND_EXTENSION(SharedLibrary, "dylib")
+            SLANG_KIND_EXTENSION(SharedLibrary, "dylib")
 #else
-    SLANG_KIND_EXTENSION(SharedLibrary, "so")
+            SLANG_KIND_EXTENSION(SharedLibrary, "so")
 #endif
 
 #endif
@@ -419,10 +492,11 @@ static const KindExtension g_cpuKindExts[] =
 
 /* static */ bool ArtifactDescUtil::isCpuBinary(const ArtifactDesc& desc)
 {
-    return isDerivedFrom(desc.kind, ArtifactKind::CompileBinary) && isDerivedFrom(desc.payload, ArtifactPayload::CPULike);
+    return isDerivedFrom(desc.kind, ArtifactKind::CompileBinary) &&
+           isDerivedFrom(desc.payload, ArtifactPayload::CPULike);
 }
 
-/* static */bool ArtifactDescUtil::isText(const ArtifactDesc& desc)
+/* static */ bool ArtifactDescUtil::isText(const ArtifactDesc& desc)
 {
     // If it's derived from text...
     if (isDerivedFrom(desc.kind, ArtifactKind::Text))
@@ -440,33 +514,34 @@ static const KindExtension g_cpuKindExts[] =
     return false;
 }
 
-/* static */bool ArtifactDescUtil::isGpuUsable(const ArtifactDesc& desc)
+/* static */ bool ArtifactDescUtil::isGpuUsable(const ArtifactDesc& desc)
 {
     if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
     {
         return isDerivedFrom(desc.payload, ArtifactPayload::KernelLike);
     }
 
-    // PTX is a kind of special case, it's an 'assembly' (low level text represention) that can be passed 
-    // to CUDA runtime
+    // PTX is a kind of special case, it's an 'assembly' (low level text represention) that can be
+    // passed to CUDA runtime
     return desc.kind == ArtifactKind::Assembly && desc.payload == ArtifactPayload::PTX;
 }
 
-/* static */bool ArtifactDescUtil::isKindBinaryLinkable(Kind kind)
+/* static */ bool ArtifactDescUtil::isKindBinaryLinkable(Kind kind)
 {
     switch (kind)
     {
-        case Kind::Library:
-        case Kind::ObjectCode:
+    case Kind::Library:
+    case Kind::ObjectCode:
         {
             return true;
         }
-        default: break;
+    default:
+        break;
     }
     return false;
 }
 
-/* static */bool ArtifactDescUtil::isLinkable(const ArtifactDesc& desc)
+/* static */ bool ArtifactDescUtil::isLinkable(const ArtifactDesc& desc)
 {
     // If is a container with compile results *assume* that result is linkable
     if (isDerivedFrom(desc.kind, ArtifactKind::Container) &&
@@ -476,7 +551,7 @@ static const KindExtension g_cpuKindExts[] =
     }
 
     // if it's a compile binary or a container
-    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary)) 
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
     {
         if (isDerivedFrom(desc.payload, ArtifactPayload::KernelLike))
         {
@@ -491,8 +566,7 @@ static const KindExtension g_cpuKindExts[] =
         else if (isDerivedFrom(desc.payload, ArtifactPayload::CPULike))
         {
             // If kind is exe or shared library, linking will arguably not work
-            if (desc.kind == ArtifactKind::SharedLibrary ||
-                desc.kind == ArtifactKind::Executable)
+            if (desc.kind == ArtifactKind::SharedLibrary || desc.kind == ArtifactKind::Executable)
             {
                 return false;
             }
@@ -508,7 +582,7 @@ static const KindExtension g_cpuKindExts[] =
     return false;
 }
 
-/* static */bool ArtifactDescUtil::isCpuLikeTarget(const ArtifactDesc& desc)
+/* static */ bool ArtifactDescUtil::isCpuLikeTarget(const ArtifactDesc& desc)
 {
     if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
     {
@@ -523,10 +597,9 @@ static const KindExtension g_cpuKindExts[] =
     return false;
 }
 
-/* static */ArtifactDesc ArtifactDescUtil::getDescFromExtension(const UnownedStringSlice& slice)
+/* static */ ArtifactDesc ArtifactDescUtil::getDescFromExtension(const UnownedStringSlice& slice)
 {
-    if (slice == "slang-module" ||
-        slice == "slang-lib")
+    if (slice == "slang-module" || slice == "slang-lib")
     {
         return ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR);
     }
@@ -570,7 +643,7 @@ static const KindExtension g_cpuKindExts[] =
         return ArtifactDesc::make(ArtifactKind::Assembly, ArtifactPayload::HostCPU);
     }
 
-    // TODO(JS): Unfortunately map extension is also used from output for linkage from 
+    // TODO(JS): Unfortunately map extension is also used from output for linkage from
     // Visual Studio. It's used here for source map.
     if (slice == toSlice("map"))
     {
@@ -597,7 +670,7 @@ static const KindExtension g_cpuKindExts[] =
     return makeDescForCompileTarget(target);
 }
 
-/* static */ArtifactDesc ArtifactDescUtil::getDescFromPath(const UnownedStringSlice& slice)
+/* static */ ArtifactDesc ArtifactDescUtil::getDescFromPath(const UnownedStringSlice& slice)
 {
     auto extension = Path::getPathExt(slice);
     return getDescFromExtension(extension);
@@ -621,36 +694,53 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
     typedef ArtifactPayload Payload;
     switch (payload)
     {
-        /* Source types */
-        case Payload::HLSL:         return toSlice("hlsl");
-        case Payload::GLSL:         return toSlice("glsl");
+    /* Source types */
+    case Payload::HLSL:
+        return toSlice("hlsl");
+    case Payload::GLSL:
+        return toSlice("glsl");
 
-        case Payload::Cpp:          return toSlice("cpp");
-        case Payload::C:            return toSlice("c");
+    case Payload::Cpp:
+        return toSlice("cpp");
+    case Payload::C:
+        return toSlice("c");
 
-        case Payload::Metal:        return toSlice("metal");
+    case Payload::Metal:
+        return toSlice("metal");
 
-        case Payload::CUDA:         return toSlice("cu");
+    case Payload::CUDA:
+        return toSlice("cu");
 
-        case Payload::Slang:        return toSlice("slang");
+    case Payload::Slang:
+        return toSlice("slang");
 
-        /* Binary types */
-        case Payload::DXIL:         return toSlice("dxil");
-        case Payload::DXBC:         return toSlice("dxbc");
-        case Payload::SPIRV:        return toSlice("spv");
+    /* Binary types */
+    case Payload::DXIL:
+        return toSlice("dxil");
+    case Payload::DXBC:
+        return toSlice("dxbc");
+    case Payload::SPIRV:
+        return toSlice("spv");
 
-        case Payload::PTX:          return toSlice("ptx");
+    case Payload::PTX:
+        return toSlice("ptx");
 
-        case Payload::LLVMIR:       return toSlice("llvm-ir");
+    case Payload::LLVMIR:
+        return toSlice("llvm-ir");
 
-        case Payload::SlangIR:      return toSlice("slang-ir");
-        
-        case Payload::MetalAIR:     return toSlice("metallib");
+    case Payload::SlangIR:
+        return toSlice("slang-ir");
 
-        case Payload::PdbDebugInfo: return toSlice("pdb");
-        case Payload::SourceMap:    return toSlice("map");
+    case Payload::MetalAIR:
+        return toSlice("metallib");
 
-        default: break;
+    case Payload::PdbDebugInfo:
+        return toSlice("pdb");
+    case Payload::SourceMap:
+        return toSlice("map");
+
+    default:
+        break;
     }
     return UnownedStringSlice();
 }
@@ -659,7 +749,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 {
     switch (desc.kind)
     {
-        case ArtifactKind::Library:
+    case ArtifactKind::Library:
         {
             // Special cases
             if (desc.payload == Payload::SlangIR)
@@ -673,30 +763,30 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
                 out << toSlice("metallib");
                 return SLANG_OK;
             }
-            
+
             break;
         }
-        case ArtifactKind::Zip:         
+    case ArtifactKind::Zip:
         {
             out << toSlice("zip");
             return SLANG_OK;
         }
-        case ArtifactKind::RiffContainer:         
+    case ArtifactKind::RiffContainer:
         {
             out << toSlice("riff");
             return SLANG_OK;
         }
-        case ArtifactKind::RiffLz4Container:
+    case ArtifactKind::RiffLz4Container:
         {
             out << toSlice("riff-lz4");
             return SLANG_OK;
         }
-        case ArtifactKind::RiffDeflateContainer:
+    case ArtifactKind::RiffDeflateContainer:
         {
             out << toSlice("riff-deflate");
             return SLANG_OK;
         }
-        case ArtifactKind::Assembly:
+    case ArtifactKind::Assembly:
         {
             // Special case PTX, because it is assembly
             if (desc.payload == Payload::PTX)
@@ -717,7 +807,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             out << toSlice("-asm");
             return SLANG_OK;
         }
-        case ArtifactKind::Source:
+    case ArtifactKind::Source:
         {
             auto ext = _getPayloadExtension(desc.payload);
             if (ext.begin() != nullptr)
@@ -725,10 +815,10 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
                 out << ext;
                 return SLANG_OK;
             }
-            // Don't know the extension for that 
+            // Don't know the extension for that
             return SLANG_E_NOT_FOUND;
         }
-        case ArtifactKind::Json:
+    case ArtifactKind::Json:
         {
             auto ext = _getPayloadExtension(desc.payload);
             if (ext.begin() != nullptr)
@@ -736,8 +826,8 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
                 // TODO(JS):
                 // Do we need to alter the extension or the name if it's an
                 // obfuscated map?
-                //if (isDerivedFrom(desc.style, ArtifactStyle::Obfuscated))
-                //{  
+                // if (isDerivedFrom(desc.style, ArtifactStyle::Obfuscated))
+                //{
                 //}
 
                 out << ext;
@@ -748,7 +838,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             out << "json";
             return SLANG_OK;
         }
-        case ArtifactKind::CompileBinary:
+    case ArtifactKind::CompileBinary:
         {
             if (isDerivedFrom(desc.payload, ArtifactPayload::SlangIR) ||
                 isDerivedFrom(desc.payload, ArtifactPayload::SlangAST))
@@ -758,7 +848,8 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             }
             break;
         }
-        default: break;
+    default:
+        break;
     }
 
     if (ArtifactDescUtil::isGpuUsable(desc))
@@ -771,21 +862,26 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
         }
     }
 
-    if (ArtifactDescUtil::isCpuLikeTarget(desc) && !isDerivedFrom(desc.payload, ArtifactPayload::Source))
+    if (ArtifactDescUtil::isCpuLikeTarget(desc) &&
+        !isDerivedFrom(desc.payload, ArtifactPayload::Source))
     {
         return appendCpuExtensionForKind(desc.kind, out);
     }
-    
+
     return SLANG_E_NOT_FOUND;
 }
 
-/* static */String ArtifactDescUtil::getBaseNameFromPath(const ArtifactDesc& desc, const UnownedStringSlice& path)
+/* static */ String ArtifactDescUtil::getBaseNameFromPath(
+    const ArtifactDesc& desc,
+    const UnownedStringSlice& path)
 {
     const String name = Path::getFileName(path);
     return getBaseNameFromName(desc, name.getUnownedSlice());
 }
 
-/* static */String ArtifactDescUtil::getBaseNameFromName(const ArtifactDesc& desc, const UnownedStringSlice& inName)
+/* static */ String ArtifactDescUtil::getBaseNameFromName(
+    const ArtifactDesc& desc,
+    const UnownedStringSlice& inName)
 {
     String name(inName);
 
@@ -794,8 +890,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     {
         // Strip lib prefix
         if (isCpuBinary(desc) &&
-            (desc.kind == ArtifactKind::Library ||
-                desc.kind == ArtifactKind::SharedLibrary))
+            (desc.kind == ArtifactKind::Library || desc.kind == ArtifactKind::SharedLibrary))
         {
             // If it starts with lib strip it
             if (name.startsWith("lib"))
@@ -809,12 +904,11 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     // Strip any extension
     {
         StringBuilder descExt;
-        if (SLANG_SUCCEEDED(appendDefaultExtension(desc, descExt)) && 
-            descExt.getLength())
+        if (SLANG_SUCCEEDED(appendDefaultExtension(desc, descExt)) && descExt.getLength())
         {
-            // TODO(JS): 
+            // TODO(JS):
             // It has an extension. We could check if they are the same
-            // but if they are not that might be fine, because of case insensitivity 
+            // but if they are not that might be fine, because of case insensitivity
             // or perhaps there are multiple valid extensions. So for now we just strip
             // and don't bother confirming with something like..
             // if (Path::getPathExt(name) == descExt))
@@ -826,19 +920,24 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     return name;
 }
 
-/* static */String ArtifactDescUtil::getBaseName(const ArtifactDesc& desc, IPathArtifactRepresentation* pathRep)
+/* static */ String ArtifactDescUtil::getBaseName(
+    const ArtifactDesc& desc,
+    IPathArtifactRepresentation* pathRep)
 {
     UnownedStringSlice path(pathRep->getPath());
     return getBaseNameFromPath(desc, path);
 }
 
-/* static */SlangResult ArtifactDescUtil::hasDefinedNameForDesc(const ArtifactDesc& desc)
+/* static */ SlangResult ArtifactDescUtil::hasDefinedNameForDesc(const ArtifactDesc& desc)
 {
     StringBuilder buf;
     return SLANG_SUCCEEDED(appendDefaultExtension(desc, buf));
 }
 
-/* static */SlangResult ArtifactDescUtil::calcNameForDesc(const ArtifactDesc& desc, const UnownedStringSlice& inBaseName, StringBuilder& outName)
+/* static */ SlangResult ArtifactDescUtil::calcNameForDesc(
+    const ArtifactDesc& desc,
+    const UnownedStringSlice& inBaseName,
+    StringBuilder& outName)
 {
     UnownedStringSlice baseName(inBaseName);
 
@@ -850,8 +949,7 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 
     // Prefix
     if (isCpuBinary(desc) &&
-        (desc.kind == ArtifactKind::SharedLibrary ||
-            desc.kind == ArtifactKind::Library))
+        (desc.kind == ArtifactKind::SharedLibrary || desc.kind == ArtifactKind::Library))
     {
         const bool isSharedLibraryPrefixPlatform = SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY;
         if (isSharedLibraryPrefixPlatform)
@@ -882,7 +980,10 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     return SLANG_OK;
 }
 
-/* static */SlangResult ArtifactDescUtil::calcPathForDesc(const ArtifactDesc& desc, const UnownedStringSlice& basePath, StringBuilder& outPath)
+/* static */ SlangResult ArtifactDescUtil::calcPathForDesc(
+    const ArtifactDesc& desc,
+    const UnownedStringSlice& basePath,
+    StringBuilder& outPath)
 {
     outPath.clear();
 
@@ -907,18 +1008,17 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     }
 }
 
-/* static */bool ArtifactDescUtil::isDisassembly(const ArtifactDesc& from, const ArtifactDesc& to)
+/* static */ bool ArtifactDescUtil::isDisassembly(const ArtifactDesc& from, const ArtifactDesc& to)
 {
     // From must be a binary like type
     if (!isDerivedFrom(from.kind, ArtifactKind::CompileBinary))
     {
         return false;
     }
-    
-    
+
+
     // Target must be assembly, and the payload be the same type
-    if (!(to.kind == ArtifactKind::Assembly && 
-        to.payload == from.payload))
+    if (!(to.kind == ArtifactKind::Assembly && to.payload == from.payload))
     {
         return false;
     }
@@ -927,15 +1027,14 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 
     // Check the payload seems like something plausible to 'disassemble'
     if (!(isDerivedFrom(payload, ArtifactPayload::KernelLike) ||
-        isDerivedFrom(payload, ArtifactPayload::CPULike) ||
-        isDerivedFrom(payload, ArtifactPayload::GeneralIR)))
+          isDerivedFrom(payload, ArtifactPayload::CPULike) ||
+          isDerivedFrom(payload, ArtifactPayload::GeneralIR)))
     {
         return false;
     }
 
     // If the flags or style are different, then it's something more than just disassembly
-    if (!(from.style == to.style &&
-        from.flags == to.flags))
+    if (!(from.style == to.style && from.flags == to.flags))
     {
         return false;
     }
@@ -943,17 +1042,17 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
     return true;
 }
 
-/* static */void ArtifactDescUtil::appendText(const ArtifactDesc& desc, StringBuilder& out)
+/* static */ void ArtifactDescUtil::appendText(const ArtifactDesc& desc, StringBuilder& out)
 {
     out << getName(desc.kind) << "/" << getName(desc.payload) << "/" << getName(desc.style);
     // TODO(JS): Output flags? None currently used
 }
 
-/* static */String ArtifactDescUtil::getText(const ArtifactDesc& desc)
+/* static */ String ArtifactDescUtil::getText(const ArtifactDesc& desc)
 {
     StringBuilder buf;
     appendText(desc, buf);
-    return std::move(buf);
+    return buf;
 }
 
 } // namespace Slang

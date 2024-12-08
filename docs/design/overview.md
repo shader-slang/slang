@@ -11,7 +11,7 @@ Compilation is always performed in the context of a *compile request*, which bun
 Inside the code, there is a type `CompileRequest` to represent this.
 
 The user specifies some number of *translation units* (represented in the code as a `TranslationUnitRequest`) which comprise some number of *sources* (files or strings).
-HLSL follows the traditional C model where a "translaiton unit" is more or less synonymous with a source file, so when compiling HLSL code the command-line `slangc` will treat each source file as its own translation unit.
+HLSL follows the traditional C model where a "translation unit" is more or less synonymous with a source file, so when compiling HLSL code the command-line `slangc` will treat each source file as its own translation unit.
 For Slang code, the command-line tool will by default put all source files into a single translation unit (so that they represent a shared namespace0).
 
 The user can also specify some number of *entry points* in each translation unit (`EntryPointRequest`), which combines the name of a function to compile with the pipeline stage to compile for.
@@ -23,7 +23,7 @@ It might not be immediately clear why we have such fine-grained concepts as this
 The "Front End"
 ---------------
 
-The job of the Slang front-end is to turn textual source code into a combination of code in our custom intermediate represnetation (IR) plus layout and binding information for shader parameters.
+The job of the Slang front-end is to turn textual source code into a combination of code in our custom intermediate representation (IR) plus layout and binding information for shader parameters.
 
 ### Lexing
 
@@ -60,7 +60,7 @@ The parser (`Parser` in `parser.{h,cpp}`) is mostly a straightforward recursive-
 Because the input is already tokenized before we start, we can use arbitrary lookahead, although we seldom look ahead more than one token.
 
 Traditionally, parsing of C-like languages requires context-sensitive parsing techniques to distinguish types from values, and deal with stuff like the C++ "most vexing parse."
-Slang instead uses heuristic approaches: for example, when we encouter an `<` after an identifier, we first try parsing a generic argument list with a closing `>` and then look at the next token to determine if this looks like a generic application (in which case we continue from there) or not (in which case we backtrack).
+Slang instead uses heuristic approaches: for example, when we encounter an `<` after an identifier, we first try parsing a generic argument list with a closing `>` and then look at the next token to determine if this looks like a generic application (in which case we continue from there) or not (in which case we backtrack).
 
 There are still some cases where we use lookup in the current environment to see if something is a type or a value, but officially we strive to support out-of-order declarations like most modern languages.
 In order to achieve that goal we will eventually move to a model where we parse the bodies of declarations and functions in a later pass, after we have resolved names in the global scope.
@@ -71,7 +71,7 @@ This means that most of the language "keywords" in Slang aren't keywords at all,
 Syntax declarations are associated with a callback that is invoked to parse the construct they name.
 
 The design of treating syntax as ordinary declarations has a long-term motivation (we'd like to support a flexible macro system) but it also has short-term practical benefits.
-It is easy for us to add new modifier keywords to the language without touching the lexer or parser (just adding them to the standard library), and we also don't have to worry about any of Slang's extended construct (e.g., `import`) breaking existing HLSL code that just happens to use one of those new keywords as a local variable name.
+It is easy for us to add new modifier keywords to the language without touching the lexer or parser (just adding them to the core module), and we also don't have to worry about any of Slang's extended construct (e.g., `import`) breaking existing HLSL code that just happens to use one of those new keywords as a local variable name.
 
 What the parser produces is an abstract syntax tree (AST).
 The AST currently uses a strongly-typed C++ class hierarchy with a "visitor" API generated via some ugly macro magic.
@@ -97,7 +97,7 @@ An expression that ends up referring to a type will have a `TypeType` as its typ
 
 The most complicated thing about semantic checking is that we strive to support out-of-order declarations, which means we may need to check a function declaration later in the file before checking a function body early in the file.
 In turn, that function declaration might depend on a reference to a nested type declared somewhere else, etc.
-We currently solve this issue by doing some amount of on-demand checking; when we have a reference to a function declaration and we need to know its type, we will first check if the function has been through semantic checking yet, and if not we will go ahead and recurisvely type check that function before we proceed.
+We currently solve this issue by doing some amount of on-demand checking; when we have a reference to a function declaration and we need to know its type, we will first check if the function has been through semantic checking yet, and if not we will go ahead and recursively type check that function before we proceed.
 
 This kind of unfounded recursion can lead to real problems (especially when the user might write code with circular dependencies), so we have made some attempts to more strictly "phase" the semantic checking, but those efforts have not yet been done systematically.
 
@@ -105,7 +105,7 @@ When code involved generics and/or interfaces, the semantic checking phase is re
 
 ### Lowering and Mandatory Optimizations
 
-The lowering step (`lower-to-ir.{h,cpp}`) is responsible for converting semantically valid ASTs into an intermediate representation that is more suitable for specialization, optimization, and code generaton.
+The lowering step (`lower-to-ir.{h,cpp}`) is responsible for converting semantically valid ASTs into an intermediate representation that is more suitable for specialization, optimization, and code generation.
 The main thing that happens at this step is that a lot of the "sugar" in a high-level language gets baked out. For example:
 
 - A "member function" in a type will turn into an ordinary function that takes an initial `this` parameter
@@ -116,29 +116,29 @@ The main thing that happens at this step is that a lot of the "sugar" in a high-
 The lowering step is done once for each translation unit, and like semantic checking it does *not* depend on any particular compilation target.
 During this step we attach "mangled" names to any imported or exported symbols, so that each function overload, etc. has a unique name.
 
-After IR code has been generated for a translation unit (now called a "module") we next perform a set of "mandatory" optimizations, including SSA promotion and simple copy propagation and elmination of dead control-flow paths.
+After IR code has been generated for a translation unit (now called a "module") we next perform a set of "mandatory" optimizations, including SSA promotion and simple copy propagation and elimination of dead control-flow paths.
 These optimizations are not primarily motivated by a desire to speed up code, but rather to ensure that certain "obvious" simplifications have been performed before the next step of validation.
 
 After the IR has been "optimized" we perform certain validation/checking tasks that would have been difficult or impossible to perform on the AST.
 For example, we can validate that control flow never reached the end of a non-`void` function, and issue an error otherwise.
 There are other validation tasks that can/should be performed at this step, although not all of them are currently implemented:
 
-- We should check that any `[unroll]` loops can actually be unrolled, by ensuring tha their termination conditions can be resolved to a compile-time constant (even if we don't know the constant yet)
+- We should check that any `[unroll]` loops can actually be unrolled, by ensuring that their termination conditions can be resolved to a compile-time constant (even if we don't know the constant yet)
 
 - We should check that any resource types are being used in ways that can be statically resolved (e.g., that the code never conditionally computes a resource to reference), since this is a requirement for all our current targets
 
-- We should check that the operands to any operation that requires a compile-time constant (e.g., the texel offset argument to certain `Sample()` calls) are passed values that end up being compile-time cosntants
+- We should check that the operands to any operation that requires a compile-time constant (e.g., the texel offset argument to certain `Sample()` calls) are passed values that end up being compile-time constants
 
 The goal is to eliminate any possible sources of failure in low-level code generation, without needing to have a global view of all the code in a program.
 Any error conditions we have to push off until later starts to limit the value of our separate compilation support.
 
 ### Parameter Binding and Type Layout
 
-The next phase of parameter binding (`parameter-binding.{h,cpp}`) is independednt of IR generation, and proceeds based on the AST that came out of semantic checking.
+The next phase of parameter binding (`parameter-binding.{h,cpp}`) is independent of IR generation, and proceeds based on the AST that came out of semantic checking.
 Parameter binding is the task of figuring out what locations/bindings/offsets should be given to all shader parameters referenced by the user's code.
 
 Parameter binding is done once for each target (because, e.g., Vulkan may bind parameters differently than D3D12), and it is done for the whole compile request (all translation units) rather than one at a time.
-This is because when users compile something like HLSL vertex and fragment shaders in distinct translation units, they will often share the "same" parameter via a header, and we need to ensure that it gets just one locaton.
+This is because when users compile something like HLSL vertex and fragment shaders in distinct translation units, they will often share the "same" parameter via a header, and we need to ensure that it gets just one location.
 
 At a high level, parameter binding starts by computing the *type layout* of each shader parameter.
 A type layout describes the amount of registers/bindings/bytes/etc. that a type consumes, and also encodes the information needed to compute offsets/registers for individual `struct` fields or array elements.
@@ -186,11 +186,11 @@ We make a copy of things so that any optimization/transformation passes we do fo
 
 While copying IR code into the fresh module, we have cases where there might be multiple definitions of the same function or other entity.
 In those cases, we apply "target specialization" to pick the definition that is the best for the chosen target.
-This step is where we can select between, say, a built-in definition of the `saturate` function for D3D targets, vs. a hand-written one in the Slang standard library to use for GLSL-based targets.
+This step is where we can select between, say, a built-in definition of the `saturate` function for D3D targets, vs. a hand-written one in a Slang standard module to use for GLSL-based targets.
 
 ### API Legalization
 
-If we are targetting a GLSL-based platform, we need to translate "varying" shader entry point parameters into global variables used for cross-stage data passing.
+If we are targeting a GLSL-based platform, we need to translate "varying" shader entry point parameters into global variables used for cross-stage data passing.
 We also need to translate any "system value" semantics into uses of the special built-in `gl_*` variables.
 
 We currently handle this kind of API-specific legalization quite early in the process, performing it right after linking.
@@ -208,7 +208,7 @@ At the end of specialization, we should have code that makes no use of user-defi
 ### Type Legalization
 
 While HLSL and Slang allow a single `struct` type to contain both "ordinary" data like a `float3` and "resources" like a `Texture2D`, the rules for GLSL and SPIR-V are more restrictive.
-Ther are some additional wrinkles that arise for such "mixed" types, so we prefer to always "legalize" the types in the users code by replacing an aggregate type like:
+There are some additional wrinkles that arise for such "mixed" types, so we prefer to always "legalize" the types in the users code by replacing an aggregate type like:
 
 ```hlsl
 struct Material { float4 baseColor; Texture2D detailMap; };
@@ -230,7 +230,7 @@ Changing the "shape" of a type like this (so that a single variable becomes more
 
 We dont' currently apply many other optimizations on the IR code in the back-end, under the assumption that the lower-level compilers below Slang will do some of the "heavy lifting."
 
-That said, there are certain optimizations that Slang must do eventually, for semantic completeness. One of the most important examples of these is implementing the sematncis of the `[unroll]` attribute, since we can't always rely on downstream compilers to have a capable unrolling implementation.
+That said, there are certain optimizations that Slang must do eventually, for semantic completeness. One of the most important examples of these is implementing the semantics of the `[unroll]` attribute, since we can't always rely on downstream compilers to have a capable unrolling implementation.
 
 We expect that over time it will be valuable for Slang to support a wider array of optimization passes, as long as they are ones that are considered "safe" to do above the driver interface, because they won't interfere with downstream optimization opportunities.
 

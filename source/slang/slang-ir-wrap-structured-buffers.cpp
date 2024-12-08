@@ -1,8 +1,8 @@
 // slang-ir-wrap-structured-buffers.cpp
 #include "slang-ir-wrap-structured-buffers.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -51,16 +51,13 @@ struct WrapStructuredBuffersContext
 
     // We process a module by processing all its instructions, recursively.
     //
-    void processModule()
-    {
-        processInstRec(m_module->getModuleInst());
-    }
+    void processModule() { processInstRec(m_module->getModuleInst()); }
 
     void processInstRec(IRInst* inst)
     {
         processInst(inst);
 
-        for(auto child : inst->getChildren())
+        for (auto child : inst->getChildren())
             processInstRec(child);
     }
 
@@ -74,10 +71,10 @@ struct WrapStructuredBuffersContext
         // the right form, then we will skip it.
         //
         auto oldStructuredBufferType = as<IRHLSLStructuredBufferTypeBase>(inst);
-        if(!oldStructuredBufferType)
+        if (!oldStructuredBufferType)
             return;
         auto matrixType = as<IRMatrixType>(oldStructuredBufferType->getElementType());
-        if(!matrixType)
+        if (!matrixType)
             return;
 
         // Having found a `*StructuredBuffer<M>` we will now
@@ -108,7 +105,8 @@ struct WrapStructuredBuffersContext
         // replacing one type A with another type B globally, and doing
         // so could affect any type that in turn referenced A...
         //
-        auto newStructuredBufferType = builder->getType(oldStructuredBufferType->getOp(), wrapperStruct);
+        auto newStructuredBufferType =
+            builder->getType(oldStructuredBufferType->getOp(), wrapperStruct);
         oldStructuredBufferType->replaceUsesWith(newStructuredBufferType);
 
         // Any values that used our old structured bufer type
@@ -132,133 +130,140 @@ struct WrapStructuredBuffersContext
         // scanning through its IR uses, since values of that
         // type are using it as a (type) operand.
         //
-        traverseUses(newStructuredBufferType, [&](IRUse* typeUse)
-        {
-            // There might be uses of `newStructuredBufferType` where
-            // it isn't being used as the type of a value, so we
-            // start by weeding out the ones we don't care about.
-            //
-            auto valueOfStructuredBufferType = typeUse->getUser();
-            if(valueOfStructuredBufferType->getFullType() != newStructuredBufferType)
-                return;
-
-            // Now we have some `valueOfStructuredBufferType`. In our running
-            // example, this might be `gBuffer`, which is an `IRGlobalParam`.
-            //
-            // We don't need to change anything about `gBuffer` itself, since
-            // replacing `oldStructuredBufferType` with `newStructuredBufferType`
-            // already replaced the type of `gBuffer`.
-            //
-            // Instead, we want to look for instructions that *use* the buffer,
-            // because these could be calls to intrinsic functions like
-            // `RWStructuredBuffer.Load`
-            //
-            traverseUses(valueOfStructuredBufferType, [&](IRUse* valueUse)
+        traverseUses(
+            newStructuredBufferType,
+            [&](IRUse* typeUse)
             {
-                // we are only interested in instructions that are calls,
-                // with at least one argument, where the first argument
-                // is our `valueOfStructuredBufferType`. These
-                // are calls that could potentially be intrinsic
-                // operations on `*StructuredBuffer`.
+                // There might be uses of `newStructuredBufferType` where
+                // it isn't being used as the type of a value, so we
+                // start by weeding out the ones we don't care about.
                 //
-                auto user = valueUse->getUser();
-                switch (user->getOp())
-                {
-                case kIROp_StructuredBufferLoad:
-                case kIROp_StructuredBufferLoadStatus:
-                case kIROp_RWStructuredBufferStore:
-                case kIROp_RWStructuredBufferLoadStatus:
-                case kIROp_RWStructuredBufferGetElementPtr:
-                    break;
-                default:
+                auto valueOfStructuredBufferType = typeUse->getUser();
+                if (valueOfStructuredBufferType->getFullType() != newStructuredBufferType)
                     return;
-                }
 
-                builder->setInsertAfter(user);
-                auto oldResultType = user->getDataType();
-
-                // First we care about the case for `Load`, which
-                // will return the element type, which would be
-                // a matrix type.
+                // Now we have some `valueOfStructuredBufferType`. In our running
+                // example, this might be `gBuffer`, which is an `IRGlobalParam`.
                 //
-                if( as<IRMatrixType>(oldResultType) )
-                {
-                    // We know that the call to `Load` should now
-                    // return our wrapper struct type, so we will
-                    // go ahead and modify its type to be correct.
-                    //
-                    auto newResultType = wrapperStruct;
-                    builder->setDataType(user, newResultType);
-
-                    // Next, we need to make sure to extract the
-                    // field from the wrapper struct, so that
-                    // we get back to a value of the expected
-                    // type.
-                    //
-                    // This logic takes something like:
-                    //
-                    //      WrapperStruct call = gBuffer.Load(index);
-                    //
-                    // and follows it with:
-                    //
-                    //      float4x4 newVal = call.wrapped;
-                    //
-                    auto newVal = builder->emitFieldExtract(oldResultType, user, wrappedFieldKey);
-
-                    // Any code that used the value of `call` should
-                    // now use `newVal` instead...
-                    //
-                    user->replaceUsesWith(newVal);
-                    //
-                    // ... except for one important gotcha, which is
-                    // that `newVal` itself used `call`, and replacing
-                    // `call` with `newVal` results in `newVal` using
-                    // itself as one of its operands.
-                    //
-                    // It is a bit of a kludge, but we fix the situation
-                    // by just setting the appropriate operand again.
-                    //
-                    // TODO: it might be helpful to have a variant
-                    // of `replaceUsesWith` that can handle cases like
-                    // this.
-                    //
-                    newVal->setOperand(0, user);
-                }
+                // We don't need to change anything about `gBuffer` itself, since
+                // replacing `oldStructuredBufferType` with `newStructuredBufferType`
+                // already replaced the type of `gBuffer`.
                 //
-                // The second interesting case is the `ref` accessor
-                // in `operator[]` for a `RWStructuredBuffer`, which
-                // at the IR level returns a *pointer* to the buffer
-                // element type.
+                // Instead, we want to look for instructions that *use* the buffer,
+                // because these could be calls to intrinsic functions like
+                // `RWStructuredBuffer.Load`
                 //
-                else if(auto oldPtrType = as<IRPtrTypeBase>(oldResultType))
-                {
-                    auto pointeeType = oldPtrType->getValueType();
-                    if( as<IRMatrixType>(pointeeType) )
+                traverseUses(
+                    valueOfStructuredBufferType,
+                    [&](IRUse* valueUse)
                     {
-                        // At this point we know that the intrinsic
-                        // operation returned a pointer to a matrix,
-                        // which seems like a good indications that
-                        // it is our `operator[]` and it should now
-                        // return a pointer to the wrapper struct
-                        // instead.
+                        // we are only interested in instructions that are calls,
+                        // with at least one argument, where the first argument
+                        // is our `valueOfStructuredBufferType`. These
+                        // are calls that could potentially be intrinsic
+                        // operations on `*StructuredBuffer`.
                         //
-                        // The logic here is almost identical to the
-                        // non-pointer case above, so please refer
-                        // there if you want the comments.
+                        auto user = valueUse->getUser();
+                        switch (user->getOp())
+                        {
+                        case kIROp_StructuredBufferLoad:
+                        case kIROp_StructuredBufferLoadStatus:
+                        case kIROp_RWStructuredBufferStore:
+                        case kIROp_RWStructuredBufferLoadStatus:
+                        case kIROp_RWStructuredBufferGetElementPtr:
+                            break;
+                        default:
+                            return;
+                        }
 
-                        auto newResultType = builder->getPtrType(oldPtrType->getOp(), wrapperStruct);
-                        builder->setDataType(user, newResultType);
+                        builder->setInsertAfter(user);
+                        auto oldResultType = user->getDataType();
 
-                        auto newVal = builder->emitFieldAddress(oldResultType, user, wrappedFieldKey);
-                        user->replaceUsesWith(newVal);
-                        newVal->setOperand(0, user);
-                    }
-                }
+                        // First we care about the case for `Load`, which
+                        // will return the element type, which would be
+                        // a matrix type.
+                        //
+                        if (as<IRMatrixType>(oldResultType))
+                        {
+                            // We know that the call to `Load` should now
+                            // return our wrapper struct type, so we will
+                            // go ahead and modify its type to be correct.
+                            //
+                            auto newResultType = wrapperStruct;
+                            builder->setDataType(user, newResultType);
+
+                            // Next, we need to make sure to extract the
+                            // field from the wrapper struct, so that
+                            // we get back to a value of the expected
+                            // type.
+                            //
+                            // This logic takes something like:
+                            //
+                            //      WrapperStruct call = gBuffer.Load(index);
+                            //
+                            // and follows it with:
+                            //
+                            //      float4x4 newVal = call.wrapped;
+                            //
+                            auto newVal =
+                                builder->emitFieldExtract(oldResultType, user, wrappedFieldKey);
+
+                            // Any code that used the value of `call` should
+                            // now use `newVal` instead...
+                            //
+                            user->replaceUsesWith(newVal);
+                            //
+                            // ... except for one important gotcha, which is
+                            // that `newVal` itself used `call`, and replacing
+                            // `call` with `newVal` results in `newVal` using
+                            // itself as one of its operands.
+                            //
+                            // It is a bit of a kludge, but we fix the situation
+                            // by just setting the appropriate operand again.
+                            //
+                            // TODO: it might be helpful to have a variant
+                            // of `replaceUsesWith` that can handle cases like
+                            // this.
+                            //
+                            newVal->setOperand(0, user);
+                        }
+                        //
+                        // The second interesting case is the `ref` accessor
+                        // in `operator[]` for a `RWStructuredBuffer`, which
+                        // at the IR level returns a *pointer* to the buffer
+                        // element type.
+                        //
+                        else if (auto oldPtrType = as<IRPtrTypeBase>(oldResultType))
+                        {
+                            auto pointeeType = oldPtrType->getValueType();
+                            if (as<IRMatrixType>(pointeeType))
+                            {
+                                // At this point we know that the intrinsic
+                                // operation returned a pointer to a matrix,
+                                // which seems like a good indications that
+                                // it is our `operator[]` and it should now
+                                // return a pointer to the wrapper struct
+                                // instead.
+                                //
+                                // The logic here is almost identical to the
+                                // non-pointer case above, so please refer
+                                // there if you want the comments.
+
+                                auto newResultType =
+                                    builder->getPtrType(oldPtrType->getOp(), wrapperStruct);
+                                builder->setDataType(user, newResultType);
+
+                                auto newVal =
+                                    builder->emitFieldAddress(oldResultType, user, wrappedFieldKey);
+                                user->replaceUsesWith(newVal);
+                                newVal->setOperand(0, user);
+                            }
+                        }
+                    });
             });
-        });
     }
 
-        /// Get the struture field "key" to use for generated wrappers
+    /// Get the struture field "key" to use for generated wrappers
     IRStructKey* getWrappedFieldKey(IRBuilder* builder)
     {
         // We will re-use the same field key for all of the
@@ -272,17 +277,17 @@ struct WrapStructuredBuffersContext
         // has been transformed and now there is this
         // `._S2` in the middle of their expressions.
 
-        if( !m_wrappedFieldKey )
+        if (!m_wrappedFieldKey)
         {
             m_wrappedFieldKey = builder->createStructKey();
         }
         return m_wrappedFieldKey;
     }
 
-        /// Lazily created and cached field "key" to use for wrapper structs.
+    /// Lazily created and cached field "key" to use for wrapper structs.
     IRStructKey* m_wrappedFieldKey = nullptr;
 
-        /// Get the wrapper struct to use for a particular `matrixType`.
+    /// Get the wrapper struct to use for a particular `matrixType`.
     IRStructType* getWrapperStruct(IRBuilder* builder, IRMatrixType* matrixType)
     {
         // TODO: Because our type de-duplication isn't perfect right now,
@@ -309,12 +314,11 @@ struct WrapStructuredBuffersContext
     }
 };
 
-void wrapStructuredBuffersOfMatrices(
-    IRModule*                           module)
+void wrapStructuredBuffersOfMatrices(IRModule* module)
 {
     WrapStructuredBuffersContext context;
     context.m_module = module;
     context.processModule();
 }
 
-}
+} // namespace Slang

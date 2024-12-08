@@ -1,20 +1,22 @@
 // unit-test-record-replay.cpp
 
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-process-util.h"
-
-#include "../../source/core/slang-io.h"
 #include "../../source/core/slang-http.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-random-generator.h"
-
-#include "tools/unit-test/slang-unit-test.h"
+#include "../../source/core/slang-string-util.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <chrono>
 #include <thread>
 
 using namespace Slang;
 
-static SlangResult createProcess(UnitTestContext* context, const char* processName, const List<String>* optArgs, RefPtr<Process>& outProcess)
+static SlangResult createProcess(
+    UnitTestContext* context,
+    const char* processName,
+    const List<String>* optArgs,
+    RefPtr<Process>& outProcess)
 {
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, processName));
@@ -60,7 +62,9 @@ static SlangResult parseHashes(List<String> const& lines, List<entryHashInfo>& o
         }
 
         entryHashInfo hashInfo;
-        auto extractToken = [](const UnownedStringSlice& token, const char splitChar, UnownedStringSlice& outToken) -> SlangResult
+        auto extractToken = [](const UnownedStringSlice& token,
+                               const char splitChar,
+                               UnownedStringSlice& outToken) -> SlangResult
         {
             List<UnownedStringSlice> subTokens;
             StringUtil::split(token, splitChar, subTokens);
@@ -153,7 +157,10 @@ static void findRecordFileName(List<String>* fileNames)
                 m_fileNames->add(filename);
             }
         }
-        Visitor(List<String>* fileNames) : m_fileNames(fileNames) {}
+        Visitor(List<String>* fileNames)
+            : m_fileNames(fileNames)
+        {
+        }
         List<String>* m_fileNames;
     };
 
@@ -161,14 +168,18 @@ static void findRecordFileName(List<String>* fileNames)
     Path::find("slang-record", "*.cap", &visitor);
 }
 
-static SlangResult launchProcessAndReadStdout(UnitTestContext* context, const List<String>& optArgs,
-        const char* exampleName, RefPtr<Process>& process, ExecuteResult& exeRes)
+static SlangResult launchProcessAndReadStdout(
+    UnitTestContext* context,
+    const List<String>& optArgs,
+    const char* exampleName,
+    RefPtr<Process>& process,
+    ExecuteResult& exeRes)
 {
     StringBuilder msgBuilder;
     SlangResult res = createProcess(context, exampleName, &optArgs, process);
     if (SLANG_FAILED(res))
     {
-        msgBuilder << "Failed to launch process of '"<< exampleName << "'\n";
+        msgBuilder << "Failed to launch process of '" << exampleName << "'\n";
         getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
         return res;
     }
@@ -202,7 +213,10 @@ static SlangResult launchProcessAndReadStdout(UnitTestContext* context, const Li
     return SLANG_OK;
 }
 
-static SlangResult runExample(UnitTestContext* context, const char* exampleName, List<entryHashInfo>& outHashes)
+static SlangResult runExample(
+    UnitTestContext* context,
+    const char* exampleName,
+    List<entryHashInfo>& outHashes)
 {
     SlangResult finalRes = SLANG_OK;
 
@@ -301,7 +315,9 @@ static SlangResult replayExample(UnitTestContext* context, List<entryHashInfo>& 
     return SLANG_OK;
 }
 
-static SlangResult resultCompare(List<entryHashInfo> const& expectHashes, List<entryHashInfo> const& resultHashes)
+static SlangResult resultCompare(
+    List<entryHashInfo> const& expectHashes,
+    List<entryHashInfo> const& resultHashes)
 {
     if (expectHashes.getCount() == 0)
     {
@@ -312,7 +328,8 @@ static SlangResult resultCompare(List<entryHashInfo> const& expectHashes, List<e
     StringBuilder msgBuilder;
     if (expectHashes.getCount() != resultHashes.getCount())
     {
-        msgBuilder << "The number of hashes doesn't match, expect: " << expectHashes.getCount() << ", actual: " << resultHashes.getCount() << "\n";
+        msgBuilder << "The number of hashes doesn't match, expect: " << expectHashes.getCount()
+                   << ", actual: " << resultHashes.getCount() << "\n";
         getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
         return SLANG_FAIL;
     }
@@ -322,23 +339,32 @@ static SlangResult resultCompare(List<entryHashInfo> const& expectHashes, List<e
         if (expectHashes[i].targetIndex != resultHashes[i].targetIndex)
         {
             msgBuilder << "Failed to match 'targetIndex' at index " << i << "\n";
-            msgBuilder << "Expect: " << expectHashes[i].targetIndex << ", actual: " << resultHashes[i].targetIndex << "\n";
-            getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+            msgBuilder << "Expect: " << expectHashes[i].targetIndex
+                       << ", actual: " << resultHashes[i].targetIndex << "\n";
+            getTestReporter()->message(
+                TestMessageType::TestFailure,
+                msgBuilder.toString().getBuffer());
             return SLANG_FAIL;
         }
         if (expectHashes[i].entryPointIndex != resultHashes[i].entryPointIndex)
         {
             msgBuilder << "Failed to match 'entryPointIndex' at index " << i << "\n";
-            msgBuilder << "Expect: " << expectHashes[i].entryPointIndex << ", actual: " << resultHashes[i].entryPointIndex << "\n";
-            getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+            msgBuilder << "Expect: " << expectHashes[i].entryPointIndex
+                       << ", actual: " << resultHashes[i].entryPointIndex << "\n";
+            getTestReporter()->message(
+                TestMessageType::TestFailure,
+                msgBuilder.toString().getBuffer());
             return SLANG_FAIL;
         }
 
         if (expectHashes[i].hash != resultHashes[i].hash)
         {
             msgBuilder << "Failed to match 'hash' at index " << i << "\n";
-            msgBuilder << "Expect: " << expectHashes[i].hash << ", actual: " << resultHashes[i].hash << "\n";
-            getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+            msgBuilder << "Expect: " << expectHashes[i].hash << ", actual: " << resultHashes[i].hash
+                       << "\n";
+            getTestReporter()->message(
+                TestMessageType::TestFailure,
+                msgBuilder.toString().getBuffer());
             return SLANG_FAIL;
         }
     }
@@ -351,7 +377,9 @@ static SlangResult cleanupRecordFiles()
     SlangResult res = Path::removeNonEmpty("slang-record");
     if (SLANG_FAILED(res))
     {
-        getTestReporter()->message(TestMessageType::TestFailure, "Failed to remove 'slang-record' directory\n");
+        getTestReporter()->message(
+            TestMessageType::TestFailure,
+            "Failed to remove 'slang-record' directory\n");
     }
 
     return res;
@@ -362,17 +390,17 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
     List<entryHashInfo> expectHashes;
     List<entryHashInfo> resultHashes;
     SlangResult res = SLANG_OK;
-    if((res = runExample(context, testName, expectHashes)) != SLANG_OK)
+    if ((res = runExample(context, testName, expectHashes)) != SLANG_OK)
     {
         goto error;
     }
 
-    if((res = replayExample(context, resultHashes)) != SLANG_OK)
+    if ((res = replayExample(context, resultHashes)) != SLANG_OK)
     {
         goto error;
     }
 
-    if((res = resultCompare(expectHashes, resultHashes)) != SLANG_OK)
+    if ((res = resultCompare(expectHashes, resultHashes)) != SLANG_OK)
     {
         goto error;
     }
@@ -384,15 +412,15 @@ error:
 
 static SlangResult runTests(UnitTestContext* context)
 {
- const char* testBinaryNames[] = {
+    const char* testBinaryNames[] = {
         "cpu-hello-world",
         "triangle",
         "ray-tracing",
         "ray-tracing-pipeline",
         "autodiff-texture",
         "gpu-printing"
-        // "shader-object", // these examples requires reflection API to replay, we have to disable it for now.
-        // "model-viewer",
+        // "shader-object", // these examples requires reflection API to replay, we have to disable
+        // it for now. "model-viewer",
     };
 
     SlangResult finalRes = SLANG_OK;
@@ -403,7 +431,9 @@ static SlangResult runTests(UnitTestContext* context)
         {
             StringBuilder msgBuilder;
             msgBuilder << "Failed subtest: '" << testBinaryName << "'\n\n\n";
-            getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+            getTestReporter()->message(
+                TestMessageType::TestFailure,
+                msgBuilder.toString().getBuffer());
             finalRes = res;
         }
     }

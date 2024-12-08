@@ -34,7 +34,7 @@ DifferentialPair<float> dd1(DifferentialPair<float> x)
 }
 
 // CHECK-DAG: {{.*}}(37): error 31151
-[BackwardDerivative(f)]
+[BackwardDerivativeOf(f)]
 DifferentialPair<float> df<let N:int>(inout DifferentialPair<float> x, float dOut)
 {
     var primal = x.p * x.p;

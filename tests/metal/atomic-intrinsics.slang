@@ -1,8 +1,7 @@
 //TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute -DMETAL
 //TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute -DMETAL
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
@@ -36,22 +35,22 @@ void computeMain(uint groupIndex : SV_GroupIndex)
     float val = 0.0f;
 
     // InterlockedAdd
-    //MTL: atomic_uint threadgroup* {{.*}}shareMemUI
+    //MTL: atomic_uint threadgroup*{{.*}}shareMemUI
     //LIB: call {{.*}}.atomic.local.add.u.i32
     InterlockedAdd(shareMemUI[idx], uint(1));
     val += shareMemUI[idx];
 
-    //MTL: atomic_int threadgroup* {{.*}}shareMemI
+    //MTL: atomic_int threadgroup*{{.*}}shareMemI
     //LIB: call {{.*}}.atomic.local.add.s.i32
     InterlockedAdd(shareMemI[idx],  2);
     val += shareMemI[idx];
 
-    //MTL: atomic_uint device* {{.*}}uintBuffer
+    //MTL: atomic_uint device*{{.*}}uintBuffer
     //LIB: call {{.*}}.atomic.global.add.u.i32
     InterlockedAdd(uintBuffer[idx], 1);
     val += uintBuffer[idx];
 
-    //MTL: atomic_int device* {{.*}}intBuffer
+    //MTL: atomic_int device*{{.*}}intBuffer
     //LIB: call {{.*}}.atomic.global.add.s.i32
     InterlockedAdd(intBuffer[idx], 2);
     val += intBuffer[idx];

@@ -12,9 +12,13 @@
 // precision as needed.
 #include <sstream>
 
-namespace Slang {
+namespace Slang
+{
 
-SourceWriter::SourceWriter(SourceManager* sourceManager, LineDirectiveMode lineDirectiveMode, IBoxValue<SourceMap>* sourceMap)
+SourceWriter::SourceWriter(
+    SourceManager* sourceManager,
+    LineDirectiveMode lineDirectiveMode,
+    IBoxValue<SourceMap>* sourceMap)
 {
     m_sourceMap = sourceMap;
     m_lineDirectiveMode = lineDirectiveMode;
@@ -251,8 +255,7 @@ void SourceWriter::emit(double value)
     std::frexp(value, &expBase2);
     // 2^17 = 131072 which is close to 10^5, so in that case we will
     // change to use scientific representation.
-    std::ios::fmtflags flags = (std::abs(expBase2) >= 17) ?
-            std::ios::scientific : std::ios::fixed;
+    std::ios::fmtflags flags = (std::abs(expBase2) >= 17) ? std::ios::scientific : std::ios::fixed;
 
     stream.setf(flags, std::ios::floatfield);
     stream.precision(std::numeric_limits<double>::max_digits10);
@@ -296,23 +299,25 @@ void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocatio
 
 void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
 {
-    // If we don't have any line directives *and* we don't want to output 
+    // If we don't have any line directives *and* we don't want to output
     // source map, we can just ignore
-    if (getLineDirectiveMode() == LineDirectiveMode::None &&
-        m_sourceMap == nullptr)
+    if (getLineDirectiveMode() == LineDirectiveMode::None && m_sourceMap == nullptr)
     {
-        // Ignore if we aren't outputting directives 
+        // Ignore if we aren't outputting directives
         return;
     }
-    
+
     if (!sourceLocation.isValid())
     {
         // If it's not valid, we will just keep the current location.
 
-        // The question now is if we want to trigger outputting the source location again. We do so if
+        // The question now is if we want to trigger outputting the source location again. We do so
+        // if
         // * The nextSourceLoc is valid
         // * The line number on the output is different from that location
-        m_needToUpdateSourceLocation = m_needToUpdateSourceLocation || (m_nextSourceLoc.isValid() && m_nextHumaneSourceLocation.line != m_loc.line);
+        m_needToUpdateSourceLocation =
+            m_needToUpdateSourceLocation ||
+            (m_nextSourceLoc.isValid() && m_nextHumaneSourceLocation.line != m_loc.line);
         return;
     }
 
@@ -320,22 +325,25 @@ void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
     // as we have a valid line location.
     if (sourceLocation == m_nextSourceLoc)
     {
-        // This is important because we can end up with many instructions with the same source location - for example
-        // when we have [__unsafeForceInlineEarly] all the inlined instructions get the same location.
-        // When we output lines of source, the target sources line numbers change, therefore we need to
-        // output  the same #line directive multiple times.
-     
-        m_needToUpdateSourceLocation = m_needToUpdateSourceLocation || (m_nextHumaneSourceLocation.line > 0);
+        // This is important because we can end up with many instructions with the same source
+        // location - for example when we have [__unsafeForceInlineEarly] all the inlined
+        // instructions get the same location. When we output lines of source, the target sources
+        // line numbers change, therefore we need to output  the same #line directive multiple
+        // times.
+
+        m_needToUpdateSourceLocation =
+            m_needToUpdateSourceLocation || (m_nextHumaneSourceLocation.line > 0);
         return;
     }
 
     // Workout the humane source location.
-    const HumaneSourceLoc humaneSourceLoc = getSourceManager()->getHumaneLoc(sourceLocation, SourceLocType::Emit);
+    const HumaneSourceLoc humaneSourceLoc =
+        getSourceManager()->getHumaneLoc(sourceLocation, SourceLocType::Emit);
 
     // If the location is valid, mark need to update, and the new location
     if (humaneSourceLoc.line > 0)
     {
-        m_needToUpdateSourceLocation = true;        
+        m_needToUpdateSourceLocation = true;
         m_nextHumaneSourceLocation = humaneSourceLoc;
     }
 
@@ -353,7 +361,7 @@ void SourceWriter::_flushSourceLocationChange()
     // advances the location, and outputting text is what
     // triggers this flush operation.
     m_needToUpdateSourceLocation = false;
-    
+
     _emitLineDirectiveIfNeeded(m_nextHumaneSourceLocation);
 
     // If we have a source map update state
@@ -392,11 +400,12 @@ void SourceWriter::_updateSourceMap(const HumaneSourceLoc& sourceLocation)
     SourceMap::Entry entry;
     entry.init();
 
-    entry.sourceFileIndex = sourceMap->getSourceFileIndex(sourceLocation.pathInfo.getName().getUnownedSlice());
+    entry.sourceFileIndex =
+        sourceMap->getSourceFileIndex(sourceLocation.pathInfo.getName().getUnownedSlice());
     entry.sourceLine = sourceLocation.line - 1;
     entry.sourceColumn = sourceLocation.column - 1;
     entry.generatedColumn = generatedColumnIndex;
-    
+
     sourceMap->addEntry(entry);
 }
 
@@ -410,13 +419,13 @@ void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocat
     auto mode = getLineDirectiveMode();
     switch (mode)
     {
-        case LineDirectiveMode::SourceMap:
-        case LineDirectiveMode::None:
-            return;
+    case LineDirectiveMode::SourceMap:
+    case LineDirectiveMode::None:
+        return;
 
-        case LineDirectiveMode::Default:
-        default:
-            break;
+    case LineDirectiveMode::Default:
+    default:
+        break;
     }
 
     // Ignore invalid source locations
@@ -427,18 +436,19 @@ void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocat
     // a differnet file or line, *or* if the source location is
     // somehow later on the line than what we want to emit,
     // then we need to emit a new `#line` directive.
-    if (sourceLocation.pathInfo.foundPath != m_loc.pathInfo.foundPath
-        || sourceLocation.line != m_loc.line
-        || sourceLocation.column < m_loc.column)
+    if (sourceLocation.pathInfo.foundPath != m_loc.pathInfo.foundPath ||
+        sourceLocation.line != m_loc.line || sourceLocation.column < m_loc.column)
     {
         // Special case: if we are in the same file, and within a small number
         // of lines of the target location, then go ahead and output newlines
         // to get us caught up.
-        enum { kSmallLineCount = 3 };
+        enum
+        {
+            kSmallLineCount = 3
+        };
         auto lineDiff = sourceLocation.line - m_loc.line;
-        if (sourceLocation.pathInfo.foundPath == m_loc.pathInfo.foundPath
-            && sourceLocation.line > m_loc.line
-            && lineDiff <= kSmallLineCount)
+        if (sourceLocation.pathInfo.foundPath == m_loc.pathInfo.foundPath &&
+            sourceLocation.line > m_loc.line && lineDiff <= kSmallLineCount)
         {
             for (int ii = 0; ii < lineDiff; ++ii)
             {
@@ -470,12 +480,12 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
         auto mode = getLineDirectiveMode();
         switch (mode)
         {
-            default:
-            case LineDirectiveMode::SourceMap:
-            case LineDirectiveMode::None:
-                SLANG_UNEXPECTED("should not be trying to emit '#line' directive");
-                return;
-            case LineDirectiveMode::GLSL:
+        default:
+        case LineDirectiveMode::SourceMap:
+        case LineDirectiveMode::None:
+            SLANG_UNEXPECTED("should not be trying to emit '#line' directive");
+            return;
+        case LineDirectiveMode::GLSL:
             {
                 auto path = sourceLocation.pathInfo.foundPath;
 
@@ -497,8 +507,8 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
                 emitRawText(buffer);
                 break;
             }
-            case LineDirectiveMode::Default:
-            case LineDirectiveMode::Standard:
+        case LineDirectiveMode::Default:
+        case LineDirectiveMode::Standard:
             {
                 // The simple case is to emit the path for the current source
                 // location. We need to be a little bit careful with this,
@@ -513,21 +523,21 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
                 const auto& path = sourceLocation.pathInfo.foundPath;
                 for (auto c : path)
                 {
-                    char charBuffer[] = { c, 0 };
+                    char charBuffer[] = {c, 0};
                     switch (c)
                     {
-                        default:
-                            emitRawText(charBuffer);
-                            break;
+                    default:
+                        emitRawText(charBuffer);
+                        break;
 
-                            // The incoming file path might use `/` and/or `\\` as
-                            // a directory separator. We want to canonicalize this.
-                            //
-                            // TODO: should probably canonicalize paths to not use backslash somewhere else
-                            // in the compilation pipeline...
-                        case '\\':
-                            emitRawText("/");
-                            break;
+                        // The incoming file path might use `/` and/or `\\` as
+                        // a directory separator. We want to canonicalize this.
+                        //
+                        // TODO: should probably canonicalize paths to not use backslash
+                        // somewhere else in the compilation pipeline...
+                    case '\\':
+                        emitRawText("/");
+                        break;
                     }
                 }
                 emitRawText("\"");
@@ -541,7 +551,7 @@ void SourceWriter::_emitLineDirective(const HumaneSourceLoc& sourceLocation)
 
 void SourceWriter::_calcLocation(Index& outLineIndex, Index& outColumnIndex)
 {
-    // If there are move chars we need to update 
+    // If there are move chars we need to update
     if (m_currentOutputOffset < m_builder.getLength())
     {
         const char* cur = m_builder.getBuffer() + m_currentOutputOffset;
@@ -567,7 +577,7 @@ void SourceWriter::_calcLocation(Index& outLineIndex, Index& outColumnIndex)
 
                 // Next line
                 ++m_currentLineIndex;
-                
+
                 // Check the next char to see if it's part of a CR/LF combination
                 if (cur < end)
                 {
@@ -588,7 +598,7 @@ void SourceWriter::_calcLocation(Index& outLineIndex, Index& outColumnIndex)
         // Get the bytes remaining on this line (which may not be complete)
         const UnownedStringSlice lineRemaining(start, m_builder.end());
 
-        // Offset the column index in codepoints 
+        // Offset the column index in codepoints
         m_currentColumnIndex += UTF8Util::calcCodePointCount(lineRemaining);
     }
 

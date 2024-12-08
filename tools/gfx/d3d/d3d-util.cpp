@@ -9,37 +9,38 @@
 #endif
 
 // We will use the C standard library just for printing error messages.
-#include <stdio.h>
-
 #include "core/slang-basic.h"
 #include "core/slang-platform.h"
 
-#ifdef GFX_NV_AFTERMATH
-#   include "GFSDK_Aftermath.h"
-#   include "GFSDK_Aftermath_Defines.h"
-#   include "GFSDK_Aftermath_GpuCrashDump.h"
+#include <stdio.h>
 
-#   include "core/slang-process.h"
+#ifdef GFX_NV_AFTERMATH
+#include "GFSDK_Aftermath.h"
+#include "GFSDK_Aftermath_Defines.h"
+#include "GFSDK_Aftermath_GpuCrashDump.h"
+#include "core/slang-process.h"
 #endif
 
-namespace gfx {
+namespace gfx
+{
 using namespace Slang;
 
-/* static */D3D_PRIMITIVE_TOPOLOGY D3DUtil::getPrimitiveTopology(PrimitiveTopology topology)
+/* static */ D3D_PRIMITIVE_TOPOLOGY D3DUtil::getPrimitiveTopology(PrimitiveTopology topology)
 {
     switch (topology)
     {
-        case PrimitiveTopology::TriangleList:
-            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-        case PrimitiveTopology::TriangleStrip:
-            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
-        case PrimitiveTopology::LineList:
-            return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-        case PrimitiveTopology::LineStrip:
-            return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
-        case PrimitiveTopology::PointList:
-            return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-        default: break;
+    case PrimitiveTopology::TriangleList:
+        return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case PrimitiveTopology::TriangleStrip:
+        return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case PrimitiveTopology::LineList:
+        return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+    case PrimitiveTopology::LineStrip:
+        return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+    case PrimitiveTopology::PointList:
+        return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+    default:
+        break;
     }
     return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
 }
@@ -140,188 +141,282 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
     return rs;
 }
 
-/* static */DXGI_FORMAT D3DUtil::getMapFormat(Format format)
+/* static */ DXGI_FORMAT D3DUtil::getMapFormat(Format format)
 {
     switch (format)
     {
-        case Format::R32G32B32A32_TYPELESS:     return DXGI_FORMAT_R32G32B32A32_TYPELESS;
-        case Format::R32G32B32_TYPELESS:        return DXGI_FORMAT_R32G32B32_TYPELESS;
-        case Format::R32G32_TYPELESS:           return DXGI_FORMAT_R32G32_TYPELESS;
-        case Format::R32_TYPELESS:              return DXGI_FORMAT_R32_TYPELESS;
+    case Format::R32G32B32A32_TYPELESS:
+        return DXGI_FORMAT_R32G32B32A32_TYPELESS;
+    case Format::R32G32B32_TYPELESS:
+        return DXGI_FORMAT_R32G32B32_TYPELESS;
+    case Format::R32G32_TYPELESS:
+        return DXGI_FORMAT_R32G32_TYPELESS;
+    case Format::R32_TYPELESS:
+        return DXGI_FORMAT_R32_TYPELESS;
 
-        case Format::R16G16B16A16_TYPELESS:     return DXGI_FORMAT_R16G16B16A16_TYPELESS;
-        case Format::R16G16_TYPELESS:           return DXGI_FORMAT_R16G16_TYPELESS;
-        case Format::R16_TYPELESS:              return DXGI_FORMAT_R16_TYPELESS;
+    case Format::R16G16B16A16_TYPELESS:
+        return DXGI_FORMAT_R16G16B16A16_TYPELESS;
+    case Format::R16G16_TYPELESS:
+        return DXGI_FORMAT_R16G16_TYPELESS;
+    case Format::R16_TYPELESS:
+        return DXGI_FORMAT_R16_TYPELESS;
 
-        case Format::R8G8B8A8_TYPELESS:         return DXGI_FORMAT_R8G8B8A8_TYPELESS;
-        case Format::R8G8_TYPELESS:             return DXGI_FORMAT_R8G8_TYPELESS;
-        case Format::R8_TYPELESS:               return DXGI_FORMAT_R8_TYPELESS;
-        case Format::B8G8R8A8_TYPELESS:         return DXGI_FORMAT_B8G8R8A8_TYPELESS;
+    case Format::R8G8B8A8_TYPELESS:
+        return DXGI_FORMAT_R8G8B8A8_TYPELESS;
+    case Format::R8G8_TYPELESS:
+        return DXGI_FORMAT_R8G8_TYPELESS;
+    case Format::R8_TYPELESS:
+        return DXGI_FORMAT_R8_TYPELESS;
+    case Format::B8G8R8A8_TYPELESS:
+        return DXGI_FORMAT_B8G8R8A8_TYPELESS;
 
-        case Format::R32G32B32A32_FLOAT:        return DXGI_FORMAT_R32G32B32A32_FLOAT;
-        case Format::R32G32B32_FLOAT:           return DXGI_FORMAT_R32G32B32_FLOAT;
-        case Format::R32G32_FLOAT:              return DXGI_FORMAT_R32G32_FLOAT;
-        case Format::R32_FLOAT:                 return DXGI_FORMAT_R32_FLOAT;
+    case Format::R32G32B32A32_FLOAT:
+        return DXGI_FORMAT_R32G32B32A32_FLOAT;
+    case Format::R32G32B32_FLOAT:
+        return DXGI_FORMAT_R32G32B32_FLOAT;
+    case Format::R32G32_FLOAT:
+        return DXGI_FORMAT_R32G32_FLOAT;
+    case Format::R32_FLOAT:
+        return DXGI_FORMAT_R32_FLOAT;
 
-        case Format::R16G16B16A16_FLOAT:        return DXGI_FORMAT_R16G16B16A16_FLOAT;
-        case Format::R16G16_FLOAT:              return DXGI_FORMAT_R16G16_FLOAT;
-        case Format::R16_FLOAT:                 return DXGI_FORMAT_R16_FLOAT;
+    case Format::R16G16B16A16_FLOAT:
+        return DXGI_FORMAT_R16G16B16A16_FLOAT;
+    case Format::R16G16_FLOAT:
+        return DXGI_FORMAT_R16G16_FLOAT;
+    case Format::R16_FLOAT:
+        return DXGI_FORMAT_R16_FLOAT;
 
-        case Format::R64_UINT:                  return DXGI_FORMAT_R32G32_UINT;
+    case Format::R64_UINT:
+        return DXGI_FORMAT_R32G32_UINT;
 
-        case Format::R32G32B32A32_UINT:         return DXGI_FORMAT_R32G32B32A32_UINT;
-        case Format::R32G32B32_UINT:            return DXGI_FORMAT_R32G32B32_UINT;
-        case Format::R32G32_UINT:               return DXGI_FORMAT_R32G32_UINT;
-        case Format::R32_UINT:                  return DXGI_FORMAT_R32_UINT;
+    case Format::R32G32B32A32_UINT:
+        return DXGI_FORMAT_R32G32B32A32_UINT;
+    case Format::R32G32B32_UINT:
+        return DXGI_FORMAT_R32G32B32_UINT;
+    case Format::R32G32_UINT:
+        return DXGI_FORMAT_R32G32_UINT;
+    case Format::R32_UINT:
+        return DXGI_FORMAT_R32_UINT;
 
-        case Format::R16G16B16A16_UINT:         return DXGI_FORMAT_R16G16B16A16_UINT;
-        case Format::R16G16_UINT:               return DXGI_FORMAT_R16G16_UINT;
-        case Format::R16_UINT:                  return DXGI_FORMAT_R16_UINT;
+    case Format::R16G16B16A16_UINT:
+        return DXGI_FORMAT_R16G16B16A16_UINT;
+    case Format::R16G16_UINT:
+        return DXGI_FORMAT_R16G16_UINT;
+    case Format::R16_UINT:
+        return DXGI_FORMAT_R16_UINT;
 
-        case Format::R8G8B8A8_UINT:             return DXGI_FORMAT_R8G8B8A8_UINT;
-        case Format::R8G8_UINT:                 return DXGI_FORMAT_R8G8_UINT;
-        case Format::R8_UINT:                   return DXGI_FORMAT_R8_UINT;
+    case Format::R8G8B8A8_UINT:
+        return DXGI_FORMAT_R8G8B8A8_UINT;
+    case Format::R8G8_UINT:
+        return DXGI_FORMAT_R8G8_UINT;
+    case Format::R8_UINT:
+        return DXGI_FORMAT_R8_UINT;
 
-        case Format::R64_SINT:                  return DXGI_FORMAT_R32G32_SINT;
+    case Format::R64_SINT:
+        return DXGI_FORMAT_R32G32_SINT;
 
-        case Format::R32G32B32A32_SINT:         return DXGI_FORMAT_R32G32B32A32_SINT;
-        case Format::R32G32B32_SINT:            return DXGI_FORMAT_R32G32B32_SINT;
-        case Format::R32G32_SINT:               return DXGI_FORMAT_R32G32_SINT;
-        case Format::R32_SINT:                  return DXGI_FORMAT_R32_SINT;
+    case Format::R32G32B32A32_SINT:
+        return DXGI_FORMAT_R32G32B32A32_SINT;
+    case Format::R32G32B32_SINT:
+        return DXGI_FORMAT_R32G32B32_SINT;
+    case Format::R32G32_SINT:
+        return DXGI_FORMAT_R32G32_SINT;
+    case Format::R32_SINT:
+        return DXGI_FORMAT_R32_SINT;
 
-        case Format::R16G16B16A16_SINT:         return DXGI_FORMAT_R16G16B16A16_SINT;
-        case Format::R16G16_SINT:               return DXGI_FORMAT_R16G16_SINT;
-        case Format::R16_SINT:                  return DXGI_FORMAT_R16_SINT;
+    case Format::R16G16B16A16_SINT:
+        return DXGI_FORMAT_R16G16B16A16_SINT;
+    case Format::R16G16_SINT:
+        return DXGI_FORMAT_R16G16_SINT;
+    case Format::R16_SINT:
+        return DXGI_FORMAT_R16_SINT;
 
-        case Format::R8G8B8A8_SINT:             return DXGI_FORMAT_R8G8B8A8_SINT;
-        case Format::R8G8_SINT:                 return DXGI_FORMAT_R8G8_SINT;
-        case Format::R8_SINT:                   return DXGI_FORMAT_R8_SINT;
+    case Format::R8G8B8A8_SINT:
+        return DXGI_FORMAT_R8G8B8A8_SINT;
+    case Format::R8G8_SINT:
+        return DXGI_FORMAT_R8G8_SINT;
+    case Format::R8_SINT:
+        return DXGI_FORMAT_R8_SINT;
 
-        case Format::R16G16B16A16_UNORM:        return DXGI_FORMAT_R16G16B16A16_UNORM;
-        case Format::R16G16_UNORM:              return DXGI_FORMAT_R16G16_UNORM;
-        case Format::R16_UNORM:                 return DXGI_FORMAT_R16_UNORM;
+    case Format::R16G16B16A16_UNORM:
+        return DXGI_FORMAT_R16G16B16A16_UNORM;
+    case Format::R16G16_UNORM:
+        return DXGI_FORMAT_R16G16_UNORM;
+    case Format::R16_UNORM:
+        return DXGI_FORMAT_R16_UNORM;
 
-        case Format::R8G8B8A8_UNORM:            return DXGI_FORMAT_R8G8B8A8_UNORM;
-        case Format::R8G8B8A8_UNORM_SRGB:       return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        case Format::R8G8_UNORM:                return DXGI_FORMAT_R8G8_UNORM;
-        case Format::R8_UNORM:                  return DXGI_FORMAT_R8_UNORM;
-        case Format::B8G8R8A8_UNORM:            return DXGI_FORMAT_B8G8R8A8_UNORM;
-        case Format::B8G8R8X8_UNORM:            return DXGI_FORMAT_B8G8R8X8_UNORM;
-        case Format::B8G8R8A8_UNORM_SRGB:       return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-        case Format::B8G8R8X8_UNORM_SRGB:       return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
+    case Format::R8G8B8A8_UNORM:
+        return DXGI_FORMAT_R8G8B8A8_UNORM;
+    case Format::R8G8B8A8_UNORM_SRGB:
+        return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    case Format::R8G8_UNORM:
+        return DXGI_FORMAT_R8G8_UNORM;
+    case Format::R8_UNORM:
+        return DXGI_FORMAT_R8_UNORM;
+    case Format::B8G8R8A8_UNORM:
+        return DXGI_FORMAT_B8G8R8A8_UNORM;
+    case Format::B8G8R8X8_UNORM:
+        return DXGI_FORMAT_B8G8R8X8_UNORM;
+    case Format::B8G8R8A8_UNORM_SRGB:
+        return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+    case Format::B8G8R8X8_UNORM_SRGB:
+        return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
 
-        case Format::R16G16B16A16_SNORM:        return DXGI_FORMAT_R16G16B16A16_SNORM;
-        case Format::R16G16_SNORM:              return DXGI_FORMAT_R16G16_SNORM;
-        case Format::R16_SNORM:                 return DXGI_FORMAT_R16_SNORM;
+    case Format::R16G16B16A16_SNORM:
+        return DXGI_FORMAT_R16G16B16A16_SNORM;
+    case Format::R16G16_SNORM:
+        return DXGI_FORMAT_R16G16_SNORM;
+    case Format::R16_SNORM:
+        return DXGI_FORMAT_R16_SNORM;
 
-        case Format::R8G8B8A8_SNORM:            return DXGI_FORMAT_R8G8B8A8_SNORM;
-        case Format::R8G8_SNORM:                return DXGI_FORMAT_R8G8_SNORM;
-        case Format::R8_SNORM:                  return DXGI_FORMAT_R8_SNORM;
+    case Format::R8G8B8A8_SNORM:
+        return DXGI_FORMAT_R8G8B8A8_SNORM;
+    case Format::R8G8_SNORM:
+        return DXGI_FORMAT_R8G8_SNORM;
+    case Format::R8_SNORM:
+        return DXGI_FORMAT_R8_SNORM;
 
-        case Format::D32_FLOAT:                 return DXGI_FORMAT_D32_FLOAT;
-        case Format::D16_UNORM:                 return DXGI_FORMAT_D16_UNORM;
-        case Format::D32_FLOAT_S8_UINT:         return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
-        case Format::R32_FLOAT_X32_TYPELESS:    return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
+    case Format::D32_FLOAT:
+        return DXGI_FORMAT_D32_FLOAT;
+    case Format::D16_UNORM:
+        return DXGI_FORMAT_D16_UNORM;
+    case Format::D32_FLOAT_S8_UINT:
+        return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+    case Format::R32_FLOAT_X32_TYPELESS:
+        return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
 
-        case Format::B4G4R4A4_UNORM:            return DXGI_FORMAT_B4G4R4A4_UNORM;
-        case Format::B5G6R5_UNORM:              return DXGI_FORMAT_B5G6R5_UNORM;
-        case Format::B5G5R5A1_UNORM:            return DXGI_FORMAT_B5G5R5A1_UNORM;
+    case Format::B4G4R4A4_UNORM:
+        return DXGI_FORMAT_B4G4R4A4_UNORM;
+    case Format::B5G6R5_UNORM:
+        return DXGI_FORMAT_B5G6R5_UNORM;
+    case Format::B5G5R5A1_UNORM:
+        return DXGI_FORMAT_B5G5R5A1_UNORM;
 
-        case Format::R9G9B9E5_SHAREDEXP:        return DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
-        case Format::R10G10B10A2_TYPELESS:      return DXGI_FORMAT_R10G10B10A2_TYPELESS;
-        case Format::R10G10B10A2_UINT:          return DXGI_FORMAT_R10G10B10A2_UINT;
-        case Format::R10G10B10A2_UNORM:         return DXGI_FORMAT_R10G10B10A2_UNORM;
-        case Format::R11G11B10_FLOAT:           return DXGI_FORMAT_R11G11B10_FLOAT;
+    case Format::R9G9B9E5_SHAREDEXP:
+        return DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
+    case Format::R10G10B10A2_TYPELESS:
+        return DXGI_FORMAT_R10G10B10A2_TYPELESS;
+    case Format::R10G10B10A2_UINT:
+        return DXGI_FORMAT_R10G10B10A2_UINT;
+    case Format::R10G10B10A2_UNORM:
+        return DXGI_FORMAT_R10G10B10A2_UNORM;
+    case Format::R11G11B10_FLOAT:
+        return DXGI_FORMAT_R11G11B10_FLOAT;
 
-        case Format::BC1_UNORM:                 return DXGI_FORMAT_BC1_UNORM;
-        case Format::BC1_UNORM_SRGB:            return DXGI_FORMAT_BC1_UNORM_SRGB;
-        case Format::BC2_UNORM:                 return DXGI_FORMAT_BC2_UNORM;
-        case Format::BC2_UNORM_SRGB:            return DXGI_FORMAT_BC2_UNORM_SRGB;
-        case Format::BC3_UNORM:                 return DXGI_FORMAT_BC3_UNORM;
-        case Format::BC3_UNORM_SRGB:            return DXGI_FORMAT_BC3_UNORM_SRGB;
-        case Format::BC4_UNORM:                 return DXGI_FORMAT_BC4_UNORM;
-        case Format::BC4_SNORM:                 return DXGI_FORMAT_BC4_SNORM;
-        case Format::BC5_UNORM:                 return DXGI_FORMAT_BC5_UNORM;
-        case Format::BC5_SNORM:                 return DXGI_FORMAT_BC5_SNORM;
-        case Format::BC6H_UF16:                 return DXGI_FORMAT_BC6H_UF16;
-        case Format::BC6H_SF16:                 return DXGI_FORMAT_BC6H_SF16;
-        case Format::BC7_UNORM:                 return DXGI_FORMAT_BC7_UNORM;
-        case Format::BC7_UNORM_SRGB:            return DXGI_FORMAT_BC7_UNORM_SRGB;
+    case Format::BC1_UNORM:
+        return DXGI_FORMAT_BC1_UNORM;
+    case Format::BC1_UNORM_SRGB:
+        return DXGI_FORMAT_BC1_UNORM_SRGB;
+    case Format::BC2_UNORM:
+        return DXGI_FORMAT_BC2_UNORM;
+    case Format::BC2_UNORM_SRGB:
+        return DXGI_FORMAT_BC2_UNORM_SRGB;
+    case Format::BC3_UNORM:
+        return DXGI_FORMAT_BC3_UNORM;
+    case Format::BC3_UNORM_SRGB:
+        return DXGI_FORMAT_BC3_UNORM_SRGB;
+    case Format::BC4_UNORM:
+        return DXGI_FORMAT_BC4_UNORM;
+    case Format::BC4_SNORM:
+        return DXGI_FORMAT_BC4_SNORM;
+    case Format::BC5_UNORM:
+        return DXGI_FORMAT_BC5_UNORM;
+    case Format::BC5_SNORM:
+        return DXGI_FORMAT_BC5_SNORM;
+    case Format::BC6H_UF16:
+        return DXGI_FORMAT_BC6H_UF16;
+    case Format::BC6H_SF16:
+        return DXGI_FORMAT_BC6H_SF16;
+    case Format::BC7_UNORM:
+        return DXGI_FORMAT_BC7_UNORM;
+    case Format::BC7_UNORM_SRGB:
+        return DXGI_FORMAT_BC7_UNORM_SRGB;
 
-        default:                                return DXGI_FORMAT_UNKNOWN;
+    default:
+        return DXGI_FORMAT_UNKNOWN;
     }
 }
 
-/* static */DXGI_FORMAT D3DUtil::calcResourceFormat(UsageType usage, Int usageFlags, DXGI_FORMAT format)
+/* static */ DXGI_FORMAT
+D3DUtil::calcResourceFormat(UsageType usage, Int usageFlags, DXGI_FORMAT format)
 {
     SLANG_UNUSED(usage);
     if (usageFlags)
     {
         switch (format)
         {
-            case DXGI_FORMAT_R32_FLOAT:     /* fallthru */
-            case DXGI_FORMAT_R32_UINT:
-            case DXGI_FORMAT_D32_FLOAT:
+        case DXGI_FORMAT_R32_FLOAT: /* fallthru */
+        case DXGI_FORMAT_R32_UINT:
+        case DXGI_FORMAT_D32_FLOAT:
             {
                 return DXGI_FORMAT_R32_TYPELESS;
             }
-            case DXGI_FORMAT_D24_UNORM_S8_UINT:    return DXGI_FORMAT_R24G8_TYPELESS;
-            default: break;
+        case DXGI_FORMAT_D24_UNORM_S8_UINT:
+            return DXGI_FORMAT_R24G8_TYPELESS;
+        default:
+            break;
         }
         return format;
     }
     return format;
 }
 
-/* static */DXGI_FORMAT D3DUtil::calcFormat(UsageType usage, DXGI_FORMAT format)
+/* static */ DXGI_FORMAT D3DUtil::calcFormat(UsageType usage, DXGI_FORMAT format)
 {
     switch (usage)
     {
-        case USAGE_COUNT_OF:
-        case USAGE_UNKNOWN:
+    case USAGE_COUNT_OF:
+    case USAGE_UNKNOWN:
         {
             return DXGI_FORMAT_UNKNOWN;
         }
-        case USAGE_DEPTH_STENCIL:
+    case USAGE_DEPTH_STENCIL:
         {
             switch (format)
             {
-                case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
-                case DXGI_FORMAT_R32_TYPELESS:
+            case DXGI_FORMAT_D32_FLOAT: /* fallthru */
+            case DXGI_FORMAT_R32_TYPELESS:
                 {
                     return DXGI_FORMAT_D32_FLOAT;
                 }
-                case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:    return DXGI_FORMAT_D24_UNORM_S8_UINT;
-                case DXGI_FORMAT_R24G8_TYPELESS:        return DXGI_FORMAT_D24_UNORM_S8_UINT;
-                default: break;
+            case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+                return DXGI_FORMAT_D24_UNORM_S8_UINT;
+            case DXGI_FORMAT_R24G8_TYPELESS:
+                return DXGI_FORMAT_D24_UNORM_S8_UINT;
+            default:
+                break;
             }
             return format;
         }
-        case USAGE_TARGET:
+    case USAGE_TARGET:
         {
             switch (format)
             {
-                case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
-                case DXGI_FORMAT_D24_UNORM_S8_UINT:
+            case DXGI_FORMAT_D32_FLOAT: /* fallthru */
+            case DXGI_FORMAT_D24_UNORM_S8_UINT:
                 {
                     return DXGI_FORMAT_UNKNOWN;
                 }
-                case DXGI_FORMAT_R32_TYPELESS:        return DXGI_FORMAT_R32_FLOAT;
-                default: break;
+            case DXGI_FORMAT_R32_TYPELESS:
+                return DXGI_FORMAT_R32_FLOAT;
+            default:
+                break;
             }
             return format;
         }
-        case USAGE_SRV:
+    case USAGE_SRV:
         {
             switch (format)
             {
-                case DXGI_FORMAT_D32_FLOAT:     /* fallthru */
-                case DXGI_FORMAT_R32_TYPELESS:
+            case DXGI_FORMAT_D32_FLOAT: /* fallthru */
+            case DXGI_FORMAT_R32_TYPELESS:
                 {
                     return DXGI_FORMAT_R32_FLOAT;
                 }
-                case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:    return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-                default: break;
+            case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+                return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+            default:
+                break;
             }
 
             return format;
@@ -336,101 +431,108 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 {
     switch (format)
     {
-        case DXGI_FORMAT_R32G32B32A32_TYPELESS:
-        case DXGI_FORMAT_R32G32B32_TYPELESS:
-        case DXGI_FORMAT_R16G16B16A16_TYPELESS:
-        case DXGI_FORMAT_R32G32_TYPELESS:
-        case DXGI_FORMAT_R32G8X24_TYPELESS:
-        case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
-        case DXGI_FORMAT_R10G10B10A2_TYPELESS:
-        case DXGI_FORMAT_R8G8B8A8_TYPELESS:
-        case DXGI_FORMAT_R16G16_TYPELESS:
-        case DXGI_FORMAT_R32_TYPELESS:
-        case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
-        case DXGI_FORMAT_R24G8_TYPELESS:
-        case DXGI_FORMAT_R8G8_TYPELESS:
-        case DXGI_FORMAT_R16_TYPELESS:
-        case DXGI_FORMAT_R8_TYPELESS:
-        case DXGI_FORMAT_BC1_TYPELESS:
-        case DXGI_FORMAT_BC2_TYPELESS:
-        case DXGI_FORMAT_BC3_TYPELESS:
-        case DXGI_FORMAT_BC4_TYPELESS:
-        case DXGI_FORMAT_BC5_TYPELESS:
-        case DXGI_FORMAT_B8G8R8A8_TYPELESS:
-        case DXGI_FORMAT_BC6H_TYPELESS:
-        case DXGI_FORMAT_BC7_TYPELESS:
+    case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+    case DXGI_FORMAT_R32G32B32_TYPELESS:
+    case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+    case DXGI_FORMAT_R32G32_TYPELESS:
+    case DXGI_FORMAT_R32G8X24_TYPELESS:
+    case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+    case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+    case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+    case DXGI_FORMAT_R16G16_TYPELESS:
+    case DXGI_FORMAT_R32_TYPELESS:
+    case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+    case DXGI_FORMAT_R24G8_TYPELESS:
+    case DXGI_FORMAT_R8G8_TYPELESS:
+    case DXGI_FORMAT_R16_TYPELESS:
+    case DXGI_FORMAT_R8_TYPELESS:
+    case DXGI_FORMAT_BC1_TYPELESS:
+    case DXGI_FORMAT_BC2_TYPELESS:
+    case DXGI_FORMAT_BC3_TYPELESS:
+    case DXGI_FORMAT_BC4_TYPELESS:
+    case DXGI_FORMAT_BC5_TYPELESS:
+    case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+    case DXGI_FORMAT_BC6H_TYPELESS:
+    case DXGI_FORMAT_BC7_TYPELESS:
         {
             return true;
         }
-        default: break;
+    default:
+        break;
     }
     return false;
 }
 
-/* static */Int D3DUtil::getNumColorChannelBits(DXGI_FORMAT fmt)
+/* static */ Int D3DUtil::getNumColorChannelBits(DXGI_FORMAT fmt)
 {
     switch (fmt)
     {
-        case DXGI_FORMAT_R32G32B32A32_TYPELESS:
-        case DXGI_FORMAT_R32G32B32A32_FLOAT:
-        case DXGI_FORMAT_R32G32B32A32_UINT:
-        case DXGI_FORMAT_R32G32B32A32_SINT:
-        case DXGI_FORMAT_R32G32B32_TYPELESS:
-        case DXGI_FORMAT_R32G32B32_FLOAT:
-        case DXGI_FORMAT_R32G32B32_UINT:
-        case DXGI_FORMAT_R32G32B32_SINT:
+    case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+    case DXGI_FORMAT_R32G32B32A32_FLOAT:
+    case DXGI_FORMAT_R32G32B32A32_UINT:
+    case DXGI_FORMAT_R32G32B32A32_SINT:
+    case DXGI_FORMAT_R32G32B32_TYPELESS:
+    case DXGI_FORMAT_R32G32B32_FLOAT:
+    case DXGI_FORMAT_R32G32B32_UINT:
+    case DXGI_FORMAT_R32G32B32_SINT:
         {
             return 32;
         }
-        case DXGI_FORMAT_R16G16B16A16_TYPELESS:
-        case DXGI_FORMAT_R16G16B16A16_FLOAT:
-        case DXGI_FORMAT_R16G16B16A16_UNORM:
-        case DXGI_FORMAT_R16G16B16A16_UINT:
-        case DXGI_FORMAT_R16G16B16A16_SNORM:
-        case DXGI_FORMAT_R16G16B16A16_SINT:
+    case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+    case DXGI_FORMAT_R16G16B16A16_FLOAT:
+    case DXGI_FORMAT_R16G16B16A16_UNORM:
+    case DXGI_FORMAT_R16G16B16A16_UINT:
+    case DXGI_FORMAT_R16G16B16A16_SNORM:
+    case DXGI_FORMAT_R16G16B16A16_SINT:
         {
             return 16;
         }
-        case DXGI_FORMAT_R10G10B10A2_TYPELESS:
-        case DXGI_FORMAT_R10G10B10A2_UNORM:
-        case DXGI_FORMAT_R10G10B10A2_UINT:
-        case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
+    case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+    case DXGI_FORMAT_R10G10B10A2_UNORM:
+    case DXGI_FORMAT_R10G10B10A2_UINT:
+    case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
         {
             return 10;
         }
-        case DXGI_FORMAT_R8G8B8A8_TYPELESS:
-        case DXGI_FORMAT_R8G8B8A8_UNORM:
-        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-        case DXGI_FORMAT_R8G8B8A8_UINT:
-        case DXGI_FORMAT_R8G8B8A8_SNORM:
-        case DXGI_FORMAT_R8G8B8A8_SINT:
-        case DXGI_FORMAT_B8G8R8A8_UNORM:
-        case DXGI_FORMAT_B8G8R8X8_UNORM:
-        case DXGI_FORMAT_B8G8R8A8_TYPELESS:
-        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
-        case DXGI_FORMAT_B8G8R8X8_TYPELESS:
-        case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+    case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+    case DXGI_FORMAT_R8G8B8A8_UNORM:
+    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+    case DXGI_FORMAT_R8G8B8A8_UINT:
+    case DXGI_FORMAT_R8G8B8A8_SNORM:
+    case DXGI_FORMAT_R8G8B8A8_SINT:
+    case DXGI_FORMAT_B8G8R8A8_UNORM:
+    case DXGI_FORMAT_B8G8R8X8_UNORM:
+    case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+    case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+    case DXGI_FORMAT_B8G8R8X8_TYPELESS:
+    case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
         {
             return 8;
         }
-        case DXGI_FORMAT_B5G6R5_UNORM:
-        case DXGI_FORMAT_B5G5R5A1_UNORM:
+    case DXGI_FORMAT_B5G6R5_UNORM:
+    case DXGI_FORMAT_B5G5R5A1_UNORM:
         {
             return 5;
         }
-        case DXGI_FORMAT_B4G4R4A4_UNORM:
-            return 4;
+    case DXGI_FORMAT_B4G4R4A4_UNORM:
+        return 4;
 
-        default:
-            return 0;
+    default:
+        return 0;
     }
 }
 
 // Note: this subroutine is now only used by D3D11 for generating bytecode to go into input layouts.
 //
-// TODO: we can probably remove that code completely by switching to a PSO-like model across all APIs.
+// TODO: we can probably remove that code completely by switching to a PSO-like model across all
+// APIs.
 //
-/* static */Result D3DUtil::compileHLSLShader(char const* sourcePath, char const* source, char const* entryPointName, char const* dxProfileName, ComPtr<ID3DBlob>& shaderBlobOut)
+/* static */ Result D3DUtil::compileHLSLShader(
+    char const* sourcePath,
+    char const* source,
+    char const* entryPointName,
+    char const* dxProfileName,
+    ComPtr<ID3DBlob>& shaderBlobOut)
 {
 #if !SLANG_ENABLE_DXBC_SUPPORT
     return SLANG_E_NOT_IMPLEMENTED;
@@ -458,7 +560,8 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
             return SLANG_FAIL;
         }
 
-        compileFunc = (pD3DCompile)SharedLibrary::findSymbolAddressByName(compilerModule, "D3DCompile");
+        compileFunc =
+            (pD3DCompile)SharedLibrary::findSymbolAddressByName(compilerModule, "D3DCompile");
         if (!compileFunc)
         {
             fprintf(stderr, "error: failed load symbol 'D3DCompile'\n");
@@ -476,8 +579,8 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     // We will always define `__HLSL__` when compiling here, so that
     // input code can react differently to being compiled as pure HLSL.
     D3D_SHADER_MACRO defines[] = {
-        { "__HLSL__", "1" },
-        { nullptr, nullptr },
+        {"__HLSL__", "1"},
+        {nullptr, nullptr},
     };
 
     // The `D3DCompile` entry point takes a bunch of parameters, but we
@@ -485,8 +588,18 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     ComPtr<ID3DBlob> shaderBlob;
     ComPtr<ID3DBlob> errorBlob;
 
-    HRESULT hr = compileFunc(source, strlen(source), sourcePath, &defines[0], nullptr, entryPointName, dxProfileName, flags, 0,
-        shaderBlob.writeRef(), errorBlob.writeRef());
+    HRESULT hr = compileFunc(
+        source,
+        strlen(source),
+        sourcePath,
+        &defines[0],
+        nullptr,
+        entryPointName,
+        dxProfileName,
+        flags,
+        0,
+        shaderBlob.writeRef(),
+        errorBlob.writeRef());
 
     // If the HLSL-to-bytecode compilation produced any diagnostic messages
     // then we will print them out (whether or not the compilation failed).
@@ -505,11 +618,12 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 #endif // SLANG_ENABLE_DXBC_SUPPORT
 }
 
-/* static */SharedLibrary::Handle D3DUtil::getDxgiModule()
+/* static */ SharedLibrary::Handle D3DUtil::getDxgiModule()
 {
     const char* const libName = SLANG_ENABLE_DXVK ? "dxvk_dxgi" : "dxgi";
 
-    static SharedLibrary::Handle s_dxgiModule = [&](){
+    static SharedLibrary::Handle s_dxgiModule = [&]()
+    {
         SharedLibrary::Handle h = nullptr;
         SharedLibrary::load(libName, h);
         if (!h)
@@ -521,19 +635,23 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     return s_dxgiModule;
 }
 
-/* static */SlangResult D3DUtil::createFactory(DeviceCheckFlags flags, ComPtr<IDXGIFactory>& outFactory)
+/* static */ SlangResult D3DUtil::createFactory(
+    DeviceCheckFlags flags,
+    ComPtr<IDXGIFactory>& outFactory)
 {
-    auto dxgiModule =  getDxgiModule();
+    auto dxgiModule = getDxgiModule();
     if (!dxgiModule)
     {
         return SLANG_FAIL;
     }
 
-    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY)(REFIID riid, void   **ppFactory);
-    typedef HRESULT(WINAPI *PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, void **ppFactory);
+    typedef HRESULT(WINAPI * PFN_DXGI_CREATE_FACTORY)(REFIID riid, void** ppFactory);
+    typedef HRESULT(WINAPI * PFN_DXGI_CREATE_FACTORY_2)(UINT Flags, REFIID riid, void** ppFactory);
 
     {
-        auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory2");
+        auto createFactory2 = (PFN_DXGI_CREATE_FACTORY_2)SharedLibrary::findSymbolAddressByName(
+            dxgiModule,
+            "CreateDXGIFactory2");
         if (createFactory2)
         {
             UINT dxgiFlags = 0;
@@ -552,7 +670,9 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 
     {
-        auto createFactory = (PFN_DXGI_CREATE_FACTORY)SharedLibrary::findSymbolAddressByName(dxgiModule, "CreateDXGIFactory");
+        auto createFactory = (PFN_DXGI_CREATE_FACTORY)SharedLibrary::findSymbolAddressByName(
+            dxgiModule,
+            "CreateDXGIFactory");
         if (!createFactory)
         {
             fprintf(stderr, "error: failed load symbol '%s'\n", "CreateDXGIFactory");
@@ -562,7 +682,10 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     }
 }
 
-/* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
+/* static */ SlangResult D3DUtil::findAdapters(
+    DeviceCheckFlags flags,
+    const AdapterLUID* adapterLUID,
+    List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
     ComPtr<IDXGIFactory> factory;
     SLANG_RETURN_ON_FAIL(createFactory(flags, factory));
@@ -579,7 +702,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
     return luid;
 }
 
-/* static */bool D3DUtil::isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapterIn)
+/* static */ bool D3DUtil::isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapterIn)
 {
     ComPtr<IDXGIFactory4> dxgiFactory4;
     if (SLANG_SUCCEEDED(dxgiFactory->QueryInterface(IID_PPV_ARGS(dxgiFactory4.writeRef()))))
@@ -816,7 +939,8 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
         return D3D12_RESOURCE_STATE_STREAM_OUT;
     case ResourceState::ShaderResource:
     case ResourceState::AccelerationStructureBuildInput:
-        return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+               D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     case ResourceState::PixelShaderResource:
         return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     case ResourceState::NonPixelShaderResource:
@@ -848,7 +972,7 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
     }
 }
 
-/* static */SlangResult D3DUtil::reportLiveObjects()
+/* static */ SlangResult D3DUtil::reportLiveObjects()
 {
     static IDXGIDebug* dxgiDebug = nullptr;
 
@@ -858,7 +982,8 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
         HMODULE debugModule = LoadLibraryA("dxgidebug.dll");
         if (debugModule != INVALID_HANDLE_VALUE)
         {
-            auto fun = reinterpret_cast<decltype(&DXGIGetDebugInterface)>(GetProcAddress(debugModule, "DXGIGetDebugInterface"));
+            auto fun = reinterpret_cast<decltype(&DXGIGetDebugInterface)>(
+                GetProcAddress(debugModule, "DXGIGetDebugInterface"));
             if (fun)
             {
                 fun(__uuidof(IDXGIDebug), (void**)&dxgiDebug);
@@ -869,7 +994,8 @@ D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
 
     if (dxgiDebug)
     {
-        const GUID DXGI_DEBUG_ALL_ = { 0xe48ae283, 0xda80, 0x490b, { 0x87, 0xe6,  0x43,  0xe9,  0xa9,  0xcf,  0xda,  0x8 } };
+        const GUID DXGI_DEBUG_ALL_ =
+            {0xe48ae283, 0xda80, 0x490b, {0x87, 0xe6, 0x43, 0xe9, 0xa9, 0xcf, 0xda, 0x8}};
         dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL_, DXGI_DEBUG_RLO_ALL);
         return SLANG_OK;
     }
@@ -883,7 +1009,7 @@ Result SLANG_MCALL reportD3DLiveObjects()
 }
 
 
-/* static */SlangResult D3DUtil::waitForCrashDumpCompletion(HRESULT res)
+/* static */ SlangResult D3DUtil::waitForCrashDumpCompletion(HRESULT res)
 {
     // If it's not a device remove/reset then theres nothing to wait for
     if (!(res == DXGI_ERROR_DEVICE_REMOVED || res == DXGI_ERROR_DEVICE_RESET))
@@ -909,8 +1035,8 @@ Result SLANG_MCALL reportD3DLiveObjects()
         // Loop while Aftermath crash dump data collection has not finished or
         // the application is still processing the crash dump data.
         while (status != GFSDK_Aftermath_CrashDump_Status_CollectingDataFailed &&
-            status != GFSDK_Aftermath_CrashDump_Status_Finished &&
-            Process::getClockTick() - startTick < timeOutTicks)
+               status != GFSDK_Aftermath_CrashDump_Status_Finished &&
+               Process::getClockTick() - startTick < timeOutTicks)
         {
             // Sleep a couple of milliseconds and poll the status again.
             Process::sleepCurrentThread(50);
@@ -934,7 +1060,11 @@ Result SLANG_MCALL reportD3DLiveObjects()
     return SLANG_OK;
 }
 
-/* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const AdapterLUID* adapterLUID, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
+/* static */ SlangResult D3DUtil::findAdapters(
+    DeviceCheckFlags flags,
+    const AdapterLUID* adapterLUID,
+    IDXGIFactory* dxgiFactory,
+    List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
     outDxgiAdapters.clear();
 
@@ -979,7 +1109,8 @@ Result SLANG_MCALL reportD3DLiveObjects()
         }
 
         // If the right type then add it
-        if ((deviceFlags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 && (flags & DeviceCheckFlag::UseHardwareDevice) != 0)
+        if ((deviceFlags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0 &&
+            (flags & DeviceCheckFlag::UseHardwareDevice) != 0)
         {
             outDxgiAdapters.add(dxgiAdapter);
         }

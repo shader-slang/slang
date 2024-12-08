@@ -1,15 +1,16 @@
 // slang-source-loc.cpp
 #include "slang-source-loc.h"
 
-#include "../core/slang-string-util.h"
-#include "../core/slang-string-escape-util.h"
 #include "../core/slang-char-encode.h"
-#include "slang-artifact-representation-impl.h"
-#include "slang-artifact-impl.h"
-#include "slang-artifact-util.h"
+#include "../core/slang-string-escape-util.h"
+#include "../core/slang-string-util.h"
 #include "slang-artifact-desc-util.h"
+#include "slang-artifact-impl.h"
+#include "slang-artifact-representation-impl.h"
+#include "slang-artifact-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -17,13 +18,15 @@ const String PathInfo::getMostUniqueIdentity() const
 {
     switch (type)
     {
-        case Type::Normal:      return uniqueIdentity;
-        case Type::FoundPath:   
-        case Type::FromString:
+    case Type::Normal:
+        return uniqueIdentity;
+    case Type::FoundPath:
+    case Type::FromString:
         {
             return foundPath;
         }
-        default:                return "";
+    default:
+        return "";
     }
 }
 
@@ -31,9 +34,9 @@ String PathInfo::getName() const
 {
     switch (type)
     {
-        case Type::Normal:
-        case Type::FromString:
-        case Type::FoundPath:
+    case Type::Normal:
+    case Type::FromString:
+    case Type::FoundPath:
         {
             return foundPath;
         }
@@ -51,24 +54,25 @@ bool PathInfo::operator==(const ThisType& rhs) const
 
     switch (type)
     {
-        case Type::TokenPaste:
-        case Type::TypeParse:
-        case Type::Unknown:
-        case Type::CommandLine:
+    case Type::TokenPaste:
+    case Type::TypeParse:
+    case Type::Unknown:
+    case Type::CommandLine:
         {
             return true;
         }
-        case Type::Normal:
+    case Type::Normal:
         {
             return foundPath == rhs.foundPath && uniqueIdentity == rhs.uniqueIdentity;
         }
-        case Type::FromString:
-        case Type::FoundPath:
+    case Type::FromString:
+    case Type::FoundPath:
         {
             // Only have a found path
             return foundPath == rhs.foundPath;
         }
-        default: break;
+    default:
+        break;
     }
 
     return false;
@@ -78,18 +82,30 @@ void PathInfo::appendDisplayName(StringBuilder& out) const
 {
     switch (type)
     {
-        case Type::TokenPaste:      out << "[Token Paste]"; break;
-        case Type::TypeParse:       out << "[Type Parse]"; break;
-        case Type::Unknown:         out << "[Unknown]"; break;
-        case Type::CommandLine:     out << "[Command Line]"; break;
-        case Type::Normal:          
-        case Type::FromString:
-        case Type::FoundPath:
+    case Type::TokenPaste:
+        out << "[Token Paste]";
+        break;
+    case Type::TypeParse:
+        out << "[Type Parse]";
+        break;
+    case Type::Unknown:
+        out << "[Unknown]";
+        break;
+    case Type::CommandLine:
+        out << "[Command Line]";
+        break;
+    case Type::Normal:
+    case Type::FromString:
+    case Type::FoundPath:
         {
-            StringEscapeUtil::appendQuoted(StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp), foundPath.getUnownedSlice(), out);    
+            StringEscapeUtil::appendQuoted(
+                StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp),
+                foundPath.getUnownedSlice(),
+                out);
             break;
         }
-        default: break;
+    default:
+        break;
     }
 }
 
@@ -104,10 +120,10 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
 
     const auto rawValue = sourceLoc.getRaw();
 
-    Index hi = m_entries.getCount();    
-    // If there are no entries, or it is in front of the first entry, then there is no associated entry
-    if (hi == 0 || 
-        m_entries[0].m_startLoc.getRaw() > sourceLoc.getRaw())
+    Index hi = m_entries.getCount();
+    // If there are no entries, or it is in front of the first entry, then there is no associated
+    // entry
+    if (hi == 0 || m_entries[0].m_startLoc.getRaw() > sourceLoc.getRaw())
     {
         return -1;
     }
@@ -133,29 +149,35 @@ int SourceView::findEntryIndex(SourceLoc sourceLoc) const
     return int(lo);
 }
 
-void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handle pathHandle, int line)
+void SourceView::addLineDirective(
+    SourceLoc directiveLoc,
+    StringSlicePool::Handle pathHandle,
+    int line)
 {
     SLANG_ASSERT(pathHandle != StringSlicePool::Handle(0));
     SLANG_ASSERT(m_range.contains(directiveLoc));
 
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.getCount() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(
+        m_entries.getCount() == 0 ||
+        (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
     // Calculate the offset
     const int offset = m_range.getOffset(directiveLoc);
-    
+
     // Get the line index in the original file
     const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
 
     Entry entry;
     entry.m_startLoc = directiveLoc;
     entry.m_pathHandle = pathHandle;
-    
+
     // We also need to make sure that any lookups for line numbers will
     // get corrected based on this files location.
-    // We assume the line number coming from the directive is a line number, NOT an index, so the correction needs + 1
-    // There is an additional + 1 because we want the NEXT line - ie the line after the #line directive, to the specified value
-    // Taking both into account means +2 is correct 'fix'
+    // We assume the line number coming from the directive is a line number, NOT an index, so the
+    // correction needs + 1 There is an additional + 1 because we want the NEXT line - ie the line
+    // after the #line directive, to the specified value Taking both into account means +2 is
+    // correct 'fix'
     entry.m_lineAdjust = line - (lineIndex + 2);
 
     m_entries.add(entry);
@@ -163,7 +185,8 @@ void SourceView::addLineDirective(SourceLoc directiveLoc, StringSlicePool::Handl
 
 void SourceView::addLineDirective(SourceLoc directiveLoc, const String& path, int line)
 {
-    StringSlicePool::Handle pathHandle = getSourceManager()->getStringSlicePool().add(path.getUnownedSlice());
+    StringSlicePool::Handle pathHandle =
+        getSourceManager()->getStringSlicePool().add(path.getUnownedSlice());
     return addLineDirective(directiveLoc, pathHandle, line);
 }
 
@@ -171,9 +194,12 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 {
     SLANG_ASSERT(m_range.contains(directiveLoc));
     // Check that the directiveLoc values are always increasing
-    SLANG_ASSERT(m_entries.getCount() == 0 || (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
+    SLANG_ASSERT(
+        m_entries.getCount() == 0 ||
+        (m_entries.getLast().m_startLoc.getRaw() < directiveLoc.getRaw()));
 
-    // Well if there are no entries, or the last one puts it in default case, then we don't need to add anything
+    // Well if there are no entries, or the last one puts it in default case, then we don't need to
+    // add anything
     if (m_entries.getCount() == 0 || (m_entries.getCount() && m_entries.getLast().isDefault()))
     {
         return;
@@ -181,8 +207,9 @@ void SourceView::addDefaultLineDirective(SourceLoc directiveLoc)
 
     Entry entry;
     entry.m_startLoc = directiveLoc;
-    entry.m_lineAdjust = 0;                                 // No line adjustment... we are going back to default
-    entry.m_pathHandle = StringSlicePool::Handle(0);        // Mark that there is no path, and that this is a 'default'
+    entry.m_lineAdjust = 0; // No line adjustment... we are going back to default
+    entry.m_pathHandle =
+        StringSlicePool::Handle(0); // Mark that there is no path, and that this is a 'default'
 
     SLANG_ASSERT(entry.isDefault());
 
@@ -204,16 +231,20 @@ static bool _canFollowSourceMap(SourceFile* sourceFile, SourceLocType type)
     }
 
     // If it's obfuscated we can't follow if we are emitting
-    if (sourceFile->getSourceMapKind() == SourceMapKind::Obfuscated &&
-        type == SourceLocType::Emit)
+    if (sourceFile->getSourceMapKind() == SourceMapKind::Obfuscated && type == SourceLocType::Emit)
     {
         return false;
     }
 
-    return _isNominalLike(type); 
+    return _isNominalLike(type);
 }
 
-static SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, SourceView* sourceView, SourceLoc loc, SourceLocType type, HandleSourceLoc& outLoc)
+static SlangResult _findLocWithSourceMap(
+    SourceManager* lookupSourceManager,
+    SourceView* sourceView,
+    SourceLoc loc,
+    SourceLocType type,
+    HandleSourceLoc& outLoc)
 {
     auto sourceFile = sourceView->getSourceFile();
 
@@ -229,9 +260,9 @@ static SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, Sou
     Index entryIndex = -1;
 
     // Do the initial lookup using the loc
-    {    
+    {
         const auto offset = sourceView->getRange().getOffset(loc);
-    
+
         const auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
         const auto colIndex = sourceFile->calcColumnIndex(lineIndex, offset);
 
@@ -239,7 +270,7 @@ static SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, Sou
         auto sourceMap = sourceFile->getSourceMap();
         SLANG_ASSERT(sourceMap);
 
-        entryIndex = sourceMap->get().findEntry(lineIndex, colIndex);   
+        entryIndex = sourceMap->get().findEntry(lineIndex, colIndex);
     }
 
     if (entryIndex < 0)
@@ -247,8 +278,8 @@ static SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, Sou
         return SLANG_FAIL;
     }
 
-    // Keep searching through source maps 
-    do 
+    // Keep searching through source maps
+    do
     {
         auto sourceMap = sourceFile->getSourceMap()->getPtr();
 
@@ -259,7 +290,8 @@ static SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, Sou
         // If we have a source name, see if it already exists in source manager
         if (sourceFileName.getLength())
         {
-            if (auto foundSourceFile = lookupSourceManager->findSourceFileByPathRecursively(sourceFileName))
+            if (auto foundSourceFile =
+                    lookupSourceManager->findSourceFileByPathRecursively(sourceFileName))
             {
                 // We only follow if the source file hasn't already been visisted
                 if (sourceFiles.indexOf(foundSourceFile) < 0)
@@ -267,12 +299,14 @@ static SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, Sou
                     // Add so we don't reprocess
                     sourceFiles.add(foundSourceFile);
 
-                    // If it has a source map, we try and look up the current location in it's source map
+                    // If it has a source map, we try and look up the current location in it's
+                    // source map
                     if (_canFollowSourceMap(foundSourceFile, type))
                     {
                         auto foundSourceMap = foundSourceFile->getSourceMap();
 
-                        const auto foundEntryIndex = foundSourceMap->get().findEntry(entry.sourceLine, entry.sourceColumn);
+                        const auto foundEntryIndex =
+                            foundSourceMap->get().findEntry(entry.sourceLine, entry.sourceColumn);
 
                         // If we found the entry repeat the lookup
                         if (foundEntryIndex >= 0)
@@ -304,7 +338,10 @@ static SlangResult _findLocWithSourceMap(SourceManager* lookupSourceManager, Sou
 }
 
 
-SlangResult SourceView::_findSourceMapLoc(SourceLoc loc, SourceLocType type, HandleSourceLoc& outLoc)
+SlangResult SourceView::_findSourceMapLoc(
+    SourceLoc loc,
+    SourceLocType type,
+    HandleSourceLoc& outLoc)
 {
     // We only do source map lookups with nominal
     if (!_isNominalLike(type))
@@ -312,9 +349,9 @@ SlangResult SourceView::_findSourceMapLoc(SourceLoc loc, SourceLocType type, Han
         return SLANG_E_NOT_FOUND;
     }
 
-    // TODO(JS): 
-    // Ideally we'd do the lookup on the "current" source manager rather than the source manager on this 
-    // view, which may be a parent to the current one. 
+    // TODO(JS):
+    // Ideally we'd do the lookup on the "current" source manager rather than the source manager on
+    // this view, which may be a parent to the current one.
     auto lookupSourceManager = m_sourceFile->getSourceManager();
 
     SLANG_RETURN_ON_FAIL(_findLocWithSourceMap(lookupSourceManager, this, loc, type, outLoc));
@@ -324,31 +361,32 @@ SlangResult SourceView::_findSourceMapLoc(SourceLoc loc, SourceLocType type, Han
 
 HandleSourceLoc SourceView::getHandleLoc(SourceLoc loc, SourceLocType type)
 {
-    {   HandleSourceLoc handleLoc;
+    {
+        HandleSourceLoc handleLoc;
         if (SLANG_SUCCEEDED(_findSourceMapLoc(loc, type, handleLoc)))
         {
             return handleLoc;
         }
     }
 
-    // Get the offset in bytes for this loc 
+    // Get the offset in bytes for this loc
     const int offset = m_range.getOffset(loc);
 
     // We need the line index from the original source file
     const int lineIndex = m_sourceFile->calcLineIndexFromOffset(offset);
 
-    // TODO: 
+    // TODO:
     // - Tab characters, which should really adjust how we report
     //   columns (although how are we supposed to know the setting
     //   that an IDE expects us to use when reporting locations?)
-    //   
+    //
     //   For now we just count tabs as single chars
     const int columnIndex = m_sourceFile->calcColumnIndex(lineIndex, offset);
 
     HandleSourceLoc handleLoc;
     handleLoc.column = columnIndex + 1;
     handleLoc.line = lineIndex + 1;
-    
+
     // Only bother looking up the entry information if we want a 'Norminal'-like lookup
     if (_isNominalLike(type))
     {
@@ -411,7 +449,7 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
         return getViewPathInfo();
     }
 
-    {   
+    {
         HandleSourceLoc handleLoc;
         if (SLANG_SUCCEEDED(_findSourceMapLoc(loc, type, handleLoc)))
         {
@@ -420,7 +458,8 @@ PathInfo SourceView::getPathInfo(SourceLoc loc, SourceLocType type)
     }
 
     const int entryIndex = findEntryIndex(loc);
-    return _getPathInfoFromHandle((entryIndex >= 0) ? m_entries[entryIndex].m_pathHandle : StringSlicePool::Handle(0));
+    return _getPathInfoFromHandle(
+        (entryIndex >= 0) ? m_entries[entryIndex].m_pathHandle : StringSlicePool::Handle(0));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -464,13 +503,13 @@ SourceFile::OffsetRange SourceFile::getOffsetRangeAtLineIndex(Index lineIndex)
         const uint32_t offsetEnd = uint32_t(getContentSize());
         const uint32_t offsetStart = (lineIndex >= count) ? offsetEnd : offsets[lineIndex];
         // The line is the span from start, to the end of the content
-        return OffsetRange{ offsetStart, offsetEnd };
+        return OffsetRange{offsetStart, offsetEnd};
     }
     else
     {
         const uint32_t offsetStart = offsets[lineIndex];
         const uint32_t offsetEnd = offsets[lineIndex + 1];
-        return OffsetRange { offsetStart, offsetEnd };
+        return OffsetRange{offsetStart, offsetEnd};
     }
 }
 
@@ -483,7 +522,7 @@ UnownedStringSlice SourceFile::getLineAtIndex(Index lineIndex)
         const UnownedStringSlice content = getContent();
         SLANG_ASSERT(range.end <= uint32_t(content.getLength()));
 
-        const char*const text = content.begin();
+        const char* const text = content.begin();
         return UnownedStringSlice(text + range.start, text + range.end);
     }
 
@@ -517,7 +556,7 @@ int SourceFile::calcLineIndexFromOffset(int offset)
 
     while (lo + 1 < hi)
     {
-        const Index mid = (hi + lo) >> 1; 
+        const Index mid = (hi + lo) >> 1;
         const uint32_t midOffset = lineBreakOffsets[mid];
         if (midOffset <= uint32_t(offset))
         {
@@ -535,14 +574,15 @@ int SourceFile::calcLineIndexFromOffset(int offset)
 int SourceFile::calcColumnOffset(int lineIndex, int offset)
 {
     const auto& lineBreakOffsets = getLineBreakOffsets();
-    return offset - lineBreakOffsets[lineIndex];   
+    return offset - lineBreakOffsets[lineIndex];
 }
 
 int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
 {
     const int colOffset = calcColumnOffset(lineIndex, offset);
 
-    // If we don't have the content of the file, the best we can do is to assume there is a char per column
+    // If we don't have the content of the file, the best we can do is to assume there is a char per
+    // column
     if (!hasContent())
     {
         return colOffset;
@@ -553,7 +593,7 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
     const auto head = line.head(colOffset);
 
     auto colCount = UTF8Util::calcCodePointCount(head);
-    
+
     if (tabSize >= 0)
     {
         Count tabCount = 0;
@@ -581,10 +621,7 @@ void SourceFile::setContents(ISlangBlob* blob)
 
     // Query the encoding type and discard the Unicode Byte-Order-Marker before decoding
     size_t offset;
-    auto type = CharEncoding::determineEncoding(
-        rawContentBegin,
-        rawContentSize,
-        offset);
+    auto type = CharEncoding::determineEncoding(rawContentBegin, rawContentSize, offset);
     SLANG_ASSERT(rawContentSize >= offset);
 
     List<char> decodedBuffer;
@@ -608,16 +645,12 @@ void SourceFile::setContents(const String& content)
     setContents(contentBlob);
 }
 
-SourceFile::SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize) :
-    m_sourceManager(sourceManager),
-    m_pathInfo(pathInfo),
-    m_contentSize(contentSize)
+SourceFile::SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize)
+    : m_sourceManager(sourceManager), m_pathInfo(pathInfo), m_contentSize(contentSize)
 {
 }
 
-SourceFile::~SourceFile()
-{
-}
+SourceFile::~SourceFile() {}
 
 SHA1::Digest SourceFile::getDigest()
 {
@@ -638,7 +671,10 @@ String SourceFile::calcVerbosePath() const
     {
         String displayPath;
         ComPtr<ISlangBlob> displayPathBlob;
-        if (SLANG_SUCCEEDED(fileSystemExt->getPath(PathKind::Display, m_pathInfo.foundPath.getBuffer(), displayPathBlob.writeRef())))
+        if (SLANG_SUCCEEDED(fileSystemExt->getPath(
+                PathKind::Display,
+                m_pathInfo.foundPath.getBuffer(),
+                displayPathBlob.writeRef())))
         {
             displayPath = StringUtil::getString(displayPathBlob);
         }
@@ -653,9 +689,7 @@ String SourceFile::calcVerbosePath() const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceManager !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void SourceManager::initialize(
-    SourceManager*  p,
-    ISlangFileSystemExt* fileSystemExt)
+void SourceManager::initialize(SourceManager* p, ISlangFileSystemExt* fileSystemExt)
 {
     m_fileSystemExt = fileSystemExt;
 
@@ -730,8 +764,8 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     // TODO: consider using atomics here
 
 
-    SourceLoc beginLoc  = m_nextLoc;
-    SourceLoc endLoc    = beginLoc + size;
+    SourceLoc beginLoc = m_nextLoc;
+    SourceLoc endLoc = beginLoc + size;
 
     // We need to be able to represent the location that is *at* the end of
     // the input source, so the next available location for a new file
@@ -749,7 +783,9 @@ SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, si
     return sourceFile;
 }
 
-SourceFile* SourceManager::createSourceFileWithString(const PathInfo& pathInfo, const String& contents)
+SourceFile* SourceManager::createSourceFileWithString(
+    const PathInfo& pathInfo,
+    const String& contents)
 {
     SourceFile* sourceFile = new SourceFile(this, pathInfo, contents.getLength());
     m_sourceFiles.add(sourceFile);
@@ -765,13 +801,16 @@ SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, IS
     return sourceFile;
 }
 
-SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathInfo* pathInfo, SourceLoc initiatingSourceLoc)
+SourceView* SourceManager::createSourceView(
+    SourceFile* sourceFile,
+    const PathInfo* pathInfo,
+    SourceLoc initiatingSourceLoc)
 {
     SourceRange range = allocateSourceRange(sourceFile->getContentSize());
 
     SourceView* sourceView = nullptr;
-    if (pathInfo &&
-        (pathInfo->foundPath.getLength() && sourceFile->getPathInfo().foundPath != pathInfo->foundPath))
+    if (pathInfo && (pathInfo->foundPath.getLength() &&
+                     sourceFile->getPathInfo().foundPath != pathInfo->foundPath))
     {
         sourceView = new SourceView(sourceFile, range, &pathInfo->foundPath, initiatingSourceLoc);
     }
@@ -844,7 +883,7 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
 {
     // Start with this manager
     const SourceManager* manager = this;
-    do 
+    do
     {
         SourceView* sourceView = manager->findSourceView(loc);
         // If we found a hit we are done
@@ -854,8 +893,7 @@ SourceView* SourceManager::findSourceViewRecursively(SourceLoc loc) const
         }
         // Try the parent
         manager = manager->m_parent;
-    }
-    while (manager);
+    } while (manager);
     // Didn't find it
     return nullptr;
 }
@@ -881,7 +919,7 @@ SourceFile* SourceManager::findSourceFileByPathRecursively(const String& name) c
 
 SourceFile* SourceManager::findSourceFileByPath(const String& name) const
 {
-    for(auto sourceFile : m_sourceFiles)
+    for (auto sourceFile : m_sourceFiles)
     {
         if (sourceFile->getPathInfo().foundPath == name)
         {
@@ -893,14 +931,14 @@ SourceFile* SourceManager::findSourceFileByPath(const String& name) const
 
 SourceFile* SourceManager::findSourceFile(const String& uniqueIdentity) const
 {
-    SourceFile*const* filePtr = m_sourceFileMap.tryGetValue(uniqueIdentity);
+    SourceFile* const* filePtr = m_sourceFileMap.tryGetValue(uniqueIdentity);
     return (filePtr) ? *filePtr : nullptr;
 }
 
 SourceFile* SourceManager::findSourceFileRecursively(const String& uniqueIdentity) const
 {
     const SourceManager* manager = this;
-    do 
+    do
     {
         SourceFile* sourceFile = manager->findSourceFile(uniqueIdentity);
         if (sourceFile)

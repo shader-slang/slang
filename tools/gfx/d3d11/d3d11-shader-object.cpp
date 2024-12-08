@@ -24,7 +24,7 @@ Result ShaderObjectImpl::create(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
+ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
 {
     Index offset = inOffset.uniformOffset;
     Index size = inSize;
@@ -54,7 +54,7 @@ SLANG_NO_THROW Result SLANG_MCALL
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourceView)
+ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourceView)
 {
     if (offset.bindingRangeIndex < 0)
         return SLANG_E_INVALID_ARG;
@@ -67,17 +67,20 @@ SLANG_NO_THROW Result SLANG_MCALL
     if (D3DUtil::isUAVBinding(bindingRange.bindingType))
     {
         SLANG_ASSERT(resourceViewImpl->m_type == ResourceViewImpl::Type::UAV);
-        m_uavs[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<UnorderedAccessViewImpl*>(resourceView);
+        m_uavs[bindingRange.baseIndex + offset.bindingArrayIndex] =
+            static_cast<UnorderedAccessViewImpl*>(resourceView);
     }
     else
     {
         SLANG_ASSERT(resourceViewImpl->m_type == ResourceViewImpl::Type::SRV);
-        m_srvs[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<ShaderResourceViewImpl*>(resourceView);
+        m_srvs[bindingRange.baseIndex + offset.bindingArrayIndex] =
+            static_cast<ShaderResourceViewImpl*>(resourceView);
     }
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
+SLANG_NO_THROW Result SLANG_MCALL
+ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
 {
     if (offset.bindingRangeIndex < 0)
         return SLANG_E_INVALID_ARG;
@@ -86,7 +89,8 @@ SLANG_NO_THROW Result SLANG_MCALL ShaderObjectImpl::setSampler(ShaderOffset cons
         return SLANG_E_INVALID_ARG;
     auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
 
-    m_samplers[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<SamplerStateImpl*>(sampler);
+    m_samplers[bindingRange.baseIndex + offset.bindingArrayIndex] =
+        static_cast<SamplerStateImpl*>(sampler);
     return SLANG_OK;
 }
 
@@ -152,7 +156,7 @@ Result ShaderObjectImpl::init(IDevice* device, ShaderObjectLayoutImpl* layout)
 
 Result ShaderObjectImpl::_writeOrdinaryData(
     void* dest,
-    size_t                  destSize,
+    size_t destSize,
     ShaderObjectLayoutImpl* specializedLayout)
 {
     // We start by simply writing in the ordinary data contained directly in this object.
@@ -180,7 +184,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
     for (auto const& subObjectRangeInfo : specializedLayout->getSubObjectRanges())
     {
         Index subObjectRangeIndex = subObjectRangeCounter++;
-        auto const& bindingRangeInfo = specializedLayout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
+        auto const& bindingRangeInfo =
+            specializedLayout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
 
         // We only need to handle sub-object ranges for interface/existential-type fields,
         // because fields of constant-buffer or parameter-block type are responsible for
@@ -234,11 +239,15 @@ Result ShaderObjectImpl::_writeOrdinaryData(
             RefPtr<ShaderObjectLayoutImpl> subObjectLayout;
             SLANG_RETURN_ON_FAIL(subObject->_getSpecializedLayout(subObjectLayout.writeRef()));
 
-            auto subObjectOffset = subObjectRangePendingDataOffset + i * subObjectRangePendingDataStride;
+            auto subObjectOffset =
+                subObjectRangePendingDataOffset + i * subObjectRangePendingDataStride;
 
             auto subObjectDest = (char*)dest + subObjectOffset;
 
-            subObject->_writeOrdinaryData(subObjectDest, destSize - subObjectOffset, subObjectLayout);
+            subObject->_writeOrdinaryData(
+                subObjectDest,
+                destSize - subObjectOffset,
+                subObjectLayout);
         }
     }
 
@@ -280,7 +289,8 @@ Result ShaderObjectImpl::_ensureOrdinaryDataBufferCreatedIfNeeded(
         //
 
         auto ordinaryData = device->map(m_ordinaryDataBuffer, gfx::MapFlavor::WriteDiscard);
-        auto result = _writeOrdinaryData(ordinaryData, specializedOrdinaryDataSize, specializedLayout);
+        auto result =
+            _writeOrdinaryData(ordinaryData, specializedOrdinaryDataSize, specializedLayout);
         device->unmap(m_ordinaryDataBuffer, 0, specializedOrdinaryDataSize);
         m_isConstantBufferDirty = false;
         return result;
@@ -295,7 +305,8 @@ Result ShaderObjectImpl::_bindOrdinaryDataBufferIfNeeded(
 {
     // We start by ensuring that the buffer is created, if it is needed.
     //
-    SLANG_RETURN_ON_FAIL(_ensureOrdinaryDataBufferCreatedIfNeeded(context->device, specializedLayout));
+    SLANG_RETURN_ON_FAIL(
+        _ensureOrdinaryDataBufferCreatedIfNeeded(context->device, specializedLayout));
 
     // If we did indeed need/create a buffer, then we must bind it
     // into root binding state.
@@ -319,7 +330,8 @@ Result ShaderObjectImpl::bindAsConstantBuffer(
     // resources and sub-objects.
     //
     BindingOffset offset = inOffset;
-    SLANG_RETURN_ON_FAIL(_bindOrdinaryDataBufferIfNeeded(context, /*inout*/ offset, specializedLayout));
+    SLANG_RETURN_ON_FAIL(
+        _bindOrdinaryDataBufferIfNeeded(context, /*inout*/ offset, specializedLayout));
 
     // Once the ordinary data buffer is bound, we can move on to binding
     // the rest of the state, which can use logic shared with the case
@@ -403,7 +415,8 @@ Result ShaderObjectImpl::bindAsValue(
     for (auto const& subObjectRange : specializedLayout->getSubObjectRanges())
     {
         auto subObjectLayout = subObjectRange.layout;
-        auto const& bindingRange = specializedLayout->getBindingRange(subObjectRange.bindingRangeIndex);
+        auto const& bindingRange =
+            specializedLayout->getBindingRange(subObjectRange.bindingRangeIndex);
         Index count = bindingRange.count;
         Index subObjectIndex = bindingRange.subObjectIndex;
 
@@ -425,21 +438,21 @@ Result ShaderObjectImpl::bindAsValue(
             //
         case slang::BindingType::ConstantBuffer:
         case slang::BindingType::ParameterBlock:
-        {
-            BindingOffset objOffset = rangeOffset;
-            for (Index i = 0; i < count; ++i)
             {
-                auto subObject = m_objects[subObjectIndex + i];
+                BindingOffset objOffset = rangeOffset;
+                for (Index i = 0; i < count; ++i)
+                {
+                    auto subObject = m_objects[subObjectIndex + i];
 
-                // Unsurprisingly, we bind each object in the range as
-                // a constant buffer.
-                //
-                subObject->bindAsConstantBuffer(context, objOffset, subObjectLayout);
+                    // Unsurprisingly, we bind each object in the range as
+                    // a constant buffer.
+                    //
+                    subObject->bindAsConstantBuffer(context, objOffset, subObjectLayout);
 
-                objOffset += rangeStride;
+                    objOffset += rangeStride;
+                }
             }
-        }
-        break;
+            break;
 
         case slang::BindingType::ExistentialValue:
             // We can only bind information for existential-typed sub-object
@@ -552,7 +565,10 @@ Result RootShaderObjectImpl::bindAsRoot(
     // really be querying an appropriate absolute offset from `specializedLayout`.
     //
     BindingOffset ordinaryDataBufferOffset = offset;
-    SLANG_RETURN_ON_FAIL(_bindOrdinaryDataBufferIfNeeded(context, /*inout*/ ordinaryDataBufferOffset, specializedLayout));
+    SLANG_RETURN_ON_FAIL(_bindOrdinaryDataBufferIfNeeded(
+        context,
+        /*inout*/ ordinaryDataBufferOffset,
+        specializedLayout));
     SLANG_RETURN_ON_FAIL(bindAsValue(context, offset, specializedLayout));
 
     // Once the state stored in the root shader object itself has been bound,
@@ -574,7 +590,8 @@ Result RootShaderObjectImpl::bindAsRoot(
         // the absolute offsets as are used for the global scope do not apply
         // (because entry points don't need to deal with explicit bindings).
         //
-        SLANG_RETURN_ON_FAIL(entryPoint->bindAsConstantBuffer(context, entryPointOffset, entryPointInfo.layout));
+        SLANG_RETURN_ON_FAIL(
+            entryPoint->bindAsConstantBuffer(context, entryPointOffset, entryPointInfo.layout));
     }
 
     return SLANG_OK;
@@ -652,7 +669,11 @@ Result RootShaderObjectImpl::_createSpecializedLayout(ShaderObjectLayoutImpl** o
 
     auto slangSpecializedLayout = specializedComponentType->getLayout();
     RefPtr<RootShaderObjectLayoutImpl> specializedLayout;
-    RootShaderObjectLayoutImpl::create(getRenderer(), specializedComponentType, slangSpecializedLayout, specializedLayout.writeRef());
+    RootShaderObjectLayoutImpl::create(
+        getRenderer(),
+        specializedComponentType,
+        slangSpecializedLayout,
+        specializedLayout.writeRef());
 
     // Note: Computing the layout for the specialized program will have also computed
     // the layouts for the entry points, and we really need to attach that information

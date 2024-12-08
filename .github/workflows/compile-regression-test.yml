@@ -2,19 +2,21 @@ name: Compile Regression-Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
+      - "README.md"
   pull_request:
-    branches: [ master ]
+    branches: [master]
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
+      - "README.md"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -40,28 +42,28 @@ jobs:
       run:
         shell: bash
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: 'recursive'
-        fetch-depth: '0'
-    - name: Setup
-      uses: ./.github/actions/common-setup
-      with:
-        os: ${{matrix.os}}
-        compiler: ${{matrix.compiler}}
-        platform: ${{matrix.platform}}
-        config: ${{matrix.config}}
-        build-llvm: true
-    - name: Build Slang
-      run: |
-        cmake --preset default --fresh \
-          -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-          -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
-          -DSLANG_ENABLE_CUDA=1
-        cmake --workflow --preset "${{matrix.config}}"
-    - name: Run compile and validation test
-      run: |
-        cp -r /c/slang_compile_test_suite_a .
-        cd slang_compile_test_suite_a
-        export SLANGC_PATH="$bin_dir/slangc.exe"
-        bash ./compile_all_slang.sh
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "0"
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{matrix.os}}
+          compiler: ${{matrix.compiler}}
+          platform: ${{matrix.platform}}
+          config: ${{matrix.config}}
+          build-llvm: true
+      - name: Build Slang
+        run: |
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
+            -DSLANG_ENABLE_CUDA=1
+          cmake --workflow --preset "${{matrix.config}}"
+      - name: Run compile and validation test
+        run: |
+          cp -r /c/slang_compile_test_suite_a .
+          cd slang_compile_test_suite_a
+          export SLANGC_PATH="$bin_dir/slangc.exe"
+          bash ./compile_all_slang.sh

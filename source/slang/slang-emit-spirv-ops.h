@@ -13,8 +13,7 @@ SpvInst* emitOpName(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const UnownedStringSlice& name
-)
+    const UnownedStringSlice& name)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpName, target, name);
@@ -27,8 +26,7 @@ SpvInst* emitOpMemberName(
     IRInst* inst,
     const T& target,
     int index,
-    const UnownedStringSlice& name
-)
+    const UnownedStringSlice& name)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpMemberName, target, SpvLiteralInteger::from32(index), name);
@@ -51,8 +49,7 @@ SpvInst* emitOpMemoryModel(
     SpvInstParent* parent,
     IRInst* inst,
     SpvAddressingModel addressingModel,
-    SpvMemoryModel memoryModel
-)
+    SpvMemoryModel memoryModel)
 {
     return emitInst(parent, inst, SpvOpMemoryModel, addressingModel, memoryModel);
 }
@@ -65,8 +62,7 @@ SpvInst* emitOpEntryPoint(
     SpvExecutionModel executionModel,
     const T& entryPoint,
     const UnownedStringSlice& name,
-    const Ts& interfaces
-)
+    const Ts& interfaces)
 {
     static_assert(isSingular<T>);
     static_assert(isPlural<Ts>);
@@ -83,24 +79,27 @@ SpvInst* emitOpCapability(SpvInstParent* parent, IRInst* inst, SpvCapability cap
 SpvInst* emitOpTypeVoid(IRInst* inst)
 {
     return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeVoid, kResultID
-    );
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeVoid,
+        kResultID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeBool
 SpvInst* emitOpTypeBool(IRInst* inst)
 {
     return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeBool, kResultID
-    );
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeBool,
+        kResultID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeInt
 SpvInst* emitOpTypeInt(
     IRInst* inst,
     const SpvLiteralInteger& width,
-    const SpvLiteralInteger& signedness
-)
+    const SpvLiteralInteger& signedness)
 {
     return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -108,16 +107,18 @@ SpvInst* emitOpTypeInt(
         SpvOpTypeInt,
         kResultID,
         width,
-        signedness
-    );
+        signedness);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeFloat
 SpvInst* emitOpTypeFloat(IRInst* inst, const SpvLiteralInteger& width)
 {
     return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeFloat, kResultID, width
-    );
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeFloat,
+        kResultID,
+        width);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeVector
@@ -125,8 +126,7 @@ template<typename T>
 SpvInst* emitOpTypeVector(
     IRInst* inst,
     const T& componentType,
-    const SpvLiteralInteger& componentCount
-)
+    const SpvLiteralInteger& componentCount)
 {
     static_assert(isSingular<T>);
     return emitInstMemoized(
@@ -135,8 +135,7 @@ SpvInst* emitOpTypeVector(
         SpvOpTypeVector,
         kResultID,
         componentType,
-        componentCount
-    );
+        componentCount);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeMatrix
@@ -150,8 +149,7 @@ SpvInst* emitOpTypeMatrix(IRInst* inst, const T& columnType, const SpvLiteralInt
         SpvOpTypeMatrix,
         kResultID,
         columnType,
-        columnCount
-    );
+        columnCount);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeImage
@@ -165,8 +163,7 @@ SpvInst* emitOpTypeImage(
     const SpvLiteralInteger& mS,
     const SpvLiteralInteger& sampled,
     SpvImageFormat imageFormat,
-    OptionalOperand<SpvAccessQualifier> accessQualifier = SkipThisOptionalOperand{}
-)
+    OptionalOperand<SpvAccessQualifier> accessQualifier = SkipThisOptionalOperand{})
 {
     static_assert(isSingular<T>);
     return emitInstMemoized(
@@ -181,16 +178,17 @@ SpvInst* emitOpTypeImage(
         mS,
         sampled,
         imageFormat,
-        accessQualifier
-    );
+        accessQualifier);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeSampler
 SpvInst* emitOpTypeSampler(IRInst* inst)
 {
     return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeSampler, kResultID
-    );
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeSampler,
+        kResultID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeSampler
@@ -198,29 +196,38 @@ template<typename T1>
 SpvInst* emitOpTypeSampledImage(IRInst* inst, const T1& imageType)
 {
     return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeSampledImage, kResultID, imageType
-    );
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeSampledImage,
+        kResultID,
+        imageType);
 }
 
 SpvInst* emitOpTypeAccelerationStructure(IRInst* inst)
 {
     return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeAccelerationStructureKHR, kResultID
-    );
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeAccelerationStructureKHR,
+        kResultID);
 }
 
 SpvInst* emitOpTypeRayQuery(IRInst* inst)
 {
     return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeRayQueryKHR, kResultID
-    );
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeRayQueryKHR,
+        kResultID);
 }
 
 SpvInst* emitOpTypeHitObject(IRInst* inst)
 {
     return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes), inst, SpvOpTypeHitObjectNV, kResultID
-    );
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeHitObjectNV,
+        kResultID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeArray
@@ -235,8 +242,7 @@ SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)
         SpvOpTypeArray,
         kResultID,
         elementType,
-        length
-    );
+        length);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeRuntimeArray
@@ -249,8 +255,7 @@ SpvInst* emitOpTypeRuntimeArray(IRInst* inst, const T& elementType)
         inst,
         SpvOpTypeRuntimeArray,
         kResultID,
-        elementType
-    );
+        elementType);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeStruct
@@ -263,8 +268,7 @@ SpvInst* emitOpTypeStruct(IRInst* inst, const Ts& member0TypeMember1TypeEtc)
         inst,
         SpvOpTypeStruct,
         kResultID,
-        member0TypeMember1TypeEtc
-    );
+        member0TypeMember1TypeEtc);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeForwardPointer
@@ -277,8 +281,7 @@ SpvInst* emitOpTypeForwardPointer(const T& type, SpvStorageClass storageClass)
         nullptr,
         SpvOpTypeForwardPointer,
         type,
-        storageClass
-    );
+        storageClass);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypePointer
@@ -292,8 +295,7 @@ SpvInst* emitOpTypePointer(IRInst* inst, SpvStorageClass storageClass, const T& 
         SpvOpTypePointer,
         kResultID,
         storageClass,
-        type
-    );
+        type);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeFunction
@@ -301,8 +303,7 @@ template<typename T, typename Ts>
 SpvInst* emitOpTypeFunction(
     IRInst* inst,
     const T& returnType,
-    const Ts& parameter0TypeParameter1TypeEtc
-)
+    const Ts& parameter0TypeParameter1TypeEtc)
 {
     static_assert(isSingular<T>);
     static_assert(isPlural<Ts>);
@@ -312,8 +313,7 @@ SpvInst* emitOpTypeFunction(
         SpvOpTypeFunction,
         kResultID,
         returnType,
-        parameter0TypeParameter1TypeEtc
-    );
+        parameter0TypeParameter1TypeEtc);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstantTrue
@@ -326,8 +326,7 @@ SpvInst* emitOpConstantTrue(IRInst* inst, const T& idResultType)
         inst,
         SpvOpConstantTrue,
         idResultType,
-        kResultID
-    );
+        kResultID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstantFalse
@@ -340,8 +339,7 @@ SpvInst* emitOpConstantFalse(IRInst* inst, const T& idResultType)
         inst,
         SpvOpConstantFalse,
         idResultType,
-        kResultID
-    );
+        kResultID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstant
@@ -355,8 +353,7 @@ SpvInst* emitOpConstant(IRInst* inst, const T& idResultType, const SpvLiteralBit
         SpvOpConstant,
         idResultType,
         kResultID,
-        value
-    );
+        value);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstantComposite
@@ -371,8 +368,7 @@ SpvInst* emitOpConstantComposite(IRInst* inst, const T& idResultType, const Ts& 
         SpvOpConstantComposite,
         idResultType,
         kResultID,
-        constituents
-    );
+        constituents);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpConstantNull
@@ -385,8 +381,7 @@ SpvInst* emitOpConstantNull(IRInst* inst, const T& idResultType)
         inst,
         SpvOpConstantNull,
         idResultType,
-        kResultID
-    );
+        kResultID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFunction
@@ -396,14 +391,18 @@ SpvInst* emitOpFunction(
     IRInst* inst,
     const T1& idResultType,
     SpvFunctionControlMask functionControl,
-    const T2& functionType
-)
+    const T2& functionType)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     return emitInst(
-        parent, inst, SpvOpFunction, idResultType, kResultID, functionControl, functionType
-    );
+        parent,
+        inst,
+        SpvOpFunction,
+        idResultType,
+        kResultID,
+        functionControl,
+        functionType);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFunctionParameter
@@ -427,15 +426,19 @@ SpvInst* emitOpFunctionCall(
     IRInst* inst,
     const T1& idResultType,
     const T2& function,
-    const Ts& argument0Argument1Etc
-)
+    const Ts& argument0Argument1Etc)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isPlural<Ts>);
     return emitInst(
-        parent, inst, SpvOpFunctionCall, idResultType, kResultID, function, argument0Argument1Etc
-    );
+        parent,
+        inst,
+        SpvOpFunctionCall,
+        idResultType,
+        kResultID,
+        function,
+        argument0Argument1Etc);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpVariable
@@ -445,26 +448,44 @@ SpvInst* emitOpVariable(
     IRInst* inst,
     const T& idResultType,
     SpvStorageClass storageClass,
-    const Opt& initializer = SkipThisOptionalOperand{}
-)
+    const Opt& initializer = SkipThisOptionalOperand{})
 {
     static_assert(isSingular<T>);
     static_assert(isSingular<Opt>);
     return emitInst(
-        parent, inst, SpvOpVariable, idResultType, kResultID, storageClass, initializer
-    );
+        parent,
+        inst,
+        SpvOpVariable,
+        idResultType,
+        kResultID,
+        storageClass,
+        initializer);
 }
 
 template<typename T, typename TOperand>
-SpvInst* emitOpSpecConstant(SpvInstParent* parent, IRInst* inst, const T& idResultType, TOperand operand)
+SpvInst* emitOpSpecConstant(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    TOperand operand)
 {
     return emitInst(parent, inst, SpvOpSpecConstant, idResultType, kResultID, operand);
 }
 
 template<typename T, typename Ts>
-SpvInst* emitOpSpecConstantComposite(SpvInstParent* parent, IRInst* inst, const T& idResultType, const Ts& constituents)
+SpvInst* emitOpSpecConstantComposite(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    const Ts& constituents)
 {
-    return emitInst(parent, inst, SpvOpSpecConstantComposite, idResultType, kResultID, constituents);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpSpecConstantComposite,
+        idResultType,
+        kResultID,
+        constituents);
 }
 
 template<typename T>
@@ -486,8 +507,7 @@ SpvInst* emitOpLoad(
     IRInst* inst,
     const T1& idResultType,
     const T2& pointer,
-    OptionalOperand<SpvMemoryAccessMask> memoryAccess = SkipThisOptionalOperand{}
-)
+    OptionalOperand<SpvMemoryAccessMask> memoryAccess = SkipThisOptionalOperand{})
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -501,8 +521,7 @@ SpvInst* emitOpLoadAligned(
     IRInst* inst,
     const T1& idResultType,
     const T2& pointer,
-    const SpvLiteralInteger& literalInteger
-)
+    const SpvLiteralInteger& literalInteger)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -514,8 +533,7 @@ SpvInst* emitOpLoadAligned(
         kResultID,
         pointer,
         SpvMemoryAccessAlignedMask,
-        literalInteger
-    );
+        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpStore
@@ -525,8 +543,7 @@ SpvInst* emitOpStore(
     IRInst* inst,
     const T1& pointer,
     const T2& object,
-    OptionalOperand<SpvMemoryAccessMask> memoryAccess = SkipThisOptionalOperand{}
-)
+    OptionalOperand<SpvMemoryAccessMask> memoryAccess = SkipThisOptionalOperand{})
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -540,14 +557,18 @@ SpvInst* emitOpStoreAligned(
     IRInst* inst,
     const T1& pointer,
     const T2& object,
-    const SpvLiteralInteger& literalInteger
-)
+    const SpvLiteralInteger& literalInteger)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     return emitInst(
-        parent, inst, SpvOpStore, pointer, object, SpvMemoryAccessAlignedMask, literalInteger
-    );
+        parent,
+        inst,
+        SpvOpStore,
+        pointer,
+        object,
+        SpvMemoryAccessAlignedMask,
+        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpAccessChain
@@ -557,8 +578,7 @@ SpvInst* emitOpAccessChain(
     IRInst* inst,
     const T1& idResultType,
     const T2& base,
-    const Ts& indexes
-)
+    const Ts& indexes)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -574,8 +594,7 @@ SpvInst* emitOpPtrAccessChain(
     IRInst* inst,
     const T1& idResultType,
     const T2& base,
-    const T3& element
-)
+    const T3& element)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -589,8 +608,7 @@ SpvInst* emitOpDecorate(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    SpvDecoration decoration
-)
+    SpvDecoration decoration)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, decoration);
@@ -602,13 +620,16 @@ SpvInst* emitOpDecorateSpecId(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& specializationConstantID
-)
+    const SpvLiteralInteger& specializationConstantID)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpDecorate, target, SpvDecorationSpecId, specializationConstantID
-    );
+        parent,
+        inst,
+        SpvOpDecorate,
+        target,
+        SpvDecorationSpecId,
+        specializationConstantID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
@@ -617,8 +638,7 @@ SpvInst* emitOpDecorateArrayStride(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& arrayStride
-)
+    const SpvLiteralInteger& arrayStride)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationArrayStride, arrayStride);
@@ -630,8 +650,7 @@ SpvInst* emitOpDecorateMatrixStride(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& matrixStride
-)
+    const SpvLiteralInteger& matrixStride)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationMatrixStride, matrixStride);
@@ -643,8 +662,7 @@ SpvInst* emitOpDecorateBuiltIn(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    SpvBuiltIn builtIn
-)
+    SpvBuiltIn builtIn)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationBuiltIn, builtIn);
@@ -658,8 +676,7 @@ SpvInst* emitOpMemberDecorateString(
     const T& target,
     const SpvLiteralInteger& index,
     SpvDecoration decoration,
-    UnownedStringSlice text
-)
+    UnownedStringSlice text)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpMemberDecorateString, target, index, decoration, text);
@@ -672,8 +689,7 @@ SpvInst* emitOpDecorateString(
     IRInst* inst,
     const T& target,
     SpvDecoration decoration,
-    UnownedStringSlice text
-)
+    UnownedStringSlice text)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorateString, target, decoration, text);
@@ -685,8 +701,7 @@ SpvInst* emitOpDecorateUniformId(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& target,
-    const T2& execution
-)
+    const T2& execution)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -699,8 +714,7 @@ SpvInst* emitOpDecorateLocation(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& location
-)
+    const SpvLiteralInteger& location)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationLocation, location);
@@ -712,8 +726,7 @@ SpvInst* emitOpDecorateComponent(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& component
-)
+    const SpvLiteralInteger& component)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationComponent, component);
@@ -725,8 +738,7 @@ SpvInst* emitOpDecorateIndex(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& index
-)
+    const SpvLiteralInteger& index)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationIndex, index);
@@ -738,8 +750,7 @@ SpvInst* emitOpDecorateBinding(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& bindingPoint
-)
+    const SpvLiteralInteger& bindingPoint)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationBinding, bindingPoint);
@@ -751,11 +762,16 @@ SpvInst* emitOpDecorateInputAttachmentIndex(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& bindingPoint
-)
+    const SpvLiteralInteger& bindingPoint)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationInputAttachmentIndex, bindingPoint);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpDecorate,
+        target,
+        SpvDecorationInputAttachmentIndex,
+        bindingPoint);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
@@ -764,8 +780,7 @@ SpvInst* emitOpDecorateDescriptorSet(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& descriptorSet
-)
+    const SpvLiteralInteger& descriptorSet)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationDescriptorSet, descriptorSet);
@@ -777,8 +792,7 @@ SpvInst* emitOpDecorateOffset(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const SpvLiteralInteger& byteOffset
-)
+    const SpvLiteralInteger& byteOffset)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationOffset, byteOffset);
@@ -790,13 +804,16 @@ SpvInst* emitOpDecorateFPRoundingMode(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    SpvFPRoundingMode floatingPointRoundingMode
-)
+    SpvFPRoundingMode floatingPointRoundingMode)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpDecorate, target, SpvDecorationFPRoundingMode, floatingPointRoundingMode
-    );
+        parent,
+        inst,
+        SpvOpDecorate,
+        target,
+        SpvDecorationFPRoundingMode,
+        floatingPointRoundingMode);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
@@ -805,12 +822,17 @@ SpvInst* emitOpDecorateCounterBuffer(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& target,
-    const T2& counterBuffer
-)
+    const T2& counterBuffer)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
-    return emitInst(parent, inst, SpvOpDecorateId, target, SpvDecorationCounterBuffer, counterBuffer);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpDecorateId,
+        target,
+        SpvDecorationCounterBuffer,
+        counterBuffer);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
@@ -819,8 +841,7 @@ SpvInst* emitOpDecorateUserSemantic(
     SpvInstParent* parent,
     IRInst* inst,
     const T& target,
-    const UnownedStringSlice& semantic
-)
+    const UnownedStringSlice& semantic)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationUserSemantic, semantic);
@@ -833,8 +854,7 @@ SpvInst* emitOpMemberDecorate(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    SpvDecoration decoration
-)
+    SpvDecoration decoration)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpMemberDecorate, structureType, member, decoration);
@@ -847,8 +867,7 @@ SpvInst* emitOpMemberDecorateSpecId(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& specializationConstantID
-)
+    const SpvLiteralInteger& specializationConstantID)
 {
     static_assert(isSingular<T>);
     return emitInst(
@@ -858,8 +877,7 @@ SpvInst* emitOpMemberDecorateSpecId(
         structureType,
         member,
         SpvDecorationSpecId,
-        specializationConstantID
-    );
+        specializationConstantID);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -869,8 +887,7 @@ SpvInst* emitOpMemberDecorateArrayStride(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& arrayStride
-)
+    const SpvLiteralInteger& arrayStride)
 {
     static_assert(isSingular<T>);
     return emitInst(
@@ -880,8 +897,7 @@ SpvInst* emitOpMemberDecorateArrayStride(
         structureType,
         member,
         SpvDecorationArrayStride,
-        arrayStride
-    );
+        arrayStride);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -891,8 +907,7 @@ SpvInst* emitOpMemberDecorateMatrixStride(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& matrixStride
-)
+    const SpvLiteralInteger& matrixStride)
 {
     static_assert(isSingular<T>);
     return emitInst(
@@ -902,8 +917,7 @@ SpvInst* emitOpMemberDecorateMatrixStride(
         structureType,
         member,
         SpvDecorationMatrixStride,
-        matrixStride
-    );
+        matrixStride);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -913,13 +927,17 @@ SpvInst* emitOpMemberDecorateBuiltIn(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    SpvBuiltIn builtIn
-)
+    SpvBuiltIn builtIn)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpMemberDecorate, structureType, member, SpvDecorationBuiltIn, builtIn
-    );
+        parent,
+        inst,
+        SpvOpMemberDecorate,
+        structureType,
+        member,
+        SpvDecorationBuiltIn,
+        builtIn);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -929,14 +947,18 @@ SpvInst* emitOpMemberDecorateUniformId(
     IRInst* inst,
     const T1& structureType,
     const SpvLiteralInteger& member,
-    const T2& execution
-)
+    const T2& execution)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     return emitInst(
-        parent, inst, SpvOpMemberDecorate, structureType, member, SpvDecorationUniformId, execution
-    );
+        parent,
+        inst,
+        SpvOpMemberDecorate,
+        structureType,
+        member,
+        SpvDecorationUniformId,
+        execution);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -946,13 +968,17 @@ SpvInst* emitOpMemberDecorateLocation(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& location
-)
+    const SpvLiteralInteger& location)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpMemberDecorate, structureType, member, SpvDecorationLocation, location
-    );
+        parent,
+        inst,
+        SpvOpMemberDecorate,
+        structureType,
+        member,
+        SpvDecorationLocation,
+        location);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -962,13 +988,17 @@ SpvInst* emitOpMemberDecorateComponent(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& component
-)
+    const SpvLiteralInteger& component)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpMemberDecorate, structureType, member, SpvDecorationComponent, component
-    );
+        parent,
+        inst,
+        SpvOpMemberDecorate,
+        structureType,
+        member,
+        SpvDecorationComponent,
+        component);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -978,13 +1008,17 @@ SpvInst* emitOpMemberDecorateIndex(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& index
-)
+    const SpvLiteralInteger& index)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpMemberDecorate, structureType, member, SpvDecorationIndex, index
-    );
+        parent,
+        inst,
+        SpvOpMemberDecorate,
+        structureType,
+        member,
+        SpvDecorationIndex,
+        index);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -994,13 +1028,17 @@ SpvInst* emitOpMemberDecorateBinding(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& bindingPoint
-)
+    const SpvLiteralInteger& bindingPoint)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpMemberDecorate, structureType, member, SpvDecorationBinding, bindingPoint
-    );
+        parent,
+        inst,
+        SpvOpMemberDecorate,
+        structureType,
+        member,
+        SpvDecorationBinding,
+        bindingPoint);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -1010,8 +1048,7 @@ SpvInst* emitOpMemberDecorateDescriptorSet(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& descriptorSet
-)
+    const SpvLiteralInteger& descriptorSet)
 {
     static_assert(isSingular<T>);
     return emitInst(
@@ -1021,8 +1058,7 @@ SpvInst* emitOpMemberDecorateDescriptorSet(
         structureType,
         member,
         SpvDecorationDescriptorSet,
-        descriptorSet
-    );
+        descriptorSet);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -1032,13 +1068,17 @@ SpvInst* emitOpMemberDecorateOffset(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const SpvLiteralInteger& byteOffset
-)
+    const SpvLiteralInteger& byteOffset)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpMemberDecorate, structureType, member, SpvDecorationOffset, byteOffset
-    );
+        parent,
+        inst,
+        SpvOpMemberDecorate,
+        structureType,
+        member,
+        SpvDecorationOffset,
+        byteOffset);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -1048,8 +1088,7 @@ SpvInst* emitOpMemberDecorateFPRoundingMode(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    SpvFPRoundingMode floatingPointRoundingMode
-)
+    SpvFPRoundingMode floatingPointRoundingMode)
 {
     static_assert(isSingular<T>);
     return emitInst(
@@ -1059,8 +1098,7 @@ SpvInst* emitOpMemberDecorateFPRoundingMode(
         structureType,
         member,
         SpvDecorationFPRoundingMode,
-        floatingPointRoundingMode
-    );
+        floatingPointRoundingMode);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -1070,8 +1108,7 @@ SpvInst* emitOpMemberDecorateCounterBuffer(
     IRInst* inst,
     const T1& structureType,
     const SpvLiteralInteger& member,
-    const T2& counterBuffer
-)
+    const T2& counterBuffer)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1082,8 +1119,7 @@ SpvInst* emitOpMemberDecorateCounterBuffer(
         structureType,
         member,
         SpvDecorationCounterBuffer,
-        counterBuffer
-    );
+        counterBuffer);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpMemberDecorate
@@ -1093,13 +1129,17 @@ SpvInst* emitOpMemberDecorateUserSemantic(
     IRInst* inst,
     const T& structureType,
     const SpvLiteralInteger& member,
-    const UnownedStringSlice& semantic
-)
+    const UnownedStringSlice& semantic)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpMemberDecorate, structureType, member, SpvDecorationUserSemantic, semantic
-    );
+        parent,
+        inst,
+        SpvOpMemberDecorate,
+        structureType,
+        member,
+        SpvDecorationUserSemantic,
+        semantic);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpVectorShuffle
@@ -1110,15 +1150,20 @@ SpvInst* emitOpVectorShuffle(
     const T1& idResultType,
     const T2& vector1,
     const T3& vector2,
-    ArrayView<SpvLiteralInteger> components
-)
+    ArrayView<SpvLiteralInteger> components)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpVectorShuffle, idResultType, kResultID, vector1, vector2, components
-    );
+        parent,
+        inst,
+        SpvOpVectorShuffle,
+        idResultType,
+        kResultID,
+        vector1,
+        vector2,
+        components);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCompositeConstruct
@@ -1127,8 +1172,7 @@ SpvInst* emitOpCompositeConstruct(
     SpvInstParent* parent,
     IRInst* inst,
     const T& idResultType,
-    const Ts& constituents
-)
+    const Ts& constituents)
 {
     static_assert(isSingular<T>);
     static_assert(isPlural<Ts>);
@@ -1142,11 +1186,17 @@ SpvInst* emitOpCompositeConstruct(
     IRInst* inst,
     const T& idResultType,
     const T1& constituent1,
-    const T2& constituent2
-)
+    const T2& constituent2)
 {
     static_assert(isSingular<T>);
-    return emitInst(parent, inst, SpvOpCompositeConstruct, idResultType, kResultID, constituent1, constituent2);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpCompositeConstruct,
+        idResultType,
+        kResultID,
+        constituent1,
+        constituent2);
 }
 
 template<typename T, typename Ts>
@@ -1154,8 +1204,7 @@ SpvInst* emitOpConstantComposite(
     SpvInstParent* parent,
     IRInst* inst,
     const T& idResultType,
-    const Ts& constituents
-)
+    const Ts& constituents)
 {
     static_assert(isSingular<T>);
     static_assert(isPlural<Ts>);
@@ -1169,14 +1218,18 @@ SpvInst* emitOpCompositeExtract(
     IRInst* inst,
     const T1& idResultType,
     const T2& composite,
-    const Array<SpvLiteralInteger, N>& indexes
-)
+    const Array<SpvLiteralInteger, N>& indexes)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     return emitInst(
-        parent, inst, SpvOpCompositeExtract, idResultType, kResultID, composite, indexes
-    );
+        parent,
+        inst,
+        SpvOpCompositeExtract,
+        idResultType,
+        kResultID,
+        composite,
+        indexes);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCompositeInsert
@@ -1187,16 +1240,21 @@ SpvInst* emitOpCompositeInsert(
     const T1& idResultType,
     const T2& object,
     const T3& composite,
-    const Array<SpvLiteralInteger, N>& indexes
-)
+    const Array<SpvLiteralInteger, N>& indexes)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
 
     return emitInst(
-        parent, inst, SpvOpCompositeInsert, idResultType, kResultID, object, composite, indexes
-    );
+        parent,
+        inst,
+        SpvOpCompositeInsert,
+        idResultType,
+        kResultID,
+        object,
+        composite,
+        indexes);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpVectorExtractDynamic
@@ -1212,8 +1270,13 @@ SpvInst* emitOpVectorExtractDynamic(
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpVectorExtractDynamic, idResultType, kResultID, composite, index
-    );
+        parent,
+        inst,
+        SpvOpVectorExtractDynamic,
+        idResultType,
+        kResultID,
+        composite,
+        index);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCopyObject
@@ -1222,8 +1285,7 @@ SpvInst* emitOpCopyObject(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& operand
-)
+    const T2& operand)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1236,8 +1298,7 @@ SpvInst* emitOpConvertFToU(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& floatValue
-)
+    const T2& floatValue)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1250,8 +1311,7 @@ SpvInst* emitOpConvertFToS(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& floatValue
-)
+    const T2& floatValue)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1264,8 +1324,7 @@ SpvInst* emitOpConvertSToF(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& signedValue
-)
+    const T2& signedValue)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1278,8 +1337,7 @@ SpvInst* emitOpConvertUToF(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& unsignedValue
-)
+    const T2& unsignedValue)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1292,8 +1350,7 @@ SpvInst* emitOpUConvert(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& unsignedValue
-)
+    const T2& unsignedValue)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1306,8 +1363,7 @@ SpvInst* emitOpSConvert(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& signedValue
-)
+    const T2& signedValue)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1320,8 +1376,7 @@ SpvInst* emitOpFConvert(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& floatValue
-)
+    const T2& floatValue)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1334,8 +1389,7 @@ SpvInst* emitOpBitcast(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& operand
-)
+    const T2& operand)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1348,8 +1402,7 @@ SpvInst* emitOpSNegate(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& operand
-)
+    const T2& operand)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1362,8 +1415,7 @@ SpvInst* emitOpFNegate(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& operand
-)
+    const T2& operand)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1377,8 +1429,7 @@ SpvInst* emitOpIAdd(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1393,8 +1444,7 @@ SpvInst* emitOpFAdd(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1409,8 +1459,7 @@ SpvInst* emitOpISub(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1425,8 +1474,7 @@ SpvInst* emitOpFSub(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1441,8 +1489,7 @@ SpvInst* emitOpIMul(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1457,8 +1504,7 @@ SpvInst* emitOpFMul(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1473,8 +1519,7 @@ SpvInst* emitOpUDiv(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1489,8 +1534,7 @@ SpvInst* emitOpSDiv(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1505,8 +1549,7 @@ SpvInst* emitOpFDiv(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1521,8 +1564,7 @@ SpvInst* emitOpUMod(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1537,8 +1579,7 @@ SpvInst* emitOpSRem(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1553,8 +1594,7 @@ SpvInst* emitOpFRem(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1569,8 +1609,7 @@ SpvInst* emitOpIAddCarry(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1585,8 +1624,7 @@ SpvInst* emitOpISubBorrow(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1601,8 +1639,7 @@ SpvInst* emitOpLogicalEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1617,15 +1654,19 @@ SpvInst* emitOpLogicalNotEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpLogicalNotEqual, idResultType, kResultID, operand1, operand2
-    );
+        parent,
+        inst,
+        SpvOpLogicalNotEqual,
+        idResultType,
+        kResultID,
+        operand1,
+        operand2);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLogicalOr
@@ -1635,8 +1676,7 @@ SpvInst* emitOpLogicalOr(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1651,8 +1691,7 @@ SpvInst* emitOpLogicalAnd(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1666,8 +1705,7 @@ SpvInst* emitOpLogicalNot(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& operand
-)
+    const T2& operand)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1681,8 +1719,7 @@ SpvInst* emitOpIEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1697,8 +1734,7 @@ SpvInst* emitOpINotEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1713,8 +1749,7 @@ SpvInst* emitOpUGreaterThan(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1729,8 +1764,7 @@ SpvInst* emitOpSGreaterThan(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1745,15 +1779,19 @@ SpvInst* emitOpUGreaterThanEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpUGreaterThanEqual, idResultType, kResultID, operand1, operand2
-    );
+        parent,
+        inst,
+        SpvOpUGreaterThanEqual,
+        idResultType,
+        kResultID,
+        operand1,
+        operand2);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSGreaterThanEqual
@@ -1763,15 +1801,19 @@ SpvInst* emitOpSGreaterThanEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpSGreaterThanEqual, idResultType, kResultID, operand1, operand2
-    );
+        parent,
+        inst,
+        SpvOpSGreaterThanEqual,
+        idResultType,
+        kResultID,
+        operand1,
+        operand2);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpULessThan
@@ -1781,8 +1823,7 @@ SpvInst* emitOpULessThan(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1797,8 +1838,7 @@ SpvInst* emitOpSLessThan(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1813,8 +1853,7 @@ SpvInst* emitOpULessThanEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1829,8 +1868,7 @@ SpvInst* emitOpSLessThanEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1845,8 +1883,7 @@ SpvInst* emitOpFOrdEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1861,8 +1898,7 @@ SpvInst* emitOpFOrdNotEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1877,8 +1913,7 @@ SpvInst* emitOpFOrdLessThan(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1893,15 +1928,19 @@ SpvInst* emitOpFOrdGreaterThan(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpFOrdGreaterThan, idResultType, kResultID, operand1, operand2
-    );
+        parent,
+        inst,
+        SpvOpFOrdGreaterThan,
+        idResultType,
+        kResultID,
+        operand1,
+        operand2);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFOrdLessThanEqual
@@ -1911,15 +1950,19 @@ SpvInst* emitOpFOrdLessThanEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpFOrdLessThanEqual, idResultType, kResultID, operand1, operand2
-    );
+        parent,
+        inst,
+        SpvOpFOrdLessThanEqual,
+        idResultType,
+        kResultID,
+        operand1,
+        operand2);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpFOrdGreaterThanEqual
@@ -1929,15 +1972,19 @@ SpvInst* emitOpFOrdGreaterThanEqual(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpFOrdGreaterThanEqual, idResultType, kResultID, operand1, operand2
-    );
+        parent,
+        inst,
+        SpvOpFOrdGreaterThanEqual,
+        idResultType,
+        kResultID,
+        operand1,
+        operand2);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpShiftRightLogical
@@ -1947,8 +1994,7 @@ SpvInst* emitOpShiftRightLogical(
     IRInst* inst,
     const T1& idResultType,
     const T2& base,
-    const T3& shift
-)
+    const T3& shift)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1963,8 +2009,7 @@ SpvInst* emitOpShiftRightArithmetic(
     IRInst* inst,
     const T1& idResultType,
     const T2& base,
-    const T3& shift
-)
+    const T3& shift)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1979,8 +2024,7 @@ SpvInst* emitOpShiftLeftLogical(
     IRInst* inst,
     const T1& idResultType,
     const T2& base,
-    const T3& shift
-)
+    const T3& shift)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -1995,8 +2039,7 @@ SpvInst* emitOpBitwiseOr(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2011,8 +2054,7 @@ SpvInst* emitOpBitwiseXor(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2027,8 +2069,7 @@ SpvInst* emitOpBitwiseAnd(
     IRInst* inst,
     const T1& idResultType,
     const T2& operand1,
-    const T3& operand2
-)
+    const T3& operand2)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2042,8 +2083,7 @@ SpvInst* emitOpBitReverse(
     SpvInstParent* parent,
     IRInst* inst,
     const T1& idResultType,
-    const T2& base
-)
+    const T2& base)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2059,8 +2099,7 @@ SpvInst* emitOpLoopMerge(
     IRInst* inst,
     const T1& mergeBlock,
     const T2& continueTarget,
-    SpvLoopControlMask loopControl
-)
+    SpvLoopControlMask loopControl)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2074,8 +2113,7 @@ SpvInst* emitOpLoopMergeDependencyLength(
     IRInst* inst,
     const T1& mergeBlock,
     const T2& continueTarget,
-    const SpvLiteralInteger& literalInteger
-)
+    const SpvLiteralInteger& literalInteger)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2086,8 +2124,7 @@ SpvInst* emitOpLoopMergeDependencyLength(
         mergeBlock,
         continueTarget,
         SpvLoopControlDependencyLengthMask,
-        literalInteger
-    );
+        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
@@ -2097,8 +2134,7 @@ SpvInst* emitOpLoopMergeMinIterations(
     IRInst* inst,
     const T1& mergeBlock,
     const T2& continueTarget,
-    const SpvLiteralInteger& literalInteger
-)
+    const SpvLiteralInteger& literalInteger)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2109,8 +2145,7 @@ SpvInst* emitOpLoopMergeMinIterations(
         mergeBlock,
         continueTarget,
         SpvLoopControlMinIterationsMask,
-        literalInteger
-    );
+        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
@@ -2120,8 +2155,7 @@ SpvInst* emitOpLoopMergeMaxIterations(
     IRInst* inst,
     const T1& mergeBlock,
     const T2& continueTarget,
-    const SpvLiteralInteger& literalInteger
-)
+    const SpvLiteralInteger& literalInteger)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2132,8 +2166,7 @@ SpvInst* emitOpLoopMergeMaxIterations(
         mergeBlock,
         continueTarget,
         SpvLoopControlMaxIterationsMask,
-        literalInteger
-    );
+        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
@@ -2143,8 +2176,7 @@ SpvInst* emitOpLoopMergeIterationMultiple(
     IRInst* inst,
     const T1& mergeBlock,
     const T2& continueTarget,
-    const SpvLiteralInteger& literalInteger
-)
+    const SpvLiteralInteger& literalInteger)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2155,8 +2187,7 @@ SpvInst* emitOpLoopMergeIterationMultiple(
         mergeBlock,
         continueTarget,
         SpvLoopControlIterationMultipleMask,
-        literalInteger
-    );
+        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
@@ -2166,8 +2197,7 @@ SpvInst* emitOpLoopMergePeelCount(
     IRInst* inst,
     const T1& mergeBlock,
     const T2& continueTarget,
-    const SpvLiteralInteger& literalInteger
-)
+    const SpvLiteralInteger& literalInteger)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2178,8 +2208,7 @@ SpvInst* emitOpLoopMergePeelCount(
         mergeBlock,
         continueTarget,
         SpvLoopControlPeelCountMask,
-        literalInteger
-    );
+        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoopMerge
@@ -2189,8 +2218,7 @@ SpvInst* emitOpLoopMergePartialCount(
     IRInst* inst,
     const T1& mergeBlock,
     const T2& continueTarget,
-    const SpvLiteralInteger& literalInteger
-)
+    const SpvLiteralInteger& literalInteger)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2201,8 +2229,7 @@ SpvInst* emitOpLoopMergePartialCount(
         mergeBlock,
         continueTarget,
         SpvLoopControlPartialCountMask,
-        literalInteger
-    );
+        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpSelectionMerge
@@ -2211,8 +2238,7 @@ SpvInst* emitOpSelectionMerge(
     SpvInstParent* parent,
     IRInst* inst,
     const T& mergeBlock,
-    SpvSelectionControlMask selectionControl
-)
+    SpvSelectionControlMask selectionControl)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpSelectionMerge, mergeBlock, selectionControl);
@@ -2240,15 +2266,19 @@ SpvInst* emitOpBranchConditional(
     const T1& condition,
     const T2& trueLabel,
     const T3& falseLabel,
-    const Array<SpvLiteralInteger, N>& branchWeights
-)
+    const Array<SpvLiteralInteger, N>& branchWeights)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     static_assert(isSingular<T3>);
     return emitInst(
-        parent, inst, SpvOpBranchConditional, condition, trueLabel, falseLabel, branchWeights
-    );
+        parent,
+        inst,
+        SpvOpBranchConditional,
+        condition,
+        trueLabel,
+        falseLabel,
+        branchWeights);
 }
 
 // OpSwitch elided, please use emitInst directly
@@ -2302,8 +2332,7 @@ SpvInst* emitOpExecutionModeId(
     SpvInstParent* parent,
     IRInst* inst,
     const T& entryPoint,
-    SpvExecutionMode mode
-)
+    SpvExecutionMode mode)
 {
     static_assert(isSingular<T>);
     return emitInst(parent, inst, SpvOpExecutionModeId, entryPoint, mode);
@@ -2317,13 +2346,18 @@ SpvInst* emitOpExecutionModeIdLocalSize(
     const T& entryPoint,
     const SpvLiteralInteger& xSize,
     const SpvLiteralInteger& ySize,
-    const SpvLiteralInteger& zSize
-)
+    const SpvLiteralInteger& zSize)
 {
     static_assert(isSingular<T>);
     return emitInst(
-        parent, inst, SpvOpExecutionModeId, entryPoint, SpvExecutionModeLocalSize, xSize, ySize, zSize
-    );
+        parent,
+        inst,
+        SpvOpExecutionModeId,
+        entryPoint,
+        SpvExecutionModeLocalSize,
+        xSize,
+        ySize,
+        zSize);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionModeId
@@ -2334,8 +2368,7 @@ SpvInst* emitOpExecutionModeIdLocalSizeId(
     const T1& entryPoint,
     const T2& xSize,
     const T3& ySize,
-    const T4& zSize
-)
+    const T4& zSize)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2349,8 +2382,127 @@ SpvInst* emitOpExecutionModeIdLocalSizeId(
         SpvExecutionModeLocalSizeId,
         xSize,
         ySize,
-        zSize
-    );
+        zSize);
+}
+
+template<typename T1, typename T2, typename T3, typename T4>
+SpvInst* emitOpAtomicLoad(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semantics)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicLoad,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semantics);
+}
+
+template<typename T1, typename T2, typename T3, typename T4>
+SpvInst* emitOpAtomicStore(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& pointer,
+    const T2& memory,
+    const T3& semantics,
+    const T4& value)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    return emitInst(parent, inst, SpvOpAtomicStore, pointer, memory, semantics, value);
+}
+
+template<typename T1, typename T2, typename T3, typename T4, typename T5>
+SpvInst* emitOpAtomicExchange(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semantics,
+    const T5& value)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    static_assert(isSingular<T5>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicExchange,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semantics,
+        value);
+}
+
+template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
+SpvInst* emitOpAtomicCompareExchange(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semanticsEqual,
+    const T5& semanticsUnequal,
+    const T6& value,
+    const T7& comparator)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    static_assert(isSingular<T5>);
+    static_assert(isSingular<T6>);
+    static_assert(isSingular<T7>);
+
+    return emitInst(
+        parent,
+        inst,
+        SpvOpAtomicCompareExchange,
+        idResultType,
+        kResultID,
+        pointer,
+        memory,
+        semanticsEqual,
+        semanticsUnequal,
+        value,
+        comparator);
+}
+
+template<typename T1, typename T2, typename T3, typename T4, typename T5>
+SpvInst* emitOpAtomicOp(
+    SpvInstParent* parent,
+    IRInst* inst,
+    SpvOp op,
+    const T1& idResultType,
+    const T2& pointer,
+    const T3& memory,
+    const T4& semantics,
+    const T5& value)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    static_assert(isSingular<T4>);
+    static_assert(isSingular<T5>);
+    return emitInst(parent, inst, op, idResultType, kResultID, pointer, memory, semantics, value);
 }
 
 template<typename T1, typename T2, typename T3, typename T4>
@@ -2360,8 +2512,7 @@ SpvInst* emitOpAtomicIIncrement(
     const T1& idResultType,
     const T2& pointer,
     const T3& memory,
-    const T4& semantics
-)
+    const T4& semantics)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2375,8 +2526,7 @@ SpvInst* emitOpAtomicIIncrement(
         kResultID,
         pointer,
         memory,
-        semantics
-    );
+        semantics);
 }
 
 template<typename T1, typename T2, typename T3, typename T4>
@@ -2386,8 +2536,7 @@ SpvInst* emitOpAtomicIDecrement(
     const T1& idResultType,
     const T2& pointer,
     const T3& memory,
-    const T4& semantics
-)
+    const T4& semantics)
 {
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
@@ -2401,7 +2550,6 @@ SpvInst* emitOpAtomicIDecrement(
         kResultID,
         pointer,
         memory,
-        semantics
-    );
+        semantics);
 }
-#endif        // SLANG_IN_SPIRV_EMIT_CONTEXT
+#endif // SLANG_IN_SPIRV_EMIT_CONTEXT

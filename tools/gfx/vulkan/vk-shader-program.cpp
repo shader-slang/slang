@@ -30,7 +30,10 @@ ShaderProgramImpl::~ShaderProgramImpl()
     }
 }
 
-void ShaderProgramImpl::comFree() { m_device.breakStrongReference(); }
+void ShaderProgramImpl::comFree()
+{
+    m_device.breakStrongReference();
+}
 
 VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
     const char* entryPointName,
@@ -50,7 +53,10 @@ VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
 
     VkShaderModule module;
     SLANG_VK_CHECK(m_device->m_api.vkCreateShaderModule(
-        m_device->m_device, &moduleCreateInfo, nullptr, &module));
+        m_device->m_device,
+        &moduleCreateInfo,
+        nullptr,
+        &module));
     outShaderModule = module;
 
     VkPipelineShaderStageCreateInfo shaderStageCreateInfo = {
@@ -64,7 +70,8 @@ VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
 }
 
 Result ShaderProgramImpl::createShaderModule(
-    slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode)
+    slang::EntryPointReflection* entryPointInfo,
+    ComPtr<ISlangBlob> kernelCode)
 {
     m_codeBlobs.add(kernelCode);
     VkShaderModule shaderModule;

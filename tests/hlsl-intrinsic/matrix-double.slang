@@ -1,6 +1,6 @@
 // TODO(JS):
 // It doesn't look like fxc, dxc, vk support double versions of many of the intrinsics, so they are disabled here.
-// Arguably we should implement simple intrinsics if missing in the stdlib
+// Arguably we should implement simple intrinsics if missing in the core module.
 // More complicated functions (like say sin) can also be written, if not available on a target, but requires significant
 // care.
 
@@ -91,6 +91,7 @@ void test1(inout FloatMatrix ft, inout FloatMatrix f, int idx)
 
     ft += exp2(f);
     ft += exp(f);
+    ft += exp10(f);
 
     ft += frac(f * makeFloatMatrix(3));
     ft += ceil(f * makeFloatMatrix(5) - makeFloatMatrix(3));

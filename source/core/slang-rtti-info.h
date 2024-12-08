@@ -2,25 +2,32 @@
 #define SLANG_CORE_RTTI_INFO_H
 
 #include "slang-basic.h"
+#include "slang-dictionary.h"
+#include "slang-list.h"
 #include "slang-memory-arena.h"
 
-#include "slang-list.h"
-#include "slang-dictionary.h"
-
-namespace Slang {
+namespace Slang
+{
 
 struct RttiInfo;
 struct RttiTypeFuncsMap;
 
 struct RttiTypeFuncs
 {
-    typedef void (*CtorArray)(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count);
-    typedef void (*DtorArray)(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count);
-    typedef void (*CopyArray)(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, const void* src, Index count);
+    typedef void (
+        *CtorArray)(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count);
+    typedef void (
+        *DtorArray)(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count);
+    typedef void (*CopyArray)(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* dst,
+        const void* src,
+        Index count);
 
-    bool isValid() const { return ctorArray && dtorArray && copyArray;  }
+    bool isValid() const { return ctorArray && dtorArray && copyArray; }
 
-    static RttiTypeFuncs makeEmpty() { return RttiTypeFuncs{ nullptr, nullptr, nullptr }; }
+    static RttiTypeFuncs makeEmpty() { return RttiTypeFuncs{nullptr, nullptr, nullptr}; }
 
     CtorArray ctorArray;
     DtorArray dtorArray;
@@ -30,11 +37,11 @@ struct RttiTypeFuncs
 /* Provides a mechanism to map a type to it's RttiFuncs */
 struct RttiTypeFuncsMap
 {
-        /// For a given type returns the funcs.
-        /// If not found returns funcs that return 'isValid' as false. 
+    /// For a given type returns the funcs.
+    /// If not found returns funcs that return 'isValid' as false.
     RttiTypeFuncs getFuncsForType(const RttiInfo* rttiInfo);
 
-        /// Add funcs for a type
+    /// Add funcs for a type
     void add(const RttiInfo* rttiInfo, const RttiTypeFuncs& funcs);
 
 protected:
@@ -42,10 +49,14 @@ protected:
 };
 
 /* Template to get funcs for any arbitrary type */
-template <typename T>
+template<typename T>
 struct GetRttiTypeFuncs
 {
-    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* in, Index count)
+    static void ctorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* in,
+        Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
@@ -55,7 +66,11 @@ struct GetRttiTypeFuncs
             new (dst + i) T;
         }
     }
-    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* in, Index count)
+    static void dtorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* in,
+        Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
@@ -65,7 +80,12 @@ struct GetRttiTypeFuncs
             (dst + i)->~T();
         }
     }
-    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    static void copyArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* inDst,
+        const void* inSrc,
+        Index count)
     {
         SLANG_UNUSED(rttiInfo);
         SLANG_UNUSED(typeMap);
@@ -90,23 +110,36 @@ struct GetRttiTypeFuncs
 /* An implementation of funcs, for a type that is POD *and* can be zero initialized.
 Built in types generally fall into this catagory, but so do raw pointers and other types,
 such as structs that only contain "ZeroPod" types */
-template <typename T>
+template<typename T>
 struct GetRttiTypeFuncsForZeroPod
 {
-    static void ctorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count)
+    static void ctorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* dst,
+        Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
         ::memset(dst, 0, sizeof(T) * count);
     }
-    static void dtorArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, Index count)
+    static void dtorArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* dst,
+        Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
         SLANG_UNUSED(dst);
         SLANG_UNUSED(count);
     }
-    static void copyArray(RttiTypeFuncsMap* typeMap, const RttiInfo* rttiInfo, void* dst, const void* src, Index count)
+    static void copyArray(
+        RttiTypeFuncsMap* typeMap,
+        const RttiInfo* rttiInfo,
+        void* dst,
+        const void* src,
+        Index count)
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
@@ -148,7 +181,7 @@ struct RttiInfo
         Enum,
         List,
         Dictionary,
-     
+
         CountOf,
     };
 
@@ -156,25 +189,47 @@ struct RttiInfo
     AlignmentType m_alignment;
     SizeType m_size;
 
-    void init(Kind kind, size_t alignment, size_t size) { m_kind = kind; m_alignment = AlignmentType(alignment); m_size = SizeType(size); }
+    void init(Kind kind, size_t alignment, size_t size)
+    {
+        m_kind = kind;
+        m_alignment = AlignmentType(alignment);
+        m_size = SizeType(size);
+    }
 
-    template <typename T>
-    void init(Kind kind) { init(kind, SLANG_ALIGN_OF(T), sizeof(T)); }
-    
-        /// Allocate memory for RttiInfo types.
-        /// Is thread safe, and doesn't require the memory to be freed explicitly
-        /// Will be freed at shutdown (via global dtor)
+    template<typename T>
+    void init(Kind kind)
+    {
+        init(kind, SLANG_ALIGN_OF(T), sizeof(T));
+    }
+
+    /// Allocate memory for RttiInfo types.
+    /// Is thread safe, and doesn't require the memory to be freed explicitly
+    /// Will be freed at shutdown (via global dtor)
     static void* allocate(size_t size);
-        /// Will free up any allocations. Can only be called at shutdown, and there are guarenteed no uses of
-        /// RttiInfo - otherwise contents may be undefined.
-        /// NOTE! Memory *will* be freed with final dtors, but if memory check functions are used they can report
-        /// this memory.
+    /// Will free up any allocations. Can only be called at shutdown, and there are guarenteed no
+    /// uses of RttiInfo - otherwise contents may be undefined. NOTE! Memory *will* be freed with
+    /// final dtors, but if memory check functions are used they can report this memory.
     static void deallocateAll();
 
-    static bool isIntegral(RttiInfo::Kind kind) { return Index(kind) >= Index(RttiInfo::Kind::I32) && Index(kind) <= Index(RttiInfo::Kind::U64); }
-    static bool isFloat(RttiInfo::Kind kind) { return kind == RttiInfo::Kind::F32 || kind == RttiInfo::Kind::F64; }
-    static bool isBuiltIn(RttiInfo::Kind kind) { return Index(kind) >= Index(RttiInfo::Kind::I32) && Index(kind) <= Index(RttiInfo::Kind::Bool); }
-    static bool isNamed(RttiInfo::Kind kind) { return Index(kind) >= Index(RttiInfo::Kind::Struct) && Index(kind) <= Index(RttiInfo::Kind::Enum); }
+    static bool isIntegral(RttiInfo::Kind kind)
+    {
+        return Index(kind) >= Index(RttiInfo::Kind::I32) &&
+               Index(kind) <= Index(RttiInfo::Kind::U64);
+    }
+    static bool isFloat(RttiInfo::Kind kind)
+    {
+        return kind == RttiInfo::Kind::F32 || kind == RttiInfo::Kind::F64;
+    }
+    static bool isBuiltIn(RttiInfo::Kind kind)
+    {
+        return Index(kind) >= Index(RttiInfo::Kind::I32) &&
+               Index(kind) <= Index(RttiInfo::Kind::Bool);
+    }
+    static bool isNamed(RttiInfo::Kind kind)
+    {
+        return Index(kind) >= Index(RttiInfo::Kind::Struct) &&
+               Index(kind) <= Index(RttiInfo::Kind::Enum);
+    }
 
     bool isIntegral() const { return isIntegral(m_kind); }
     bool isFloat() const { return isFloat(m_kind); }
@@ -190,7 +245,7 @@ struct RttiInfo
 // but this works fine for most purposes
 enum class RttiDefaultValue : uint8_t
 {
-    Normal,             ///< Zero for integral/float types/false for bool
+    Normal, ///< Zero for integral/float types/false for bool
     One,
     MinusOne,
 
@@ -199,7 +254,7 @@ enum class RttiDefaultValue : uint8_t
 
 struct NamedRttiInfo : public RttiInfo
 {
-    const char* m_name;                 ///< Name
+    const char* m_name; ///< Name
 };
 
 struct StructRttiInfo : public NamedRttiInfo
@@ -216,16 +271,16 @@ struct StructRttiInfo : public NamedRttiInfo
 
     struct Field
     {
-        const char* m_name;             ///< Name of this field
-        const RttiInfo* m_type;         ///< The type of this field
-        uint32_t m_offset;              ///< Offset from object type in bytes
-        Flags m_flags;                  ///< Field flags
+        const char* m_name;     ///< Name of this field
+        const RttiInfo* m_type; ///< The type of this field
+        uint32_t m_offset;      ///< Offset from object type in bytes
+        Flags m_flags;          ///< Field flags
     };
 
-    const StructRttiInfo* m_super;      ///< Super class or nullptr if not defined
+    const StructRttiInfo* m_super; ///< Super class or nullptr if not defined
 
-    Index m_fieldCount;                 ///< Amount of fields
-    const Field* m_fields;              ///< Fields
+    Index m_fieldCount;    ///< Amount of fields
+    const Field* m_fields; ///< Fields
     bool m_ignoreUnknownFieldsInJson = false;
 };
 
@@ -234,7 +289,9 @@ struct EnumRttiInfo : public NamedRttiInfo
     // TODO(JS):
 };
 
-SLANG_FORCE_INLINE StructRttiInfo::Flags combine(StructRttiInfo::Flags flags, RttiDefaultValue defaultValue)
+SLANG_FORCE_INLINE StructRttiInfo::Flags combine(
+    StructRttiInfo::Flags flags,
+    RttiDefaultValue defaultValue)
 {
     return StructRttiInfo::Flags(defaultValue) | flags;
 }
@@ -274,23 +331,62 @@ struct OtherRttiInfo : public NamedRttiInfo
 };
 
 // The default is to just get the info from a global held inside the type.
-template <typename T>
+template<typename T>
 struct GetRttiInfo
 {
     SLANG_FORCE_INLINE static const RttiInfo* get() { return &T::g_rttiInfo; }
 };
 
-template <> struct GetRttiInfo<bool> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::Bool)];} };
-template <> struct GetRttiInfo<int32_t> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::I32)]; } };
-template <> struct GetRttiInfo<int64_t> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::I64)]; } };
-template <> struct GetRttiInfo<uint32_t> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::U32)]; } };
-template <> struct GetRttiInfo<uint64_t> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::U64)]; } };
-template <> struct GetRttiInfo<float> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::F32)]; } };
-template <> struct GetRttiInfo<double> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::F64)]; } };
-template <> struct GetRttiInfo<String> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::String)]; } };
-template <> struct GetRttiInfo<UnownedStringSlice> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::UnownedStringSlice)]; } };
+template<>
+struct GetRttiInfo<bool>
+{
+    static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::Bool)]; }
+};
+template<>
+struct GetRttiInfo<int32_t>
+{
+    static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::I32)]; }
+};
+template<>
+struct GetRttiInfo<int64_t>
+{
+    static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::I64)]; }
+};
+template<>
+struct GetRttiInfo<uint32_t>
+{
+    static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::U32)]; }
+};
+template<>
+struct GetRttiInfo<uint64_t>
+{
+    static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::U64)]; }
+};
+template<>
+struct GetRttiInfo<float>
+{
+    static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::F32)]; }
+};
+template<>
+struct GetRttiInfo<double>
+{
+    static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::F64)]; }
+};
+template<>
+struct GetRttiInfo<String>
+{
+    static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::String)]; }
+};
+template<>
+struct GetRttiInfo<UnownedStringSlice>
+{
+    static const RttiInfo* get()
+    {
+        return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::UnownedStringSlice)];
+    }
+};
 
-template <typename T>
+template<typename T>
 struct GetRttiInfo<List<T>>
 {
     static const ListRttiInfo _make()
@@ -300,17 +396,21 @@ struct GetRttiInfo<List<T>>
         info.m_elementType = GetRttiInfo<T>::get();
         return info;
     }
-    static const RttiInfo* get() { static const ListRttiInfo g_info = _make(); return &g_info; }
+    static const RttiInfo* get()
+    {
+        static const ListRttiInfo g_info = _make();
+        return &g_info;
+    }
 };
 
 // Strip const
-template <typename T>
+template<typename T>
 struct GetRttiInfo<const T>
 {
     static const RttiInfo* get() { return GetRttiInfo<T>::get(); }
 };
 
-template <typename K, typename V>
+template<typename K, typename V>
 struct GetRttiInfo<Dictionary<K, V>>
 {
     static const DictionaryRttiInfo _make()
@@ -321,10 +421,14 @@ struct GetRttiInfo<Dictionary<K, V>>
         info.m_valueType = GetRttiInfo<V>::get();
         return info;
     }
-    static const RttiInfo* get() { static const DictionaryRttiInfo g_info = _make(); return &g_info; }
+    static const RttiInfo* get()
+    {
+        static const DictionaryRttiInfo g_info = _make();
+        return &g_info;
+    }
 };
 
-template <typename TARGET>
+template<typename TARGET>
 struct GetRttiInfo<TARGET*>
 {
     static const PtrRttiInfo _make()
@@ -334,10 +438,14 @@ struct GetRttiInfo<TARGET*>
         info.m_targetType = GetRttiInfo<TARGET>::get();
         return info;
     }
-    static const RttiInfo* get() { static const PtrRttiInfo g_info = _make(); return &g_info; }
+    static const RttiInfo* get()
+    {
+        static const PtrRttiInfo g_info = _make();
+        return &g_info;
+    }
 };
 
-template <typename TARGET>
+template<typename TARGET>
 struct GetRttiInfo<RefPtr<TARGET>>
 {
     static const RefPtrRttiInfo _make()
@@ -347,10 +455,14 @@ struct GetRttiInfo<RefPtr<TARGET>>
         info.m_targetType = GetRttiInfo<TARGET>::get();
         return info;
     }
-    static const RttiInfo* get() { static const RefPtrRttiInfo g_info = _make(); return &g_info; }
+    static const RttiInfo* get()
+    {
+        static const RefPtrRttiInfo g_info = _make();
+        return &g_info;
+    }
 };
 
-template <typename T, size_t COUNT>
+template<typename T, size_t COUNT>
 struct GetRttiInfo<T[COUNT]>
 {
     static const FixedArrayRttiInfo _make()
@@ -363,19 +475,23 @@ struct GetRttiInfo<T[COUNT]>
         info.m_elementCount = COUNT;
         return info;
     }
-    static const RttiInfo* get() { static const FixedArrayRttiInfo g_info = _make(); return &g_info; }
+    static const RttiInfo* get()
+    {
+        static const FixedArrayRttiInfo g_info = _make();
+        return &g_info;
+    }
 };
 
 struct StructRttiBuilder
 {
-    template <typename T>
-    StructRttiBuilder(T* obj, const char* name, const StructRttiInfo* super) 
+    template<typename T>
+    StructRttiBuilder(T* obj, const char* name, const StructRttiInfo* super)
     {
         m_rttiInfo.init<T>(RttiInfo::Kind::Struct);
         _init(name, super, (const Byte*)obj);
     }
 
-    template <typename T>
+    template<typename T>
     void addField(const char* name, const T* fieldPtr, StructRttiInfo::Flags flags = 0)
     {
         StructRttiInfo::Field field;

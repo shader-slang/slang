@@ -11,7 +11,7 @@ The first goal is to make the code look relatively consistent so that it is easy
 Having varying styles across different modules, files, functions, or lines of code makes the overall design and intention of the codebase harder to follow.
 
 The second goal is to minimize the scope complexity of diffs when multiple maintainers work together on the codebase.
-In the absence of an enforced style, developers tend to "clean up" code they encoutner to match their personal preferences, and in so doing create additional diffs that increase the chances of merge conflicts and pain down the line.
+In the absence of an enforced style, developers tend to "clean up" code they encounter to match their personal preferences, and in so doing create additional diffs that increase the chances of merge conflicts and pain down the line.
 
 Because the Slang codebase has passed through many hands and evolved without a pre-existing convention, these two goals can come into conflict.
 We encourage developers to err on the side of leaving well enough alone (favoring the second goal).
@@ -72,7 +72,7 @@ As a general rule, default to making the implementation of a type `public`, and 
 
 ### Slang
 
-The Slang project codebase also includes `.slang` files implementing the Slang standard library, as well as various test cases and examples.
+The Slang project codebase also includes `.slang` files implementing the Slang core module, as well as various test cases and examples.
 The conventions described here are thus the "official" recommendations for how users should format Slang code.
 
 To the extent possible, we will try to apply the same basic conventions to both C++ and Slang.
@@ -132,169 +132,24 @@ Namespaces
 Favor fewer namespaces when possible.
 Small programs may not need any.
 
-All library code that a Slang user might link against should go in the `Slang` namespace for now, to avoid any possibility of clashes in a static linking scenario.
+All standard module code that a Slang user might link against should go in the `Slang` namespace for now, to avoid any possibility of clashes in a static linking scenario.
 The public C API is obviously an exception to this.
 
 
-Indenting, Spacing, and Braces
+Code Formatting
 ------------------------------
 
-Indent by four spaces. Don't use tabs except in files that require them (e.g., `Makefile`s).
+- For C++ files, please format using `clang-format`; `.clang-format` files in
+  the source tree define the style.
+- For CMake files, please format using `gersemi`
+- For shell scripts, please format using `shfmt`
+- For YAML files, please use `prettier`
 
-Matching opening/closing curly braces should be indented to the same column, with an exception for empty braces (`{}`).
-An opening curly brace should always be on a new line.
+The formatting for the codebase is overall specified by the
+[`extras/formatting.sh`](./extras/formatting.sh) script.
 
-```c++
-void someFunc(int a)
-{
-    doThings(a);
-}
-
-void emptyFunc()
-{}
-
-struct Helper
-{
-    void help()
-    {
-        emptyFunc();
-    }
-}
-```
-
-Extremely short "accessor" style functions can violate these rules if the whole definition fits on a line.
-
-```c++
-struct Vec1
-{
-    float x;
-
-    float getX() { return x; }
-}
-```
-
-There is no hard limit on line length, but if you are going past 80-100 columns quite often, maybe think about breaking lines.
-
-When you decide to break lines for a paramter or argument list, always break after the opening `(`, and put each argument/parameter on its own line:
-
-```c++
-float bigFunc(
-    int     a,
-    float   b,
-    void*   c)
-{
-    ...
-}
-
-float gVar = bigFunc(
-    0,
-    1.0f,
-    data);
-```
-
-You can vertically align succesive lines of code to emphasize common structure, but this is not required:
-
-```c++
-case A_AND_B: doA(); doB(); break;
-case JUST_A:  doA();        break;
-case JUST_B:         doB(); break;
-```
-
-Put space between a control-flow keyword and a following `(`.
-This is a default setting of Visual Studio 2019 and 2022.
-Examples of how to format the major C++ control-flow constructs follow:
-
-```c++
-void example()
-{
-    for (int ii = 0; ii < N; ++ii)
-    {
-        if (ii == 0)
-        {
-        }
-        else
-        {
-        }
-    }
-
-    int x = 0;
-    while (x < 100)
-    {
-        x++;
-    }
-
-    int mode = 0;
-    do
-    {
-        switch (mode)
-        {
-        case 0:
-            x /= 2;
-            /* fallthrough */
-        case 1:
-            x--;
-            mode = 3;
-
-        case 2:
-        default:
-            x++;
-            mode--;
-            break;
-        }
-    } while (x > 0);
-}
-```
-
-Don't put space between a unary operator and its operand.
-Always put space between an assignment (including compound assignment) operator and its operands.
-For other binary operators, use your best judgement.
-
-If you have to line break a binary expression, put the line break after the operator for an assignment, and before the operator before all others.
-
-Intializer lists for constructors get some special-case formatting rules.
-If everything fits on one line, then great:
-
-```c++
-SomeClass::SomeClass()
-    : a(0), b(1), c(2)
-{}
-```
-
-Otherwise, put the line break *before* the comma:
-
-```c++
-SomeClass::SomeClass()
-    : a(0)
-    , b(1)
-    , c(2)
-{}
-```
-
-When working with `static const` arrays, put the outer `{}` for the array on their own line, and then put each element on its own line and aim for vertical alignment.
-
-```c++
-struct Mapping
-{
-    char const* key;
-    char const* val;
-} kMapping[] =
-{
-    { "a", "aardvark" },
-    { "b", "bat" },
-};
-```
-
-A trailing comma should always be used for array initializer lists like this, as well as for `enum` tags.
-
-When writing multi-line macros, the backslash escapes should align vertically.
-For consistentcy, a trailing `\` can be used, followed by a comment to mark the end of the definition:
-
-```c++
-#define FOREACH_ANIMAL(X)   \
-    X(Aardvark)             \
-    X(Bat)                  \
-    /* end */
-```
+If you open a pull request and the formatting is incorrect, you can comment
+`/format` and a bot will format your code for you.
 
 Naming
 ------
@@ -382,7 +237,7 @@ enum
 
 Note that the type name reflects the plural case, while the cases that represent individual bits are named with a singular prefix.
 
-In public APIs, all `enum`s should use the style of separating the type defintion from the `enum`, and all cases should use `SCREAMING_SNAKE_CASE`:
+In public APIs, all `enum`s should use the style of separating the type definition from the `enum`, and all cases should use `SCREAMING_SNAKE_CASE`:
 
 ```c++
 typedef unsigned int SlangAxes;
@@ -400,14 +255,14 @@ enum
 
 ### General
 
-Names should default to the English language and US spellings, to match the dominant conventiosn of contemporary open-source projects.
+Names should default to the English language and US spellings, to match the dominant conventions of contemporary open-source projects.
 
 Function names should either be named with action verbs (`get`, `set`, `create`, `emit`, `parse`, etc.) or read as questions (`isEnabled`, `shouldEmit`, etc.).
 
 Whenever possible, compiler concepts should be named using the most widely-understood term available: e.g., we use `Token` over `Lexeme`, and `Lexer` over `Scanner` simply because they appear to be the more common names.
 
 Avoid abbreviations and initialisms unless they are already widely established across the codebase; a longer name may be cumbersome to write in the moment, but the code will probably be read many more times than it is written, so clarity should be preferred.
-An important exception to this is common compiler concepts or techqniues which may have laboriously long names: e.g., Static Single Assignment (SSA), Sparse Conditional Copy Propagation (SCCP), etc.
+An important exception to this is common compiler concepts or techniques which may have laboriously long names: e.g., Static Single Assignment (SSA), Sparse Conditional Copy Propagation (SCCP), etc.
 
 One gotcha particular to compiler front-ends is that almost every synonym for "type" has some kind of established technical meaning; most notably the term "kind" has a precise meaning that is relevant in our domain.
 It is common practice in C and C++ to define tagged union types with a selector field called a "type" or "kind," which does not usually match this technical definition.

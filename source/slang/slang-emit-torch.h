@@ -12,19 +12,20 @@ class TorchCppSourceEmitter : public CPPSourceEmitter
 public:
     typedef CPPSourceEmitter Super;
 
-    TorchCppSourceEmitter(const Desc& desc) :
-        Super(desc)
+    TorchCppSourceEmitter(const Desc& desc)
+        : Super(desc)
     {
     }
 
 protected:
-    // CPPSourceEmitter overrides 
+    // CPPSourceEmitter overrides
     virtual bool tryEmitInstStmtImpl(IRInst* inst) override;
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) override;
-    virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out) override;
+    virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
+        override;
     virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink) override;
 };
 
-}
+} // namespace Slang
 #endif

@@ -7,6 +7,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+// Passing, but: slang-test: Test context Slang session is leaking #5610
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 // A lot of the setup is the same as for `interface-shader-param`,
 // so look there if you want the comments.

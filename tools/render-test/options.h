@@ -7,16 +7,15 @@
 #define SLANG_HANDLE_RESULT_FAIL(x) assert(!"failure")
 #endif
 
-#include "slang-com-helper.h"
-#include "../../source/core/slang-writer.h"
-
-#include "../../source/core/slang-process-util.h"
-
 #include "../../source/compiler-core/slang-command-line-args.h"
+#include "../../source/core/slang-process-util.h"
+#include "../../source/core/slang-writer.h"
+#include "slang-com-helper.h"
 
 #include <slang-rhi.h>
 
-namespace renderer_test {
+namespace renderer_test
+{
 
 using namespace rhi;
 
@@ -50,16 +49,17 @@ struct Options
     Slang::String appName = "render-test";
     Slang::String sourcePath;
     Slang::String outputPath;
-	ShaderProgramType shaderType = ShaderProgramType::Graphics;
+    ShaderProgramType shaderType = ShaderProgramType::Graphics;
 
-        /// The renderer type inferred from the target language type. Used if a rendererType is not explicitly set.
-    DeviceType targetLanguageDeviceType = DeviceType::Unknown;
-        /// The set render type
-    DeviceType deviceType = DeviceType::Unknown;
+    /// The renderer type inferred from the target language type. Used if a rendererType is not
+    /// explicitly set.
+    DeviceType targetLanguageDeviceType = DeviceType::Default;
+    /// The set render type
+    DeviceType deviceType = DeviceType::Default;
     InputLanguageID inputLanguageID = InputLanguageID::Slang;
     SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 
-        /// Can be used for overriding the profile
+    /// Can be used for overriding the profile
     Slang::String profileName;
 
     bool outputUsingType = false;
@@ -77,19 +77,23 @@ struct Options
 
     Slang::String entryPointName;
 
-    Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
+    Slang::List<Slang::String> renderFeatures; /// Required render features for this test to run
 
-    uint32_t computeDispatchSize[3] = { 1, 1, 1 };
+    uint32_t computeDispatchSize[3] = {1, 1, 1};
 
-    Slang::String nvapiExtnSlot;                               ///< The nvapiRegister to use.
+    Slang::String nvapiExtnSlot; ///< The nvapiRegister to use.
 
-    Slang::DownstreamArgs downstreamArgs;                    ///< Args to downstream tools. Here it's just slang
+    Slang::DownstreamArgs downstreamArgs; ///< Args to downstream tools. Here it's just slang
 
     bool generateSPIRVDirectly = true;
 
     Options() { downstreamArgs.addName("slang"); }
 
-    static SlangResult parse(int argc, const char*const* argv, Slang::WriterHelper stdError, Options& outOptions);
+    static SlangResult parse(
+        int argc,
+        const char* const* argv,
+        Slang::WriterHelper stdError,
+        Options& outOptions);
 };
 
-} // renderer_test
+} // namespace renderer_test

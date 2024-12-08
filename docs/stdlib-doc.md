@@ -60418,7 +60418,7 @@ matrix<T,N,M> fwidth<T, N:int, M:int>(matrix<T,N,M> x);
  This function can be applied to scalars, vectors, and matrices of
  built-in scalar types.
 
- Note: these functions are not curently implemented for Vulkan/SPIR-V output.
+ Note: these functions are not currently implemented for Vulkan/SPIR-V output.
 
 ## Signature 
 

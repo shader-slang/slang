@@ -1,39 +1,38 @@
 // main.cpp
 
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "compiler-core/slang-doc-extractor.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-name-convention-util.h"
+#include "compiler-core/slang-name.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-list.h"
+#include "core/slang-secure-crt.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string-util.h"
+#include "core/slang-string.h"
+#include "core/slang-writer.h"
+#include "macro-writer.h"
+#include "slang-com-helper.h"
+#include "slang-cpp-parser/diagnostics.h"
+#include "slang-cpp-parser/file-util.h"
+#include "slang-cpp-parser/node.h"
+#include "slang-cpp-parser/options.h"
+#include "slang-cpp-parser/parser.h"
+#include "slang-cpp-parser/unit-test.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../source/core/slang-secure-crt.h"
-
-#include "slang-com-helper.h"
-
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-string.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-string-slice-pool.h"
-#include "../../source/core/slang-writer.h"
-#include "../../source/core/slang-file-system.h"
-
-#include "../../source/compiler-core/slang-source-loc.h"
-#include "../../source/compiler-core/slang-lexer.h"
-#include "../../source/compiler-core/slang-diagnostic-sink.h"
-#include "../../source/compiler-core/slang-name.h"
-#include "../../source/compiler-core/slang-name-convention-util.h"
-#include "../../source/compiler-core/slang-doc-extractor.h"
-
-#include "node.h"
-#include "diagnostics.h"
-#include "options.h"
-#include "parser.h"
-#include "macro-writer.h"
-#include "file-util.h"
-#include "unit-test.h"
 
 /*
 Some command lines:
 
--d source/slang slang-ast-support-types.h slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang- -o slang-generated -output-fields -mark-suffix _CLASS
+-d source/slang slang-ast-support-types.h slang-ast-base.h slang-ast-decl.h slang-ast-expr.h
+slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang- -o
+slang-generated -output-fields -mark-suffix _CLASS
 */
 
 namespace CppExtract
@@ -46,24 +45,20 @@ using namespace Slang;
 class App
 {
 public:
-    
     SlangResult execute(const Options& options);
 
-        /// Execute
-    SlangResult executeWithArgs(int argc, const char*const* argv);
+    /// Execute
+    SlangResult executeWithArgs(int argc, const char* const* argv);
 
     const Options& getOptions() const { return m_options; }
 
-    App(DiagnosticSink* sink, SourceManager* sourceManager, RootNamePool* rootNamePool):
-        m_sink(sink),
-        m_sourceManager(sourceManager),
-        m_slicePool(StringSlicePool::Style::Default)
+    App(DiagnosticSink* sink, SourceManager* sourceManager, RootNamePool* rootNamePool)
+        : m_sink(sink), m_sourceManager(sourceManager), m_slicePool(StringSlicePool::Style::Default)
     {
         m_namePool.setRootNamePool(rootNamePool);
     }
 
 protected:
-
     SlangResult _extractDoc(NodeTree* nodeTree);
 
     NamePool m_namePool;
@@ -71,7 +66,7 @@ protected:
     Options m_options;
     DiagnosticSink* m_sink;
     SourceManager* m_sourceManager;
-    
+
     StringSlicePool m_slicePool;
 };
 
@@ -79,7 +74,8 @@ protected:
 // Work out an appropriate search type for a node type.
 //
 // TODO(JS):
-// NOTE! Currently extractor doesn't extract callable types and so doesn't extract callable types parameters
+// NOTE! Currently extractor doesn't extract callable types and so doesn't extract callable types
+// parameters
 static DocMarkupExtractor::SearchStyle _getSearchStyle(Node* node)
 {
     typedef DocMarkupExtractor::SearchStyle SearchStyle;
@@ -91,27 +87,28 @@ static DocMarkupExtractor::SearchStyle _getSearchStyle(Node* node)
 
     switch (node->m_kind)
     {
-        case Node::Kind::Invalid:
+    case Node::Kind::Invalid:
         {
             return SearchStyle::None;
         }
-        case Node::Kind::Field:
+    case Node::Kind::Field:
         {
             return SearchStyle::Variable;
         }
-        case Node::Kind::EnumCase:
+    case Node::Kind::EnumCase:
         {
             return SearchStyle::EnumCase;
         }
-        case Node::Kind::TypeDef:
+    case Node::Kind::TypeDef:
         {
             return SearchStyle::Variable;
         }
-        case Node::Kind::Callable:
+    case Node::Kind::Callable:
         {
             return SearchStyle::Before;
         }
-        default: break;
+    default:
+        break;
     }
 
     // Default is to only allow before.
@@ -162,7 +159,13 @@ SlangResult App::_extractDoc(NodeTree* nodeTree)
 
     DocMarkupExtractor extractor;
 
-    SLANG_RETURN_ON_FAIL(extractor.extract(inputItems.getBuffer(), inputItems.getCount(), m_sourceManager, m_sink, views, outputItems));
+    SLANG_RETURN_ON_FAIL(extractor.extract(
+        inputItems.getBuffer(),
+        inputItems.getCount(),
+        m_sourceManager,
+        m_sink,
+        views,
+        outputItems));
 
     // Put what was extracted into the nodes
     {
@@ -177,7 +180,8 @@ SlangResult App::_extractDoc(NodeTree* nodeTree)
             const auto inputIndex = outputItem.inputIndex;
             const auto& inputItem = inputItems[inputIndex];
 
-            if (inputItem.searchStyle != DocMarkupExtractor::SearchStyle::None && outputItem.text.getLength())
+            if (inputItem.searchStyle != DocMarkupExtractor::SearchStyle::None &&
+                outputItem.text.getLength())
             {
                 Node* node = nodes[inputIndex];
 
@@ -238,15 +242,20 @@ SlangResult App::execute(const Options& options)
     {
         for (TypeSet* typeSet : tree.getTypeSets())
         {
-            // The macro name is in upper snake, so split it 
+            // The macro name is in upper snake, so split it
             List<UnownedStringSlice> slices;
             NameConventionUtil::split(typeSet->m_macroName, slices);
 
             if (typeSet->m_fileMark.getLength() == 0)
             {
                 StringBuilder buf;
-                // Let's guess a 'fileMark' (it becomes part of the filename) based on the macro name. Use lower kabab.
-                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), NameConvention::LowerKabab, buf);
+                // Let's guess a 'fileMark' (it becomes part of the filename) based on the macro
+                // name. Use lower kabab.
+                NameConventionUtil::join(
+                    slices.getBuffer(),
+                    slices.getCount(),
+                    NameConvention::LowerKabab,
+                    buf);
                 typeSet->m_fileMark = buf.produceString();
             }
 
@@ -254,7 +263,11 @@ SlangResult App::execute(const Options& options)
             {
                 // Let's guess a typename if not set -> go with upper camel
                 StringBuilder buf;
-                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), NameConvention::UpperCamel, buf);
+                NameConventionUtil::join(
+                    slices.getBuffer(),
+                    slices.getCount(),
+                    NameConvention::UpperCamel,
+                    buf);
                 typeSet->m_typeName = buf.produceString();
             }
         }
@@ -303,7 +316,7 @@ SlangResult App::execute(const Options& options)
 }
 
 /// Execute
-SlangResult App::executeWithArgs(int argc, const char*const* argv)
+SlangResult App::executeWithArgs(int argc, const char* const* argv)
 {
     Options options;
     OptionsParser optionsParser;
@@ -316,10 +329,13 @@ SlangResult App::executeWithArgs(int argc, const char*const* argv)
 
 
 /*
-The typical command line for producing generated slang files. Can be determined by setting `dumpCommandLine` belong and compiling.
+The typical command line for producing generated slang files. Can be determined by setting
+`dumpCommandLine` belong and compiling.
 
 ```
--d E:\git\slang-jsmall-nvidia\source\slang\ slang-ast-support-types.h slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang- -o slang-generated -output-fields -mark-suffix _CLASS
+-d E:\git\slang-jsmall-nvidia\source\slang\ slang-ast-support-types.h slang-ast-base.h
+slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h
+slang-ast-val.h -strip-prefix slang- -o slang-generated -output-fields -mark-suffix _CLASS
 ```
 
 A command line to try and parse the slang.h
@@ -329,7 +345,7 @@ A command line to try and parse the slang.h
 ```
 */
 
-int main(int argc, const char*const* argv)
+int main(int argc, const char* const* argv)
 {
     using namespace CppExtract;
     using namespace Slang;
@@ -345,8 +361,8 @@ int main(int argc, const char*const* argv)
         DiagnosticSink sink(&sourceManager, Lexer::sourceLocationLexer);
         sink.writer = writer;
 
-        // Set to true to see command line that initiated C++ extractor. Helpful when finding issues from solution building failing, and then so
-        // being able to repeat the issue
+        // Set to true to see command line that initiated C++ extractor. Helpful when finding issues
+        // from solution building failing, and then so being able to repeat the issue
         bool dumpCommandLine = false;
 
         if (dumpCommandLine)
@@ -384,4 +400,3 @@ int main(int argc, const char*const* argv)
     }
     return 0;
 }
-

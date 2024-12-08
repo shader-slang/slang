@@ -3,15 +3,15 @@
 
 namespace Slang
 {
-    struct IRModule;
+struct IRModule;
 
-    struct IRDerivativeCallProcessOptions
-    {
-        // Nothing for now..
-    };
+struct IRDerivativeCallProcessOptions
+{
+    // Nothing for now..
+};
 
-    bool processDerivativeCalls(
-        IRModule*                               module, 
-        IRDerivativeCallProcessOptions const&   options = IRDerivativeCallProcessOptions());
+bool processDerivativeCalls(
+    IRModule* module,
+    IRDerivativeCallProcessOptions const& options = IRDerivativeCallProcessOptions());
 
-}
+} // namespace Slang

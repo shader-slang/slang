@@ -2,35 +2,45 @@
 #include "slang-visual-studio-compiler-util.h"
 
 #include "../core/slang-common.h"
-#include "slang-com-helper.h"
-#include "../core/slang-string-util.h"
 #include "../core/slang-string-slice-pool.h"
+#include "../core/slang-string-util.h"
+#include "slang-com-helper.h"
 
 // if Visual Studio import the visual studio platform specific header
 #if SLANG_VC
-#   include "windows/slang-win-visual-studio-util.h"
+#include "windows/slang-win-visual-studio-util.h"
 #endif
 
 #include "../core/slang-io.h"
-
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-diagnostic-util.h"
-#include "slang-artifact-util.h"
 #include "slang-artifact-representation-impl.h"
+#include "slang-artifact-util.h"
 
 namespace Slang
 {
 
-static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
+static void _addFile(
+    const String& path,
+    const ArtifactDesc& desc,
+    IOSFileArtifactRepresentation* lockFile,
+    List<ComPtr<IArtifact>>& outArtifacts)
 {
-    auto fileRep = OSFileArtifactRepresentation::create(IOSFileArtifactRepresentation::Kind::Owned, path.getUnownedSlice(), lockFile);
+    auto fileRep = OSFileArtifactRepresentation::create(
+        IOSFileArtifactRepresentation::Kind::Owned,
+        path.getUnownedSlice(),
+        lockFile);
     auto artifact = ArtifactUtil::createArtifact(desc);
     artifact->addRepresentation(fileRep);
 
     outArtifacts.add(artifact);
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::calcCompileProducts(const CompileOptions& options, ProductFlags flags, IOSFileArtifactRepresentation* lockFile, List<ComPtr<IArtifact>>& outArtifacts)
+/* static */ SlangResult VisualStudioCompilerUtil::calcCompileProducts(
+    const CompileOptions& options,
+    ProductFlags flags,
+    IOSFileArtifactRepresentation* lockFile,
+    List<ComPtr<IArtifact>>& outArtifacts)
 {
     SLANG_ASSERT(options.modulePath.count);
 
@@ -44,35 +54,67 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
     {
         StringBuilder builder;
         const auto desc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
-        SLANG_RETURN_ON_FAIL(ArtifactDescUtil::calcPathForDesc(desc, modulePath.getUnownedSlice(), builder));
+        SLANG_RETURN_ON_FAIL(
+            ArtifactDescUtil::calcPathForDesc(desc, modulePath.getUnownedSlice(), builder));
 
         _addFile(builder, desc, lockFile, outArtifacts);
     }
     if (flags & ProductFlag::Miscellaneous)
     {
-        
-        _addFile(modulePath + ".ilk", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
+
+        _addFile(
+            modulePath + ".ilk",
+            ArtifactDesc::make(
+                ArtifactKind::BinaryFormat,
+                ArtifactPayload::Unknown,
+                ArtifactStyle::None),
+            lockFile,
+            outArtifacts);
 
         if (options.targetType == SLANG_SHADER_SHARED_LIBRARY)
         {
-            _addFile(modulePath + ".exp", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::Unknown, ArtifactStyle::None), lockFile, outArtifacts);
-            _addFile(modulePath + ".lib", ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
+            _addFile(
+                modulePath + ".exp",
+                ArtifactDesc::make(
+                    ArtifactKind::BinaryFormat,
+                    ArtifactPayload::Unknown,
+                    ArtifactStyle::None),
+                lockFile,
+                outArtifacts);
+            _addFile(
+                modulePath + ".lib",
+                ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::HostCPU, targetDesc),
+                lockFile,
+                outArtifacts);
         }
     }
     if (flags & ProductFlag::Compile)
     {
-        _addFile(modulePath + ".obj", ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, targetDesc), lockFile, outArtifacts);
+        _addFile(
+            modulePath + ".obj",
+            ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::HostCPU, targetDesc),
+            lockFile,
+            outArtifacts);
     }
     if (flags & ProductFlag::Debug)
     {
         // TODO(JS): Could try and determine based on debug information
-        _addFile(modulePath + ".pdb", ArtifactDesc::make(ArtifactKind::BinaryFormat, ArtifactPayload::PdbDebugInfo, targetDesc), lockFile, outArtifacts);
+        _addFile(
+            modulePath + ".pdb",
+            ArtifactDesc::make(
+                ArtifactKind::BinaryFormat,
+                ArtifactPayload::PdbDebugInfo,
+                targetDesc),
+            lockFile,
+            outArtifacts);
     }
 
     return SLANG_OK;
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::calcArgs(const CompileOptions& options, CommandLine& cmdLine)
+/* static */ SlangResult VisualStudioCompilerUtil::calcArgs(
+    const CompileOptions& options,
+    CommandLine& cmdLine)
 {
     SLANG_ASSERT(options.modulePath.count);
 
@@ -112,17 +154,17 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
 
     switch (options.debugInfoType)
     {
-        default:
+    default:
         {
             // Multithreaded statically linked runtime library
             cmdLine.addArg("/MD");
             break;
         }
-        case DebugInfoType::None:
+    case DebugInfoType::None:
         {
             break;
         }
-        case DebugInfoType::Maximal:
+    case DebugInfoType::Maximal:
         {
             // Multithreaded statically linked *debug* runtime library
             cmdLine.addArg("/MDd");
@@ -140,44 +182,48 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
 
     switch (options.optimizationLevel)
     {
-        case OptimizationLevel::None:
+    case OptimizationLevel::None:
         {
             // No optimization
-            cmdLine.addArg("/Od");   
+            cmdLine.addArg("/Od");
             break;
         }
-        case OptimizationLevel::Default:
+    case OptimizationLevel::Default:
         {
             break;
         }
-        case OptimizationLevel::High:
+    case OptimizationLevel::High:
         {
             cmdLine.addArg("/O2");
             break;
         }
-        case OptimizationLevel::Maximal:
+    case OptimizationLevel::Maximal:
         {
             cmdLine.addArg("/Ox");
             break;
         }
-        default: break;
+    default:
+        break;
     }
 
     switch (options.floatingPointMode)
     {
-        case FloatingPointMode::Default: break;
-        case FloatingPointMode::Precise:
+    case FloatingPointMode::Default:
+        break;
+    case FloatingPointMode::Precise:
         {
             // precise is default behavior, VS also has 'strict'
             //
-            // ```/fp:strict has behavior similar to /fp:precise, that is, the compiler preserves the source ordering and rounding properties of floating-point code when
-            // it generates and optimizes object code for the target machine, and observes the standard when handling special values. In addition, the program may safely
-            // access or modify the floating-point environment at runtime.```
+            // ```/fp:strict has behavior similar to /fp:precise, that is, the compiler preserves
+            // the source ordering and rounding properties of floating-point code when it generates
+            // and optimizes object code for the target machine, and observes the standard when
+            // handling special values. In addition, the program may safely access or modify the
+            // floating-point environment at runtime.```
 
             cmdLine.addArg("/fp:precise");
             break;
         }
-        case FloatingPointMode::Fast:
+    case FloatingPointMode::Fast:
         {
             cmdLine.addArg("/fp:fast");
             break;
@@ -188,8 +234,8 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
 
     switch (options.targetType)
     {
-        case SLANG_SHADER_SHARED_LIBRARY:
-        case SLANG_HOST_SHARED_LIBRARY:
+    case SLANG_SHADER_SHARED_LIBRARY:
+    case SLANG_HOST_SHARED_LIBRARY:
         {
             // Create dynamic link library
             if (options.debugInfoType == DebugInfoType::None)
@@ -204,12 +250,13 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
             cmdLine.addPrefixPathArg("/Fe", modulePath, ".dll");
             break;
         }
-        case SLANG_HOST_EXECUTABLE:
+    case SLANG_HOST_EXECUTABLE:
         {
             cmdLine.addPrefixPathArg("/Fe", modulePath, ".exe");
             break;
         }
-        default: break;
+    default:
+        break;
     }
 
     // Object file specify it's location - needed if we are out
@@ -244,12 +291,12 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
     {
         ComPtr<IOSFileArtifactRepresentation> fileRep;
 
-        // TODO(JS): 
+        // TODO(JS):
         // Do we want to keep the file on the file system? It's probably reasonable to do so.
         SLANG_RETURN_ON_FAIL(sourceArtifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
         cmdLine.addArg(fileRep->getPath());
     }
-    
+
     // Link options (parameters past /link go to linker)
     cmdLine.addArg("/link");
 
@@ -288,7 +335,9 @@ static void _addFile(const String& path, const ArtifactDesc& desc, IOSFileArtifa
     return SLANG_OK;
 }
 
-static SlangResult _parseSeverity(const UnownedStringSlice& in, ArtifactDiagnostic::Severity& outSeverity)
+static SlangResult _parseSeverity(
+    const UnownedStringSlice& in,
+    ArtifactDiagnostic::Severity& outSeverity)
 {
     typedef ArtifactDiagnostic::Severity Severity;
 
@@ -311,7 +360,10 @@ static SlangResult _parseSeverity(const UnownedStringSlice& in, ArtifactDiagnost
     return SLANG_OK;
 }
 
-static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const UnownedStringSlice& line, ArtifactDiagnostic& outDiagnostic)
+static SlangResult _parseVisualStudioLine(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& line,
+    ArtifactDiagnostic& outDiagnostic)
 {
     typedef IArtifactDiagnostics::Diagnostic Diagnostic;
 
@@ -328,8 +380,8 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
 
     outDiagnostic.stage = ArtifactDiagnostic::Stage::Compile;
 
-    const char*const start = line.begin();
-    const char*const end = line.end();
+    const char* const start = line.begin();
+    const char* const end = line.end();
 
     UnownedStringSlice postPath;
     // Handle the path and line no
@@ -409,7 +461,8 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
             return SLANG_FAIL;
         }
 
-        const UnownedStringSlice errorSection = UnownedStringSlice(postPath.begin(), postPath.begin() + errorColonIndex);
+        const UnownedStringSlice errorSection =
+            UnownedStringSlice(postPath.begin(), postPath.begin() + errorColonIndex);
         Index errorCodeIndex = errorSection.lastIndexOf(' ');
         if (errorCodeIndex < 0)
         {
@@ -417,17 +470,20 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
         }
 
         // Extract the code
-        outDiagnostic.code = allocator.allocate(errorSection.begin() + errorCodeIndex + 1, errorSection.end());
+        outDiagnostic.code =
+            allocator.allocate(errorSection.begin() + errorCodeIndex + 1, errorSection.end());
         if (asStringSlice(outDiagnostic.code).startsWith(UnownedStringSlice::fromLiteral("LNK")))
         {
             outDiagnostic.stage = Diagnostic::Stage::Link;
         }
 
         // Extract the bit before the code
-        SLANG_RETURN_ON_FAIL(_parseSeverity(UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim(), outDiagnostic.severity));
+        SLANG_RETURN_ON_FAIL(_parseSeverity(
+            UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim(),
+            outDiagnostic.severity));
 
         // Link codes start with LNK prefix
-        postError = UnownedStringSlice(postPath.begin() + errorColonIndex + 1, end); 
+        postError = UnownedStringSlice(postPath.begin() + errorColonIndex + 1, end);
     }
 
     outDiagnostic.text = allocator.allocate(postError);
@@ -435,7 +491,9 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
     return SLANG_OK;
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::parseOutput(const ExecuteResult& exeRes, IArtifactDiagnostics* diagnostics)
+/* static */ SlangResult VisualStudioCompilerUtil::parseOutput(
+    const ExecuteResult& exeRes,
+    IArtifactDiagnostics* diagnostics)
 {
     diagnostics->reset();
 
@@ -466,7 +524,7 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
     return SLANG_OK;
 }
 
-/* static */SlangResult VisualStudioCompilerUtil::locateCompilers(
+/* static */ SlangResult VisualStudioCompilerUtil::locateCompilers(
     const String& path,
     ISlangSharedLibraryLoader* loader,
     [[maybe_unused]] DownstreamCompilerSet* set)
@@ -484,4 +542,4 @@ static SlangResult _parseVisualStudioLine(SliceAllocator& allocator, const Unown
     return SLANG_OK;
 }
 
-}
+} // namespace Slang

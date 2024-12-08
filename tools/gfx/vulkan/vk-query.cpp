@@ -67,12 +67,18 @@ Result QueryPoolImpl::getResult(GfxIndex index, GfxCount count, uint64_t* data)
 }
 
 void _writeTimestamp(
-    VulkanApi* api, VkCommandBuffer vkCmdBuffer, IQueryPool* queryPool, SlangInt index)
+    VulkanApi* api,
+    VkCommandBuffer vkCmdBuffer,
+    IQueryPool* queryPool,
+    SlangInt index)
 {
     auto queryPoolImpl = static_cast<QueryPoolImpl*>(queryPool);
     api->vkCmdResetQueryPool(vkCmdBuffer, queryPoolImpl->m_pool, (uint32_t)index, 1);
     api->vkCmdWriteTimestamp(
-        vkCmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, queryPoolImpl->m_pool, (uint32_t)index);
+        vkCmdBuffer,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        queryPoolImpl->m_pool,
+        (uint32_t)index);
 }
 
 } // namespace vk

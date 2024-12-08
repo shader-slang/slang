@@ -10,14 +10,14 @@
 // CHECK_GLSL_LINEAR_C: layout(derivative_group_linearNV)
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_C): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD -DCOMPUTE
-// CHECK_SPV_QUAD_C: DerivativeGroupQuadsNV
-// CHECK_SPV_QUAD_C-NOT: DerivativeGroupQuadsNV
+// CHECK_SPV_QUAD_C: DerivativeGroupQuads{{NV|KHR}}
+// CHECK_SPV_QUAD_C-NOT: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_C: "SPV_NV_compute_shader_derivatives"
 // CHECK_SPV_QUAD_C-NOT: "SPV_NV_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR -DCOMPUTE
-// CHECK_SPV_LINEAR_C: DerivativeGroupLinearNV
-// CHECK_SPV_LINEAR_C-NOT: DerivativeGroupLinearNV
+// CHECK_SPV_LINEAR_C: DerivativeGroupLinear{{NV|KHR}}
+// CHECK_SPV_LINEAR_C-NOT: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_C: "SPV_NV_compute_shader_derivatives"
 // CHECK_SPV_LINEAR_C-NOT: "SPV_NV_compute_shader_derivatives"
 
@@ -28,11 +28,11 @@
 // CHECK_GLSL_F-NOT: GL_NV_compute_shader_derivatives
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_F): -allow-glsl -stage fragment -entry computeMain -target spirv -DQUAD
-// CHECK_SPV_QUAD_F-NOT: DerivativeGroupQuadsNV
+// CHECK_SPV_QUAD_F-NOT: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_F-NOT: "SPV_NV_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_F): -allow-glsl -stage fragment -entry computeMain -target spirv -DLINEAR
-// CHECK_SPV_LINEAR_F-NOT: DerivativeGroupLinearNV
+// CHECK_SPV_LINEAR_F-NOT: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_F-NOT: "SPV_NV_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL_QUAD_F): -allow-glsl -stage fragment -entry computeMain -target glsl

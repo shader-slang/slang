@@ -1,14 +1,14 @@
 #include "slang-ir-glsl-liveness.h"
 
+#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
-
-#include "slang-ir-dominators.h"
 
 namespace Slang
 {
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct GLSLLivenessContext
 {
@@ -19,18 +19,18 @@ struct GLSLLivenessContext
         CountOf,
     };
 
-        /// Process the module
+    /// Process the module
     void processModule();
 
-    GLSLLivenessContext(IRModule* module):
-        m_module(module), m_builder(module)
+    GLSLLivenessContext(IRModule* module)
+        : m_module(module), m_builder(module)
     {
     }
 
     void _replaceMarker(IRLiveRangeMarker* liveMarker);
     void _addDecorations(Kind kind, IRFunc* func);
 
-        /// Process a function in the module
+    /// Process a function in the module
     void _processFunction(IRFunc* funcInst);
 
     IRType* _getReferencedType(IRInst* referenced);
@@ -39,9 +39,12 @@ struct GLSLLivenessContext
     {
         switch (op)
         {
-            case kIROp_LiveRangeStart: return Kind::Start;
-            case kIROp_LiveRangeEnd:   return Kind::End;
-            default: break;
+        case kIROp_LiveRangeStart:
+            return Kind::Start;
+        case kIROp_LiveRangeEnd:
+            return Kind::End;
+        default:
+            break;
         }
         SLANG_UNREACHABLE("Invalid op");
     }
@@ -49,17 +52,18 @@ struct GLSLLivenessContext
     // Entry holds information about each of the function kinds
     struct Entry
     {
-        Dictionary<IRType*, IRFunc*> m_funcs;       ///< Map of the parameter type to functions implementing (for the kind)
-        IRStringLit* m_nameHintLiteral = nullptr;   ///< Name hint string literal of the function 
-        IRInst* m_spirvOpLiteral = nullptr;         ///< The SPIR-V opcode for the kind
+        Dictionary<IRType*, IRFunc*>
+            m_funcs; ///< Map of the parameter type to functions implementing (for the kind)
+        IRStringLit* m_nameHintLiteral = nullptr; ///< Name hint string literal of the function
+        IRInst* m_spirvOpLiteral = nullptr;       ///< The SPIR-V opcode for the kind
     };
 
-    List<IRLiveRangeMarker*> m_markerInsts;         ///< All of the liveness marker instrucitons found
+    List<IRLiveRangeMarker*> m_markerInsts; ///< All of the liveness marker instrucitons found
 
-    Entry m_entries[Index(Kind::CountOf)];          /// Entry for each kind of function
+    Entry m_entries[Index(Kind::CountOf)]; /// Entry for each kind of function
 
-    IRInst* m_zeroIntLiteral = nullptr;                     ///< Zero value literal
-    IRType* m_spirvIntLiteralType = nullptr;                ///< Int type that emits as `spirv_literal`
+    IRInst* m_zeroIntLiteral = nullptr;      ///< Zero value literal
+    IRType* m_spirvIntLiteralType = nullptr; ///< Int type that emits as `spirv_literal`
 
     IRModule* m_module;
     IRBuilder m_builder;
@@ -120,7 +124,7 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
     IRType* referencedType = _getReferencedType(referenced);
 
     IRFunc* func = nullptr;
-    
+
     if (IRFunc** funcPtr = entry.m_funcs.tryGetValue(referencedType))
     {
         func = *funcPtr;
@@ -131,15 +135,17 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
         //
         // void func(Ref<ReferencedType> target, int sizeInBytes)
 
-        IRType* paramTypes[] = 
-        {
-            m_builder.getRefType(referencedType, AddressSpace::Generic),       ///< Use a reference to the referenced type
-            m_spirvIntLiteralType,                      ///< The size type
+        IRType* paramTypes[] = {
+            m_builder.getRefType(
+                referencedType,
+                AddressSpace::Generic), ///< Use a reference to the referenced type
+            m_spirvIntLiteralType,      ///< The size type
         };
 
         func = m_builder.createFunc();
 
-        auto funcType = m_builder.getFuncType(SLANG_COUNT_OF(paramTypes), paramTypes, m_builder.getVoidType());
+        auto funcType =
+            m_builder.getFuncType(SLANG_COUNT_OF(paramTypes), paramTypes, m_builder.getVoidType());
         m_builder.setDataType(func, funcType);
 
         // Add any decorations to the new function
@@ -155,10 +161,9 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
 
     // As per the SPIR-V documentation around the OpLifetimeStart/OpLifetimeEnd
     // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#OpLifetimeStart
-    // 
+    //
     // If the type is known the size should be passed as 0
-    IRInst* args[] = 
-    {
+    IRInst* args[] = {
         referenced,
         m_zeroIntLiteral,
     };
@@ -189,7 +194,7 @@ void GLSLLivenessContext::processModule()
             _processFunction(funcInst);
         }
     }
-    
+
     // If we didn't find any liveness marker instructions then we are done
     if (!m_markerInsts.getCount())
     {
@@ -202,8 +207,9 @@ void GLSLLivenessContext::processModule()
     // Zero value literal
     m_zeroIntLiteral = m_builder.getIntValue(m_builder.getIntType(), 0);
 
-    // We don't need to explicitly add this decoration because it will be added as needed on GLSL emit
-    // m_extensionStringLiteral = m_builder.getStringValue(UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics"));
+    // We don't need to explicitly add this decoration because it will be added as needed on GLSL
+    // emit m_extensionStringLiteral =
+    // m_builder.getStringValue(UnownedStringSlice::fromLiteral("GL_EXT_spirv_intrinsics"));
 
     // Set up some values that will be needed on instructions
 
@@ -212,23 +218,26 @@ void GLSLLivenessContext::processModule()
 
     {
         auto& entry = m_entries[Index(Kind::Start)];
-        entry.m_nameHintLiteral = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessStart"));
+        entry.m_nameHintLiteral =
+            m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessStart"));
         entry.m_spirvOpLiteral = m_builder.getIntValue(m_builder.getIntType(), 256);
     }
     {
         auto& entry = m_entries[Index(Kind::End)];
-        entry.m_nameHintLiteral = m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessEnd"));
+        entry.m_nameHintLiteral =
+            m_builder.getStringValue(UnownedStringSlice::fromLiteral("livenessEnd"));
         entry.m_spirvOpLiteral = m_builder.getIntValue(m_builder.getIntType(), 257);
     }
 
-    // Iterate across instructions, replacing with a call to a generated function (one that just is a declaration defining the SPIR-V op)
+    // Iterate across instructions, replacing with a call to a generated function (one that just is
+    // a declaration defining the SPIR-V op)
     for (auto markerInst : m_markerInsts)
     {
         _replaceMarker(markerInst);
     }
 }
 
-} // anonymous
+} // namespace
 
 void applyGLSLLiveness(IRModule* module)
 {
@@ -238,4 +247,3 @@ void applyGLSLLiveness(IRModule* module)
 }
 
 } // namespace Slang
-    

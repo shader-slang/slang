@@ -1,9 +1,11 @@
 // slang-ast-print.cpp
 #include "slang-ast-print.h"
 
+#include "core/slang-char-util.h"
 #include "slang-check-impl.h"
 
-namespace Slang {
+namespace Slang
+{
 
 ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
 {
@@ -12,14 +14,22 @@ ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
 
     switch (type)
     {
-        case Type::ParamType:           return Kind::Type;
-        case Type::ParamName:           return Kind::Name;
-        case Type::ReturnType:          return Kind::Type;
-        case Type::DeclPath:            return Kind::Name;
-        case Type::GenericParamType:    return Kind::Type;
-        case Type::GenericParamValue:   return Kind::Value; 
-        case Type::GenericParamValueType:    return Kind::Type;
-        default: break;
+    case Type::ParamType:
+        return Kind::Type;
+    case Type::ParamName:
+        return Kind::Name;
+    case Type::ReturnType:
+        return Kind::Type;
+    case Type::DeclPath:
+        return Kind::Name;
+    case Type::GenericParamType:
+        return Kind::Type;
+    case Type::GenericParamValue:
+        return Kind::Value;
+    case Type::GenericParamValueType:
+        return Kind::Type;
+    default:
+        break;
     }
     return Kind::None;
 }
@@ -69,7 +79,7 @@ void ASTPrinter::addVal(Val* val)
     val->toText(m_builder);
 }
 
-/* static */void ASTPrinter::appendDeclName(Decl* decl, StringBuilder& out)
+/* static */ void ASTPrinter::appendDeclName(Decl* decl, StringBuilder& out)
 {
     if (as<ConstructorDecl>(decl))
     {
@@ -81,7 +91,11 @@ void ASTPrinter::addVal(Val* val)
     }
     else
     {
-        out << getText(decl->getName());
+        auto text = getText(decl->getName());
+        if (text.getLength() && !(CharUtil::isAlphaOrDigit(text[0]) || text[0] == '_'))
+            out << "operator" << text;
+        else
+            out << text;
     }
 }
 
@@ -126,20 +140,30 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     else if (auto namespaceDeclRef = parentDeclRef.as<NamespaceDecl>())
     {
         _addDeclPathRec(namespaceDeclRef, depth + 1);
-        // Hmm, it could be argued that we follow the . as seen in AggType as is followed in some other languages
-        // like Java.
-        // That it is useful to have a distinction between something that is a member/method and something that is
-        // in a scope (such as a namespace), and is something that has returned to later languages probably for that
-        // reason (Slang accepts . or ::). So for now this is follows the :: convention.
+        // Hmm, it could be argued that we follow the . as seen in AggType as is followed in some
+        // other languages like Java. That it is useful to have a distinction between something that
+        // is a member/method and something that is in a scope (such as a namespace), and is
+        // something that has returned to later languages probably for that reason (Slang accepts .
+        // or ::). So for now this is follows the :: convention.
         //
-        // It could be argued them that the previous '.' use should vary depending on that distinction.
-        
+        // It could be argued them that the previous '.' use should vary depending on that
+        // distinction.
+
         sb << toSlice("::");
     }
     else if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
     {
         ExtensionDecl* extensionDecl = as<ExtensionDecl>(parentDeclRef.getDecl());
         Type* type = extensionDecl->targetType.type;
+        if (m_optionFlags & OptionFlag::NoSpecializedExtensionTypeName)
+        {
+            if (auto unspecializedDeclRef = isDeclRefTypeOf<Decl>(type))
+            {
+                type = DeclRefType::create(
+                    m_astBuilder,
+                    unspecializedDeclRef.getDecl()->getDefaultDeclRef());
+            }
+        }
         addType(type);
         sb << toSlice(".");
     }
@@ -159,7 +183,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
         Name* moduleName = moduleDecl->getName();
         if ((m_optionFlags & OptionFlag::ModuleName) && moduleName)
         {
-            sb << moduleName->text; 
+            sb << moduleName->text;
         }
         return;
     }
@@ -168,11 +192,11 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
     // If the parent declaration is a generic, then we need to print out its
     // signature
-    if (parentGenericDeclRef && 
-        !declRef.as<GenericValueParamDecl>() &&
+    if (parentGenericDeclRef && !declRef.as<GenericValueParamDecl>() &&
         !declRef.as<GenericTypeParamDeclBase>())
     {
-        auto substArgs = tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
+        auto substArgs =
+            tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
         if (substArgs.getCount())
         {
             // If the name we printed previously was an operator
@@ -201,7 +225,8 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
                 if (as<Witness>(arg))
                     continue;
 
-                if (!first) sb << ", ";
+                if (!first)
+                    sb << ", ";
                 addVal(arg);
                 first = false;
             }
@@ -225,7 +250,8 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
     {
         if (auto genericTypeParam = paramDeclRef.as<GenericTypeParamDecl>())
         {
-            if (!first) sb << ", ";
+            if (!first)
+                sb << ", ";
             first = false;
 
             {
@@ -235,7 +261,8 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
         }
         else if (auto genericValParam = paramDeclRef.as<GenericValueParamDecl>())
         {
-            if (!first) sb << ", ";
+            if (!first)
+                sb << ", ";
             first = false;
 
             {
@@ -252,7 +279,8 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
         }
         else if (auto genericTypePackParam = paramDeclRef.as<GenericTypePackParamDecl>())
         {
-            if (!first) sb << ", ";
+            if (!first)
+                sb << ", ";
             first = false;
             {
                 ScopePart scopePart(this, Part::Type::GenericParamType);
@@ -286,7 +314,11 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
 
             auto addParamElement = [&](Type* type, Index elementIndex)
             {
-                if (!first) sb << ", ";
+                if (!first)
+                {
+                    sb << ", ";
+                    rangeStart += 2;
+                }
 
                 // Type part.
                 {
@@ -337,7 +369,8 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
             };
             if (auto typePack = as<ConcreteTypePack>(paramType))
             {
-                for (Index elementIndex = 0; elementIndex < typePack->getTypeCount(); ++elementIndex)
+                for (Index elementIndex = 0; elementIndex < typePack->getTypeCount();
+                     ++elementIndex)
                 {
                     addParamElement(typePack->getElementType(elementIndex), elementIndex);
                 }
@@ -354,7 +387,9 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
     {
         addGenericParams(genericDeclRef);
 
-        addDeclParams(m_astBuilder->getMemberDeclRef(genericDeclRef, genericDeclRef.getDecl()->inner), outParamRange);
+        addDeclParams(
+            m_astBuilder->getMemberDeclRef(genericDeclRef, genericDeclRef.getDecl()->inner),
+            outParamRange);
     }
     else
     {
@@ -480,7 +515,8 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     DeclRef<Decl> declRef = inDeclRef;
     if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
-        declRef = m_astBuilder->getMemberDeclRef<Decl>(genericDeclRef, genericDeclRef.getDecl()->inner);
+        declRef =
+            m_astBuilder->getMemberDeclRef<Decl>(genericDeclRef, genericDeclRef.getDecl()->inner);
     }
 
     if (declRef.as<ConstructorDecl>())
@@ -505,7 +541,7 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     }
 }
 
-/* static */void ASTPrinter::addDeclSignature(const DeclRef<Decl>& declRef)
+/* static */ void ASTPrinter::addDeclSignature(const DeclRef<Decl>& declRef)
 {
     addDeclKindPrefix(declRef.getDecl());
     addDeclPath(declRef);
@@ -513,7 +549,9 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     addDeclResultType(declRef);
 }
 
-/* static */String ASTPrinter::getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder)
+/* static */ String ASTPrinter::getDeclSignatureString(
+    DeclRef<Decl> declRef,
+    ASTBuilder* astBuilder)
 {
     ASTPrinter astPrinter(
         astBuilder,
@@ -522,14 +560,20 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     return astPrinter.getString();
 }
 
-/* static */String ASTPrinter::getDeclSignatureString(const LookupResultItem& item, ASTBuilder* astBuilder)
+/* static */ String ASTPrinter::getDeclSignatureString(
+    const LookupResultItem& item,
+    ASTBuilder* astBuilder)
 {
     return getDeclSignatureString(item.declRef, astBuilder);
 }
 
-/* static */UnownedStringSlice ASTPrinter::getPart(Part::Type partType, const UnownedStringSlice& slice, const List<Part>& parts)
+/* static */ UnownedStringSlice ASTPrinter::getPart(
+    Part::Type partType,
+    const UnownedStringSlice& slice,
+    const List<Part>& parts)
 {
-    const Index index = parts.findFirstIndex([&](const Part& part) -> bool { return part.type == partType; });
+    const Index index =
+        parts.findFirstIndex([&](const Part& part) -> bool { return part.type == partType; });
     return index >= 0 ? getPart(slice, parts[index]) : UnownedStringSlice();
 }
 

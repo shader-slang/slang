@@ -36,7 +36,10 @@ CommandQueueImpl::~CommandQueueImpl()
 }
 
 SLANG_NO_THROW void SLANG_MCALL CommandQueueImpl::executeCommandBuffers(
-    GfxCount count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
+    GfxCount count,
+    ICommandBuffer* const* commandBuffers,
+    IFence* fence,
+    uint64_t valueToSignal)
 {
     SLANG_UNUSED(valueToSignal);
     // TODO: implement fence.
@@ -55,7 +58,9 @@ SLANG_NO_THROW void SLANG_MCALL CommandQueueImpl::waitOnHost()
 }
 
 SLANG_NO_THROW Result SLANG_MCALL CommandQueueImpl::waitForFenceValuesOnDevice(
-    GfxCount fenceCount, IFence** fences, uint64_t* waitValues)
+    GfxCount fenceCount,
+    IFence** fences,
+    uint64_t* waitValues)
 {
     return SLANG_FAIL;
 }
@@ -115,8 +120,7 @@ void CommandQueueImpl::dispatchCompute(int x, int y, int z)
     // stored in host memory in a CUDAEntryPointShaderObject, as expected by cuLaunchKernel.
     //
     auto entryPointBuffer = currentRootObject->entryPointObjects[kernelId]->getBuffer();
-    auto entryPointDataSize =
-        currentRootObject->entryPointObjects[kernelId]->getBufferSize();
+    auto entryPointDataSize = currentRootObject->entryPointObjects[kernelId]->getBufferSize();
 
     void* extraOptions[] = {
         CU_LAUNCH_PARAM_BUFFER_POINTER,
@@ -160,13 +164,14 @@ void CommandQueueImpl::copyBuffer(
         size);
 }
 
-void CommandQueueImpl::uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data)
+void CommandQueueImpl::uploadBufferData(
+    IBufferResource* dst,
+    size_t offset,
+    size_t size,
+    void* data)
 {
     auto dstImpl = static_cast<BufferResourceImpl*>(dst);
-    cuMemcpy(
-        (CUdeviceptr)((uint8_t*)dstImpl->m_cudaMemory + offset),
-        (CUdeviceptr)data,
-        size);
+    cuMemcpy((CUdeviceptr)((uint8_t*)dstImpl->m_cudaMemory + offset), (CUdeviceptr)data, size);
 }
 
 void CommandQueueImpl::writeTimestamp(IQueryPool* pool, SlangInt index)
@@ -185,12 +190,10 @@ void CommandQueueImpl::execute(CommandBufferImpl* commandBuffer)
             setPipelineState(commandBuffer->getObject<PipelineStateBase>(cmd.operands[0]));
             break;
         case CommandName::BindRootShaderObject:
-            bindRootShaderObject(
-                commandBuffer->getObject<ShaderObjectBase>(cmd.operands[0]));
+            bindRootShaderObject(commandBuffer->getObject<ShaderObjectBase>(cmd.operands[0]));
             break;
         case CommandName::DispatchCompute:
-            dispatchCompute(
-                int(cmd.operands[0]), int(cmd.operands[1]), int(cmd.operands[2]));
+            dispatchCompute(int(cmd.operands[0]), int(cmd.operands[1]), int(cmd.operands[2]));
             break;
         case CommandName::CopyBuffer:
             copyBuffer(

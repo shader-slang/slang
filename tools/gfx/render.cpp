@@ -1,13 +1,14 @@
 // render.cpp
-#include "renderer-shared.h"
-#include "../../source/core/slang-math.h"
 #include "../../source/core/slang-blob.h"
-#include "open-gl/render-gl.h"
+#include "../../source/core/slang-math.h"
 #include "debug-layer/debug-device.h"
+#include "open-gl/render-gl.h"
+#include "renderer-shared.h"
 
 #include <cstring>
 
-namespace gfx {
+namespace gfx
+{
 using namespace Slang;
 
 Result SLANG_MCALL createD3D11Device(const IDevice::Desc* desc, IDevice** outDevice);
@@ -26,16 +27,16 @@ Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters);
 Result SLANG_MCALL reportD3DLiveObjects();
 
 static bool debugLayerEnabled = false;
-bool isGfxDebugLayerEnabled() { return debugLayerEnabled; }
+bool isGfxDebugLayerEnabled()
+{
+    return debugLayerEnabled;
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Global Renderer Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 #define GFX_FORMAT_SIZE(name, blockSizeInBytes, pixelsPerBlock) {blockSizeInBytes, pixelsPerBlock},
 
-static const uint32_t s_formatSizeInfo[][2] =
-{
-    GFX_FORMAT(GFX_FORMAT_SIZE)
-};
+static const uint32_t s_formatSizeInfo[][2] = {GFX_FORMAT(GFX_FORMAT_SIZE)};
 
 static bool _checkFormat()
 {
@@ -43,7 +44,8 @@ static bool _checkFormat()
     Index count = 0;
 
     // Check the values are in the same order
-#define GFX_FORMAT_CHECK(name, blockSizeInBytes, pixelsPerblock) count += Index(Index(Format::name) == value++);
+#define GFX_FORMAT_CHECK(name, blockSizeInBytes, pixelsPerblock) \
+    count += Index(Index(Format::name) == value++);
     GFX_FORMAT(GFX_FORMAT_CHECK)
 
     const bool r = (count == Index(Format::_Count));
@@ -170,7 +172,12 @@ struct FormatInfoMap
         set(Format::BC7_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
     }
 
-    void set(Format format, SlangScalarType type, Index channelCount, uint32_t blockWidth = 1, uint32_t blockHeight = 1)
+    void set(
+        Format format,
+        SlangScalarType type,
+        Index channelCount,
+        uint32_t blockWidth = 1,
+        uint32_t blockHeight = 1)
     {
         FormatInfo& info = m_infos[Index(format)];
         info.channelCount = uint8_t(channelCount);
@@ -249,7 +256,8 @@ extern "C"
         return SLANG_OK;
     }
 
-    SLANG_GFX_API SlangResult SLANG_MCALL gfxGetAdapters(DeviceType type, ISlangBlob** outAdaptersBlob)
+    SLANG_GFX_API SlangResult SLANG_MCALL
+    gfxGetAdapters(DeviceType type, ISlangBlob** outAdaptersBlob)
     {
         List<AdapterInfo> adapters;
 
@@ -290,7 +298,8 @@ extern "C"
             return SLANG_E_INVALID_ARG;
         }
 
-        auto adaptersBlob = RawBlob::create(adapters.getBuffer(), adapters.getCount() * sizeof(AdapterInfo));
+        auto adaptersBlob =
+            RawBlob::create(adapters.getBuffer(), adapters.getCount() * sizeof(AdapterInfo));
         if (outAdaptersBlob)
             returnComPtr(outAdaptersBlob, adaptersBlob);
 
@@ -340,37 +349,37 @@ extern "C"
             break;
 #elif SLANG_APPLE_FAMILY
         case DeviceType::Vulkan:
-        {
-            return createVKDevice(desc, outDevice);
-        }
+            {
+                return createVKDevice(desc, outDevice);
+            }
         case DeviceType::Metal:
-        {
-            return createMetalDevice(desc, outDevice);
-        }
+            {
+                return createMetalDevice(desc, outDevice);
+            }
         case DeviceType::Default:
-        {
-            IDevice::Desc newDesc = *desc;
-            newDesc.deviceType = DeviceType::Metal;
-            if (_createDevice(&newDesc, outDevice) == SLANG_OK)
-                return SLANG_OK;
-            newDesc.deviceType = DeviceType::Vulkan;
-            if (_createDevice(&newDesc, outDevice) == SLANG_OK)
-                return SLANG_OK;
-            return SLANG_FAIL;
-        }
+            {
+                IDevice::Desc newDesc = *desc;
+                newDesc.deviceType = DeviceType::Metal;
+                if (_createDevice(&newDesc, outDevice) == SLANG_OK)
+                    return SLANG_OK;
+                newDesc.deviceType = DeviceType::Vulkan;
+                if (_createDevice(&newDesc, outDevice) == SLANG_OK)
+                    return SLANG_OK;
+                return SLANG_FAIL;
+            }
 #elif SLANG_LINUX_FAMILY && !defined(__CYGWIN__)
         case DeviceType::Vulkan:
-        {
-            return createVKDevice(desc, outDevice);
-        }
+            {
+                return createVKDevice(desc, outDevice);
+            }
         case DeviceType::Default:
-        {
-            IDevice::Desc newDesc = *desc;
-            newDesc.deviceType = DeviceType::Vulkan;
-            if (_createDevice(&newDesc, outDevice) == SLANG_OK)
-                return SLANG_OK;
-            return SLANG_FAIL;
-        }
+            {
+                IDevice::Desc newDesc = *desc;
+                newDesc.deviceType = DeviceType::Vulkan;
+                if (_createDevice(&newDesc, outDevice) == SLANG_OK)
+                    return SLANG_OK;
+                return SLANG_FAIL;
+            }
 #endif
         case DeviceType::CUDA:
             {
@@ -388,7 +397,7 @@ extern "C"
     }
 
     SLANG_GFX_API SlangResult SLANG_MCALL
-        gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice)
+    gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice)
     {
         ComPtr<IDevice> innerDevice;
         auto resultCode = _createDevice(desc, innerDevice.writeRef());
@@ -405,8 +414,7 @@ extern "C"
         return resultCode;
     }
 
-    SLANG_GFX_API SlangResult SLANG_MCALL
-        gfxReportLiveObjects()
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxReportLiveObjects()
     {
 #if SLANG_ENABLE_DIRECTX
         SLANG_RETURN_ON_FAIL(reportD3DLiveObjects());
@@ -478,4 +486,4 @@ extern "C"
     }
 }
 
-} // renderer_test
+} // namespace gfx

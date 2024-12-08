@@ -1,10 +1,11 @@
 // slang-ir-string-hash.cpp
 #include "slang-ir-string-hash.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
-namespace Slang {
+namespace Slang
+{
 
 static void _findGetStringHashRec(IRInst* inst, List<IRGetStringHash*>& outInsts)
 {
@@ -27,9 +28,10 @@ void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
 {
     IRModuleInst* moduleInst = module->getModuleInst();
 
-    for(IRInst* child : moduleInst->getChildren())
+    for (IRInst* child : moduleInst->getChildren())
     {
-        if (IRGlobalHashedStringLiterals* hashedStringLits = as<IRGlobalHashedStringLiterals>(child))
+        if (IRGlobalHashedStringLiterals* hashedStringLits =
+                as<IRGlobalHashedStringLiterals>(child))
         {
             const Index count = hashedStringLits->getOperandCount();
             for (Index i = 0; i < count; ++i)
@@ -50,7 +52,7 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module
     }
 
     IRBuilder builder(module);
-    
+
     // We need to add a global instruction that references all of these string literals
     builder.setInsertInto(module->getModuleInst());
 
@@ -92,8 +94,8 @@ Result checkGetStringHashInsts(IRModule* module, DiagnosticSink* sink)
             return SLANG_FAIL;
         }
     }
-    
+
     return SLANG_OK;
 }
 
-}
+} // namespace Slang

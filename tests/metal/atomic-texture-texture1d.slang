@@ -128,7 +128,7 @@ void test()
 	InterlockedOr(intTexture1DArray[0], valInt, originalValueInt);
 	InterlockedXor(intTexture1DArray[0], valInt, originalValueInt);
 	InterlockedExchange(intTexture1DArray[0], valInt, originalValueInt);
-	InterlockedCompareExchange(intTexture1DArray[0], valInt, compareValueInt, originalValueUInt);
+	InterlockedCompareExchange(intTexture1DArray[0], valInt, compareValueInt, originalValueInt);
 	InterlockedCompareStore(intTexture1DArray[0], valUInt, compareValueUInt);
 
 	InterlockedAdd(uintTexture1DArray[0], valUInt);

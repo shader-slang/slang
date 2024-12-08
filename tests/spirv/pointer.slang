@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -O0 -emit-spirv-directly
 
 
 struct PP
