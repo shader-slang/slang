@@ -919,7 +919,8 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
 void MetalSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    emitSimpleTypeImpl(elementType);
+    // NM: Passing count here, as Metal 64-bit vector type names do not match their scalar equivalents.
+    emitSimpleTypeKnowingCount(elementType, elementCount);
 
     switch (elementType->getOp())
     {
@@ -1039,9 +1040,12 @@ void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     emitType(type, name);
 }
 
-void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
+void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue elementCount)
 {
-    switch (type->getOp())
+    // NM: note, "ulong/ushort" is only type that works for i16/i64 vec, but can't be used for scalars.
+    // (See metal specification pg 26)
+    
+  switch (type->getOp())
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
@@ -1059,20 +1063,29 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_Int64Type:
         m_writer->emit("long");
         return;
-    case kIROp_UInt64Type:
-        m_writer->emit("ulong");
+    case kIROp_UInt64Type:        
+        if (elementCount > 1) 
+            m_writer->emit("ulong");
+        else
+            m_writer->emit("uint64_t");
         return;
     case kIROp_Int16Type:
         m_writer->emit("short");
         return;
     case kIROp_UInt16Type:
-        m_writer->emit("ushort");
+        if (elementCount > 1) 
+            m_writer->emit("ushort");
+        else
+            m_writer->emit("uint16_t");
         return;
     case kIROp_IntPtrType:
         m_writer->emit("long");
         return;
     case kIROp_UIntPtrType:
-        m_writer->emit("ulong");
+        if (elementCount > 1) 
+            m_writer->emit("ulong");
+        else
+            m_writer->emit("uint64_t");
         return;
     case kIROp_StructType:
         m_writer->emit(getName(type));
@@ -1284,6 +1297,11 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(" >");
         }
     }
+}
+
+void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
+{
+    emitSimpleTypeKnowingCount(type, 1);
 }
 
 void MetalSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)

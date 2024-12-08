@@ -2945,6 +2945,30 @@ void GLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
     }
 }
 
+void GLSLSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
+{
+    m_writer->emit("bitfieldExtract(");
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit(",");
+    emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+    m_writer->emit(",");
+    emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+    m_writer->emit(")");
+}
+
+void GLSLSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
+{
+    m_writer->emit("bitfieldInsert(");
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit(",");
+    emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+    m_writer->emit(",");
+    emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+    m_writer->emit(",");
+    emitOperand(inst->getOperand(3), getInfo(EmitOp::General));
+    m_writer->emit(")");
+}
+
 void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())

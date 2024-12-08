@@ -54,6 +54,8 @@ protected:
         IRType* valueType,
         IRPackOffsetDecoration* decoration) SLANG_OVERRIDE;
 
+    void emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue elementCount);
+    
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
