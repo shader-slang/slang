@@ -919,9 +919,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
 void MetalSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    // NM: Passing count here, as Metal 64-bit vector type names do not match their scalar
-    // equivalents.
-    emitSimpleTypeKnowingCount(elementType, elementCount);
+    emitSimpleType(elementType);
 
     switch (elementType->getOp())
     {
@@ -1041,7 +1039,7 @@ void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     emitType(type, name);
 }
 
-void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue elementCount)
+void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())
     {
@@ -1286,11 +1284,6 @@ void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue
             m_writer->emit(" >");
         }
     }
-}
-
-void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
-{
-    emitSimpleTypeKnowingCount(type, 1);
 }
 
 void MetalSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
