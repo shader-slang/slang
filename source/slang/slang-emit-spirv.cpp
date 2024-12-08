@@ -6529,7 +6529,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         Slang::IRType* elementType = dataType;
         if (vectorType)
             elementType = vectorType->getElementType();
-        
+
         const IntInfo i = getIntTypeInfo(elementType);
 
         // NM: technically, using bitfield intrinsics for anything non-32-bit goes against
@@ -6554,7 +6554,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         Slang::IRType* elementType = dataType;
         if (vectorType)
             elementType = vectorType->getElementType();
-        
+
         const IntInfo i = getIntTypeInfo(elementType);
 
         if (i.width == 64)

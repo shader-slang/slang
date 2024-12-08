@@ -1045,7 +1045,7 @@ void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue
 {
     // NM: note, "ulong/ushort" is only type that works for i16/i64 vec, but can't be used for
     // scalars. (See metal specification pg 26)
-    
+
     switch (type->getOp())
     {
     case kIROp_VoidType:
@@ -1065,7 +1065,7 @@ void MetalSourceEmitter::emitSimpleTypeKnowingCount(IRType* type, IRIntegerValue
         m_writer->emit("long");
         return;
     case kIROp_UInt64Type:
-        if (elementCount > 1) 
+        if (elementCount > 1)
             m_writer->emit("ulong");
         else
             m_writer->emit("uint64_t");

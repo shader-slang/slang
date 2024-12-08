@@ -3869,34 +3869,34 @@ void CLikeSourceEmitter::emitVecNOrScalar(
         {
             m_writer->emit("make_");
 
-            switch (elementType->getOp()) 
+            switch (elementType->getOp())
             {
-                case kIROp_Int8Type:
-                    m_writer->emit("char");
-                    break;
-                case kIROp_Int16Type:
-                    m_writer->emit("short");
-                    break;
-                case kIROp_IntType:
-                    m_writer->emit("int");
-                    break;
-                case kIROp_Int64Type:
-                    m_writer->emit("longlong");
-                    break;
-                case kIROp_UInt8Type:
-                    m_writer->emit("uchar");
-                    break;
-                case kIROp_UInt16Type:
-                    m_writer->emit("ushort");
-                    break;
-                case kIROp_UIntType:
-                    m_writer->emit("uint");
-                    break;
-                case kIROp_UInt64Type:
-                    m_writer->emit("ulonglong");
-                    break;
-                default:
-                    SLANG_ABORT_COMPILATION("Unhandled type emitting CUDA vector");
+            case kIROp_Int8Type:
+                m_writer->emit("char");
+                break;
+            case kIROp_Int16Type:
+                m_writer->emit("short");
+                break;
+            case kIROp_IntType:
+                m_writer->emit("int");
+                break;
+            case kIROp_Int64Type:
+                m_writer->emit("longlong");
+                break;
+            case kIROp_UInt8Type:
+                m_writer->emit("uchar");
+                break;
+            case kIROp_UInt16Type:
+                m_writer->emit("ushort");
+                break;
+            case kIROp_UIntType:
+                m_writer->emit("uint");
+                break;
+            case kIROp_UInt64Type:
+                m_writer->emit("ulonglong");
+                break;
+            default:
+                SLANG_ABORT_COMPILATION("Unhandled type emitting CUDA vector");
             }
 
             m_writer->emitRawText(std::to_string(N).c_str());
@@ -3912,7 +3912,7 @@ void CLikeSourceEmitter::emitVecNOrScalar(
         }
 
         // In other languages, we can output the Slang vector type directly
-        else 
+        else
         {
             emitType(vectorType);
         }
@@ -3965,22 +3965,22 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
     String one;
     switch (bitWidth)
     {
-        case 8:
-            one = "uint8_t(1)";
-            break;
-        case 16:
-            one = "uint16_t(1)";
-            break;
-        case 32:
-            one = "uint32_t(1)";
-            break;
-        case 64:
-            one = "uint64_t(1)";
-            break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unexpected bit width");
+    case 8:
+        one = "uint8_t(1)";
+        break;
+    case 16:
+        one = "uint16_t(1)";
+        break;
+    case 32:
+        one = "uint32_t(1)";
+        break;
+    case 64:
+        one = "uint64_t(1)";
+        break;
+    default:
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unexpected bit width");
     }
-    
+
     // Emit open paren and type cast for later sign extension
     if (isSigned)
     {

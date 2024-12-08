@@ -3642,7 +3642,7 @@ IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
     addInst(inst);
     return inst;
 }
-  
+
 IRInst* IRBuilder::emitBitfieldExtract(IRType* type, IRInst* value, IRInst* offset, IRInst* bits)
 {
     auto inst = createInst<IRInst>(this, kIROp_BitfieldExtract, type, value, offset, bits);
