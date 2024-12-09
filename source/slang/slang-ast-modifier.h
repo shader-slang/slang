@@ -693,6 +693,7 @@ class UncheckedAttribute : public AttributeBase
     Scope* scope = nullptr;
 };
 
+// A GLSL layout qualifier whose value has not yet been resolved or validated.
 class UncheckedGLSLLayoutAttribute : public AttributeBase
 {
     SLANG_AST_CLASS(UncheckedGLSLLayoutAttribute)
