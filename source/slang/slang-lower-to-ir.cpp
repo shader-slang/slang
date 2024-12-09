@@ -5938,7 +5938,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         if (auto maxItersAttr = stmt->findModifier<MaxItersAttribute>())
         {
-            getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
+            auto iters = lowerVal(context, maxItersAttr->value);
+            getBuilder()->addLoopMaxItersDecoration(inst, getSimpleVal(context, iters));
         }
         else if (auto inferredMaxItersAttr = stmt->findModifier<InferredMaxItersAttribute>())
         {
@@ -6028,12 +6029,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             if (auto maxIters = stmt->findModifier<MaxItersAttribute>())
             {
-                if (inferredMaxIters->value < maxIters->value)
+                if (auto constIntVal = as<ConstantIntVal>(maxIters->value))
                 {
-                    context->getSink()->diagnose(
-                        maxIters,
-                        Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
-                        inferredMaxIters->value);
+                    if (inferredMaxIters->value < constIntVal->getValue())
+                    {
+                        context->getSink()->diagnose(
+                            maxIters,
+                            Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
+                            inferredMaxIters->value);
+                    }
                 }
             }
         }
