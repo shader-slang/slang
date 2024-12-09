@@ -984,7 +984,8 @@ static void addExplicitParameterBindings_HLSL(
     //
     // For now we do the filtering on target in a very direct fashion:
     //
-    if (!isD3DTarget(context->getTargetRequest()) && !isMetalTarget(context->getTargetRequest()))
+    bool isMetal = isMetalTarget(context->getTargetRequest());
+    if (!isD3DTarget(context->getTargetRequest()) && !isMetal)
         return;
 
     auto typeLayout = varLayout->typeLayout;
@@ -1018,6 +1019,7 @@ static void addExplicitParameterBindings_HLSL(
         if (kind == LayoutResourceKind::None)
             continue;
 
+
         // TODO: need to special-case when this is a `c` register binding...
 
         // Find the appropriate resource-binding information
@@ -1025,6 +1027,19 @@ static void addExplicitParameterBindings_HLSL(
         // of the given kind.
 
         auto typeRes = typeLayout->FindResourceInfo(kind);
+        if (isMetal && !typeRes)
+        {
+            // Metal doesn't distinguish a unordered access and a readonly/uniform buffer.
+            switch (kind)
+            {
+            case LayoutResourceKind::UnorderedAccess:
+            case LayoutResourceKind::ShaderResource:
+                semanticInfo.kind = LayoutResourceKind::MetalBuffer;
+                typeRes = typeLayout->FindResourceInfo(LayoutResourceKind::MetalBuffer);
+                break;
+            }
+        }
+
         LayoutSize count = 0;
         if (typeRes)
         {
@@ -1066,24 +1081,8 @@ static void addExplicitParameterBindings_GLSL(
     RefPtr<ParameterInfo> parameterInfo,
     RefPtr<VarLayout> varLayout)
 {
-    // We only want to apply GLSL-style layout modifers
-    // when compiling for a Khronos-related target.
-    //
-    // TODO: This should have some finer granularity
-    // so that we are able to distinguish between
-    // Vulkan and OpenGL as targets.
-    //
-    if (!isKhronosTarget(context->getTargetRequest()))
-        return;
-
     auto typeLayout = varLayout->typeLayout;
     auto varDecl = varLayout->varDecl;
-
-    // The catch in GLSL is that the expected resource type
-    // is implied by the parameter declaration itself, and
-    // the `layout` modifier is only allowed to adjust
-    // the index/offset/etc.
-    //
 
     enum
     {
@@ -1105,56 +1104,12 @@ static void addExplicitParameterBindings_GLSL(
     };
     ResAndSemanticInfo info[kMaxResCount] = {};
 
-    if (auto foundInputAttachmentIndex =
-            typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
-    {
-        foundResInfo = foundInputAttachmentIndex;
-        // Try to find `input_attachment_index`
-        if (auto glslAttachmentIndexAttr =
-                varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
-        {
-            info[kSubpassResInfo].resInfo = foundResInfo;
-            // Subpass fills semantic info of a descriptor and subpass
-            info[kSubpassResInfo].semanticInfo.index = (UInt)glslAttachmentIndexAttr->location;
-            info[kSubpassResInfo].semanticInfo.space = 0;
-        }
-    }
+    // First, we want to apply offsets of specialization constants for platforms that supports them.
+    if (!isKhronosTarget(context->getTargetRequest()) &&
+        !isWGPUTarget(context->getTargetRequest()) && !isMetalTarget(context->getTargetRequest()))
+        return;
 
-    if (auto foundDescriptorTableSlot =
-            typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
-    {
-        foundResInfo = foundDescriptorTableSlot;
-        // Try to find `binding` and `set`
-        if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
-        {
-            info[kResInfo].resInfo = foundResInfo;
-            info[kResInfo].semanticInfo.index = glslBindingAttr->binding;
-            info[kResInfo].semanticInfo.space = glslBindingAttr->set;
-        }
-    }
-    else if (
-        auto foundSubElementRegisterSpace =
-            typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
-    {
-        foundResInfo = foundSubElementRegisterSpace;
-        // Try to find `set`
-        if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
-        {
-            info[kResInfo].resInfo = foundResInfo;
-            if (attr->binding != 0)
-            {
-                getSink(context)->diagnose(
-                    attr,
-                    Diagnostics::wholeSpaceParameterRequiresZeroBinding,
-                    varDecl.getName(),
-                    attr->binding);
-            }
-            info[kResInfo].semanticInfo.index = attr->set;
-            info[kResInfo].semanticInfo.space = 0;
-        }
-    }
-    else if (
-        auto foundSpecializationConstant =
+    if (auto foundSpecializationConstant =
             typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant))
     {
         info[kResInfo].resInfo = foundSpecializationConstant;
@@ -1165,6 +1120,70 @@ static void addExplicitParameterBindings_GLSL(
             return;
     }
 
+    // For remaining cases, we only want to apply GLSL-style layout modifers
+    // when compiling for Khronos and WGSL targets.
+    //
+    // TODO: This should have some finer granularity
+    // so that we are able to distinguish between
+    // Vulkan and OpenGL as targets.
+    //
+    if (isKhronosTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
+    {
+        // The catch in GLSL is that the expected resource type
+        // is implied by the parameter declaration itself, and
+        // the `layout` modifier is only allowed to adjust
+        // the index/offset/etc.
+        //
+
+        if (auto foundInputAttachmentIndex =
+                typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
+        {
+            foundResInfo = foundInputAttachmentIndex;
+            // Try to find `input_attachment_index`
+            if (auto glslAttachmentIndexAttr =
+                    varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
+            {
+                info[kSubpassResInfo].resInfo = foundResInfo;
+                // Subpass fills semantic info of a descriptor and subpass
+                info[kSubpassResInfo].semanticInfo.index = (UInt)glslAttachmentIndexAttr->location;
+                info[kSubpassResInfo].semanticInfo.space = 0;
+            }
+        }
+
+        if (auto foundDescriptorTableSlot =
+                typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+        {
+            foundResInfo = foundDescriptorTableSlot;
+            // Try to find `binding` and `set`
+            if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+            {
+                info[kResInfo].resInfo = foundResInfo;
+                info[kResInfo].semanticInfo.index = glslBindingAttr->binding;
+                info[kResInfo].semanticInfo.space = glslBindingAttr->set;
+            }
+        }
+        else if (
+            auto foundSubElementRegisterSpace =
+                typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+        {
+            foundResInfo = foundSubElementRegisterSpace;
+            // Try to find `set`
+            if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+            {
+                info[kResInfo].resInfo = foundResInfo;
+                if (attr->binding != 0)
+                {
+                    getSink(context)->diagnose(
+                        attr,
+                        Diagnostics::wholeSpaceParameterRequiresZeroBinding,
+                        varDecl.getName(),
+                        attr->binding);
+                }
+                info[kResInfo].semanticInfo.index = attr->set;
+                info[kResInfo].semanticInfo.space = 0;
+            }
+        }
+    }
 
     auto varDeclBase = as<VarDeclBase>(varDecl);
     bool hasABinding = false;

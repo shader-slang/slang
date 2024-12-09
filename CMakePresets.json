@@ -119,7 +119,15 @@
       "generators": ["ZIP"],
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang",
-        "CPACK_COMPONENTS_ALL": "Unspecified;metadata;debug-info;slang-llvm"
+        "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
+      }
+    },
+    {
+      "name": "base-debug-info",
+      "inherits": "base",
+      "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang-debug-info",
+        "CPACK_COMPONENTS_ALL": "debug-info"
       }
     },
     {
@@ -139,6 +147,24 @@
       "inherits": "base",
       "configurations": ["Debug"],
       "packageDirectory": "dist-debug"
+    },
+    {
+      "name": "release-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["Release"],
+      "packageDirectory": "dist-release-debug-info"
+    },
+    {
+      "name": "releaseWithDebugInfo-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["RelWithDebInfo"],
+      "packageDirectory": "dist-releaseWithDebugInfo-debug-info"
+    },
+    {
+      "name": "debug-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["Debug"],
+      "packageDirectory": "dist-debug-debug-info"
     },
     {
       "name": "generators",

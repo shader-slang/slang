@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         os: [linux, macos, windows]
-        config: [releaseWithDebugInfo]
+        config: [release]
         platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
@@ -109,23 +109,18 @@ jobs:
           brew install Bearer/tap/gon
           security find-identity -v
           brew install coreutils
-
           # create variables
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
           # import certificate and provisioning profile from secrets
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode --output "$CERTIFICATE_PATH"
-
           # create temporary keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
           # import certificate to keychain
           security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH"
-
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "$KEYCHAIN_PATH"
 
           binaries=(
@@ -137,6 +132,8 @@ jobs:
             "${bin_dir}/slangd"
             "${bin_dir}/slangc"
           )
+
+          # Sign main binaries
           for b in "${binaries[@]}"; do
             if [[ -f "$b" ]]; then
               echo "Signing binary '$b'..."
@@ -152,15 +149,27 @@ jobs:
       - name: Package Slang
         id: package
         run: |
-          # For the release, also generate a tar.gz file
+          # Package main binaries
           cpack --preset "$config" -G ZIP
           cpack --preset "$config" -G TGZ
+          # Package debug info
+          cpack --preset "$config-debug-info" -G ZIP
+          cpack --preset "$config-debug-info" -G TGZ
+
           triggering_ref=${{ github.ref_name }}
           base=slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
+
+          # Move main packages
           mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
+
+          # Move debug info packages
+          mv "$(pwd)/build/dist-${config}-debug-info/slang-debug-info.zip" "${base}-debug-info.zip"
+          echo "SLANG_DEBUG_INFO_ARCHIVE_ZIP=${base}-debug-info.zip" >> "$GITHUB_OUTPUT"
+          mv "$(pwd)/build/dist-${config}-debug-info/slang-debug-info.tar.gz" "${base}-debug-info.tar.gz"
+          echo "SLANG_DEBUG_INFO_ARCHIVE_TAR=${base}-debug-info.tar.gz" >> "$GITHUB_OUTPUT"
 
           # For some reason, the binaries packed by cpack for macos is modified
           # by cpack and considered damanged by macos. For now we workaround this
@@ -169,8 +178,14 @@ jobs:
             mkdir ./ttmp
             unzip "${base}.zip" -d ./ttmp
 
-            /bin/cp -rf build/$cmake_config/bin/* ./ttmp/bin/
-            /bin/cp -rf build/$cmake_config/lib/* ./ttmp/lib/
+            # Copy only existing files from build directory
+            find ./ttmp/{bin,lib} -type f | while read -r file; do
+              src_file="build/$cmake_config/${file#./ttmp/}"
+              if [ -f "$src_file" ]; then
+                cp "$src_file" "$file"
+              fi
+            done
+
             rm ${base}.zip
             rm ${base}.tar.gz
             cd ./ttmp
@@ -178,6 +193,7 @@ jobs:
             tar -czvf ../${base}.tar.gz .
             cd ../
           fi
+
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
@@ -191,6 +207,8 @@ jobs:
           files: |
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_ZIP }}
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+            ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_ZIP }}
+            ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_TAR }}
             ${{ steps.notarize.outputs.SLANG_NOTARIZED_DIST }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

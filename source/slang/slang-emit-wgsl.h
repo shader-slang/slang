@@ -52,6 +52,7 @@ public:
         UnownedStringSlice intrinsicDefinition,
         IRInst* intrinsicInst,
         EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
+    virtual void emitGlobalParamDefaultVal(IRGlobalParam* varDecl) SLANG_OVERRIDE;
 
     void emit(const AddressSpace addressSpace);
 
