@@ -7421,6 +7421,15 @@ bool SemanticsVisitor::isScalarIntegerType(Type* type)
     return isIntegerBaseType(baseType) || baseType == BaseType::Bool;
 }
 
+bool SemanticsVisitor::isHalfType(Type* type)
+{
+    auto basicType = as<BasicExpressionType>(type);
+    if (!basicType)
+        return false;
+    auto baseType = basicType->getBaseType();
+    return baseType == BaseType::Half;
+}
+
 bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
 {
     return isScalarIntegerType(type) || isEnumType(type);
@@ -7466,6 +7475,9 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
 #endif
         return value >= std::numeric_limits<int64_t>::min() &&
                value <= std::numeric_limits<int64_t>::max();
+
+    case BaseType::Half:
+        return value >= -2048 && value <= 2048;
     default:
         return false;
     }
