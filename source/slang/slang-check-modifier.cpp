@@ -1505,7 +1505,6 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
         {
             uncheckedAttr->args.add(uncheckedAttr->args[0]);
             uncheckedAttr->args[0] = nullptr;
-            SLANG_ASSERT(uncheckedAttr->args[1] != nullptr);
         }
 
         SLANG_ASSERT(uncheckedAttr->args.getCount() == 2);
@@ -2043,13 +2042,13 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
             }
             else
             {
-                const auto constVal = checkConstantIntVal(glslOffsetAttribute->args[0]);
-                SLANG_ASSERT(constVal != nullptr);
-
-                glslOffsetAttribute->offset = uint64_t(constVal->getValue());
-                getGLSLBindingOffsetTracker()->setBindingOffset(
-                    glslBindingAttribute->binding,
-                    glslOffsetAttribute->offset);
+                if (const auto constVal = checkConstantIntVal(glslOffsetAttribute->args[0]))
+                {
+                    glslOffsetAttribute->offset = uint64_t(constVal->getValue());
+                    getGLSLBindingOffsetTracker()->setBindingOffset(
+                        glslBindingAttribute->binding,
+                        glslOffsetAttribute->offset);
+                }
             }
         }
         else
