@@ -23,7 +23,7 @@ This document is designed to guide you in contributing to the project. It is int
    - [Testing](#testing)
    - [Commit to the Branch](#commit-to-the-branch)
    - [Push to Forked Repository](#push-to-forked-repository)
-2. [Request Pull](#request-pull)
+2. [Pull Request](#pull-request)
    - [Addressing Code Reviews](#addressing-code-reviews)
    - [Labeling Breaking Changes](#labeling-breaking-changes)
    - [Source Code Formatting](#source-code-formatting)
@@ -240,7 +240,7 @@ Go to your forked repository and change the branch name to the one you used for 
 It will show a message like "This branch is 1 commit ahead of `shader-slang/slang:master`."
 You can create a PR by clicking on the message.
 
-## Request Pull
+## Pull Request
 Once a PR is created against `shader-slang/slang:master`, the PR will be merged when the following conditions are met:
 1. The PR is reviewed and got approval.
 2. All of the workflows pass.
