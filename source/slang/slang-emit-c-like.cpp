@@ -2853,6 +2853,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
+
             emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
             m_writer->emit(".Store(");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3900,15 +3901,6 @@ void CLikeSourceEmitter::emitVecNOrScalar(
             }
 
             m_writer->emitRawText(std::to_string(N).c_str());
-        }
-        // Special handling required for Metal target
-        else if (isMetalTarget(getTargetReq()))
-        {
-            m_writer->emit("vec<");
-            emitType(elementType);
-            m_writer->emit(", ");
-            m_writer->emit(N);
-            m_writer->emit(">");
         }
 
         // In other languages, we can output the Slang vector type directly
