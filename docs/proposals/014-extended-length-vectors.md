@@ -1,4 +1,4 @@
-# SP #13: Extended Length Vectors
+# SP #014: Extended Length Vectors
 
 This proposal introduces support for vectors with 0 or more than 4 components in
 Slang, extending the current vector type system while maintaining compatibility
