@@ -387,6 +387,9 @@ INST(Alloca, alloca, 1, 0)
 INST(UpdateElement, updateElement, 2, 0)
 INST(DetachDerivative, detachDerivative, 1, 0)
 
+INST(BitfieldExtract, bitfieldExtract, 3, 0)
+INST(BitfieldInsert, bitfieldInsert, 4, 0)
+
 INST(PackAnyValue, packAnyValue, 1, 0)
 INST(UnpackAnyValue, unpackAnyValue, 1, 0)
 
