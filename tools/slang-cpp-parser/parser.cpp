@@ -1109,32 +1109,58 @@ SlangResult Parser::_parseSpecialMacro()
     Token name;
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &name));
 
-    List<Token> params;
-
-    if (m_reader.peekTokenType() == TokenType::LParent)
-    {
-        // Mark the start
-        auto startCursor = m_reader.getCursor();
-
-        // Consume the params
-        SLANG_RETURN_ON_FAIL(_consumeBalancedParens());
-
-        auto endCursor = m_reader.getCursor();
-        m_reader.setCursor(startCursor);
-
-        while (!m_reader.isAtCursor(endCursor))
-        {
-            params.add(m_reader.advanceToken());
-        }
-    }
-
-    // Can do special handling here
     const UnownedStringSlice suffix = name.getContent().tail(m_options->m_markPrefix.getLength());
 
     if (suffix == "COM_INTERFACE")
     {
-        // TODO(JS): It's a com interface. Extact the GUID
+        return _parseGuid();
     }
+
+    if (m_reader.peekTokenType() == TokenType::LParent)
+    {
+        SLANG_RETURN_ON_FAIL(_consumeBalancedParens());
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult Parser::_parseGuid()
+{
+    Guid guid{};
+    Token guidToken;
+    Int value;
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::IntegerLiteral, &guidToken));
+    StringUtil::parseInt(guidToken.getContent(), value);
+    guid.data1 = value;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::IntegerLiteral, &guidToken));
+    StringUtil::parseInt(guidToken.getContent(), value);
+    guid.data2 = value;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::IntegerLiteral, &guidToken));
+    StringUtil::parseInt(guidToken.getContent(), value);
+    guid.data3 = value;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LBrace));
+    for (Index i = 0; i < 8; ++i)
+    {
+        SLANG_RETURN_ON_FAIL(expect(TokenType::IntegerLiteral, &guidToken));
+        StringUtil::parseInt(guidToken.getContent(), value);
+        guid.data4[i] = value;
+        if (i < 7)
+        {
+            SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+        }
+    }
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RBrace));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
+
+    ClassLikeNode* node = as<ClassLikeNode>(m_currentScope);
+
+    node->m_guid = guid;
 
     return SLANG_OK;
 }

@@ -44,6 +44,7 @@ protected:
 
     SlangResult _parseTypeDef();
     SlangResult _parseEnum();
+    SlangResult _parseGuid();
     SlangResult _parseMarker();
     SlangResult _parseSpecialMacro();
 

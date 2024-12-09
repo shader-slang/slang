@@ -42,6 +42,8 @@ struct TestState
 
 static const char someSource[] = "class ISomeInterface\n"
                                  "{\n"
+                                 "    SLANG_COM_INTERFACE(0x514027d8, 0x23d1, 0x4093, "
+                                 "{0x94,0x85,0xb9,0x2c,0x06,0x95,0x7f,0x5e})\n"
                                  "    public:\n"
                                  "    virtual int SLANG_MCALL someMethod(int a, int b) const = 0;\n"
                                  "    virtual float SLANG_MCALL anotherMethod(float a) = 0;\n"
