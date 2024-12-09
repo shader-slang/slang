@@ -919,7 +919,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
 void MetalSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    emitSimpleType(elementType);
+    emitSimpleTypeImpl(elementType);
 
     switch (elementType->getOp())
     {
