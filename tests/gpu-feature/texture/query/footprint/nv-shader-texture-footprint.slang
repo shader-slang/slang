@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -emit-spirv-via-glsl -entry fragmentMain -stage fragment -DENABLE_CLAMP
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry fragmentMain -stage fragment -DENABLE_CLAMP
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry fragmentMain -stage fragment -DENABLE_CLAMP -O0
 //DISABLED_TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry fragmentMain -stage fragment -DENABLE_CLAMP -emit-spirv-directly
 
 //DISABLED_TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -stage fragment
@@ -148,57 +148,41 @@ CLAMP(  accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##GradClamp 
 
         TEST_2D(Coarse);
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[TRUE]]
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[TRUE]]{{$}}
 // HLSL-DAG: NvFootprintCoarse{{.*}}NV_EXTN_TEXTURE_2D
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[TRUE]] Bias
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[TRUE]] Bias %
 // HLSL-DAG: NvFootprintCoarseBias{{.*}}NV_EXTN_TEXTURE_2D
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[TRUE]] MinLod
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[TRUE]] MinLod %
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[TRUE]] Bias|MinLod %
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[TRUE]] Bias|MinLod
-
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[TRUE]] Lod
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[TRUE]] Lod %
 // HLSL-DAG: NvFootprintCoarseLevel{{.*}}NV_EXTN_TEXTURE_2D
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[TRUE]] Grad
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[TRUE]] Grad %
 // HLSL-DAG: NvFootprintCoarseGrad{{.*}}NV_EXTN_TEXTURE_2D
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[TRUE]] Grad|MinLod
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[TRUE]] Grad|MinLod %
 
         TEST_2D(Fine);
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[FALSE]]
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[FALSE]]{{$}}
 // HLSL-DAG: NvFootprintFine{{.*}}NV_EXTN_TEXTURE_2D
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[FALSE]] Bias
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[FALSE]] Bias %
 // HLSL-DAG: NvFootprintFineBias{{.*}}NV_EXTN_TEXTURE_2D
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[FALSE]] MinLod
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[FALSE]] MinLod %
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[FALSE]] Bias|MinLod %
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[FALSE]] Bias|MinLod
-
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[FALSE]] Lod
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[FALSE]] Lod %
 // HLSL-DAG: NvFootprintFineLevel{{.*}}NV_EXTN_TEXTURE_2D
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[FALSE]] Grad
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[FALSE]] Grad %
 // HLSL-DAG: NvFootprintFineGrad{{.*}}NV_EXTN_TEXTURE_2D
 
-// SPIRV: OpImageSampleFootprintNV
-// SPIRV-SAME: [[FALSE]] Grad|MinLod
+// SPIRV-DAG: OpImageSampleFootprintNV {{.*}} [[FALSE]] Grad|MinLod %
 
     }
 
