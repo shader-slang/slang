@@ -1037,6 +1037,10 @@ static Modifier* parseUncheckedGLSLLayoutAttribute(Parser* parser, NameLoc& name
         // through the list builder when implicitly injecting an offset qualifier.
         attr = parser->astBuilder->create<UncheckedGLSLOffsetLayoutAttribute>();
     }
+    else if (nameLoc.name->text == "set")
+    {
+        attr = parser->astBuilder->create<UncheckedGLSLSetLayoutAttribute>();
+    }
     else
     {
         attr = parser->astBuilder->create<UncheckedGLSLLayoutAttribute>();

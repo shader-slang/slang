@@ -709,6 +709,14 @@ class UncheckedGLSLBindingLayoutAttribute : public UncheckedGLSLLayoutAttribute
     SLANG_UNREFLECTED
 };
 
+// GLSL `set` layout qualifier, does not include `binding`.
+class UncheckedGLSLSetLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLSetLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
 // GLSL `offset` layout qualifier.
 class UncheckedGLSLOffsetLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {

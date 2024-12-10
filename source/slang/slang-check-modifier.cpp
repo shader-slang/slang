@@ -1475,8 +1475,8 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
     // attribute.
     bool addNode = true;
 
-    const auto& name = uncheckedAttr->getKeywordName()->text;
-    if (as<UncheckedGLSLBindingLayoutAttribute>(uncheckedAttr) || name == "set")
+    if (as<UncheckedGLSLBindingLayoutAttribute>(uncheckedAttr) ||
+        as<UncheckedGLSLSetLayoutAttribute>(uncheckedAttr))
     {
         // Binding and set are coupled together as a descriptor table slot resource for codegen.
         // Attempt to retrieve and annotate an existing binding attribute or create a new one.

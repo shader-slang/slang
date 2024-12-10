@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv
 
-layout(rgba6f)
+layout(rgba8)
 RWTexture2D<float4> texture;
 
 [numthreads(4, 1, 1)]
