@@ -5979,21 +5979,24 @@ ForStmt* Parser::ParseForStatement()
     FillPosition(stmt);
     ReadToken("for");
     ReadToken(TokenType::LParent);
-    auto modifiers = ParseModifiers(this);
-    if (peekTypeName(this) || !modifiers.isEmpty())
+    if (!LookAheadToken(TokenType::Semicolon))
     {
-        stmt->initialStatement = parseVarDeclrStatement(modifiers);
-    }
-    else
-    {
-        if (!LookAheadToken(TokenType::Semicolon))
+        stmt->initialStatement = ParseStatement();
+        if (as<DeclStmt>(stmt->initialStatement) || as<ExpressionStmt>(stmt->initialStatement))
         {
-            stmt->initialStatement = ParseExpressionStatement();
+            // These are the only allowed form of initial statements of a for loop.
         }
         else
         {
-            ReadToken(TokenType::Semicolon);
+            sink->diagnose(
+                stmt->initialStatement->loc,
+                Diagnostics::unexpectedTokenExpectedTokenType,
+                "expression");
         }
+    }
+    else
+    {
+        ReadToken(TokenType::Semicolon);
     }
     if (!LookAheadToken(TokenType::Semicolon))
         stmt->predicateExpression = ParseExpression();
