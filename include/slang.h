@@ -1775,7 +1775,8 @@ public:                                                              \
     typedef struct SlangReflectionVariable SlangReflectionVariable;
     typedef struct SlangReflectionVariableLayout SlangReflectionVariableLayout;
     typedef struct SlangReflectionTypeParameter SlangReflectionTypeParameter;
-    typedef struct SlangReflectionAttribute SlangReflectionUserAttribute;
+    typedef struct SlangReflectionUserAttribute SlangReflectionUserAttribute;
+    typedef SlangReflectionUserAttribute SlangReflectionAttribute;
     typedef struct SlangReflectionFunction SlangReflectionFunction;
     typedef struct SlangReflectionGeneric SlangReflectionGeneric;
 

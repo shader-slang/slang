@@ -154,6 +154,8 @@ static SlangReflectionUserAttribute* findUserAttributeByName(
     const char* name)
 {
     auto nameObj = session->tryGetNameObj(name);
+    if (!nameObj)
+        return nullptr;
     for (auto x : decl->getModifiersOfType<Attribute>())
     {
         if (x->keywordName == nameObj)
