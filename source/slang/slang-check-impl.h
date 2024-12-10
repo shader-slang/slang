@@ -614,6 +614,17 @@ struct ImplicitCastMethodKey
     }
 };
 
+/// Used to track offsets for atomic counter storage qualifiers.
+struct GLSLBindingOffsetTracker
+{
+public:
+    void setBindingOffset(int binding, int64_t byteOffset);
+    int64_t getNextBindingOffset(int binding);
+
+private:
+    Dictionary<int, int64_t> bindingToByteOffset;
+};
+
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -644,6 +655,8 @@ struct SharedSemanticsContext : public RefObject
     //
     List<ModuleDecl*> importedModulesList;
     HashSet<ModuleDecl*> importedModulesSet;
+
+    GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
 public:
     SharedSemanticsContext(
@@ -704,6 +717,8 @@ public:
         /// The rest of the links in the chain of declarations being processed
         InheritanceCircularityInfo* next = nullptr;
     };
+
+    GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker() { return &m_glslBindingOffsetTracker; }
 
     /// Get the processed inheritance information for `type`, including all its facets
     InheritanceInfo getInheritanceInfo(
@@ -1054,6 +1069,11 @@ public:
     Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
     OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
+
+    GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
+    {
+        return m_shared->getGLSLBindingOffsetTracker();
+    }
 
 private:
     SharedSemanticsContext* m_shared = nullptr;
@@ -1647,6 +1667,10 @@ public:
         UncheckedAttribute* uncheckedAttr,
         ModifiableSyntaxNode* attrTarget);
 
+    AttributeBase* checkGLSLLayoutAttribute(
+        UncheckedGLSLLayoutAttribute* uncheckedAttr,
+        ModifiableSyntaxNode* attrTarget);
+
     Modifier* checkModifier(
         Modifier* m,
         ModifiableSyntaxNode* syntaxNode,
@@ -1966,6 +1990,9 @@ public:
 
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
+
+    /// Is `type` a scalar half type.
+    bool isHalfType(Type* type);
 
     /// Is `type` something we allow as compile time constants, i.e. scalar integer and enum types.
     bool isValidCompileTimeConstantType(Type* type);

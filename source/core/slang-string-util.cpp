@@ -461,7 +461,7 @@ String StringUtil::replaceAll(
     StringBuilder builder;
     for (Index i = 0; i < text.getLength();)
     {
-        if (i + subStr.getLength() >= text.getLength())
+        if (i + subStr.getLength() > text.getLength())
         {
             builder.append(text.subString(i, text.getLength() - i));
             break;
