@@ -4257,7 +4257,7 @@ SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outInclu
         // Next, try to find the file of the given name,
         // using our ordinary include-handling logic.
 
-        auto searchDirs = getSearchDirectories();
+        auto& searchDirs = getSearchDirectories();
         outIncludeSystem = IncludeSystem(&searchDirs, getFileSystemExt(), getSourceManager());
 
         // Get the original path info
