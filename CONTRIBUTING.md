@@ -243,13 +243,13 @@ You can create a PR by clicking on the message.
 ## Pull Request
 Once a PR is created against `shader-slang/slang:master`, the PR will be merged when the following conditions are met:
 1. The PR is reviewed and got approval.
-2. All of the workflows pass.
+1. All of the workflows pass.
 
 When the conditions above are all met, you will have a chance to rewrite the commit message. Since the Slang repo uses the "squash" strategy for merging, multiple commits in your PR will become one commit. By default, GitHub will concatenate all of the commit messages sequentially, but often it is not readable. Please rewrite the final commit message in a way that people can easily understand what the purpose of the commit is.
 
 There are two cases where the workflow may fail for reasons that are not directly related to the change:
 1. "Breaking change" labeling is missing.
-2. Source code "Format" needs to be changed.
+1. Source code "Format" needs to be changed.
 
 ### Addressing Code Reviews
 After your pull request is created, you will receive code reviews from the community within 24 hours.
@@ -304,15 +304,15 @@ Follow our [Coding Conventions](docs/design/coding-conventions.md) to maintain c
 
 Here are a few highlights:
 1. Indent by four spaces. Don't use tabs except in files that require them (e.g., Makefiles).
-2. Don't use the STL containers, iostreams, or the built-in C++ RTTI system.
-3. Don't use the C++ variants of C headers (e.g., use `<stdio.h>` instead of `<cstdio>`).
-4. Don't use exceptions for non-fatal errors (and even then support a build flag to opt out of exceptions).
-5. Types should use UpperCamelCase, values should use lowerCamelCase, and macros should use `SCREAMING_SNAKE_CASE` with a prefix `SLANG_`.
-6. Global variables should have a `g` prefix, non-const static class members can have an `s` prefix, constant data (in the sense of static const) should have a `k` prefix, and an `m_` prefix on member variables and a `_` prefix on member functions are allowed.
-7. Prefixes based on types (e.g., `p` for pointers) should never be used.
-8. In function parameter lists, an `in`, `out`, or `io` prefix can be added to a parameter name to indicate whether a pointer/reference/buffer is intended to be used for input, output, or both input and output.
-9. Trailing commas should always be used for array initializer lists.
-10. Try to write comments that explain the "why" of your code more than the "what."
+1. Don't use the STL containers, iostreams, or the built-in C++ RTTI system.
+1. Don't use the C++ variants of C headers (e.g., use `<stdio.h>` instead of `<cstdio>`).
+1. Don't use exceptions for non-fatal errors (and even then support a build flag to opt out of exceptions).
+1. Types should use UpperCamelCase, values should use lowerCamelCase, and macros should use `SCREAMING_SNAKE_CASE` with a prefix `SLANG_`.
+1. Global variables should have a `g` prefix, non-const static class members can have an `s` prefix, constant data (in the sense of static const) should have a `k` prefix, and an `m_` prefix on member variables and a `_` prefix on member functions are allowed.
+1. Prefixes based on types (e.g., `p` for pointers) should never be used.
+1. In function parameter lists, an `in`, `out`, or `io` prefix can be added to a parameter name to indicate whether a pointer/reference/buffer is intended to be used for input, output, or both input and output.
+1. Trailing commas should always be used for array initializer lists.
+1. Try to write comments that explain the "why" of your code more than the "what."
 
 ## Issue Tracking
 We track all our work with GitHub issues. Check the [Issues](https://github.com/shader-slang/slang/issues) for open issues. If you find a bug or want to suggest an enhancement, please open a new issue.
