@@ -19785,6 +19785,7 @@ ${
 }
 
     [__NoSideEffect]
+    [ForceInline]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     [require(glsl_spirv, texturefootprint)]
@@ -19811,6 +19812,7 @@ ${
     }
 
     [__NoSideEffect]
+    [ForceInline]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     [require(glsl_spirv, texturefootprint)]
@@ -19838,6 +19840,7 @@ ${
     }
 
     [__NoSideEffect]
+    [ForceInline]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
@@ -19867,6 +19870,7 @@ ${
     }
 
     [__NoSideEffect]
+    [ForceInline]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
@@ -19897,6 +19901,7 @@ ${
     }
 
     [__NoSideEffect]
+    [ForceInline]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     [__requiresNVAPI]
@@ -19929,6 +19934,7 @@ ${{{
     // Texture sampling with gradient is only available for 2D textures.
 }}}
     [__NoSideEffect]
+    [ForceInline]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     [__requiresNVAPI]
@@ -19958,6 +19964,7 @@ ${{{
     }
 
     [__NoSideEffect]
+    [ForceInline]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
     __glsl_extension(GL_ARB_sparse_texture_clamp)
