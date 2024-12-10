@@ -801,6 +801,8 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_CALLABLE,
         SLANG_STAGE_MESH,
         SLANG_STAGE_AMPLIFICATION,
+        //
+        SLANG_STAGE_COUNT,
 
         // alias:
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
@@ -2429,20 +2431,36 @@ struct TypeLayoutReflection
             (SlangReflectionTypeLayout*)this);
     }
 
-    size_t getSize(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)
+    size_t getSize(SlangParameterCategory category)
     {
         return spReflectionTypeLayout_GetSize((SlangReflectionTypeLayout*)this, category);
     }
 
-    size_t getStride(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)
+    size_t getStride(SlangParameterCategory category)
     {
         return spReflectionTypeLayout_GetStride((SlangReflectionTypeLayout*)this, category);
     }
 
-    int32_t getAlignment(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)
+    int32_t getAlignment(SlangParameterCategory category)
     {
         return spReflectionTypeLayout_getAlignment((SlangReflectionTypeLayout*)this, category);
     }
+
+    size_t getSize(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
+    {
+        return spReflectionTypeLayout_GetSize((SlangReflectionTypeLayout*)this, (SlangParameterCategory)category);
+    }
+
+    size_t getStride(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
+    {
+        return spReflectionTypeLayout_GetStride((SlangReflectionTypeLayout*)this, (SlangParameterCategory)category);
+    }
+
+    int32_t getAlignment(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
+    {
+        return spReflectionTypeLayout_getAlignment((SlangReflectionTypeLayout*)this, (SlangParameterCategory)category);
+    }
+
 
     unsigned int getFieldCount()
     {
@@ -2849,10 +2867,15 @@ struct VariableLayoutReflection
     }
 
 
-    size_t getOffset(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)
+    size_t getOffset(SlangParameterCategory category)
     {
         return spReflectionVariableLayout_GetOffset((SlangReflectionVariableLayout*)this, category);
     }
+    size_t getOffset(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
+    {
+        return spReflectionVariableLayout_GetOffset((SlangReflectionVariableLayout*)this, (SlangParameterCategory)category);
+    }
+
 
     TypeReflection* getType() { return getVariable()->getType(); }
 
@@ -2869,6 +2892,10 @@ struct VariableLayoutReflection
     size_t getBindingSpace(SlangParameterCategory category)
     {
         return spReflectionVariableLayout_GetSpace((SlangReflectionVariableLayout*)this, category);
+    }
+    size_t getBindingSpace(slang::ParameterCategory category)
+    {
+        return spReflectionVariableLayout_GetSpace((SlangReflectionVariableLayout*)this, (SlangParameterCategory)category);
     }
 
     char const* getSemanticName()
