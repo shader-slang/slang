@@ -5070,7 +5070,9 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
     synPropertyDecl->nameAndLoc.name =
         getName(String("$syn_property_") + getText(requiredMemberDeclRef.getName()));
     synPropertyDecl->parentDecl = context->parentDecl;
-
+    synPropertyDecl->ownedScope = m_astBuilder->create<Scope>();
+    synPropertyDecl->ownedScope->containerDecl = synPropertyDecl;
+    synPropertyDecl->ownedScope->parent = context->parentDecl->ownedScope;
 
     // The type of our synthesized property can be derived from the
     // specialized declref to the requirement decl.
