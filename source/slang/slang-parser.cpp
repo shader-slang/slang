@@ -5805,6 +5805,27 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     FillPosition(varDeclrStatement);
     auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
     varDeclrStatement->decl = decl;
+
+    if (as<VarDeclBase>(decl))
+    {
+    }
+    else if (as<DeclGroup>(decl))
+    {
+    }
+    else if (as<AggTypeDecl>(decl))
+    {
+    }
+    else if (as<TypeDefDecl>(decl))
+    {
+    }
+    else if (as<UsingDecl>(decl))
+    {
+    }
+    else
+    {
+        sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
+    }
+
     return varDeclrStatement;
 }
 
