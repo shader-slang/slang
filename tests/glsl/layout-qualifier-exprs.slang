@@ -7,8 +7,11 @@ layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 static const uint BINDING_BASE = 3;
 static const uint BINDING_STRIDE = 2;
 
+static const uint SET_BASE = 1;
+static const uint SET_STRIDE = 4;
+
 //TEST_INPUT:ubuffer(data=[2 2 2 2], stride=4):name=a
-layout(set = 0, binding = BINDING_BASE * BINDING_STRIDE) buffer InputA {
+layout(set = SET_BASE, binding = BINDING_BASE * BINDING_STRIDE) buffer InputA {
     float a[];
 };
 
@@ -17,7 +20,7 @@ layout(set = 0, binding = BINDING_BASE * BINDING_STRIDE * 2) buffer InputB {
     float b[];
 };
 
-layout(set = 0, binding = 2) buffer Output {
+layout(set = SET_BASE + SET_STRIDE, binding = 2) buffer Output {
     float result[];
 };
 

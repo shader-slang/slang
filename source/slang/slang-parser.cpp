@@ -4598,10 +4598,10 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     if (!bindingMod)
     {
         bindingMod = modifiers->findModifier<UncheckedGLSLBindingLayoutAttribute>();
-        if (!bindingMod)
-        {
-            return;
-        }
+    }
+    if (!bindingMod)
+    {
+        return;
     }
 
     // here is a problem; we link types into a literal in IR stage post parse

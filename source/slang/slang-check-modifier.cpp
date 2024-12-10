@@ -1480,7 +1480,7 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
     bool addNode = true;
 
     const auto& name = uncheckedAttr->getKeywordName()->text;
-    if (name == "binding" || name == "set")
+    if (as<UncheckedGLSLBindingLayoutAttribute>(uncheckedAttr) || name == "set")
     {
         // Binding and set are coupled together as a descriptor table slot resource for codegen.
         // Attempt to retrieve and annotate an existing binding attribute or create a new one.
@@ -1497,7 +1497,7 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
         // `validateAttribute`, which will be called to parse the binding arguments, also accepts
         // modifiers from vk::binding and gl::binding where both set and binding are specified.
         // Binding is the first and set is the second argument - specify them explicitly here.
-        if (name == "binding")
+        if (as<UncheckedGLSLBindingLayoutAttribute>(uncheckedAttr))
         {
             uncheckedAttr->args.add(nullptr);
         }
@@ -1509,13 +1509,13 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
 
         SLANG_ASSERT(uncheckedAttr->args.getCount() == 2);
     }
-    else if (name == "offset")
+    else if (as<UncheckedGLSLOffsetLayoutAttribute>(uncheckedAttr))
     {
         attr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
     }
     else
     {
-        getSink()->diagnose(uncheckedAttr->loc, Diagnostics::unrecognizedGLSLLayoutQualifier);
+        getSink()->diagnose(uncheckedAttr, Diagnostics::unrecognizedGLSLLayoutQualifier);
     }
 
     if (attr)
@@ -1571,7 +1571,7 @@ Modifier* SemanticsVisitor::checkModifier(
         return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);
     }
 
-    if (auto glslImplicitOffsetAttribute = as<GLSLImplicitOffsetLayoutAttribute>(m))
+    if (const auto glslImplicitOffsetAttribute = as<GLSLImplicitOffsetLayoutAttribute>(m))
     {
         auto offsetAttr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
         offsetAttr->loc = glslImplicitOffsetAttribute->loc;
@@ -2033,29 +2033,24 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     // binding layout qualifiers are processed first.
     if (auto glslOffsetAttribute = syntaxNode->findModifier<GLSLOffsetLayoutAttribute>())
     {
-        if (auto glslBindingAttribute = syntaxNode->findModifier<GLSLBindingAttribute>())
+        if (const auto glslBindingAttribute = syntaxNode->findModifier<GLSLBindingAttribute>())
         {
             if (glslOffsetAttribute->args.getCount() == 0)
             {
                 glslOffsetAttribute->offset = getGLSLBindingOffsetTracker()->getNextBindingOffset(
                     glslBindingAttribute->binding);
             }
-            else
+            else if (const auto constVal = checkConstantIntVal(glslOffsetAttribute->args[0]))
             {
-                if (const auto constVal = checkConstantIntVal(glslOffsetAttribute->args[0]))
-                {
-                    glslOffsetAttribute->offset = uint64_t(constVal->getValue());
-                    getGLSLBindingOffsetTracker()->setBindingOffset(
-                        glslBindingAttribute->binding,
-                        glslOffsetAttribute->offset);
-                }
+                glslOffsetAttribute->offset = uint64_t(constVal->getValue());
+                getGLSLBindingOffsetTracker()->setBindingOffset(
+                    glslBindingAttribute->binding,
+                    glslOffsetAttribute->offset);
             }
         }
         else
         {
-            getSink()->diagnose(
-                glslOffsetAttribute->loc,
-                Diagnostics::missingLayoutBindingModifier);
+            getSink()->diagnose(glslOffsetAttribute, Diagnostics::missingLayoutBindingModifier);
         }
     }
 

@@ -701,6 +701,7 @@ class UncheckedGLSLLayoutAttribute : public AttributeBase
     SLANG_UNREFLECTED
 };
 
+// GLSL `binding` layout qualifier, does not include `set`.
 class UncheckedGLSLBindingLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     SLANG_AST_CLASS(UncheckedGLSLBindingLayoutAttribute)
@@ -708,6 +709,7 @@ class UncheckedGLSLBindingLayoutAttribute : public UncheckedGLSLLayoutAttribute
     SLANG_UNREFLECTED
 };
 
+// GLSL `offset` layout qualifier.
 class UncheckedGLSLOffsetLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     SLANG_AST_CLASS(UncheckedGLSLOffsetLayoutAttribute)
