@@ -1207,6 +1207,13 @@ DIAGNOSTIC(
     Error,
     cannotUseUnsizedTypeInConstantBuffer,
     "cannot use unsized type '$0' in a constant buffer.")
+DIAGNOSTIC(31216, Error, unrecognizedGLSLLayoutQualifier, "GLSL layout qualifier is unrecognized")
+DIAGNOSTIC(
+    31217,
+    Error,
+    unrecognizedGLSLLayoutQualifierOrRequiresAssignment,
+    "GLSL layout qualifier is unrecognized or requires assignment")
+
 
 // Enums
 
