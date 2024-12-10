@@ -5143,6 +5143,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     // float in hlsl & glsl
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPointSize, inst);
                 }
+                else if (semanticName == "sv_drawindex")
+                {
+                    requireSPIRVCapability(SpvCapabilityDrawParameters);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInDrawIndex, inst);
+                }
                 else if (semanticName == "sv_primitiveid")
                 {
                     auto entryPoints = m_referencingEntryPoints.tryGetValue(inst);

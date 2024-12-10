@@ -693,6 +693,38 @@ class UncheckedAttribute : public AttributeBase
     Scope* scope = nullptr;
 };
 
+// A GLSL layout qualifier whose value has not yet been resolved or validated.
+class UncheckedGLSLLayoutAttribute : public AttributeBase
+{
+    SLANG_AST_CLASS(UncheckedGLSLLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+// GLSL `binding` layout qualifier, does not include `set`.
+class UncheckedGLSLBindingLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLBindingLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+// GLSL `set` layout qualifier, does not include `binding`.
+class UncheckedGLSLSetLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLSetLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+// GLSL `offset` layout qualifier.
+class UncheckedGLSLOffsetLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLOffsetLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
 // A `[name(arg0, ...)]` style attribute that has been validated.
 class Attribute : public AttributeBase
 {
@@ -744,7 +776,7 @@ class MaxItersAttribute : public Attribute
 {
     SLANG_AST_CLASS(MaxItersAttribute)
 
-    int32_t value = 0;
+    IntVal* value = 0;
 };
 
 // An inferred max iteration count on a loop.
@@ -852,6 +884,14 @@ class GLSLOffsetLayoutAttribute : public Attribute
     SLANG_AST_CLASS(GLSLOffsetLayoutAttribute)
 
     int64_t offset;
+};
+
+// Implicitly added offset qualifier when no offset is specified.
+class GLSLImplicitOffsetLayoutAttribute : public AttributeBase
+{
+    SLANG_AST_CLASS(GLSLImplicitOffsetLayoutAttribute)
+
+    SLANG_UNREFLECTED
 };
 
 class GLSLSimpleIntegerLayoutAttribute : public Attribute

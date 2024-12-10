@@ -4641,9 +4641,14 @@ public:
             getIntValue(getIntType(), IRIntegerValue(mode)));
     }
 
-    void addLoopMaxItersDecoration(IRInst* value, IntegerLiteralValue iters)
+    void addLoopMaxItersDecoration(IRInst* value, IRIntegerValue iters)
     {
-        addDecoration(value, kIROp_LoopMaxItersDecoration, getIntValue(getIntType(), iters));
+        addDecoration(value, kIROp_LoopMaxItersDecoration, getIntValue(iters));
+    }
+
+    void addLoopMaxItersDecoration(IRInst* value, IRInst* iters)
+    {
+        addDecoration(value, kIROp_LoopMaxItersDecoration, iters);
     }
 
     void addLoopForceUnrollDecoration(IRInst* value, IntegerLiteralValue iters)

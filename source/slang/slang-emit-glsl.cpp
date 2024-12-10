@@ -1127,6 +1127,10 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
     {
         _requireGLSLExtension(toSlice("GL_EXT_fragment_shading_rate_primitive"));
     }
+    else if (name == "gl_DrawID")
+    {
+        _requireGLSLVersion(460);
+    }
 }
 
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)
