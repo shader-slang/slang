@@ -16,11 +16,11 @@ layout(set = SET_BASE, binding = BINDING_BASE * BINDING_STRIDE) buffer InputA {
 };
 
 //TEST_INPUT:ubuffer(data=[2 2 2 2], stride=4):name=b
-layout(set = 0, binding = BINDING_BASE * BINDING_STRIDE * 2) buffer InputB {
+layout(set = SET_BASE + SET_STRIDE, binding = BINDING_BASE * BINDING_STRIDE * 2) buffer InputB {
     float b[];
 };
 
-layout(set = SET_BASE + SET_STRIDE, binding = 2) buffer Output {
+layout(set = SET_BASE + SET_STRIDE * 2, binding = BINDING_BASE * BINDING_STRIDE * 3) buffer Output {
     float result[];
 };
 
