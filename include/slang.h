@@ -2330,11 +2330,7 @@ struct TypeReflection
             name);
     }
 
-    [[deprecated("use findAttributeByName")]] UserAttribute* findUserAttributeByName(
-        char const* name)
-    {
-        return findAttributeByName(name);
-    }
+    UserAttribute* findUserAttributeByName(char const* name) { return findAttributeByName(name); }
 
     TypeReflection* applySpecializations(GenericReflection* generic)
     {
@@ -2801,9 +2797,7 @@ struct VariableReflection
             name);
     }
 
-    [[deprecated("use findAttributeByName")]] Attribute* findUserAttributeByName(
-        SlangSession* globalSession,
-        char const* name)
+    Attribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
     {
         return findAttributeByName(globalSession, name);
     }
@@ -2936,9 +2930,7 @@ struct FunctionReflection
             globalSession,
             name);
     }
-    [[deprecated("use findAttributeByName")]] Attribute* findUserAttributeByName(
-        SlangSession* globalSession,
-        char const* name)
+    Attribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
     {
         return findAttributeByName(globalSession, name);
     }
