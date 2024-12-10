@@ -1775,7 +1775,7 @@ public:                                                              \
     typedef struct SlangReflectionVariable SlangReflectionVariable;
     typedef struct SlangReflectionVariableLayout SlangReflectionVariableLayout;
     typedef struct SlangReflectionTypeParameter SlangReflectionTypeParameter;
-    typedef struct SlangReflectionUserAttribute SlangReflectionUserAttribute;
+    typedef struct SlangReflectionAttribute SlangReflectionUserAttribute;
     typedef struct SlangReflectionFunction SlangReflectionFunction;
     typedef struct SlangReflectionGeneric SlangReflectionGeneric;
 
@@ -2140,45 +2140,47 @@ union GenericArgReflection
     bool boolVal;
 };
 
-struct UserAttribute
+struct Attribute
 {
     char const* getName()
     {
-        return spReflectionUserAttribute_GetName((SlangReflectionUserAttribute*)this);
+        return spReflectionUserAttribute_GetName((SlangReflectionAttribute*)this);
     }
     uint32_t getArgumentCount()
     {
         return (uint32_t)spReflectionUserAttribute_GetArgumentCount(
-            (SlangReflectionUserAttribute*)this);
+            (SlangReflectionAttribute*)this);
     }
     TypeReflection* getArgumentType(uint32_t index)
     {
         return (TypeReflection*)spReflectionUserAttribute_GetArgumentType(
-            (SlangReflectionUserAttribute*)this,
+            (SlangReflectionAttribute*)this,
             index);
     }
     SlangResult getArgumentValueInt(uint32_t index, int* value)
     {
         return spReflectionUserAttribute_GetArgumentValueInt(
-            (SlangReflectionUserAttribute*)this,
+            (SlangReflectionAttribute*)this,
             index,
             value);
     }
     SlangResult getArgumentValueFloat(uint32_t index, float* value)
     {
         return spReflectionUserAttribute_GetArgumentValueFloat(
-            (SlangReflectionUserAttribute*)this,
+            (SlangReflectionAttribute*)this,
             index,
             value);
     }
     const char* getArgumentValueString(uint32_t index, size_t* outSize)
     {
         return spReflectionUserAttribute_GetArgumentValueString(
-            (SlangReflectionUserAttribute*)this,
+            (SlangReflectionAttribute*)this,
             index,
             outSize);
     }
 };
+
+typedef Attribute UserAttribute;
 
 struct TypeReflection
 {
@@ -2320,11 +2322,17 @@ struct TypeReflection
         return (UserAttribute*)spReflectionType_GetUserAttribute((SlangReflectionType*)this, index);
     }
 
-    UserAttribute* findUserAttributeByName(char const* name)
+    UserAttribute* findAttributeByName(char const* name)
     {
         return (UserAttribute*)spReflectionType_FindUserAttributeByName(
             (SlangReflectionType*)this,
             name);
+    }
+
+    [[deprecated("use findAttributeByName")]] UserAttribute* findUserAttributeByName(
+        char const* name)
+    {
+        return findAttributeByName(name);
     }
 
     TypeReflection* applySpecializations(GenericReflection* generic)
@@ -2777,19 +2785,26 @@ struct VariableReflection
         return spReflectionVariable_GetUserAttributeCount((SlangReflectionVariable*)this);
     }
 
-    UserAttribute* getUserAttributeByIndex(unsigned int index)
+    Attribute* getUserAttributeByIndex(unsigned int index)
     {
         return (UserAttribute*)spReflectionVariable_GetUserAttribute(
             (SlangReflectionVariable*)this,
             index);
     }
 
-    UserAttribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
+    Attribute* findAttributeByName(SlangSession* globalSession, char const* name)
     {
         return (UserAttribute*)spReflectionVariable_FindUserAttributeByName(
             (SlangReflectionVariable*)this,
             globalSession,
             name);
+    }
+
+    [[deprecated("use findAttributeByName")]] Attribute* findUserAttributeByName(
+        SlangSession* globalSession,
+        char const* name)
+    {
+        return findAttributeByName(globalSession, name);
     }
 
     bool hasDefaultValue()
@@ -2908,20 +2923,24 @@ struct FunctionReflection
     {
         return spReflectionFunction_GetUserAttributeCount((SlangReflectionFunction*)this);
     }
-    UserAttribute* getUserAttributeByIndex(unsigned int index)
+    Attribute* getUserAttributeByIndex(unsigned int index)
     {
-        return (UserAttribute*)spReflectionFunction_GetUserAttribute(
-            (SlangReflectionFunction*)this,
-            index);
+        return (
+            Attribute*)spReflectionFunction_GetUserAttribute((SlangReflectionFunction*)this, index);
     }
-    UserAttribute* findUserAttributeByName(SlangSession* globalSession, char const* name)
+    Attribute* findAttributeByName(SlangSession* globalSession, char const* name)
     {
-        return (UserAttribute*)spReflectionFunction_FindUserAttributeByName(
+        return (Attribute*)spReflectionFunction_FindUserAttributeByName(
             (SlangReflectionFunction*)this,
             globalSession,
             name);
     }
-
+    [[deprecated("use findAttributeByName")]] Attribute* findUserAttributeByName(
+        SlangSession* globalSession,
+        char const* name)
+    {
+        return findAttributeByName(globalSession, name);
+    }
     Modifier* findModifier(Modifier::ID id)
     {
         return (Modifier*)spReflectionFunction_FindModifier(
