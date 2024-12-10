@@ -744,7 +744,7 @@ class MaxItersAttribute : public Attribute
 {
     SLANG_AST_CLASS(MaxItersAttribute)
 
-    int32_t value = 0;
+    IntVal* value = 0;
 };
 
 // An inferred max iteration count on a loop.

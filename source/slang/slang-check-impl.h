@@ -1967,6 +1967,9 @@ public:
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
 
+    /// Is `type` a scalar half type.
+    bool isHalfType(Type* type);
+
     /// Is `type` something we allow as compile time constants, i.e. scalar integer and enum types.
     bool isValidCompileTimeConstantType(Type* type);
 
@@ -2654,8 +2657,6 @@ public:
     //
     //
 
-    Expr* MaybeDereference(Expr* inExpr);
-
     Expr* CheckMatrixSwizzleExpr(
         MemberExpr* memberRefExpr,
         Type* baseElementType,
@@ -2696,11 +2697,24 @@ public:
 
     /// Perform checking operations required for the "base" expression of a member-reference like
     /// `base.someField`
-    Expr* checkBaseForMemberExpr(Expr* baseExpr, bool& outNeedDeref);
+    enum class CheckBaseContext
+    {
+        Member,
+        Subscript,
+    };
+    Expr* checkBaseForMemberExpr(
+        Expr* baseExpr,
+        CheckBaseContext checkBaseContext,
+        bool& outNeedDeref);
+
+    Expr* maybeDereference(Expr* inExpr, CheckBaseContext checkBaseContext);
 
     /// Prepare baseExpr for use as the base of a member expr.
     /// This include inserting implicit open-existential operations as needed.
-    Expr* maybeInsertImplicitOpForMemberBase(Expr* baseExpr, bool& outNeedDeref);
+    Expr* maybeInsertImplicitOpForMemberBase(
+        Expr* baseExpr,
+        CheckBaseContext checkBaseContext,
+        bool& outNeedDeref);
 
     Expr* lookupMemberResultFailure(
         DeclRefExpr* expr,

@@ -5783,6 +5783,27 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     FillPosition(varDeclrStatement);
     auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
     varDeclrStatement->decl = decl;
+
+    if (as<VarDeclBase>(decl))
+    {
+    }
+    else if (as<DeclGroup>(decl))
+    {
+    }
+    else if (as<AggTypeDecl>(decl))
+    {
+    }
+    else if (as<TypeDefDecl>(decl))
+    {
+    }
+    else if (as<UsingDecl>(decl))
+    {
+    }
+    else
+    {
+        sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
+    }
+
     return varDeclrStatement;
 }
 
@@ -5932,21 +5953,24 @@ ForStmt* Parser::ParseForStatement()
     FillPosition(stmt);
     ReadToken("for");
     ReadToken(TokenType::LParent);
-    auto modifiers = ParseModifiers(this);
-    if (peekTypeName(this) || !modifiers.isEmpty())
+    if (!LookAheadToken(TokenType::Semicolon))
     {
-        stmt->initialStatement = parseVarDeclrStatement(modifiers);
-    }
-    else
-    {
-        if (!LookAheadToken(TokenType::Semicolon))
+        stmt->initialStatement = ParseStatement();
+        if (as<DeclStmt>(stmt->initialStatement) || as<ExpressionStmt>(stmt->initialStatement))
         {
-            stmt->initialStatement = ParseExpressionStatement();
+            // These are the only allowed form of initial statements of a for loop.
         }
         else
         {
-            ReadToken(TokenType::Semicolon);
+            sink->diagnose(
+                stmt->initialStatement->loc,
+                Diagnostics::unexpectedTokenExpectedTokenType,
+                "expression");
         }
+    }
+    else
+    {
+        ReadToken(TokenType::Semicolon);
     }
     if (!LookAheadToken(TokenType::Semicolon))
         stmt->predicateExpression = ParseExpression();
