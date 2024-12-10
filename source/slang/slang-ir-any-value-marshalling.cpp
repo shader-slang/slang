@@ -103,6 +103,12 @@ struct AnyValueMarshallingContext
                 intraFieldOffset = 0;
             }
         }
+        void ensureOffsetAt8ByteBoundary()
+        {
+            ensureOffsetAt4ByteBoundary();
+            if ((fieldOffset & 1) != 0)
+                fieldOffset++;
+        }
         void ensureOffsetAt2ByteBoundary()
         {
             if (intraFieldOffset == 0)
@@ -146,6 +152,7 @@ struct AnyValueMarshallingContext
         case kIROp_BoolType:
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
+        case kIROp_PtrType:
             context->marshalBasicType(builder, dataType, concreteTypedVar);
             break;
         case kIROp_VectorType:
@@ -367,11 +374,39 @@ struct AnyValueMarshallingContext
             case kIROp_UInt64Type:
             case kIROp_Int64Type:
             case kIROp_DoubleType:
+            case kIROp_PtrType:
 #if SLANG_PTR_IS_64
             case kIROp_UIntPtrType:
             case kIROp_IntPtrType:
 #endif
-                SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
+                ensureOffsetAt8ByteBoundary();
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcVal = builder->emitLoad(concreteVar);
+                    auto dstVal = builder->emitBitCast(builder->getUInt64Type(), srcVal);
+                    auto lowBits = builder->emitCast(builder->getUIntType(), dstVal);
+                    auto highBits = builder->emitShr(
+                        builder->getUInt64Type(),
+                        dstVal,
+                        builder->getIntValue(builder->getIntType(), 32));
+                    highBits = builder->emitCast(builder->getUIntType(), highBits);
+
+                    auto dstAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    builder->emitStore(dstAddr, lowBits);
+                    fieldOffset++;
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        dstAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        builder->emitStore(dstAddr, lowBits);
+                        fieldOffset++;
+                    }
+                }
                 break;
             default:
                 SLANG_UNREACHABLE("unknown basic type");
@@ -564,7 +599,34 @@ struct AnyValueMarshallingContext
             case kIROp_DoubleType:
             case kIROp_Int8Type:
             case kIROp_UInt8Type:
-                SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
+            case kIROp_PtrType:
+#if SLANG_PTR_IS_64
+            case kIROp_IntPtrType:
+            case kIROp_UIntPtrType:
+#endif
+                ensureOffsetAt8ByteBoundary();
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    auto lowBits = builder->emitLoad(srcAddr);
+                    fieldOffset++;
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        auto srcAddr1 = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        fieldOffset++;
+                        auto highBits = builder->emitLoad(srcAddr1);
+                        auto combinedBits = builder->emitMakeUInt64(lowBits, highBits);
+                        if (dataType->getOp() != kIROp_UInt64Type)
+                            combinedBits = builder->emitBitCast(dataType, combinedBits);
+                        builder->emitStore(concreteVar, combinedBits);
+                    }
+                }
                 break;
             default:
                 SLANG_UNREACHABLE("unknown basic type");
@@ -754,7 +816,8 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_UInt64Type:
     case kIROp_Int64Type:
     case kIROp_DoubleType:
-        return -1;
+    case kIROp_PtrType:
+        return alignUp(offset, 8) + 8;
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
     case kIROp_HalfType:
