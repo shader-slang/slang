@@ -166,17 +166,36 @@ struct AnyValueMarshallingContext
                 auto matrixType = static_cast<IRMatrixType*>(dataType);
                 auto colCount = getIntVal(matrixType->getColumnCount());
                 auto rowCount = getIntVal(matrixType->getRowCount());
-                for (IRIntegerValue i = 0; i < colCount; i++)
+                if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
                 {
-                    auto col = builder->emitElementAddress(
-                        concreteTypedVar,
-                        builder->getIntValue(builder->getIntType(), i));
-                    for (IRIntegerValue j = 0; j < rowCount; j++)
+                    for (IRIntegerValue i = 0; i < colCount; i++)
                     {
-                        auto element = builder->emitElementAddress(
-                            col,
-                            builder->getIntValue(builder->getIntType(), j));
-                        emitMarshallingCode(builder, context, element);
+                        for (IRIntegerValue j = 0; j < rowCount; j++)
+                        {
+                            auto row = builder->emitElementAddress(
+                                concreteTypedVar,
+                                builder->getIntValue(builder->getIntType(), j));
+                            auto element = builder->emitElementAddress(
+                                row,
+                                builder->getIntValue(builder->getIntType(), i));
+                            emitMarshallingCode(builder, context, element);
+                        }
+                    }
+                }
+                else
+                {
+                    for (IRIntegerValue i = 0; i < rowCount; i++)
+                    {
+                        auto row = builder->emitElementAddress(
+                            concreteTypedVar,
+                            builder->getIntValue(builder->getIntType(), i));
+                        for (IRIntegerValue j = 0; j < colCount; j++)
+                        {
+                            auto element = builder->emitElementAddress(
+                                row,
+                                builder->getIntValue(builder->getIntType(), j));
+                            emitMarshallingCode(builder, context, element);
+                        }
                     }
                 }
                 break;
@@ -762,9 +781,9 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
             auto elementType = matrixType->getElementType();
             auto colCount = getIntVal(matrixType->getColumnCount());
             auto rowCount = getIntVal(matrixType->getRowCount());
-            for (IRIntegerValue i = 0; i < colCount; i++)
+            for (IRIntegerValue i = 0; i < rowCount; i++)
             {
-                for (IRIntegerValue j = 0; j < rowCount; j++)
+                for (IRIntegerValue j = 0; j < colCount; j++)
                 {
                     offset = _getAnyValueSizeRaw(elementType, offset);
                     if (offset < 0)
