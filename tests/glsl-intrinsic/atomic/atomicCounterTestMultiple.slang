@@ -9,7 +9,10 @@ buffer MyBlockName
 
 layout(binding = 1, offset = 12) uniform atomic_uint one; 
 layout(binding = 1) uniform atomic_uint two; 
-layout(binding = 1, offset = 4) uniform atomic_uint three; 
+
+// Layout qualifiers can be specified in any order.
+layout(offset = 4, binding = 1) uniform atomic_uint three; 
+
 layout(binding = 1) uniform atomic_uint four; 
 layout(binding = 2) uniform atomic_uint five; 
 
