@@ -39,8 +39,7 @@ static const ExampleResources resourceBase("reflection-api");
 // a hard-coded list of targets to compile and reflect the programs for.
 //
 
-static const char* kSourceFileNames[] =
-{
+static const char* kSourceFileNames[] = {
     "raster-simple.slang",
     "compute-simple.slang",
 };
@@ -49,10 +48,9 @@ static const struct
 {
     SlangCompileTarget format;
     const char* profile;
-} kTargets[] =
-{
-    { SLANG_DXIL, "sm_6_0" },
-    { SLANG_SPIRV, "sm_6_0" },
+} kTargets[] = {
+    {SLANG_DXIL, "sm_6_0"},
+    {SLANG_SPIRV, "sm_6_0"},
 };
 static const int kTargetCount = SLANG_COUNT_OF(kTargets);
 
@@ -87,23 +85,20 @@ struct ReflectingPrinting
     // macros that help to keep things tidy that we need to introduce
     // here, before they are used.
     //
-#define WITH_ARRAY() \
-    for(int _i = (beginArray(), 1); _i; _i = (endArray(),0))
+#define WITH_ARRAY() for (int _i = (beginArray(), 1); _i; _i = (endArray(), 0))
 
-#define SCOPED_OBJECT() \
-    ScopedObject scopedObject##__COUNTER__(this)
+#define SCOPED_OBJECT() ScopedObject scopedObject##__COUNTER__(this)
 
     // Compiling a Program
     // -------------------
     //
-    Result compileAndReflectProgram(
-        slang::ISession* session,
-        const char* sourceFileName)
+    Result compileAndReflectProgram(slang::ISession* session, const char* sourceFileName)
     {
         SCOPED_OBJECT();
         printComment("program");
 
-        key("file name"); printQuotedString(sourceFileName);
+        key("file name");
+        printQuotedString(sourceFileName);
         String sourceFilePath = resourceBase.resolveResource(sourceFileName);
 
         ComPtr<slang::IBlob> diagnostics;
@@ -113,9 +108,7 @@ struct ReflectingPrinting
         //
 
         ComPtr<slang::IModule> module;
-        module = session->loadModule(
-            sourceFilePath.getBuffer(),
-            diagnostics.writeRef());
+        module = session->loadModule(sourceFilePath.getBuffer(), diagnostics.writeRef());
         diagnoseIfNeeded(diagnostics);
         if (!module)
             return SLANG_FAIL;
@@ -135,7 +128,8 @@ struct ReflectingPrinting
 
             element();
             SCOPED_OBJECT();
-            key("name"); printQuotedString(entryPoint->getFunctionReflection()->getName());
+            key("name");
+            printQuotedString(entryPoint->getFunctionReflection()->getName());
 
             componentsToLink.add(ComPtr<slang::IComponentType>(entryPoint.get()));
         }
@@ -153,9 +147,7 @@ struct ReflectingPrinting
         SLANG_RETURN_ON_FAIL(result);
 
         ComPtr<slang::IComponentType> program;
-        result = composed->link(
-            program.writeRef(),
-            diagnostics.writeRef());
+        result = composed->link(program.writeRef(), diagnostics.writeRef());
         diagnoseIfNeeded(diagnostics);
         SLANG_RETURN_ON_FAIL(result);
 
@@ -167,18 +159,17 @@ struct ReflectingPrinting
 
             // ### Getting the Program Layout
             //
-            slang::ProgramLayout* programLayout = program->getLayout(
-                targetIndex,
-                diagnostics.writeRef());
+            slang::ProgramLayout* programLayout =
+                program->getLayout(targetIndex, diagnostics.writeRef());
             diagnoseIfNeeded(diagnostics);
-            if(!programLayout)
+            if (!programLayout)
             {
                 result = SLANG_FAIL;
                 continue;
             }
 
-            SLANG_RETURN_ON_FAIL(collectEntryPointMetadata(
-                program, targetIndex, definedEntryPointCount));
+            SLANG_RETURN_ON_FAIL(
+                collectEntryPointMetadata(program, targetIndex, definedEntryPointCount));
 
             _programLayout = programLayout;
             auto targetFormat = kTargets[targetIndex].format;
@@ -189,8 +180,7 @@ struct ReflectingPrinting
     }
     slang::ProgramLayout* _programLayout = nullptr;
 
-    Result compileAndReflectPrograms(
-        slang::ISession* session)
+    Result compileAndReflectPrograms(slang::ISession* session)
     {
         Result result = SLANG_OK;
 
@@ -198,9 +188,7 @@ struct ReflectingPrinting
         for (auto fileName : kSourceFileNames)
         {
             element();
-            auto programResult = compileAndReflectProgram(
-                session,
-                fileName);
+            auto programResult = compileAndReflectProgram(session, fileName);
             if (SLANG_FAILED(programResult))
             {
                 result = programResult;
@@ -222,8 +210,10 @@ struct ReflectingPrinting
         const char* name = variable->getName();
         slang::TypeReflection* type = variable->getType();
 
-        key("name");    printQuotedString(name);
-        key("type");    printType(type);
+        key("name");
+        printQuotedString(name);
+        key("type");
+        printType(type);
     }
 
     // ### Types
@@ -235,8 +225,10 @@ struct ReflectingPrinting
         const char* name = type->getName();
         slang::TypeReflection::Kind kind = type->getKind();
 
-        key("name"); printQuotedString(name);
-        key("kind"); printTypeKind(kind);
+        key("name");
+        printQuotedString(name);
+        key("kind");
+        printTypeKind(kind);
 
         // There is information that we would like to
         // print for both types and type layouts, so
@@ -383,13 +375,12 @@ struct ReflectingPrinting
     //
     // ### Variable Layouts
     //
-    void printVariableLayout(
-        slang::VariableLayoutReflection* variableLayout,
-        AccessPath accessPath)
+    void printVariableLayout(slang::VariableLayoutReflection* variableLayout, AccessPath accessPath)
     {
         SCOPED_OBJECT();
 
-        key("name"); printQuotedString(variableLayout->getName());
+        key("name");
+        printQuotedString(variableLayout->getName());
 
         printOffsets(variableLayout, accessPath);
 
@@ -403,8 +394,7 @@ struct ReflectingPrinting
 
     // #### Offsets
 
-    void printRelativeOffsets(
-        slang::VariableLayoutReflection* variableLayout)
+    void printRelativeOffsets(slang::VariableLayoutReflection* variableLayout)
     {
         key("relative");
         int usedLayoutUnitCount = variableLayout->getCategoryCount();
@@ -419,8 +409,8 @@ struct ReflectingPrinting
     }
 
     void printOffset(
-        slang::VariableLayoutReflection*    variableLayout,
-        slang::ParameterCategory            layoutUnit)
+        slang::VariableLayoutReflection* variableLayout,
+        slang::ParameterCategory layoutUnit)
     {
         printOffset(
             layoutUnit,
@@ -428,15 +418,14 @@ struct ReflectingPrinting
             variableLayout->getBindingSpace(layoutUnit));
     }
 
-    void printOffset(
-        slang::ParameterCategory    layoutUnit,
-        size_t                      offset,
-        size_t                      spaceOffset)
+    void printOffset(slang::ParameterCategory layoutUnit, size_t offset, size_t spaceOffset)
     {
         SCOPED_OBJECT();
 
-        key("value"); print(offset);
-        key("unit"); printLayoutUnit(layoutUnit);
+        key("value");
+        print(offset);
+        key("unit");
+        printLayoutUnit(layoutUnit);
 
         // #### Spaces / Sets
 
@@ -450,21 +439,22 @@ struct ReflectingPrinting
         case slang::ParameterCategory::UnorderedAccess:
         case slang::ParameterCategory::SamplerState:
         case slang::ParameterCategory::DescriptorTableSlot:
-            key("space"); print(spaceOffset);
+            key("space");
+            print(spaceOffset);
             break;
         }
     }
 
     // ### Type Layouts
     //
-    void printTypeLayout(
-        slang::TypeLayoutReflection*    typeLayout,
-        AccessPath                      accessPath)
+    void printTypeLayout(slang::TypeLayoutReflection* typeLayout, AccessPath accessPath)
     {
         SCOPED_OBJECT();
 
-        key("name"); printQuotedString(typeLayout->getName());
-        key("kind"); printTypeKind(typeLayout->getKind());
+        key("name");
+        printQuotedString(typeLayout->getName());
+        key("kind");
+        printTypeKind(typeLayout->getKind());
         printCommonTypeInfo(typeLayout->getType());
 
         printSizes(typeLayout);
@@ -474,8 +464,7 @@ struct ReflectingPrinting
 
     // #### Size
     //
-    void printSizes(
-        slang::TypeLayoutReflection* typeLayout)
+    void printSizes(slang::TypeLayoutReflection* typeLayout)
     {
         key("size");
 
@@ -509,15 +498,15 @@ struct ReflectingPrinting
     {
         SCOPED_OBJECT();
 
-        key("value"); printPossiblyUnbounded(size);
-        key("unit"); printLayoutUnit(layoutUnit);
+        key("value");
+        printPossiblyUnbounded(size);
+        key("unit");
+        printLayoutUnit(layoutUnit);
     }
 
     // #### Kind-Specific Information
     //
-    void printKindSpecificInfo(
-        slang::TypeLayoutReflection*    typeLayout,
-        AccessPath                      accessPath)
+    void printKindSpecificInfo(slang::TypeLayoutReflection* typeLayout, AccessPath accessPath)
     {
         switch (typeLayout->getKind())
         {
@@ -585,7 +574,8 @@ struct ReflectingPrinting
 
                 AccessPath innerOffsets = accessPath;
                 innerOffsets.deepestConstantBufer = innerOffsets.leaf;
-                if (containerVarLayout->getTypeLayout()->getSize(slang::ParameterCategory::SubElementRegisterSpace) != 0)
+                if (containerVarLayout->getTypeLayout()->getSize(
+                        slang::ParameterCategory::SubElementRegisterSpace) != 0)
                 {
                     innerOffsets.deepestParameterBlock = innerOffsets.leaf;
                 }
@@ -599,17 +589,15 @@ struct ReflectingPrinting
                     ExtendedAccessPath elementOffsets(innerOffsets, elementVarLayout);
 
                     key("type layout");
-                    printTypeLayout(
-                        elementVarLayout->getTypeLayout(),
-                        elementOffsets);
+                    printTypeLayout(elementVarLayout->getTypeLayout(), elementOffsets);
                 }
             }
             break;
 
         case slang::TypeReflection::Kind::Resource:
             {
-                if ((typeLayout->getResourceShape() & SLANG_RESOURCE_BASE_SHAPE_MASK)
-                    == SLANG_STRUCTURED_BUFFER)
+                if ((typeLayout->getResourceShape() & SLANG_RESOURCE_BASE_SHAPE_MASK) ==
+                    SLANG_STRUCTURED_BUFFER)
                 {
                     key("element type layout");
                     printTypeLayout(typeLayout->getElementTypeLayout(), accessPath);
@@ -630,13 +618,12 @@ struct ReflectingPrinting
     // Programs and Scopes
     // -------------------
     //
-    void printProgramLayout(
-        slang::ProgramLayout* programLayout,
-        SlangCompileTarget targetFormat)
+    void printProgramLayout(slang::ProgramLayout* programLayout, SlangCompileTarget targetFormat)
     {
         SCOPED_OBJECT();
 
-        key("target"); printTargetFormat(targetFormat);
+        key("target");
+        printTargetFormat(targetFormat);
 
         AccessPath rootOffsets;
         rootOffsets.valid = true;
@@ -653,16 +640,13 @@ struct ReflectingPrinting
         for (int i = 0; i < entryPointCount; ++i)
         {
             element();
-            printEntryPointLayout(
-                programLayout->getEntryPointByIndex(i), rootOffsets);
+            printEntryPointLayout(programLayout->getEntryPointByIndex(i), rootOffsets);
         }
     }
 
     // ### Global Scope
     //
-    void printScope(
-        slang::VariableLayoutReflection*    scopeVarLayout,
-        AccessPath                          accessPath)
+    void printScope(slang::VariableLayoutReflection* scopeVarLayout, AccessPath accessPath)
     {
         ExtendedAccessPath scopeOffsets(accessPath, scopeVarLayout);
 
@@ -693,13 +677,10 @@ struct ReflectingPrinting
             key("automatically-introduced constant buffer");
             {
                 SCOPED_OBJECT();
-                printOffsets(
-                    scopeTypeLayout->getContainerVarLayout(),
-                    scopeOffsets);
+                printOffsets(scopeTypeLayout->getContainerVarLayout(), scopeOffsets);
             }
 
-            printScope(scopeTypeLayout->getElementVarLayout(),
-                scopeOffsets);
+            printScope(scopeTypeLayout->getElementVarLayout(), scopeOffsets);
             break;
 
         // #### Wrapped in a Parameter Block If Needed
@@ -708,13 +689,10 @@ struct ReflectingPrinting
             key("automatically-introduced parameter block");
             {
                 SCOPED_OBJECT();
-                printOffsets(
-                    scopeTypeLayout->getContainerVarLayout(),
-                    scopeOffsets);
+                printOffsets(scopeTypeLayout->getContainerVarLayout(), scopeOffsets);
             }
 
-            printScope(scopeTypeLayout->getElementVarLayout(),
-                scopeOffsets);
+            printScope(scopeTypeLayout->getElementVarLayout(), scopeOffsets);
             break;
 
         default:
@@ -730,13 +708,12 @@ struct ReflectingPrinting
 
     // ### Entry Points
     //
-    void printEntryPointLayout(
-        slang::EntryPointReflection*    entryPointLayout,
-        AccessPath                      accessPath)
+    void printEntryPointLayout(slang::EntryPointReflection* entryPointLayout, AccessPath accessPath)
     {
         SCOPED_OBJECT();
 
-        key("stage"); printStage(entryPointLayout->getStage());
+        key("stage");
+        printStage(entryPointLayout->getStage());
 
         printStageSpecificInfo(entryPointLayout);
 
@@ -745,14 +722,14 @@ struct ReflectingPrinting
         auto resultVariableLayout = entryPointLayout->getResultVarLayout();
         if (resultVariableLayout->getTypeLayout()->getKind() != slang::TypeReflection::Kind::None)
         {
-            key("result"); printVariableLayout(resultVariableLayout, accessPath);
+            key("result");
+            printVariableLayout(resultVariableLayout, accessPath);
         }
     }
 
     // #### Stage-Specific Information
     //
-    void printStageSpecificInfo(
-        slang::EntryPointReflection* entryPointLayout)
+    void printStageSpecificInfo(slang::EntryPointReflection* entryPointLayout)
     {
         switch (entryPointLayout->getStage())
         {
@@ -767,29 +744,34 @@ struct ReflectingPrinting
 
                 key("thread group size");
                 SCOPED_OBJECT();
-                key("x"); print(sizes[0]);
-                key("y"); print(sizes[1]);
-                key("z"); print(sizes[2]);
+                key("x");
+                print(sizes[0]);
+                key("y");
+                print(sizes[1]);
+                key("z");
+                print(sizes[2]);
             }
             break;
 
         case SLANG_STAGE_FRAGMENT:
-            key("uses any sample-rate inputs"); printBool(entryPointLayout->usesAnySampleRateInput());
+            key("uses any sample-rate inputs");
+            printBool(entryPointLayout->usesAnySampleRateInput());
             break;
         }
     }
 
     // #### Varying Parameters
     //
-    void printVaryingParameterInfo(
-        slang::VariableLayoutReflection* variableLayout)
+    void printVaryingParameterInfo(slang::VariableLayoutReflection* variableLayout)
     {
-        if(auto semanticName = variableLayout->getSemanticName())
+        if (auto semanticName = variableLayout->getSemanticName())
         {
             key("semantic");
             SCOPED_OBJECT();
-            key("name"); printQuotedString(semanticName);
-            key("index"); print(variableLayout->getSemanticIndex());
+            key("name");
+            printQuotedString(semanticName);
+            key("index");
+            print(variableLayout->getSemanticIndex());
         }
     }
 
@@ -821,8 +803,8 @@ struct ReflectingPrinting
     };
 
     void printCumulativeOffsets(
-        slang::VariableLayoutReflection*    variableLayout,
-        AccessPath                          accessPath)
+        slang::VariableLayoutReflection* variableLayout,
+        AccessPath accessPath)
     {
         key("cumulative");
 
@@ -839,8 +821,8 @@ struct ReflectingPrinting
 
     CumulativeOffset calculateCumulativeOffset(
         slang::VariableLayoutReflection* variableLayout,
-        slang::ParameterCategory    layoutUnit,
-        AccessPath          accessPath)
+        slang::ParameterCategory layoutUnit,
+        AccessPath accessPath)
     {
         CumulativeOffset result = calculateCumulativeOffset(layoutUnit, accessPath);
         result.value += variableLayout->getOffset(layoutUnit);
@@ -853,8 +835,8 @@ struct ReflectingPrinting
         slang::ParameterCategory layoutUnit,
         AccessPath accessPath)
     {
-        CumulativeOffset cumulativeOffset = calculateCumulativeOffset(
-            variableLayout, layoutUnit, accessPath);
+        CumulativeOffset cumulativeOffset =
+            calculateCumulativeOffset(variableLayout, layoutUnit, accessPath);
 
         printOffset(layoutUnit, cumulativeOffset.value, cumulativeOffset.space);
     }
@@ -863,12 +845,10 @@ struct ReflectingPrinting
 
     struct ExtendedAccessPath : AccessPath
     {
-        ExtendedAccessPath(
-            AccessPath const& base,
-            slang::VariableLayoutReflection* variableLayout)
+        ExtendedAccessPath(AccessPath const& base, slang::VariableLayoutReflection* variableLayout)
             : AccessPath(base)
         {
-            if(!valid)
+            if (!valid)
                 return;
 
             element.variableLayout = variableLayout;
@@ -883,8 +863,8 @@ struct ReflectingPrinting
     // ### Accumulating Offsets Along An Access Path
 
     CumulativeOffset calculateCumulativeOffset(
-        slang::ParameterCategory    layoutUnit,
-        AccessPath          accessPath)
+        slang::ParameterCategory layoutUnit,
+        AccessPath accessPath)
     {
         CumulativeOffset result;
         switch (layoutUnit)
@@ -901,7 +881,8 @@ struct ReflectingPrinting
         // #### Bytes
         //
         case slang::ParameterCategory::Uniform:
-            for (auto node = accessPath.leaf; node != accessPath.deepestConstantBufer; node = node->outer)
+            for (auto node = accessPath.leaf; node != accessPath.deepestConstantBufer;
+                 node = node->outer)
             {
                 result.value += node->variableLayout->getOffset(layoutUnit);
             }
@@ -914,14 +895,16 @@ struct ReflectingPrinting
         case slang::ParameterCategory::UnorderedAccess:
         case slang::ParameterCategory::SamplerState:
         case slang::ParameterCategory::DescriptorTableSlot:
-            for (auto node = accessPath.leaf; node != accessPath.deepestParameterBlock; node = node->outer)
+            for (auto node = accessPath.leaf; node != accessPath.deepestParameterBlock;
+                 node = node->outer)
             {
                 result.value += node->variableLayout->getOffset(layoutUnit);
                 result.space += node->variableLayout->getBindingSpace(layoutUnit);
             }
             for (auto node = accessPath.deepestParameterBlock; node != nullptr; node = node->outer)
             {
-                result.space += node->variableLayout->getOffset(slang::ParameterCategory::SubElementRegisterSpace);
+                result.space += node->variableLayout->getOffset(
+                    slang::ParameterCategory::SubElementRegisterSpace);
             }
             break;
         }
@@ -932,9 +915,9 @@ struct ReflectingPrinting
     // ---------------------------------------
 
     Result collectEntryPointMetadata(
-        slang::IComponentType*  program,
-        int                     targetIndex,
-        int                     entryPointCount)
+        slang::IComponentType* program,
+        int targetIndex,
+        int entryPointCount)
     {
         _metadataForEntryPoints.setCount(entryPointCount);
         for (int entryPointIndex = 0; entryPointIndex < entryPointCount; entryPointIndex++)
@@ -942,7 +925,10 @@ struct ReflectingPrinting
             ComPtr<slang::IMetadata> entryPointMetadata;
             ComPtr<slang::IBlob> diagnostics;
             SLANG_RETURN_ON_FAIL(program->getEntryPointMetadata(
-                entryPointIndex, targetIndex, entryPointMetadata.writeRef(), diagnostics.writeRef()));
+                entryPointIndex,
+                targetIndex,
+                entryPointMetadata.writeRef(),
+                diagnostics.writeRef()));
             diagnoseIfNeeded(diagnostics);
 
             _metadataForEntryPoints[entryPointIndex] = entryPointMetadata;
@@ -962,7 +948,10 @@ struct ReflectingPrinting
         {
             bool isUsed = false;
             _metadataForEntryPoints[i]->isParameterLocationUsed(
-                SlangParameterCategory(layoutUnit), offset.space, offset.value, isUsed);
+                SlangParameterCategory(layoutUnit),
+                offset.space,
+                offset.value,
+                isUsed);
             if (isUsed)
             {
                 auto entryPointStage = _programLayout->getEntryPointByIndex(i)->getStage();
@@ -983,19 +972,15 @@ struct ReflectingPrinting
         for (int i = 0; i < usedLayoutUnitCount; ++i)
         {
             auto layoutUnit = variableLayout->getCategoryByIndex(i);
-            auto offset = calculateCumulativeOffset(
-                variableLayout, layoutUnit, accessPath);
+            auto offset = calculateCumulativeOffset(variableLayout, layoutUnit, accessPath);
 
-            mask |= calculateParameterStageMask(
-                layoutUnit, offset);
+            mask |= calculateParameterStageMask(layoutUnit, offset);
         }
 
         return mask;
     }
 
-    void printStageUsage(
-        slang::VariableLayoutReflection* variableLayout,
-        AccessPath accessPath)
+    void printStageUsage(slang::VariableLayoutReflection* variableLayout, AccessPath accessPath)
     {
         StageMask stageMask = calculateStageMask(variableLayout, accessPath);
 
@@ -1063,25 +1048,13 @@ struct ReflectingPrinting
     // these operations would need to do more actual
     // work.
 
-    void beginObject()
-    {
-        indentation++;
-    }
+    void beginObject() { indentation++; }
 
-    void endObject()
-    {
-        indentation--;
-    }
+    void endObject() { indentation--; }
 
-    void beginArray()
-    {
-        indentation++;
-    }
+    void beginArray() { indentation++; }
 
-    void endArray()
-    {
-        indentation--;
-    }
+    void endArray() { indentation--; }
 
     // #### Scope-Based Objects
     //
@@ -1098,10 +1071,7 @@ struct ReflectingPrinting
             outer->beginObject();
         }
 
-        ~ScopedObject()
-        {
-            outer->endObject();
-        }
+        ~ScopedObject() { outer->endObject(); }
 
         ReflectingPrinting* outer = nullptr;
     };
@@ -1145,7 +1115,7 @@ struct ReflectingPrinting
     //
     void key(char const* key)
     {
-        if(!afterArrayElement)
+        if (!afterArrayElement)
         {
             newLine();
         }
@@ -1172,24 +1142,15 @@ struct ReflectingPrinting
         }
     }
 
-    void printBool(bool value)
-    {
-        printf(value ? "true" : "false");
-    }
+    void printBool(bool value) { printf(value ? "true" : "false"); }
 
-    void print(size_t value)
-    {
-        printf("%u", unsigned(value));
-    }
+    void print(size_t value) { printf("%u", unsigned(value)); }
 
     // YAML supports comments, but JSON doesn't.
     // This function could be stubbed out if
     // we switch up the output format.
     //
-    void printComment(char const* text)
-    {
-        printf("# %s", text);
-    }
+    void printComment(char const* text) { printf("# %s", text); }
 
 
     // Printing Enumerants
@@ -1202,28 +1163,30 @@ struct ReflectingPrinting
     {
         switch (kind)
         {
-#define CASE(TAG) \
-        case slang::TypeReflection::Kind::TAG: printf("%s", #TAG); break
+#define CASE(TAG)                          \
+    case slang::TypeReflection::Kind::TAG: \
+        printf("%s", #TAG);                \
+        break
 
-        CASE(None);
-        CASE(Struct);
-        CASE(Array);
-        CASE(Matrix);
-        CASE(Vector);
-        CASE(Scalar);
-        CASE(ConstantBuffer);
-        CASE(Resource);
-        CASE(SamplerState);
-        CASE(TextureBuffer);
-        CASE(ShaderStorageBuffer);
-        CASE(ParameterBlock);
-        CASE(GenericTypeParameter);
-        CASE(Interface);
-        CASE(OutputStream);
-        CASE(Specialized);
-        CASE(Feedback);
-        CASE(Pointer);
-        CASE(DynamicResource);
+            CASE(None);
+            CASE(Struct);
+            CASE(Array);
+            CASE(Matrix);
+            CASE(Vector);
+            CASE(Scalar);
+            CASE(ConstantBuffer);
+            CASE(Resource);
+            CASE(SamplerState);
+            CASE(TextureBuffer);
+            CASE(ShaderStorageBuffer);
+            CASE(ParameterBlock);
+            CASE(GenericTypeParameter);
+            CASE(Interface);
+            CASE(OutputStream);
+            CASE(Specialized);
+            CASE(Feedback);
+            CASE(Pointer);
+            CASE(DynamicResource);
 #undef CASE
 
         default:
@@ -1238,21 +1201,23 @@ struct ReflectingPrinting
 
         key("base");
         auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
-        switch(baseShape)
+        switch (baseShape)
         {
-#define CASE(TAG) \
-        case SLANG_##TAG: printf("%s", #TAG); break
+#define CASE(TAG)           \
+    case SLANG_##TAG:       \
+        printf("%s", #TAG); \
+        break
 
-        CASE(TEXTURE_1D);
-        CASE(TEXTURE_2D);
-        CASE(TEXTURE_3D);
-        CASE(TEXTURE_CUBE);
-        CASE(TEXTURE_BUFFER);
-        CASE(STRUCTURED_BUFFER);
-        CASE(BYTE_ADDRESS_BUFFER);
-        CASE(RESOURCE_UNKNOWN);
-        CASE(ACCELERATION_STRUCTURE);
-        CASE(TEXTURE_SUBPASS);
+            CASE(TEXTURE_1D);
+            CASE(TEXTURE_2D);
+            CASE(TEXTURE_3D);
+            CASE(TEXTURE_CUBE);
+            CASE(TEXTURE_BUFFER);
+            CASE(STRUCTURED_BUFFER);
+            CASE(BYTE_ADDRESS_BUFFER);
+            CASE(RESOURCE_UNKNOWN);
+            CASE(ACCELERATION_STRUCTURE);
+            CASE(TEXTURE_SUBPASS);
 #undef CASE
 
         default:
@@ -1260,32 +1225,40 @@ struct ReflectingPrinting
             break;
         }
 
-#define CASE(TAG) \
-        do { if(shape & SLANG_TEXTURE_##TAG##_FLAG) { key(#TAG); printf("true"); } } while (0)
+#define CASE(TAG)                               \
+    do                                          \
+    {                                           \
+        if (shape & SLANG_TEXTURE_##TAG##_FLAG) \
+        {                                       \
+            key(#TAG);                          \
+            printf("true");                     \
+        }                                       \
+    } while (0)
 
         CASE(FEEDBACK);
         CASE(SHADOW);
         CASE(ARRAY);
         CASE(MULTISAMPLE);
 #undef CASE
-
     }
 
     void printResourceAccess(SlangResourceAccess access)
     {
         switch (access)
         {
-#define CASE(TAG) \
-        case SLANG_RESOURCE_ACCESS_##TAG: printf("%s", #TAG); break
+#define CASE(TAG)                     \
+    case SLANG_RESOURCE_ACCESS_##TAG: \
+        printf("%s", #TAG);           \
+        break
 
-        CASE(NONE);
-        CASE(READ);
-        CASE(READ_WRITE);
-        CASE(RASTER_ORDERED);
-        CASE(APPEND);
-        CASE(CONSUME);
-        CASE(WRITE);
-        CASE(FEEDBACK);
+            CASE(NONE);
+            CASE(READ);
+            CASE(READ_WRITE);
+            CASE(RASTER_ORDERED);
+            CASE(APPEND);
+            CASE(CONSUME);
+            CASE(WRITE);
+            CASE(FEEDBACK);
 #undef CASE
 
         default:
@@ -1298,32 +1271,34 @@ struct ReflectingPrinting
     {
         switch (layoutUnit)
         {
-#define CASE(TAG, DESCRIPTION) \
-        case slang::ParameterCategory::TAG: printf("%s # %s", #TAG, DESCRIPTION); break
+#define CASE(TAG, DESCRIPTION)                \
+    case slang::ParameterCategory::TAG:       \
+        printf("%s # %s", #TAG, DESCRIPTION); \
+        break
 
-        CASE(ConstantBuffer, "constant buffer slots");
-        CASE(ShaderResource, "texture slots");
-        CASE(UnorderedAccess, "uav slots");
-        CASE(VaryingInput, "varying input slots");
-        CASE(VaryingOutput, "varying output slots");
-        CASE(SamplerState, "sampler slots");
-        CASE(Uniform, "bytes");
-        CASE(DescriptorTableSlot, "bindings");
-        CASE(SpecializationConstant, "specialization constant ids");
-        CASE(PushConstantBuffer, "push-constant buffers");
-        CASE(RegisterSpace, "register space offset for a variable");
-        CASE(GenericResource, "generic resources");
-        CASE(RayPayload, "ray payloads");
-        CASE(HitAttributes, "hit attributes");
-        CASE(CallablePayload, "callable payloads");
-        CASE(ShaderRecord, "shader records");
-        CASE(ExistentialTypeParam, "existential type parameters");
-        CASE(ExistentialObjectParam, "existential object parameters");
-        CASE(SubElementRegisterSpace, "register spaces / descriptor sets");
-        CASE(InputAttachmentIndex, "subpass input attachments");
-        CASE(MetalArgumentBufferElement, "Metal argument buffer elements");
-        CASE(MetalAttribute, "Metal attributes");
-        CASE(MetalPayload, "Metal payloads");
+            CASE(ConstantBuffer, "constant buffer slots");
+            CASE(ShaderResource, "texture slots");
+            CASE(UnorderedAccess, "uav slots");
+            CASE(VaryingInput, "varying input slots");
+            CASE(VaryingOutput, "varying output slots");
+            CASE(SamplerState, "sampler slots");
+            CASE(Uniform, "bytes");
+            CASE(DescriptorTableSlot, "bindings");
+            CASE(SpecializationConstant, "specialization constant ids");
+            CASE(PushConstantBuffer, "push-constant buffers");
+            CASE(RegisterSpace, "register space offset for a variable");
+            CASE(GenericResource, "generic resources");
+            CASE(RayPayload, "ray payloads");
+            CASE(HitAttributes, "hit attributes");
+            CASE(CallablePayload, "callable payloads");
+            CASE(ShaderRecord, "shader records");
+            CASE(ExistentialTypeParam, "existential type parameters");
+            CASE(ExistentialObjectParam, "existential object parameters");
+            CASE(SubElementRegisterSpace, "register spaces / descriptor sets");
+            CASE(InputAttachmentIndex, "subpass input attachments");
+            CASE(MetalArgumentBufferElement, "Metal argument buffer elements");
+            CASE(MetalAttribute, "Metal attributes");
+            CASE(MetalPayload, "Metal payloads");
 #undef CASE
 
         default:
@@ -1336,24 +1311,26 @@ struct ReflectingPrinting
     {
         switch (stage)
         {
-#define CASE(NAME) \
-        case SLANG_STAGE_##NAME: printf(#NAME); break
+#define CASE(NAME)           \
+    case SLANG_STAGE_##NAME: \
+        printf(#NAME);       \
+        break
 
-        CASE(NONE);
-        CASE(VERTEX);
-        CASE(HULL);
-        CASE(DOMAIN);
-        CASE(GEOMETRY);
-        CASE(FRAGMENT);
-        CASE(COMPUTE);
-        CASE(RAY_GENERATION);
-        CASE(INTERSECTION);
-        CASE(ANY_HIT);
-        CASE(CLOSEST_HIT);
-        CASE(MISS);
-        CASE(CALLABLE);
-        CASE(MESH);
-        CASE(AMPLIFICATION);
+            CASE(NONE);
+            CASE(VERTEX);
+            CASE(HULL);
+            CASE(DOMAIN);
+            CASE(GEOMETRY);
+            CASE(FRAGMENT);
+            CASE(COMPUTE);
+            CASE(RAY_GENERATION);
+            CASE(INTERSECTION);
+            CASE(ANY_HIT);
+            CASE(CLOSEST_HIT);
+            CASE(MISS);
+            CASE(CALLABLE);
+            CASE(MESH);
+            CASE(AMPLIFICATION);
 #undef CASE
 
         default:
@@ -1365,40 +1342,42 @@ struct ReflectingPrinting
     {
         switch (targetFormat)
         {
-#define CASE(TAG) \
-        case SLANG_##TAG: printf("%s", #TAG); break
+#define CASE(TAG)           \
+    case SLANG_##TAG:       \
+        printf("%s", #TAG); \
+        break
 
-        CASE(TARGET_UNKNOWN);
-        CASE(TARGET_NONE);
-        CASE(GLSL);
-        CASE(GLSL_VULKAN_DEPRECATED);
-        CASE(GLSL_VULKAN_ONE_DESC_DEPRECATED);
-        CASE(HLSL);
-        CASE(SPIRV);
-        CASE(SPIRV_ASM);
-        CASE(DXBC);
-        CASE(DXBC_ASM);
-        CASE(DXIL);
-        CASE(DXIL_ASM);
-        CASE(C_SOURCE);
-        CASE(CPP_SOURCE);
-        CASE(HOST_EXECUTABLE);
-        CASE(SHADER_SHARED_LIBRARY);
-        CASE(SHADER_HOST_CALLABLE);
-        CASE(CUDA_SOURCE);
-        CASE(PTX);
-        CASE(CUDA_OBJECT_CODE);
-        CASE(OBJECT_CODE);
-        CASE(HOST_CPP_SOURCE);
-        CASE(HOST_HOST_CALLABLE);
-        CASE(CPP_PYTORCH_BINDING);
-        CASE(METAL);
-        CASE(METAL_LIB);
-        CASE(METAL_LIB_ASM);
-        CASE(HOST_SHARED_LIBRARY);
-        CASE(WGSL);
-        CASE(WGSL_SPIRV_ASM);
-        CASE(WGSL_SPIRV);
+            CASE(TARGET_UNKNOWN);
+            CASE(TARGET_NONE);
+            CASE(GLSL);
+            CASE(GLSL_VULKAN_DEPRECATED);
+            CASE(GLSL_VULKAN_ONE_DESC_DEPRECATED);
+            CASE(HLSL);
+            CASE(SPIRV);
+            CASE(SPIRV_ASM);
+            CASE(DXBC);
+            CASE(DXBC_ASM);
+            CASE(DXIL);
+            CASE(DXIL_ASM);
+            CASE(C_SOURCE);
+            CASE(CPP_SOURCE);
+            CASE(HOST_EXECUTABLE);
+            CASE(SHADER_SHARED_LIBRARY);
+            CASE(SHADER_HOST_CALLABLE);
+            CASE(CUDA_SOURCE);
+            CASE(PTX);
+            CASE(CUDA_OBJECT_CODE);
+            CASE(OBJECT_CODE);
+            CASE(HOST_CPP_SOURCE);
+            CASE(HOST_HOST_CALLABLE);
+            CASE(CPP_PYTORCH_BINDING);
+            CASE(METAL);
+            CASE(METAL_LIB);
+            CASE(METAL_LIB_ASM);
+            CASE(HOST_SHARED_LIBRARY);
+            CASE(WGSL);
+            CASE(WGSL_SPIRV_ASM);
+            CASE(WGSL_SPIRV);
 #undef CASE
 
         default:
@@ -1410,23 +1389,25 @@ struct ReflectingPrinting
     {
         switch (scalarType)
         {
-#define CASE(TAG) \
-    case slang::TypeReflection::TAG: printf("%s", #TAG); break
+#define CASE(TAG)                    \
+    case slang::TypeReflection::TAG: \
+        printf("%s", #TAG);          \
+        break
 
-        CASE(None);
-        CASE(Void);
-        CASE(Bool);
-        CASE(Int32);
-        CASE(UInt32);
-        CASE(Int64);
-        CASE(UInt64);
-        CASE(Float16);
-        CASE(Float32);
-        CASE(Float64);
-        CASE(Int8);
-        CASE(UInt8);
-        CASE(Int16);
-        CASE(UInt16);
+            CASE(None);
+            CASE(Void);
+            CASE(Bool);
+            CASE(Int32);
+            CASE(UInt32);
+            CASE(Int64);
+            CASE(UInt64);
+            CASE(Float16);
+            CASE(Float32);
+            CASE(Float64);
+            CASE(Int8);
+            CASE(UInt8);
+            CASE(Int16);
+            CASE(UInt16);
 #undef CASE
 
         default:
@@ -1436,14 +1417,16 @@ struct ReflectingPrinting
 
     void printMatrixLayoutMode(SlangMatrixLayoutMode mode)
     {
-        switch(mode)
+        switch (mode)
         {
-#define CASE(TAG) \
-    case SLANG_MATRIX_LAYOUT_##TAG: printf("%s", #TAG); break
+#define CASE(TAG)                   \
+    case SLANG_MATRIX_LAYOUT_##TAG: \
+        printf("%s", #TAG);         \
+        break
 
-        CASE(MODE_UNKNOWN);
-        CASE(ROW_MAJOR);
-        CASE(COLUMN_MAJOR);
+            CASE(MODE_UNKNOWN);
+            CASE(ROW_MAJOR);
+            CASE(COLUMN_MAJOR);
 #undef CASE
 
         default:

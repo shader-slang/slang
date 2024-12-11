@@ -2448,17 +2448,23 @@ struct TypeLayoutReflection
 
     size_t getSize(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
     {
-        return spReflectionTypeLayout_GetSize((SlangReflectionTypeLayout*)this, (SlangParameterCategory)category);
+        return spReflectionTypeLayout_GetSize(
+            (SlangReflectionTypeLayout*)this,
+            (SlangParameterCategory)category);
     }
 
     size_t getStride(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
     {
-        return spReflectionTypeLayout_GetStride((SlangReflectionTypeLayout*)this, (SlangParameterCategory)category);
+        return spReflectionTypeLayout_GetStride(
+            (SlangReflectionTypeLayout*)this,
+            (SlangParameterCategory)category);
     }
 
     int32_t getAlignment(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
     {
-        return spReflectionTypeLayout_getAlignment((SlangReflectionTypeLayout*)this, (SlangParameterCategory)category);
+        return spReflectionTypeLayout_getAlignment(
+            (SlangReflectionTypeLayout*)this,
+            (SlangParameterCategory)category);
     }
 
 
@@ -2873,7 +2879,9 @@ struct VariableLayoutReflection
     }
     size_t getOffset(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
     {
-        return spReflectionVariableLayout_GetOffset((SlangReflectionVariableLayout*)this, (SlangParameterCategory)category);
+        return spReflectionVariableLayout_GetOffset(
+            (SlangReflectionVariableLayout*)this,
+            (SlangParameterCategory)category);
     }
 
 
@@ -2895,7 +2903,9 @@ struct VariableLayoutReflection
     }
     size_t getBindingSpace(slang::ParameterCategory category)
     {
-        return spReflectionVariableLayout_GetSpace((SlangReflectionVariableLayout*)this, (SlangParameterCategory)category);
+        return spReflectionVariableLayout_GetSpace(
+            (SlangReflectionVariableLayout*)this,
+            (SlangParameterCategory)category);
     }
 
     char const* getSemanticName()
