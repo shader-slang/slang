@@ -2,8 +2,7 @@
 #include "slang-glslang.h"
 
 #include "SPIRV/GlslangToSpv.h"
-#include "SPIRV/disassemble.h"
-#include "glslang/Public/ResourceLimits.h"
+#include "glslang/MachineIndependent/localintermediate.h"
 #include "glslang/Public/ShaderLang.h"
 #include "slang.h"
 #include "spirv-tools/libspirv.h"
@@ -13,6 +12,8 @@
 #include <windows.h>
 #endif
 
+#include <cassert>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <sstream>
