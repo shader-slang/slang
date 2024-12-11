@@ -65,13 +65,15 @@ void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRMod
     }
 
     // Since certain globals that appear in the IR are considered illegal for all targets,
-    // e.g. calls to functions, we delete globals which no longer have uses (or children with uses) after inlining.
-    for (auto& globalInst: globalInstsToConsiderDeleting)
+    // e.g. calls to functions, we delete globals which no longer have uses (or children with uses)
+    // after inlining.
+    for (auto& globalInst : globalInstsToConsiderDeleting)
     {
-        if (!hasDescendantSatisfyingPredicate(globalInst, [](IRInst* inst){return inst->hasUses();}))
+        if (!hasDescendantSatisfyingPredicate(
+                globalInst,
+                [](IRInst* inst) { return inst->hasUses(); }))
             globalInst->removeAndDeallocate();
     }
-
 }
 
 bool GlobalInstInliningContextGeneric::isLegalGlobalInst(IRInst* inst)
@@ -186,7 +188,10 @@ bool GlobalInstInliningContextGeneric::shouldInlineInst(IRInst* inst)
     return result;
 }
 
-IRInst* GlobalInstInliningContextGeneric::inlineInst(IRBuilder& builder, IRCloneEnv& cloneEnv, IRInst* inst)
+IRInst* GlobalInstInliningContextGeneric::inlineInst(
+    IRBuilder& builder,
+    IRCloneEnv& cloneEnv,
+    IRInst* inst)
 {
     IRInst* result;
     if (cloneEnv.mapOldValToNew.tryGetValue(inst, result))

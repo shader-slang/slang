@@ -11,8 +11,8 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
-#include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-global-values.h"
+#include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-peephole.h"
@@ -1591,7 +1591,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    struct GlobalInstInliningContext: public GlobalInstInliningContextGeneric
+    struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
@@ -1602,10 +1602,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             switch (inst->getOp())
             {
-                case kIROp_SPIRVAsm:
-                    return true;
-                default:
-                    break;
+            case kIROp_SPIRVAsm:
+                return true;
+            default:
+                break;
             }
 
             if (as<IRSPIRVAsmInst>(inst))
