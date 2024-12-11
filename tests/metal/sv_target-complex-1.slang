@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
-//TEST:SIMPLE(filecheck=METAL-ASM): -target metallib
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry fragmentMain -stage fragment
+//TEST:SIMPLE(filecheck=METAL_ASM): -target metallib
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl
+//TEST:SIMPLE(filecheck=WGSLSPIRV): -target wgsl-spirv-asm
 
 struct NestedReturn
 {
@@ -21,18 +22,19 @@ struct Output
     NestedReturn2 debug2 : SV_TaRget3;
 }
 
-// METAL-ASM: define {{.*}} @fragmentMain
+// METAL_ASM: define {{.*}} @fragmentMain
 // METAL: color(0)
 // METAL-DAG: color(1)
 // METAL-DAG: color(2)
 // METAL-DAG: color(3)
 // METAL-DAG: color(4)
 
-// WGSL: location(0)
-// WGSL-DAG: location(1)
-// WGSL-DAG: location(2)
-// WGSL-DAG: location(3)
-// WGSL-DAG: location(4)
+// WGSLSPIRV: %fragmentMain = OpFunction
+// WGSL: @location(0) Diffuse
+// WGSL: @location(1) debug
+// WGSL: @location(2) Material
+// WGSL: @location(3) debugAux1
+// WGSL: @location(4) debugAux2
 
 [shader("fragment")]
 Output fragmentMain()
