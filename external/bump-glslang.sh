@@ -4,7 +4,7 @@ set -e
 
 EXTERNAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-refDef=refs/heads/master
+refDef=refs/heads/main
 ref=$refDef
 upstreamDef=https://github.com/KhronosGroup/glslang
 upstream=$upstreamDef
@@ -89,6 +89,7 @@ spirv_headers=$EXTERNAL_DIR/spirv-headers
 spirv_tools=$EXTERNAL_DIR/spirv-tools
 spirv_tools_generated=$EXTERNAL_DIR/spirv-tools-generated
 effcee=$spirv_tools/external/effcee
+absl=$spirv_tools/external/effcee/third_party/abseil_cpp
 re2=$spirv_tools/external/re2
 
 if ! test -f "$glslang/.git"; then
@@ -142,6 +143,9 @@ bump_dep "$spirv_headers" "spirv-tools/external/spirv-headers"
 
 test -d "$effcee" || git clone https://github.com/google/effcee.git "$effcee"
 git -C "$effcee" pull
+
+test -d "$absl" || git clone https://github.com/abseil/abseil-cpp "$absl"
+git -C "$absl" pull
 
 test -d "$re2" || git clone https://github.com/google/re2.git "$re2"
 git -C "$re2" pull
