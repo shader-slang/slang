@@ -19803,7 +19803,8 @@ ${
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19830,7 +19831,8 @@ ${
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Bias $bias;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Bias $bias;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19859,7 +19861,8 @@ ${
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel MinLod $lodClamp;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel MinLod $lodClamp;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19889,7 +19892,8 @@ ${
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Bias|MinLod $bias $lodClamp;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Bias|MinLod $bias $lodClamp;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19917,7 +19921,8 @@ ${
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Lod $lod;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Lod $lod;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19950,7 +19955,8 @@ ${{{
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Grad $dx $dy;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Grad $dx $dy;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
@@ -19981,7 +19987,8 @@ ${{{
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV &this $coords $granularity $useCoarseLevel Grad|MinLod $dx $dy $lodClamp;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
+                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Grad|MinLod $dx $dy $lodClamp;
                 OpStore &footprint %resultVal;
                 result:$$bool = OpCompositeExtract %resultVal 0;
             };
