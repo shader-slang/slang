@@ -9,8 +9,14 @@ namespace Slang
 struct RedundancyRemovalContext
 {
     RefPtr<IRDominatorTree> dom;
-    bool isSingleIterationLoop(IRLoop* loop)
+    bool isLikelySingleIterationLoop(IRLoop* loop)
     {
+        auto targetBlock = loop->getTargetBlock();
+        if (targetBlock->getPredecessors().getCount() != 1)
+            return false;
+        if (*targetBlock->getPredecessors().begin() != loop->getParent())
+            return false;
+
         int useCount = 0;
         for (auto use = loop->getBreakBlock()->firstUse; use; use = use->nextUse)
         {
@@ -20,6 +26,9 @@ struct RedundancyRemovalContext
             if (useCount > 1)
                 return false;
         }
+
+        // We've run trivial checks, the loop may still not be a single iteration loop,
+        // but we are allowed to be conservative here to assume it is.
         return true;
     }
 
@@ -32,7 +41,7 @@ struct RedundancyRemovalContext
         {
             auto terminatorInst = parentBlock->getTerminator();
             if (terminatorInst->getOp() == kIROp_loop &&
-                !isSingleIterationLoop(as<IRLoop>(terminatorInst)))
+                !isLikelySingleIterationLoop(as<IRLoop>(terminatorInst)))
             {
                 // Consider hoisting the inst into this block.
                 // This is only possible if all operands of the inst are dominating `parentBlock`.
