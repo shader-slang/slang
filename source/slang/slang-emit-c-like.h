@@ -676,6 +676,8 @@ protected:
     // one.
     void _emitSwizzleStorePerElement(IRInst* inst);
 
+    String _emitLiteralOneWithType(int bitWidth);
+
     CodeGenContext* m_codeGenContext = nullptr;
     IRModule* m_irModule = nullptr;
 
