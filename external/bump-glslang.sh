@@ -27,6 +27,9 @@ while [[ "$#" -gt 0 ]]; do
   --do-commit)
     do_commit=1
     ;;
+  --do-fetch)
+    do_fetch=1
+    ;;
   *)
     echo "Unknown parameter passed: $1" >&2
     exit 1
@@ -47,6 +50,10 @@ $me: Update external/glslang and dependencies
 - Optionally commit the changes
 
 Options:
+  --do-fetch    : Fetch new changes to glslang spirv-tools spirv-headers, if
+                  this isn't specified then the ref/release/upstream options do
+                  nothing
+
   --ref 2b2523f : merge this specific commit into our branch
                   defaults to $refDef
 
@@ -128,16 +135,19 @@ merge_dep() {
   new_ref["$1"]=$(git -C "$dir" describe --exclude master-tot --tags HEAD)
 }
 
-merge_dep glslang "$glslang" "$upstream" "$ref"
+if [ "$do_fetch" ]; then
+  merge_dep glslang "$glslang" "$upstream" "$ref"
 
-spirv_tools_upstream=https://github.com/$(
-  jq <"$glslang/known_good.json" \
-    ".commits | .[] | select(.name == \"spirv-tools\") | .subrepo" \
-    --raw-output
-)
-merge_dep spirv-tools "$spirv_tools" "$spirv_tools_upstream" "$(known_good_commit "spirv-tools")"
+  spirv_tools_upstream=https://github.com/$(
+    jq <"$glslang/known_good.json" \
+      ".commits | .[] | select(.name == \"spirv-tools\") | .subrepo" \
+      --raw-output
+  )
 
-bump_dep "$spirv_headers" "spirv-tools/external/spirv-headers"
+  merge_dep spirv-tools "$spirv_tools" "$spirv_tools_upstream" "$(known_good_commit "spirv-tools")"
+
+  bump_dep "$spirv_headers" "spirv-tools/external/spirv-headers"
+fi
 
 # Make sure we have the dependencies of spirv-tools up to date
 
