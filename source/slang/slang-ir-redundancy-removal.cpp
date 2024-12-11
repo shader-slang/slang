@@ -9,28 +9,6 @@ namespace Slang
 struct RedundancyRemovalContext
 {
     RefPtr<IRDominatorTree> dom;
-    bool isLikelySingleIterationLoop(IRLoop* loop)
-    {
-        auto targetBlock = loop->getTargetBlock();
-        if (targetBlock->getPredecessors().getCount() != 1)
-            return false;
-        if (*targetBlock->getPredecessors().begin() != loop->getParent())
-            return false;
-
-        int useCount = 0;
-        for (auto use = loop->getBreakBlock()->firstUse; use; use = use->nextUse)
-        {
-            if (use->getUser() == loop)
-                continue;
-            useCount++;
-            if (useCount > 1)
-                return false;
-        }
-
-        // We've run trivial checks, the loop may still not be a single iteration loop,
-        // but we are allowed to be conservative here to assume it is.
-        return true;
-    }
 
     bool tryHoistInstToOuterMostLoop(IRGlobalValueWithCode* func, IRInst* inst)
     {
@@ -40,11 +18,15 @@ struct RedundancyRemovalContext
              parentBlock = dom->getImmediateDominator(parentBlock))
         {
             auto terminatorInst = parentBlock->getTerminator();
-            if (terminatorInst->getOp() == kIROp_loop &&
-                !isLikelySingleIterationLoop(as<IRLoop>(terminatorInst)))
+            if (auto loop = as<IRLoop>(terminatorInst))
             {
+                // If `inst` is outside of the loop region, don't hoist it into the loop.
+                if (dom->dominates(loop->getBreakBlock(), inst))
+                    continue;
+
                 // Consider hoisting the inst into this block.
-                // This is only possible if all operands of the inst are dominating `parentBlock`.
+                // This is only possible if all operands of the inst are dominating
+                // `parentBlock`.
                 bool canHoist = true;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
