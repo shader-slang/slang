@@ -169,9 +169,13 @@ bool GlobalInstInliningContextGeneric::shouldInlineInst(IRInst* inst)
     return result;
 }
 
-IRInst* GlobalInstInliningContextGeneric::inlineInst(IRBuilder& builder, IRCloneEnv& cloneEnv, IRInst* inst)
+IRInst* GlobalInstInliningContextGeneric::inlineInst(
+    IRBuilder& builder,
+    IRCloneEnv& cloneEnv,
+    IRInst* inst)
 {
-    // We rely on this dictionary in order to force inlining of any nodes with that should be inlined
+    // We rely on this dictionary in order to force inlining of any nodes with that should be
+    // inlined
     SLANG_ASSERT(m_mapGlobalInstToShouldInline[inst]);
 
     IRInst* result;

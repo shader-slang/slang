@@ -1,8 +1,8 @@
 #include "slang-ir-wgsl-legalize.h"
 
 #include "slang-ir-insts.h"
-#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-legalize-global-values.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-parameter-binding.h"
@@ -1588,7 +1588,7 @@ struct LegalizeWGSLEntryPointContext
     }
 };
 
-struct GlobalInstInliningContext: public GlobalInstInliningContextGeneric
+struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
 {
     bool isLegalGlobalInstForTarget(IRInst* /* inst */) override
     {
