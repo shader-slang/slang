@@ -4,7 +4,7 @@
 #include "slang-common.h"
 
 #include <stdlib.h>
-#ifdef _MSC_VER
+#if SLANG_WINDOWS_FAMILY
 #include <malloc.h>
 #endif
 
@@ -14,7 +14,7 @@ namespace Slang
 {
 inline void* alignedAllocate(size_t size, size_t alignment)
 {
-#ifdef _MSC_VER
+#if SLANG_WINDOWS_FAMILY
     return _aligned_malloc(size, alignment);
 #elif defined(__CYGWIN__)
     return aligned_alloc(alignment, size);
@@ -27,7 +27,7 @@ inline void* alignedAllocate(size_t size, size_t alignment)
 
 inline void alignedDeallocate(void* ptr)
 {
-#ifdef _MSC_VER
+#if SLANG_WINDOWS_FAMILY
     _aligned_free(ptr);
 #else
     free(ptr);
