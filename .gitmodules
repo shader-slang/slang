@@ -1,6 +1,6 @@
 [submodule "external/glslang"]
 	path = external/glslang
-	url = https://github.com/shader-slang/glslang.git
+	url = https://github.com/KhronosGroup/glslang
 [submodule "external/tinyobjloader"]
 	path = external/tinyobjloader
 	url = https://github.com/syoyo/tinyobjloader
@@ -15,7 +15,7 @@
 	url = https://github.com/shader-slang/slang-binaries
 [submodule "external/spirv-tools"]
 	path = external/spirv-tools
-	url = https://github.com/shader-slang/SPIRV-Tools.git
+	url = https://github.com/KhronosGroup/SPIRV-Tools.git
 [submodule "external/spirv-headers"]
 	path = external/spirv-headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git

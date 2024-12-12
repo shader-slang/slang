@@ -1660,6 +1660,8 @@ public:
 
     void setName(String name);
     void setName(Name* name) { m_name = name; }
+    Name* getNameObj() { return m_name; }
+
     void setPathInfo(PathInfo pathInfo) { m_pathInfo = pathInfo; }
 
     /// Set the IR for this module.
