@@ -8,7 +8,7 @@
 #include "../slang-visual-studio-compiler-util.h"
 
 #ifdef _WIN32
-#include <Shlobj.h>
+#include <shlobj.h>
 #include <windows.h>
 #pragma comment(lib, "advapi32")
 #pragma comment(lib, "Shell32")
