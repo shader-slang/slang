@@ -933,6 +933,7 @@ struct ReflectingPrinting
 
             _metadataForEntryPoints[entryPointIndex] = entryPointMetadata;
         }
+        return SLANG_OK;
     }
     Slang::List<ComPtr<slang::IMetadata>> _metadataForEntryPoints;
 
