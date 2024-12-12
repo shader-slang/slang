@@ -166,6 +166,10 @@ function(set_default_compile_options target)
         PROPERTIES # -fvisibility=hidden
             CXX_VISIBILITY_PRESET
             hidden
+            C_VISIBILITY_PRESET
+            hidden
+            VISIBILITY_INLINES_HIDDEN
+            ON
             # C++ standard
             CXX_STANDARD
             17
