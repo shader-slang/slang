@@ -4250,7 +4250,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
             {
                 needDefaultConstantBuffer = true;
                 if (varLayout->varDecl.getDecl()->hasModifier<GLSLBindingAttribute>() ||
-                    varLayout->varDecl.getDecl()->hasModifier<GLSLLocationLayoutModifier>())
+                    varLayout->varDecl.getDecl()->hasModifier<GLSLLocationAttribute>())
                     sink->diagnose(
                         varLayout->varDecl,
                         Diagnostics::explicitUniformLocation,

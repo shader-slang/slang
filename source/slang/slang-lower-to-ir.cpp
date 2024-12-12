@@ -2290,14 +2290,12 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         {
             builder->addSimpleDecoration<IRGlobalInputDecoration>(inst);
         }
-        else if (auto glslLocationMod = as<GLSLLocationLayoutModifier>(mod))
+        else if (auto glslLocationMod = as<GLSLLocationAttribute>(mod))
         {
             builder->addDecoration(
                 inst,
                 kIROp_GLSLLocationDecoration,
-                builder->getIntValue(
-                    builder->getIntType(),
-                    stringToInt(glslLocationMod->valToken.getContent())));
+                builder->getIntValue(builder->getIntType(), glslLocationMod->value));
         }
         else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
         {
