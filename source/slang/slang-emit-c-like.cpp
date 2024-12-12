@@ -3906,20 +3906,13 @@ void CLikeSourceEmitter::emitVecNOrScalar(
         // In other languages, we can output the Slang vector type directly
         else
         {
-            if (getTarget() == CodeGenTarget::WGSL)
-            {
-                m_writer->emit("vec");
-                m_writer->emitRawText(std::to_string(N).c_str());
-                m_writer->emit("<u32>");
-            }
-            else
-                emitType(vectorType);
+            emitType(vectorType);
         }
 
         m_writer->emit("(");
         for (int i = 0; i < N; ++i)
         {
-            (getTarget() == CodeGenTarget::WGSL) ? m_writer->emit("u32") : emitType(elementType);
+            emitType(elementType);
             m_writer->emit("(");
             emitComponentLogic();
             m_writer->emit(")");
@@ -3930,9 +3923,6 @@ void CLikeSourceEmitter::emitVecNOrScalar(
     }
     else
     {
-        if (getTarget() == CodeGenTarget::WGSL)
-            m_writer->emit("u32");
-
         m_writer->emit("(");
         emitComponentLogic();
         m_writer->emit(")");
@@ -3995,8 +3985,23 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
 
     Slang::IRType* elementType = dataType;
     IRVectorType* vectorType = as<IRVectorType>(elementType);
+    IRVectorType* vectorTypeForShiftNumber = nullptr;
+
     if (vectorType)
+    {
         elementType = vectorType->getElementType();
+
+        if (getTarget() == CodeGenTarget::WGSL)
+        {
+            IRBuilder builder(elementType);
+            vectorTypeForShiftNumber =
+                builder.getVectorType(builder.getUIntType(), vectorType->getElementCount());
+        }
+        else
+        {
+            vectorTypeForShiftNumber = vectorType;
+        }
+    }
 
     bool isSigned;
     int bitWidth;
@@ -4019,60 +4024,47 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
         m_writer->emit("(");
     }
 
-    // Emit bitfield extraction ( (val>>off) & ((1u<<bts)-1) )
+    // Emit bitfield extraction ( (val >> off) & ((1u << bts) - 1) )
     m_writer->emit("(");
+
+    // In WGSL, "&" operator requires the operands to have the same type, since the
+    // right operand '((1u << bts) - 1)' is known to be u32, we need to cast the left operand to
+    // u32.
     if (getTarget() == CodeGenTarget::WGSL)
     {
-        if (vectorType)
-        {
-            int N = int(getIntVal(vectorType->getElementCount()));
-            m_writer->emit("vec");
-            m_writer->emitRawText(std::to_string(N).c_str());
-            m_writer->emit("<u32>(");
-        }
-        else
-            m_writer->emit("u32(");
+        (vectorTypeForShiftNumber != nullptr) ? emitType(vectorTypeForShiftNumber)
+                                              : m_writer->emit("u32");
     }
-    else
-    {
-        m_writer->emit("(");
-    }
+
+    m_writer->emit("(");
 
     emitOperand(val, getInfo(EmitOp::General));
     m_writer->emit(">>");
-    emitVecNOrScalar(vectorType, [&]() { emitOperand(off, getInfo(EmitOp::General)); });
+    emitVecNOrScalar(
+        vectorTypeForShiftNumber,
+        [&]() { emitOperand(off, getInfo(EmitOp::General)); });
 
     m_writer->emit(")&(");
     emitVecNOrScalar(
-        vectorType,
+        vectorTypeForShiftNumber,
         [&]()
         {
             m_writer->emit("((" + one + "<<");
-
-            if (getTarget() == CodeGenTarget::WGSL)
-                m_writer->emit("u32");
-
-            m_writer->emit("(");
             emitOperand(bts, getInfo(EmitOp::General));
-            m_writer->emit(")");
-
             m_writer->emit(")-" + one + ")");
         });
     m_writer->emit("))");
 
     // Emit sign extension logic
-    // (type(bitfield<<(numBits-bts))>>(numBits-bts))
+    // ( type(bitfield << (numBits - bts) ) >> (numBits - bts) )
     //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     if (isSigned)
     {
         m_writer->emit("<<");
         emitVecNOrScalar(
-            vectorType,
+            vectorTypeForShiftNumber,
             [&]()
             {
-                if (getTarget() == CodeGenTarget::WGSL)
-                    m_writer->emit("u32");
-
                 m_writer->emit("(");
                 m_writer->emit(bitWidth);
                 m_writer->emit("-");
@@ -4081,12 +4073,9 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
             });
         m_writer->emit(")>>");
         emitVecNOrScalar(
-            vectorType,
+            vectorTypeForShiftNumber,
             [&]()
             {
-                if (getTarget() == CodeGenTarget::WGSL)
-                    m_writer->emit("u32");
-
                 m_writer->emit("(");
                 m_writer->emit(bitWidth);
                 m_writer->emit("-");
@@ -4104,16 +4093,31 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
     // uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
     // BitfieldInsert := T(uint(clearedBase) | uint(maskedInsert));
     Slang::IRType* dataType = inst->getDataType();
-    Slang::IRInst* bse = inst->getOperand(0);
-    Slang::IRInst* ins = inst->getOperand(1);
+    Slang::IRInst* base = inst->getOperand(0);
+    Slang::IRInst* insert = inst->getOperand(1);
     Slang::IRInst* off = inst->getOperand(2);
     Slang::IRInst* bts = inst->getOperand(3);
 
 
     Slang::IRType* elementType = dataType;
     IRVectorType* vectorType = as<IRVectorType>(elementType);
+    IRVectorType* vectorTypeForShiftNumber = nullptr;
+
     if (vectorType)
+    {
         elementType = vectorType->getElementType();
+
+        if (getTarget() == CodeGenTarget::WGSL)
+        {
+            IRBuilder builder(elementType);
+            vectorTypeForShiftNumber =
+                builder.getVectorType(builder.getUIntType(), vectorType->getElementCount());
+        }
+        else
+        {
+            vectorTypeForShiftNumber = vectorType;
+        }
+    }
 
     bool isSigned;
     int bitWidth;
@@ -4128,39 +4132,39 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
 
     String one = _emitLiteralOneWithType(bitWidth);
 
-    m_writer->emit("((");
+    if (isSigned)
+    {
+        emitType(inst->getDataType());
+        m_writer->emit("(");
+    }
+    m_writer->emit("(");
 
-    // emit clearedBase := uint(bse & ~(((1u<<bts)-1u)<<off))
-    emitOperand(bse, getInfo(EmitOp::General));
+    // emit clearedBase := uint( base & ~( ((1u << bts) - 1u) << off ) )
+
+    // In WGSL, "&" operator requires the operands to have the same type, since the
+    // right operand '~( ((1u << bts) - 1u) << off )' is known to be u32, we need to
+    // cast the left operand to u32.
+    if (getTarget() == CodeGenTarget::WGSL)
+    {
+        (vectorTypeForShiftNumber != nullptr) ? emitType(vectorTypeForShiftNumber)
+                                              : m_writer->emit("u32");
+    }
+
+    m_writer->emit("(");
+    emitOperand(base, getInfo(EmitOp::General));
+    m_writer->emit(")");
+
     m_writer->emit("&");
     emitVecNOrScalar(
-        vectorType,
+        vectorTypeForShiftNumber,
         [&]()
         {
             m_writer->emit("~(((" + one + "<<");
-
-            if (getTarget() == CodeGenTarget::WGSL)
-            {
-                m_writer->emit("u32(");
-                emitOperand(bts, getInfo(EmitOp::General));
-                m_writer->emit(")");
-            }
-            else
-                emitOperand(bts, getInfo(EmitOp::General));
+            emitOperand(bts, getInfo(EmitOp::General));
 
             m_writer->emit(")-" + one + ")<<");
 
-            if (getTarget() == CodeGenTarget::WGSL)
-            {
-                m_writer->emit("u32(");
-                emitOperand(off, getInfo(EmitOp::General));
-                m_writer->emit(")");
-            }
-            else
-            {
-                emitOperand(off, getInfo(EmitOp::General));
-            }
-
+            emitOperand(off, getInfo(EmitOp::General));
             m_writer->emit(")");
         });
 
@@ -4171,23 +4175,24 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
 
     // - first emit mask := (insert & ((1u << bits) - 1u))
     m_writer->emit("(");
-    emitOperand(ins, getInfo(EmitOp::General));
+
+    // For the same reason as above, we need to cast the left operand to u32 for WGSL target.
+    if (getTarget() == CodeGenTarget::WGSL)
+    {
+        (vectorTypeForShiftNumber != nullptr) ? emitType(vectorTypeForShiftNumber)
+                                              : m_writer->emit("u32");
+    }
+    m_writer->emit("(");
+    emitOperand(insert, getInfo(EmitOp::General));
+    m_writer->emit(")");
+
     m_writer->emit("&");
     emitVecNOrScalar(
-        vectorType,
+        vectorTypeForShiftNumber,
         [&]()
         {
             m_writer->emit("(" + one + "<<");
-
-            if (getTarget() == CodeGenTarget::WGSL)
-            {
-                m_writer->emit("u32(");
-                emitOperand(bts, getInfo(EmitOp::General));
-                m_writer->emit(")");
-            }
-            else
-                emitOperand(bts, getInfo(EmitOp::General));
-
+            emitOperand(bts, getInfo(EmitOp::General));
             m_writer->emit(")-" + one);
         });
     m_writer->emit(")");
@@ -4195,19 +4200,14 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
     // then emit shift := << offset
     m_writer->emit("<<");
     emitVecNOrScalar(
-        vectorType,
-        [&]()
-        {
-            if (getTarget() == CodeGenTarget::WGSL)
-            {
-                m_writer->emit("u32(");
-                emitOperand(off, getInfo(EmitOp::General));
-                m_writer->emit(")");
-            }
-            else
-                emitOperand(off, getInfo(EmitOp::General));
-        });
-    m_writer->emit("))");
+        vectorTypeForShiftNumber,
+        [&]() { emitOperand(off, getInfo(EmitOp::General)); });
+    m_writer->emit(")");
+
+    if (isSigned)
+    {
+        m_writer->emit(")");
+    }
 }
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)

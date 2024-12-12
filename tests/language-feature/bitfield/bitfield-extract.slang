@@ -25,9 +25,6 @@
 //TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name=i32Buffer
 RWStructuredBuffer<int> i32Buffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=i64Buffer
-RWStructuredBuffer<uint64_t> i64Buffer;
-
 [numthreads(1, 1, 1)]
 void computeMain()
 {

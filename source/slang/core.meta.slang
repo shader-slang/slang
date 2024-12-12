@@ -2721,7 +2721,7 @@ __generic<T>
 [__readNone]
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitfieldInsert))
-T bitfieldInsert(T base, T insert, int offset, int bits);
+T bitfieldInsert(T base, T insert, uint offset, uint bits);
 
 /// `bitfieldExtract` extracts a subset of the bits of `value` and
 /// returns it in the least significant bits of the result. The range of bits extracted is [offset, offset + bits - 1].
@@ -2729,7 +2729,7 @@ __generic<T>
 [__readNone]
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitfieldExtract))
-T bitfieldExtract(T value, int offset, int bits);
+T bitfieldExtract(T value, uint offset, uint bits);
 
 /// Use an otherwise unused value
 /// This can be used to silence the warning about returning before initializing an out paramter.
