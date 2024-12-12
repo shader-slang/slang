@@ -94,10 +94,10 @@ int64_t getTimerFrequency();
 template<typename... TArgs>
 inline void reportError(const char* format, TArgs... args)
 {
-    printf(format, args...);
+    printf(format, std::forward<TArgs>(args)...);
 #ifdef _WIN32
     char buffer[4096];
-    sprintf_s(buffer, format, args...);
+    sprintf_s(buffer, format, std::forward<TArgs>(args)...);
     _Win32OutputDebugString(buffer);
 #endif
 }

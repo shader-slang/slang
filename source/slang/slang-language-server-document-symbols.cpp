@@ -195,6 +195,11 @@ static void _getDocumentSymbolsImpl(
                     sym.range.end.line = (int)line;
                     sym.range.end.character = (int)col;
                 }
+                if (sym.selectionRange.end.line == sym.range.end.line ||
+                    sym.selectionRange.end.character >= sym.range.end.character)
+                {
+                    sym.selectionRange.end = sym.range.end;
+                }
             }
             if (const auto childContainerDecl = as<ContainerDecl>(child))
             {

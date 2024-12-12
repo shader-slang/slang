@@ -13,6 +13,7 @@
 #include <windows.h>
 #endif
 
+#include <process.h>
 #include <stdio.h>
 #include <stdlib.h>
 

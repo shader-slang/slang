@@ -2,7 +2,7 @@
 #include "slang-std-writers.h"
 
 #if SLANG_WINDOWS_FAMILY
-#include <Windows.h>
+#include <windows.h>
 #endif
 
 namespace Slang
