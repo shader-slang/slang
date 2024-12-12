@@ -3285,6 +3285,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return nullptr;
     }
 
+    SpvInst* emitMakeUInt64(SpvInstParent* parent, IRInst* inst)
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto vec = emitOpCompositeConstruct(
+            parent,
+            nullptr,
+            builder.getVectorType(builder.getUIntType(), 2),
+            inst->getOperand(0),
+            inst->getOperand(1));
+        return emitOpBitcast(parent, inst, inst->getDataType(), vec);
+    }
+
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
@@ -3396,6 +3409,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_BitfieldInsert:
             result = emitBitfieldInsert(parent, inst);
+        case kIROp_MakeUInt64:
+            result = emitMakeUInt64(parent, inst);
             break;
         case kIROp_Add:
         case kIROp_Sub:

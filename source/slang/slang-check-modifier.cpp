@@ -752,18 +752,15 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 auto& arg = attr->args[paramIndex];
                 bool typeChecked = false;
-                if (auto basicType = as<BasicExpressionType>(paramDecl->getType()))
+                if (isValidCompileTimeConstantType(paramDecl->getType()))
                 {
-                    if (basicType->getBaseType() == BaseType::Int)
+                    if (auto cint = checkConstantIntVal(arg))
                     {
-                        if (auto cint = checkConstantIntVal(arg))
-                        {
-                            for (Index ci = attr->intArgVals.getCount(); ci < paramIndex + 1; ci++)
-                                attr->intArgVals.add(nullptr);
-                            attr->intArgVals[(uint32_t)paramIndex] = cint;
-                        }
-                        typeChecked = true;
+                        for (Index ci = attr->intArgVals.getCount(); ci < paramIndex + 1; ci++)
+                            attr->intArgVals.add(nullptr);
+                        attr->intArgVals[(uint32_t)paramIndex] = cint;
                     }
+                    typeChecked = true;
                 }
                 if (!typeChecked)
                 {

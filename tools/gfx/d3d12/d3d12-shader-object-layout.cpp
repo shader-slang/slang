@@ -39,7 +39,7 @@ bool ShaderObjectLayoutImpl::isBindingRangeRootParameter(
     {
         if (auto leafVariable = typeLayout->getBindingRangeLeafVariable(bindingRangeIndex))
         {
-            if (leafVariable->findUserAttributeByName(globalSession, rootParameterAttributeName))
+            if (leafVariable->findAttributeByName(globalSession, rootParameterAttributeName))
             {
                 isRootParameter = true;
             }
