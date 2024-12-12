@@ -3930,7 +3930,7 @@ void CLikeSourceEmitter::emitVecNOrScalar(
     }
     else
     {
-        if(getTarget() == CodeGenTarget::WGSL)
+        if (getTarget() == CodeGenTarget::WGSL)
             m_writer->emit("u32");
 
         m_writer->emit("(");
@@ -3983,11 +3983,11 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
     // Else signed, bfse := (((val>>off)&((1u<<bts)-1))<<(nbts-bts)>>(nbts-bts));
     //
     // Note: In WGSL, the data type for bit operators are more restricted than in other languages.
-    // The number of bits to shift must be a u32 or vecN<u32>, therefore we have to cast this operand
-    // to u32 always.
-    // Another constraint is that for "&" and "|" operators, the operands must have the same type.
-    // TODO: We can consider to bring the logic to WGSLSourceEmitter::emitBitfieldExtractImpl so that
-    // we don't have to have those special handling here.
+    // The number of bits to shift must be a u32 or vecN<u32>, therefore we have to cast this
+    // operand to u32 always. Another constraint is that for "&" and "|" operators, the operands
+    // must have the same type.
+    // TODO: We can consider to bring the logic to WGSLSourceEmitter::emitBitfieldExtractImpl so
+    // that we don't have to have those special handling here.
     Slang::IRType* dataType = inst->getDataType();
     Slang::IRInst* val = inst->getOperand(0);
     Slang::IRInst* off = inst->getOperand(1);
@@ -4040,11 +4040,7 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
 
     emitOperand(val, getInfo(EmitOp::General));
     m_writer->emit(">>");
-    emitVecNOrScalar(vectorType,
-        [&]()
-        {
-            emitOperand(off, getInfo(EmitOp::General));
-        });
+    emitVecNOrScalar(vectorType, [&]() { emitOperand(off, getInfo(EmitOp::General)); });
 
     m_writer->emit(")&(");
     emitVecNOrScalar(
@@ -4053,7 +4049,7 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
         {
             m_writer->emit("((" + one + "<<");
 
-            if(getTarget() == CodeGenTarget::WGSL)
+            if (getTarget() == CodeGenTarget::WGSL)
                 m_writer->emit("u32");
 
             m_writer->emit("(");
@@ -4074,7 +4070,7 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
             vectorType,
             [&]()
             {
-                if(getTarget() == CodeGenTarget::WGSL)
+                if (getTarget() == CodeGenTarget::WGSL)
                     m_writer->emit("u32");
 
                 m_writer->emit("(");
@@ -4088,7 +4084,7 @@ void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
             vectorType,
             [&]()
             {
-                if(getTarget() == CodeGenTarget::WGSL)
+                if (getTarget() == CodeGenTarget::WGSL)
                     m_writer->emit("u32");
 
                 m_writer->emit("(");
@@ -4198,7 +4194,8 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
 
     // then emit shift := << offset
     m_writer->emit("<<");
-    emitVecNOrScalar(vectorType,
+    emitVecNOrScalar(
+        vectorType,
         [&]()
         {
             if (getTarget() == CodeGenTarget::WGSL)

@@ -3409,6 +3409,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_BitfieldInsert:
             result = emitBitfieldInsert(parent, inst);
+            break;
         case kIROp_MakeUInt64:
             result = emitMakeUInt64(parent, inst);
             break;
