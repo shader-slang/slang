@@ -1,8 +1,6 @@
 // static-const-in-generic-interface.slang
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
-// WGSL: Functions cannot be called at module scope #5607
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Test that `static const` variable declarations inside of
 // a generic `interface` type correctly translate to interface requirements.

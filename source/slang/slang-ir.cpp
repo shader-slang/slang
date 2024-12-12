@@ -7971,7 +7971,7 @@ void IRInst::removeOperand(Index index)
 }
 
 // Remove this instruction from its parent block,
-// and then destroy it (it had better have no uses!)
+// and then destroy it (it had better have no uses, or descendants with uses!)
 void IRInst::removeAndDeallocate()
 {
     removeAndDeallocateAllDecorationsAndChildren();
