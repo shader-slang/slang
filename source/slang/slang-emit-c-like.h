@@ -615,6 +615,11 @@ protected:
         SLANG_UNUSED(baseName);
     }
 
+    bool tryGetIntInfo(IRType* elementType, bool& isSigned, int& bitWidth);
+    void emitVecNOrScalar(IRVectorType* vectorType, std::function<void()> func);
+    virtual void emitBitfieldExtractImpl(IRInst* inst);
+    virtual void emitBitfieldInsertImpl(IRInst* inst);
+
     virtual void emitSubpassInputTypeImpl(IRSubpassInputType* type) { SLANG_UNUSED(type); }
 
     // Again necessary for & prefix intrinsics. May be removable in the future
@@ -670,6 +675,8 @@ protected:
     // variable first, then assign the corresponding elements to the left-handside vector one by
     // one.
     void _emitSwizzleStorePerElement(IRInst* inst);
+
+    String _emitLiteralOneWithType(int bitWidth);
 
     CodeGenContext* m_codeGenContext = nullptr;
     IRModule* m_irModule = nullptr;
