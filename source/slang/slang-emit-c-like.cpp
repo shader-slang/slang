@@ -2963,6 +2963,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             break; // should already have been parsed and used.
         }
+    case kIROp_GlobalValueRef:
+        {
+            emitOperand(as<IRGlobalValueRef>(inst)->getOperand(0), getInfo(EmitOp::General));
+            break;
+        }
     default:
         diagnoseUnhandledInst(inst);
         break;
