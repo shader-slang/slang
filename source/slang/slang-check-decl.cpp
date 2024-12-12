@@ -1356,7 +1356,8 @@ bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
         auto& assistInfo = getLinkage()->contentAssistInfo;
         // If this func is not defined in the primary module, skip checking its body.
         auto moduleDecl = getModuleDecl(decl);
-        if (moduleDecl && moduleDecl->getName() != assistInfo.primaryModuleName)
+        if (moduleDecl && moduleDecl->module->getNameObj() != assistInfo.primaryModuleName &&
+            moduleDecl->getName() != assistInfo.primaryModuleName)
             return true;
         if (funcDecl->body)
         {
