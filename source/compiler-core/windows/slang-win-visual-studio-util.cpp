@@ -8,7 +8,7 @@
 #include "../slang-visual-studio-compiler-util.h"
 
 #ifdef _WIN32
-#include <Shlobj.h>
+#include <shlobj.h>
 #include <windows.h>
 #pragma comment(lib, "advapi32")
 #pragma comment(lib, "Shell32")
@@ -69,7 +69,7 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
 
 // Make easier to set up the array
 
-static DownstreamCompilerMatchVersion _makeVersion(int main)
+[[maybe_unused]] static DownstreamCompilerMatchVersion _makeVersion(int main)
 {
     DownstreamCompilerMatchVersion version;
     version.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
@@ -77,7 +77,7 @@ static DownstreamCompilerMatchVersion _makeVersion(int main)
     return version;
 }
 
-static DownstreamCompilerMatchVersion _makeVersion(int main, int dot)
+[[maybe_unused]] static DownstreamCompilerMatchVersion _makeVersion(int main, int dot)
 {
     DownstreamCompilerMatchVersion version;
     version.type = SLANG_PASS_THROUGH_VISUAL_STUDIO;
@@ -149,6 +149,7 @@ static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersi
 
 /* static */ DownstreamCompilerMatchVersion WinVisualStudioUtil::getCompiledVersion()
 {
+#ifdef _MSC_VER
     // Get the version of visual studio used to compile this source
     // Not const, because otherwise we get an warning/error about constant expression...
     uint32_t version = _MSC_VER;
@@ -247,6 +248,7 @@ static SlangResult _parseVersion(UnownedStringSlice versionString, SemanticVersi
             SLANG_PASS_THROUGH_VISUAL_STUDIO,
             MatchSemanticVersion::makeFuture());
     }
+#endif
 
     // Unknown version
     return DownstreamCompilerMatchVersion(SLANG_PASS_THROUGH_VISUAL_STUDIO, MatchSemanticVersion());
