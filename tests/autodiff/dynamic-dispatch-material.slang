@@ -1,6 +1,6 @@
 // Test calling differentiable function through dynamic dispatch.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -Xslang -dump-intermediates
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -Xslang -dump-intermediates -Xslang -dump-ir-ids
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -42,11 +42,6 @@ interface IMaterialInstance : IDifferentiable
     float eval( float x );
 }
 
-[open]
-struct MaterialBase
-{
-    MaterialHeader header;
-}
 
 [BackwardDerivative(getMaterial_bwd)]
 IMaterial getMaterial(int id)
@@ -60,10 +55,11 @@ void getMaterial_bwd(int id, IDifferentiable d)
     outputBuffer[id] = 2.f;
 }
 
-struct Material1: MaterialBase, IMaterial
+struct Material1: IMaterial
 {
     typedef MaterialInstance1 MaterialInstance;
 
+    MaterialHeader header;
     float a;
     float b;
     float c;
@@ -92,10 +88,11 @@ struct MaterialInstance1: IMaterialInstance
     }
 }
 
-struct Material2: MaterialBase, IMaterial
+struct Material2: IMaterial
 {
     typedef MaterialInstance2 MaterialInstance;
 
+    MaterialHeader header;
     float a;
     float b;
 
@@ -137,6 +134,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer[0] = shade(0, {0.5}, 0.6);
 
+    // TODO: VERIFY
     DifferentialPair<float> dpx = diffPair(3.0);
     bwd_diff(shade)(0, {0.5}, dpx, 1.0);
 

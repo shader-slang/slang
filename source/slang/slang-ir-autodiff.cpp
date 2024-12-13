@@ -291,12 +291,19 @@ IRInst* getExistentialBaseWitnessTable(IRBuilder* builder, IRType* type)
     }
 }
 
-IRInst* getCacheKey(IRInst* primalType)
+IRInst* getCacheKey(IRBuilder* builder, IRInst* primalType)
 {
-    if (as<IRLookupWitnessMethod>(primalType))
-        return cast<IRLookupWitnessMethod>(primalType)->getRequirementKey();
-    else if (as<IRExtractExistentialType>(primalType))
-        return cast<IRExtractExistentialType>(primalType)->getOperand(0)->getDataType();
+    if (auto lookupWitness = as<IRLookupWitnessMethod>(primalType))
+        return lookupWitness->getRequirementKey();
+    else if (auto extractExistentialType = as<IRExtractExistentialType>(primalType))
+    {
+        auto interfaceType = extractExistentialType->getOperand(0)->getDataType();
+
+        // We will cache on the interface's this-type, since the interface type itself can be
+        // deallocated during the lowering process.
+        //
+        return builder->getThisType(interfaceType);
+    }
 
     return primalType;
 }
@@ -344,7 +351,7 @@ IRInst* DifferentialPairTypeBuilder::emitPrimalFieldAccess(
             getPrimalKey);
 
         auto primalFieldVal =
-            builder->emitCallInst(primalTypeMap[pairTypeKey], primalFieldMethod, baseInst);
+            builder->emitCallInst(primalTypeMap[loweredPairType], primalFieldMethod, baseInst);
 
         return primalFieldVal;
     }
@@ -372,7 +379,7 @@ IRInst* DifferentialPairTypeBuilder::emitDiffFieldAccess(
             getDiffKey);
 
         auto diffFieldVal =
-            builder->emitCallInst(diffTypeMap[pairTypeKey], diffFieldMethod, baseInst);
+            builder->emitCallInst(diffTypeMap[loweredPairType], diffFieldMethod, baseInst);
 
         return diffFieldVal;
     }
@@ -447,15 +454,13 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
     //
     IRType* requirementBaseType = nullptr;
 
-    // Cache key.
-    IRInst* cacheKey = nullptr;
+    // Requirement key (only used for associated types)
+    //
+    IRInst* requirementKey = nullptr;
 
     // Add a name hint to the key.
     StringBuilder nameBuilderReqKey;
     nameBuilderReqKey << "DiffPair_Req_";
-
-    // StringBuilder nameBuilderIDiffPair;
-    // nameBuilderIDiffPair << "IDiffPair_";
 
     if (auto lookup = as<IRLookupWitnessMethod>(origBaseType))
     {
@@ -466,17 +471,15 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         requirementBaseType =
             cast<IRType>(findInterfaceRequirement(interfaceType, lookup->getRequirementKey()));
 
-        cacheKey = lookup->getRequirementKey();
+        requirementKey = lookup->getRequirementKey();
 
         if (auto nameHint = lookup->getRequirementKey()->findDecoration<IRNameHintDecoration>())
         {
             nameBuilderReqKey << nameHint->getName();
-            // nameBuilderIDiffPair << nameHint->getName();
         }
         else
         {
             nameBuilderReqKey << "unknown_assoc_type";
-            // nameBuilderIDiffPair << "unknown_assoc_type";
         }
     }
     else if (auto extractType = as<IRExtractExistentialType>(origBaseType))
@@ -485,17 +488,15 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         interfaceType = cast<IRInterfaceType>(existentialType->getDataType());
         requirementBaseType = builder.getThisType(interfaceType);
 
-        cacheKey = interfaceType;
+        requirementKey = nullptr;
 
         if (auto nameHint = interfaceType->findDecoration<IRNameHintDecoration>())
         {
             nameBuilderReqKey << nameHint->getName();
-            // nameBuilderIDiffPair << nameHint->getName();
         }
         else
         {
             nameBuilderReqKey << "unknown_interface_type";
-            // nameBuilderIDiffPair << "unknown_interface_type";
         }
     }
     else
@@ -506,15 +507,15 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
     auto diffPairInterfaceType =
         cast<IRInterfaceType>(getOrCreateCommonDiffPairInterface(&builder));
 
-    // Add 4 requirements to the interface: the associated pair type, getPrimal and getDiff.
+    // Add 4 requirements to the interface:
+    // the associated pair type, getPrimal, getDiff & makePair
+    //
     builder.setInsertInto(interfaceType);
     IRStructKey* diffPairRequirementKey = builder.createStructKey();
     IRStructKey* getPrimalRequirementKey = builder.createStructKey();
     IRStructKey* getDiffRequirementKey = builder.createStructKey();
     IRStructKey* makePairRequirementKey = builder.createStructKey();
 
-    // auto cacheKeyInst = getCacheKey(origBaseType);
-    // assocPairTypeKeyCache[cacheKeyInst] = diffPairRequirementKey;
     makePairKeyMap[diffPairRequirementKey] = makePairRequirementKey;
     getPrimalKeyMap[diffPairRequirementKey] = getPrimalRequirementKey;
     getDiffKeyMap[diffPairRequirementKey] = getDiffRequirementKey;
@@ -523,13 +524,16 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
 
     // Add all the old requirements to the new interface.
     for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
-    {
         entries.add(interfaceType->getOperand(i));
-    }
+
+    //
+    // Create the new requirement entries.
+    //
 
     {
         // Create & insert the requirement key.
         List<IRInterfaceType*> constraintTypes;
+        constraintTypes.add(diffPairInterfaceType);
         auto entry = builder.createInterfaceRequirementEntry(
             diffPairRequirementKey,
             builder.getAssociatedType(constraintTypes.getArrayView()));
@@ -631,10 +635,12 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         interfaceType = newInterfaceType;
     }
 
+    //
     // Implement the requirements in all the witness tables.
-    List<IRWitnessTable*> concreteWitnessTables;
+    //
 
     // Collect all witness tables of the given interfaceType.
+    List<IRWitnessTable*> concreteWitnessTables;
     auto witnessTableType = builder.getWitnessTableType(interfaceType);
     for (auto use = witnessTableType->firstUse; use; use = use->nextUse)
     {
@@ -650,10 +656,30 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
 
     for (auto concreteWitnessTable : concreteWitnessTables)
     {
+        IRType* concretePrimalType = nullptr;
+
+        // What requirement are we trying to satisfy?
+        if (as<IRThisType>(requirementBaseType))
+        {
+            // For this types, we should lower the concrete type of the witness table itself.
+            concretePrimalType = concreteWitnessTable->getConcreteType();
+        }
+        else if (as<IRAssociatedType>(requirementBaseType))
+        {
+            // For associated types, look it up in the witness table.
+            concretePrimalType =
+                (IRType*)findWitnessTableEntry(concreteWitnessTable, requirementKey);
+        }
+        else
+        {
+            // We shouldn't see any other case here.
+            SLANG_UNEXPECTED("Unexpected requirement base type");
+        }
+
         // Create the pair type.
         auto witness = ctx.tryGetDifferentiableWitness(
             &builder,
-            concreteWitnessTable->getConcreteType(),
+            concretePrimalType,
             DiffConformanceKind::Value);
 
         // Really should not see a case where the original interface is differentiable, but
@@ -662,7 +688,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         SLANG_ASSERT(witness);
 
         auto concretePairType = builder.getDifferentialPairType(
-            concreteWitnessTable->getConcreteType(),
+            concretePrimalType,
             witness); // TODO: Need to handle the other conformance kinds
         auto concreteDiffType =
             (IRType*)_getDiffTypeFromPairType(sharedContext, &builder, concretePairType);
@@ -672,8 +698,8 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         // Create an (empty) witness table for loweredStuctType : IDiffPair_...
         // This is just so that there is a bound on the any-value-size for each group of pair types.
         //
-        auto diffPairWitnessTableType = builder.getWitnessTableType(diffPairInterfaceType);
-        builder.createWitnessTable(diffPairWitnessTableType, loweredStructType);
+        auto witnessTable = builder.createWitnessTable(diffPairInterfaceType, loweredStructType);
+        builder.addKeepAliveDecoration(witnessTable);
 
         builder.setInsertInto(concreteWitnessTable);
 
@@ -696,16 +722,14 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
 
             primalMethod->setFullType(builder.getFuncType(
                 List<IRType*>({(IRType*)loweredStructType}),
-                concreteWitnessTable->getConcreteType()));
+                concretePrimalType));
 
             builder.setInsertInto(primalMethod);
             auto block = builder.emitBlock();
             builder.setInsertInto(block);
             auto param = builder.emitParam((IRType*)loweredStructType);
-            builder.emitReturn(builder.emitFieldExtract(
-                concreteWitnessTable->getConcreteType(),
-                param,
-                _getOrCreatePrimalStructKey()));
+            builder.emitReturn(
+                builder.emitFieldExtract(concretePrimalType, param, _getOrCreatePrimalStructKey()));
 
             builder.setInsertInto(concreteWitnessTable);
             builder.createWitnessTableEntry(
@@ -750,13 +774,13 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
             builder.addNameHintDecoration(makePairMethod, nameBuilder.getUnownedSlice());
 
             makePairMethod->setFullType(builder.getFuncType(
-                List<IRType*>({concreteWitnessTable->getConcreteType(), concreteDiffType}),
+                List<IRType*>({concretePrimalType, concreteDiffType}),
                 (IRType*)loweredStructType));
 
             builder.setInsertInto(makePairMethod);
             auto block = builder.emitBlock();
             builder.setInsertInto(block);
-            auto param1 = builder.emitParam(concreteWitnessTable->getConcreteType());
+            auto param1 = builder.emitParam(concretePrimalType);
             auto param2 = builder.emitParam(concreteDiffType);
             List<IRInst*> args = {param1, param2};
             auto pair = builder.emitMakeStruct((IRType*)loweredStructType, args);
@@ -822,24 +846,25 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
 
     if (isRuntimeType(primalType))
     {
-        auto cacheKey = getCacheKey(primalType);
-        if (existentialPairTypeCache.tryGetValue(cacheKey, result))
-            return result;
-
         // Existential case.
+        auto cacheKey = getCacheKey(builder, primalType);
         auto diffType = _getDiffTypeFromPairType(sharedContext, builder, pairType);
-        auto pairReqKey = _createDiffPairInterfaceRequirement(primalType, (IRType*)diffType);
+
+        IRInst* pairReqKey = nullptr;
+        if (!existentialPairTypeCache.tryGetValue(cacheKey, pairReqKey))
+        {
+            pairReqKey = _createDiffPairInterfaceRequirement(primalType, (IRType*)diffType);
+            existentialPairTypeCache.add(cacheKey, pairReqKey);
+        }
+
         auto baseWitnessTable = getExistentialBaseWitnessTable(builder, primalType);
-
-        primalTypeMap[pairReqKey] = primalType;
-        diffTypeMap[pairReqKey] = (IRType*)diffType;
-
         result = builder->emitLookupInterfaceMethodInst(
             builder->getTypeKind(),
             baseWitnessTable,
             pairReqKey);
 
-        existentialPairTypeCache.add(cacheKey, result);
+        primalTypeMap[result] = primalType;
+        diffTypeMap[result] = (IRType*)diffType;
 
         return result;
     }

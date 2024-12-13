@@ -864,6 +864,7 @@ Result linkAndOptimizeIR(
     // even if the AD pass itself is not run.
     //
     finalizeAutoDiffPass(targetProgram, irModule);
+    eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
     // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
     // lowering.
@@ -932,6 +933,8 @@ Result linkAndOptimizeIR(
         return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    inferAnyValueSizeWhereNecessary(targetProgram, irModule);
 
     // If we have any witness tables that are marked as `KeepAlive`,
     // but are not used for dynamic dispatch, unpin them so we don't
