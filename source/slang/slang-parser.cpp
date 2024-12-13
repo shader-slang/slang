@@ -8510,6 +8510,9 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
         }                                                                                       \
         else                                                                                    \
         {                                                                                       \
+            auto defaultLocationExpr = parser->astBuilder->create<IntegerLiteralExpr>();        \
+            defaultLocationExpr->value = 0;                                                     \
+            modifier->args.add(defaultLocationExpr);                                            \
         }                                                                                       \
         listBuilder.add(modifier);                                                              \
     }                                                                                           \
