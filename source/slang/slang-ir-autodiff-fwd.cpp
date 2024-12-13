@@ -782,6 +782,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 while (auto attrType = as<IRAttributedType>(origType))
                     origType = attrType->getBaseType();
             }
+
             if (auto pairType = tryGetDiffPairType(&argBuilder, primalType))
             {
                 auto pairPtrType = as<IRPtrTypeBase>(pairType);
@@ -862,6 +863,58 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 }
             }
         }
+
+        {
+            // --WORKAROUND--
+            // This is a temporary workaround for a very specific case..
+            //
+            // If all the following are true:
+            // 1. the parameter type expects a differential pair,
+            // 2. the argument is derived from a no_diff type, and
+            // 3. the argument type is a run-time type (i.e. extract_existential_type),
+            // then we need to generate a differential 0, but the IR has no
+            // information on the diff witness.
+            //
+            // We will bypass the conformance system & brute-force the lookup for the interface
+            // keys, but the proper fix is to lower this key mapping during `no_diff` lowering.
+            //
+
+            // Condition 1
+            if (differentiableTypeConformanceContext.isDifferentiableType((originalParamType)))
+            {
+                // Condition 3
+                if (auto extractExistentialType = as<IRExtractExistentialType>(primalType))
+                {
+                    // Condition 2
+                    if (isNoDiffType(extractExistentialType->getOperand(0)->getDataType()))
+                    {
+                        // Force-differentiate the type (this will perform a search for the witness
+                        // without going through the diff-type annotation list)
+                        //
+                        IRInst* witnessTable = nullptr;
+                        auto diffType = differentiateExtractExistentialType(
+                            &argBuilder,
+                            extractExistentialType,
+                            witnessTable);
+
+                        auto pairType =
+                            getOrCreateDiffPairType(&argBuilder, primalType, witnessTable);
+                        auto zeroMethod = argBuilder.emitLookupInterfaceMethodInst(
+                            differentiableTypeConformanceContext.sharedContext->zeroMethodType,
+                            witnessTable,
+                            differentiableTypeConformanceContext.sharedContext
+                                ->zeroMethodStructKey);
+                        auto diffZero = argBuilder.emitCallInst(diffType, zeroMethod, 0, nullptr);
+                        auto diffPair =
+                            argBuilder.emitMakeDifferentialPair(pairType, primalArg, diffZero);
+
+                        args.add(diffPair);
+                        continue;
+                    }
+                }
+            }
+        }
+
         // Argument is not differentiable.
         // Add original/primal argument.
         args.add(primalArg);

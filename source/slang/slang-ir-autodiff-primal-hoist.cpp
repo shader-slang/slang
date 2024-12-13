@@ -1397,7 +1397,7 @@ struct UseGraph
     // Set of linear paths to the base use.
     // Note that some nodes may be common to multiple paths.
     //
-    Dictionary<IRUse*, List<UseChain>> chainSets;
+    OrderedDictionary<IRUse*, List<UseChain>> chainSets;
 
     static UseGraph from(
         IRInst* baseInst,
@@ -1419,7 +1419,7 @@ struct UseGraph
                     result.chainSets[finalUse] = List<UseChain>();
                 }
 
-                result.chainSets[finalUse].add(chain);
+                result.chainSets[finalUse].getValue().add(chain);
             }
 
             use = nextUse;
@@ -1433,17 +1433,31 @@ struct UseGraph
         // that can retroactively correct the uses as needed.
         //
         IROutOfOrderCloneContext ctx;
-        for (auto chain : chainSets[use])
+        List<UseChain> chains = chainSets[use];
+        for (auto chain : chains)
         {
-            builder->setInsertAfter(inst);
+            // builder->setInsertAfter(inst);
             chain.replace(&ctx, builder, inst);
         }
 
-        builder->setInsertBefore(use->getUser());
-        auto lastInstInChain = ctx.cloneInstOutOfOrder(builder, use->get());
+        if (!isTrivial())
+        {
+            builder->setInsertBefore(use->getUser());
+            auto lastInstInChain = ctx.cloneInstOutOfOrder(builder, use->get());
 
-        // Replace the base use.
-        builder->replaceOperand(use, lastInstInChain);
+            // Replace the base use.
+            builder->replaceOperand(use, lastInstInChain);
+        }
+    }
+
+    bool isTrivial()
+    {
+        // We're trivial if there's only one chain, and it has only one use.
+        if (chainSets.getCount() != 1)
+            return false;
+
+        auto& chain = chainSets.getFirst().value;
+        return chain.getCount() == 1;
     }
 
     List<IRUse*> getUniqueUses() const
@@ -1452,7 +1466,7 @@ struct UseGraph
 
         for (auto& pair : chainSets)
         {
-            result.add(pair.first);
+            result.add(pair.key);
         }
 
         return result;

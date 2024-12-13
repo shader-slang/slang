@@ -2689,8 +2689,11 @@ struct AutoDiffPass : public InstPassBase
                             if (type)
                             {
                                 loweredIntermediateTypes.add(type);
-                                auto func =
-                                    cast<IRGlobalValueWithCode>(differentiateInst->getFunc());
+
+                                auto func = differentiateInst->getFunc();
+
+                                if (auto spec = as<IRSpecialize>(func))
+                                    func = spec->getBase();
 
                                 if (auto generic = as<IRGeneric>(func))
                                 {
