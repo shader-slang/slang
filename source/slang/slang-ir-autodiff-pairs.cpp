@@ -13,7 +13,6 @@ struct DiffPairLoweringPass : InstPassBase
 
     IRInst* lowerPairType(IRBuilder* builder, IRType* pairType)
     {
-        builder->setInsertBefore(pairType);
         auto loweredPairType = pairBuilder->lowerDiffPairType(builder, pairType);
         return loweredPairType;
     }
@@ -22,26 +21,35 @@ struct DiffPairLoweringPass : InstPassBase
     {
         if (auto makePairInst = as<IRMakeDifferentialPairBase>(inst))
         {
-            bool isTrivial = false;
             auto pairType = as<IRDifferentialPairTypeBase>(makePairInst->getDataType());
+            builder->setInsertBefore(makePairInst);
             if (auto loweredPairType = lowerPairType(builder, pairType))
             {
-                builder->setInsertBefore(makePairInst);
-                IRInst* result = nullptr;
-                if (isTrivial)
+                if (isRuntimeType(pairType->getValueType()))
                 {
-                    result = makePairInst->getPrimalValue();
+                    auto result = pairBuilder->emitExistentialMakePair(
+                        builder,
+                        loweredPairType,
+                        makePairInst->getPrimalValue(),
+                        makePairInst->getDifferentialValue());
+
+                    makePairInst->replaceUsesWith(result);
+                    makePairInst->removeAndDeallocate();
+                    return result;
                 }
                 else
                 {
+                    IRInst* result = nullptr;
+
                     IRInst* operands[2] = {
                         makePairInst->getPrimalValue(),
                         makePairInst->getDifferentialValue()};
                     result = builder->emitMakeStruct((IRType*)(loweredPairType), 2, operands);
+
+                    makePairInst->replaceUsesWith(result);
+                    makePairInst->removeAndDeallocate();
+                    return result;
                 }
-                makePairInst->replaceUsesWith(result);
-                makePairInst->removeAndDeallocate();
-                return result;
             }
         }
 
@@ -58,12 +66,14 @@ struct DiffPairLoweringPass : InstPassBase
                 pairType = pairPtrType->getValueType();
             }
 
-            if (lowerPairType(builder, pairType))
+            builder->setInsertBefore(getDiffInst);
+            if (auto loweredType = lowerPairType(builder, pairType))
             {
-                builder->setInsertBefore(getDiffInst);
                 IRInst* diffFieldExtract = nullptr;
-                diffFieldExtract =
-                    pairBuilder->emitDiffFieldAccess(builder, getDiffInst->getBase());
+                diffFieldExtract = pairBuilder->emitDiffFieldAccess(
+                    builder,
+                    (IRType*)loweredType,
+                    getDiffInst->getBase());
                 getDiffInst->replaceUsesWith(diffFieldExtract);
                 getDiffInst->removeAndDeallocate();
                 return diffFieldExtract;
@@ -77,13 +87,14 @@ struct DiffPairLoweringPass : InstPassBase
                 pairType = pairPtrType->getValueType();
             }
 
-            if (lowerPairType(builder, pairType))
+            builder->setInsertBefore(getPrimalInst);
+            if (auto loweredType = lowerPairType(builder, pairType))
             {
-                builder->setInsertBefore(getPrimalInst);
-
                 IRInst* primalFieldExtract = nullptr;
-                primalFieldExtract =
-                    pairBuilder->emitPrimalFieldAccess(builder, getPrimalInst->getBase());
+                primalFieldExtract = pairBuilder->emitPrimalFieldAccess(
+                    builder,
+                    (IRType*)loweredType,
+                    getPrimalInst->getBase());
                 getPrimalInst->replaceUsesWith(primalFieldExtract);
                 getPrimalInst->removeAndDeallocate();
                 return primalFieldExtract;

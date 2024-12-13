@@ -203,12 +203,22 @@ IRFuncType* BackwardDiffPropagateTranscriber::differentiateFunctionType(
     IRInst* func,
     IRFuncType* funcType)
 {
-    IRType* intermediateType =
-        builder->getBackwardDiffIntermediateContextType(maybeFindOuterGeneric(func));
+    IRType* intermediateType = nullptr;
     if (auto outerGeneric = findOuterGeneric(builder->getInsertLoc().getParent()))
     {
         intermediateType =
+            builder->getBackwardDiffIntermediateContextType(maybeFindOuterGeneric(func));
+        intermediateType =
             (IRType*)specializeWithGeneric(*builder, intermediateType, as<IRGeneric>(outerGeneric));
+    }
+    else if (as<IRLookupWitnessMethod>(func))
+    {
+        intermediateType = nullptr;
+    }
+    else
+    {
+        intermediateType =
+            builder->getBackwardDiffIntermediateContextType(maybeFindOuterGeneric(func));
     }
     return differentiateFunctionTypeImpl(builder, funcType, intermediateType);
 }
@@ -382,14 +392,7 @@ InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(
     IRFunc* primalFunc = origFunc;
 
     maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
-
-    // The original func may not have a type dictionary if it is not originally marked as
-    // differentiable, in this case we would have already pulled the necessary types from
-    // the user-provided derivative function, so we are still fine.
-    if (origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
-    {
-        differentiableTypeConformanceContext.setFunc(origFunc);
-    }
+    differentiableTypeConformanceContext.setFunc(origFunc);
 
     auto diffFunc = builder.createFunc();
 
@@ -415,11 +418,11 @@ InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(
     // Mark the generated derivative function itself as differentiable.
     builder.addBackwardDifferentiableDecoration(diffFunc);
     // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
-    if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
+    /*if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
     {
         builder.setInsertBefore(diffFunc->getFirstDecorationOrChild());
         cloneInst(&cloneEnv, &builder, dictDecor);
-    }
+    }*/
     copyOriginalDecorations(origFunc, diffFunc);
     builder.addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
     return InstPair(primalFunc, diffFunc);

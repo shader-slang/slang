@@ -592,9 +592,19 @@ struct IRGenContext
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
 
+    // Callback function to call when after lowering a type.
+    std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
+        nullptr;
+
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : shared(inShared), astBuilder(inAstBuilder), env(&inShared->globalEnv), irBuilder(nullptr)
     {
+    }
+
+    void registerTypeCallback(
+        std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> callback)
+    {
+        lowerTypeCallback = callback;
     }
 
     void setGlobalValue(Decl* decl, LoweredValInfo value) { shared->setGlobalValue(decl, value); }
@@ -2202,7 +2212,12 @@ IRType* lowerType(IRGenContext* context, Type* type)
 {
     ValLoweringVisitor visitor;
     visitor.context = context;
-    return (IRType*)getSimpleVal(context, visitor.dispatchType(type));
+    IRType* loweredType = (IRType*)getSimpleVal(context, visitor.dispatchType(type));
+
+    if (context->lowerTypeCallback && loweredType)
+        context->lowerTypeCallback(context, type, loweredType);
+
+    return loweredType;
 }
 
 void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
@@ -8067,6 +8082,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
 
             subContextStorage.returnDestination = LoweredValInfo();
+            subContextStorage.lowerTypeCallback = nullptr;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -8591,7 +8607,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
-        context->setValue(decl, LoweredValInfo::simple(finalVal));
+        context->setGlobalValue(decl, LoweredValInfo::simple(finalVal));
 
         subBuilder->setInsertBefore(irInterface);
 
@@ -8745,6 +8761,33 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+
+        /*for (auto requirementDecl : decl->getMembersOfType<DerivativePairAssocTypeDecl>())
+        {
+            // If there is an associated derivative pair decl, create a decoration linking them
+            // together.
+            //
+            auto derivativePairKey = getInterfaceRequirementKey(requirementDecl);
+            if (as<AssocTypeDecl>(requirementDecl->originalDecl))
+            {
+                auto origKey = getInterfaceRequirementKey(requirementDecl->originalDecl);
+                context->irBuilder->addDecoration(
+                    origKey,
+                    kIROp_DifferentialPairAssociatedTypeDecoration,
+                    derivativePairKey);
+            }
+            else if (as<ThisTypeDecl>(requirementDecl->originalDecl))
+            {
+                context->irBuilder->addDecoration(
+                    irInterface,
+                    kIROp_DifferentialPairAssociatedTypeDecoration,
+                    derivativePairKey);
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unexpected derivative pair associated type decl.");
+            }
+        }*/
 
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
@@ -9071,6 +9114,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInst* inst,
         DifferentiableAttribute* attr)
     {
+        // TODO: Problem is that for dynamic types we have to lower the diff type relationship into
+        // the function body. Current approach: We add annotation instructions into the code as
+        // necessary. Need to intercept at lowerType itself. Let's add a type-hook mechanism that
+        // emits this code for differentiable functions.
+        // Plus need to register the derivative types as we get them.
+        //
         auto irDict = getBuilder()->addDifferentiableTypeDictionaryDecoration(inst);
         for (auto& entry : attr->getMapTypeToIDifferentiableWitness())
         {
@@ -9872,6 +9921,48 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else
             outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
+        // If our function is differentiable, register a callback so the derivative
+        // annotations for types can be lowered.
+        //
+        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        {
+            auto diffTypeWitnessMap = diffAttr->getMapTypeToIDifferentiableWitness();
+            OrderedDictionary<DeclRefBase*, SubtypeWitness*> resolveddiffTypeWitnessMap;
+
+            // Go through each entry in the map and resolve the key.
+            for (auto& entry : diffTypeWitnessMap)
+            {
+                auto resolvedKey = as<DeclRefBase>(entry.key->resolve());
+                resolveddiffTypeWitnessMap[resolvedKey] =
+                    as<SubtypeWitness>(as<Val>(entry.value)->resolve());
+            }
+
+            subContext->registerTypeCallback(
+                [=](IRGenContext* context, Type* type, IRType* irType)
+                {
+                    if (!as<DeclRefType>(type))
+                        return irType;
+
+                    DeclRefBase* declRefBase = as<DeclRefType>(type)->getDeclRefBase();
+                    if (resolveddiffTypeWitnessMap.containsKey(declRefBase))
+                    {
+                        auto irWitness =
+                            lowerVal(subContext, resolveddiffTypeWitnessMap[declRefBase]).val;
+                        if (irWitness)
+                        {
+                            IRInst* args[] = {irType, irWitness};
+                            context->irBuilder->emitIntrinsicInst(
+                                context->irBuilder->getVoidType(),
+                                kIROp_DifferentiableTypeAnnotation,
+                                2,
+                                args);
+                        }
+                    }
+
+                    return irType;
+                });
+        }
+
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
             subContext,
@@ -10166,6 +10257,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        subContext->registerTypeCallback(nullptr);
+
         getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 
         addSpecializedForTargetDecorations(irFunc, decl);
@@ -10413,7 +10506,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        /*if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
         {
             if (decl->body)
             {
@@ -10421,7 +10514,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 lowerDifferentiableAttribute(subContext, irFunc, diffAttr);
                 subContext->irBuilder->setInsertInto(irFunc);
             }
-        }
+        }*/
 
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function

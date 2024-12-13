@@ -160,6 +160,43 @@ InstPair ForwardDiffTranscriber::transcribeReinterpret(IRBuilder* builder, IRIns
     return InstPair(primalVal, diffVal);
 }
 
+InstPair ForwardDiffTranscriber::transcribeDifferentiableTypeAnnotation(
+    IRBuilder* builder,
+    IRInst* origInst)
+{
+    auto primalAnnotation =
+        as<IRDifferentiableTypeAnnotation>(maybeCloneForPrimalInst(builder, origInst));
+
+    IRDifferentiableTypeAnnotation* annotation = as<IRDifferentiableTypeAnnotation>(origInst);
+    auto diffWitness = annotation->getWitness();
+
+    differentiableTypeConformanceContext.addTypeToDictionary(
+        (IRType*)primalAnnotation->getBaseType(),
+        primalAnnotation->getWitness());
+
+    auto diffType = differentiateType(builder, (IRType*)annotation->getBaseType());
+    // SLANG_ASSERT(diffType);
+    //  Temporary break:
+    if (!diffType)
+        return InstPair(primalAnnotation, nullptr);
+
+    auto diffTypeDiffWitness =
+        tryGetDifferentiableWitness(builder, diffType, DiffConformanceKind::Any);
+
+    IRInst* args[] = {diffType, diffTypeDiffWitness};
+
+    auto diffAnnotation = builder->emitIntrinsicInst(
+        builder->getVoidType(),
+        kIROp_DifferentiableTypeAnnotation,
+        2,
+        args);
+
+    builder->markInstAsPrimal(diffAnnotation);
+    builder->markInstAsPrimal(primalAnnotation);
+
+    return InstPair(primalAnnotation, diffAnnotation);
+}
+
 InstPair ForwardDiffTranscriber::transcribeVar(IRBuilder* builder, IRVar* origVar)
 {
     if (IRType* diffType = differentiateType(builder, origVar->getDataType()->getValueType()))
@@ -752,9 +789,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 auto pairValType = as<IRDifferentialPairTypeBase>(
                     pairPtrType ? pairPtrType->getValueType() : pairType);
 
-                auto diffType = differentiableTypeConformanceContext.getDiffTypeFromPairType(
-                    &argBuilder,
-                    pairValType);
+                auto diffType = differentiateType(&argBuilder, primalType);
                 if (auto ptrParamType = as<IRPtrTypeBase>(diffParamType))
                 {
                     // Create temp var to pass in/out arguments.
@@ -833,11 +868,14 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
 
     IRType* diffReturnType = nullptr;
-    diffReturnType = tryGetDiffPairType(&argBuilder, origCall->getFullType());
+    auto primalReturnType =
+        (IRType*)findOrTranscribePrimalInst(&argBuilder, origCall->getFullType());
+
+    diffReturnType = tryGetDiffPairType(&argBuilder, primalReturnType);
 
     if (!diffReturnType)
     {
-        diffReturnType = (IRType*)findOrTranscribePrimalInst(&argBuilder, origCall->getFullType());
+        diffReturnType = primalReturnType;
     }
 
     auto callInst = argBuilder.emitCallInst(diffReturnType, diffCallee, args);
@@ -1035,6 +1073,7 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(
     IRInst* diffBase = nullptr;
     if (instMapD.tryGetValue(origSpecialize->getBase(), diffBase))
     {
+        auto diffType = differentiateType(builder, origSpecialize->getFullType());
         if (diffBase)
         {
             List<IRInst*> args;
@@ -1042,11 +1081,8 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(
             {
                 args.add(primalSpecialize->getArg(i));
             }
-            auto diffSpecialize = builder->emitSpecializeInst(
-                builder->getTypeKind(),
-                diffBase,
-                args.getCount(),
-                args.getBuffer());
+            auto diffSpecialize =
+                builder->emitSpecializeInst(diffType, diffBase, args.getCount(), args.getBuffer());
             return InstPair(primalSpecialize, diffSpecialize);
         }
         else
@@ -1605,7 +1641,6 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
     IRBuilder builder = *inBuilder;
 
     maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
-
     differentiableTypeConformanceContext.setFunc(origFunc);
 
     auto diffFunc = builder.createFunc();
@@ -1634,10 +1669,10 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
     copyCheckpointHints(&builder, origFunc, diffFunc);
 
     // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
-    if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
+    /*if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
     {
         cloneDecoration(&cloneEnv, dictDecor, diffFunc, diffFunc->getModule());
-    }
+    }*/
     return diffFunc;
 }
 
@@ -2012,6 +2047,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_Reinterpret:
         return transcribeReinterpret(builder, origInst);
 
+    case kIROp_DifferentiableTypeAnnotation:
+        return transcribeDifferentiableTypeAnnotation(builder, origInst);
+
         // Differentiable insts that should have been lowered in a previous pass.
     case kIROp_SwizzledStore:
         {
@@ -2138,13 +2176,10 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
 
         if (as<IRDifferentialPairType>(diffPairType) || as<IRDifferentialPtrPairType>(diffPairType))
         {
+            auto diffType = differentiateType(builder, (IRType*)origParam->getFullType());
             return InstPair(
                 builder->emitDifferentialPairGetPrimal(diffPairParam),
-                builder->emitDifferentialPairGetDifferential(
-                    (IRType*)differentiableTypeConformanceContext.getDiffTypeFromPairType(
-                        builder,
-                        as<IRDifferentialPairTypeBase>(diffPairType)),
-                    diffPairParam));
+                builder->emitDifferentialPairGetDifferential(diffType, diffPairParam));
         }
         else if (auto pairPtrType = as<IRPtrTypeBase>(diffPairType))
         {

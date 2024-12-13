@@ -201,6 +201,46 @@ struct DiffUnzipPass
         return nullptr;
     }
 
+    IRInst* getIntermediateType(IRBuilder* builder, IRInst* baseFn)
+    {
+        if (as<IRLookupWitnessMethod>(baseFn))
+        {
+            return builder->getVoidType();
+        }
+        else if (auto specialize = as<IRSpecialize>(baseFn))
+        {
+            if (as<IRLookupWitnessMethod>(specialize->getBase()))
+                return builder->getVoidType();
+
+            auto func = findSpecializeReturnVal(specialize);
+            if (as<IRLookupWitnessMethod>(func))
+            {
+                // An interface method won't have intermediate type.
+                return builder->getVoidType();
+            }
+            else
+            {
+                auto outerGen = findOuterGeneric(func);
+                auto innerIntermediateType =
+                    builder->getBackwardDiffIntermediateContextType(outerGen);
+
+                List<IRInst*> args;
+                for (UInt i = 0; i < specialize->getArgCount(); i++)
+                    args.add(specialize->getArg(i));
+
+                return builder->emitSpecializeInst(
+                    builder->getTypeKind(),
+                    innerIntermediateType,
+                    args.getCount(),
+                    args.getBuffer());
+            }
+        }
+        else
+        {
+            return builder->getBackwardDiffIntermediateContextType(baseFn);
+        }
+    }
+
     InstPair splitCall(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRCall* mixedCall)
     {
         IRBuilder globalBuilder(autodiffContext->moduleInst->getModule());
@@ -213,37 +253,7 @@ struct DiffUnzipPass
             primalBuilder,
             baseFn->getDataType());
 
-        IRInst* intermediateType = nullptr;
-
-        if (auto specialize = as<IRSpecialize>(baseFn))
-        {
-            auto func = findSpecializeReturnVal(specialize);
-            auto outerGen = findOuterGeneric(func);
-            if (func->getOp() == kIROp_LookupWitness)
-            {
-                // An interface method won't have intermediate type.
-                intermediateType = primalBuilder->getVoidType();
-            }
-            else
-            {
-                intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(outerGen);
-                List<IRInst*> args;
-                for (UInt i = 0; i < specialize->getArgCount(); i++)
-                    args.add(specialize->getArg(i));
-                intermediateType = primalBuilder->emitSpecializeInst(
-                    primalBuilder->getTypeKind(),
-                    intermediateType,
-                    args.getCount(),
-                    args.getBuffer());
-            }
-        }
-        else
-        {
-            if (baseFn->getOp() == kIROp_LookupWitness)
-                intermediateType = primalBuilder->getVoidType();
-            else
-                intermediateType = primalBuilder->getBackwardDiffIntermediateContextType(baseFn);
-        }
+        IRInst* intermediateType = getIntermediateType(primalBuilder, baseFn);
 
         IRVar* intermediateVar = nullptr;
         if (!as<IRVoidType>(intermediateType))
@@ -314,8 +324,8 @@ struct DiffUnzipPass
             auto arg = mixedCall->getArg(ii);
 
             // Depending on the type and direction of each argument,
-            // we might need to prepare a different value for the transposition logic to produce the
-            // correct final argument in the propagate function call.
+            // we might need to prepare a different value for the transposition logic to produce
+            // the correct final argument in the propagate function call.
             if (isRelevantDifferentialPair(arg->getDataType()))
             {
                 auto primalArg = lookupPrimalInst(arg);
@@ -328,13 +338,13 @@ struct DiffUnzipPass
 
                 if (const auto outType = as<IROutType>(primalParamType))
                 {
-                    // For `out` parameters that expects an input derivative to propagate through,
-                    // we insert a `LoadReverseGradient` inst here to signify the logic in
-                    // `transposeStore` that this argument should actually be the currently
+                    // For `out` parameters that expects an input derivative to propagate
+                    // through, we insert a `LoadReverseGradient` inst here to signify the logic
+                    // in `transposeStore` that this argument should actually be the currently
                     // accumulated derivative on this variable. The end purpose is that we will
                     // generate a load(diffArg) in the final transposed code and use that as the
-                    // argument for the call, but we can't just emit a normal load inst here because
-                    // the transposition logic will turn loads into stores.
+                    // argument for the call, but we can't just emit a normal load inst here
+                    // because the transposition logic will turn loads into stores.
                     auto outDiffType = cast<IRPtrTypeBase>(diffArg->getDataType())->getValueType();
                     auto gradArg = diffBuilder->emitLoadReverseGradient(outDiffType, diffArg);
                     diffBuilder->markInstAsDifferential(gradArg, primalArg->getDataType());
@@ -342,23 +352,24 @@ struct DiffUnzipPass
                 }
                 else if (const auto inoutType = as<IRInOutType>(primalParamType))
                 {
-                    // Since arg is split into separate vars, we need a new temp var that represents
-                    // the remerged diff pair.
+                    // Since arg is split into separate vars, we need a new temp var that
+                    // represents the remerged diff pair.
                     auto diffPairType = as<IRDifferentialPairType>(
                         as<IRPtrTypeBase>(arg->getDataType())->getValueType());
                     auto primalValueType = diffPairType->getValueType();
 
                     // We can't simply reuse primalArg for an inout parameter since this will
                     // represent the value after the primal call which can potentially alter
-                    // primalArg. Therefore, we will find the first store into primalArg, and create
-                    // a temp var holding that value (i.e. value prior to primal call)
+                    // primalArg. Therefore, we will find the first store into primalArg, and
+                    // create a temp var holding that value (i.e. value prior to primal call)
                     //
                     auto storeUse = findUniqueStoredVal(cast<IRVar>(primalArg));
                     auto storeInst = cast<IRStore>(storeUse->getUser());
 
                     auto storedVal = storeInst->getVal();
 
-                    // Emit the temp var into the primal blocks since it's holding a primal value.
+                    // Emit the temp var into the primal blocks since it's holding a primal
+                    // value.
                     auto tempPrimalVar = primalBuilder->emitVar(primalValueType);
                     primalBuilder->emitStore(tempPrimalVar, storedVal);
 
@@ -407,8 +418,8 @@ struct DiffUnzipPass
                     // For pure 'in' type. Simply re-use the original argument inst.
                     //
                     // For 'out' type parameters, it doesn't really matter what we pass in here,
-                    // since the tranposition logic will discard the argument anyway (we'll pass in
-                    // the old arg, just to keep the number of arguments consistent)
+                    // since the tranposition logic will discard the argument anyway (we'll pass
+                    // in the old arg, just to keep the number of arguments consistent)
                     //
                     diffArgs.add(arg);
                 }
@@ -520,6 +531,21 @@ struct DiffUnzipPass
             return InstPair(primalBranch, returnInst);
         }
     }
+
+    /*InstPair splitDifferentiableTypeAnnotation(
+        IRBuilder* primalBuilder,
+        IRBuilder* diffBuilder,
+        IRDifferentiableTypeAnnotation* mixedDiffTypeAnnotation)
+    {
+        auto primalType = mixedDiffTypeAnnotation->getBaseType();
+        auto diffWitness = mixedDiffTypeAnnotation->getWitness();
+
+        auto primalInst = primalBuilder->emitDifferentiableTypeAnnotation(primalType,
+    diffWitness); auto diffInst = diffBuilder->emitDifferentiableTypeAnnotation(primalType,
+    diffWitness);
+
+        return InstPair(primalInst, diffInst);
+    }*/
 
     // Splitting a loop is one of the trickiest parts of the unzip pass.
     // Thus far, we've been dealing with blocks that are only run once, so we
@@ -704,6 +730,12 @@ struct DiffUnzipPass
 
         case kIROp_Return:
             return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
+
+            /*case kIROp_DifferentiableTypeAnnotation:
+                return splitDifferentiableTypeAnnotation(
+                    primalBuilder,
+                    diffBuilder,
+                    as<IRDifferentiableTypeAnnotation>(inst));*/
 
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:

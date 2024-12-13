@@ -798,7 +798,18 @@ Result linkAndOptimizeIR(
         bool changed = false;
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
-            changed |= specializeModule(targetProgram, irModule, codeGenContext->getSink());
+        {
+            // Pre-autodiff, we will attempt to specialize as much as possible.
+            //
+            // Note: Lowered dynamic-dispatch code cannot be differentiated correctly due to
+            // missing information, so we defer that to after the auto-dff step.
+            //
+            SpecializationOptions specOptions;
+            specOptions.lowerWitnessLookups = false;
+            changed |=
+                specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+        }
+
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
@@ -850,9 +861,18 @@ Result linkAndOptimizeIR(
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
 
     // Finalization is always run so AD-related instructions can be removed,
-    // even the AD pass itself is not run.
+    // even if the AD pass itself is not run.
     //
     finalizeAutoDiffPass(targetProgram, irModule);
+
+    // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
+    // lowering.
+    //
+    {
+        SpecializationOptions specOptions;
+        specOptions.lowerWitnessLookups = true;
+        specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+    }
 
     finalizeSpecialization(irModule);
 

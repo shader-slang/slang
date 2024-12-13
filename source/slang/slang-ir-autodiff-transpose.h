@@ -623,8 +623,9 @@ struct DiffTransposePass
                         {
                             varInst->insertAtEnd(firstRevDiffBlock);
 
-                            auto dzero =
-                                emitDZeroOfDiffInstType(&builder, ptrPrimalType->getValueType());
+                            auto dzero = diffTypeContext.emitDZeroOfDiffInstType(
+                                &builder,
+                                ptrPrimalType->getValueType());
                             builder.emitStore(varInst, dzero);
                         }
                         else
@@ -726,7 +727,9 @@ struct DiffTransposePass
             auto gradValue = builder->emitLoad(accVar);
             builder->emitStore(
                 accVar,
-                emitDZeroOfDiffInstType(builder, tryGetPrimalTypeFromDiffInst(fwdInst)));
+                diffTypeContext.emitDZeroOfDiffInstType(
+                    builder,
+                    tryGetPrimalTypeFromDiffInst(fwdInst)));
 
             return gradValue;
         }
@@ -760,7 +763,7 @@ struct DiffTransposePass
         auto primalType = tryGetPrimalTypeFromDiffInst(fwdInst);
         auto diffType = fwdInst->getDataType();
 
-        auto zero = emitDZeroOfDiffInstType(&tempVarBuilder, primalType);
+        auto zero = diffTypeContext.emitDZeroOfDiffInstType(&tempVarBuilder, primalType);
 
         // Emit a var in the top-level differential block to hold the gradient,
         // and initialize it.
@@ -925,8 +928,9 @@ struct DiffTransposePass
                 }
                 else
                 {
-                    phiParamRevGradInsts.add(
-                        emitDZeroOfDiffInstType(&builder, tryGetPrimalTypeFromDiffInst(param)));
+                    phiParamRevGradInsts.add(diffTypeContext.emitDZeroOfDiffInstType(
+                        &builder,
+                        tryGetPrimalTypeFromDiffInst(param)));
                 }
             }
             else
@@ -1177,7 +1181,8 @@ struct DiffTransposePass
                 auto pairType = as<IRDifferentialPairType>(arg->getDataType());
                 auto var = builder->emitVar(arg->getDataType());
 
-                auto diffZero = emitDZeroOfDiffInstType(builder, pairType->getValueType());
+                auto diffZero =
+                    diffTypeContext.emitDZeroOfDiffInstType(builder, pairType->getValueType());
 
                 // Initialize this var to (arg.primal, 0).
                 builder->emitStore(
@@ -1236,7 +1241,9 @@ struct DiffTransposePass
             argRequiresLoad.add(false);
         }
 
-        auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
+        // auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
+        auto revFnType = this->autodiffContext->transcriberSet.propagateTranscriber
+                             ->differentiateFunctionType(builder, baseFn, baseFnType);
         IRInst* revCallee = nullptr;
         if (getResolvedInstForDecorations(baseFn)->getOp() == kIROp_LookupWitness)
         {
@@ -1615,7 +1622,7 @@ struct DiffTransposePass
         SLANG_ASSERT(primalType);
 
         // Clear the value at the differential address, by setting to 0.
-        IRInst* emptyVal = emitDZeroOfDiffInstType(builder, primalType);
+        IRInst* emptyVal = diffTypeContext.emitDZeroOfDiffInstType(builder, primalType);
         builder->emitStore(fwdStore->getPtr(), emptyVal);
 
         if (auto diffPairType = as<IRDifferentialPairType>(revVal->getDataType()))
@@ -2071,7 +2078,7 @@ struct DiffTransposePass
         auto primalElementTypeDecor = updateInst->findDecoration<IRPrimalElementTypeDecoration>();
         SLANG_RELEASE_ASSERT(primalElementTypeDecor);
 
-        auto diffZero = emitDZeroOfDiffInstType(
+        auto diffZero = diffTypeContext.emitDZeroOfDiffInstType(
             builder,
             (IRType*)primalElementTypeDecor->getPrimalElementType());
         SLANG_ASSERT(diffZero);
@@ -2350,16 +2357,18 @@ struct DiffTransposePass
     {
         auto primalCondition = fwdInst->getOperand(0);
 
-        auto leftZero =
-            emitDZeroOfDiffInstType(builder, tryGetPrimalTypeFromDiffInst(fwdInst->getOperand(1)));
+        auto leftZero = diffTypeContext.emitDZeroOfDiffInstType(
+            builder,
+            tryGetPrimalTypeFromDiffInst(fwdInst->getOperand(1)));
         auto leftGradientInst = builder->emitIntrinsicInst(
             fwdInst->getOperand(1)->getDataType(),
             kIROp_Select,
             3,
             List<IRInst*>(primalCondition, revValue, leftZero).getBuffer());
 
-        auto rightZero =
-            emitDZeroOfDiffInstType(builder, tryGetPrimalTypeFromDiffInst(fwdInst->getOperand(2)));
+        auto rightZero = diffTypeContext.emitDZeroOfDiffInstType(
+            builder,
+            tryGetPrimalTypeFromDiffInst(fwdInst->getOperand(2)));
         auto rightGradientInst = builder->emitIntrinsicInst(
             fwdInst->getOperand(2)->getDataType(),
             kIROp_Select,
@@ -2527,7 +2536,8 @@ struct DiffTransposePass
         List<IRInst*> zeroElements;
         for (Index i = 0; i < elementCount; ++i)
         {
-            auto zeroElement = emitDZeroOfDiffInstType(builder, primalElementTypes[i]);
+            auto zeroElement =
+                diffTypeContext.emitDZeroOfDiffInstType(builder, primalElementTypes[i]);
             elementGrads.add(zeroElement);
             zeroElements.add(zeroElement);
         }
@@ -2537,8 +2547,11 @@ struct DiffTransposePass
             if (elementGrads[i] == zeroElements[i])
                 elementGrads[i] = grad;
             else
-                elementGrads[i] =
-                    emitDAddOfDiffInstType(builder, primalElementTypes[i], elementGrads[i], grad);
+                elementGrads[i] = diffTypeContext.emitDAddOfDiffInstType(
+                    builder,
+                    primalElementTypes[i],
+                    elementGrads[i],
+                    grad);
         };
 
         for (auto gradient : gradients)
@@ -2624,7 +2637,7 @@ struct DiffTransposePass
                     gradient.targetInst,
                     builder->emitMakeDifferentialPairUserCode(
                         baseType,
-                        emitDZeroOfDiffInstType(builder, baseType->getValueType()),
+                        diffTypeContext.emitDZeroOfDiffInstType(builder, baseType->getValueType()),
                         gradient.revGradInst),
                     gradient.fwdGradInst));
             }
@@ -2640,7 +2653,9 @@ struct DiffTransposePass
                     builder->emitMakeDifferentialPairUserCode(
                         baseType,
                         gradient.revGradInst,
-                        emitDZeroOfDiffInstType(builder, fwdGetPrimal->getFullType())),
+                        diffTypeContext.emitDZeroOfDiffInstType(
+                            builder,
+                            fwdGetPrimal->getFullType())),
                     gradient.fwdGradInst));
             }
         }
@@ -2694,7 +2709,7 @@ struct DiffTransposePass
             (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
 
         // Initialize with T.dzero()
-        auto zeroValueInst = emitDZeroOfDiffInstType(builder, aggPrimalType);
+        auto zeroValueInst = diffTypeContext.emitDZeroOfDiffInstType(builder, aggPrimalType);
 
         builder->emitStore(revGradVar, zeroValueInst);
 
@@ -2764,7 +2779,7 @@ struct DiffTransposePass
             (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
 
         // Initialize with T.dzero()
-        auto zeroValueInst = emitDZeroOfDiffInstType(builder, aggPrimalType);
+        auto zeroValueInst = diffTypeContext.emitDZeroOfDiffInstType(builder, aggPrimalType);
 
         builder->emitStore(revGradVar, zeroValueInst);
 
@@ -2839,8 +2854,11 @@ struct DiffTransposePass
                 continue;
             }
 
-            currentValue =
-                emitDAddOfDiffInstType(builder, aggPrimalType, currentValue, gradient.revGradInst);
+            currentValue = diffTypeContext.emitDAddOfDiffInstType(
+                builder,
+                aggPrimalType,
+                currentValue,
+                gradient.revGradInst);
         }
 
         return RevGradient(
@@ -2919,7 +2937,7 @@ struct DiffTransposePass
             if (aggDiffType != nullptr)
             {
                 // If type is non-null/non-void, call T.dzero() to produce a 0 gradient.
-                return emitDZeroOfDiffInstType(builder, aggPrimalType);
+                return diffTypeContext.emitDZeroOfDiffInstType(builder, aggPrimalType);
             }
             else
             {
@@ -2951,7 +2969,7 @@ struct DiffTransposePass
         return nullptr;
     }
 
-    IRInst* emitDZeroOfDiffInstType(IRBuilder* builder, IRType* primalType)
+    /*IRInst* emitDZeroOfDiffInstType(IRBuilder* builder, IRType* primalType)
     {
         if (auto arrayType = as<IRArrayType>(primalType))
         {
@@ -3089,7 +3107,7 @@ struct DiffTransposePass
             (IRType*)diffTypeContext.getDifferentialForType(builder, primalType),
             addMethod,
             List<IRInst*>(op1, op2));
-    }
+    }*/
 
     void addRevGradientForFwdInst(IRInst* fwdInst, RevGradient assignment)
     {
