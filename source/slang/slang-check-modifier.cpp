@@ -522,7 +522,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         if (!location)
             return nullptr;
 
-        locationLayoutAttr->value = location->getValue();
+        locationLayoutAttr->value = int32_t(location->getValue());
     }
     else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
     {

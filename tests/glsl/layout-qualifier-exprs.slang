@@ -7,7 +7,7 @@ static const uint BINDING_BASE = 3;
 static const uint BINDING_STRIDE = 2;
 static const uint SET_BASE = 1;
 static const uint SET_STRIDE = 4;
-static const uint BASE_IN_LOC = 20;
+static const uint BASE_IN_LOC = 3;
 static const uint BASE_IN_INDEX = 24;
 static const uint BASE_OUT_LOC = 2;
 static const uint INPUT_ATT_BASE = 16;
@@ -38,11 +38,11 @@ layout(constant_id = 3 * 9) const float specConst = 0.2;
 [vk_location(BASE_OUT_LOC + 4)]
 out vec4 fragColor;
 
-// CHECK_GLSL: location = 23
-layout(location = BASE_IN_LOC + 3, index = BASE_IN_INDEX / 3 ) in float inParam;
+// CHECK_GLSL: location = 7
+layout(location = (BASE_IN_LOC * 2) + 1, index = BASE_IN_INDEX / 3 ) in float inParam;
 
 void fragmentMain() {
-    uint index = gl_GlobalInvocationID.x;
+    uint index = gl_FragCoord.x;
     result[index] = a[index] * b[index];
 
     vec4 attachmentData = subpassLoad(inputAttachment0);
