@@ -1,6 +1,6 @@
-#ifndef _WIN32
 #ifndef SLANG_CORE_SECURE_CRT_H
 #define SLANG_CORE_SECURE_CRT_H
+#ifndef _WIN32
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -104,6 +104,18 @@ inline void strncpy_s(
     size_t count)
 {
     strncpy(strDestination, strSource, count);
+}
+#elif defined(__MINGW32__ )
+#include <stdio.h>
+inline size_t fread_s(
+    void* buffer,
+    [[maybe_unused]] size_t bufferSize,
+    size_t elementSize,
+    size_t count,
+    FILE* stream)
+{
+    assert(bufferSize >= elementSize * count);
+    return fread(buffer, elementSize, count, stream);
 }
 #endif
 #endif
