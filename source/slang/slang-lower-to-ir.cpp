@@ -8765,34 +8765,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-
-        /*for (auto requirementDecl : decl->getMembersOfType<DerivativePairAssocTypeDecl>())
-        {
-            // If there is an associated derivative pair decl, create a decoration linking them
-            // together.
-            //
-            auto derivativePairKey = getInterfaceRequirementKey(requirementDecl);
-            if (as<AssocTypeDecl>(requirementDecl->originalDecl))
-            {
-                auto origKey = getInterfaceRequirementKey(requirementDecl->originalDecl);
-                context->irBuilder->addDecoration(
-                    origKey,
-                    kIROp_DifferentialPairAssociatedTypeDecoration,
-                    derivativePairKey);
-            }
-            else if (as<ThisTypeDecl>(requirementDecl->originalDecl))
-            {
-                context->irBuilder->addDecoration(
-                    irInterface,
-                    kIROp_DifferentialPairAssociatedTypeDecoration,
-                    derivativePairKey);
-            }
-            else
-            {
-                SLANG_UNEXPECTED("Unexpected derivative pair associated type decl.");
-            }
-        }*/
-
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         if (auto anyValueSizeAttr = decl->findModifier<AnyValueSizeAttribute>())
@@ -9118,12 +9090,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInst* inst,
         DifferentiableAttribute* attr)
     {
-        // TODO: Problem is that for dynamic types we have to lower the diff type relationship into
-        // the function body. Current approach: We add annotation instructions into the code as
-        // necessary. Need to intercept at lowerType itself. Let's add a type-hook mechanism that
-        // emits this code for differentiable functions.
-        // Plus need to register the derivative types as we get them.
-        //
         auto irDict = getBuilder()->addDifferentiableTypeDictionaryDecoration(inst);
         for (auto& entry : attr->getMapTypeToIDifferentiableWitness())
         {
@@ -10509,16 +10475,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
             }
         }
-
-        /*if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
-        {
-            if (decl->body)
-            {
-                subContext->irBuilder->setInsertInto(irFunc->getParent());
-                lowerDifferentiableAttribute(subContext, irFunc, diffAttr);
-                subContext->irBuilder->setInsertInto(irFunc);
-            }
-        }*/
 
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
