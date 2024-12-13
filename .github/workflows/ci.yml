@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [linux, macos, windows]
-        config: [debug, releaseWithDebugInfo]
+        config: [debug, release]
         compiler: [gcc, clang, cl]
         platform: [x86_64, aarch64, wasm]
         exclude:
@@ -44,14 +44,14 @@ jobs:
           # quick or full conditionally otherwise
           - test-category: smoke
           - { os: windows, test-category: quick }
-          - { config: releaseWithDebugInfo, test-category: full }
+          - { config: release, test-category: full }
           # default not full gpu tests
           - full-gpu-tests: false
           # The runners don't have a GPU by default except for the self-hosted ones
           - has-gpu: false
           # Self-hosted aarch64 build
           - os: linux
-            config: releaseWithDebugInfo
+            config: release
             compiler: gcc
             platform: aarch64
             test-category: smoke
@@ -60,7 +60,7 @@ jobs:
             has-gpu: true
           # Self-hosted full gpu build
           - os: windows
-            config: releaseWithDebugInfo
+            config: release
             compiler: cl
             platform: x86_64
             test-category: full

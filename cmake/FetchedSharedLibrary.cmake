@@ -1,3 +1,9 @@
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(dep_shared_library_prefix "")
+else()
+    set(dep_shared_library_prefix "lib")
+endif()
+
 # Helper function to download and extract an archive
 function(download_and_extract archive_name url)
     cmake_path(GET url FILENAME filename_with_ext)
@@ -57,7 +63,7 @@ function(copy_fetched_shared_library library_name url)
     endif()
 
     set(shared_library_filename
-        "${CMAKE_SHARED_LIBRARY_PREFIX}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        "${dep_shared_library_prefix}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
     )
     macro(from_glob dir)
         # A little helper function
@@ -82,7 +88,7 @@ function(copy_fetched_shared_library library_name url)
     elseif(
         url
             MATCHES
-            "${CMAKE_SHARED_LIBRARY_PREFIX}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
+            "${dep_shared_library_prefix}.+${CMAKE_SHARED_LIBRARY_SUFFIX}$"
         AND EXISTS "${url}"
     )
         # Otherwise, if it's a direct path to a shared object, use that
@@ -105,7 +111,7 @@ function(copy_fetched_shared_library library_name url)
 
     # We didn't find it, just return and don't create a target and operation
     # which will fail
-    if(NOT EXISTS ${source_object} AND ARG_IGNORE_FAILURE)
+    if((NOT EXISTS "${source_object}") AND ARG_IGNORE_FAILURE)
         return()
     endif()
 
@@ -136,7 +142,7 @@ endfunction()
 function(install_fetched_shared_library library_name url)
     copy_fetched_shared_library(${library_name} ${url} ${ARGN})
     set(shared_library_filename
-        "${CMAKE_SHARED_LIBRARY_PREFIX}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        "${dep_shared_library_prefix}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
     )
     set(dest_object
         ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${shared_library_filename}

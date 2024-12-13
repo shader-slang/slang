@@ -1951,6 +1951,20 @@ static T* createInst(
 }
 
 template<typename T>
+static T* createInst(
+    IRBuilder* builder,
+    IROp op,
+    IRType* type,
+    IRInst* arg1,
+    IRInst* arg2,
+    IRInst* arg3,
+    IRInst* arg4)
+{
+    IRInst* args[] = {arg1, arg2, arg3, arg4};
+    return createInstImpl<T>(builder, op, type, 4, &args[0]);
+}
+
+template<typename T>
 static T* createInstWithTrailingArgs(
     IRBuilder* builder,
     IROp op,
@@ -3625,7 +3639,25 @@ IRInst* IRBuilder::emitLookupInterfaceMethodInst(
 IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
 {
     auto inst = createInst<IRAlloca>(this, kIROp_GetSequentialID, getUIntType(), rttiObj);
+    addInst(inst);
+    return inst;
+}
 
+IRInst* IRBuilder::emitBitfieldExtract(IRType* type, IRInst* value, IRInst* offset, IRInst* bits)
+{
+    auto inst = createInst<IRInst>(this, kIROp_BitfieldExtract, type, value, offset, bits);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitBitfieldInsert(
+    IRType* type,
+    IRInst* base,
+    IRInst* insert,
+    IRInst* offset,
+    IRInst* bits)
+{
+    auto inst = createInst<IRInst>(this, kIROp_BitfieldInsert, type, base, insert, offset, bits);
     addInst(inst);
     return inst;
 }
@@ -7971,7 +8003,7 @@ void IRInst::removeOperand(Index index)
 }
 
 // Remove this instruction from its parent block,
-// and then destroy it (it had better have no uses!)
+// and then destroy it (it had better have no uses, or descendants with uses!)
 void IRInst::removeAndDeallocate()
 {
     removeAndDeallocateAllDecorationsAndChildren();
@@ -8188,6 +8220,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_PtrCast:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:
+    case kIROp_BitfieldExtract:
+    case kIROp_BitfieldInsert:
     case kIROp_PackAnyValue:
     case kIROp_UnpackAnyValue:
     case kIROp_Reinterpret:
