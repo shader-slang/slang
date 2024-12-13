@@ -417,12 +417,7 @@ InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(
 
     // Mark the generated derivative function itself as differentiable.
     builder.addBackwardDifferentiableDecoration(diffFunc);
-    // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
-    /*if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
-    {
-        builder.setInsertBefore(diffFunc->getFirstDecorationOrChild());
-        cloneInst(&cloneEnv, &builder, dictDecor);
-    }*/
+
     copyOriginalDecorations(origFunc, diffFunc);
     builder.addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
     return InstPair(primalFunc, diffFunc);

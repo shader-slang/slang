@@ -1129,9 +1129,6 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 {
     parentFunc = func;
 
-    // auto decor = func->findDecoration<IRDifferentiableTypeDictionaryDecoration>();
-    // SLANG_RELEASE_ASSERT(decor);
-
     List<IRDifferentiableTypeAnnotation*> annotations = getAnnotations(func);
 
     // Go up the parents of func & add the annotations of any IRGeneric or IRModule parent:
@@ -1153,11 +1150,6 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
         parent = parent->getParent();
     }
 
-    // Build lookup dictionary for type witnesses.
-    // for (auto child = decor->getFirstChild(); child; child = child->next)
-    //{
-    //    if (auto item = as<IRDifferentiableTypeDictionaryItem>(child))
-    //    {
     for (auto item : annotations)
     {
         IRInterfaceType* diffInterfaceType = getConformanceTypeFromWitness(item->getWitness());
@@ -1279,22 +1271,6 @@ IRInst* DifferentiableTypeConformanceContext::lookUpConformanceForType(
 {
     IRInst* foundResult = nullptr;
     differentiableTypeWitnessDictionary.tryGetValue(type, foundResult);
-
-    /*if (!foundResult)
-    {
-        // For concrete types, we should be able to look for a table.
-        if (kind == DiffConformanceKind::Value)
-            foundResult = findGlobalWitness(sharedContext->differentiableInterfaceType, type);
-        else if (kind == DiffConformanceKind::Ptr)
-            foundResult = findGlobalWitness(sharedContext->differentiablePtrInterfaceType,
-    type); else if (kind == DiffConformanceKind::Any)
-        {
-            foundResult = findGlobalWitness(sharedContext->differentiableInterfaceType, type);
-            if (!foundResult)
-                foundResult =
-                    findGlobalWitness(sharedContext->differentiablePtrInterfaceType, type);
-        }
-    }*/
 
     if (!foundResult)
         return nullptr;
@@ -2960,17 +2936,6 @@ struct AutoDiffPass : public InstPassBase
                 diffFieldWitness = diffFieldTypeInfo.diffWitness;
             }
 
-            /*if (auto diffDecor =
-                    field->findDecoration<IRIntermediateContextFieldDifferentialTypeDecoration>())
-            {
-                diffFieldWitness = diffDecor->getDifferentialWitness();
-            }
-            else
-            {
-                IntermediateContextTypeDifferentialInfo diffFieldTypeInfo;
-                diffTypes.tryGetValue(field->getFieldType(), diffFieldTypeInfo);
-                diffFieldWitness = diffFieldTypeInfo.diffWitness;
-            }*/
             if (diffFieldWitness)
             {
                 FieldInfo info;
@@ -2978,12 +2943,6 @@ struct AutoDiffPass : public InstPassBase
                 keyBuilder.setInsertBefore(maybeFindOuterGeneric(originalType));
                 auto diffKey = keyBuilder.createStructKey();
                 auto diffFieldType = ctx->getDifferentialForType(&builder, field->getFieldType());
-
-                /*_lookupWitness(
-                    &keyBuilder,
-                    diffFieldWitness,
-                    autodiffContext->differentialAssocTypeStructKey,
-                    builder.getTypeKind());*/
 
                 info.field = builder.createStructField(diffType, diffKey, (IRType*)diffFieldType);
                 info.witness = diffFieldWitness;
@@ -3009,14 +2968,6 @@ struct AutoDiffPass : public InstPassBase
 
             for (auto info : diffFields)
             {
-                /*auto innerZeroMethod = _lookupWitness(
-                    &builder,
-                    info.witness,
-                    autodiffContext->zeroMethodStructKey,
-                    autodiffContext->zeroMethodType);
-                IRInst* val =
-                    builder.emitCallInst(info.field->getFieldType(), innerZeroMethod, 0,
-                nullptr);*/
                 fieldVals.add(ctx->emitDZeroOfDiffInstType(&builder, info.primalType));
             }
             builder.emitReturn(builder.emitMakeStruct(diffType, fieldVals));
@@ -3045,8 +2996,7 @@ struct AutoDiffPass : public InstPassBase
                     builder
                         .emitFieldExtract(info.field->getFieldType(), param2, info.field->getKey()),
                 };
-                /*IRInst* val =
-                    builder.emitCallInst(info.field->getFieldType(), innerAddMethod, 2, args);*/
+
                 fieldVals.add(
                     ctx->emitDAddOfDiffInstType(&builder, info.primalType, args[0], args[1]));
             }

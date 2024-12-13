@@ -532,21 +532,6 @@ struct DiffUnzipPass
         }
     }
 
-    /*InstPair splitDifferentiableTypeAnnotation(
-        IRBuilder* primalBuilder,
-        IRBuilder* diffBuilder,
-        IRDifferentiableTypeAnnotation* mixedDiffTypeAnnotation)
-    {
-        auto primalType = mixedDiffTypeAnnotation->getBaseType();
-        auto diffWitness = mixedDiffTypeAnnotation->getWitness();
-
-        auto primalInst = primalBuilder->emitDifferentiableTypeAnnotation(primalType,
-    diffWitness); auto diffInst = diffBuilder->emitDifferentiableTypeAnnotation(primalType,
-    diffWitness);
-
-        return InstPair(primalInst, diffInst);
-    }*/
-
     // Splitting a loop is one of the trickiest parts of the unzip pass.
     // Thus far, we've been dealing with blocks that are only run once, so we
     // could arbitrarily move intermediate instructions to other blocks since they are
@@ -730,12 +715,6 @@ struct DiffUnzipPass
 
         case kIROp_Return:
             return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
-
-            /*case kIROp_DifferentiableTypeAnnotation:
-                return splitDifferentiableTypeAnnotation(
-                    primalBuilder,
-                    diffBuilder,
-                    as<IRDifferentiableTypeAnnotation>(inst));*/
 
         case kIROp_unconditionalBranch:
         case kIROp_conditionalBranch:

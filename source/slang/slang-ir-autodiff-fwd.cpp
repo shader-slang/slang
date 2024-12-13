@@ -168,15 +168,12 @@ InstPair ForwardDiffTranscriber::transcribeDifferentiableTypeAnnotation(
         as<IRDifferentiableTypeAnnotation>(maybeCloneForPrimalInst(builder, origInst));
 
     IRDifferentiableTypeAnnotation* annotation = as<IRDifferentiableTypeAnnotation>(origInst);
-    auto diffWitness = annotation->getWitness();
 
     differentiableTypeConformanceContext.addTypeToDictionary(
         (IRType*)primalAnnotation->getBaseType(),
         primalAnnotation->getWitness());
 
     auto diffType = differentiateType(builder, (IRType*)annotation->getBaseType());
-    // SLANG_ASSERT(diffType);
-    //  Temporary break:
     if (!diffType)
         return InstPair(primalAnnotation, nullptr);
 
@@ -1720,12 +1717,6 @@ IRFunc* ForwardDiffTranscriber::transcribeFuncHeaderImpl(IRBuilder* inBuilder, I
 
     // Transfer checkpoint hint decorations
     copyCheckpointHints(&builder, origFunc, diffFunc);
-
-    // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
-    /*if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
-    {
-        cloneDecoration(&cloneEnv, dictDecor, diffFunc, diffFunc->getModule());
-    }*/
     return diffFunc;
 }
 

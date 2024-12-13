@@ -561,8 +561,7 @@ IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* 
             return nullptr;
     }
 
-    if (auto diffWitness =
-            tryGetDifferentiableWitness(builder, originalType, DiffConformanceKind::Any))
+    if (tryGetDifferentiableWitness(builder, originalType, DiffConformanceKind::Any))
         return (IRType*)getOrCreateDiffPairType(builder, originalType);
     return nullptr;
 }
@@ -1002,9 +1001,6 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
         }
 
         differentiableTypeConformanceContext.setFunc(innerFunc);
-
-        // if (!innerFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
-        //     return InstPair(origGeneric, nullptr);
     }
     else if (const auto funcType = as<IRFuncType>(innerVal))
     {

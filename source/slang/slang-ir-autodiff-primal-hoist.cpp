@@ -1355,17 +1355,12 @@ struct UseChain
             return;
         }
 
-        // IRCloneEnv env;
-
         // Pop the last use, which is the base use that needs to be replaced.
         auto baseUse = chain.getLast();
         chain.removeLast();
 
         // Ensure that replacement inst is set as mapping for the baseUse.
-        // env.mapOldValToNew[baseUse->get()] = inst;
         ctx->cloneEnv.mapOldValToNew[baseUse->get()] = inst;
-
-        auto lastInstInChain = inst;
 
         IRBuilder chainBuilder(builder->getModule());
         setInsertAfterOrdinaryInst(&chainBuilder, inst);
@@ -1376,7 +1371,7 @@ struct UseChain
         // Clone the rest of the chain.
         for (auto& use : chain)
         {
-            lastInstInChain = ctx->cloneInstOutOfOrder(&chainBuilder, use->get());
+            ctx->cloneInstOutOfOrder(&chainBuilder, use->get());
         }
 
         // We won't actually replace the final use, because if there are multiple chains
@@ -1436,7 +1431,6 @@ struct UseGraph
         List<UseChain> chains = chainSets[use];
         for (auto chain : chains)
         {
-            // builder->setInsertAfter(inst);
             chain.replace(&ctx, builder, inst);
         }
 
@@ -1471,8 +1465,6 @@ struct UseGraph
 
         return result;
     }
-
-    // bool isEmpty() const { return chainSets.getCount() == 0; }
 };
 
 

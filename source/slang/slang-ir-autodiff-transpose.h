@@ -1241,9 +1241,9 @@ struct DiffTransposePass
             argRequiresLoad.add(false);
         }
 
-        // auto revFnType = builder->getFuncType(argTypes, builder->getVoidType());
         auto revFnType = this->autodiffContext->transcriberSet.propagateTranscriber
                              ->differentiateFunctionType(builder, baseFn, baseFnType);
+
         IRInst* revCallee = nullptr;
         if (getResolvedInstForDecorations(baseFn)->getOp() == kIROp_LookupWitness)
         {
@@ -2968,146 +2968,6 @@ struct DiffTransposePass
 
         return nullptr;
     }
-
-    /*IRInst* emitDZeroOfDiffInstType(IRBuilder* builder, IRType* primalType)
-    {
-        if (auto arrayType = as<IRArrayType>(primalType))
-        {
-            auto diffElementType = (IRType*)diffTypeContext.getDifferentialForType(
-                builder,
-                arrayType->getElementType());
-            SLANG_RELEASE_ASSERT(diffElementType);
-            auto diffArrayType =
-                builder->getArrayType(diffElementType, arrayType->getElementCount());
-            auto diffElementZero = emitDZeroOfDiffInstType(builder, arrayType->getElementType());
-            return builder->emitMakeArrayFromElement(diffArrayType, diffElementZero);
-        }
-        else if (auto diffPairUserType = as<IRDifferentialPairUserCodeType>(primalType))
-        {
-            auto primalZero = emitDZeroOfDiffInstType(builder, diffPairUserType->getValueType());
-            auto diffZero = primalZero;
-            auto diffType = primalZero->getFullType();
-            auto diffWitness =
-                diffTypeContext.getDiffTypeWitnessFromPairType(builder, diffPairUserType);
-            auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
-            return builder->emitMakeDifferentialPairUserCode(
-                diffDiffPairType,
-                primalZero,
-                diffZero);
-        }
-        else if (as<IRInterfaceType>(primalType) || as<IRAssociatedType>(primalType))
-        {
-            // Pack a null value into an existential type.
-            auto existentialZero = builder->emitMakeExistential(
-                autodiffContext->differentiableInterfaceType,
-                diffTypeContext.emitNullDifferential(builder),
-                autodiffContext->nullDifferentialWitness);
-
-            return existentialZero;
-        }
-
-        auto zeroMethod = diffTypeContext.getZeroMethodForType(builder, primalType);
-
-        // Should exist.
-        SLANG_ASSERT(zeroMethod);
-
-        return builder->emitCallInst(
-            (IRType*)diffTypeContext.getDifferentialForType(builder, primalType),
-            zeroMethod,
-            List<IRInst*>());
-    }
-
-    IRInst* emitDAddForExistentialType(
-        IRBuilder* builder,
-        IRType* primalType,
-        IRInst* op1,
-        IRInst* op2)
-    {
-        auto existentialDAddFunc = diffTypeContext.getOrCreateExistentialDAddMethod();
-
-        // Should exist.
-        SLANG_ASSERT(existentialDAddFunc);
-
-        return builder->emitCallInst(
-            (IRType*)diffTypeContext.getDifferentialForType(builder, primalType),
-            existentialDAddFunc,
-            List<IRInst*>({op1, op2}));
-    }
-
-    IRInst* emitDAddOfDiffInstType(IRBuilder* builder, IRType* primalType, IRInst* op1, IRInst* op2)
-    {
-        if (auto arrayType = as<IRArrayType>(primalType))
-        {
-            auto diffElementType = (IRType*)diffTypeContext.getDifferentialForType(
-                builder,
-                arrayType->getElementType());
-            SLANG_RELEASE_ASSERT(diffElementType);
-            auto arraySize = arrayType->getElementCount();
-
-            if (auto constArraySize = as<IRIntLit>(arraySize))
-            {
-                List<IRInst*> args;
-                for (IRIntegerValue i = 0; i < constArraySize->getValue(); i++)
-                {
-                    auto index = builder->getIntValue(builder->getIntType(), i);
-                    auto op1Val = builder->emitElementExtract(diffElementType, op1, index);
-                    auto op2Val = builder->emitElementExtract(diffElementType, op2, index);
-                    args.add(emitDAddOfDiffInstType(
-                        builder,
-                        arrayType->getElementType(),
-                        op1Val,
-                        op2Val));
-                }
-                auto diffArrayType =
-                    builder->getArrayType(diffElementType, arrayType->getElementCount());
-                return builder->emitMakeArray(
-                    diffArrayType,
-                    (UInt)args.getCount(),
-                    args.getBuffer());
-            }
-            else
-            {
-                // TODO: insert a runtime loop here.
-                SLANG_UNIMPLEMENTED_X("dadd of dynamic array.");
-            }
-        }
-        else if (auto diffPairUserType = as<IRDifferentialPairUserCodeType>(primalType))
-        {
-            auto diffType =
-                (IRType*)diffTypeContext.getDiffTypeFromPairType(builder, diffPairUserType);
-            auto diffWitness =
-                diffTypeContext.getDiffTypeWitnessFromPairType(builder, diffPairUserType);
-
-            auto primal1 = builder->emitDifferentialPairGetPrimalUserCode(op1);
-            auto primal2 = builder->emitDifferentialPairGetPrimalUserCode(op2);
-            auto primal =
-                emitDAddOfDiffInstType(builder, diffPairUserType->getValueType(), primal1, primal2);
-
-            auto diff1 = builder->emitDifferentialPairGetDifferentialUserCode(diffType, op1);
-            auto diff2 = builder->emitDifferentialPairGetDifferentialUserCode(diffType, op2);
-            auto diff = emitDAddOfDiffInstType(builder, diffType, diff1, diff2);
-
-            auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
-            return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primal, diff);
-        }
-        else if (as<IRInterfaceType>(primalType) || as<IRAssociatedType>(primalType))
-        {
-            // If our type is existential, we need to handle the case where
-            // one or both of our operands are null-type.
-            //
-            return emitDAddForExistentialType(builder, primalType, op1, op2);
-        }
-
-        auto addMethod = diffTypeContext.getAddMethodForType(builder, primalType);
-
-        // Should exist.
-        SLANG_ASSERT(addMethod);
-
-        return builder->emitCallInst(
-            (IRType*)diffTypeContext.getDifferentialForType(builder, primalType),
-            addMethod,
-            List<IRInst*>(op1, op2));
-    }*/
 
     void addRevGradientForFwdInst(IRInst* fwdInst, RevGradient assignment)
     {
