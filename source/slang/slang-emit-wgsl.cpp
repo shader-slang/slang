@@ -352,12 +352,18 @@ static const char* getWgslImageFormat(IRTextureTypeBase* type)
         // normally just resolve to unknown.
         auto elementType = type->getElementType();
         Int vectorWidth = 1;
-        if (auto vectorType = as<IRVectorType>(elementType);
-            auto intLitVal = as<IRIntLit>(vectorType->getElementCount()))
+        if (auto elementVecType = as<IRVectorType>(elementType))
         {
-            vectorWidth = intLitVal->getValue();
+            if (auto intLitVal = as<IRIntLit>(elementVecType->getElementCount()))
+            {
+                vectorWidth = (Int)intLitVal->getValue();
+            }
+            else
+            {
+                vectorWidth = 0;
+            }
+            elementType = elementVecType->getElementType();
         }
-        elementType = getVectorElementType((IRType*)elementType);
         if (auto basicType = as<IRBasicType>(elementType))
         {
             switch (basicType->getBaseType())

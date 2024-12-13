@@ -1356,7 +1356,8 @@ bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
         auto& assistInfo = getLinkage()->contentAssistInfo;
         // If this func is not defined in the primary module, skip checking its body.
         auto moduleDecl = getModuleDecl(decl);
-        if (moduleDecl && moduleDecl->getName() != assistInfo.primaryModuleName)
+        if (moduleDecl && moduleDecl->module->getNameObj() != assistInfo.primaryModuleName &&
+            moduleDecl->getName() != assistInfo.primaryModuleName)
             return true;
         if (funcDecl->body)
         {
@@ -3100,6 +3101,17 @@ Type* unwrapArrayType(Type* type)
     {
         if (auto arrayType = as<ArrayExpressionType>(type))
             type = arrayType->getElementType();
+        else
+            return type;
+    }
+}
+
+Type* unwrapModifiedType(Type* type)
+{
+    for (;;)
+    {
+        if (auto modType = as<ModifiedType>(type))
+            type = modType->getBase();
         else
             return type;
     }
@@ -5059,7 +5071,9 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
     synPropertyDecl->nameAndLoc.name =
         getName(String("$syn_property_") + getText(requiredMemberDeclRef.getName()));
     synPropertyDecl->parentDecl = context->parentDecl;
-
+    synPropertyDecl->ownedScope = m_astBuilder->create<Scope>();
+    synPropertyDecl->ownedScope->containerDecl = synPropertyDecl;
+    synPropertyDecl->ownedScope->parent = context->parentDecl->ownedScope;
 
     // The type of our synthesized property can be derived from the
     // specialized declref to the requirement decl.
@@ -7410,6 +7424,15 @@ bool SemanticsVisitor::isScalarIntegerType(Type* type)
     return isIntegerBaseType(baseType) || baseType == BaseType::Bool;
 }
 
+bool SemanticsVisitor::isHalfType(Type* type)
+{
+    auto basicType = as<BasicExpressionType>(type);
+    if (!basicType)
+        return false;
+    auto baseType = basicType->getBaseType();
+    return baseType == BaseType::Half;
+}
+
 bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
 {
     return isScalarIntegerType(type) || isEnumType(type);
@@ -7455,6 +7478,9 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
 #endif
         return value >= std::numeric_limits<int64_t>::min() &&
                value <= std::numeric_limits<int64_t>::max();
+
+    case BaseType::Half:
+        return value >= -2048 && value <= 2048;
     default:
         return false;
     }

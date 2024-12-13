@@ -216,9 +216,10 @@ bool isManagedType(Type* type)
 {
     if (auto declRefValueType = as<DeclRefType>(type))
     {
-        if (as<ClassDecl>(declRefValueType->getDeclRef().getDecl()))
+        auto decl = declRefValueType->getDeclRef().getDecl();
+        if (as<ClassDecl>(decl))
             return true;
-        if (as<InterfaceDecl>(declRefValueType->getDeclRef().getDecl()))
+        if (as<InterfaceDecl>(decl) && decl->findModifier<ComInterfaceAttribute>())
             return true;
     }
     return false;

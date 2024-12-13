@@ -2084,8 +2084,8 @@ Result DeviceImpl::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
 {
     VkSamplerCreateInfo samplerInfo = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 
-    samplerInfo.magFilter = VulkanUtil::translateFilterMode(desc.minFilter);
-    samplerInfo.minFilter = VulkanUtil::translateFilterMode(desc.magFilter);
+    samplerInfo.magFilter = VulkanUtil::translateFilterMode(desc.magFilter);
+    samplerInfo.minFilter = VulkanUtil::translateFilterMode(desc.minFilter);
 
     samplerInfo.addressModeU = VulkanUtil::translateAddressingMode(desc.addressU);
     samplerInfo.addressModeV = VulkanUtil::translateAddressingMode(desc.addressV);

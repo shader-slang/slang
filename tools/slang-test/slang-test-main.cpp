@@ -524,6 +524,17 @@ static SlangResult _extractCommand(const char** ioCursor, UnownedStringSlice& ou
     }
 }
 
+static void applyMacroSubstitution(String filePath, TestDetails& details)
+{
+    for (auto& arg : details.options.args)
+    {
+        arg = StringUtil::replaceAll(
+            arg.getUnownedSlice(),
+            toSlice("$dirname"),
+            Path::getParentDirectory(filePath).getUnownedSlice());
+    }
+}
+
 // Try to read command-line options from the test file itself
 static SlangResult _gatherTestsForFile(
     TestCategorySet* categorySet,
@@ -597,6 +608,7 @@ static SlangResult _gatherTestsForFile(
         if (command == "TEST")
         {
             SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
+            applyMacroSubstitution(filePath, testDetails);
 
             // See if the type of test needs certain APIs available
             const RenderApiFlags testRequiredApis =
@@ -611,6 +623,7 @@ static SlangResult _gatherTestsForFile(
         else if (command == "DIAGNOSTIC_TEST")
         {
             SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
+            applyMacroSubstitution(filePath, testDetails);
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);

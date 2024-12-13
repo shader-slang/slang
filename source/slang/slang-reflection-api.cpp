@@ -23,11 +23,11 @@ namespace Slang
 
 // Conversion routines to help with strongly-typed reflection API
 
-static inline UserDefinedAttribute* convert(SlangReflectionUserAttribute* attrib)
+static inline Attribute* convert(SlangReflectionUserAttribute* attrib)
 {
-    return (UserDefinedAttribute*)attrib;
+    return (Attribute*)attrib;
 }
-static inline SlangReflectionUserAttribute* convert(UserDefinedAttribute* attrib)
+static inline SlangReflectionUserAttribute* convert(Attribute* attrib)
 {
     return (SlangReflectionUserAttribute*)attrib;
 }
@@ -154,7 +154,9 @@ static SlangReflectionUserAttribute* findUserAttributeByName(
     const char* name)
 {
     auto nameObj = session->tryGetNameObj(name);
-    for (auto x : decl->getModifiersOfType<UserDefinedAttribute>())
+    if (!nameObj)
+        return nullptr;
+    for (auto x : decl->getModifiersOfType<Attribute>())
     {
         if (x->keywordName == nameObj)
             return (SlangReflectionUserAttribute*)(x);

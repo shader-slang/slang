@@ -9,19 +9,6 @@ namespace Slang
 struct RedundancyRemovalContext
 {
     RefPtr<IRDominatorTree> dom;
-    bool isSingleIterationLoop(IRLoop* loop)
-    {
-        int useCount = 0;
-        for (auto use = loop->getBreakBlock()->firstUse; use; use = use->nextUse)
-        {
-            if (use->getUser() == loop)
-                continue;
-            useCount++;
-            if (useCount > 1)
-                return false;
-        }
-        return true;
-    }
 
     bool tryHoistInstToOuterMostLoop(IRGlobalValueWithCode* func, IRInst* inst)
     {
@@ -31,11 +18,15 @@ struct RedundancyRemovalContext
              parentBlock = dom->getImmediateDominator(parentBlock))
         {
             auto terminatorInst = parentBlock->getTerminator();
-            if (terminatorInst->getOp() == kIROp_loop &&
-                !isSingleIterationLoop(as<IRLoop>(terminatorInst)))
+            if (auto loop = as<IRLoop>(terminatorInst))
             {
+                // If `inst` is outside of the loop region, don't hoist it into the loop.
+                if (dom->dominates(loop->getBreakBlock(), inst))
+                    continue;
+
                 // Consider hoisting the inst into this block.
-                // This is only possible if all operands of the inst are dominating `parentBlock`.
+                // This is only possible if all operands of the inst are dominating
+                // `parentBlock`.
                 bool canHoist = true;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {

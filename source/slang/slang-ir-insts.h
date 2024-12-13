@@ -3905,6 +3905,10 @@ public:
 
     IRInst* emitGlobalValueRef(IRInst* globalInst);
 
+    IRInst* emitBitfieldExtract(IRType* type, IRInst* op0, IRInst* op1, IRInst* op2);
+
+    IRInst* emitBitfieldInsert(IRType* type, IRInst* op0, IRInst* op1, IRInst* op2, IRInst* op3);
+
     IRInst* emitPackAnyValue(IRType* type, IRInst* value);
 
     IRInst* emitUnpackAnyValue(IRType* type, IRInst* value);
@@ -4649,9 +4653,14 @@ public:
             getIntValue(getIntType(), IRIntegerValue(mode)));
     }
 
-    void addLoopMaxItersDecoration(IRInst* value, IntegerLiteralValue iters)
+    void addLoopMaxItersDecoration(IRInst* value, IRIntegerValue iters)
     {
-        addDecoration(value, kIROp_LoopMaxItersDecoration, getIntValue(getIntType(), iters));
+        addDecoration(value, kIROp_LoopMaxItersDecoration, getIntValue(iters));
+    }
+
+    void addLoopMaxItersDecoration(IRInst* value, IRInst* iters)
+    {
+        addDecoration(value, kIROp_LoopMaxItersDecoration, iters);
     }
 
     void addLoopForceUnrollDecoration(IRInst* value, IntegerLiteralValue iters)

@@ -35,21 +35,21 @@ void main(out float3 pos)
             pos.xy, 0);
 }
 
-// SPIRV: OpDecorate %myStruct1{{.*}} Binding 1
-// SPIRV: OpDecorate %myStruct1{{.*}} DescriptorSet 1
-// SPIRV: OpDecorate %myStruct2{{.*}} Binding 2
-// SPIRV: OpDecorate %myStruct2{{.*}} DescriptorSet 1
-// SPIRV: OpDecorate %texture{{.*}} Binding 3
-// SPIRV: OpDecorate %texture{{.*}} DescriptorSet 1
-// SPIRV: OpDecorate %sampler{{.*}} Binding 4
-// SPIRV: OpDecorate %sampler{{.*}} DescriptorSet 1
+// SPIRV-DAG: OpDecorate %myStruct1{{.*}} Binding 1
+// SPIRV-DAG: OpDecorate %myStruct1{{.*}} DescriptorSet 1
+// SPIRV-DAG: OpDecorate %myStruct2{{.*}} Binding 2
+// SPIRV-DAG: OpDecorate %myStruct2{{.*}} DescriptorSet 1
+// SPIRV-DAG: OpDecorate %texture{{.*}} Binding 3
+// SPIRV-DAG: OpDecorate %texture{{.*}} DescriptorSet 1
+// SPIRV-DAG: OpDecorate %sampler{{.*}} Binding 4
+// SPIRV-DAG: OpDecorate %sampler{{.*}} DescriptorSet 1
 //
 //
-// GL-SPIRV: OpDecorate %myStruct1{{.*}} DescriptorSet 1
-// GL-SPIRV: OpDecorate %myStruct1{{.*}} Binding 1
-// GL-SPIRV: OpDecorate %myStruct2{{.*}} DescriptorSet 1
-// GL-SPIRV: OpDecorate %myStruct2{{.*}} Binding 2
-// GL-SPIRV: OpDecorate %texture{{.*}} DescriptorSet 1
-// GL-SPIRV: OpDecorate %texture{{.*}} Binding 3
-// GL-SPIRV: OpDecorate %sampler{{.*}} DescriptorSet 1
-// GL-SPIRV: OpDecorate %sampler{{.*}} Binding 4
+// GL-SPIRV-DAG: OpDecorate %myStruct1{{.*}} DescriptorSet 1
+// GL-SPIRV-DAG: OpDecorate %myStruct1{{.*}} Binding 1
+// GL-SPIRV-DAG: OpDecorate %myStruct2{{.*}} DescriptorSet 1
+// GL-SPIRV-DAG: OpDecorate %myStruct2{{.*}} Binding 2
+// GL-SPIRV-DAG: OpDecorate %texture{{.*}} DescriptorSet 1
+// GL-SPIRV-DAG: OpDecorate %texture{{.*}} Binding 3
+// GL-SPIRV-DAG: OpDecorate %sampler{{.*}} DescriptorSet 1
+// GL-SPIRV-DAG: OpDecorate %sampler{{.*}} Binding 4

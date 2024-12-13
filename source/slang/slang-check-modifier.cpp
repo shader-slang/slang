@@ -32,6 +32,7 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
         IntegerConstantExpressionCoercionType::AnyInteger,
         nullptr,
         ConstantFoldingKind::CompileTime);
+
     if (!intVal)
         return nullptr;
 
@@ -524,17 +525,32 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
 
         // TODO(JS): Prior validation currently doesn't ensure both args are ints (as specified in
-        // core.meta.slang), so check here to make sure they both are
-        auto binding = checkConstantIntVal(attr->args[0]);
-        auto set = checkConstantIntVal(attr->args[1]);
+        // core.meta.slang), so check here to make sure they both are.
+        //
+        // Binding attribute may also be created from GLSL style layout qualifiers where only one of
+        // the args are specified, hence check for each individually.
+        ConstantIntVal* binding = nullptr;
+        if (attr->args[0])
+            binding = checkConstantIntVal(attr->args[0]);
 
-        if (binding == nullptr || set == nullptr)
+        ConstantIntVal* set = nullptr;
+        if (attr->args[1])
+            set = checkConstantIntVal(attr->args[1]);
+
+        if (!binding && !set)
         {
             return nullptr;
         }
 
-        bindingAttr->binding = int32_t(binding->getValue());
-        bindingAttr->set = int32_t(set->getValue());
+        if (binding)
+        {
+            bindingAttr->binding = int32_t(binding->getValue());
+        }
+
+        if (set)
+        {
+            bindingAttr->set = int32_t(set->getValue());
+        }
     }
     else if (auto simpleLayoutAttr = as<GLSLSimpleIntegerLayoutAttribute>(attr))
     {
@@ -720,11 +736,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
         else
         {
-            auto cint = checkConstantIntVal(attr->args[0]);
-            if (cint)
-            {
-                maxItersAttrs->value = (int32_t)cint->getValue();
-            }
+            maxItersAttrs->value = checkLinkTimeConstantIntVal(attr->args[0]);
         }
     }
     else if (const auto userDefAttr = as<UserDefinedAttribute>(attr))
@@ -740,18 +752,15 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 auto& arg = attr->args[paramIndex];
                 bool typeChecked = false;
-                if (auto basicType = as<BasicExpressionType>(paramDecl->getType()))
+                if (isValidCompileTimeConstantType(paramDecl->getType()))
                 {
-                    if (basicType->getBaseType() == BaseType::Int)
+                    if (auto cint = checkConstantIntVal(arg))
                     {
-                        if (auto cint = checkConstantIntVal(arg))
-                        {
-                            for (Index ci = attr->intArgVals.getCount(); ci < paramIndex + 1; ci++)
-                                attr->intArgVals.add(nullptr);
-                            attr->intArgVals[(uint32_t)paramIndex] = cint;
-                        }
-                        typeChecked = true;
+                        for (Index ci = attr->intArgVals.getCount(); ci < paramIndex + 1; ci++)
+                            attr->intArgVals.add(nullptr);
+                        attr->intArgVals[(uint32_t)paramIndex] = cint;
                     }
+                    typeChecked = true;
                 }
                 if (!typeChecked)
                 {
@@ -1434,6 +1443,97 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     }
 }
 
+void GLSLBindingOffsetTracker::setBindingOffset(int binding, int64_t byteOffset)
+{
+    bindingToByteOffset.set(binding, byteOffset);
+}
+
+int64_t GLSLBindingOffsetTracker::getNextBindingOffset(int binding)
+{
+    int64_t currentOffset;
+    if (bindingToByteOffset.addIfNotExists(binding, 0))
+        currentOffset = 0;
+    else
+        currentOffset = bindingToByteOffset.getValue(binding) + sizeof(uint32_t);
+
+    bindingToByteOffset.set(binding, currentOffset + sizeof(uint32_t));
+    return currentOffset;
+}
+
+AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
+    UncheckedGLSLLayoutAttribute* uncheckedAttr,
+    ModifiableSyntaxNode* attrTarget)
+{
+    SLANG_ASSERT(uncheckedAttr->args.getCount() == 1);
+
+    Attribute* attr = nullptr;
+
+    // False if the current unchecked attribute node is deleted and does not result in a new checked
+    // attribute.
+    bool addNode = true;
+
+    if (as<UncheckedGLSLBindingLayoutAttribute>(uncheckedAttr) ||
+        as<UncheckedGLSLSetLayoutAttribute>(uncheckedAttr))
+    {
+        // Binding and set are coupled together as a descriptor table slot resource for codegen.
+        // Attempt to retrieve and annotate an existing binding attribute or create a new one.
+        attr = attrTarget->findModifier<GLSLBindingAttribute>();
+        if (!attr)
+        {
+            attr = m_astBuilder->create<GLSLBindingAttribute>();
+        }
+        else
+        {
+            addNode = false;
+        }
+
+        // `validateAttribute`, which will be called to parse the binding arguments, also accepts
+        // modifiers from vk::binding and gl::binding where both set and binding are specified.
+        // Binding is the first and set is the second argument - specify them explicitly here.
+        if (as<UncheckedGLSLBindingLayoutAttribute>(uncheckedAttr))
+        {
+            uncheckedAttr->args.add(nullptr);
+        }
+        else
+        {
+            uncheckedAttr->args.add(uncheckedAttr->args[0]);
+            uncheckedAttr->args[0] = nullptr;
+        }
+
+        SLANG_ASSERT(uncheckedAttr->args.getCount() == 2);
+    }
+    else if (as<UncheckedGLSLOffsetLayoutAttribute>(uncheckedAttr))
+    {
+        attr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
+    }
+    else
+    {
+        getSink()->diagnose(uncheckedAttr, Diagnostics::unrecognizedGLSLLayoutQualifier);
+    }
+
+    if (attr)
+    {
+        attr->keywordName = uncheckedAttr->keywordName;
+        attr->originalIdentifierToken = uncheckedAttr->originalIdentifierToken;
+        attr->args = uncheckedAttr->args;
+        attr->loc = uncheckedAttr->loc;
+
+        // Offset constant folding computation is deferred until all other modifiers are checked to
+        // ensure bindinig is checked first.
+        if (!as<GLSLOffsetLayoutAttribute>(attr))
+        {
+            validateAttribute(attr, nullptr, attrTarget);
+        }
+    }
+
+    if (!addNode)
+    {
+        attr = nullptr;
+    }
+
+    return attr;
+}
+
 Modifier* SemanticsVisitor::checkModifier(
     Modifier* m,
     ModifiableSyntaxNode* syntaxNode,
@@ -1457,6 +1557,21 @@ Modifier* SemanticsVisitor::checkModifier(
             return getASTBuilder()->create<TransparentModifier>();
         }
         return checkedAttr;
+    }
+
+    if (auto glslLayoutAttribute = as<UncheckedGLSLLayoutAttribute>(m))
+    {
+        return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);
+    }
+
+    if (const auto glslImplicitOffsetAttribute = as<GLSLImplicitOffsetLayoutAttribute>(m))
+    {
+        auto offsetAttr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
+        offsetAttr->loc = glslImplicitOffsetAttribute->loc;
+
+        // Offset constant folding computation is deferred until all other modifiers are checked to
+        // ensure bindinig is checked first.
+        return offsetAttr;
     }
 
     if (auto decl = as<Decl>(syntaxNode))
@@ -1906,6 +2021,31 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     // Whether we actually re-wrote anything or note, lets
     // install the new list of modifiers on the declaration
     syntaxNode->modifiers.first = resultModifiers;
+
+    // GLSL offset layout qualifiers are resolved after all other modifiers are checked to ensure
+    // binding layout qualifiers are processed first.
+    if (auto glslOffsetAttribute = syntaxNode->findModifier<GLSLOffsetLayoutAttribute>())
+    {
+        if (const auto glslBindingAttribute = syntaxNode->findModifier<GLSLBindingAttribute>())
+        {
+            if (glslOffsetAttribute->args.getCount() == 0)
+            {
+                glslOffsetAttribute->offset = getGLSLBindingOffsetTracker()->getNextBindingOffset(
+                    glslBindingAttribute->binding);
+            }
+            else if (const auto constVal = checkConstantIntVal(glslOffsetAttribute->args[0]))
+            {
+                glslOffsetAttribute->offset = uint64_t(constVal->getValue());
+                getGLSLBindingOffsetTracker()->setBindingOffset(
+                    glslBindingAttribute->binding,
+                    glslOffsetAttribute->offset);
+            }
+        }
+        else
+        {
+            getSink()->diagnose(glslOffsetAttribute, Diagnostics::missingLayoutBindingModifier);
+        }
+    }
 
     postProcessingOnModifiers(syntaxNode->modifiers);
 }
