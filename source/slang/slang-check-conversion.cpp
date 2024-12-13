@@ -1327,7 +1327,7 @@ bool SemanticsVisitor::_coerce(
                 // For general types of implicit conversions, we issue a warning, unless `fromExpr`
                 // is a known constant and we know it won't cause a problem.
                 bool shouldEmitGeneralWarning = true;
-                if (isScalarIntegerType(toType))
+                if (isScalarIntegerType(toType) || isHalfType(toType))
                 {
                     if (auto intVal = tryFoldIntegerConstantExpression(
                             fromExpr,

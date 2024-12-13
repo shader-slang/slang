@@ -108,7 +108,7 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(result == SLANG_OK);
     SLANG_CHECK(val == 1024);
     SLANG_CHECK(
-        funcReflection->findUserAttributeByName(globalSession.get(), "MyFuncProperty") ==
+        funcReflection->findAttributeByName(globalSession.get(), "MyFuncProperty") ==
         userAttribute);
 
     // Check overloaded method resolution

@@ -1127,6 +1127,10 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
     {
         _requireGLSLExtension(toSlice("GL_EXT_fragment_shading_rate_primitive"));
     }
+    else if (name == "gl_DrawID")
+    {
+        _requireGLSLVersion(460);
+    }
 }
 
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)
@@ -2943,6 +2947,45 @@ void GLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
     {
         Super::emitFuncDecorationImpl(decoration);
     }
+}
+
+void GLSLSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
+{
+    m_writer->emit("bitfieldExtract(");
+
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit(",");
+
+    m_writer->emit("int(");
+    emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+    m_writer->emit(")");
+    m_writer->emit(",");
+
+    m_writer->emit("int(");
+    emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+    m_writer->emit("))");
+}
+
+void GLSLSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
+{
+    m_writer->emit("bitfieldInsert(");
+
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit(",");
+
+    emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+    m_writer->emit(",");
+
+    m_writer->emit("int(");
+    emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+    m_writer->emit(")");
+    m_writer->emit(",");
+
+    m_writer->emit("int(");
+    emitOperand(inst->getOperand(3), getInfo(EmitOp::General));
+    m_writer->emit(")");
+
+    m_writer->emit(")");
 }
 
 void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)

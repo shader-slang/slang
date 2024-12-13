@@ -479,13 +479,13 @@ bool Test_ScalarType()
         // CHECK_GLSL-COUNT-2: bitfieldExtract(
         // CHECK_SPIR: OpBitFieldSExtract{{ }}
         // CHECK_SPIR: OpBitFieldUExtract{{ }}
-        && genIType(0) == bitfieldExtract(genIType(zero), int(zero), int(zero))
-        && genUType(0) == bitfieldExtract(genUType(zero), int(zero), int(zero))
+        && genIType(0) == bitfieldExtract(genIType(zero), uint(zero), uint(zero))
+        && genUType(0) == bitfieldExtract(genUType(zero), uint(zero), uint(zero))
 
         // CHECK_GLSL-COUNT-2: bitfieldInsert(
         // CHECK_SPIR-COUNT-2: OpBitFieldInsert{{ }}
-        && genIType(0) == bitfieldInsert(genIType(zero), genIType(zero), int(zero), int(zero))
-        && genUType(0) == bitfieldInsert(genUType(zero), genUType(zero), int(zero), int(zero))
+        && genIType(0) == bitfieldInsert(genIType(zero), genIType(zero), uint(zero), uint(zero))
+        && genUType(0) == bitfieldInsert(genUType(zero), genUType(zero), uint(zero), uint(zero))
 
         // CHECK_GLSL-COUNT-2: bitfieldReverse(
         // CHECK_SPIR-COUNT-2: OpBitReverse{{ }}
@@ -1062,15 +1062,15 @@ bool Test_VectorType()
         // CHECK_SPIR-NOT: OpBitFieldSExtract{{ }}
         // CHECK_SPIR: OpBitFieldUExtract{{ }}
         // CHECK_SPIR-NOT: OpBitFieldUExtract{{ }}
-        && genIType(0) == bitfieldExtract(genIType(zero), int(zero), int(zero))
-        && genUType(0) == bitfieldExtract(genUType(zero), int(zero), int(zero))
+        && genIType(0) == bitfieldExtract(genIType(zero), uint(zero), uint(zero))
+        && genUType(0) == bitfieldExtract(genUType(zero), uint(zero), uint(zero))
 
         // CHECK_GLSL-COUNT-2: bitfieldInsert(
         // CHECK_GLSL-NOT: bitfieldInsert(
         // CHECK_SPIR-COUNT-2: OpBitFieldInsert{{ }}
         // CHECK_SPIR-NOT: OpBitFieldInsert{{ }}
-        && genIType(0) == bitfieldInsert(genIType(zero), genIType(zero), int(zero), int(zero))
-        && genUType(0) == bitfieldInsert(genUType(zero), genUType(zero), int(zero), int(zero))
+        && genIType(0) == bitfieldInsert(genIType(zero), genIType(zero), uint(zero), uint(zero))
+        && genUType(0) == bitfieldInsert(genUType(zero), genUType(zero), uint(zero), uint(zero))
 
         // CHECK_GLSL-COUNT-2: bitfieldReverse(
         // CHECK_GLSL-NOT: bitfieldReverse(

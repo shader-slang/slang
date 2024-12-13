@@ -230,26 +230,6 @@ public:
             lastErrorLoc = loc;
         }
     }
-
-public:
-    void setBindingOffset(int binding, int64_t byteOffset)
-    {
-        bindingToByteOffset.set(binding, byteOffset);
-    }
-    int64_t getNextBindingOffset(int binding)
-    {
-        int64_t currentOffset;
-        if (bindingToByteOffset.addIfNotExists(binding, 0))
-            currentOffset = 0;
-        else
-            currentOffset = bindingToByteOffset.getValue(binding) + sizeof(uint32_t);
-
-        bindingToByteOffset.set(binding, currentOffset + sizeof(uint32_t));
-        return currentOffset;
-    }
-
-private:
-    Dictionary<int, int64_t> bindingToByteOffset;
 };
 
 // Forward Declarations
@@ -1033,6 +1013,49 @@ static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierL
         // Read the second ]
         parser->ReadToken(TokenType::RBracket);
     }
+}
+
+static Modifier* parseUncheckedGLSLLayoutAttribute(Parser* parser, NameLoc& nameLoc)
+{
+    // Only valued GLSL layout qualifiers should be parsed here.
+    if (!AdvanceIf(parser, TokenType::OpAssign))
+    {
+        return parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
+    }
+
+    UncheckedGLSLLayoutAttribute* attr;
+
+    if (nameLoc.name->text == "binding")
+    {
+        // An explicit type for binding is used so that it can be looked up quickly
+        // through the list builder when implicitly injecting an offset qualifier.
+        attr = parser->astBuilder->create<UncheckedGLSLBindingLayoutAttribute>();
+    }
+    else if (nameLoc.name->text == "offset")
+    {
+        // An explicit type for offset is used so that it can be looked up quickly
+        // through the list builder when implicitly injecting an offset qualifier.
+        attr = parser->astBuilder->create<UncheckedGLSLOffsetLayoutAttribute>();
+    }
+    else if (nameLoc.name->text == "set")
+    {
+        attr = parser->astBuilder->create<UncheckedGLSLSetLayoutAttribute>();
+    }
+    else
+    {
+        attr = parser->astBuilder->create<UncheckedGLSLLayoutAttribute>();
+    }
+
+    attr->keywordName = nameLoc.name;
+    attr->loc = nameLoc.loc;
+
+    Expr* arg = parser->ParseArgExpr();
+    if (arg)
+    {
+        attr->args.add(arg);
+    }
+
+    return attr;
 }
 
 static TokenType peekTokenType(Parser* parser)
@@ -4574,9 +4597,16 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     auto declRefExpr = as<DeclRefExpr>(varDeclBase->type.exp);
     if (!declRefExpr)
         return;
-    auto bindingMod = modifiers->findModifier<GLSLBindingAttribute>();
+
+    AttributeBase* bindingMod = modifiers->findModifier<GLSLBindingAttribute>();
     if (!bindingMod)
+    {
+        bindingMod = modifiers->findModifier<UncheckedGLSLBindingLayoutAttribute>();
+    }
+    if (!bindingMod)
+    {
         return;
+    }
 
     // here is a problem; we link types into a literal in IR stage post parse
     // but, order (top down) mattter when parsing atomic_uint offset
@@ -4587,14 +4617,10 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     {
         if (name->text.equals("atomic_uint"))
         {
-            if (!modifiers->findModifier<GLSLOffsetLayoutAttribute>())
+            if (!modifiers->findModifier<UncheckedGLSLOffsetLayoutAttribute>())
             {
-                const int64_t nextOffset = parser->getNextBindingOffset(bindingMod->binding);
-                GLSLOffsetLayoutAttribute* modifier =
-                    parser->astBuilder->create<GLSLOffsetLayoutAttribute>();
-                modifier->keywordName = NULL;    // no keyword name given
-                modifier->loc = bindingMod->loc; // has no location in file, set to parent binding
-                modifier->offset = nextOffset;
+                auto* modifier = parser->astBuilder->create<GLSLImplicitOffsetLayoutAttribute>();
+                modifier->loc = bindingMod->loc; // has no location in file, set to parent
 
                 Modifiers newModifier;
                 newModifier.first = modifier;
@@ -5783,6 +5809,27 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     FillPosition(varDeclrStatement);
     auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
     varDeclrStatement->decl = decl;
+
+    if (as<VarDeclBase>(decl))
+    {
+    }
+    else if (as<DeclGroup>(decl))
+    {
+    }
+    else if (as<AggTypeDecl>(decl))
+    {
+    }
+    else if (as<TypeDefDecl>(decl))
+    {
+    }
+    else if (as<UsingDecl>(decl))
+    {
+    }
+    else
+    {
+        sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
+    }
+
     return varDeclrStatement;
 }
 
@@ -5932,21 +5979,24 @@ ForStmt* Parser::ParseForStatement()
     FillPosition(stmt);
     ReadToken("for");
     ReadToken(TokenType::LParent);
-    auto modifiers = ParseModifiers(this);
-    if (peekTypeName(this) || !modifiers.isEmpty())
+    if (!LookAheadToken(TokenType::Semicolon))
     {
-        stmt->initialStatement = parseVarDeclrStatement(modifiers);
-    }
-    else
-    {
-        if (!LookAheadToken(TokenType::Semicolon))
+        stmt->initialStatement = ParseStatement();
+        if (as<DeclStmt>(stmt->initialStatement) || as<ExpressionStmt>(stmt->initialStatement))
         {
-            stmt->initialStatement = ParseExpressionStatement();
+            // These are the only allowed form of initial statements of a for loop.
         }
         else
         {
-            ReadToken(TokenType::Semicolon);
+            sink->diagnose(
+                stmt->initialStatement->loc,
+                Diagnostics::unexpectedTokenExpectedTokenType,
+                "expression");
         }
+    }
+    else
+    {
+        ReadToken(TokenType::Semicolon);
     }
     if (!LookAheadToken(TokenType::Semicolon))
         stmt->predicateExpression = ParseExpression();
@@ -8417,36 +8467,6 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 inputAttachmentIndexLayoutAttribute->location = intVal;
             }
         }
-        else if (nameText == "binding" || nameText == "set")
-        {
-            GLSLBindingAttribute* attr = listBuilder.find<GLSLBindingAttribute>();
-            if (!attr)
-            {
-                attr = parser->astBuilder->create<GLSLBindingAttribute>();
-                listBuilder.add(attr);
-            }
-
-            parser->ReadToken(TokenType::OpAssign);
-
-            // If the token asked for is not returned found will put in recovering state, and return
-            // token found
-            Token valToken = parser->ReadToken(TokenType::IntegerLiteral);
-            // If wasn't the desired IntegerLiteral return that couldn't parse
-            if (valToken.type == TokenType::IntegerLiteral)
-            {
-                // Work out the value
-                auto value = getIntegerLiteralValue(valToken);
-
-                if (nameText == "binding")
-                {
-                    attr->binding = int32_t(value);
-                }
-                else
-                {
-                    attr->set = int32_t(value);
-                }
-            }
-        }
         else if (findImageFormatByName(nameText.getUnownedSlice(), &format))
         {
             auto attr = parser->astBuilder->create<FormatAttribute>();
@@ -8470,10 +8490,9 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
             CASE(std140, GLSLStd140Modifier)
             CASE(std430, GLSLStd430Modifier)
             CASE(scalar, GLSLScalarModifier)
-            CASE(offset, GLSLOffsetLayoutAttribute)
             CASE(location, GLSLLocationLayoutModifier)
             {
-                modifier = parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
+                modifier = parseUncheckedGLSLLayoutAttribute(parser, nameAndLoc);
             }
             SLANG_ASSERT(modifier);
 #undef CASE
@@ -8489,28 +8508,18 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 if (AdvanceIf(parser, TokenType::OpAssign))
                     glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
             }
-            // Special handling for GLSLOffsetLayoutAttribute to add to the byte offset tracker at a
-            // binding location
-            else if (auto glslOffset = as<GLSLOffsetLayoutAttribute>(modifier))
-            {
-                if (auto binding = listBuilder.find<GLSLBindingAttribute>())
-                {
-                    // all GLSLOffsetLayoutAttribute have an OpAssign with value token
-                    parser->ReadToken(TokenType::OpAssign);
-                    glslOffset->offset = int64_t(
-                        getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral)));
-                    parser->setBindingOffset(binding->binding, glslOffset->offset);
-                }
-                else
-                {
-                    parser->diagnose(modifier->loc, Diagnostics::missingLayoutBindingModifier);
-                }
-            }
             else if (auto specConstAttr = as<VkConstantIdAttribute>(modifier))
             {
                 parser->ReadToken(TokenType::OpAssign);
                 specConstAttr->location =
                     (int)getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral));
+            }
+
+            if (as<GLSLUnparsedLayoutModifier>(modifier))
+            {
+                parser->diagnose(
+                    modifier,
+                    Diagnostics::unrecognizedGLSLLayoutQualifierOrRequiresAssignment);
             }
 
             listBuilder.add(modifier);

@@ -429,7 +429,14 @@ void calcRequiredLoweringPassSet(
     {
         // If any instruction has an interface type, we need to run
         // the generics lowering pass.
-        auto type = inst->getDataType();
+        auto type = as<IRType>(inst) ? inst : inst->getDataType();
+        for (;;)
+        {
+            if (auto ptrType = as<IRPtrTypeBase>(type))
+                type = ptrType->getValueType();
+            else
+                break;
+        }
         if (type && type->getOp() == kIROp_InterfaceType)
         {
             result.generics = true;

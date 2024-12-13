@@ -5953,7 +5953,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         if (auto maxItersAttr = stmt->findModifier<MaxItersAttribute>())
         {
-            getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
+            auto iters = lowerVal(context, maxItersAttr->value);
+            getBuilder()->addLoopMaxItersDecoration(inst, getSimpleVal(context, iters));
         }
         else if (auto inferredMaxItersAttr = stmt->findModifier<InferredMaxItersAttribute>())
         {
@@ -6043,12 +6044,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             if (auto maxIters = stmt->findModifier<MaxItersAttribute>())
             {
-                if (inferredMaxIters->value < maxIters->value)
+                if (auto constIntVal = as<ConstantIntVal>(maxIters->value))
                 {
-                    context->getSink()->diagnose(
-                        maxIters,
-                        Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
-                        inferredMaxIters->value);
+                    if (inferredMaxIters->value < constIntVal->getValue())
+                    {
+                        context->getSink()->diagnose(
+                            maxIters,
+                            Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
+                            inferredMaxIters->value);
+                    }
                 }
             }
         }
@@ -11477,6 +11481,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
+        // We don't allow recursive types.
+        checkForRecursiveTypes(module, compileRequest->getSink());
+
+        if (compileRequest->getSink()->getErrorCount() != 0)
+            return module;
+
         // Propagate `constexpr`-ness through the dataflow graph (and the
         // call graph) based on constraints imposed by different instructions.
         propagateConstExpr(module, compileRequest->getSink());
@@ -11488,10 +11498,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // instructions remain.
 
         checkForMissingReturns(module, compileRequest->getSink());
-
-        // We don't allow recursive types.
-        checkForRecursiveTypes(module, compileRequest->getSink());
-
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 

@@ -3285,6 +3285,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return nullptr;
     }
 
+    SpvInst* emitMakeUInt64(SpvInstParent* parent, IRInst* inst)
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto vec = emitOpCompositeConstruct(
+            parent,
+            nullptr,
+            builder.getVectorType(builder.getUIntType(), 2),
+            inst->getOperand(0),
+            inst->getOperand(1));
+        return emitOpBitcast(parent, inst, inst->getDataType(), vec);
+    }
+
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
@@ -3390,6 +3403,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_PtrCast:
         case kIROp_BitCast:
             result = emitOpBitcast(parent, inst, inst->getDataType(), inst->getOperand(0));
+            break;
+        case kIROp_BitfieldExtract:
+            result = emitBitfieldExtract(parent, inst);
+            break;
+        case kIROp_BitfieldInsert:
+            result = emitBitfieldInsert(parent, inst);
+            break;
+        case kIROp_MakeUInt64:
+            result = emitMakeUInt64(parent, inst);
             break;
         case kIROp_Add:
         case kIROp_Sub:
@@ -5137,6 +5159,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     // float in hlsl & glsl
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPointSize, inst);
                 }
+                else if (semanticName == "sv_drawindex")
+                {
+                    requireSPIRVCapability(SpvCapabilityDrawParameters);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInDrawIndex, inst);
+                }
                 else if (semanticName == "sv_primitiveid")
                 {
                     auto entryPoints = m_referencingEntryPoints.tryGetValue(inst);
@@ -6514,6 +6541,60 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst->getFullType(),
             kResultID,
             inst->getOperand(0));
+    }
+
+    SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst)
+    {
+        auto dataType = inst->getDataType();
+        IRVectorType* vectorType = as<IRVectorType>(dataType);
+        Slang::IRType* elementType = dataType;
+        if (vectorType)
+            elementType = vectorType->getElementType();
+
+        const IntInfo i = getIntTypeInfo(elementType);
+
+        // NM: technically, using bitfield intrinsics for anything non-32-bit goes against
+        // VK specification: VUID-StandaloneSpirv-Base-04781. However, it works on at least
+        // NVIDIA HW.
+        SpvOp opcode = i.isSigned ? SpvOpBitFieldSExtract : SpvOpBitFieldUExtract;
+        return emitInst(
+            parent,
+            inst,
+            opcode,
+            inst->getFullType(),
+            kResultID,
+            inst->getOperand(0),
+            inst->getOperand(1),
+            inst->getOperand(2));
+    }
+
+    SpvInst* emitBitfieldInsert(SpvInstParent* parent, IRInst* inst)
+    {
+        auto dataType = inst->getDataType();
+        IRVectorType* vectorType = as<IRVectorType>(dataType);
+        Slang::IRType* elementType = dataType;
+        if (vectorType)
+            elementType = vectorType->getElementType();
+
+        const IntInfo i = getIntTypeInfo(elementType);
+
+        if (i.width == 64)
+            requireSPIRVCapability(SpvCapabilityInt64);
+        if (i.width == 16)
+            requireSPIRVCapability(SpvCapabilityInt16);
+        if (i.width == 8)
+            requireSPIRVCapability(SpvCapabilityInt8);
+
+        return emitInst(
+            parent,
+            inst,
+            SpvOpBitFieldInsert,
+            inst->getFullType(),
+            kResultID,
+            inst->getOperand(0),
+            inst->getOperand(1),
+            inst->getOperand(2),
+            inst->getOperand(3));
     }
 
     template<typename T, typename Ts>
