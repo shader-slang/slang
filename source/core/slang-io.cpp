@@ -185,7 +185,7 @@ namespace Slang
 
 bool File::exists(const String& fileName)
 {
-#if defined(_WIN32) && !defined(__MINGW32__ )
+#if defined(_WIN32) && !defined(__MINGW32__)
     struct _stat32 statVar;
     return ::_wstat32(((String)fileName).toWString(), &statVar) != -1;
 #else
@@ -640,7 +640,7 @@ bool Path::createDirectoryRecursive(const String& path)
 
 /* static */ SlangResult Path::getPathType(const String& path, SlangPathType* pathTypeOut)
 {
-#if defined(_WIN32) && !defined(__MINGW32__ )
+#if defined(_WIN32) && !defined(__MINGW32__)
     // https://msdn.microsoft.com/en-us/library/14h5k7ff.aspx
     struct _stat32 statVar;
     if (::_wstat32(String(path).toWString(), &statVar) == 0)

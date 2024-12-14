@@ -105,7 +105,7 @@ inline void strncpy_s(
 {
     strncpy(strDestination, strSource, count);
 }
-#elif defined(__MINGW32__ )
+#elif defined(__MINGW32__)
 #include <stdio.h>
 inline size_t fread_s(
     void* buffer,
