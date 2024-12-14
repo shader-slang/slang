@@ -1,9 +1,14 @@
 #pragma once
 
+#include <emscripten.h>
 #include <emscripten/val.h>
+#include <optional>
 #include <slang-com-ptr.h>
 #include <slang.h>
+#include <string>
 #include <unordered_map>
+#include <vector>
+#include <stdint.h>
 
 /**
 The web assembly binding here is designed to make javascript code as simple and native as possible.
@@ -34,6 +39,14 @@ namespace slang
 namespace wgsl
 {
 
+class TypeLayoutReflection;
+class TypeReflection;
+class VariableLayoutReflection;
+class VariableReflection;
+class FunctionReflection;
+class GenericReflection;
+
+
 class Error
 {
 public:
@@ -51,11 +64,93 @@ Error getLastError();
 // in the form of [{name: STRING, value: INT}, ...].
 emscripten::val getCompileTargets();
 
+class DeclReflection
+{
+public:
+    std::string getName();
+    slang::DeclReflection::Kind getKind();
+    uint32_t getChildrenCount();
+    slang::wgsl::DeclReflection* getChild(uint32_t index);
+    slang::wgsl::TypeReflection* getType();
+    slang::wgsl::VariableReflection* asVariable();
+    slang::wgsl::FunctionReflection* asFunction();
+    slang::wgsl::GenericReflection* asGeneric();
+    slang::wgsl::DeclReflection* getParent();
+
+    slang::DeclReflection* interface() const { return (slang::DeclReflection*)this; };
+};
+
+class GenericReflection
+{
+
+public:
+    std::string getName();
+    slang::wgsl::DeclReflection* asDecl();
+    uint32_t getTypeParameterCount();
+    slang::wgsl::VariableReflection* getTypeParameter(unsigned index);
+    uint32_t getValueParameterCount();
+    slang::wgsl::VariableReflection* getValueParameter(unsigned index);
+    // uint32_t getTypeParameterConstraintCount(VariableReflection* typeParam);
+    // slang::wgsl::TypeReflection* getTypeParameterConstraintType(
+    //     VariableReflection* typeParam,
+    //     unsigned index);
+    slang::wgsl::DeclReflection* getInnerDecl();
+    SlangDeclKind getInnerKind();
+    slang::wgsl::GenericReflection* getOuterGenericContainer();
+    // TypeReflection* getConcreteType(slang::wgsl::VariableReflection* typeParam);
+    // int64_t getConcreteIntVal(slang::wgsl::VariableReflection* valueParam);
+    // GenericReflection* applySpecializations(slang::wgsl::GenericReflection* generic);
+
+    slang::GenericReflection* interface() const { return (slang::GenericReflection*)this; };
+};
+
+class TypeReflection
+{
+
+public:
+    slang::TypeReflection::ScalarType getScalarType();
+    slang::TypeReflection::Kind getKind();
+    uint32_t getFieldCount();
+    slang::wgsl::VariableReflection* getFieldByIndex(uint32_t index);
+
+    slang::TypeReflection* interface() const { return (slang::TypeReflection*)this; };
+};
+
+
+class UserAttribute
+{
+
+public:
+    std::string getName();
+    uint32_t getArgumentCount();
+    float getArgumentValueFloat(uint32_t index);
+    slang::wgsl::TypeReflection* getArgumentType(uint32_t index);
+    slang::UserAttribute* interface() const { return (slang::UserAttribute*)this; };
+};
+
+
+class VariableReflection
+{
+public:
+    std::string getName();
+    slang::wgsl::TypeReflection* getType();
+    Modifier* findModifier(Modifier::ID id);
+    uint32_t getUserAttributeCount();
+    slang::wgsl::UserAttribute* getUserAttributeByIndex(uint32_t index);
+    // slang::wgsl::UserAttribute* findUserAttributeByName(SlangSession* globalSession, std::string
+    // name);
+    bool hasDefaultValue();
+    // slang::wgsl::GenericReflection* getGenericContainer();
+    // slang::wgsl::VariableReflection* applySpecializations(slang::wgsl::GenericReflection*
+    // generic);
+    slang::VariableReflection* interface() const { return (slang::VariableReflection*)this; }
+};
+
+
 class TypeLayoutReflection
 {
 public:
-    BindingType getDescriptorSetDescriptorRangeType(unsigned int setIndex, unsigned int rangeIndex);
-
+    BindingType getDescriptorSetDescriptorRangeType(uint32_t setIndex, uint32_t rangeIndex);
     slang::TypeLayoutReflection* interface() const { return (slang::TypeLayoutReflection*)this; }
 };
 
@@ -64,7 +159,7 @@ class VariableLayoutReflection
 public:
     std::string getName();
     slang::wgsl::TypeLayoutReflection* getTypeLayout();
-    unsigned int getBindingIndex();
+    uint32_t getBindingIndex();
 
     slang::VariableLayoutReflection* interface() const
     {
@@ -78,24 +173,35 @@ class EntryPointReflection
 public:
     struct ThreadGroupSize
     {
-        unsigned int x;
-        unsigned int y;
-        unsigned int z;
+        uint32_t x;
+        uint32_t y;
+        uint32_t z;
     };
 
     ThreadGroupSize getComputeThreadGroupSize();
-    slang::EntryPointReflection* interface() const { return (slang::EntryPointReflection*)this; }
+    slang::EntryPointReflection* interface() const { return (slang::EntryPointReflection*)this; };
+};
+class FunctionReflection
+{
+
+public:
+    std::string getName();
+    uint32_t getUserAttributeCount();
+    slang::wgsl::UserAttribute* getUserAttributeByIndex(uint32_t index);
+    slang::FunctionReflection* interface() const { return (slang::FunctionReflection*)this; };
 };
 
 class ProgramLayout
 {
 public:
-    unsigned int getParameterCount();
-    slang::wgsl::VariableLayoutReflection* getParameterByIndex(unsigned int index);
+    uint32_t getParameterCount();
+    slang::wgsl::VariableLayoutReflection* getParameterByIndex(uint32_t index);
 
     slang::wgsl::TypeLayoutReflection* getGlobalParamsTypeLayout();
 
     slang::wgsl::EntryPointReflection* findEntryPointByName(std::string name);
+
+    slang::wgsl::FunctionReflection* findFunctionByName(std::string name);
 
     slang::ProgramLayout* interface() const { return (slang::ProgramLayout*)this; }
 
@@ -127,7 +233,7 @@ public:
     // Returns UInt8Array or null.
     emscripten::val getTargetCodeBlob(int targetIndex);
 
-    slang::wgsl::ProgramLayout* getLayout(unsigned int targetIndex);
+    slang::wgsl::ProgramLayout* getLayout(uint32_t targetIndex);
 
     slang::IComponentType* interface() const { return m_interface; }
 

@@ -45,6 +45,21 @@ EMSCRIPTEN_BINDINGS(slang)
             "getDescriptorSetDescriptorRangeType",
             &slang::wgsl::TypeLayoutReflection::getDescriptorSetDescriptorRangeType);
 
+    class_<slang::wgsl::VariableReflection>("VariableReflection")
+        .function("getName", &slang::wgsl::VariableReflection::getName)
+        .function(
+            "findModifier",
+            &slang::wgsl::VariableReflection::findModifier,
+            allow_raw_pointers())
+        .function("getType", &slang::wgsl::VariableReflection::getType, allow_raw_pointers())
+        .function("getUserAttributeCount", &slang::wgsl::VariableReflection::getUserAttributeCount)
+        .function(
+            "getUserAttributeByIndex",
+            &slang::wgsl::VariableReflection::getUserAttributeByIndex,
+            allow_raw_pointers())
+        .function("hasDefaultValue", &slang::wgsl::VariableReflection::hasDefaultValue);
+
+
     class_<slang::wgsl::VariableLayoutReflection>("VariableLayoutReflection")
         .function("getName", &slang::wgsl::VariableLayoutReflection::getName)
         .function(
@@ -52,6 +67,111 @@ EMSCRIPTEN_BINDINGS(slang)
             &slang::wgsl::VariableLayoutReflection::getTypeLayout,
             allow_raw_pointers())
         .function("getBindingIndex", &slang::wgsl::VariableLayoutReflection::getBindingIndex);
+
+    class_<slang::wgsl::GenericReflection>("GenericReflection")
+        .function("getName", &slang::wgsl::GenericReflection::getName)
+        .function("getTypeParameterCount", &slang::wgsl::GenericReflection::getTypeParameterCount)
+        .function("getValueParameterCount", &slang::wgsl::GenericReflection::getValueParameterCount)
+        .function("getInnerKind", &slang::wgsl::GenericReflection::getInnerKind)
+        .function("asDecl", &slang::wgsl::GenericReflection::asDecl, allow_raw_pointers())
+        // .function(
+        //     "getTypeParameterConstraintCount",
+        //     &slang::wgsl::GenericReflection::getTypeParameterConstraintCount,
+        //     allow_raw_pointers())
+        .function(
+            "getTypeParameter",
+            &slang::wgsl::GenericReflection::getTypeParameter,
+            allow_raw_pointers())
+        .function(
+            "getValueParameter",
+            &slang::wgsl::GenericReflection::getValueParameter,
+            allow_raw_pointers())
+        .function(
+            "getInnerDecl",
+            &slang::wgsl::GenericReflection::getInnerDecl,
+            allow_raw_pointers())
+        .function(
+            "getOuterGenericContainer",
+            &slang::wgsl::GenericReflection::getOuterGenericContainer,
+            allow_raw_pointers());
+
+    enum_<SlangDeclKind>("SlangDeclKind")
+        .value(
+            "SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION",
+            SlangDeclKind::SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION)
+        .value("SLANG_DECL_KIND_STRUCT", SlangDeclKind::SLANG_DECL_KIND_STRUCT)
+        .value("SLANG_DECL_KIND_FUNC", SlangDeclKind::SLANG_DECL_KIND_FUNC)
+        .value("SLANG_DECL_KIND_MODULE", SlangDeclKind::SLANG_DECL_KIND_MODULE)
+        .value("SLANG_DECL_KIND_GENERIC", SlangDeclKind::SLANG_DECL_KIND_GENERIC)
+        .value("SLANG_DECL_KIND_VARIABLE", SlangDeclKind::SLANG_DECL_KIND_VARIABLE)
+        .value("SLANG_DECL_KIND_NAMESPACE", SlangDeclKind::SLANG_DECL_KIND_NAMESPACE);
+
+    class_<slang::wgsl::DeclReflection>("DeclReflection")
+        .function("getName", &slang::wgsl::DeclReflection::getName)
+        .function("getChildrenCount", &slang::wgsl::DeclReflection::getChildrenCount)
+        .function("getKind", &slang::wgsl::DeclReflection::getKind)
+        .function("getChild", &slang::wgsl::DeclReflection::getChild, allow_raw_pointers())
+        .function("getType", &slang::wgsl::DeclReflection::getType, allow_raw_pointers())
+        .function("asVariable", &slang::wgsl::DeclReflection::asVariable, allow_raw_pointers())
+        .function("asFunction", &slang::wgsl::DeclReflection::asFunction, allow_raw_pointers())
+        .function("asGeneric", &slang::wgsl::DeclReflection::asGeneric, allow_raw_pointers())
+        .function("getParent", &slang::wgsl::DeclReflection::getParent, allow_raw_pointers());
+
+    enum_<slang::DeclReflection::Kind>("DeclReflectionKind")
+        .value("Unsupported", slang::DeclReflection::Kind::Unsupported)
+        .value("Struct", slang::DeclReflection::Kind::Struct)
+        .value("Func", slang::DeclReflection::Kind::Func)
+        .value("Module", slang::DeclReflection::Kind::Module)
+        .value("Generic", slang::DeclReflection::Kind::Generic)
+        .value("Variable", slang::DeclReflection::Kind::Variable)
+        .value("Namespace", slang::DeclReflection::Kind::Namespace);
+
+
+    class_<slang::wgsl::TypeReflection>("TypeReflection")
+        .function("getScalarType", &slang::wgsl::TypeReflection::getScalarType)
+        .function("getKind", &slang::wgsl::TypeReflection::getKind);
+
+    enum_<slang::TypeReflection::Kind>("TypeReflectionKind")
+        .value("None", slang::TypeReflection::Kind::None)
+        .value("Struct", slang::TypeReflection::Kind::Struct)
+        .value("Array", slang::TypeReflection::Kind::Array)
+        .value("Matrix", slang::TypeReflection::Kind::Matrix)
+        .value("Vector", slang::TypeReflection::Kind::Vector)
+        .value("Scalar", slang::TypeReflection::Kind::Scalar)
+        .value("ConstantBuffer", slang::TypeReflection::Kind::ConstantBuffer)
+        .value("Resource", slang::TypeReflection::Kind::Resource)
+        .value("SamplerState", slang::TypeReflection::Kind::SamplerState)
+        .value("TextureBuffer", slang::TypeReflection::Kind::TextureBuffer)
+        .value("ShaderStorageBuffer", slang::TypeReflection::Kind::ShaderStorageBuffer)
+        .value("ParameterBlock", slang::TypeReflection::Kind::ParameterBlock)
+        .value("GenericTypeParameter", slang::TypeReflection::Kind::GenericTypeParameter)
+        .value("Interface", slang::TypeReflection::Kind::Interface)
+        .value("OutputStream", slang::TypeReflection::Kind::OutputStream)
+        .value("Specialized", slang::TypeReflection::Kind::Specialized)
+        .value("Feedback", slang::TypeReflection::Kind::Feedback)
+        .value("Pointer", slang::TypeReflection::Kind::Pointer)
+        .value("DynamicResource", slang::TypeReflection::Kind::DynamicResource);
+
+
+    class_<slang::wgsl::UserAttribute>("UserAttribute")
+        .function("getName", &slang::wgsl::UserAttribute::getName)
+        .function("getArgumentCount", &slang::wgsl::UserAttribute::getArgumentCount)
+        .function(
+            "getArgumentType",
+            &slang::wgsl::UserAttribute::getArgumentType,
+            allow_raw_pointers())
+        .function(
+            "getArgumentValueFloat",
+            &slang::wgsl::UserAttribute::getArgumentValueFloat,
+            allow_raw_pointers());
+
+    class_<slang::wgsl::FunctionReflection>("FunctionReflection")
+        .function("getName", &slang::wgsl::FunctionReflection::getName)
+        .function("getUserAttributeCount", &slang::wgsl::FunctionReflection::getUserAttributeCount)
+        .function(
+            "getUserAttributeByIndex",
+            &slang::wgsl::FunctionReflection::getUserAttributeByIndex,
+            allow_raw_pointers());
 
     class_<slang::wgsl::EntryPointReflection>("EntryPointReflection")
         .function(
@@ -77,6 +197,10 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "findEntryPointByName",
             &slang::wgsl::ProgramLayout::findEntryPointByName,
+            allow_raw_pointers())
+        .function(
+            "findFunctionByName",
+            &slang::wgsl::ProgramLayout::findFunctionByName,
             allow_raw_pointers());
 
     enum_<slang::BindingType>("BindingType")
