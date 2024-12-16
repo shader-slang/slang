@@ -4,7 +4,7 @@
 /** \file slang.h
 
 The Slang API provides services to compile, reflect, and specialize code
-written in the Slang shading language.
+written in the Slang shading language. TEST
 */
 
 /*
