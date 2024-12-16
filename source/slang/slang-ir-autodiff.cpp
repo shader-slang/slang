@@ -868,6 +868,65 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
 
         return result;
     }
+    else if (auto typePack = as<IRTypePack>(primalType))
+    {
+        // Lower DiffPair(TypePack(a_0, a_1, ...), MakeWitnessPack(w_0, w_1, ...)) as
+        // TypePack(DiffPair(a_0, w_0), DiffPair(a_1, w_1), ...)
+        //
+        auto cacheKey = primalType;
+        if (pairTypeCache.tryGetValue(cacheKey, result))
+            return result;
+
+        auto packWitness = pairType->getWitness();
+
+        // Right now we only support concrete witness tables for type packs.
+        auto concretePackWitness = as<IRWitnessTable>(packWitness);
+        SLANG_ASSERT(concretePackWitness);
+
+        // Get diff type pack.
+        IRTypePack* diffTypePack = nullptr;
+
+        if (concretePackWitness->getConformanceType() ==
+            this->sharedContext->differentiableInterfaceType)
+            diffTypePack = as<IRTypePack>(findWitnessTableEntry(
+                concretePackWitness,
+                this->sharedContext->differentialAssocTypeStructKey));
+        else if (
+            concretePackWitness->getConformanceType() ==
+            this->sharedContext->differentiablePtrInterfaceType)
+            diffTypePack = as<IRTypePack>(findWitnessTableEntry(
+                concretePackWitness,
+                this->sharedContext->differentialAssocRefTypeStructKey));
+        else
+            SLANG_UNEXPECTED("Unexpected witness table");
+
+        SLANG_ASSERT(diffTypePack);
+
+        List<IRType*> args;
+        for (UInt i = 0; i < typePack->getOperandCount(); i++)
+        {
+            auto type = (IRType*)typePack->getOperand(i);
+            auto diffType = (IRType*)typePack->getOperand(i);
+
+            if (pairTypeCache.tryGetValue(type, result))
+            {
+                args.add((IRType*)result);
+                continue;
+            }
+
+            // Lower the diff pair type.
+            auto loweredPairType = (IRType*)_createDiffPairType(type, diffType);
+
+            pairTypeCache.add(type, loweredPairType);
+            args.add(loweredPairType);
+        }
+
+        auto loweredTypePack = builder->getTypePack(args.getCount(), args.getBuffer());
+        // TODO: Unify the cache between the three cases.
+        pairTypeCache.add(cacheKey, loweredTypePack);
+
+        return loweredTypePack;
+    }
     else
     {
         auto cacheKey = primalType;

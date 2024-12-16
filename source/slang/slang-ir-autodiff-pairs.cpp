@@ -23,7 +23,7 @@ struct DiffPairLoweringPass : InstPassBase
         {
             auto pairType = as<IRDifferentialPairTypeBase>(makePairInst->getDataType());
             builder->setInsertBefore(makePairInst);
-            if (auto loweredPairType = lowerPairType(builder, pairType))
+            if (auto loweredPairType = (IRType*)lowerPairType(builder, pairType))
             {
                 if (isRuntimeType(pairType->getValueType()))
                 {
@@ -36,6 +36,52 @@ struct DiffPairLoweringPass : InstPassBase
                     makePairInst->replaceUsesWith(result);
                     makePairInst->removeAndDeallocate();
                     return result;
+                }
+                else if (auto typePack = as<IRTypePack>(pairType->getValueType()))
+                {
+                    // TODO: Do we need to flatten the packs here?
+
+                    // If the type is a type pack, then the value must be in
+                    // MakePair(MakeValuePack(p_0, p_1, ...), MakeValuePack(d_0, d_1, ...)) form
+                    // Convert it to MakeValuePack(MakePair(p_0, d_0), MakePair(p_1, d_1), ...)
+                    // and lower each MakePair.
+                    //
+
+                    // Primal pack
+                    auto primalValue = as<IRMakeValuePack>(makePairInst->getPrimalValue());
+                    SLANG_ASSERT(primalValue);
+
+                    // Differential pack
+                    auto diffValue = as<IRMakeValuePack>(makePairInst->getDifferentialValue());
+                    SLANG_ASSERT(diffValue);
+
+                    // Expect the lowered pair type to be a type pack of pair types.
+                    SLANG_ASSERT(as<IRTypePack>(loweredPairType));
+
+                    List<IRInst*> newValues;
+                    for (UInt i = 0; i < typePack->getOperandCount(); i++)
+                    {
+                        auto primalElement = primalValue->getOperand(i);
+                        auto diffElement = diffValue->getOperand(i);
+
+                        auto pairType = (IRType*)loweredPairType->getOperand(i);
+
+                        IRInst* operands[] = {primalElement, diffElement};
+
+                        auto loweredMakePair =
+                            builder->emitMakeStruct((IRType*)pairType, 2, operands);
+
+                        newValues.add(loweredMakePair);
+                    }
+
+                    auto newPack = builder->emitMakeValuePack(
+                        loweredPairType,
+                        newValues.getCount(),
+                        newValues.getBuffer());
+
+                    makePairInst->replaceUsesWith(newPack);
+                    makePairInst->removeAndDeallocate();
+                    return newPack;
                 }
                 else
                 {
