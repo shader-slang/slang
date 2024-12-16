@@ -263,29 +263,6 @@ class SharedModifiers : public Modifier
     SLANG_AST_CLASS(SharedModifiers)
 };
 
-
-// A GLSL `layout` modifier
-//
-// We use a distinct modifier for each key that
-// appears within the `layout(...)` construct,
-// and each key might have an optional value token.
-//
-// TODO: We probably want a notion of  "modifier groups"
-// so that we can recover good source location info
-// for modifiers that were part of the same vs.
-// different constructs.
-class GLSLLayoutModifier : public Modifier
-{
-    SLANG_ABSTRACT_AST_CLASS(GLSLLayoutModifier)
-
-
-    // The token used to introduce the modifier is stored
-    // as the `nameToken` field.
-
-    // TODO: may want to accept a full expression here
-    Token valToken;
-};
-
 // AST nodes to represent the begin/end of a `layout` modifier group
 class GLSLLayoutModifierGroupMarker : public Modifier
 {
@@ -302,29 +279,12 @@ class GLSLLayoutModifierGroupEnd : public GLSLLayoutModifierGroupMarker
     SLANG_AST_CLASS(GLSLLayoutModifierGroupEnd)
 };
 
-
-// We divide GLSL `layout` modifiers into those we have parsed
-// (in the sense of having some notion of their semantics), and
-// those we have not.
-class GLSLParsedLayoutModifier : public GLSLLayoutModifier
-{
-    SLANG_ABSTRACT_AST_CLASS(GLSLParsedLayoutModifier)
-};
-
-class GLSLUnparsedLayoutModifier : public GLSLLayoutModifier
+class GLSLUnparsedLayoutModifier : public Modifier
 {
     SLANG_AST_CLASS(GLSLUnparsedLayoutModifier)
 };
 
-
-// Specific cases for known GLSL `layout` modifiers that we need to work with
-
-class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier
-{
-    SLANG_AST_CLASS(GLSLLocationLayoutModifier)
-};
-
-class GLSLBufferDataLayoutModifier : public GLSLParsedLayoutModifier
+class GLSLBufferDataLayoutModifier : public Modifier
 {
     SLANG_AST_CLASS(GLSLBufferDataLayoutModifier)
 };
@@ -721,6 +681,70 @@ class UncheckedGLSLSetLayoutAttribute : public UncheckedGLSLLayoutAttribute
 class UncheckedGLSLOffsetLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     SLANG_AST_CLASS(UncheckedGLSLOffsetLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLInputAttachmentIndexLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLInputAttachmentIndexLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLLocationLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLLocationLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLIndexLayoutAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLIndexLayoutAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLConstantIdAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLConstantIdAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLRayPayloadAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLRayPayloadAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLRayPayloadInAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLRayPayloadInAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+
+class UncheckedGLSLHitObjectAttributesAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLHitObjectAttributesAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLCallablePayloadAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLCallablePayloadAttribute)
+
+    SLANG_UNREFLECTED
+};
+
+class UncheckedGLSLCallablePayloadInAttribute : public UncheckedGLSLLayoutAttribute
+{
+    SLANG_AST_CLASS(UncheckedGLSLCallablePayloadInAttribute)
 
     SLANG_UNREFLECTED
 };
