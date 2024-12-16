@@ -1213,8 +1213,21 @@ DIAGNOSTIC(
     Error,
     unrecognizedGLSLLayoutQualifierOrRequiresAssignment,
     "GLSL layout qualifier is unrecognized or requires assignment")
-
-
+DIAGNOSTIC(
+    31218,
+    Error,
+    specializationConstantMustBeScalar,
+    "specialization constant must be a scalar.")
+DIAGNOSTIC(
+    31219,
+    Error,
+    pushOrSpecializationConstantCannotBeStatic,
+    "push or specialization constants cannot be 'static'.")
+DIAGNOSTIC(
+    31220,
+    Error,
+    variableCannotBePushAndSpecializationConstant,
+    "'$0' cannot be a push constant and a specialization constant at the same time")
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
