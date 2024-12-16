@@ -5172,12 +5172,15 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             }
         }
 
-        // If any entry points were discovered, then we should emit the program with entrypoints linked.
+        // If any entry points were discovered, then we should emit the program with entrypoints
+        // linked.
         if (entryPointsDiscovered)
         {
-            RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
+            RefPtr<CompositeComponentType> composite =
+                new CompositeComponentType(linkage, components);
             ComPtr<IComponentType> linkedComponentType;
-            SLANG_RETURN_NULL_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
+            SLANG_RETURN_NULL_ON_FAIL(
+                composite->link(linkedComponentType.writeRef(), outDiagnostics));
             auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
                                       ->getTargetArtifact(targetIndex, outDiagnostics);
             if (targetArtifact)
