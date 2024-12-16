@@ -1658,7 +1658,24 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
         return InstPair(origFunc, fwdDecor->getForwardDerivativeFunc());
     }
 
-    auto diffFunc = transcribeFuncHeaderImpl(inBuilder, origFunc);
+    IRFunc* diffFunc = nullptr;
+
+    // If we're transcribing a function as a 'value' (i.e. maybe embedded in a generic, keep the
+    // insert location unchanges). If we're transcribing it as a declaration, we should
+    // insert into the module.
+    //
+    auto origOuterGen = as<IRGeneric>(findOuterGeneric(origFunc));
+    if (!origOuterGen || !(findInnerMostGenericReturnVal(origOuterGen) == origFunc))
+    {
+        // Dealing with a declaration.. insert into module scope.
+        IRBuilder subBuilder = *inBuilder;
+        subBuilder.setInsertInto(inBuilder->getModule());
+        diffFunc = transcribeFuncHeaderImpl(&subBuilder, origFunc);
+    }
+    else
+    {
+        diffFunc = transcribeFuncHeaderImpl(inBuilder, origFunc);
+    }
 
     if (auto outerGen = findOuterGeneric(diffFunc))
     {

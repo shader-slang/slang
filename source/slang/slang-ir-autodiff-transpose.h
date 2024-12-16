@@ -1241,8 +1241,12 @@ struct DiffTransposePass
             argRequiresLoad.add(false);
         }
 
-        auto revFnType = this->autodiffContext->transcriberSet.propagateTranscriber
-                             ->differentiateFunctionType(builder, baseFn, baseFnType);
+
+        auto revFnType =
+            this->autodiffContext->transcriberSet.propagateTranscriber->differentiateFunctionType(
+                builder,
+                getResolvedInstForDecorations(baseFn),
+                baseFnType);
 
         IRInst* revCallee = nullptr;
         if (getResolvedInstForDecorations(baseFn)->getOp() == kIROp_LookupWitness)

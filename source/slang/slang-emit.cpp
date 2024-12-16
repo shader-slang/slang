@@ -876,6 +876,7 @@ Result linkAndOptimizeIR(
     // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
     // lowering.
     //
+    if (!codeGenContext->isSpecializationDisabled())
     {
         SpecializationOptions specOptions;
         specOptions.lowerWitnessLookups = true;

@@ -249,9 +249,11 @@ struct DiffUnzipPass
         auto baseFn = _getOriginalFunc(mixedCall);
         SLANG_RELEASE_ASSERT(baseFn);
 
-        auto primalFuncType = autodiffContext->transcriberSet.primalTranscriber->transcribe(
-            primalBuilder,
-            baseFn->getDataType());
+        auto primalFuncType =
+            autodiffContext->transcriberSet.primalTranscriber->differentiateFunctionType(
+                primalBuilder,
+                baseFn,
+                as<IRFuncType>(baseFn->getDataType()));
 
         IRInst* intermediateType = getIntermediateType(primalBuilder, baseFn);
 
