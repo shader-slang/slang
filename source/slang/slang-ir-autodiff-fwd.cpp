@@ -828,7 +828,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         if (diffArg)
                         {
                             auto newDiffVal = afterBuilder.emitDifferentialPairGetDifferential(
-                                (IRType*)diffType,
+                                (IRType*)as<IRPtrTypeBase>(diffType)->getValueType(),
                                 newVal);
                             markDiffTypeInst(
                                 &afterBuilder,

@@ -1665,6 +1665,9 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
             //
             auto isPassthroughInst = [&](IRInst* inst)
             {
+                if (as<IRTerminatorInst>(inst))
+                    return false;
+
                 if (!canInstBeStored(inst))
                     return true;
 
@@ -1811,6 +1814,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
 
                 for (auto use : outOfScopeUses)
                 {
+                    // TODO: Prevent terminator insts from being treated as passthrough..
                     List<IndexTrackingInfo> useBlockIndices =
                         indexedBlockInfo[getBlock(use->getUser())];
                     setInsertBeforeOrdinaryInst(&builder, getInstInBlock(use->getUser()));
