@@ -11726,8 +11726,7 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             // Specialization constant.
             // Check that type is basic type.
-            if (!as<BasicExpressionType>(varDecl->getType()) &&
-                !as<ErrorType>(varDecl->getType()))
+            if (!as<BasicExpressionType>(varDecl->getType()) && !as<ErrorType>(varDecl->getType()))
             {
                 getSink()->diagnose(modifier, Diagnostics::specializationConstantMustBeScalar);
             }
@@ -11740,7 +11739,10 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
     if (hasSpecConstAttr && hasPushConstAttr)
     {
-        getSink()->diagnose(varDecl, Diagnostics::variableCannotBePushAndSpecializationConstant, varDecl->getName());
+        getSink()->diagnose(
+            varDecl,
+            Diagnostics::variableCannotBePushAndSpecializationConstant,
+            varDecl->getName());
     }
     if (hasSpecConstAttr || hasPushConstAttr)
     {
