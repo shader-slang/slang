@@ -64,12 +64,12 @@ struct DiffPairLoweringPass : InstPassBase
                         auto primalElement = primalValue->getOperand(i);
                         auto diffElement = diffValue->getOperand(i);
 
-                        auto pairType = (IRType*)loweredPairType->getOperand(i);
+                        auto loweredElementPairType = (IRType*)loweredPairType->getOperand(i);
 
                         IRInst* operands[] = {primalElement, diffElement};
 
                         auto loweredMakePair =
-                            builder->emitMakeStruct((IRType*)pairType, 2, operands);
+                            builder->emitMakeStruct((IRType*)loweredElementPairType, 2, operands);
 
                         newValues.add(loweredMakePair);
                     }
