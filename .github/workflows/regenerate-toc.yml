@@ -22,6 +22,11 @@ jobs:
           ref: ${{ github.event.client_payload.pull_request.base.ref }}
           path: target-branch
 
+      - name: Install Mono
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mono-complete
+
       - name: Regenerate Table of Contents
         id: regen
         run: |
