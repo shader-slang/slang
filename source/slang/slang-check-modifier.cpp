@@ -513,6 +513,17 @@ Modifier* SemanticsVisitor::validateAttribute(
 
         inputAttachmentIndexLayoutAttribute->location = location->getValue();
     }
+    else if (auto locationLayoutAttr = as<GLSLLocationAttribute>(attr))
+    {
+        if (attr->args.getCount() != 1)
+            return nullptr;
+
+        auto location = checkConstantIntVal(attr->args[0]);
+        if (!location)
+            return nullptr;
+
+        locationLayoutAttr->value = int32_t(location->getValue());
+    }
     else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
     {
         // This must be vk::binding or gl::binding (as specified in core.meta.slang under
@@ -1242,12 +1253,22 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
         return ASTNodeType::OutModifier;
 
         // Modifiers that are their own exclusive group.
-    case ASTNodeType::GLSLLayoutModifier:
-    case ASTNodeType::GLSLParsedLayoutModifier:
-    case ASTNodeType::GLSLLocationLayoutModifier:
     case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
     case ASTNodeType::GLSLOffsetLayoutAttribute:
     case ASTNodeType::GLSLUnparsedLayoutModifier:
+    case ASTNodeType::UncheckedGLSLBindingLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLSetLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLOffsetLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLInputAttachmentIndexLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLLocationLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLIndexLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLConstantIdAttribute:
+    case ASTNodeType::UncheckedGLSLRayPayloadAttribute:
+    case ASTNodeType::UncheckedGLSLRayPayloadInAttribute:
+    case ASTNodeType::UncheckedGLSLHitObjectAttributesAttribute:
+    case ASTNodeType::UncheckedGLSLCallablePayloadAttribute:
+    case ASTNodeType::UncheckedGLSLCallablePayloadInAttribute:
+    case ASTNodeType::GLSLBufferDataLayoutModifier:
     case ASTNodeType::GLSLLayoutModifierGroupMarker:
     case ASTNodeType::GLSLLayoutModifierGroupBegin:
     case ASTNodeType::GLSLLayoutModifierGroupEnd:
@@ -1321,12 +1342,10 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::InModifier:
     case ASTNodeType::InOutModifier:
     case ASTNodeType::OutModifier:
-    case ASTNodeType::GLSLLayoutModifier:
-    case ASTNodeType::GLSLParsedLayoutModifier:
-    case ASTNodeType::GLSLLocationLayoutModifier:
     case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
     case ASTNodeType::GLSLOffsetLayoutAttribute:
     case ASTNodeType::GLSLUnparsedLayoutModifier:
+    case ASTNodeType::UncheckedGLSLLayoutAttribute:
     case ASTNodeType::GLSLLayoutModifierGroupMarker:
     case ASTNodeType::GLSLLayoutModifierGroupBegin:
     case ASTNodeType::GLSLLayoutModifierGroupEnd:
@@ -1502,14 +1521,28 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
 
         SLANG_ASSERT(uncheckedAttr->args.getCount() == 2);
     }
-    else if (as<UncheckedGLSLOffsetLayoutAttribute>(uncheckedAttr))
-    {
-        attr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
+
+#define CASE(UncheckedType, CheckedType)            \
+    else if (as<UncheckedType>(uncheckedAttr))      \
+    {                                               \
+        attr = m_astBuilder->create<CheckedType>(); \
     }
+
+    CASE(UncheckedGLSLOffsetLayoutAttribute, GLSLOffsetLayoutAttribute)
+    CASE(UncheckedGLSLInputAttachmentIndexLayoutAttribute, GLSLInputAttachmentIndexLayoutAttribute)
+    CASE(UncheckedGLSLLocationLayoutAttribute, GLSLLocationAttribute)
+    CASE(UncheckedGLSLIndexLayoutAttribute, GLSLIndexAttribute)
+    CASE(UncheckedGLSLConstantIdAttribute, VkConstantIdAttribute)
+    CASE(UncheckedGLSLRayPayloadAttribute, VulkanRayPayloadAttribute)
+    CASE(UncheckedGLSLRayPayloadInAttribute, VulkanRayPayloadInAttribute)
+    CASE(UncheckedGLSLHitObjectAttributesAttribute, VulkanHitObjectAttributesAttribute)
+    CASE(UncheckedGLSLCallablePayloadAttribute, VulkanCallablePayloadAttribute)
+    CASE(UncheckedGLSLCallablePayloadInAttribute, VulkanCallablePayloadInAttribute)
     else
     {
         getSink()->diagnose(uncheckedAttr, Diagnostics::unrecognizedGLSLLayoutQualifier);
     }
+#undef CASE
 
     if (attr)
     {
@@ -1559,21 +1592,6 @@ Modifier* SemanticsVisitor::checkModifier(
         return checkedAttr;
     }
 
-    if (auto glslLayoutAttribute = as<UncheckedGLSLLayoutAttribute>(m))
-    {
-        return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);
-    }
-
-    if (const auto glslImplicitOffsetAttribute = as<GLSLImplicitOffsetLayoutAttribute>(m))
-    {
-        auto offsetAttr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
-        offsetAttr->loc = glslImplicitOffsetAttribute->loc;
-
-        // Offset constant folding computation is deferred until all other modifiers are checked to
-        // ensure bindinig is checked first.
-        return offsetAttr;
-    }
-
     if (auto decl = as<Decl>(syntaxNode))
     {
         auto moduleDecl = getModuleDecl(decl);
@@ -1589,6 +1607,21 @@ Modifier* SemanticsVisitor::checkModifier(
             }
             return m;
         }
+    }
+
+    if (auto glslLayoutAttribute = as<UncheckedGLSLLayoutAttribute>(m))
+    {
+        return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);
+    }
+
+    if (const auto glslImplicitOffsetAttribute = as<GLSLImplicitOffsetLayoutAttribute>(m))
+    {
+        auto offsetAttr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
+        offsetAttr->loc = glslImplicitOffsetAttribute->loc;
+
+        // Offset constant folding computation is deferred until all other modifiers are checked to
+        // ensure bindinig is checked first.
+        return offsetAttr;
     }
 
     MemoryQualifierSetModifier::Flags::MemoryQualifiersBit memoryQualifierBit =
