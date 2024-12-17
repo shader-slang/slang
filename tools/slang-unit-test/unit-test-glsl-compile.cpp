@@ -56,7 +56,7 @@ SLANG_UNIT_TEST(glslCompile)
     session->createCompositeComponentType(
         componentTypes,
         2,
-        composedProgram.writeRef(), 
+        composedProgram.writeRef(),
         diagnosticBlob.writeRef());
 
     ComPtr<slang::IComponentType> linkedProgram;
