@@ -857,6 +857,7 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
         for (auto globalInst : module->getGlobalInsts())
         {
             IRType* elementType = nullptr;
+
             if (options.lowerBufferPointer)
             {
                 if (auto ptrType = as<IRPtrTypeBase>(globalInst))

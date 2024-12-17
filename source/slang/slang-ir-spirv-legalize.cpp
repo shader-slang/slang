@@ -309,7 +309,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
                 if (user->getDataType() && user->getDataType()->getOp() == kIROp_RefType &&
-                    addressSpace == AddressSpace::Input)
+                    (addressSpace == AddressSpace::Input || addressSpace == AddressSpace::BuiltinInput))
                 {
                     builder.replaceOperand(use, addr);
                     continue;
@@ -431,7 +431,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     String semanticName = systemValueAttr->getName();
                     semanticName = semanticName.toLower();
                     if (semanticName == "sv_pointsize")
-                        addressSpace = AddressSpace::Input;
+                        addressSpace = AddressSpace::BuiltinInput;
                 }
             }
 
@@ -660,6 +660,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     SLANG_UNEXPECTED("Var layout contains conflicting resource uses, cannot "
                                      "resolve a storage class address space.");
             }
+        }
+
+        switch (result)
+        {
+        case AddressSpace::Input:
+            if (varLayout->findSystemValueSemanticAttr())
+                result = AddressSpace::BuiltinInput;
+            break;
+        case AddressSpace::Output:
+            if (varLayout->findSystemValueSemanticAttr())
+                result = AddressSpace::BuiltinOutput;
+            break;
         }
         return result;
     }

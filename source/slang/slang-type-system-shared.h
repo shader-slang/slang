@@ -74,8 +74,12 @@ enum class AddressSpace : uint64_t
     MetalObjectData,
     // Corresponds to SPIR-V's SpvStorageClassInput
     Input,
+    // Same as `Input`, but used for builtin input variables.
+    BuiltinInput,
     // Corresponds to SPIR-V's SpvStorageClassOutput
     Output,
+    // Same as `Output`, but used for builtin output variables.
+    BuiltinOutput,
     // Corresponds to SPIR-V's SpvStorageClassTaskPayloadWorkgroupEXT
     TaskPayloadWorkgroup,
     // Corresponds to SPIR-V's SpvStorageClassFunction
