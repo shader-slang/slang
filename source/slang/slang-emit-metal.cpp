@@ -701,6 +701,21 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             return true;
         }
+    case kIROp_Neg:
+        {
+            if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
+            {
+                // Metal does not support negate operator on matrices,
+                // we should emit "(matrix(0) - op0)" instead.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("(0) - ");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+                return true;
+            }
+            break;
+        }
     case kIROp_Mul:
         {
             // Component-wise multiplication needs to be special cased,
