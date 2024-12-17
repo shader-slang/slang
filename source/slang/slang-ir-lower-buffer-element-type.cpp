@@ -819,10 +819,16 @@ struct LoweredElementTypeContext
             IRType* elementType = nullptr;
             if (options.lowerBufferPointer)
             {
-                if (auto ptrType = as<IRPtrType>(globalInst))
+                if (auto ptrType = as<IRPtrTypeBase>(globalInst))
                 {
-                    if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+                    switch (ptrType->getAddressSpace())
+                    {
+                    case AddressSpace::UserPointer:
+                    case AddressSpace::Input:
+                    case AddressSpace::Output:
                         elementType = ptrType->getValueType();
+                        break;
+                    }
                 }
             }
             else
