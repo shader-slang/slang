@@ -4785,10 +4785,18 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (auto optionalType = as<OptionalType>(type))
+    {
+        // OptionalType should be laid out the same way as Tuple<T, bool>.
+        Array<Type*, 2> types =
+            makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
+        auto tupleType = context.astBuilder->getTupleType(types.getView());
+        return _createTypeLayout(context, tupleType);
+    }
     else if (auto tupleType = as<TupleType>(type))
     {
         // A `Tuple` type is laid out exactly the same way as a `struct` type,
-        // except that we want have a declref to the field.
+        // except that we won't have a declref to the field.
 
         StructTypeLayoutBuilder typeLayoutBuilder;
         StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
