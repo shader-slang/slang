@@ -7,8 +7,17 @@ struct Vertex
     float4 pos;
 }
 
-[shader("vertex")]
-float4 vertMain(Vertex v) : SV_Position
+struct VertexOut
 {
-    return mul(v.m, v.pos);
+    float4 pos : SV_Position;
+    float4 color;
+}
+
+[shader("vertex")]
+VertexOut vertMain(Vertex v)
+{
+    VertexOut o;
+    o.pos = mul(v.m, v.pos);
+    o.color = v.pos;
+    return o;
 }
