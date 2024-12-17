@@ -28,9 +28,6 @@ public:
 
 protected:
     RefPtr<HLSLExtensionTracker> m_extensionTracker;
-    Dictionary<const char*, IRStringLit*> m_builtinPreludes;
-
-    void ensurePrelude(const char* preludeText);
 
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,

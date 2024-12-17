@@ -12,7 +12,7 @@ namespace Slang
 {
 
 static const char* kHLSLBuiltInPrelude64BitCast = R"(
-uint64_t _slang_bitcast64(double x)
+uint64_t _slang_asuint64(double x)
 {
     uint32_t low;
     uint32_t high;
@@ -20,7 +20,7 @@ uint64_t _slang_bitcast64(double x)
     return ((uint64_t)high << 32) | low;
 }
 
-double _slang_bitcast64(uint64_t x)
+double _slang_asdouble(uint64_t x)
 {
     uint32_t low = x & 0xFFFFFFFF;
     uint32_t high = x >> 32;
@@ -384,18 +384,6 @@ void HLSLSourceEmitter::_emitHLSLSubpassInputType(IRSubpassInputType* subpassTyp
     m_writer->emit("<");
     emitType(subpassType->getElementType());
     m_writer->emit(">");
-}
-
-void HLSLSourceEmitter::ensurePrelude(const char* preludeText)
-{
-    IRStringLit* stringLit;
-    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
-    {
-        IRBuilder builder(m_irModule);
-        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
-        m_builtinPreludes[preludeText] = stringLit;
-    }
-    m_requiredPreludes.add(stringLit);
 }
 
 void HLSLSourceEmitter::emitLayoutSemanticsImpl(
@@ -855,7 +843,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 break;
             case BaseType::Double:
                 ensurePrelude(kHLSLBuiltInPrelude64BitCast);
-                m_writer->emit("_slang_bitcast64");
+                m_writer->emit("_slang_asdouble");
                 break;
             }
             m_writer->emit("(");
@@ -888,7 +876,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 break;
             case BaseType::Double:
                 ensurePrelude(kHLSLBuiltInPrelude64BitCast);
-                m_writer->emit("_slang_bitcast64(");
+                m_writer->emit("_slang_asuint64(");
                 closeCount++;
                 break;
             }
