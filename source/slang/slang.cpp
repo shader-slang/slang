@@ -5171,22 +5171,24 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
                 entryPointsDiscovered = true;
             }
         }
-        // If no entry points were discovered, then we should return nullptr.
-        if (!entryPointsDiscovered)
-        {
-            return nullptr;
-        }
 
-        RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
-        ComPtr<IComponentType> linkedComponentType;
-        SLANG_RETURN_NULL_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
-        auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
-                                  ->getTargetArtifact(targetIndex, outDiagnostics);
-        if (targetArtifact)
+        // If any entry points were discovered, then we should emit the program with entrypoints
+        // linked.
+        if (entryPointsDiscovered)
         {
-            m_targetArtifacts[targetIndex] = targetArtifact;
+            RefPtr<CompositeComponentType> composite =
+                new CompositeComponentType(linkage, components);
+            ComPtr<IComponentType> linkedComponentType;
+            SLANG_RETURN_NULL_ON_FAIL(
+                composite->link(linkedComponentType.writeRef(), outDiagnostics));
+            auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
+                                      ->getTargetArtifact(targetIndex, outDiagnostics);
+            if (targetArtifact)
+            {
+                m_targetArtifacts[targetIndex] = targetArtifact;
+            }
+            return targetArtifact;
         }
-        return targetArtifact;
     }
 
     auto target = linkage->targets[targetIndex];
