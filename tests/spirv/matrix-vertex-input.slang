@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
-// CHECK: OpMatrixTimesVector
+// CHECK: OpVectorTimesMatrix
 
 struct Vertex
 {
