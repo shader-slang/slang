@@ -52,7 +52,7 @@ SLANG_UNIT_TEST(genericEntryPointCompile)
     session->createCompositeComponentType(
         componentTypes,
         2,
-        composedProgram.writeRef(), 
+        composedProgram.writeRef(),
         diagnosticBlob.writeRef());
 
     ComPtr<slang::IComponentType> linkedProgram;
@@ -61,6 +61,7 @@ SLANG_UNIT_TEST(genericEntryPointCompile)
     ComPtr<slang::IBlob> code;
     linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
 
-    SLANG_CHECK(UnownedStringSlice((char*)code->getBufferPointer())
+    SLANG_CHECK(
+        UnownedStringSlice((char*)code->getBufferPointer())
             .indexOf(toSlice("vec4(float(X_getValue")) != -1);
 }
