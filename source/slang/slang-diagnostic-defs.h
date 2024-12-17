@@ -2439,6 +2439,11 @@ DIAGNOSTIC(
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
 DIAGNOSTIC(57003, Error, unknownTessPartitioning, "unknown tessellation partitioning '$0'.")
+DIAGNOSTIC(
+    57004,
+    Error,
+    outputSpvIsEmpty,
+    "output SPIR-V contains no exported symbols. Please make sure to specify at least one entrypoint.")
 
 // GLSL Compatibility
 DIAGNOSTIC(

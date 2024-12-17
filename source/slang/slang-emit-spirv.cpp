@@ -7956,6 +7956,8 @@ SlangResult emitSPIRVFromIR(
     List<uint8_t>& spirvOut)
 {
     spirvOut.clear();
+    
+    bool symbolsEmitted = false;
 
     auto sink = codeGenContext->getSink();
 
@@ -8001,6 +8003,7 @@ SlangResult emitSPIRVFromIR(
         if (shouldPreserveParams && as<IRGlobalParam>(inst))
         {
             context.ensureInst(inst);
+            symbolsEmitted = true;
         }
         if (generateWholeProgram)
         {
@@ -8009,6 +8012,7 @@ SlangResult emitSPIRVFromIR(
                 if (func->findDecoration<IRDownstreamModuleExportDecoration>())
                 {
                     context.ensureInst(inst);
+                    symbolsEmitted = true;
                 }
             }
         }
@@ -8039,8 +8043,14 @@ SlangResult emitSPIRVFromIR(
     for (auto irEntryPoint : irEntryPoints)
     {
         context.ensureInst(irEntryPoint);
+        symbolsEmitted = true;
     }
 
+    if (!symbolsEmitted)
+    {
+        sink->diagnose(irModule->getModuleInst(), Diagnostics::outputSpvIsEmpty);
+        return SLANG_FAIL;
+    }
 
     // Move forward delcared pointers to the end.
     do
