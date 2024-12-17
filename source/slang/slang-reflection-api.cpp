@@ -1,8 +1,8 @@
 // slang-reflection-api.cpp
 
 #include "../core/slang-basic.h"
-#include "slang-check.h"
 #include "slang-check-impl.h"
+#include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
