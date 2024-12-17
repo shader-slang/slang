@@ -2264,7 +2264,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
     else if (auto optionalType = as<OptionalType>(type))
     {
-        Array<Type*, 2> types = makeArray(optionalType->getValueType(), context->getASTBuilder()->getBoolType());
+        Array<Type*, 2> types =
+            makeArray(optionalType->getValueType(), context->getASTBuilder()->getBoolType());
         auto tupleType = context->getASTBuilder()->getTupleType(types.getView());
         return processEntryPointVaryingParameter(context, tupleType, state, varLayout);
     }
@@ -2293,7 +2294,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             if (!fieldTypeLayout)
             {
-                getSink(context)->diagnose(varLayout->varDecl, Diagnostics::notValidVaryingParameter, fieldType);
+                getSink(context)->diagnose(
+                    varLayout->varDecl,
+                    Diagnostics::notValidVaryingParameter,
+                    fieldType);
                 continue;
             }
             fieldVarLayout->typeLayout = fieldTypeLayout;
