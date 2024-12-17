@@ -1,9 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -emit-spirv-via-glsl -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -d3d12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -compile-arg -O3 -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-mtl -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<uint64_t> gOutputBuffer;
