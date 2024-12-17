@@ -71,7 +71,7 @@ struct PlatformTest : public WindowedAppBase
 
     Slang::Result initialize()
     {
-        initializeBase("platform-test", 1024, 768);
+        SLANG_RETURN_ON_FAIL(initializeBase("platform-test", 1024, 768));
 
         gWindow->events.sizeChanged = [this]() { onSizeChanged(); };
         gWindow->events.focus = [this]() { onFocus(); };

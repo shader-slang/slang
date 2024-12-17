@@ -282,7 +282,7 @@ struct ShaderToyApp : public WindowedAppBase
 
     Result initialize()
     {
-        initializeBase("Shader Toy", 1024, 768);
+        SLANG_RETURN_ON_FAIL(initializeBase("Shader Toy", 1024, 768));
         gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
         gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
         gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
