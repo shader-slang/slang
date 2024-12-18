@@ -2690,7 +2690,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(spvAsmBuiltinVar);
         builder.setInsertBefore(spvAsmBuiltinVar);
         auto varInst = getBuiltinGlobalVar(
-            builder.getPtrType(kIROp_PtrType, spvAsmBuiltinVar->getDataType(), AddressSpace::BuiltinInput),
+            builder.getPtrType(
+                kIROp_PtrType,
+                spvAsmBuiltinVar->getDataType(),
+                AddressSpace::BuiltinInput),
             kind,
             spvAsmBuiltinVar);
         registerInst(spvAsmBuiltinVar, varInst);
@@ -4999,8 +5002,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!ptrType)
             return;
         auto addrSpace = ptrType->getAddressSpace();
-        if (addrSpace == AddressSpace::Input ||
-            addrSpace == AddressSpace::BuiltinInput)
+        if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
         {
             if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
             {

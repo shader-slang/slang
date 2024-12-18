@@ -24,7 +24,7 @@ struct TypeLoweringConfig
 };
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType);
 
-    struct LoweredElementTypeContext
+struct LoweredElementTypeContext
 {
     static const IRIntegerValue kMaxArraySizeToUnroll = 32;
 
@@ -85,10 +85,8 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
 
     struct LoweredTypeMap : RefObject
     {
-        Dictionary<IRType*, LoweredElementTypeInfo>
-            loweredTypeInfo;
-        Dictionary<IRType*, LoweredElementTypeInfo>
-            mapLoweredTypeToInfo;
+        Dictionary<IRType*, LoweredElementTypeInfo> loweredTypeInfo;
+        Dictionary<IRType*, LoweredElementTypeInfo> mapLoweredTypeToInfo;
     };
 
     Dictionary<TypeLoweringConfig, RefPtr<LoweredTypeMap>> loweredTypeInfoMaps;
@@ -592,8 +590,7 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             bool isTrivial = true;
             for (auto field : structType->getFields())
             {
-                auto loweredFieldTypeInfo =
-                    getLoweredTypeInfo(field->getFieldType(), config);
+                auto loweredFieldTypeInfo = getLoweredTypeInfo(field->getFieldType(), config);
                 fieldLoweredTypeInfo.add(loweredFieldTypeInfo);
                 if (loweredFieldTypeInfo.convertLoweredToOriginal ||
                     config.layoutRule->ruleName != IRTypeLayoutRuleName::Natural)
@@ -802,7 +799,11 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             return info;
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(target->getOptionSet(), config.layoutRule, info.loweredType, &sizeAlignment);
+        getSizeAndAlignment(
+            target->getOptionSet(),
+            config.layoutRule,
+            info.loweredType,
+            &sizeAlignment);
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -884,8 +885,7 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&
                 !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
                 continue;
-            bufferTypeInsts.add(
-                BufferTypeInfo{(IRType*)globalInst, elementType});
+            bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
 
         // Maintain a pending work list of all matrix addresses, and try to lower them out of
@@ -1135,8 +1135,7 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
                                     // We are tring to get a pointer to a lowered matrix element.
                                     // We process this insts at a later phase.
                                     SLANG_ASSERT(user->getOp() == kIROp_GetElementPtr);
-                                    matrixAddrInsts.add(
-                                        MatrixAddrWorkItem{user, config});
+                                    matrixAddrInsts.add(MatrixAddrWorkItem{user, config});
                                 }
                                 else
                                 {
@@ -1213,8 +1212,8 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             SLANG_ASSERT(majorGEP);
             auto loweredMatrixType =
                 cast<IRPtrTypeBase>(majorGEP->getBase()->getFullType())->getValueType();
-            auto matrixTypeInfo =
-                getTypeLoweringMap(workItem.config).mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
+            auto matrixTypeInfo = getTypeLoweringMap(workItem.config)
+                                      .mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
             SLANG_ASSERT(matrixTypeInfo);
             auto matrixType = as<IRMatrixType>(matrixTypeInfo->originalType);
             auto rowCount = getIntVal(matrixType->getRowCount());
