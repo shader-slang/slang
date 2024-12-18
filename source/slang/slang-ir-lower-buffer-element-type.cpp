@@ -803,8 +803,8 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(target->getOptionSet(), config.layoutRule, info.loweredType, &sizeAlignment);
-        loweredTypeInfo.add(type, info);
-        mapLoweredTypeToInfo.add(info.loweredType, info);
+        loweredTypeInfo.set(type, info);
+        mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
         conversionMethodMap[{info.loweredType, info.originalType}] = info.convertOriginalToLowered;
         return info;
