@@ -7956,7 +7956,7 @@ SlangResult emitSPIRVFromIR(
     List<uint8_t>& spirvOut)
 {
     spirvOut.clear();
-    
+
     bool symbolsEmitted = false;
 
     auto sink = codeGenContext->getSink();

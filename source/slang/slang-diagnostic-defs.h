@@ -2443,7 +2443,8 @@ DIAGNOSTIC(
     57004,
     Error,
     outputSpvIsEmpty,
-    "output SPIR-V contains no exported symbols. Please make sure to specify at least one entrypoint.")
+    "output SPIR-V contains no exported symbols. Please make sure to specify at least one "
+    "entrypoint.")
 
 // GLSL Compatibility
 DIAGNOSTIC(
