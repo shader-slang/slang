@@ -276,6 +276,8 @@ Since metal does not differentiate a constant buffer, a shader resource (read-on
 
 `spaceN` specifiers inside `register` semantics are ignored.
 
+The `[vk::location(N)]` attributes on stage input/output parameters are respected.
+
 ## Specialization Constants
 
 Specialization constants declared with the `[SpecializationConstant]` or `[vk::constant_id]` attribute will be translated into a `function_constant` when generating Metal source.

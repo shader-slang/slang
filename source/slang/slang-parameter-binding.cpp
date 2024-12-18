@@ -1909,7 +1909,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     // `location`s in declaration order coincidentally matches
     // the `SV_Target` order.
     //
-    if (isKhronosTarget(context->getTargetRequest()))
+    if (isKhronosTarget(context->getTargetRequest())
+        || isMetalTarget(context->getTargetRequest())
+        || isWGPUTarget(context->getTargetRequest()))
     {
         if (auto locationAttr = decl->findModifier<GLSLLocationAttribute>())
         {
