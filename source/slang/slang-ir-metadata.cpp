@@ -66,8 +66,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
         {
             // Get the binding information from this attribute and insert it into the list
             auto spaceIndex = offsetAttr->getSpace();
-            if (auto spaceAttr =
-                    varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+            if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
             {
                 spaceIndex += spaceAttr->getOffset();
             }
