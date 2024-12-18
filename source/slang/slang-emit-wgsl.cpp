@@ -49,18 +49,6 @@ fn _slang_getNan() -> f32
 }
 )";
 
-void WGSLSourceEmitter::ensurePrelude(const char* preludeText)
-{
-    IRStringLit* stringLit;
-    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
-    {
-        IRBuilder builder(m_irModule);
-        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
-        m_builtinPreludes[preludeText] = stringLit;
-    }
-    m_requiredPreludes.add(stringLit);
-}
-
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     const SwitchRegion::Case* const currentCase,
     const bool isDefault)
