@@ -678,6 +678,9 @@ protected:
 
     String _emitLiteralOneWithType(int bitWidth);
 
+
+    virtual void ensurePrelude(const char* preludeText);
+
     CodeGenContext* m_codeGenContext = nullptr;
     IRModule* m_irModule = nullptr;
 
@@ -723,6 +726,8 @@ protected:
     {
         String requireComputeDerivatives;
     } m_requiredAfter;
+
+    Dictionary<const char*, IRStringLit*> m_builtinPreludes;
 };
 
 } // namespace Slang
