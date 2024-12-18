@@ -2262,12 +2262,63 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
         return ptrTypeLayout;
     }
+    else if (auto optionalType = as<OptionalType>(type))
+    {
+        Array<Type*, 2> types =
+            makeArray(optionalType->getValueType(), context->getASTBuilder()->getBoolType());
+        auto tupleType = context->getASTBuilder()->getTupleType(types.getView());
+        return processEntryPointVaryingParameter(context, tupleType, state, varLayout);
+    }
+    else if (auto tupleType = as<TupleType>(type))
+    {
+        RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
+        structLayout->type = type;
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            auto fieldType = tupleType->getMember(i);
+            RefPtr<VarLayout> fieldVarLayout = new VarLayout();
+
+            // We don't really have a "field" decl, so just use the tuple-typed decl
+            // itself as the varDecl of the elements.
+            auto fieldDecl = (VarDeclBase*)varLayout->varDecl.getDecl();
+            fieldVarLayout->varDecl = fieldDecl;
+
+            structLayout->fields.add(fieldVarLayout);
+
+            auto fieldTypeLayout = processEntryPointVaryingParameterDecl(
+                context,
+                fieldDecl,
+                fieldType,
+                state,
+                fieldVarLayout);
+
+            if (!fieldTypeLayout)
+            {
+                getSink(context)->diagnose(
+                    varLayout->varDecl,
+                    Diagnostics::notValidVaryingParameter,
+                    fieldType);
+                continue;
+            }
+            fieldVarLayout->typeLayout = fieldTypeLayout;
+
+            // Assign offsets in var layout for each resource kind of the type.
+            for (auto fieldTypeResInfo : fieldTypeLayout->resourceInfos)
+            {
+                auto kind = fieldTypeResInfo.kind;
+                auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
+                auto fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
+                fieldResInfo->index = structTypeResInfo->count.getFiniteValue();
+                structTypeResInfo->count += fieldTypeResInfo.count;
+            }
+        }
+        return structLayout;
+    }
     // Catch declaration-reference types late in the sequence, since
     // otherwise they will include all of the above cases...
     else if (auto declRefType = as<DeclRefType>(type))
     {
         auto declRef = declRefType->getDeclRef();
-
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
