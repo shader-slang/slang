@@ -282,10 +282,18 @@ struct ShaderToyApp : public WindowedAppBase
 
     Result initialize()
     {
-        initializeBase("Shader Toy", 1024, 768);
-        gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
-        gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
-        gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
+        SLANG_RETURN_ON_FAIL(initializeBase("Shader Toy", 1024, 768));
+
+        // We may not have a window if we're running in test mode
+        SLANG_ASSERT(isTestMode() || gWindow);
+        if (gWindow)
+        {
+            gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e)
+            { handleEvent(e); };
+            gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
+            gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e)
+            { handleEvent(e); };
+        }
 
         InputElementDesc inputElements[] = {
             {"POSITION", 0, Format::R32G32_FLOAT, offsetof(FullScreenTriangle::Vertex, position)},
@@ -383,7 +391,11 @@ struct ShaderToyApp : public WindowedAppBase
         commandBuffer->close();
 
         gQueue->executeCommandBuffer(commandBuffer);
-        gSwapchain->present();
+
+        // We may not have a swapchain if we're running in test mode
+        SLANG_ASSERT(isTestMode() || gSwapchain);
+        if (gSwapchain)
+            gSwapchain->present();
     }
 
     void handleEvent(const platform::MouseEventArgs& event)
