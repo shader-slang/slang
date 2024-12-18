@@ -163,6 +163,8 @@ The `[vk::binding(index,set)]` attribute is respected when emitting WGSL code, a
 
 If the `[vk::binding()]` attribute is not specified by a `:register()` semantic is present, Slang will derive the binding from the `register` semantic the same way as the SPIRV and GLSL backends.
 
+The `[vk::location(N)]` attributes on stage input/output parameters are respected.
+
 ## Specialization Constants
 
 Specialization constants declared with the `[SpecializationConstant]` or `[vk::constant_id]` attribute will be translated into a global `override` declaration when generating WGSL source.
