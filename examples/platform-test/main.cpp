@@ -71,18 +71,26 @@ struct PlatformTest : public WindowedAppBase
 
     Slang::Result initialize()
     {
-        initializeBase("platform-test", 1024, 768);
+        SLANG_RETURN_ON_FAIL(initializeBase("platform-test", 1024, 768));
 
-        gWindow->events.sizeChanged = [this]() { onSizeChanged(); };
-        gWindow->events.focus = [this]() { onFocus(); };
-        gWindow->events.lostFocus = [this]() { onLostFocus(); };
-        gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
-        gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
-        gWindow->events.keyPress = [this](const platform::KeyEventArgs& e) { onKeyPress(e); };
-        gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
-        gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
-        gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
-        gWindow->events.mouseWheel = [this](const platform::MouseEventArgs& e) { onMouseWheel(e); };
+        // We may not have a window if we're running in test mode
+        SLANG_ASSERT(isTestMode() || gWindow);
+        if (gWindow)
+        {
+            gWindow->events.sizeChanged = [this]() { onSizeChanged(); };
+            gWindow->events.focus = [this]() { onFocus(); };
+            gWindow->events.lostFocus = [this]() { onLostFocus(); };
+            gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
+            gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
+            gWindow->events.keyPress = [this](const platform::KeyEventArgs& e) { onKeyPress(e); };
+            gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e)
+            { onMouseMove(e); };
+            gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e)
+            { onMouseDown(e); };
+            gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
+            gWindow->events.mouseWheel = [this](const platform::MouseEventArgs& e)
+            { onMouseWheel(e); };
+        }
 
         return SLANG_OK;
     }
@@ -105,7 +113,10 @@ struct PlatformTest : public WindowedAppBase
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
 
-        gSwapchain->present();
+        // We may not have a swapchain if we're running in test mode
+        SLANG_ASSERT(isTestMode() || gSwapchain);
+        if (gSwapchain)
+            gSwapchain->present();
     }
 };
 
