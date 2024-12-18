@@ -163,6 +163,9 @@ struct ShaderBindingRange
         case slang::UnorderedAccess:
         case slang::SamplerState:
         case slang::DescriptorTableSlot:
+        case slang::VaryingInput:
+        case slang::VaryingOutput:
+        case slang::SpecializationConstant:
             return true;
         default:
             return false;
