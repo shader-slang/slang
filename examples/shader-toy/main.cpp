@@ -391,7 +391,11 @@ struct ShaderToyApp : public WindowedAppBase
         commandBuffer->close();
 
         gQueue->executeCommandBuffer(commandBuffer);
-        gSwapchain->present();
+
+        // We may not have a swapchain if we're running in test mode
+        SLANG_ASSERT(isTestMode() || gSwapchain);
+        if (gSwapchain)
+            gSwapchain->present();
     }
 
     void handleEvent(const platform::MouseEventArgs& event)
