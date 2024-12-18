@@ -229,29 +229,25 @@ bool isPrimaryDecl(CallableDecl* decl)
     return (!decl->primaryDecl) || (decl == decl->primaryDecl);
 }
 
-FuncDecl* findFunctionDeclByName(Module* translationUnit, Name* name, DiagnosticSink* sink)
+DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, DiagnosticSink* sink)
 {
-    FuncDecl* entryPointFuncDecl = nullptr;
+    DeclRef<FuncDecl> entryPointFuncDeclRef;
 
     auto expr = translationUnit->findDeclFromString(getText(name), sink);
     if (auto declRefExpr = as<DeclRefExpr>(expr))
     {
-        auto declRef = declRefExpr->declRef;
-        entryPointFuncDecl = declRef.as<FuncDecl>().getDecl();
+        entryPointFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
 
-        if (entryPointFuncDecl && getModule(entryPointFuncDecl) != translationUnit)
-            entryPointFuncDecl = nullptr;
+        if (entryPointFuncDeclRef && getModule(entryPointFuncDeclRef.getDecl()) != translationUnit)
+            entryPointFuncDeclRef = DeclRef<FuncDecl>();
     }
 
-    if (entryPointFuncDecl && getModule(entryPointFuncDecl) != translationUnit)
-        entryPointFuncDecl = nullptr;
-
-    if (!entryPointFuncDecl)
+    if (!entryPointFuncDeclRef)
     {
         auto translationUnitSyntax = translationUnit->getModuleDecl();
         sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, name);
     }
-    return entryPointFuncDecl;
+    return entryPointFuncDeclRef;
 }
 
 // Is a entry pointer parmaeter of `type` always a uniform parameter?
@@ -409,8 +405,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // make up the entry point.
             //
             Name* name = linkage->getNamePool()->getName(stringLit->value);
-            FuncDecl* patchConstantFuncDecl = findFunctionDeclByName(module, name, sink);
-            if (!patchConstantFuncDecl)
+            DeclRef<FuncDecl> patchConstantFuncDeclRef = findFunctionDeclByName(module, name, sink);
+            if (!patchConstantFuncDeclRef)
             {
                 sink->diagnose(
                     expr,
@@ -420,7 +416,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 return;
             }
 
-            attr->patchConstantFuncDecl = patchConstantFuncDecl;
+            attr->patchConstantFuncDecl = patchConstantFuncDeclRef.getDecl();
         }
     }
     else if (stage == Stage::Compute)
@@ -648,11 +644,11 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     auto sink = compileRequest->getSink();
 
     auto entryPointName = entryPointReq->getName();
-    FuncDecl* entryPointFuncDecl =
+    DeclRef<FuncDecl> entryPointFuncDeclRef =
         findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
 
     // Did we find a function declaration in our search?
-    if (!entryPointFuncDecl)
+    if (!entryPointFuncDeclRef)
     {
         return nullptr;
     }
@@ -673,14 +669,14 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         entryPointProfile,
         linkage->m_optionSet,
         linkage->targets,
-        entryPointFuncDecl,
+        entryPointFuncDeclRef.getDecl(),
         sink);
     // TODO: Should we attach a `[shader(...)]` attribute to an
     // entry point that didn't have one, so that we can have
     // a more uniform representation in the AST?
 
     RefPtr<EntryPoint> entryPoint =
-        EntryPoint::create(linkage, makeDeclRef(entryPointFuncDecl), entryPointProfile);
+        EntryPoint::create(linkage, entryPointFuncDeclRef, entryPointProfile);
 
     // Now that we've *found* the entry point, it is time to validate
     // that it actually meets the constraints for the chosen stage/profile.
