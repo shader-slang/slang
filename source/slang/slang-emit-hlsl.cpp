@@ -11,6 +11,23 @@
 namespace Slang
 {
 
+static const char* kHLSLBuiltInPrelude64BitCast = R"(
+uint64_t _slang_asuint64(double x)
+{
+    uint32_t low;
+    uint32_t high;
+    asuint(x, low, high);
+    return ((uint64_t)high << 32) | low;
+}
+
+double _slang_asdouble(uint64_t x)
+{
+    uint32_t low = x & 0xFFFFFFFF;
+    uint32_t high = x >> 32;
+    return asdouble(low, high);
+}
+)";
+
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
     IRFunc* entryPoint,
@@ -822,16 +839,11 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 //
                 // There is no current function (it seems)
                 // for bit-casting an `int16_t` to a `half`.
-                //
-                // TODO: There is an `asdouble` function
-                // for converting two 32-bit integer values into
-                // one `double`. We could use that for
-                // bit casts of 64-bit values with a bit of
-                // extra work, but doing so might be best
-                // handled in an IR pass that legalizes
-                // bit-casts.
-                //
                 m_writer->emit("asfloat");
+                break;
+            case BaseType::Double:
+                ensurePrelude(kHLSLBuiltInPrelude64BitCast);
+                m_writer->emit("_slang_asdouble");
                 break;
             }
             m_writer->emit("(");
@@ -844,6 +856,8 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 diagnoseUnhandledInst(inst);
                 break;
 
+            case BaseType::Int64:
+            case BaseType::UInt64:
             case BaseType::UInt:
             case BaseType::Int:
             case BaseType::Bool:
@@ -858,6 +872,11 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             case BaseType::Half:
                 m_writer->emit("asuint16(");
+                closeCount++;
+                break;
+            case BaseType::Double:
+                ensurePrelude(kHLSLBuiltInPrelude64BitCast);
+                m_writer->emit("_slang_asuint64(");
                 closeCount++;
                 break;
             }

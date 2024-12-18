@@ -263,18 +263,6 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
     }
 }
 
-void MetalSourceEmitter::ensurePrelude(const char* preludeText)
-{
-    IRStringLit* stringLit;
-    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
-    {
-        IRBuilder builder(m_irModule);
-        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
-        m_builtinPreludes[preludeText] = stringLit;
-    }
-    m_requiredPreludes.add(stringLit);
-}
-
 void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
 {
     auto memoryOrder = (IRMemoryOrder)getIntVal(inst);
@@ -701,6 +689,21 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             return true;
         }
+    case kIROp_Neg:
+        {
+            if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
+            {
+                // Metal does not support negate operator on matrices,
+                // we should emit "(matrix(0) - op0)" instead.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("(0) - ");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+                return true;
+            }
+            break;
+        }
     case kIROp_Mul:
         {
             // Component-wise multiplication needs to be special cased,
@@ -1050,7 +1053,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_UInt8Type:
     case kIROp_UIntType:
     case kIROp_FloatType:
-    case kIROp_DoubleType:
     case kIROp_HalfType:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
@@ -1078,6 +1080,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(getName(type));
         return;
 
+    case kIROp_DoubleType:
+        SLANG_UNEXPECTED("'double' type emitted");
+        return;
     case kIROp_VectorType:
         {
             auto vecType = (IRVectorType*)type;
