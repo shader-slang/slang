@@ -43,6 +43,41 @@ static void _insertBinding(
     ranges.add(newRange);
 }
 
+void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadata)
+{
+    auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return;
+
+    auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!varLayout)
+        return;
+
+    for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
+    {
+        auto kind = sizeAttr->getResourceKind();
+
+        // Only track resource types that we can reliably track, such as textures.
+        // Do not track individual uniforms, for example.
+        if (!ShaderBindingRange::isUsageTracked(kind))
+            continue;
+
+        if (auto offsetAttr = varLayout->findOffsetAttr(kind))
+        {
+            // Get the binding information from this attribute and insert it into the list
+            auto spaceIndex = offsetAttr->getSpace();
+            if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+            {
+                spaceIndex += spaceAttr->getOffset();
+            }
+            auto registerIndex = offsetAttr->getOffset();
+            auto size = sizeAttr->getSize();
+            auto count = size.isFinite() ? size.getFiniteValue() : 0;
+            _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
+        }
+    }
+}
+
 // Collects the metadata from the provided IR module, saves it in outMetadata.
 void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata)
 {
@@ -57,39 +92,18 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
                 auto name = func->findDecoration<IRExportDecoration>()->getMangledName();
                 outMetadata.m_exportedFunctionMangledNames.add(name);
             }
+
+            // Collect metadata from entrypoint params.
+            for (auto param : func->getParams())
+            {
+                collectMetadataFromInst(param, outMetadata);
+            }
         }
 
         auto param = as<IRGlobalParam>(inst);
         if (!param)
             continue;
-
-        auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecoration)
-            continue;
-
-        auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
-        if (!varLayout)
-            continue;
-
-        for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
-        {
-            auto kind = sizeAttr->getResourceKind();
-
-            // Only track resource types that we can reliably track, such as textures.
-            // Do not track individual uniforms, for example.
-            if (!ShaderBindingRange::isUsageTracked(kind))
-                continue;
-
-            if (auto offsetAttr = varLayout->findOffsetAttr(kind))
-            {
-                // Get the binding information from this attribute and insert it into the list
-                auto spaceIndex = offsetAttr->getSpace();
-                auto registerIndex = offsetAttr->getOffset();
-                auto size = sizeAttr->getSize();
-                auto count = size.isFinite() ? size.getFiniteValue() : 0;
-                _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
-            }
-        }
+        collectMetadataFromInst(param, outMetadata);
     }
 }
 
