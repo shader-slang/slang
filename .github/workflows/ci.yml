@@ -182,6 +182,7 @@ jobs:
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
            --os "${{matrix.os}}" \
+           --platform "${{matrix.platform}}" \
            --config "${{matrix.config}}" \
            --skip-file tests/expected-example-failure-github.txt
       - name: Test Slang via glsl
