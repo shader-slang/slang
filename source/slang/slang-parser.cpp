@@ -2335,6 +2335,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
         case TokenType::Dot:
         case TokenType::LParent:
         case TokenType::RParent:
+        case TokenType::LBracket:
         case TokenType::RBracket:
         case TokenType::Colon:
         case TokenType::Comma:
