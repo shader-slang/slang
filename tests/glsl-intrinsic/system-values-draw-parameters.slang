@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK_SPIRV): -entry main -stage compute -target spirv
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -entry main -stage compute -target glsl
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -entry main -stage compute -target hlsl
-//TEST:SIMPLE(filecheck=CHECK_METAL): -entry main -stage compute -target metal
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -entry main -stage vertex -target spirv
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -entry main -stage vertex -target glsl
+//TEST:SIMPLE(filecheck=CHECK_HLSL): -entry main -stage vertex -target hlsl
+//TEST:SIMPLE(filecheck=CHECK_METAL): -entry main -stage vertex -target metal
 
 #version 460
 
