@@ -4274,7 +4274,6 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(
         emitSemanticsPrefix(fieldKey);
         emitStructFieldAttributes(structType, ff);
         emitMemoryQualifiers(fieldKey);
-        emitMatrixLayoutModifiersImpl(fieldType);
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey, allowOffsetLayout);
         emitPostDeclarationAttributesForType(fieldType);

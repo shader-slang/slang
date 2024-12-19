@@ -1241,7 +1241,22 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             }
             if (!as<IRIntLit>(matType->getRowCount()) || !as<IRIntLit>(matType->getColumnCount()))
                 canUseSugar = false;
-
+            auto matrixLayout = getIntVal(matType->getLayout());
+            if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() !=
+                (MatrixLayoutMode)matrixLayout)
+            {
+                switch (matrixLayout)
+                {
+                case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+                    m_writer->emit("column_major ");
+                    break;
+                case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+                    m_writer->emit("row_major ");
+                    break;
+                default:
+                    break;
+                }
+            }
             if (canUseSugar)
             {
                 emitType(matType->getElementType());
@@ -1662,28 +1677,6 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
                 m_writer->emit("globallycoherent\n");
             continue;
-        }
-    }
-}
-
-void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* type)
-{
-    auto matType = as<IRMatrixType>(type);
-    if (!matType)
-        return;
-    auto matrixLayout = getIntVal(matType->getLayout());
-    if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() != (MatrixLayoutMode)matrixLayout)
-    {
-        switch (matrixLayout)
-        {
-        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
-            m_writer->emit("column_major ");
-            break;
-        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
-            m_writer->emit("row_major ");
-            break;
-        default:
-            break;
         }
     }
 }
