@@ -1241,6 +1241,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             }
             if (!as<IRIntLit>(matType->getRowCount()) || !as<IRIntLit>(matType->getColumnCount()))
                 canUseSugar = false;
+
             if (canUseSugar)
             {
                 emitType(matType->getElementType());
