@@ -55,6 +55,8 @@ protected:
         IRPackOffsetDecoration* decoration) SLANG_OVERRIDE;
 
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) SLANG_OVERRIDE;
+    virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator)
+        SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
         SLANG_OVERRIDE;
