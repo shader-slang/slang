@@ -20,18 +20,28 @@ Options:
   --config    <config>   Build configuration.
                          Valid <config> values: 'debug', 'release'.
 
+  --platform  <platform> Target platform.
+                         Valid <platform> values: 'x86_64', 'aarch64'.
+
 Skip file:
 
   The skip patterns are regexp patterns on the following format:
-  <os>:<config>:<sample> # Some comment describing why test is disabled
+  <os>:<platform>:<config>:<sample> # Some comment describing why test is disabled
 
   For example:
   # Bug 123: foo-example fails (both debug and release)
-  windows:(debug|release):foo-example
+  windows:x86_64(debug|release):foo-example
   # Bug 456: bar-example fails in release mode on Linux
-  linux:release:bar-example
+  linux:aarch64:release:bar-example
 
 EOF
+}
+
+function user_error() {
+  echo "error: $1" >&2
+  echo "" >&2
+  show_help >&2
+  exit 1
 }
 
 while [[ "$#" -gt 0 ]]; do
@@ -55,9 +65,7 @@ while [[ "$#" -gt 0 ]]; do
     case $2 in
     windows | linux | macos) ;;
     *)
-      printf "error: Unrecognized os: '$2'\n\n" >&2
-      show_help >&2
-      exit 1
+      user_error "Unrecognized os: '$2'"
       ;;
     esac
     os="$2"
@@ -67,56 +75,58 @@ while [[ "$#" -gt 0 ]]; do
     case $2 in
     debug | release) ;;
     *)
-      printf "error: Unrecognized config: '$2'\n\n" >&2
-      show_help >&2
-      exit 1
+      user_error "Unrecognized config: '$2'"
       ;;
     esac
     config="$2"
     shift
     ;;
+  --platform)
+    case $2 in
+    x86_64 | aarch64) ;;
+    *)
+      user_error "Unrecognized platform: '$2'"
+      ;;
+    esac
+    platform="$2"
+    shift
+    ;;
   *)
-    echo "unrecognized argument: $1" >&2
-    show_help >&2
-    exit 1
+    user_error "Unrecognized argument: '$1'"
     ;;
   esac
   shift
 done
 
 if [[ "$os" == "" ]]; then
-  echo "error: No OS specified.\n\n"
-  show_help >&2
-  exit 1
+  user_error "No OS specified."
 fi
 
 if [[ "$config" == "" ]]; then
-  printf "error: No build configuration specified.\n\n" >&2
-  show_help >&2
-  exit 1
+  user_error "No build configuration specified."
 fi
 
 if [[ "$bin_dir" == "" ]]; then
-  printf "error: No binary directory specified.\n\n" >&2
-  show_help >&2
-  exit 1
+  user_error "No binary directory specified."
 fi
 
 if [[ "$skip_file" == "" ]]; then
-  printf "error: No skip file specified.\n\n" >&2
-  show_help >&2
-  exit 1
+  user_error "No skip file specified."
+fi
+
+if [[ "$platform" == "" ]]; then
+  user_error "No platform specified."
 fi
 
 if [[ ! -f "$skip_file" ]]; then
-  printf "error: Skip file '$skip_file' does not exist.\n\n" >&2
+  user_error "Skip file '$skip_file' does not exist."
 fi
 
 if [[ ! -d "$bin_dir" ]]; then
-  printf "error: Binary directory '$bin_dir' does not exist.\n\n" >&2
+  user_error "Binary directory '$bin_dir' does not exist."
 fi
 
-summary=""
+summary=()
 failure_count=0
 skip_count=0
 sample_count=0
@@ -126,46 +136,45 @@ function skip {
   local line_index
   p="$1"
   line_index=1
-  while read pattern; do
+  while read -r pattern; do
     pat=$pattern
     if [[ ! $pat =~ .*# ]]; then
-      echo "error: Skip pattern on line $line_index is missing a comment!"
-      exit 1
+      user_error "Skip pattern on line $line_index is missing a comment!"
     fi
     pat="${pattern%% *#*}"
     if [[ $p =~ ^$pat$ ]]; then
       return 0
     fi
     line_index=$((line_index + 1))
-  done <$skip_file
+  done <"$skip_file"
 
   return 1
 }
 
 function run_sample {
-  local command
   local sample
-  command=$@
+  local args
+  sample="$1"
   shift
-  sample="${command%% *}"
+  args=("$@")
   sample_count=$((sample_count + 1))
-  summary+="$sample: "
-  if skip "$os:$config:$sample"; then
+  summary=("${summary[@]}" "$sample: ")
+  if skip "$os:$platform:$config:$sample"; then
     echo "Skipping $sample..."
-    summary+="\n  skipped\n"
+    summary=("${summary[@]}" "  skipped")
     skip_count=$((skip_count + 1))
     return
   fi
-  echo "Running '$command'..."
+  echo "Running '$sample ${args[*]}'..."
   result=0
-  pushd $bin_dir 1>/dev/null 2>&1
+  pushd "$bin_dir" 1>/dev/null 2>&1
   if [[ ! "$dry_run" = true ]]; then
-    ./$command || result=$?
+    ./"$sample" "${args[@]}" || result=$?
   fi
   if [[ $result -eq 0 ]]; then
-    summary+="\n  success\n"
+    summary=("${summary[@]}" "  success")
   else
-    summary+="\n  failure (exit code: $result)\n"
+    summary=("${summary[@]}" "  failure (exit code: $result)")
     failure_count=$((failure_count + 1))
   fi
   popd 1>/dev/null 2>&1
@@ -187,13 +196,17 @@ sample_commands=(
 )
 
 for sample_command in "${sample_commands[@]}"; do
-  run_sample $sample_command
+  run_sample ${sample_command}
   echo ""
 done
 
 echo ""
 echo "Summary: "
-printf "\n$summary\n\n"
+echo
+for line in "${summary[@]}"; do
+  printf '  %s\n' "$line"
+done
+echo ""
 echo "$failure_count failed, and $skip_count skipped, out of $sample_count tests"
 if [[ $failure_count -ne 0 ]]; then
   exit 1
