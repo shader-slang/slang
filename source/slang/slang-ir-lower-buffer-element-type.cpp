@@ -422,9 +422,17 @@ struct LoweredElementTypeContext
 
         if (auto matrixType = as<IRMatrixType>(type))
         {
-            // For spirv, we always want to lower all matrix types, because matrix types
-            // are considered abstract types.
-            if (!target->shouldEmitSPIRVDirectly())
+            if (target->shouldEmitSPIRVDirectly())
+            {
+                // For spirv, we don't need to lower floating point matrix types because
+                // they are supported natively.
+                if (isFloatingType(matrixType->getElementType()))
+                {
+                    info.loweredType = type;
+                    return info;
+                }
+            }
+            else
             {
                 // For other targets, we only lower the matrix types if they differ from the default
                 // matrix layout.
