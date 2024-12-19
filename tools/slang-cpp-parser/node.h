@@ -316,7 +316,7 @@ struct ClassLikeNode : public ScopeNode
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
 
     ClassLikeNode(Kind kind)
-        : Super(kind), m_origin(nullptr), m_typeSet(nullptr), m_superNode(nullptr)
+        : Super(kind), m_origin(nullptr), m_typeSet(nullptr), m_superNode(nullptr), m_guid(Guid())
     {
         SLANG_ASSERT(kind == Kind::ClassType || kind == Kind::StructType);
     }
@@ -333,6 +333,8 @@ struct ClassLikeNode : public ScopeNode
     Token m_super;              ///< Super class name
     ClassLikeNode* m_superNode; ///< If this is a class/struct, the type it is derived from (or
                                 ///< nullptr if base)
+
+    Guid m_guid; ///< The guid associated with this type
 };
 
 struct CallableNode : public Node

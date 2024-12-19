@@ -13,8 +13,6 @@ using namespace Slang;
 class Parser
 {
 public:
-    typedef uint32_t NodeTypeBitType;
-
     SlangResult expect(TokenType type, Token* outToken = nullptr);
 
     bool advanceIfMarker(Token* outToken = nullptr);
@@ -28,14 +26,6 @@ public:
 
     /// Parse the contents of the source file
     SlangResult parse(SourceOrigin* sourceOrigin, const Options* options);
-
-    void setKindEnabled(Node::Kind kind, bool isEnabled = true);
-    bool isTypeEnabled(Node::Kind kind)
-    {
-        return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(kind))) != 0;
-    }
-
-    void setKindsEnabled(const Node::Kind* kinds, Index kindsCount, bool isEnabled = true);
 
     Parser(NodeTree* nodeTree, DiagnosticSink* sink);
 
@@ -54,6 +44,7 @@ protected:
 
     SlangResult _parseTypeDef();
     SlangResult _parseEnum();
+    SlangResult _parseGuid();
     SlangResult _parseMarker();
     SlangResult _parseSpecialMacro();
 
@@ -91,8 +82,6 @@ protected:
     SlangResult _consumeToSync();
     /// Consumes balanced parens. Will return an error if not matched. Assumes starts on opening (
     SlangResult _consumeBalancedParens();
-
-    NodeTypeBitType m_nodeTypeEnabled;
 
     TokenList m_tokenList;
     TokenReader m_reader;
