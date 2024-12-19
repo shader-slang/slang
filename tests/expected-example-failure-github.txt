@@ -1,0 +1,17 @@
+linux:(debug|release):gpu-printing           # See issue 5520
+linux:(debug|release):hello-world            # See issue 5520
+linux:(debug|release):model-viewer           # See issue 5520
+linux:(debug|release):platform-test          # See issue 5520
+linux:(debug|release):ray-tracing            # See issue 5520
+linux:(debug|release):ray-tracing-pipeline   # See issue 5520
+linux:(debug|release):shader-object          # See issue 5520
+linux:(debug|release):shader-toy             # See issue 5520
+linux:(debug|release):triangle               # See issue 5520
+macos:(debug|release):hello-world            # See issue 5520
+macos:(debug|release):model-viewer           # See issue 5520
+macos:(debug|release):ray-tracing            # See issue 5520
+macos:(debug|release):ray-tracing-pipeline   # See issue 5520
+windows:debug:ray-tracing                    # See issue 5520
+windows:debug:ray-tracing-pipeline           # See issue 5520
+windows:debug:reflection-api                 # See issue 5520
+windows:debug:hello-world                    # See issue 5520

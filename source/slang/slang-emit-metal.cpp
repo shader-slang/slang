@@ -263,18 +263,6 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
     }
 }
 
-void MetalSourceEmitter::ensurePrelude(const char* preludeText)
-{
-    IRStringLit* stringLit;
-    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
-    {
-        IRBuilder builder(m_irModule);
-        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
-        m_builtinPreludes[preludeText] = stringLit;
-    }
-    m_requiredPreludes.add(stringLit);
-}
-
 void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
 {
     auto memoryOrder = (IRMemoryOrder)getIntVal(inst);
@@ -1065,7 +1053,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_UInt8Type:
     case kIROp_UIntType:
     case kIROp_FloatType:
-    case kIROp_DoubleType:
     case kIROp_HalfType:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
@@ -1093,6 +1080,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(getName(type));
         return;
 
+    case kIROp_DoubleType:
+        SLANG_UNEXPECTED("'double' type emitted");
+        return;
     case kIROp_VectorType:
         {
             auto vecType = (IRVectorType*)type;

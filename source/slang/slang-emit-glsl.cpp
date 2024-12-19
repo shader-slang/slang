@@ -2030,6 +2030,32 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     emitType(inst->getDataType());
                 }
                 break;
+            case BaseType::Int64:
+                if (fromType == BaseType::Double)
+                {
+                    m_writer->emit("int64_t(doubleBitsToInt64(");
+                    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                    m_writer->emit("))");
+                    return true;
+                }
+                else
+                {
+                    emitType(inst->getDataType());
+                }
+                break;
+            case BaseType::UInt64:
+                if (fromType == BaseType::Double)
+                {
+                    m_writer->emit("uint64_t(doubleBitsToUint64(");
+                    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                    m_writer->emit("))");
+                    return true;
+                }
+                else
+                {
+                    emitType(inst->getDataType());
+                }
+                break;
             case BaseType::Half:
                 switch (fromType)
                 {
