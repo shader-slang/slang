@@ -94,6 +94,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeReinterpret(IRBuilder* builder, IRInst* origInst);
 
+    InstPair transcribeDifferentiableTypeAnnotation(IRBuilder* builder, IRInst* origInst);
+
     virtual IRFuncType* differentiateFunctionType(
         IRBuilder* builder,
         IRInst* func,
