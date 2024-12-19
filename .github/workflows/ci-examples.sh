@@ -20,16 +20,19 @@ Options:
   --config    <config>   Build configuration.
                          Valid <config> values: 'debug', 'release'.
 
+  --platform  <platform> Target platform.
+                         Valid <platform> values: 'x86_64', 'aarch64'.
+
 Skip file:
 
   The skip patterns are regexp patterns on the following format:
-  <os>:<config>:<sample> # Some comment describing why test is disabled
+  <os>:<platform>:<config>:<sample> # Some comment describing why test is disabled
 
   For example:
   # Bug 123: foo-example fails (both debug and release)
-  windows:(debug|release):foo-example
+  windows:x86_64(debug|release):foo-example
   # Bug 456: bar-example fails in release mode on Linux
-  linux:release:bar-example
+  linux:aarch64:release:bar-example
 
 EOF
 }
@@ -78,6 +81,16 @@ while [[ "$#" -gt 0 ]]; do
     config="$2"
     shift
     ;;
+  --platform)
+    case $2 in
+    x86_64 | aarch64) ;;
+    *)
+      user_error "Unrecognized platform: '$2'"
+      ;;
+    esac
+    platform="$2"
+    shift
+    ;;
   *)
     user_error "Unrecognized argument: '$1'"
     ;;
@@ -99,6 +112,10 @@ fi
 
 if [[ "$skip_file" == "" ]]; then
   user_error "No skip file specified."
+fi
+
+if [[ "$platform" == "" ]]; then
+  user_error "No platform specified."
 fi
 
 if [[ ! -f "$skip_file" ]]; then
@@ -142,7 +159,7 @@ function run_sample {
   args=("$@")
   sample_count=$((sample_count + 1))
   summary=("${summary[@]}" "$sample: ")
-  if skip "$os:$config:$sample"; then
+  if skip "$os:$platform:$config:$sample"; then
     echo "Skipping $sample..."
     summary=("${summary[@]}" "  skipped")
     skip_count=$((skip_count + 1))
