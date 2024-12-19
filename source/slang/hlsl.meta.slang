@@ -1062,6 +1062,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl, sm_5_0)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case hlsl:
@@ -1184,6 +1185,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl, sm_5_0)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
@@ -1864,6 +1866,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl, sm_5_0)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        __requireComputeDerivative();
         __target_switch
         {
             case hlsl:
@@ -2084,6 +2087,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl, sm_5_0)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
