@@ -4635,14 +4635,6 @@ static void CompleteDecl(
     ContainerDecl* containerDecl,
     Modifiers modifiers)
 {
-
-    // If this is a namespace and already added, we don't want to add to the parent
-    // Or add any modifiers
-    if (as<NamespaceDecl>(decl) && decl->parentDecl)
-    {
-        return;
-    }
-
     // Add any modifiers we parsed before the declaration to the list
     // of modifiers on the declaration itself.
     //
@@ -4698,6 +4690,13 @@ static void CompleteDecl(
                         declToModify->astNodeType);
                 }
             }
+        }
+
+        // If this is a namespace and already added, we don't want to add to the parent
+        // Or add any modifiers
+        if (as<NamespaceDecl>(decl) && decl->parentDecl)
+        {
+            return;
         }
 
         if (!as<GenericDecl>(containerDecl))
