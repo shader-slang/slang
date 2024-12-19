@@ -90,6 +90,10 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
     void checkPrimalSubstituteOfAttribute(
         FunctionDeclBase* funcDecl,
         PrimalSubstituteOfAttribute* attr);
+
+    void checkVarDeclCommon(VarDeclBase* varDecl);
+
+    void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 };
 
 struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
@@ -11710,6 +11714,43 @@ bool tryCheckDerivativeOfAttributeImpl(
         assocKind,
         imaginaryArgsToOriginal);
     return tempSink.getErrorCount() == 0;
+}
+
+void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
+{
+    bool hasSpecConstAttr = false;
+    bool hasPushConstAttr = false;
+    for (auto modifier : varDecl->modifiers)
+    {
+        if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
+        {
+            // Specialization constant.
+            // Check that type is basic type.
+            if (!as<BasicExpressionType>(varDecl->getType()) && !as<ErrorType>(varDecl->getType()))
+            {
+                getSink()->diagnose(modifier, Diagnostics::specializationConstantMustBeScalar);
+            }
+            hasSpecConstAttr = true;
+        }
+        else if (as<PushConstantAttribute>(modifier))
+        {
+            hasPushConstAttr = true;
+        }
+    }
+    if (hasSpecConstAttr && hasPushConstAttr)
+    {
+        getSink()->diagnose(
+            varDecl,
+            Diagnostics::variableCannotBePushAndSpecializationConstant,
+            varDecl->getName());
+    }
+    if (hasSpecConstAttr || hasPushConstAttr)
+    {
+        if (varDecl->findModifier<HLSLStaticModifier>())
+        {
+            getSink()->diagnose(varDecl, Diagnostics::pushOrSpecializationConstantCannotBeStatic);
+        }
+    }
 }
 
 void SemanticsDeclAttributesVisitor::checkForwardDerivativeOfAttribute(

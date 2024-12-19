@@ -298,7 +298,7 @@ struct RayTracing : public WindowedAppBase
 
     Slang::Result initialize()
     {
-        initializeBase("Ray Tracing Pipeline", 1024, 768);
+        SLANG_RETURN_ON_FAIL(initializeBase("Ray Tracing Pipeline", 1024, 768));
         if (!isTestMode())
         {
             gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e)
