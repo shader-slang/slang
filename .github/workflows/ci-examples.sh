@@ -139,7 +139,7 @@ function run_sample {
   local args
   sample="$1"
   shift
-  args=( "$@" )
+  args=("$@")
   sample_count=$((sample_count + 1))
   summary=("${summary[@]}" "$sample: ")
   if skip "$os:$config:$sample"; then
@@ -186,9 +186,8 @@ done
 echo ""
 echo "Summary: "
 echo
-for line in "${summary[@]}"
-do
-    printf '  %s\n' "$line"
+for line in "${summary[@]}"; do
+  printf '  %s\n' "$line"
 done
 echo ""
 echo "$failure_count failed, and $skip_count skipped, out of $sample_count tests"
