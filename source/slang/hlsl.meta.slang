@@ -1059,6 +1059,22 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, sm_5_0)]
+    T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+            case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleBias(__getSampler(), location, bias, offset, clamp, status);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
@@ -1163,6 +1179,23 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
+
+    [__readNone] 
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset, clamp, status);
+        }
+    }
+
     [__readNone]
     [ForceInline]
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
@@ -1194,6 +1227,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             };
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset, status);
         }
     }
 
@@ -1283,6 +1331,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, sm_5_0)]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp, out uint status)
+    {
+        __target_switch
+        {
+            case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp, status);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
     {
@@ -1365,6 +1428,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 };
             case wgsl:
                 return __getTexture().SampleLevel(__getSampler(), location, level, offset);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        __target_switch
+        {
+            case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                return __getTexture().SampleLevel(__getSampler(), location, level, offset, status);
         }
     }
 }
@@ -1785,6 +1863,22 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, sm_5_0)]
+    T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+            case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                __intrinsic_asm ".SampleBias";
+       }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
@@ -1990,6 +2084,22 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, sm_5_0)]
+    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmp";
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
@@ -2052,6 +2162,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3, $4)";
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpLevelZero";
         }
     }
 
@@ -2237,6 +2362,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, sm_5_0)]
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp, out uint status)
+    {
+        __target_switch
+        {
+            case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                __intrinsic_asm ".SampleGrad";
+       }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
@@ -2337,7 +2477,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
@@ -2397,6 +2536,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)$z";
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        __target_switch
+        {
+        case hlsl:
+                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                    , "HLSL supports only float and half type textures");
+                __intrinsic_asm ".SampleLevel";
         }
     }
 }
