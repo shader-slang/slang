@@ -2838,6 +2838,24 @@ void tryReplaceUsesOfStageInput(
                 });
         }
         break;
+    case ScalarizedVal::Flavor::arrayIndex:
+        {
+            auto arrayVal = as<ScalarizedArrayIndexValImpl>(val.impl);
+            traverseUses(
+                originalVal,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    switch (user->getOp())
+                    {
+                    case kIROp_GetElement:
+                    case kIROp_GetElementPtr:
+                        {
+                        }
+                        break;
+                    }
+                });
+        }
     case ScalarizedVal::Flavor::tuple:
         {
             auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
