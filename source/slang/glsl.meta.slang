@@ -146,6 +146,8 @@ public in int gl_SampleID : SV_SampleIndex;
 public in int gl_VertexIndex : SV_VertexID;
 public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
+public in int gl_BaseVertex : SV_StartVertexLocation;
+public in int gl_BaseInstance : SV_StartInstanceLocation;
 
 
 // Override operator* behavior to compute algebric product of matrices and vectors.

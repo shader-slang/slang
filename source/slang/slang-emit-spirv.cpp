@@ -5303,6 +5303,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             SpvBuiltInShadingRateKHR,
                             inst);
                 }
+                else if (semanticName == "sv_startvertexlocation")
+                {
+                    requireSPIRVCapability(SpvCapabilityDrawParameters);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseVertex, inst);
+                }
+                else if (semanticName == "sv_startinstancelocation")
+                {
+                    requireSPIRVCapability(SpvCapabilityDrawParameters);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseInstance, inst);
+                }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
         }
