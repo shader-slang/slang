@@ -3068,6 +3068,22 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
         ioParameterLists->params.add(info);
     }
 }
+
+void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
+{
+    if (paramInfo.direction == kParameterDirection_In)
+    {
+        if (!paramInfo.decl->findModifier<HLSLUniformModifier>())
+        {
+            auto semantic = paramInfo.decl->findModifier<HLSLSemantic>();
+            if (!semantic || !semantic->name.getContent().startsWithCaseInsensitive(toSlice("SV_")))
+            {
+                paramInfo.direction = kParameterDirection_ConstRef;
+            }
+        }
+        paramInfo.direction = kParameterDirection_ConstRef;
+    }
+}
 //
 // And here is our function that will do the recursive walk:
 void collectParameterLists(
@@ -3137,13 +3153,28 @@ void collectParameterLists(
     //
     if (auto callableDeclRef = declRef.as<CallableDecl>())
     {
+        // We need a special case here when lowering the varying parameters of a fragment shader.
+        // Due to the existence of `EvaluateAttributeAtSample` and friends, we need to always lower
+        // the fragment shader varying inputs as `__constref` parameters so we can pass pointers
+        // to these intrinsics.
+        //
+        bool lowerVaryingInputAsConstRef = false;
+        if (auto entryPointAttr = declRef.getDecl()->findModifier<EntryPointAttribute>())
+        {
+            lowerVaryingInputAsConstRef =
+                (entryPointAttr->capabilitySet.getTargetStage() == CapabilityAtom::fragment);
+        }
+
         // Don't collect parameters from the outer scope if
         // we are in a `static` context.
         if (mode == kParameterListCollectMode_Default)
         {
             for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
             {
-                ioParameterLists->params.add(getParameterInfo(context, paramDeclRef));
+                auto paramInfo = getParameterInfo(context, paramDeclRef);
+                if (lowerVaryingInputAsConstRef)
+                    makeVaryingInputParamConstRef(paramInfo);
+                ioParameterLists->params.add(paramInfo);
             }
             maybeAddReturnDestinationParam(
                 ioParameterLists,
@@ -8081,8 +8112,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto builder = getBuilder();
 
-        auto irParam = builder->createGlobalParam(paramType);
-        auto paramVal = LoweredValInfo::simple(irParam);
+        auto irParam = builder->createGlobalParam(builder->getPtrType(paramType));
+        auto paramVal = LoweredValInfo::ptr(irParam);
 
         addLinkageDecoration(context, irParam, decl);
         addNameHint(context, irParam, decl);
@@ -10985,6 +11016,16 @@ static void lowerFrontEndEntryPointToIR(
 
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
 
+    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
+    {
+        // If the entry point doesn't have an explicit `[shader("...")]` attribute,
+        // then we make sure to add one here, so the lowering logic knows it is an
+        // entry point.
+        auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
+        entryPointAttr->capabilitySet = entryPoint->getProfile().getCapabilityName();
+        addModifier(entryPointFuncDecl, entryPointAttr);
+    }
+
     auto builder = context->irBuilder;
     builder->setInsertInto(builder->getModule()->getModuleInst());
 
@@ -10997,21 +11038,6 @@ static void lowerFrontEndEntryPointToIR(
     if (auto irGeneric = as<IRGeneric>(instToDecorate))
     {
         instToDecorate = findGenericReturnVal(irGeneric);
-    }
-
-    // If the entry-point decorations has already been created (because the user
-    // specified duplicate entries in the entry point list), we can stop now.
-    if (instToDecorate->findDecoration<IREntryPointDecoration>())
-        return;
-
-    {
-
-        Name* entryPointName = entryPoint->getFuncDecl()->getName();
-        builder->addEntryPointDecoration(
-            instToDecorate,
-            entryPoint->getProfile(),
-            entryPointName->text.getUnownedSlice(),
-            moduleName.getUnownedSlice());
     }
 
     // Go through the entry point parameters creating decorations from layout as appropriate

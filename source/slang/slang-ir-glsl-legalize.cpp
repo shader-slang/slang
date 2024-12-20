@@ -2781,6 +2781,19 @@ void tryReplaceUsesOfStageInput(
                 });
         }
         break;
+    case ScalarizedVal::Flavor::address:
+        {
+            traverseUses(
+                originalVal,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    builder.replaceOperand(use, val.irValue);
+                });
+        }
+        break;
     case ScalarizedVal::Flavor::tuple:
         {
             auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
@@ -2789,22 +2802,27 @@ void tryReplaceUsesOfStageInput(
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
-                    if (auto fieldExtract = as<IRFieldExtract>(user))
+                    switch (user->getOp())
                     {
-                        auto fieldKey = fieldExtract->getField();
-                        ScalarizedVal fieldVal;
-                        for (auto element : tupleVal->elements)
+                    case kIROp_FieldExtract:
+                    case kIROp_FieldAddress:
                         {
-                            if (element.key == fieldKey)
+                            auto fieldKey = user->getOperand(1);
+                            ScalarizedVal fieldVal;
+                            for (auto element : tupleVal->elements)
                             {
-                                fieldVal = element.val;
-                                break;
+                                if (element.key == fieldKey)
+                                {
+                                    fieldVal = element.val;
+                                    break;
+                                }
+                            }
+                            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                            {
+                                tryReplaceUsesOfStageInput(context, fieldVal, user);
                             }
                         }
-                        if (fieldVal.flavor != ScalarizedVal::Flavor::none)
-                        {
-                            tryReplaceUsesOfStageInput(context, fieldVal, user);
-                        }
+                        break;
                     }
                 });
         }
@@ -3129,6 +3147,54 @@ void legalizeEntryPointParameterForGLSL(
             // Assign from the local variabel to the global output
             // variable before the actual `return` takes place.
             assign(&terminatorBuilder, globalOutputVal, localVal);
+        }
+    }
+    else if (auto ptrType = as<IRPtrTypeBase>(paramType))
+    {
+        // This is the case where the parameter is passed by const
+        // reference. We simply replace existing uses of the parameter
+        // with the real global variable.
+        SLANG_ASSERT(
+            ptrType->getOp() == kIROp_ConstRefType ||
+            ptrType->getAddressSpace() == AddressSpace::Input ||
+            ptrType->getAddressSpace() == AddressSpace::BuiltinInput);
+
+        auto globalValue = createGLSLGlobalVaryings(
+            context,
+            codeGenContext,
+            builder,
+            valueType,
+            paramLayout,
+            LayoutResourceKind::VaryingInput,
+            stage,
+            pp);
+        tryReplaceUsesOfStageInput(context, globalValue, pp);
+        for (auto dec : pp->getDecorations())
+        {
+            if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
+                continue;
+            auto globalVar = dec->getOperand(0);
+            auto key = dec->getOperand(1);
+            IRInst* realGlobalVar = nullptr;
+            if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
+                continue;
+            if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
+            {
+                for (auto elem : tupleVal->elements)
+                {
+                    if (elem.key == key)
+                    {
+                        realGlobalVar = elem.val.irValue;
+                        break;
+                    }
+                }
+            }
+            SLANG_ASSERT(realGlobalVar);
+
+            // we will be replacing uses of `globalVarToReplace`. We need
+            // globalVarToReplaceNextUse to catch the next use before it is removed from the
+            // list of uses.
+            globalVar->replaceUsesWith(realGlobalVar);
         }
     }
     else

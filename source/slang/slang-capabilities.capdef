@@ -390,6 +390,11 @@ alias glsl_spirv = glsl | spirv;
 /// [Compound]
 alias hlsl_spirv = hlsl | spirv;
 
+/// HLSL, GLSL and SPIRV code-gen targets
+/// [Compound]
+alias hlsl_glsl_spirv = hlsl | glsl | spirv;
+
+
 // stages
 //
 abstract stage;

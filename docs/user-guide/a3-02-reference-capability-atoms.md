@@ -792,6 +792,9 @@ Compound Capabilities
 `hlsl_spirv`
 > HLSL, and SPIRV code-gen targets
 
+`hlsl_glsl_spirv`
+> HLSL, GLSL and SPIRV code-gen targets
+
 `nvapi`
 > NVAPI capability for HLSL
 
