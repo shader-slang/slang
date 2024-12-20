@@ -2779,7 +2779,7 @@ void tryReplaceUsesOfStageInput(
             bool needMaterialize = false;
             if (auto ptrType = as<IRPtrTypeBase>(val.irValue->getDataType()))
             {
-                if (ptrType->getValueType() == originalVal->getDataType())
+                if (!as<IRPtrTypeBase>(originalVal->getDataType()))
                 {
                     needMaterialize = true;
                 }
@@ -2806,6 +2806,34 @@ void tryReplaceUsesOfStageInput(
                     else
                     {
                         builder.replaceOperand(use, val.irValue);
+                    }
+                });
+        }
+        break;
+    case ScalarizedVal::Flavor::typeAdapter:
+        {
+            traverseUses(
+                originalVal,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(val.impl);
+                    auto materializedInner = materializeValue(&builder, typeAdapter->val);
+                    auto adapted = adaptType(
+                        &builder,
+                        materializedInner,
+                        typeAdapter->pretendType,
+                        typeAdapter->actualType);
+                    if (user->getOp() == kIROp_Load)
+                    {
+                        user->replaceUsesWith(adapted.irValue);
+                        user->removeAndDeallocate();
+                    }
+                    else
+                    {
+                        use->set(adapted.irValue);
                     }
                 });
         }
@@ -3096,7 +3124,7 @@ void legalizeEntryPointParameterForGLSL(
         // We are going to create a local variable of the appropriate
         // type, which will replace the parameter, along with
         // one or more global variables for the actual input/output.
-
+        setInsertAfterOrdinaryInst(builder, pp);
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 

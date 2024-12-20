@@ -11035,6 +11035,21 @@ static void lowerFrontEndEntryPointToIR(
         instToDecorate = findGenericReturnVal(irGeneric);
     }
 
+    // If the entry-point decorations has already been created (because the user
+    // specified duplicate entries in the entry point list), we can stop now.
+    if (instToDecorate->findDecoration<IREntryPointDecoration>())
+        return;
+
+    {
+
+        Name* entryPointName = entryPoint->getFuncDecl()->getName();
+        builder->addEntryPointDecoration(
+            instToDecorate,
+            entryPoint->getProfile(),
+            entryPointName->text.getUnownedSlice(),
+            moduleName.getUnownedSlice());
+    }
+
     // Go through the entry point parameters creating decorations from layout as appropriate
     // But only if this is a definition not a declaration
     if (isDefinition(instToDecorate))
