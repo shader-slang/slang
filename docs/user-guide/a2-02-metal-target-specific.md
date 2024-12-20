@@ -40,6 +40,8 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_Target<N>`              | `[[color(N)]]`                                       |
 | `SV_VertexID`               | `[[vertex_id]]`                                      |
 | `SV_ViewportArrayIndex`     | `[[viewport_array_index]]`                           |
+| `SV_StartVertexLocation`    | `[[base_vertex]]`                                    |
+| `SV_StartInstanceLocation`  | `[[base_instance]]`                                  |
 
 Custom semantics are mapped to user attributes:
 

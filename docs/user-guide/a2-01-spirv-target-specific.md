@@ -60,8 +60,8 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_RenderTargetArrayIndex`   | `BuiltIn Layer`                   |
 | `SV_SampleIndex`              | `BuiltIn SampleId`                |
 | `SV_ShadingRate`              | `BuiltIn PrimitiveShadingRateKHR` |
-| `SV_StartVertexLocation`      | `*Not supported*                  |
-| `SV_StartInstanceLocation`    | `*Not supported*                  |
+| `SV_StartVertexLocation`      | `BuiltIn BaseVertex`              |
+| `SV_StartInstanceLocation`    | `BuiltIn BaseInstance`            |
 | `SV_StencilRef`               | `BuiltIn FragStencilRefEXT`       |
 | `SV_Target<N>`                | `Location`                        |
 | `SV_TessFactor`               | `BuiltIn TessLevelOuter`          |
