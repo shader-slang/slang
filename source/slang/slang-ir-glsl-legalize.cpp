@@ -1450,14 +1450,26 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // like our IR function parameters, and need a wrapper
     // `Out<...>` type to represent outputs.
     //
-    bool isOutput = (kind == LayoutResourceKind::VaryingOutput);
-    IRType* paramType = isOutput ? builder->getOutType(type) : type;
+    AddressSpace addrSpace = AddressSpace::Uniform;
+    IROp ptrOpCode = kIROp_PtrType;
+    switch (kind)
+    {
+    case LayoutResourceKind::VaryingInput:
+        addrSpace = AddressSpace::Input;
+        break;
+    case LayoutResourceKind::VaryingOutput:
+        addrSpace = AddressSpace::Output;
+        ptrOpCode = kIROp_OutType;
+        break;
+    default:
+        break;
+    }
+    IRType* paramType = (IRType*)builder->getPtrType(ptrOpCode, type, addrSpace);
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
 
-    ScalarizedVal val =
-        isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
+    ScalarizedVal val = ScalarizedVal::address(globalParam);
 
     if (systemValueInfo)
     {

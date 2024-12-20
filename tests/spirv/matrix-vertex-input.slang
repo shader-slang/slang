@@ -1,8 +1,8 @@
-//TEST(compute):COMPARE_RENDER_COMPUTE(filecheck-buffer=ROWMAJOR): -d3d11 -output-using-type
 //TEST(compute):COMPARE_RENDER_COMPUTE(filecheck-buffer=ROWMAJOR): -vk -output-using-type
+//TEST(compute):COMPARE_RENDER_COMPUTE(filecheck-buffer=ROWMAJOR): -d3d11 -output-using-type
 
+//TEST(compute):COMPARE_RENDER_COMPUTE(filecheck-buffer=COLMAJOR): -vk -output-using-type -xslang -DCOLUMN_MAJOR
 //TEST(compute):COMPARE_RENDER_COMPUTE(filecheck-buffer=COLMAJOR): -d3d11 -output-using-type -xslang -DCOLUMN_MAJOR
-//TEST(compute):COMPARE_RENDER_COMPUTE(filecheck-buffer=COLMAJOR): -vk -output-using-type  -xslang -DCOLUMN_MAJOR
 
 // Check that row_major and column_major matrix typed vertex input are correctly handled.
 

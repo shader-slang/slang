@@ -873,27 +873,24 @@ struct LoweredElementTypeContext
         {
             IRType* elementType = nullptr;
 
-            if (options.lowerBufferPointer)
+            if (auto ptrType = as<IRPtrTypeBase>(globalInst))
             {
-                if (auto ptrType = as<IRPtrTypeBase>(globalInst))
+                switch (ptrType->getAddressSpace())
                 {
-                    switch (ptrType->getAddressSpace())
-                    {
-                    case AddressSpace::UserPointer:
-                    case AddressSpace::Input:
-                    case AddressSpace::Output:
-                        elementType = ptrType->getValueType();
-                        break;
-                    }
+                case AddressSpace::UserPointer:
+                    if (!options.lowerBufferPointer)
+                        continue;
+                    [[fallthrough]];
+                case AddressSpace::Input:
+                case AddressSpace::Output:
+                    elementType = ptrType->getValueType();
+                    break;
                 }
             }
-            else
-            {
-                if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
-                    elementType = structBuffer->getElementType();
-                else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
-                    elementType = constBuffer->getElementType();
-            }
+            if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
+                elementType = structBuffer->getElementType();
+            else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
+                elementType = constBuffer->getElementType();
             if (as<IRTextureBufferType>(globalInst))
                 continue;
             if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&
