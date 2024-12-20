@@ -51,7 +51,7 @@ standard output = {
     "entryPoints": [
         {
             "name": "computeMain",
-            "stage:": "compute",
+            "stage": "compute",
             "parameters": [
                 {
                     "name": "tid",
