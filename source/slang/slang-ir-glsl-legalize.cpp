@@ -1464,12 +1464,16 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     default:
         break;
     }
-    IRType* paramType = (IRType*)builder->getPtrType(ptrOpCode, type, addrSpace);
+
+    // Non system value varying inputs shall be passed as pointers.
+    bool shouldUsePtr = (ptrOpCode == kIROp_OutType || !systemValueInfo);
+    IRType* paramType = shouldUsePtr ? builder->getPtrType(ptrOpCode, type, addrSpace) : type;
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
 
-    ScalarizedVal val = ScalarizedVal::address(globalParam);
+    ScalarizedVal val =
+        shouldUsePtr ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
 
     if (systemValueInfo)
     {

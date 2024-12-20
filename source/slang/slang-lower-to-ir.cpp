@@ -3081,7 +3081,6 @@ void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
                 paramInfo.direction = kParameterDirection_ConstRef;
             }
         }
-        paramInfo.direction = kParameterDirection_ConstRef;
     }
 }
 //
@@ -8112,8 +8111,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto builder = getBuilder();
 
-        auto irParam = builder->createGlobalParam(builder->getPtrType(paramType));
-        auto paramVal = LoweredValInfo::ptr(irParam);
+        auto irParam = builder->createGlobalParam(paramType);
+        auto paramVal = LoweredValInfo::simple(irParam);
 
         addLinkageDecoration(context, irParam, decl);
         addNameHint(context, irParam, decl);
