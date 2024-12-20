@@ -126,6 +126,8 @@ static const char* hlslSemanticNames[] = {
     "SV_ViewID",
     "SV_ViewportArrayIndex",
     "SV_ShadingRate",
+    "SV_StartVertexLocation",
+    "SV_StartInstanceLocation",
 };
 
 bool isDeclKeyword(const UnownedStringSlice& slice)
