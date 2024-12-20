@@ -114,6 +114,7 @@ jobs:
       - name: Build Slang
         if: steps.filter.outputs.should-run == 'true'
         run: |
+          set -e
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
               pushd emsdk
