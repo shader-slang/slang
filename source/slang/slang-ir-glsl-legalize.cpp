@@ -1466,14 +1466,12 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     }
 
     // Non system value varying inputs shall be passed as pointers.
-    bool shouldUsePtr = (ptrOpCode == kIROp_OutType || !systemValueInfo);
-    IRType* paramType = shouldUsePtr ? builder->getPtrType(ptrOpCode, type, addrSpace) : type;
+    IRType* paramType = builder->getPtrType(ptrOpCode, type, addrSpace);
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
 
-    ScalarizedVal val =
-        shouldUsePtr ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
+    ScalarizedVal val = ScalarizedVal::address(globalParam);
 
     if (systemValueInfo)
     {
@@ -2735,9 +2733,9 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
     IRBuilder builder(inputVertexAttr);
     builder.setInsertBefore(inputVertexAttr);
     auto arrayType = builder.getArrayType(
-        inputVertexAttr->getDataType(),
+        tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
-    arrayInst = builder.createGlobalParam(arrayType);
+    arrayInst = builder.createGlobalParam(builder.getPtrType(arrayType, AddressSpace::Input));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 
@@ -2770,31 +2768,45 @@ void tryReplaceUsesOfStageInput(
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
-                    if (user->getOp() == kIROp_GetPerVertexInputArray)
-                    {
-                        auto arrayInst = getOrCreatePerVertexInputArray(context, val.irValue);
-                        user->replaceUsesWith(arrayInst);
-                        user->removeAndDeallocate();
-                    }
-                    else
-                    {
-                        IRBuilder builder(user);
-                        builder.setInsertBefore(user);
-                        builder.replaceOperand(use, val.irValue);
-                    }
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    builder.replaceOperand(use, val.irValue);
                 });
         }
         break;
     case ScalarizedVal::Flavor::address:
         {
+            bool needMaterialize = false;
+            if (auto ptrType = as<IRPtrTypeBase>(val.irValue->getDataType()))
+            {
+                if (ptrType->getValueType() == originalVal->getDataType())
+                {
+                    needMaterialize = true;
+                }
+            }
             traverseUses(
                 originalVal,
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
+                    if (user->getOp() == kIROp_GetPerVertexInputArray)
+                    {
+                        auto arrayInst = getOrCreatePerVertexInputArray(context, val.irValue);
+                        user->replaceUsesWith(arrayInst);
+                        user->removeAndDeallocate();
+                        return;
+                    }
                     IRBuilder builder(user);
                     builder.setInsertBefore(user);
-                    builder.replaceOperand(use, val.irValue);
+                    if (needMaterialize)
+                    {
+                        auto materializedVal = materializeValue(&builder, val);
+                        builder.replaceOperand(use, materializedVal);
+                    }
+                    else
+                    {
+                        builder.replaceOperand(use, val.irValue);
+                    }
                 });
         }
         break;

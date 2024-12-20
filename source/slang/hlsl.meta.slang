@@ -8114,7 +8114,7 @@ RasterizerOrderedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(Rasteriz
 /// @category interpolation Vertex Interpolation Functions
 __generic<T : __BuiltinArithmeticType>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 T EvaluateAttributeAtCentroid(__constref T x)
 {
     __target_switch
@@ -8129,7 +8129,7 @@ T EvaluateAttributeAtCentroid(__constref T x)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeAtCentroid(__constref vector<T,N> x)
 {
     __target_switch
@@ -8144,7 +8144,7 @@ vector<T,N> EvaluateAttributeAtCentroid(__constref vector<T,N> x)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T,N,M> EvaluateAttributeAtCentroid(__constref matrix<T,N,M> x)
 {
     __target_switch
@@ -8163,7 +8163,7 @@ matrix<T,N,M> EvaluateAttributeAtCentroid(__constref matrix<T,N,M> x)
 /// @category interpolation Vertex Interpolation Functions
 __generic<T : __BuiltinArithmeticType>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 T EvaluateAttributeAtSample(__constref T x, uint sampleindex)
 {
     __target_switch
@@ -8178,7 +8178,7 @@ T EvaluateAttributeAtSample(__constref T x, uint sampleindex)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeAtSample(__constref vector<T,N> x, uint sampleindex)
 {
     __target_switch
@@ -8193,7 +8193,7 @@ vector<T,N> EvaluateAttributeAtSample(__constref vector<T,N> x, uint sampleindex
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T,N,M> EvaluateAttributeAtSample(__constref matrix<T,N,M> x, uint sampleindex)
 {
     __target_switch
@@ -8237,7 +8237,7 @@ matrix<T,N,M> EvaluateAttributeAtSample(__constref matrix<T,N,M> x, uint samplei
 /// @category interpolation Vertex Interpolation Functions
 __generic<T : __BuiltinArithmeticType>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 T EvaluateAttributeSnapped(__constref T x, int2 offset)
 {
     __target_switch
@@ -8258,7 +8258,7 @@ T EvaluateAttributeSnapped(__constref T x, int2 offset)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
 {
     __target_switch
@@ -8279,7 +8279,7 @@ vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(hlsl_glsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T,N,M> EvaluateAttributeSnapped(__constref matrix<T,N,M> x, int2 offset)
 {
     __target_switch
@@ -9288,7 +9288,7 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
 }
 
 __intrinsic_op($(kIROp_GetPerVertexInputArray))
-Array<T, 3> __GetPerVertexInputArray<T>(T attribute);
+Ref<Array<T, 3>> __GetPerVertexInputArray<T>(__constref T attribute);
 
 /// Get the value of a vertex attribute at a specific vertex.
 ///
@@ -9309,7 +9309,7 @@ __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
 [KnownBuiltin("GetAttributeAtVertex")]
 [__unsafeForceInlineEarly]
-T GetAttributeAtVertex(T attribute, uint vertexIndex)
+T GetAttributeAtVertex(__constref T attribute, uint vertexIndex)
 {
     __target_switch
     {
@@ -9338,7 +9338,7 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
-vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
+vector<T,N> GetAttributeAtVertex(__constref vector<T,N> attribute, uint vertexIndex)
 {
     __target_switch
     {
@@ -9372,7 +9372,7 @@ __generic<T : __BuiltinType, let N : int, let M : int>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
-matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
+matrix<T,N,M> GetAttributeAtVertex(__constref matrix<T,N,M> attribute, uint vertexIndex)
 {
     __target_switch
     {

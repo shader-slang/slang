@@ -3075,11 +3075,7 @@ void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
     {
         if (!paramInfo.decl->findModifier<HLSLUniformModifier>())
         {
-            auto semantic = paramInfo.decl->findModifier<HLSLSemantic>();
-            if (!semantic || !semantic->name.getContent().startsWithCaseInsensitive(toSlice("SV_")))
-            {
-                paramInfo.direction = kParameterDirection_ConstRef;
-            }
+            paramInfo.direction = kParameterDirection_ConstRef;
         }
     }
 }
