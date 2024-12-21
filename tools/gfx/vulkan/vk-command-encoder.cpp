@@ -206,7 +206,7 @@ Result PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindP
         api.vkCmdBindPipeline(m_vkCommandBuffer, pipelineBindPoint, newPipelineImpl->m_pipeline);
         m_boundPipelines[pipelineBindPointId] = newPipelineImpl->m_pipeline;
     }
-
+    
     return SLANG_OK;
 }
 
