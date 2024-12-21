@@ -86,10 +86,13 @@ namespace gfx
     x(vkCmdFillBuffer) \
     x(vkCmdBindDescriptorSets) \
     x(vkCmdDispatch) \
+    x(vkCmdDispatchIndirect) \
     x(vkCmdDraw) \
     x(vkCmdDrawIndexed) \
     x(vkCmdDrawIndirect) \
+    x(vkCmdDrawIndirectCount) \
     x(vkCmdDrawIndexedIndirect) \
+    x(vkCmdDrawIndexedIndirectCount) \
     x(vkCmdSetScissor) \
     x(vkCmdSetViewport) \
     x(vkCmdBindVertexBuffers) \
