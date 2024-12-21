@@ -1111,19 +1111,28 @@ Result RenderCommandEncoder::drawIndirect(
     IBufferResource* countBuffer,
     Offset countOffset)
 {
-    // Vulkan does not support sourcing the count from a buffer.
-    if (countBuffer)
-        return SLANG_FAIL;
-
     SLANG_RETURN_ON_FAIL(prepareDraw());
     auto& api = *m_api;
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
-    api.vkCmdDrawIndirect(
-        m_vkCommandBuffer,
-        argBufferImpl->m_buffer.m_buffer,
-        argOffset,
-        maxDrawCount,
-        sizeof(VkDrawIndirectCommand));
+
+    if (countBuffer) {
+        auto countBufferImpl = static_cast<BufferResourceImpl*>(countBuffer);
+        api.vkCmdDrawIndirectCount(
+            m_vkCommandBuffer,
+            argBufferImpl->m_buffer.m_buffer,
+            argOffset,
+            countBufferImpl->m_buffer.m_buffer,
+            countOffset,
+            maxDrawCount,
+            sizeof(VkDrawIndirectCommand));
+    } else {
+        api.vkCmdDrawIndirect(
+            m_vkCommandBuffer,
+            argBufferImpl->m_buffer.m_buffer,
+            argOffset,
+            maxDrawCount,
+            sizeof(VkDrawIndirectCommand));
+    }
     return SLANG_OK;
 }
 
@@ -1134,20 +1143,28 @@ Result RenderCommandEncoder::drawIndexedIndirect(
     IBufferResource* countBuffer,
     Offset countOffset)
 {
-    // Vulkan does not support sourcing the count from a buffer.
-    if (countBuffer)
-        return SLANG_FAIL;
-
     SLANG_RETURN_ON_FAIL(prepareDraw());
-
     auto& api = *m_api;
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
-    api.vkCmdDrawIndexedIndirect(
-        m_vkCommandBuffer,
-        argBufferImpl->m_buffer.m_buffer,
-        argOffset,
-        maxDrawCount,
-        sizeof(VkDrawIndexedIndirectCommand));
+
+    if (countBuffer) {
+        auto countBufferImpl = static_cast<BufferResourceImpl*>(countBuffer);
+        api.vkCmdDrawIndexedIndirectCount(
+            m_vkCommandBuffer,
+            argBufferImpl->m_buffer.m_buffer,
+            argOffset,
+            countBufferImpl->m_buffer.m_buffer,
+            countOffset,
+            maxDrawCount,
+            sizeof(VkDrawIndexedIndirectCommand));
+    } else {
+        api.vkCmdDrawIndexedIndirect(
+            m_vkCommandBuffer,
+            argBufferImpl->m_buffer.m_buffer,
+            argOffset,
+            maxDrawCount,
+            sizeof(VkDrawIndexedIndirectCommand));
+    }
     return SLANG_OK;
 }
 
