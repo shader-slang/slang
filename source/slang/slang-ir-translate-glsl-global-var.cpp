@@ -122,7 +122,8 @@ struct GlobalVarTranslationContext
             // Add an entry point parameter for all the inputs.
             auto firstBlock = entryPointFunc->getFirstBlock();
             builder.setInsertInto(firstBlock);
-            auto inputParam = builder.emitParam(inputStructType);
+            auto inputParam =
+                builder.emitParam(builder.getPtrType(inputStructType, AddressSpace::Input));
             builder.addLayoutDecoration(inputParam, paramLayout);
 
             // Initialize all global variables.
@@ -130,10 +131,6 @@ struct GlobalVarTranslationContext
             {
                 auto input = inputVars[i];
                 setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
-                auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
-                builder.emitStore(
-                    input,
-                    builder.emitFieldExtract(inputType, inputParam, inputKeys[i]));
                 // Relate "global variable" to a "global parameter" for use later in compilation
                 // to resolve a "global variable" shadowing a "global parameter" relationship.
                 builder.addGlobalVariableShadowingGlobalParameterDecoration(

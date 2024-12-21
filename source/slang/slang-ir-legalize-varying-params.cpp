@@ -1475,4 +1475,71 @@ void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* si
     context.processModule(module, sink);
 }
 
+void depointerizeInputParams(IRFunc* entryPointFunc)
+{
+    List<IRParam*> workList;
+    List<Index> modifiedParamIndices;
+    Index i = 0;
+    for (auto param : entryPointFunc->getParams())
+    {
+        if (auto constRefType = as<IRConstRefType>(param->getFullType()))
+        {
+            switch (constRefType->getValueType()->getOp())
+            {
+            case kIROp_VerticesType:
+            case kIROp_IndicesType:
+            case kIROp_PrimitivesType:
+                continue;
+            default:
+                break;
+            }
+            workList.add(param);
+            modifiedParamIndices.add(i);
+        }
+        else if (auto ptrType = as<IRPtrTypeBase>(param->getFullType()))
+        {
+            switch (ptrType->getAddressSpace())
+            {
+            case AddressSpace::Input:
+            case AddressSpace::BuiltinInput:
+                workList.add(param);
+                modifiedParamIndices.add(i);
+                break;
+            }
+        }
+        i++;
+    }
+    for (auto param : workList)
+    {
+        auto valueType = as<IRPtrTypeBase>(param->getDataType())->getValueType();
+        IRBuilder builder(param);
+        setInsertBeforeOrdinaryInst(&builder, param);
+        auto var = builder.emitVar(valueType);
+        param->replaceUsesWith(var);
+        builder.emitStore(var, param);
+        param->setFullType(valueType);
+    }
+
+    fixUpFuncType(entryPointFunc);
+
+    // Fix up callsites of the entrypoint func.
+    for (auto use = entryPointFunc->firstUse; use; use = use->nextUse)
+    {
+        auto call = as<IRCall>(use->getUser());
+        if (!call)
+            continue;
+        IRBuilder builder(call);
+        builder.setInsertBefore(call);
+        for (auto paramIndex : modifiedParamIndices)
+        {
+            auto arg = call->getArg(paramIndex);
+            auto ptrType = as<IRPtrTypeBase>(arg->getDataType());
+            if (!ptrType)
+                continue;
+            auto val = builder.emitLoad(arg);
+            call->setArg(paramIndex, val);
+        }
+    }
+}
+
 } // namespace Slang

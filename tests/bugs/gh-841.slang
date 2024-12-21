@@ -11,8 +11,8 @@ struct RasterVertex
 	float4 c : COLOR;
 
   // Make sure that the input value in location 1 is decorated as Flat
-  // SPV-DAG: [[VAL:%[_A-Za-z0-9]+]] = OpVariable {{.*}} Input
-  // SPV-DAG: OpDecorate [[VAL]] Location 1
+  // SPV-DAG: OpDecorate [[VAL:%[_A-Za-z0-9]+]] Location 1
+  // SPV-DAG: [[VAL]] = OpVariable {{.*}} Input
   // SPV-DAG: OpDecorate [[VAL]] Flat
   //
   // Likewise for GLSL

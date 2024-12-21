@@ -18,6 +18,7 @@ void legalizeEntryPointVaryingParamsForCPU(IRModule* module, DiagnosticSink* sin
 
 void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink);
 
+void depointerizeInputParams(IRFunc* entryPoint);
 
 // (#4375) Once `slang-ir-metal-legalize.cpp` is merged with
 // `slang-ir-legalize-varying-params.cpp`, move the following

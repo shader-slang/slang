@@ -4700,9 +4700,21 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     auto rawType = varDecl->getDataType();
 
     auto varType = rawType;
-    if (auto outType = as<IROutTypeBase>(varType))
+    if (auto ptrType = as<IRPtrTypeBase>(varType))
     {
-        varType = outType->getValueType();
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::Input:
+        case AddressSpace::Output:
+        case AddressSpace::BuiltinInput:
+        case AddressSpace::BuiltinOutput:
+            varType = ptrType->getValueType();
+            break;
+        default:
+            if (as<IROutTypeBase>(ptrType))
+                varType = ptrType->getValueType();
+            break;
+        }
     }
     if (as<IRVoidType>(varType))
         return;
