@@ -84,6 +84,7 @@ namespace gfx {
     x(vkCmdFillBuffer) \
     x(vkCmdBindDescriptorSets) \
     x(vkCmdDispatch) \
+    x(vkCmdDispatchIndirect) \
     x(vkCmdDraw) \
     x(vkCmdDrawIndexed) \
     x(vkCmdDrawIndirect) \

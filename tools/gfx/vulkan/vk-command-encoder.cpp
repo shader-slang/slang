@@ -206,7 +206,7 @@ Result PipelineCommandEncoder::bindRenderState(VkPipelineBindPoint pipelineBindP
         api.vkCmdBindPipeline(m_vkCommandBuffer, pipelineBindPoint, newPipelineImpl->m_pipeline);
         m_boundPipelines[pipelineBindPointId] = newPipelineImpl->m_pipeline;
     }
-    
+
     return SLANG_OK;
 }
 
@@ -1236,7 +1236,17 @@ Result ComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 
 Result ComputeCommandEncoder::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
-    SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
+    auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
+    if (!pipeline)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Also create descriptor sets based on the given pipeline layout
+    SLANG_RETURN_ON_FAIL(bindRenderState(VK_PIPELINE_BIND_POINT_COMPUTE));
+    auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
+    m_api->vkCmdDispatchIndirect(m_vkCommandBuffer, argBufferImpl->m_buffer.m_buffer, offset);
+    return SLANG_OK;
 }
 
 void RayTracingCommandEncoder::_memoryBarrier(
