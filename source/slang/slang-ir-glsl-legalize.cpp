@@ -70,6 +70,7 @@ struct ScalarizedTypeAdapterValImpl;
 
 struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
 {
+    ScalarizedVal arrayVal;
     Index index;
 };
 
@@ -132,14 +133,14 @@ struct ScalarizedVal
         result.impl = (ScalarizedValImpl*)impl;
         return result;
     }
-    static ScalarizedVal scalarizedArrayIndex(IRInst* irValue, Index index)
+    static ScalarizedVal scalarizedArrayIndex(ScalarizedVal arrayVal, Index index)
     {
         ScalarizedVal result;
         result.flavor = Flavor::arrayIndex;
         auto impl = new ScalarizedArrayIndexValImpl;
         impl->index = index;
-
-        result.irValue = irValue;
+        impl->arrayVal = arrayVal;
+        result.irValue = nullptr;
         result.impl = impl;
         return result;
     }
@@ -1287,6 +1288,22 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         }
     }
 
+    AddressSpace addrSpace = AddressSpace::Uniform;
+    IROp ptrOpCode = kIROp_PtrType;
+    switch (kind)
+    {
+    case LayoutResourceKind::VaryingInput:
+        addrSpace = AddressSpace::Input;
+        break;
+    case LayoutResourceKind::VaryingOutput:
+        addrSpace = AddressSpace::Output;
+        ptrOpCode = kIROp_OutType;
+        break;
+    default:
+        break;
+    }
+
+
     // If we have a declarator, we just use the normal logic, as that seems to work correctly
     //
     if (systemValueInfo && systemValueInfo->arrayIndex >= 0 && declarator == nullptr)
@@ -1323,9 +1340,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // Set the array size to 0, to mean it is unsized
             auto arrayType = builder->getArrayType(type, 0);
 
-            IRType* paramType = kind == LayoutResourceKind::VaryingOutput
-                                    ? (IRType*)builder->getOutType(arrayType)
-                                    : arrayType;
+            IRType* paramType = builder->getPtrType(ptrOpCode, type, addrSpace);
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
@@ -1355,9 +1370,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         semanticGlobal->addIndex(systemValueInfo->arrayIndex);
 
         // Make it an array index
-        ScalarizedVal val = ScalarizedVal::scalarizedArrayIndex(
-            semanticGlobal->globalParam,
-            systemValueInfo->arrayIndex);
+        ScalarizedVal val = ScalarizedVal::address(semanticGlobal->globalParam);
+        val = ScalarizedVal::scalarizedArrayIndex(val, systemValueInfo->arrayIndex);
 
         // We need to make this access, an array access to the global
         if (auto fromType = systemValueInfo->requiredType)
@@ -1450,20 +1464,6 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // like our IR function parameters, and need a wrapper
     // `Out<...>` type to represent outputs.
     //
-    AddressSpace addrSpace = AddressSpace::Uniform;
-    IROp ptrOpCode = kIROp_PtrType;
-    switch (kind)
-    {
-    case LayoutResourceKind::VaryingInput:
-        addrSpace = AddressSpace::Input;
-        break;
-    case LayoutResourceKind::VaryingOutput:
-        addrSpace = AddressSpace::Output;
-        ptrOpCode = kIROp_OutType;
-        break;
-    default:
-        break;
-    }
 
     // Non system value varying inputs shall be passed as pointers.
     IRType* paramType = builder->getPtrType(ptrOpCode, type, addrSpace);
@@ -1956,10 +1956,9 @@ ScalarizedVal adaptType(
         break;
     case ScalarizedVal::Flavor::arrayIndex:
         {
-            auto element = builder->emitElementExtract(
-                val.irValue,
-                as<ScalarizedArrayIndexValImpl>(val.impl)->index);
-            return adaptType(builder, element, toType, fromType);
+            auto arrayImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
+            auto elementVal = getSubscriptVal(builder, fromType, arrayImpl->arrayVal, arrayImpl->index);
+            return adaptType(builder, elementVal, toType, fromType);
         }
         break;
     default:
@@ -2840,19 +2839,25 @@ void tryReplaceUsesOfStageInput(
         break;
     case ScalarizedVal::Flavor::arrayIndex:
         {
-            auto arrayVal = as<ScalarizedArrayIndexValImpl>(val.impl);
             traverseUses(
                 originalVal,
                 [&](IRUse* use)
                 {
+                    auto arrayIndexImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
                     auto user = use->getUser();
-                    switch (user->getOp())
+                    IRBuilder builder(user);
+                    auto subscriptVal = getSubscriptVal(&builder, originalVal->getDataType(), arrayIndexImpl->arrayVal,
+                        arrayIndexImpl->index);
+                    builder.setInsertBefore(user);
+                    auto materializedInner = materializeValue(&builder, subscriptVal);
+                    if (user->getOp() == kIROp_Load)
                     {
-                    case kIROp_GetElement:
-                    case kIROp_GetElementPtr:
-                        {
-                        }
-                        break;
+                        user->replaceUsesWith(materializedInner);
+                        user->removeAndDeallocate();
+                    }
+                    else
+                    {
+                        use->set(materializedInner);
                     }
                 });
         }
