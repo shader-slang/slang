@@ -20806,3 +20806,276 @@ T workgroupUniformLoad<T>(__ref T v)
         return v;
     }
 }
+
+//
+// Pack/Unpack Math Intrinsics
+//
+
+typealias uint8_t4_packed = uint32_t;
+typealias int8_t4_packed = uint32_t;
+
+[__readNone]
+[ForceInline]
+uint16_t __lsb_as_u16(uint32_t val)
+{
+    return uint16_t(val & 0xFFU);
+}
+
+[__readNone]
+[ForceInline]
+uint32_t __lsb_as_u32(uint32_t val)
+{
+    return (val & 0xFFU);
+}
+
+[__readNone]
+[ForceInline]
+int8_t __lsb_as_s8(uint32_t val)
+{
+    return int8_t(val & 0xFFU);
+}
+
+[__readNone]
+[ForceInline]
+int16_t __lsb_as_s16(uint32_t val)
+{
+    return int16_t(__lsb_as_s8(val));
+}
+
+[__readNone]
+[ForceInline]
+int32_t __lsb_as_s32(uint32_t val)
+{
+    return int32_t(__lsb_as_s8(val));
+}
+
+
+[__readNone]
+[ForceInline]
+uint32_t __lsb_clamp_u8_as_u32(uint32_t val)
+{
+    return clamp(val, 0U, 255U);
+}
+
+[__readNone]
+[ForceInline]
+uint32_t __lsb_clamp_s8_as_u32(int32_t val)
+{
+    return (uint32_t(clamp(val, -128, 127)) & 0xFFU);
+}
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int16_t4 unpack_s8s16(int8_t4_packed packedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_s8s16";
+    default:
+        return int16_t4
+        (
+            __lsb_as_s16(packedVal),
+            __lsb_as_s16(packedVal >> 8U),
+            __lsb_as_s16(packedVal >> 16U),
+            __lsb_as_s16(packedVal >> 24U),
+        );
+    }
+}
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint16_t4 unpack_u8u16(uint8_t4_packed packedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_u8u16";
+    default:
+        return uint16_t4
+        (
+            __lsb_as_u16(packedVal),
+            __lsb_as_u16(packedVal >> 8U),
+            __lsb_as_u16(packedVal >> 16U),
+            __lsb_as_u16(packedVal >> 24U),
+        );
+    }
+}
+
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int32_t4 unpack_s8s32(int8_t4_packed packedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_s8s32";
+    case wgsl: __intrinsic_asm "unpack4xI8";
+    default:
+        return int32_t4
+        (
+            __lsb_as_s32(packedVal),
+            __lsb_as_s32(packedVal >> 8U),
+            __lsb_as_s32(packedVal >> 16U),
+            __lsb_as_s32(packedVal >> 24U),
+        );
+    }
+}
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint32_t4 unpack_u8u32(uint8_t4_packed packedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_u8u32";
+    case wgsl: __intrinsic_asm "unpack4xU8";
+    default:
+        return uint32_t4
+        (
+            __lsb_as_u32(packedVal),
+            __lsb_as_u32(packedVal >> 8U),
+            __lsb_as_u32(packedVal >> 16U),
+            __lsb_as_u32(packedVal >> 24U),
+        );
+    }
+}
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint8_t4_packed pack_u8(uint32_t4 unpackedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_u8";
+    case wgsl: __intrinsic_asm "pack4xU8";
+    default:
+        return __lsb_as_u32(unpackedVal.x)       |
+               (__lsb_as_u32(unpackedVal.y) << 8U)  |
+               (__lsb_as_u32(unpackedVal.z) << 16U) |
+               (__lsb_as_u32(unpackedVal.w) << 24U);
+    }
+}
+
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int8_t4_packed pack_s8(int32_t4 unpackedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_s8";
+    case wgsl: __intrinsic_asm "pack4xI8";
+    default:
+        return __lsb_as_u32(unpackedVal.x)       |
+               (__lsb_as_u32(unpackedVal.y) << 8U)  |
+               (__lsb_as_u32(unpackedVal.z) << 16U) |
+               (__lsb_as_u32(unpackedVal.w) << 24U);
+    }
+}
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint8_t4_packed pack_u8(uint16_t4 unpackedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_u8";
+    default:
+        return __lsb_as_u32(unpackedVal.x)       |
+               (__lsb_as_u32(unpackedVal.y) << 8U)  |
+               (__lsb_as_u32(unpackedVal.z) << 16U) |
+               (__lsb_as_u32(unpackedVal.w) << 24U);
+    }
+}
+
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int8_t4_packed pack_s8(int16_t4 unpackedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_s8";
+    default:
+        return __lsb_as_u32(unpackedVal.x)       |
+               (__lsb_as_u32(unpackedVal.y) << 8U)  |
+               (__lsb_as_u32(unpackedVal.z) << 16U) |
+               (__lsb_as_u32(unpackedVal.w) << 24U);
+    }
+}
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint8_t4_packed pack_clamp_u8(uint32_t4 unpackedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_u8";
+    case wgsl: __intrinsic_asm "pack4xU8Clamp";
+    default:
+        return __lsb_clamp_u8_as_u32(unpackedVal.x)       |
+               (__lsb_clamp_u8_as_u32(unpackedVal.y) << 8U)  |
+               (__lsb_clamp_u8_as_u32(unpackedVal.z) << 16U) |
+               (__lsb_clamp_u8_as_u32(unpackedVal.w) << 24U);
+    }
+}
+
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int8_t4_packed pack_clamp_s8(int32_t4 unpackedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_s8";
+    case wgsl: __intrinsic_asm "pack4xI8Clamp";
+    default:
+        return __lsb_clamp_s8_as_u32(unpackedVal.x)       |
+               (__lsb_clamp_s8_as_u32(unpackedVal.y) << 8U)  |
+               (__lsb_clamp_s8_as_u32(unpackedVal.z) << 16U) |
+               (__lsb_clamp_s8_as_u32(unpackedVal.w) << 24U);
+    }
+}
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint8_t4_packed pack_clamp_u8(uint16_t4 unpackedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_u8";
+    default:
+        return __lsb_clamp_u8_as_u32(unpackedVal.x)       |
+               (__lsb_clamp_u8_as_u32(unpackedVal.y) << 8U)  |
+               (__lsb_clamp_u8_as_u32(unpackedVal.z) << 16U) |
+               (__lsb_clamp_u8_as_u32(unpackedVal.w) << 24U);
+    }
+}
+
+
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int8_t4_packed pack_clamp_s8(int16_t4 unpackedVal)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_s8";
+    default:
+        return __lsb_clamp_s8_as_u32(unpackedVal.x)       |
+               (__lsb_clamp_s8_as_u32(unpackedVal.y) << 8U)  |
+               (__lsb_clamp_s8_as_u32(unpackedVal.z) << 16U) |
+               (__lsb_clamp_s8_as_u32(unpackedVal.w) << 24U);
+    }
+}
+
