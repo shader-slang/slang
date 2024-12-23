@@ -1328,7 +1328,51 @@ struct SpecializationContext
         // If we never found a parameter or return type worth specializing, we should bail out.
         //
         if (!returnTypeNeedSpecialization && !argumentNeedSpecialization)
+        {
+            auto firstParam = calleeFunc->getFirstParam();
+            auto firstArg = inst->getArg(0);
+            if (!firstParam || !firstArg)
+                return false;
+
+            // If the first parameter is `this_type(interface_type)`, we will try to see if we
+            // can specialize this type to some concrete type.
+            //
+            // This is a corner case that we can't handle during maybeSpecializeGeneric() call. For the
+            // specialize call like this `specialize(base, this_type(interface_type), witness_table)`,
+            // this will specialize the function in the witness_table by using the 'this_type(interface_type)'
+            // as the first argument. However, we cannot handle this case in maybeSpecializeGeneric() because
+            // we the concrete type of the 'this_type(interface_type)' is not known at that time. So we have to
+            // handle this case here.
+            if (auto thisType = as<IRThisType>(firstParam->getDataType()))
+            {
+                if(as<IRInterfaceType>(thisType->getConstraintType()))
+                {
+                    auto argType = firstArg->getDataType();
+                    if (isCompileTimeConstantType(argType))
+                    {
+                        IRBuilder builderStorage(module);
+                        auto builder = &builderStorage;
+                        auto newParam = builder->createParam(argType);
+
+                        // Replace the first parameter with the new parameter.
+                        auto firstBlock = calleeFunc->getFirstBlock();
+                        firstBlock->insertParamAtHead(newParam);
+                        firstParam->transferDecorationsTo(newParam);
+                        firstParam->replaceUsesWith(newParam);
+                        firstParam->removeAndDeallocate();
+
+                        // Replace the first parameter of the function type with the
+                        // concrete type.
+                        auto functionType = calleeFunc->getDataType();
+                        auto firstParamType = functionType->getParamType(0);
+                        firstParamType->replaceUsesWith(argType);
+                        firstParamType->removeAndDeallocate();
+                    }
+                }
+            }
+
             return false;
+        }
 
         // At this point, we believe we *should* and *can* specialize.
         //

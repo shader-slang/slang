@@ -16,6 +16,9 @@ get_git_version(
 project(slang VERSION "${SLANG_VERSION_NUMERIC}" LANGUAGES)
 set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
 
+# export compile_commands.json for clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 #
 # Global CMake options
 #
