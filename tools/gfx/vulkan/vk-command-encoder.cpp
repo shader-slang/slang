@@ -1115,7 +1115,8 @@ Result RenderCommandEncoder::drawIndirect(
     auto& api = *m_api;
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
 
-    if (countBuffer) {
+    if (countBuffer)
+    {
         auto countBufferImpl = static_cast<BufferResourceImpl*>(countBuffer);
         api.vkCmdDrawIndirectCount(
             m_vkCommandBuffer,
@@ -1125,7 +1126,9 @@ Result RenderCommandEncoder::drawIndirect(
             countOffset,
             maxDrawCount,
             sizeof(VkDrawIndirectCommand));
-    } else {
+    }
+    else
+    {
         api.vkCmdDrawIndirect(
             m_vkCommandBuffer,
             argBufferImpl->m_buffer.m_buffer,
@@ -1147,7 +1150,8 @@ Result RenderCommandEncoder::drawIndexedIndirect(
     auto& api = *m_api;
     auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
 
-    if (countBuffer) {
+    if (countBuffer)
+    {
         auto countBufferImpl = static_cast<BufferResourceImpl*>(countBuffer);
         api.vkCmdDrawIndexedIndirectCount(
             m_vkCommandBuffer,
@@ -1157,7 +1161,9 @@ Result RenderCommandEncoder::drawIndexedIndirect(
             countOffset,
             maxDrawCount,
             sizeof(VkDrawIndexedIndirectCommand));
-    } else {
+    }
+    else
+    {
         api.vkCmdDrawIndexedIndirect(
             m_vkCommandBuffer,
             argBufferImpl->m_buffer.m_buffer,
