@@ -1,5 +1,6 @@
 #include "slang-ir-wgsl-legalize.h"
 
+#include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-varying-params.h"
@@ -969,7 +970,8 @@ struct LegalizeWGSLEntryPointContext
                 auto newDecoration = builder.addSemanticDecoration(
                     key,
                     loweredNameSlice,
-                    hasStringIndex ? stringToInt(outIndex) : 0);
+                    hasStringIndex ? stringToInt(outIndex)
+                                   : semanticDecoration->getSemanticIndex());
                 semanticDecoration->replaceUsesWith(newDecoration);
                 semanticDecoration->removeAndDeallocate();
                 semanticDecoration = newDecoration;
@@ -1348,6 +1350,95 @@ struct LegalizeWGSLEntryPointContext
         }
     }
 
+    void hoistEntryPointParameterFromStruct(EntryPointInfo entryPoint)
+    {
+        // If an entry point has a input parameter with a struct type, we want to hoist out
+        // all the fields of the struct type to be individual parameters of the entry point.
+        // This will canonicalize the entry point signature, so we can handle all cases uniformly.
+
+        // For example, given an entry point:
+        // ```
+        // struct VertexInput { float3 pos; float 2 uv; int vertexId : SV_VertexID};
+        // void main(VertexInput vin) { ... }
+        // ```
+        // We will transform it to:
+        // ```
+        // void main(float3 pos, float2 uv, int vertexId : SV_VertexID) {
+        //     VertexInput vin = {pos,uv,vertexId};
+        //     ...
+        // }
+        // ```
+
+        auto func = entryPoint.entryPointFunc;
+        List<IRParam*> paramsToProcess;
+        for (auto param : func->getParams())
+        {
+            if (as<IRStructType>(param->getDataType()))
+            {
+                paramsToProcess.add(param);
+            }
+        }
+
+        IRBuilder builder(func);
+        builder.setInsertBefore(func);
+        for (auto param : paramsToProcess)
+        {
+            auto structType = as<IRStructType>(param->getDataType());
+            builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            auto varLayout = findVarLayout(param);
+
+            // If `param` already has a semantic, we don't want to hoist its fields out.
+            if (varLayout->findSystemValueSemanticAttr() != nullptr ||
+                param->findDecoration<IRSemanticDecoration>())
+                continue;
+
+            IRStructTypeLayout* structTypeLayout = nullptr;
+            if (varLayout)
+                structTypeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
+            Index fieldIndex = 0;
+            List<IRInst*> fieldParams;
+            for (auto field : structType->getFields())
+            {
+                auto fieldParam = builder.emitParam(field->getFieldType());
+                IRCloneEnv cloneEnv;
+                cloneInstDecorationsAndChildren(
+                    &cloneEnv,
+                    builder.getModule(),
+                    field->getKey(),
+                    fieldParam);
+
+                IRVarLayout* fieldLayout =
+                    structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
+                if (varLayout)
+                {
+                    IRVarLayout::Builder varLayoutBuilder(&builder, fieldLayout->getTypeLayout());
+                    varLayoutBuilder.cloneEverythingButOffsetsFrom(fieldLayout);
+                    for (auto offsetAttr : fieldLayout->getOffsetAttrs())
+                    {
+                        auto parentOffsetAttr =
+                            varLayout->findOffsetAttr(offsetAttr->getResourceKind());
+                        UInt parentOffset = parentOffsetAttr ? parentOffsetAttr->getOffset() : 0;
+                        UInt parentSpace = parentOffsetAttr ? parentOffsetAttr->getSpace() : 0;
+                        auto resInfo =
+                            varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+                        resInfo->offset = parentOffset + offsetAttr->getOffset();
+                        resInfo->space = parentSpace + offsetAttr->getSpace();
+                    }
+                    builder.addLayoutDecoration(fieldParam, varLayoutBuilder.build());
+                }
+                param->insertBefore(fieldParam);
+                fieldParams.add(fieldParam);
+                fieldIndex++;
+            }
+            builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            auto reconstructedParam =
+                builder.emitMakeStruct(structType, fieldParams.getCount(), fieldParams.getBuffer());
+            param->replaceUsesWith(reconstructedParam);
+            param->removeFromParent();
+        }
+        fixUpFuncType(func);
+    }
+
     void packStageInParameters(EntryPointInfo entryPoint)
     {
         // If the entry point has any parameters whose layout contains VaryingInput,
@@ -1463,6 +1554,7 @@ struct LegalizeWGSLEntryPointContext
     void legalizeEntryPointForWGSL(EntryPointInfo entryPoint)
     {
         // Input Parameter Legalize
+        hoistEntryPointParameterFromStruct(entryPoint);
         packStageInParameters(entryPoint);
         flattenInputParameters(entryPoint);
 
