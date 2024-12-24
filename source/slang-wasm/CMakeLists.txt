@@ -22,5 +22,8 @@ if(EMSCRIPTEN)
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include .
     )
     # To generate binding code
-    target_link_options(slang-wasm PUBLIC "--bind")
+    target_link_options(
+        slang-wasm
+        PUBLIC "--bind" "--emit-tsd" "interface.d.ts" "-s" "EXPORT_ES6=1"
+    )
 endif()
