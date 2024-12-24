@@ -5,10 +5,10 @@
 #include <optional>
 #include <slang-com-ptr.h>
 #include <slang.h>
+#include <stdint.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <stdint.h>
 
 /**
 The web assembly binding here is designed to make javascript code as simple and native as possible.
