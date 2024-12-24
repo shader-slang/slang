@@ -990,23 +990,29 @@ struct LegalizeWGSLEntryPointContext
                 layoutDecor = _simplifyUserSemanticNames(builder, layoutDecor);
                 oldLayoutDecorToNew[layoutDecor] = layoutDecor;
                 auto layout = layoutDecor->getLayout();
-                for (auto attr : layout->getAllAttrs())
+
+                if (layout)
                 {
-                    if (auto offset = as<IRVarOffsetAttr>(attr))
+                    for (auto attr : layout->getAllAttrs())
                     {
-                        auto& semanticUse = usedSemanticIndexVarOffset[offset->getResourceKind()];
-                        if (semanticUse.find(offset->getOffset()) != semanticUse.end())
-                            overlappingVarOffset.add({layoutDecor, offset});
-                        else
-                            semanticUse.insert(offset->getOffset());
-                    }
-                    else if (auto userSemantic = as<IRUserSemanticAttr>(attr))
-                    {
-                        auto& semanticUse = usedSemanticIndexUserSemantic[userSemantic->getName()];
-                        if (semanticUse.find(userSemantic->getIndex()) != semanticUse.end())
-                            overlappingUserSemantic.add({layoutDecor, userSemantic});
-                        else
-                            semanticUse.insert(userSemantic->getIndex());
+                        if (auto offset = as<IRVarOffsetAttr>(attr))
+                        {
+                            auto& semanticUse =
+                                usedSemanticIndexVarOffset[offset->getResourceKind()];
+                            if (semanticUse.find(offset->getOffset()) != semanticUse.end())
+                                overlappingVarOffset.add({layoutDecor, offset});
+                            else
+                                semanticUse.insert(offset->getOffset());
+                        }
+                        else if (auto userSemantic = as<IRUserSemanticAttr>(attr))
+                        {
+                            auto& semanticUse =
+                                usedSemanticIndexUserSemantic[userSemantic->getName()];
+                            if (semanticUse.find(userSemantic->getIndex()) != semanticUse.end())
+                                overlappingUserSemantic.add({layoutDecor, userSemantic});
+                            else
+                                semanticUse.insert(userSemantic->getIndex());
+                        }
                     }
                 }
             }
