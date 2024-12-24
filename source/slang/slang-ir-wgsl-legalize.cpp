@@ -1348,6 +1348,106 @@ struct LegalizeWGSLEntryPointContext
         }
     }
 
+    void packStageInParameters(EntryPointInfo entryPoint)
+    {
+        // If the entry point has any parameters whose layout contains VaryingInput,
+        // we need to pack those parameters into a single `struct` type, and decorate
+        // the fields with the appropriate `@location` decorations.
+        // For other parameters that are not `VaryingInput`, we need to leave them as is.
+        //
+        // For example,
+        // ```
+        // void main(float3 pos, float2 uv, int vertexId : SV_VertexID) {
+        //     VertexInput vin = {pos,uv,vertexId};
+        //     ...
+        // }
+        // ```
+        // We are going to transform it into:
+        // ```
+        // struct VertexInput {
+        //     @location(0) float3 pos;
+        //     @location(1) float2 uv;
+        // };
+        //
+        // void main(vin: VertexInput, @builtin(vertex_index) vertexId : u32) {
+        //     let pos = vin.pos;
+        //     let uv = vin.uv;
+        //     ...
+        // }
+
+        auto func = entryPoint.entryPointFunc;
+
+        List<IRParam*> paramsToPack;
+        for (auto param : func->getParams())
+        {
+            auto layout = findVarLayout(param);
+            if (!layout)
+                continue;
+            if (!layout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                continue;
+            paramsToPack.add(param);
+        }
+
+        if (paramsToPack.getCount() == 0)
+            return;
+
+        IRBuilder builder(func);
+        builder.setInsertBefore(func);
+        IRStructType* structType = builder.createStructType();
+        auto stageText = getStageText(entryPoint.entryPointDecor->getProfile().getStage());
+        builder.addNameHintDecoration(
+            structType,
+            (String(stageText) + toSlice("Input")).getUnownedSlice());
+        List<IRStructKey*> keys;
+        IRStructTypeLayout::Builder layoutBuilder(&builder);
+        for (auto param : paramsToPack)
+        {
+            auto paramVarLayout = findVarLayout(param);
+            auto key = builder.createStructKey();
+            param->transferDecorationsTo(key);
+            builder.createStructField(structType, key, param->getDataType());
+            if (auto varyingInOffsetAttr =
+                    paramVarLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+            {
+                if (!key->findDecoration<IRSemanticDecoration>() &&
+                    !paramVarLayout->findAttr<IRSemanticAttr>())
+                {
+                    // If the parameter doesn't have a semantic, we need to add one for semantic
+                    // matching.
+                    builder.addSemanticDecoration(
+                        key,
+                        toSlice("_slang_attr"),
+                        (int)varyingInOffsetAttr->getOffset());
+                }
+            }
+            layoutBuilder.addField(key, paramVarLayout);
+            builder.addLayoutDecoration(key, paramVarLayout);
+            keys.add(key);
+        }
+        builder.setInsertInto(func->getFirstBlock());
+        auto packedParam = builder.emitParamAtHead(structType);
+        auto typeLayout = layoutBuilder.build();
+        IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
+
+        // Add a VaryingInput resource info to the packed parameter layout, so that we can emit
+        // the individual varying input alongside other nested/struct varying inputs.
+        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput);
+        auto paramVarLayout = varLayoutBuilder.build();
+        builder.addLayoutDecoration(packedParam, paramVarLayout);
+
+        // Replace the original parameters with the packed parameter
+        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        for (Index paramIndex = 0; paramIndex < paramsToPack.getCount(); paramIndex++)
+        {
+            auto param = paramsToPack[paramIndex];
+            auto key = keys[paramIndex];
+            auto paramField = builder.emitFieldExtract(param->getDataType(), packedParam, key);
+            param->replaceUsesWith(paramField);
+            param->removeFromParent();
+        }
+        fixUpFuncType(func);
+    }
+
     void legalizeSystemValueParameters(EntryPointInfo entryPoint)
     {
         List<SystemValLegalizationWorkItem> systemValWorkItems =
@@ -1363,6 +1463,7 @@ struct LegalizeWGSLEntryPointContext
     void legalizeEntryPointForWGSL(EntryPointInfo entryPoint)
     {
         // Input Parameter Legalize
+        packStageInParameters(entryPoint);
         flattenInputParameters(entryPoint);
 
         // System Value Legalize
