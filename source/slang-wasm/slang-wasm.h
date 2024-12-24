@@ -124,6 +124,7 @@ public:
     std::string getName();
     uint32_t getArgumentCount();
     float getArgumentValueFloat(uint32_t index);
+    std::string getArgumentValueString(uint32_t index);
     slang::wgsl::TypeReflection* getArgumentType(uint32_t index);
     slang::UserAttribute* interface() const { return (slang::UserAttribute*)this; };
 };

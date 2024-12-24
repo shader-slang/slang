@@ -45,6 +45,21 @@ EMSCRIPTEN_BINDINGS(slang)
             "getDescriptorSetDescriptorRangeType",
             &slang::wgsl::TypeLayoutReflection::getDescriptorSetDescriptorRangeType);
 
+    enum_<slang::Modifier::ID>("ModifierID")
+        .value("Shared", slang::Modifier::ID::Shared)
+        .value("NoDiff", slang::Modifier::ID::NoDiff)
+        .value("Static", slang::Modifier::ID::Static)
+        .value("Const", slang::Modifier::ID::Const)
+        .value("Export", slang::Modifier::ID::Export)
+        .value("Extern", slang::Modifier::ID::Extern)
+        .value("Differentiable", slang::Modifier::ID::Differentiable)
+        .value("Mutating", slang::Modifier::ID::Mutating)
+        .value("In", slang::Modifier::ID::In)
+        .value("Out", slang::Modifier::ID::Out)
+        .value("InOut", slang::Modifier::ID::InOut);
+
+    class_<slang::Modifier>("Modifier");
+
     class_<slang::wgsl::VariableReflection>("VariableReflection")
         .function("getName", &slang::wgsl::VariableReflection::getName)
         .function(
@@ -126,6 +141,21 @@ EMSCRIPTEN_BINDINGS(slang)
         .value("Variable", slang::DeclReflection::Kind::Variable)
         .value("Namespace", slang::DeclReflection::Kind::Namespace);
 
+    enum_<slang::TypeReflection::ScalarType>("ScalarType")
+        .value("None", slang::TypeReflection::ScalarType::None)
+        .value("Void", slang::TypeReflection::ScalarType::Void)
+        .value("Bool", slang::TypeReflection::ScalarType::Bool)
+        .value("Int32", slang::TypeReflection::ScalarType::Int32)
+        .value("UInt32", slang::TypeReflection::ScalarType::UInt32)
+        .value("Int64", slang::TypeReflection::ScalarType::Int64)
+        .value("UInt64", slang::TypeReflection::ScalarType::UInt64)
+        .value("Float16", slang::TypeReflection::ScalarType::Float16)
+        .value("Float32", slang::TypeReflection::ScalarType::Float32)
+        .value("Float64", slang::TypeReflection::ScalarType::Float64)
+        .value("Int8", slang::TypeReflection::ScalarType::Int8)
+        .value("UInt8", slang::TypeReflection::ScalarType::UInt8)
+        .value("Int16", slang::TypeReflection::ScalarType::Int16)
+        .value("UInt16", slang::TypeReflection::ScalarType::UInt16);
 
     class_<slang::wgsl::TypeReflection>("TypeReflection")
         .function("getScalarType", &slang::wgsl::TypeReflection::getScalarType)
@@ -159,6 +189,10 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "getArgumentType",
             &slang::wgsl::UserAttribute::getArgumentType,
+            allow_raw_pointers())
+        .function(
+            "getArgumentValueString",
+            &slang::wgsl::UserAttribute::getArgumentValueString,
             allow_raw_pointers())
         .function(
             "getArgumentValueFloat",

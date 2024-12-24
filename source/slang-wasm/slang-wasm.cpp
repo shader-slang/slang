@@ -533,24 +533,6 @@ slang::wgsl::VariableReflection* GenericReflection::getValueParameter(unsigned i
 {
     return (slang::wgsl::VariableReflection*)interface()->getValueParameter(index);
 }
-// uint32_t GenericReflection::getTypeParameterConstraintCount(VariableReflection* typeParam)
-// {
-//     return interface()->getTypeParameterConstraintCount(typeParam);
-// }
-
-// slang::wgsl::TypeReflection* GenericReflection::getTypeParameterConstraintType()
-// {
-//     return (slang::wgsl::TypeReflection*)interface()->getTypeParameterConstraintType();
-// }
-
-// slang::wgsl::TypeReflection* GenericReflection::getTypeParameterConstraintType(
-//     VariableReflection* typeParam,
-//     unsigned index)
-// {
-//     return (slang::wgsl::TypeReflection*)interface()->getTypeParameterConstraintType(
-//         typeParam,
-//         index);
-// }
 
 slang::wgsl::DeclReflection* GenericReflection::getInnerDecl()
 {
@@ -639,6 +621,14 @@ float UserAttribute::getArgumentValueFloat(uint32_t index)
     interface()->getArgumentValueFloat(index, &value);
     return value;
 }
+
+std::string UserAttribute::getArgumentValueString(uint32_t index)
+{
+    size_t len = 0;
+    const char* out = interface()->getArgumentValueString(index, &len);
+    return std::string(out, len);
+}
+
 
 slang::wgsl::TypeReflection* UserAttribute::getArgumentType(uint32_t index)
 {
