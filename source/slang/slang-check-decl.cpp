@@ -90,6 +90,10 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
     void checkPrimalSubstituteOfAttribute(
         FunctionDeclBase* funcDecl,
         PrimalSubstituteOfAttribute* attr);
+
+    void checkVarDeclCommon(VarDeclBase* varDecl);
+
+    void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 };
 
 struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
@@ -138,6 +142,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl);
 
     void visitAssocTypeDecl(AssocTypeDecl* decl);
+
+    void checkDifferentiableCallableCommon(CallableDecl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
 
@@ -9105,24 +9111,8 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
     }
 }
 
-void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
+void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl* decl)
 {
-    for (auto paramDecl : decl->getParameters())
-    {
-        ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
-    }
-
-    auto errorType = decl->errorType;
-    if (errorType.exp)
-    {
-        errorType = CheckProperType(errorType);
-    }
-    else
-    {
-        errorType = TypeExp(m_astBuilder->getBottomType());
-    }
-    decl->errorType = errorType;
-
     if (auto interfaceDecl = findParentInterfaceDecl(decl))
     {
         bool isDiffFunc = false;
@@ -9244,6 +9234,27 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
             }
         }
     }
+}
+
+void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
+{
+    for (auto paramDecl : decl->getParameters())
+    {
+        ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
+    }
+
+    auto errorType = decl->errorType;
+    if (errorType.exp)
+    {
+        errorType = CheckProperType(errorType);
+    }
+    else
+    {
+        errorType = TypeExp(m_astBuilder->getBottomType());
+    }
+    decl->errorType = errorType;
+
+    checkDifferentiableCallableCommon(decl);
 
     // If this method is intended to be a CUDA kernel, verify that the return type is void.
     if (decl->findModifier<CudaKernelAttribute>())
@@ -9705,6 +9716,8 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
     // for `GetterDecl`s.
     //
     decl->returnType.type = _getAccessorStorageType(decl);
+
+    checkDifferentiableCallableCommon(decl);
 }
 
 void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
@@ -9795,6 +9808,7 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
                 newValueType);
         }
     }
+    checkDifferentiableCallableCommon(decl);
 }
 
 GenericDecl* SemanticsVisitor::GetOuterGeneric(Decl* decl)
@@ -11710,6 +11724,43 @@ bool tryCheckDerivativeOfAttributeImpl(
         assocKind,
         imaginaryArgsToOriginal);
     return tempSink.getErrorCount() == 0;
+}
+
+void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
+{
+    bool hasSpecConstAttr = false;
+    bool hasPushConstAttr = false;
+    for (auto modifier : varDecl->modifiers)
+    {
+        if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
+        {
+            // Specialization constant.
+            // Check that type is basic type.
+            if (!as<BasicExpressionType>(varDecl->getType()) && !as<ErrorType>(varDecl->getType()))
+            {
+                getSink()->diagnose(modifier, Diagnostics::specializationConstantMustBeScalar);
+            }
+            hasSpecConstAttr = true;
+        }
+        else if (as<PushConstantAttribute>(modifier))
+        {
+            hasPushConstAttr = true;
+        }
+    }
+    if (hasSpecConstAttr && hasPushConstAttr)
+    {
+        getSink()->diagnose(
+            varDecl,
+            Diagnostics::variableCannotBePushAndSpecializationConstant,
+            varDecl->getName());
+    }
+    if (hasSpecConstAttr || hasPushConstAttr)
+    {
+        if (varDecl->findModifier<HLSLStaticModifier>())
+        {
+            getSink()->diagnose(varDecl, Diagnostics::pushOrSpecializationConstantCannotBeStatic);
+        }
+    }
 }
 
 void SemanticsDeclAttributesVisitor::checkForwardDerivativeOfAttribute(

@@ -140,7 +140,7 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "compute",
+            "stage": "compute",
             "threadGroupSize": [1, 1, 1]
         }
     ]

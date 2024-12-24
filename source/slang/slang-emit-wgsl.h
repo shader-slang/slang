@@ -57,10 +57,6 @@ public:
     void emit(const AddressSpace addressSpace);
 
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
-    Dictionary<const char*, IRStringLit*> m_builtinPreludes;
-
-protected:
-    void ensurePrelude(const char* preludeText);
 
 private:
     bool maybeEmitSystemSemantic(IRInst* inst);

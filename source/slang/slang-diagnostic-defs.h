@@ -1213,8 +1213,21 @@ DIAGNOSTIC(
     Error,
     unrecognizedGLSLLayoutQualifierOrRequiresAssignment,
     "GLSL layout qualifier is unrecognized or requires assignment")
-
-
+DIAGNOSTIC(
+    31218,
+    Error,
+    specializationConstantMustBeScalar,
+    "specialization constant must be a scalar.")
+DIAGNOSTIC(
+    31219,
+    Error,
+    pushOrSpecializationConstantCannotBeStatic,
+    "push or specialization constants cannot be 'static'.")
+DIAGNOSTIC(
+    31220,
+    Error,
+    variableCannotBePushAndSpecializationConstant,
+    "'$0' cannot be a push constant and a specialization constant at the same time")
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
@@ -2439,6 +2452,12 @@ DIAGNOSTIC(
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
 DIAGNOSTIC(57003, Error, unknownTessPartitioning, "unknown tessellation partitioning '$0'.")
+DIAGNOSTIC(
+    57004,
+    Error,
+    outputSpvIsEmpty,
+    "output SPIR-V contains no exported symbols. Please make sure to specify at least one "
+    "entrypoint.")
 
 // GLSL Compatibility
 DIAGNOSTIC(

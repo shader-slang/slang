@@ -50,7 +50,7 @@ Getting Started
 The fastest way to get started using Slang in your own development is to use a pre-built binary package, available through GitHub [releases](https://github.com/shader-slang/slang/releases).
 Slang binaries are also included in the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) since version 1.3.296.0.
 
-There are packages built for 32- and 64-bit Windows, as well as 64-bit Ubuntu.
+There are packages built for x86_64 and aarch64 Windows, Linux and macOS.
 Each binary release includes the command-line `slangc` compiler, a shared library for the compiler, and the `slang.h` header.
 
 See the user-guide for info on using the `slangc` command-line tool: [Slang Command Line Usage](
@@ -145,7 +145,7 @@ Builds of the core Slang tools depend on the following projects, either automati
 * [`spirv-tools`](https://github.com/KhronosGroup/SPIRV-Tools) (Apache 2.0)
 * [`ankerl::unordered_dense::{map, set}`](https://github.com/martinus/unordered_dense) (MIT)
 
-Slang releases may include [slang-llvm](https://github.com/shader-slang/slang-llvm) which includes [LLVM](https://github.com/llvm/llvm-project) under the license:
+Slang releases may include [LLVM](https://github.com/llvm/llvm-project) under the license:
 
 * [`llvm`](https://llvm.org/docs/DeveloperPolicy.html#new-llvm-project-license-framework) (Apache 2.0 License with LLVM exceptions)
 

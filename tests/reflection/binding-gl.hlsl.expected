@@ -138,8 +138,8 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment",
-            "result:": {
+            "stage": "fragment",
+            "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
                 "semanticName": "SV_TARGET",
