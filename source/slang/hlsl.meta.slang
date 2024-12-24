@@ -20849,12 +20849,11 @@ int32_t __lsb_as_s32(uint32_t val)
     return int32_t(__lsb_as_s8(val));
 }
 
-
 [__readNone]
 [ForceInline]
-uint32_t __lsb_clamp_u8_as_u32(uint32_t val)
+uint32_t __lsb_clamp_u8_as_u32(int32_t val)
 {
-    return clamp(val, 0U, 255U);
+    return clamp(val, 0, 255);
 }
 
 [__readNone]
@@ -20872,6 +20871,12 @@ int16_t4 unpack_s8s16(int8_t4_packed packedVal)
     __target_switch
     {
     case hlsl: __intrinsic_asm "unpack_s8s16";
+    case spirv: 
+        return spirv_asm
+        {
+            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedVal;
+            result:$$vector<int16_t, 4> = OpSConvert %s8Vec
+        };
     default:
         return int16_t4
         (
@@ -20891,6 +20896,12 @@ uint16_t4 unpack_u8u16(uint8_t4_packed packedVal)
     __target_switch
     {
     case hlsl: __intrinsic_asm "unpack_u8u16";
+    case spirv: 
+        return spirv_asm
+        {
+            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedVal;
+            result:$$vector<uint16_t, 4> = OpUConvert %u8Vec
+        };
     default:
         return uint16_t4
         (
@@ -20902,7 +20913,6 @@ uint16_t4 unpack_u8u16(uint8_t4_packed packedVal)
     }
 }
 
-
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -20912,6 +20922,12 @@ int32_t4 unpack_s8s32(int8_t4_packed packedVal)
     {
     case hlsl: __intrinsic_asm "unpack_s8s32";
     case wgsl: __intrinsic_asm "unpack4xI8";
+    case spirv: 
+        return spirv_asm
+        {
+            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedVal;
+            result:$$vector<int32_t, 4> = OpSConvert %s8Vec
+        };
     default:
         return int32_t4
         (
@@ -20932,6 +20948,12 @@ uint32_t4 unpack_u8u32(uint8_t4_packed packedVal)
     {
     case hlsl: __intrinsic_asm "unpack_u8u32";
     case wgsl: __intrinsic_asm "unpack4xU8";
+    case spirv: 
+        return spirv_asm
+        {
+            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedVal;
+            result:$$vector<uint32_t, 4> = OpUConvert %u8Vec
+        };
     default:
         return uint32_t4
         (
@@ -20959,7 +20981,6 @@ uint8_t4_packed pack_u8(uint32_t4 unpackedVal)
                (__lsb_as_u32(unpackedVal.w) << 24U);
     }
 }
-
 
 [__readNone]
 [ForceInline]
@@ -20994,7 +21015,6 @@ uint8_t4_packed pack_u8(uint16_t4 unpackedVal)
     }
 }
 
-
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
@@ -21014,12 +21034,12 @@ int8_t4_packed pack_s8(int16_t4 unpackedVal)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-uint8_t4_packed pack_clamp_u8(uint32_t4 unpackedVal)
+uint8_t4_packed pack_clamp_u8(int32_t4 unpackedVal)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "pack_clamp_u8";
-    case wgsl: __intrinsic_asm "pack4xU8Clamp";
+    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>($0))";
     default:
         return __lsb_clamp_u8_as_u32(unpackedVal.x)       |
                (__lsb_clamp_u8_as_u32(unpackedVal.y) << 8U)  |
@@ -21027,7 +21047,6 @@ uint8_t4_packed pack_clamp_u8(uint32_t4 unpackedVal)
                (__lsb_clamp_u8_as_u32(unpackedVal.w) << 24U);
     }
 }
-
 
 [__readNone]
 [ForceInline]
@@ -21049,7 +21068,7 @@ int8_t4_packed pack_clamp_s8(int32_t4 unpackedVal)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-uint8_t4_packed pack_clamp_u8(uint16_t4 unpackedVal)
+uint8_t4_packed pack_clamp_u8(int16_t4 unpackedVal)
 {
     __target_switch
     {
@@ -21061,7 +21080,6 @@ uint8_t4_packed pack_clamp_u8(uint16_t4 unpackedVal)
                (__lsb_clamp_u8_as_u32(unpackedVal.w) << 24U);
     }
 }
-
 
 [__readNone]
 [ForceInline]

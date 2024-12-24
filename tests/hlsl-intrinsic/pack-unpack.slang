@@ -1,25 +1,28 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_0 -dx12 -use-dxil -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -output-using-type
-// 16 bit variants are not supported by WGSL
-//TEST(compute):COMPARE_COMPUTE_EX:-wgsl -compute -shaderobj -output-using-type -xslang -DWGSL
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_6 -dx12 -use-dxil -shaderobj -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj 
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+
+// 16 bit variants are not supported by WGSL.
+//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DWGSL
+// Debug info for inlining errors can be given out, so disable them for this test.
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0
 
 //TEST_INPUT:ubuffer(data=[0xD37A83FF], stride=4):name unpackTestBuffer
-StructuredBuffer<uint> unpackTestBuffer;
+StructuredBuffer<uint32_t> unpackTestBuffer;
 
 //TEST_INPUT:ubuffer(data=[0xB3F 0x6A 0x123 0xD4], stride=4): name packTestBuffer
-StructuredBuffer<uint4> packTestBuffer;
+StructuredBuffer<uint32_t4> packTestBuffer;
 
 // These should clamp to (5, 255, 255, 254) or (0x5, 0xFF, 0xFF, 0xFE).
-//TEST_INPUT:ubuffer(data=[5 256 4294967295 254], stride=4): name packClampUTestBuffer
-StructuredBuffer<uint4> packClampUTestBuffer;
+//TEST_INPUT:ubuffer(data=[5 256 12345 254], stride=4): name packClampUTestBuffer
+StructuredBuffer<int32_t4> packClampUTestBuffer;
 
 // These should clamp to (-1, 127, -128, 125) or (0xFF, 0x7F, 0x80, 0x81)
 // Inputs are [-1 250 -32768 -127].
 //TEST_INPUT:ubuffer(data=[0xFFFFFFFF 0xFA 0xFFFF8000 0xFFFFFF81], stride=4): name packClampSTestBuffer
-StructuredBuffer<int4> packClampSTestBuffer;
+StructuredBuffer<int32_t4> packClampSTestBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -121,14 +124,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     /*
      * Pack with unsigned clamping.
      */ 
-    uint32_t4 packClampU32TestValues = packClampUTestBuffer[0];
+    int32_t4 packClampU32TestValues = packClampUTestBuffer[0];
     uint8_t4_packed packClampU32Result = pack_clamp_u8(packClampU32TestValues);
     // 0xFEFFFF05
     outputBuffer[index++] = uint(packClampU32Result);
 
 #if !defined(WGSL)
-    uint16_t4 packClampU16TestValues = uint16_t4(uint16_t(packClampU32TestValues.x), uint16_t(packClampU32TestValues.y),
-                                                 uint16_t(packClampU32TestValues.z), uint16_t(packClampU32TestValues.w));
+    int16_t4 packClampU16TestValues = int16_t4(int16_t(packClampU32TestValues.x), int16_t(packClampU32TestValues.y),
+                                               int16_t(packClampU32TestValues.z), int16_t(packClampU32TestValues.w));
     uint8_t4_packed packClampU16Result = pack_clamp_u8(packClampU16TestValues);
     outputBuffer[index++] = uint(packClampU16Result);
 #else
