@@ -8114,6 +8114,7 @@ RasterizerOrderedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(Rasteriz
 /// @category interpolation Vertex Interpolation Functions
 __generic<T : __BuiltinArithmeticType>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 T EvaluateAttributeAtCentroid(__constref T x)
 {
@@ -8130,6 +8131,7 @@ T EvaluateAttributeAtCentroid(__constref T x)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeAtCentroid(__constref vector<T,N> x)
 {
@@ -8146,6 +8148,7 @@ vector<T,N> EvaluateAttributeAtCentroid(__constref vector<T,N> x)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T,N,M> EvaluateAttributeAtCentroid(__constref matrix<T,N,M> x)
 {
@@ -8165,6 +8168,7 @@ matrix<T,N,M> EvaluateAttributeAtCentroid(__constref matrix<T,N,M> x)
 /// @category interpolation Vertex Interpolation Functions
 __generic<T : __BuiltinArithmeticType>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 T EvaluateAttributeAtSample(__constref T x, uint sampleindex)
 {
@@ -8181,6 +8185,7 @@ T EvaluateAttributeAtSample(__constref T x, uint sampleindex)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeAtSample(__constref vector<T,N> x, uint sampleindex)
 {
@@ -8197,6 +8202,7 @@ vector<T,N> EvaluateAttributeAtSample(__constref vector<T,N> x, uint sampleindex
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T,N,M> EvaluateAttributeAtSample(__constref matrix<T,N,M> x, uint sampleindex)
 {
@@ -8241,6 +8247,7 @@ matrix<T,N,M> EvaluateAttributeAtSample(__constref matrix<T,N,M> x, uint samplei
 /// @category interpolation Vertex Interpolation Functions
 __generic<T : __BuiltinArithmeticType>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 T EvaluateAttributeSnapped(__constref T x, int2 offset)
 {
@@ -8263,6 +8270,7 @@ T EvaluateAttributeSnapped(__constref T x, int2 offset)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
 {
@@ -8285,6 +8293,7 @@ vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
+[ForceInline]
 [require(glsl_hlsl_spirv, fragmentprocessing)]
 matrix<T,N,M> EvaluateAttributeSnapped(__constref matrix<T,N,M> x, int2 offset)
 {
