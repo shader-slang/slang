@@ -3368,15 +3368,8 @@ static Decl* ParseBufferBlockDecl(
     {
         // GLSL bindless buffers are denoted with [] after the name.
         bufferVarDecl->nameAndLoc = ParseDeclName(parser);
-
-        IndexExpr* indexExpr = parser->astBuilder->create<IndexExpr>();
-        indexExpr->loc = parser->tokenReader.peekLoc();
-        indexExpr->baseExpression = bufferVarDecl->type.exp;
-        bufferVarDecl->type = TypeExp(indexExpr);
-
+        bufferVarDecl->type.exp = parseBracketTypeSuffix(parser, bufferVarDecl->type.exp);
         reflectionNameModifier->nameAndLoc = bufferVarDecl->nameAndLoc;
-        parser->ReadToken(TokenType::LBracket);
-        parser->ReadToken(TokenType::RBracket);
         parser->ReadToken(TokenType::Semicolon);
     }
     else
