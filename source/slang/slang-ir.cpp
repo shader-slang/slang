@@ -8235,6 +8235,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetStringHash:
     case kIROp_AllocateOpaqueHandle:
     case kIROp_GetArrayLength:
+    case kIROp_ResolveVaryingInputRef:
+    case kIROp_GetPerVertexInputArray:
         return false;
 
     case kIROp_ForwardDifferentiate:

@@ -2982,6 +2982,9 @@ struct IRLoweringParameterInfo
     // The direction (`in` vs `out` vs `in out`)
     ParameterDirection direction;
 
+    // The direction declared in user code.
+    ParameterDirection declaredDirection;
+
     // The variable/parameter declaration for
     // this parameter (if any)
     VarDeclBase* decl = nullptr;
@@ -3005,6 +3008,7 @@ IRLoweringParameterInfo getParameterInfo(
     info.type = getParamType(context->astBuilder, paramDecl);
     info.decl = paramDecl.getDecl();
     info.direction = getParameterDirection(paramDecl.getDecl());
+    info.declaredDirection = info.direction;
     info.isThisParam = false;
     return info;
 }
@@ -3154,10 +3158,9 @@ void collectParameterLists(
         // to these intrinsics.
         //
         bool lowerVaryingInputAsConstRef = false;
-        if (auto entryPointAttr = declRef.getDecl()->findModifier<EntryPointAttribute>())
+        if (declRef.getDecl()->findModifier<EntryPointAttribute>())
         {
-            lowerVaryingInputAsConstRef =
-                (entryPointAttr->capabilitySet.getTargetStage() == CapabilityAtom::fragment);
+            lowerVaryingInputAsConstRef = true;
         }
 
         // Don't collect parameters from the outer scope if
@@ -10002,6 +10005,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         if (paramInfo.isReturnDestination)
                             subContext->returnDestination = paramVal;
 
+                        if (paramInfo.declaredDirection == kParameterDirection_In &&
+                            paramInfo.direction == kParameterDirection_ConstRef)
+                        {
+                            // If the parameter is originally declared as "in", and we are
+                            // lowering it as constref, then we need to emit a local variable to
+                            // hold the original value, so that we can still generate correct code
+                            // when the user trys to mutate the variable.
+                            auto irLocal =
+                                subBuilder->emitVar(tryGetPointedToType(subBuilder, irParamType));
+                            auto localVal = LoweredValInfo::ptr(irLocal);
+                            assign(subContext, localVal, paramVal);
+                            paramVal = localVal;
+                        }
                         // TODO: We might want to copy the pointed-to value into
                         // a temporary at the start of the function, and then copy
                         // back out at the end, so that we don't have to worry

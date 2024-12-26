@@ -8123,7 +8123,7 @@ T EvaluateAttributeAtCentroid(__constref T x)
     case glsl: __intrinsic_asm "interpolateAtCentroid";
     case spirv: return spirv_asm {
         OpCapability InterpolationFunction;
-        OpExtInst $$T result glsl450 InterpolateAtCentroid &x
+        OpExtInst $$T result glsl450 InterpolateAtCentroid $__ResolveVaryingInputRef(x)
     };
     }
 }
@@ -8139,7 +8139,7 @@ vector<T,N> EvaluateAttributeAtCentroid(__constref vector<T,N> x)
     case glsl: __intrinsic_asm "interpolateAtCentroid";
     case spirv: return spirv_asm {
         OpCapability InterpolationFunction;
-        OpExtInst $$vector<T,N> result glsl450 InterpolateAtCentroid &x
+        OpExtInst $$vector<T,N> result glsl450 InterpolateAtCentroid $__ResolveVaryingInputRef(x)
     };
     }
 }
@@ -8174,7 +8174,7 @@ T EvaluateAttributeAtSample(__constref T x, uint sampleindex)
     case glsl: __intrinsic_asm "interpolateAtSample($0, int($1))";
     case spirv: return spirv_asm {
         OpCapability InterpolationFunction;
-        OpExtInst $$T result glsl450 InterpolateAtSample &x $sampleindex
+        OpExtInst $$T result glsl450 InterpolateAtSample $__ResolveVaryingInputRef(x) $sampleindex
     };
     }
 }
@@ -8190,7 +8190,7 @@ vector<T,N> EvaluateAttributeAtSample(__constref vector<T,N> x, uint sampleindex
     case glsl: __intrinsic_asm "interpolateAtSample($0, int($1))";
     case spirv: return spirv_asm {
         OpCapability InterpolationFunction;
-        OpExtInst $$vector<T,N> result glsl450 InterpolateAtSample &x $sampleindex
+        OpExtInst $$vector<T,N> result glsl450 InterpolateAtSample $__ResolveVaryingInputRef(x) $sampleindex
     };
     }
 }
@@ -8255,7 +8255,7 @@ T EvaluateAttributeSnapped(__constref T x, int2 offset)
             OpCapability InterpolationFunction;
             %foffset:$$float2 = OpConvertSToF $offset;
             %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
-            result:$$T = OpExtInst glsl450 InterpolateAtOffset &x %offsetdiv16
+            result:$$T = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %offsetdiv16
         };
     }
     }
@@ -8277,7 +8277,7 @@ vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
             OpCapability InterpolationFunction;
             %foffset:$$float2 = OpConvertSToF $offset;
             %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
-            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset &x %offsetdiv16
+            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %offsetdiv16
         };
     }
     }
@@ -9293,6 +9293,9 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
     }
 }
 
+__intrinsic_op($(kIROp_ResolveVaryingInputRef))
+Ref<T> __ResolveVaryingInputRef<T>(__constref T attribute);
+
 __intrinsic_op($(kIROp_GetPerVertexInputArray))
 Ref<Array<T, 3>> __GetPerVertexInputArray<T>(__constref T attribute);
 
@@ -9323,7 +9326,7 @@ T GetAttributeAtVertex(__constref T attribute, uint vertexIndex)
         __intrinsic_asm "GetAttributeAtVertex";
     case glsl:
     case spirv:
-        return __GetPerVertexInputArray(attribute)[vertexIndex];
+        return __GetPerVertexInputArray(__ResolveVaryingInputRef(attribute))[vertexIndex];
     }
 }
 
@@ -9354,7 +9357,7 @@ vector<T,N> GetAttributeAtVertex(__constref vector<T,N> attribute, uint vertexIn
     case glsl: 
         __intrinsic_asm "$0[$1]";
     case spirv:
-        return __GetPerVertexInputArray(attribute)[vertexIndex];
+        return __GetPerVertexInputArray(__ResolveVaryingInputRef(attribute))[vertexIndex];
     }
 }
 
@@ -9385,7 +9388,7 @@ matrix<T,N,M> GetAttributeAtVertex(__constref matrix<T,N,M> attribute, uint vert
     case glsl: 
         __intrinsic_asm "$0[$1]";
     case spirv:
-        return __GetPerVertexInputArray(attribute)[vertexIndex];
+        return __GetPerVertexInputArray(__ResolveVaryingInputRef(attribute))[vertexIndex];
     }
 }
 

@@ -3632,6 +3632,77 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     return result;
 }
 
+void resolveVaryingInputRef(
+    GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
+    IRFunc* func)
+{
+    List<IRInst*> toRemove;
+    for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
+    {
+        for (auto inst : bb->getChildren())
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_ResolveVaryingInputRef:
+                {
+                    // Resolve a reference to varying input to the actual global param
+                    // representing the varying input.
+                    auto operand = inst->getOperand(0);
+                    if (operand->getOp() == kIROp_GlobalParam)
+                    {
+                        // If the referred operand is already a global param, use it directly.
+                        inst->replaceUsesWith(operand);
+                        toRemove.add(inst);
+                    }
+                    else if (operand->getOp() == kIROp_Var)
+                    {
+                        // If the referred operand is a local var,
+                        // and there is a store(var, load(globalParam)),
+                        // replace `inst` with `globalParam`.
+                        for (auto use = operand->firstUse; use; use = use->nextUse)
+                        {
+                            auto user = use->getUser();
+                            if (auto store = as<IRStore>(user))
+                            {
+                                if (store->getPtrUse() == use)
+                                {
+                                    if (auto load = as<IRLoad>(store->getVal()))
+                                    {
+                                        if (load->getPtr()->getOp() == kIROp_GlobalParam)
+                                        {
+                                            inst->replaceUsesWith(load->getPtr());
+                                            toRemove.add(inst);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // Resolve GetVertexAttributeArray().
+    for (auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock())
+    {
+        for (auto inst : bb->getChildren())
+        {
+            if (inst->getOp() != kIROp_GetPerVertexInputArray)
+                continue;
+            auto arrayInst = getOrCreatePerVertexInputArray(context, inst->getOperand(0));
+            inst->replaceUsesWith(arrayInst);
+            toRemove.add(inst);
+        }
+    }
+    for (auto inst : toRemove)
+    {
+        inst->removeAndDeallocate();
+    }
+}
+
 void legalizeEntryPointForGLSL(
     Session* session,
     IRModule* module,
@@ -3752,6 +3823,8 @@ void legalizeEntryPointForGLSL(
 
             legalizeEntryPointParameterForGLSL(&context, codeGenContext, func, pp, paramLayout);
         }
+
+        resolveVaryingInputRef(&context, codeGenContext, func);
 
         // At this point we should have eliminated all uses of the
         // parameters of the entry block. Also, our control-flow
