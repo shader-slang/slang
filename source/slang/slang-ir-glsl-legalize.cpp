@@ -67,12 +67,7 @@ struct ScalarizedValImpl : RefObject
 };
 struct ScalarizedTupleValImpl;
 struct ScalarizedTypeAdapterValImpl;
-
-struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
-{
-    ScalarizedVal arrayVal;
-    Index index;
-};
+struct ScalarizedArrayIndexValImpl;
 
 struct ScalarizedVal
 {
@@ -133,15 +128,12 @@ struct ScalarizedVal
         result.impl = (ScalarizedValImpl*)impl;
         return result;
     }
-    static ScalarizedVal scalarizedArrayIndex(ScalarizedVal arrayVal, Index index)
+    static ScalarizedVal scalarizedArrayIndex(ScalarizedArrayIndexValImpl* impl)
     {
         ScalarizedVal result;
         result.flavor = Flavor::arrayIndex;
-        auto impl = new ScalarizedArrayIndexValImpl;
-        impl->index = index;
-        impl->arrayVal = arrayVal;
         result.irValue = nullptr;
-        result.impl = impl;
+        result.impl = (ScalarizedValImpl*)impl;
         return result;
     }
 
@@ -151,8 +143,6 @@ struct ScalarizedVal
     IRInst* irValue = nullptr;
     RefPtr<ScalarizedValImpl> impl;
 };
-
-IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
 
 // This is the case for a value that is a "tuple" of other values
 struct ScalarizedTupleValImpl : ScalarizedValImpl
@@ -175,6 +165,35 @@ struct ScalarizedTypeAdapterValImpl : ScalarizedValImpl
     IRType* actualType;  // the actual type of `val`
     IRType* pretendType; // the type this value pretends to have
 };
+
+struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
+{
+    ScalarizedVal arrayVal;
+    Index index;
+};
+
+ScalarizedVal extractField(
+    IRBuilder* builder,
+    ScalarizedVal const& val,
+    UInt fieldIndex, // Pass ~0 in to search for the index via the key
+    IRStructKey* fieldKey);
+ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType* fromType);
+ScalarizedVal adaptType(
+    IRBuilder* builder,
+    ScalarizedVal const& val,
+    IRType* toType,
+    IRType* fromType);
+IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
+ScalarizedVal getSubscriptVal(
+    IRBuilder* builder,
+    IRType* elementType,
+    ScalarizedVal val,
+    IRInst* indexVal);
+ScalarizedVal getSubscriptVal(
+    IRBuilder* builder,
+    IRType* elementType,
+    ScalarizedVal val,
+    UInt index);
 
 struct GlobalVaryingDeclarator
 {
@@ -1340,7 +1359,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // Set the array size to 0, to mean it is unsized
             auto arrayType = builder->getArrayType(type, 0);
 
-            IRType* paramType = builder->getPtrType(ptrOpCode, type, addrSpace);
+            IRType* paramType = builder->getPtrType(ptrOpCode, arrayType, addrSpace);
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
@@ -1371,7 +1390,10 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
         // Make it an array index
         ScalarizedVal val = ScalarizedVal::address(semanticGlobal->globalParam);
-        val = ScalarizedVal::scalarizedArrayIndex(val, systemValueInfo->arrayIndex);
+        RefPtr<ScalarizedArrayIndexValImpl> arrayImpl = new ScalarizedArrayIndexValImpl();
+        arrayImpl->arrayVal = val;
+        arrayImpl->index = systemValueInfo->arrayIndex;
+        val = ScalarizedVal::scalarizedArrayIndex(arrayImpl);
 
         // We need to make this access, an array access to the global
         if (auto fromType = systemValueInfo->requiredType)
@@ -1957,7 +1979,8 @@ ScalarizedVal adaptType(
     case ScalarizedVal::Flavor::arrayIndex:
         {
             auto arrayImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
-            auto elementVal = getSubscriptVal(builder, fromType, arrayImpl->arrayVal, arrayImpl->index);
+            auto elementVal =
+                getSubscriptVal(builder, fromType, arrayImpl->arrayVal, arrayImpl->index);
             return adaptType(builder, elementVal, toType, fromType);
         }
         break;
@@ -1966,8 +1989,6 @@ ScalarizedVal adaptType(
         UNREACHABLE_RETURN(ScalarizedVal());
     }
 }
-
-IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
 
 void assign(
     IRBuilder* builder,
@@ -2846,7 +2867,11 @@ void tryReplaceUsesOfStageInput(
                     auto arrayIndexImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
                     auto user = use->getUser();
                     IRBuilder builder(user);
-                    auto subscriptVal = getSubscriptVal(&builder, originalVal->getDataType(), arrayIndexImpl->arrayVal,
+                    builder.setInsertBefore(user);
+                    auto subscriptVal = getSubscriptVal(
+                        &builder,
+                        tryGetPointedToType(&builder, originalVal->getDataType()),
+                        arrayIndexImpl->arrayVal,
                         arrayIndexImpl->index);
                     builder.setInsertBefore(user);
                     auto materializedInner = materializeValue(&builder, subscriptVal);
@@ -3735,11 +3760,11 @@ void legalizeEntryPointForGLSL(
         {
             auto type = value.globalParam->getDataType();
 
-            // Strip out if there is one
-            auto outType = as<IROutType>(type);
-            if (outType)
+            // Strip ptr if there is one.
+            auto ptrType = as<IRPtrTypeBase>(type);
+            if (ptrType)
             {
-                type = outType->getValueType();
+                type = ptrType->getValueType();
             }
 
             // Get the array type
@@ -3756,10 +3781,13 @@ void legalizeEntryPointForGLSL(
             auto elementCountInst = builder.getIntValue(builder.getIntType(), value.maxIndex + 1);
             IRType* sizedArrayType = builder.getArrayType(elementType, elementCountInst);
 
-            // Re-add out if there was one on the input
-            if (outType)
+            // Re-add ptr if there was one on the input
+            if (ptrType)
             {
-                sizedArrayType = builder.getOutType(sizedArrayType);
+                sizedArrayType = builder.getPtrType(
+                    ptrType->getOp(),
+                    sizedArrayType,
+                    ptrType->getAddressSpace());
             }
 
             // Change the globals type
