@@ -94,8 +94,8 @@ struct ContentAssistInfo
     // The primary module from which the current content assist request is made. Provided by the
     // language server.
     Name* primaryModuleName = nullptr;
-    // The primary module path from which the current content assist request is made. Provided by the
-    // language server.
+    // The primary module path from which the current content assist request is made. Provided by
+    // the language server.
     String primaryModulePath;
     // The cursor location at which a completion request is made. Provided by the language server.
     Index cursorLine = 0;
@@ -110,4 +110,4 @@ struct ContentAssistInfo
     PreprocessorContentAssistInfo preprocessorInfo;
 };
 
-}
+} // namespace Slang

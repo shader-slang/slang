@@ -1,10 +1,9 @@
 // entry-point-uniform-params.slang
-
+//TEST(compute):COMPARE_COMPUTE:-wgpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-
 // Test that a shader can be written that
 // only uses entry point `uniform` parameters,
 // without any global parameters.

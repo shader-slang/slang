@@ -22,9 +22,9 @@ function(slang_glob_sources var dir)
         "*.natstepfilter"
         "*.natjmc"
     )
-    if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
         list(APPEND patterns "*.mm")
-    endif()        
+    endif()
     list(TRANSFORM patterns PREPEND "${dir}/")
 
     file(GLOB_RECURSE files CONFIGURE_DEPENDS ${patterns})

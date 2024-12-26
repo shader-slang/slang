@@ -9,7 +9,7 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "vertex",
+            "stage": "vertex",
             "parameters": [
                 {
                     "name": "a",
@@ -161,7 +161,7 @@ standard output = {
                     }
                 }
             ],
-            "result:": {
+            "result": {
                 "semanticName": "SV_POSITION",
                 "type": {
                     "kind": "vector",

@@ -4,8 +4,8 @@
 
 // This file contains utility functions for operating with Slang IR.
 //
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 namespace Slang
 {
 struct GenericChildrenMigrationContextImpl;
@@ -40,10 +40,11 @@ struct DeduplicateContext
     template<typename TFunc>
     IRInst* deduplicate(IRInst* value, const TFunc& shouldDeduplicate)
     {
-        if (!value) return nullptr;
+        if (!value)
+            return nullptr;
         if (!shouldDeduplicate(value))
             return value;
-        IRInstKey key = { value };
+        IRInstKey key = {value};
         if (auto newValue = deduplicateMap.tryGetValue(key))
             return *newValue;
         for (UInt i = 0; i < value->getOperandCount(); i++)
@@ -97,7 +98,11 @@ inline bool isScalarIntegerType(IRType* type)
 // No side effect can take place through a value of a "Value" type.
 bool isValueType(IRInst* type);
 
+bool isScalarOrVectorType(IRInst* type);
+
 bool isSimpleDataType(IRType* type);
+
+bool isSimpleHLSLDataType(IRInst* inst);
 
 SourceLoc findFirstUseLoc(IRInst* inst);
 
@@ -112,39 +117,43 @@ inline bool isChildInstOf(IRInst* inst, IRInst* parent)
     return false;
 }
 
-    // Specialize `genericToSpecialize` with the generic parameters defined in `userGeneric`.
-    // For example:
-    // ```
-    // int f<T>(T a);
-    // ```
-    // will be extended into 
-    // ```
-    // struct IntermediateFor_f<T> { T t0; }
-    // int f_primal<T>(T a, IntermediateFor_f<T> imm);
-    // ```
-    // Given a user generic `f_primal<T>` and a used value parameterized on the same set of generic parameters
-    // `IntermediateFor_f`, `genericToSpecialize` constructs `IntermediateFor_f<T>` (using the parameter list
-    // from user generic).
-    //
+// Specialize `genericToSpecialize` with the generic parameters defined in `userGeneric`.
+// For example:
+// ```
+// int f<T>(T a);
+// ```
+// will be extended into
+// ```
+// struct IntermediateFor_f<T> { T t0; }
+// int f_primal<T>(T a, IntermediateFor_f<T> imm);
+// ```
+// Given a user generic `f_primal<T>` and a used value parameterized on the same set of generic
+// parameters `IntermediateFor_f`, `genericToSpecialize` constructs `IntermediateFor_f<T>` (using
+// the parameter list from user generic).
+//
 IRInst* specializeWithGeneric(
-    IRBuilder& builder, IRInst* genericToSpecialize, IRGeneric* userGeneric);
+    IRBuilder& builder,
+    IRInst* genericToSpecialize,
+    IRGeneric* userGeneric);
 
-IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecailize, IRInst* userGeneric);
+IRInst* maybeSpecializeWithGeneric(
+    IRBuilder& builder,
+    IRInst* genericToSpecailize,
+    IRInst* userGeneric);
 
-    // For a value inside a generic, create a standalone generic wrapping just the value, and replace the use of
-    // the original value with a specialization of the new generic using the current generic arguments if
-    // `replaceExistingValue` is true.
-    // For example, if we have
-    // ```
-    //     generic G { param T; v = x(T); f = y(v); return f; }
-    // ```
-    // hoistValueFromGeneric(G, v) turns the code into:
-    // ```
-    //     generic G1 { param T1; v1 = x(T); return v1; }
-    //     generic G { param T; v = specialize(G1, T); f = y(v); return f; }
-    // ```
-    // This function returns newly created generic inst.
-    // if `value` is not inside any generic, this function makes no change to IR, and returns `value`.
+// For a value inside a generic, create a standalone generic wrapping just the value, and replace
+// the use of the original value with a specialization of the new generic using the current generic
+// arguments if `replaceExistingValue` is true. For example, if we have
+// ```
+//     generic G { param T; v = x(T); f = y(v); return f; }
+// ```
+// hoistValueFromGeneric(G, v) turns the code into:
+// ```
+//     generic G1 { param T1; v1 = x(T); return v1; }
+//     generic G { param T; v = specialize(G1, T); f = y(v); return f; }
+// ```
+// This function returns newly created generic inst.
+// if `value` is not inside any generic, this function makes no change to IR, and returns `value`.
 IRInst* hoistValueFromGeneric(
     IRBuilder& builder,
     IRInst* value,
@@ -183,7 +192,10 @@ IRType* dropNormAttributes(IRType* const t);
 void getTypeNameHint(StringBuilder& sb, IRInst* type);
 void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src);
 IRInst* getRootAddr(IRInst* addrInst);
-IRInst* getRootAddr(IRInst* addrInst, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes = nullptr);
+IRInst* getRootAddr(
+    IRInst* addrInst,
+    List<IRInst*>& outAccessChain,
+    List<IRInst*>* outTypes = nullptr);
 
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
@@ -194,12 +206,16 @@ String dumpIRToString(
 // Returns whether a call insts can be treated as a pure functional inst, and thus can be
 // DCE'd and deduplicated.
 // (no writes to memory, no reads from unknown memory, no side effects).
-bool isPureFunctionalCall(IRCall* callInst, SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
+bool isPureFunctionalCall(
+    IRCall* callInst,
+    SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
 
 // Returns whether a call insts can be treated as a pure functional inst, and thus can be
 // DCE'd (but not necessarily deduplicated).
 // (no side effects).
-bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
+bool isSideEffectFreeFunctionalCall(
+    IRCall* call,
+    SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
 
 bool doesCalleeHaveSideEffect(IRInst* callee);
 
@@ -209,7 +225,8 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
 
 IRInst* getUndefInst(IRBuilder builder, IRModule* module);
 
-// The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<) ==> (>).
+// The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
+// ==> (>).
 IROp getSwapSideComparisonOp(IROp op);
 
 // Set IRBuilder to insert before `inst`. If `inst` is a param, it will insert after the last param.
@@ -220,7 +237,12 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst);
 
 // Emit a loop structure with a simple incrementing counter.
 // Returns the loop counter `IRParam`.
-IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IRBlock*& loopBodyBlock, IRBlock*& loopBreakBlock);
+IRInst* emitLoopBlocks(
+    IRBuilder* builder,
+    IRInst* initVal,
+    IRInst* finalVal,
+    IRBlock*& loopBodyBlock,
+    IRBlock*& loopBreakBlock);
 
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
@@ -252,17 +274,13 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst);
 void initializeScratchData(IRInst* inst);
 void resetScratchDataBit(IRInst* inst, int bitIndex);
 ///
-/// IRBlock related common helper methods 
+/// IRBlock related common helper methods
 ///
 void moveParams(IRBlock* dest, IRBlock* src);
 
-List<IRBlock*> collectBlocksInRegion(
-    IRDominatorTree* dom,
-    IRLoop* loop);
+List<IRBlock*> collectBlocksInRegion(IRDominatorTree* dom, IRLoop* loop);
 
-List<IRBlock*> collectBlocksInRegion(
-    IRDominatorTree* dom,
-    IRSwitch* switchInst);
+List<IRBlock*> collectBlocksInRegion(IRDominatorTree* dom, IRSwitch* switchInst);
 
 List<IRBlock*> collectBlocksInRegion(
     IRDominatorTree* dom,
@@ -281,9 +299,12 @@ List<IRBlock*> collectBlocksInRegion(
     bool includeFirstBlock,
     bool* outHasMultilevelBreaks);
 
-List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst, bool* outHasMultilevelBreaks);
+List<IRBlock*> collectBlocksInRegion(
+    IRGlobalValueWithCode* func,
+    IRLoop* loopInst,
+    bool* outHasMultilevelBreaks);
 
-List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func,  IRLoop* loopInst);
+List<IRBlock*> collectBlocksInRegion(IRGlobalValueWithCode* func, IRLoop* loopInst);
 
 HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block);
 
@@ -344,13 +365,12 @@ void verifyComputeDerivativeGroupModifiers(
 
 inline bool isSPIRV(CodeGenTarget codeGenTarget)
 {
-    return codeGenTarget == CodeGenTarget::SPIRV
-            || codeGenTarget == CodeGenTarget::SPIRVAssembly;
+    return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
 }
 
 int getIRVectorElementSize(IRType* type);
 IRType* getIRVectorBaseType(IRType* type);
 
-}
+} // namespace Slang
 
 #endif

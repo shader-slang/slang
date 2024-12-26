@@ -5,11 +5,11 @@
 
 namespace Slang
 {
-    class DiagnosticSink;
-    struct IRModule;
+class DiagnosticSink;
+struct IRModule;
 
-    void checkForOperatorShiftOverflow(
-        IRModule* module,
-        CompilerOptionSet& optionSet,
-        DiagnosticSink* sink);
-}
+void checkForOperatorShiftOverflow(
+    IRModule* module,
+    CompilerOptionSet& optionSet,
+    DiagnosticSink* sink);
+} // namespace Slang

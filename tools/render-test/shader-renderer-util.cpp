@@ -2,91 +2,146 @@
 
 #include "shader-renderer-util.h"
 
-#include "tools/gfx/resource-desc-utils.h"
-
-namespace renderer_test {
+namespace renderer_test
+{
 
 using namespace Slang;
 using Slang::Result;
 
-/* static */ Result ShaderRendererUtil::generateTextureResource(
+inline int calcMipSize(int size, int level)
+{
+    size = size >> level;
+    return size > 0 ? size : 1;
+}
+
+inline Extents calcMipSize(Extents size, int mipLevel)
+{
+    Extents rs;
+    rs.width = calcMipSize(size.width, mipLevel);
+    rs.height = calcMipSize(size.height, mipLevel);
+    rs.depth = calcMipSize(size.depth, mipLevel);
+    return rs;
+}
+
+/// Given the type works out the maximum dimension size
+inline int calcMaxDimension(Extents size, TextureType type)
+{
+    switch (type)
+    {
+    case TextureType::Texture1D:
+        return size.width;
+    case TextureType::Texture3D:
+        return Math::Max(Math::Max(size.width, size.height), size.depth);
+    case TextureType::TextureCube: // fallthru
+    case TextureType::Texture2D:
+        {
+            return Math::Max(size.width, size.height);
+        }
+    default:
+        return 0;
+    }
+}
+
+/// Given the type, calculates the number of mip maps. 0 on error
+inline int calcNumMipLevels(TextureType type, Extents size)
+{
+    const int maxDimensionSize = calcMaxDimension(size, type);
+    return (maxDimensionSize > 0) ? (Math::Log2Floor(maxDimensionSize) + 1) : 0;
+}
+
+/* static */ Result ShaderRendererUtil::generateTexture(
     const InputTextureDesc& inputDesc,
     ResourceState defaultState,
     IDevice* device,
-    ComPtr<ITextureResource>& textureOut)
+    ComPtr<ITexture>& textureOut)
 {
     TextureData texData;
     generateTextureData(texData, inputDesc);
-    return createTextureResource(inputDesc, texData, defaultState, device, textureOut);
+    return createTexture(inputDesc, texData, defaultState, device, textureOut);
 }
 
-/* static */ Result ShaderRendererUtil::createTextureResource(
+/* static */ Result ShaderRendererUtil::createTexture(
     const InputTextureDesc& inputDesc,
     const TextureData& texData,
     ResourceState defaultState,
     IDevice* device,
-    ComPtr<ITextureResource>& textureOut)
+    ComPtr<ITexture>& textureOut)
 {
-    ITextureResource::Desc textureResourceDesc = {};
+    TextureDesc textureDesc = {};
 
     // Default to R8G8B8A8_UNORM
-    const Format format = (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
+    const Format format =
+        (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
 
-    textureResourceDesc.sampleDesc = ITextureResource::SampleDesc{inputDesc.sampleCount, 0};
-    textureResourceDesc.format = format;
-    textureResourceDesc.numMipLevels = texData.m_mipLevels;
-    textureResourceDesc.arraySize = inputDesc.arrayLength;
-    textureResourceDesc.allowedStates =
-        ResourceStateSet(defaultState, ResourceState::CopyDestination, ResourceState::CopySource);
-    textureResourceDesc.defaultState = defaultState;
+    textureDesc.sampleCount = inputDesc.sampleCount;
+    textureDesc.format = format;
+    textureDesc.mipLevelCount = texData.m_mipLevels;
+    textureDesc.arrayLength = inputDesc.arrayLength > 0 ? inputDesc.arrayLength : 1;
+    textureDesc.usage = TextureUsage::CopyDestination | TextureUsage::CopySource;
+    switch (defaultState)
+    {
+    case ResourceState::ShaderResource:
+        textureDesc.usage |= TextureUsage::ShaderResource;
+        break;
+    case ResourceState::UnorderedAccess:
+        textureDesc.usage |= TextureUsage::UnorderedAccess;
+        break;
+    default:
+        return SLANG_FAIL;
+    }
+    textureDesc.defaultState = defaultState;
 
     // It's the same size in all dimensions
     switch (inputDesc.dimension)
     {
-        case 1:
+    case 1:
         {
-            textureResourceDesc.type = IResource::Type::Texture1D;
-            textureResourceDesc.size.width = inputDesc.size;
-            textureResourceDesc.size.height = 1;
-            textureResourceDesc.size.depth = 1;
+            textureDesc.type = TextureType::Texture1D;
+            textureDesc.size.width = inputDesc.size;
+            textureDesc.size.height = 1;
+            textureDesc.size.depth = 1;
 
             break;
         }
-        case 2:
+    case 2:
         {
-            textureResourceDesc.type = inputDesc.isCube ? IResource::Type::TextureCube : IResource::Type::Texture2D;
-            textureResourceDesc.size.width = inputDesc.size;
-            textureResourceDesc.size.height = inputDesc.size;
-            textureResourceDesc.size.depth = 1;
+            textureDesc.type = inputDesc.isCube ? TextureType::TextureCube : TextureType::Texture2D;
+            textureDesc.size.width = inputDesc.size;
+            textureDesc.size.height = inputDesc.size;
+            textureDesc.size.depth = 1;
             break;
         }
-        case 3:
+    case 3:
         {
-            textureResourceDesc.type = IResource::Type::Texture3D;
-            textureResourceDesc.size.width = inputDesc.size;
-            textureResourceDesc.size.height = inputDesc.size;
-            textureResourceDesc.size.depth = inputDesc.size;
+            textureDesc.type = TextureType::Texture3D;
+            textureDesc.size.width = inputDesc.size;
+            textureDesc.size.height = inputDesc.size;
+            textureDesc.size.depth = inputDesc.size;
             break;
         }
     }
 
-    const int effectiveArraySize = calcEffectiveArraySize(textureResourceDesc);
-    const int numSubResources = calcNumSubResources(textureResourceDesc);
-
-    List<ITextureResource::SubresourceData> initSubresources;
-    int subResourceCounter = 0;
-    for( int a = 0; a < effectiveArraySize; ++a )
+    if (textureDesc.mipLevelCount == 0)
     {
-        for( int m = 0; m < textureResourceDesc.numMipLevels; ++m )
+        textureDesc.mipLevelCount = calcNumMipLevels(textureDesc.type, textureDesc.size);
+    }
+
+    List<SubresourceData> initSubresources;
+    int arrayLayerCount =
+        textureDesc.arrayLength * (textureDesc.type == TextureType::TextureCube ? 6 : 1);
+    int subResourceCounter = 0;
+    for (int a = 0; a < arrayLayerCount; ++a)
+    {
+        for (int m = 0; m < textureDesc.mipLevelCount; ++m)
         {
             int subResourceIndex = subResourceCounter++;
-            const int mipWidth = calcMipSize(textureResourceDesc.size.width, m);
-            const int mipHeight = calcMipSize(textureResourceDesc.size.height, m);
+            const int mipWidth = calcMipSize(textureDesc.size.width, m);
+            const int mipHeight = calcMipSize(textureDesc.size.height, m);
 
             auto strideY = mipWidth * sizeof(uint32_t);
             auto strideZ = mipHeight * strideY;
 
-            ITextureResource::SubresourceData subresourceData;
+            SubresourceData subresourceData;
             subresourceData.data = texData.m_slices[subResourceIndex].values;
             subresourceData.strideY = strideY;
             subresourceData.strideZ = strideZ;
@@ -95,31 +150,27 @@ using Slang::Result;
         }
     }
 
-    textureOut = device->createTextureResource(textureResourceDesc, initSubresources.getBuffer());
+    textureOut = device->createTexture(textureDesc, initSubresources.getBuffer());
 
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
 
-/* static */ Result ShaderRendererUtil::createBufferResource(
+/* static */ Result ShaderRendererUtil::createBuffer(
     const InputBufferDesc& inputDesc,
     size_t bufferSize,
     const void* initData,
     IDevice* device,
-    Slang::ComPtr<IBufferResource>& bufferOut)
+    Slang::ComPtr<IBuffer>& bufferOut)
 {
-    IBufferResource::Desc srcDesc;
-    srcDesc.type = IResource::Type::Buffer;
-    srcDesc.sizeInBytes = bufferSize;
-    srcDesc.format = inputDesc.format;
-    srcDesc.elementSize = inputDesc.stride;
-    srcDesc.defaultState = ResourceState::UnorderedAccess;
-    srcDesc.allowedStates = ResourceStateSet(
-        ResourceState::CopyDestination,
-        ResourceState::CopySource,
-        ResourceState::UnorderedAccess,
-        ResourceState::ShaderResource);
+    BufferDesc bufferDesc;
+    bufferDesc.size = bufferSize;
+    bufferDesc.format = inputDesc.format;
+    bufferDesc.elementSize = inputDesc.stride;
+    bufferDesc.usage = BufferUsage::CopyDestination | BufferUsage::CopySource |
+                       BufferUsage::ShaderResource | BufferUsage::UnorderedAccess;
+    bufferDesc.defaultState = ResourceState::UnorderedAccess;
 
-    ComPtr<IBufferResource> bufferResource = device->createBufferResource(srcDesc, initData);
+    ComPtr<IBuffer> bufferResource = device->createBuffer(bufferDesc, initData);
     if (!bufferResource)
     {
         return SLANG_FAIL;
@@ -129,21 +180,20 @@ using Slang::Result;
     return SLANG_OK;
 }
 
-static ISamplerState::Desc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
+static SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
 {
-    ISamplerState::Desc dstDesc;
+    SamplerDesc samplerDesc;
     if (srcDesc.isCompareSampler)
     {
-        dstDesc.reductionOp = TextureReductionOp::Comparison;
-        dstDesc.comparisonFunc = ComparisonFunc::Less;
+        samplerDesc.reductionOp = TextureReductionOp::Comparison;
+        samplerDesc.comparisonFunc = ComparisonFunc::Less;
     }
-    return dstDesc;
+    return samplerDesc;
 }
 
-ComPtr<ISamplerState> _createSamplerState(IDevice* device,
-    const InputSamplerDesc& srcDesc)
+ComPtr<ISampler> _createSampler(IDevice* device, const InputSamplerDesc& srcDesc)
 {
-    return device->createSamplerState(_calcSamplerDesc(srcDesc));
+    return device->createSampler(_calcSamplerDesc(srcDesc));
 }
 
-} // renderer_test
+} // namespace renderer_test

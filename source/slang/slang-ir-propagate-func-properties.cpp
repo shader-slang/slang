@@ -1,8 +1,8 @@
 #include "slang-ir-propagate-func-properties.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 
 namespace Slang
@@ -94,9 +94,8 @@ public:
                 {
                     if (inst->mightHaveSideEffects() || isResourceLoad(inst->getOp()))
                     {
-                        // We have a inst that has side effect that is not understood by this method,
-                        // e.g. bufferStore, discard, etc.
-                        // or we are seeing a resource load.
+                        // We have a inst that has side effect that is not understood by this
+                        // method, e.g. bufferStore, discard, etc. or we are seeing a resource load.
                         // These operations are not movable or removable,
                         // and should not be treated as ReadNone.
                         hasReadNoneCall = true;
@@ -364,8 +363,8 @@ bool propagateFuncProperties(IRModule* module)
     bool changed = propagateFuncPropertiesImpl(module, &readNoneContext);
 
     NoSideEffectFuncPropertyPropagationContext noSideEffectContext;
-    changed|= propagateFuncPropertiesImpl(module, &noSideEffectContext);
+    changed |= propagateFuncPropertiesImpl(module, &noSideEffectContext);
 
     return changed;
 }
-}
+} // namespace Slang

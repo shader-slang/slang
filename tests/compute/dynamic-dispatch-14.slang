@@ -2,7 +2,6 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -gl  -profile glsl_440
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -profile glsl_440
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
 
@@ -24,12 +23,10 @@ interface IInterface
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;
 
-
-// Specialize gCb1, but not gCb2
 //TEST_INPUT: set gCb = new StructuredBuffer<IInterface>{new MyImpl{1}};
 RWStructuredBuffer<IInterface> gCb;
 
-//TEST_INPUT: set gCb1 = dynamic new StructuredBuffer<IInterface>{new MyImpl{1}}
+//TEST_INPUT: set gCb1 = new StructuredBuffer<IInterface>{new MyImpl{1}}
 RWStructuredBuffer<IInterface> gCb1;
 
 [numthreads(4, 1, 1)]

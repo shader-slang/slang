@@ -2,13 +2,13 @@
 #include "slang-emit-cuda.h"
 
 #include "../core/slang-writer.h"
-
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
 
 #include <assert.h>
 
-namespace Slang {
+namespace Slang
+{
 
 static CUDAExtensionTracker::BaseTypeFlags _findBaseTypesUsed(IRModule* module)
 {
@@ -51,30 +51,48 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
 {
     switch (op)
     {
-        case kIROp_VoidType:    return UnownedStringSlice("void");
-        case kIROp_BoolType:    return UnownedStringSlice("bool");
+    case kIROp_VoidType:
+        return UnownedStringSlice("void");
+    case kIROp_BoolType:
+        return UnownedStringSlice("bool");
 
-        case kIROp_Int8Type:    return UnownedStringSlice("char");
-        case kIROp_Int16Type:   return UnownedStringSlice("short");
-        case kIROp_IntType:     return UnownedStringSlice("int");
-        case kIROp_Int64Type:   return UnownedStringSlice("longlong");
+    case kIROp_Int8Type:
+        return UnownedStringSlice("char");
+    case kIROp_Int16Type:
+        return UnownedStringSlice("short");
+    case kIROp_IntType:
+        return UnownedStringSlice("int");
+    case kIROp_Int64Type:
+        return UnownedStringSlice("longlong");
 
-        case kIROp_UInt8Type:   return UnownedStringSlice("uchar");
-        case kIROp_UInt16Type:  return UnownedStringSlice("ushort");
-        case kIROp_UIntType:    return UnownedStringSlice("uint");
-        case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
+    case kIROp_UInt8Type:
+        return UnownedStringSlice("uchar");
+    case kIROp_UInt16Type:
+        return UnownedStringSlice("ushort");
+    case kIROp_UIntType:
+        return UnownedStringSlice("uint");
+    case kIROp_UInt64Type:
+        return UnownedStringSlice("ulonglong");
 #if SLANG_PTR_IS_64
-        case kIROp_IntPtrType:  return UnownedStringSlice("int64_t");
-        case kIROp_UIntPtrType: return UnownedStringSlice("uint64_t");
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("int64_t");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("uint64_t");
 #else
-        case kIROp_IntPtrType:  return UnownedStringSlice("int");
-        case kIROp_UIntPtrType: return UnownedStringSlice("uint");
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("int");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("uint");
 #endif
-        case kIROp_HalfType:    return UnownedStringSlice("__half");
-        
-        case kIROp_FloatType:   return UnownedStringSlice("float");
-        case kIROp_DoubleType:  return UnownedStringSlice("double");
-        default:                return UnownedStringSlice();
+    case kIROp_HalfType:
+        return UnownedStringSlice("__half");
+
+    case kIROp_FloatType:
+        return UnownedStringSlice("float");
+    case kIROp_DoubleType:
+        return UnownedStringSlice("double");
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -83,23 +101,36 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
 {
     switch (op)
     {
-        case kIROp_BoolType:    return UnownedStringSlice("bool");
+    case kIROp_BoolType:
+        return UnownedStringSlice("bool");
 
-        case kIROp_Int8Type:    return UnownedStringSlice("char");
-        case kIROp_Int16Type:   return UnownedStringSlice("short");
-        case kIROp_IntType:     return UnownedStringSlice("int");
-        case kIROp_Int64Type:   return UnownedStringSlice("longlong");
+    case kIROp_Int8Type:
+        return UnownedStringSlice("char");
+    case kIROp_Int16Type:
+        return UnownedStringSlice("short");
+    case kIROp_IntType:
+        return UnownedStringSlice("int");
+    case kIROp_Int64Type:
+        return UnownedStringSlice("longlong");
 
-        case kIROp_UInt8Type:   return UnownedStringSlice("uchar");
-        case kIROp_UInt16Type:  return UnownedStringSlice("ushort");
-        case kIROp_UIntType:    return UnownedStringSlice("uint");
-        case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
+    case kIROp_UInt8Type:
+        return UnownedStringSlice("uchar");
+    case kIROp_UInt16Type:
+        return UnownedStringSlice("ushort");
+    case kIROp_UIntType:
+        return UnownedStringSlice("uint");
+    case kIROp_UInt64Type:
+        return UnownedStringSlice("ulonglong");
 
-        case kIROp_HalfType:    return UnownedStringSlice("__half");
+    case kIROp_HalfType:
+        return UnownedStringSlice("__half");
 
-        case kIROp_FloatType:   return UnownedStringSlice("float");
-        case kIROp_DoubleType:  return UnownedStringSlice("double");
-        default:                return UnownedStringSlice();
+    case kIROp_FloatType:
+        return UnownedStringSlice("float");
+    case kIROp_DoubleType:
+        return UnownedStringSlice("double");
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -112,7 +143,9 @@ void CUDASourceEmitter::emitTempModifiers(IRInst* temp)
     }
 }
 
-SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
+SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(
+    IRTextureTypeBase* texType,
+    StringBuilder& outName)
 {
     // Not clear how to do this yet
     if (texType->isMultisample())
@@ -122,17 +155,20 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
 
     switch (texType->getAccess())
     {
-        case SLANG_RESOURCE_ACCESS_READ:
+    case SLANG_RESOURCE_ACCESS_READ:
         {
             outName << "CUtexObject";
             return SLANG_OK;
         }
-        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+    case SLANG_RESOURCE_ACCESS_READ_WRITE:
+    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+    case SLANG_RESOURCE_ACCESS_WRITE:
         {
             outName << "CUsurfObject";
             return SLANG_OK;
         }
-        default: break;
+    default:
+        break;
     }
     return SLANG_FAIL;
 }
@@ -146,7 +182,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 
     switch (type->getOp())
     {
-        case kIROp_VectorType:
+    case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
             auto vecCount = int(getIntVal(vecType->getElementCount()));
@@ -160,12 +196,12 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << prefix << vecCount;
             return SLANG_OK;
         }
-        case kIROp_TensorViewType:
+    case kIROp_TensorViewType:
         {
             out << "TensorView";
             return SLANG_OK;
         }
-        default:
+    default:
         {
             if (isNominalOp(type->getOp()))
             {
@@ -186,38 +222,50 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 
             switch (type->getOp())
             {
-                case kIROp_SamplerStateType:                    out << "SamplerState"; return SLANG_OK;
-                case kIROp_SamplerComparisonStateType:          out << "SamplerComparisonState"; return SLANG_OK;
-                default: break;
+            case kIROp_SamplerStateType:
+                out << "SamplerState";
+                return SLANG_OK;
+            case kIROp_SamplerComparisonStateType:
+                out << "SamplerComparisonState";
+                return SLANG_OK;
+            default:
+                break;
             }
 
             break;
         }
     }
 
-    if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type)) {
+    if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    {
         switch (untypedBufferType->getOp())
         {
-            case kIROp_RaytracingAccelerationStructureType:
+        case kIROp_RaytracingAccelerationStructureType:
             {
                 m_writer->emit("OptixTraversableHandle");
                 return SLANG_OK;
                 break;
             }
 
-            default: break;
+        default:
+            break;
         }
     }
 
     return Super::calcTypeName(type, target, out);
 }
 
-void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling, EmitLayoutSemanticOption layoutSemanticOption)
+void CUDASourceEmitter::emitLayoutSemanticsImpl(
+    IRInst* inst,
+    char const* uniformSemanticSpelling,
+    EmitLayoutSemanticOption layoutSemanticOption)
 {
     Super::emitLayoutSemanticsImpl(inst, uniformSemanticSpelling, layoutSemanticOption);
 }
 
-void CUDASourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
+void CUDASourceEmitter::emitParameterGroupImpl(
+    IRGlobalParam* varDecl,
+    IRUniformParameterGroupType* type)
 {
     auto elementType = type->getElementType();
 
@@ -230,7 +278,9 @@ void CUDASourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniform
     m_writer->emit(" (&SLANG_globalParams)\n");
 }
 
-void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
+void CUDASourceEmitter::emitEntryPointAttributesImpl(
+    IRFunc* irFunc,
+    IREntryPointDecoration* entryPointDecor)
 {
     SLANG_UNUSED(irFunc);
     SLANG_UNUSED(entryPointDecor);
@@ -279,35 +329,37 @@ String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* ent
     // stage it is to be compiled for.
     //
     auto stage = entryPointDecor->getProfile().getStage();
-    switch( stage )
+    switch (stage)
     {
     default:
         break;
 
-#define CASE(STAGE, PREFIX) \
-    case Stage::STAGE: globalSymbolName = #PREFIX + funcName; break
+#define CASE(STAGE, PREFIX)                    \
+    case Stage::STAGE:                         \
+        globalSymbolName = #PREFIX + funcName; \
+        break
 
-    // Optix 7 Guide, Section 6.1 (Program input)
-    //
-    // > The input PTX should include one or more NVIDIA OptiX programs.
-    // > The type of program affects how the program can be used during
-    // > the execution of the pipeline. These program types are specified
-    // by prefixing the program name with the following:
-    //
-    // >    Program type        Function name prefix
-    CASE(   RayGeneration,      __raygen__);
-    CASE(   Intersection,       __intersection__);
-    CASE(   AnyHit,             __anyhit__);
-    CASE(   ClosestHit,         __closesthit__);
-    CASE(   Miss,               __miss__);
-    CASE(   Callable,           __direct_callable__);
-    //
-    // There are two stages (or "program types") supported by OptiX
-    // that Slang currently cannot target:
-    //
-    // CASE(ContinuationCallable,   __continuation_callable__);
-    // CASE(Exception,              __exception__);
-    //
+        // Optix 7 Guide, Section 6.1 (Program input)
+        //
+        // > The input PTX should include one or more NVIDIA OptiX programs.
+        // > The type of program affects how the program can be used during
+        // > the execution of the pipeline. These program types are specified
+        // by prefixing the program name with the following:
+        //
+        // >    Program type        Function name prefix
+        CASE(RayGeneration, __raygen__);
+        CASE(Intersection, __intersection__);
+        CASE(AnyHit, __anyhit__);
+        CASE(ClosestHit, __closesthit__);
+        CASE(Miss, __miss__);
+        CASE(Callable, __direct_callable__);
+        //
+        // There are two stages (or "program types") supported by OptiX
+        // that Slang currently cannot target:
+        //
+        // CASE(ContinuationCallable,   __continuation_callable__);
+        // CASE(Exception,              __exception__);
+        //
 #undef CASE
     }
 
@@ -333,8 +385,8 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
 
     switch (value->getOp())
     {
-        case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
+    case kIROp_MakeVector:
+    case kIROp_MakeMatrix:
         {
             IRType* type = value->getDataType();
 
@@ -346,7 +398,10 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
                     if (UInt(getIntVal(vecType->getElementCount())) == value->getOperandCount())
                     {
                         emitType(type);
-                        _emitInitializerList(vecType->getElementType(), value->getOperands(), value->getOperandCount());
+                        _emitInitializerList(
+                            vecType->getElementType(),
+                            value->getOperands(),
+                            value->getOperandCount());
                         return;
                     }
                 }
@@ -362,19 +417,25 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
                     const Index operandCount = Index(value->getOperandCount());
 
                     // Can init, with vectors.
-                    // For now special case if the rowVectorType is not actually a vector (when elementSize == 1)
+                    // For now special case if the rowVectorType is not actually a vector (when
+                    // elementSize == 1)
                     if (operandCount == rowCount)
                     {
-                        // Emit the braces for the Matrix struct, and then each row vector in its own line.
+                        // Emit the braces for the Matrix struct, and then each row vector in its
+                        // own line.
                         emitType(matType);
                         m_writer->emit("{\n");
                         m_writer->indent();
                         for (Index i = 0; i < rowCount; ++i)
                         {
-                            if (i != 0) m_writer->emit(",\n");
+                            if (i != 0)
+                                m_writer->emit(",\n");
                             emitType(matType->getElementType());
                             m_writer->emit(colCount);
-                            _emitInitializerList(matType->getElementType(), value->getOperand(i)->getOperands(), colCount);
+                            _emitInitializerList(
+                                matType->getElementType(),
+                                value->getOperand(i)->getOperands(),
+                                colCount);
                         }
                         m_writer->dedent();
                         m_writer->emit("\n}");
@@ -383,16 +444,18 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
                     else if (operandCount == rowCount * colCount)
                     {
                         // Handle if all are explicitly defined
-                        IRType* elementType = matType->getElementType();                                        
+                        IRType* elementType = matType->getElementType();
                         IRUse* operands = value->getOperands();
 
-                        // Emit the braces for the Matrix struct, and the elements of each row in its own line.
+                        // Emit the braces for the Matrix struct, and the elements of each row in
+                        // its own line.
                         emitType(matType);
                         m_writer->emit("{\n");
                         m_writer->indent();
                         for (Index i = 0; i < rowCount; ++i)
                         {
-                            if (i != 0) m_writer->emit(",\n");
+                            if (i != 0)
+                                m_writer->emit(",\n");
                             _emitInitializerListContent(elementType, operands, colCount);
                             operands += colCount;
                         }
@@ -402,26 +465,34 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
                     }
                 }
             }
-                      
+
             break;
         }
     }
 
-    // All other cases we just use the default emitting - might not work on arrays defined in global scope on CUDA though
+    // All other cases we just use the default emitting - might not work on arrays defined in global
+    // scope on CUDA though
     emitOperand(value, getInfo(EmitOp::General));
 }
 
-void CUDASourceEmitter::_emitInitializerListContent(IRType* elementType, IRUse* operands, Index operandCount)
+void CUDASourceEmitter::_emitInitializerListContent(
+    IRType* elementType,
+    IRUse* operands,
+    Index operandCount)
 {
     for (Index i = 0; i < operandCount; ++i)
     {
-        if (i != 0) m_writer->emit(", ");
+        if (i != 0)
+            m_writer->emit(", ");
         _emitInitializerListValue(elementType, operands[i].get());
     }
 }
 
 
-void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operands, Index operandCount)
+void CUDASourceEmitter::_emitInitializerList(
+    IRType* elementType,
+    IRUse* operands,
+    Index operandCount)
 {
     m_writer->emit("{\n");
     m_writer->indent();
@@ -432,11 +503,16 @@ void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operand
     m_writer->emit("\n}");
 }
 
-void CUDASourceEmitter::emitIntrinsicCallExprImpl(IRCall* inst, UnownedStringSlice intrinsicDefinition, IRInst* intrinsicInst, EmitOpInfo const& inOuterPrec)
+void CUDASourceEmitter::emitIntrinsicCallExprImpl(
+    IRCall* inst,
+    UnownedStringSlice intrinsicDefinition,
+    IRInst* intrinsicInst,
+    EmitOpInfo const& inOuterPrec)
 {
-    // This works around the problem, where some intrinsics that require the "half" type enabled don't use the half/float16_t type.
-    // For example `f16tof32` can operate on float16_t *and* uint. If the input is uint, although we are 
-    // using the half feature (as far as CUDA is concerned), the half/float16_t type is not visible/directly used.
+    // This works around the problem, where some intrinsics that require the "half" type enabled
+    // don't use the half/float16_t type. For example `f16tof32` can operate on float16_t *and*
+    // uint. If the input is uint, although we are using the half feature (as far as CUDA is
+    // concerned), the half/float16_t type is not visible/directly used.
     if (intrinsicDefinition.startsWith(toSlice("__half")))
     {
         m_extensionTracker->requireBaseType(BaseType::Half);
@@ -450,30 +526,175 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     switch (inst->getOp())
     {
     case kIROp_StructuredBufferGetDimensions:
-    {
-        auto count = _generateUniqueName(UnownedStringSlice("_elementCount"));
-        auto stride = _generateUniqueName(UnownedStringSlice("_stride"));
+        {
+            auto count = _generateUniqueName(UnownedStringSlice("_elementCount"));
+            auto stride = _generateUniqueName(UnownedStringSlice("_stride"));
 
-        m_writer->emit("uint ");
-        m_writer->emit(count);
-        m_writer->emit(";\n");
-        m_writer->emit("uint ");
-        m_writer->emit(stride);
-        m_writer->emit(";\n");
-        emitOperand(inst->getOperand(0), leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
-        m_writer->emit(".GetDimensions(&");
-        m_writer->emit(count);
-        m_writer->emit(", &");
-        m_writer->emit(stride);
-        m_writer->emit(");\n");
-        emitInstResultDecl(inst);
-        m_writer->emit("make_uint2(");
-        m_writer->emit(count);
-        m_writer->emit(", ");
-        m_writer->emit(stride);
-        m_writer->emit(");\n");
-        return true;
-    }
+            m_writer->emit("uint ");
+            m_writer->emit(count);
+            m_writer->emit(";\n");
+            m_writer->emit("uint ");
+            m_writer->emit(stride);
+            m_writer->emit(";\n");
+            emitOperand(
+                inst->getOperand(0),
+                leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+            m_writer->emit(".GetDimensions(&");
+            m_writer->emit(count);
+            m_writer->emit(", &");
+            m_writer->emit(stride);
+            m_writer->emit(");\n");
+            emitInstResultDecl(inst);
+            m_writer->emit("make_uint2(");
+            m_writer->emit(count);
+            m_writer->emit(", ");
+            m_writer->emit(stride);
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicLoad:
+        {
+            emitInstResultDecl(inst);
+            emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            return true;
+        }
+    case kIROp_AtomicStore:
+        {
+            emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(" = ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            return true;
+        }
+    case kIROp_AtomicExchange:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicExch(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicCompareExchange:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicCAS(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicAdd:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicAdd(");
+            bool needCloseTypeCast = false;
+            if (inst->getDataType()->getOp() == kIROp_Int64Type)
+            {
+                m_writer->emit("(unsigned long long*)(");
+                needCloseTypeCast = true;
+            }
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            if (needCloseTypeCast)
+            {
+                m_writer->emit(")");
+            }
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicSub:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicAdd(");
+            bool needCloseTypeCast = false;
+            if (inst->getDataType()->getOp() == kIROp_Int64Type)
+            {
+                m_writer->emit("(unsigned long long*)(");
+                needCloseTypeCast = true;
+            }
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            if (needCloseTypeCast)
+            {
+                m_writer->emit(")");
+            }
+            m_writer->emit(", -(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("));\n");
+            return true;
+        }
+    case kIROp_AtomicAnd:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicAnd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicOr:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicOr(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicXor:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicXor(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicMin:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicMin(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicMax:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicMax(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_AtomicInc:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", 1);\n");
+            return true;
+        }
+    case kIROp_AtomicDec:
+        {
+            emitInstResultDecl(inst);
+            m_writer->emit("atomicAdd(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", -1);\n");
+            return true;
+        }
     default:
         return false;
     }
@@ -481,10 +702,10 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    switch(inst->getOp())
+    switch (inst->getOp())
     {
-        case kIROp_MakeVector:
-        case kIROp_MakeVectorFromScalar:
+    case kIROp_MakeVector:
+    case kIROp_MakeVectorFromScalar:
         {
             m_writer->emit("make_");
             emitType(inst->getDataType());
@@ -496,7 +717,8 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 auto arg = inst->getOperand(i);
                 if (auto vectorType = as<IRVectorType>(arg->getDataType()))
                 {
-                    for (int j = 0; j < cast<IRIntLit>(vectorType->getElementCount())->getValue(); j++)
+                    for (int j = 0; j < cast<IRIntLit>(vectorType->getElementCount())->getValue();
+                         j++)
                     {
                         if (isFirst)
                             isFirst = false;
@@ -521,10 +743,10 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-        case kIROp_FloatCast:
-        case kIROp_CastIntToFloat:
-        case kIROp_IntCast:
-        case kIROp_CastFloatToInt:
+    case kIROp_FloatCast:
+    case kIROp_CastIntToFloat:
+    case kIROp_IntCast:
+    case kIROp_CastFloatToInt:
         {
             if (auto dstVectorType = as<IRVectorType>(inst->getDataType()))
             {
@@ -538,7 +760,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     auto arg = inst->getOperand(i);
                     if (auto vectorType = as<IRVectorType>(arg->getDataType()))
                     {
-                        for (int j = 0; j < cast<IRIntLit>(vectorType->getElementCount())->getValue(); j++)
+                        for (int j = 0;
+                             j < cast<IRIntLit>(vectorType->getElementCount())->getValue();
+                             j++)
                         {
                             if (isFirst)
                                 isFirst = false;
@@ -586,9 +810,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return false;
         }
-        case kIROp_MakeMatrix:
-        case kIROp_MakeMatrixFromScalar:
-        case kIROp_MatrixReshape:
+    case kIROp_MakeMatrix:
+    case kIROp_MakeMatrixFromScalar:
+    case kIROp_MatrixReshape:
         {
             m_writer->emit("make");
             emitType(inst->getDataType());
@@ -603,22 +827,22 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-        case kIROp_MakeArray:
+    case kIROp_MakeArray:
         {
             IRType* dataType = inst->getDataType();
             IRArrayType* arrayType = as<IRArrayType>(dataType);
 
             IRType* elementType = arrayType->getElementType();
 
-            // Emit braces for the FixedArray struct. 
+            // Emit braces for the FixedArray struct.
 
             _emitInitializerList(elementType, inst->getOperands(), Index(inst->getOperandCount()));
 
             return true;
         }
-        case kIROp_WaveMaskBallot:
+    case kIROp_WaveMaskBallot:
         {
-             m_extensionTracker->requireSMVersion(SemanticVersion(7, 0));
+            m_extensionTracker->requireSMVersion(SemanticVersion(7, 0));
 
             m_writer->emit("__ballot_sync(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
@@ -627,9 +851,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-        case kIROp_WaveMaskMatch:
+    case kIROp_WaveMaskMatch:
         {
-             m_extensionTracker->requireSMVersion(SemanticVersion(7, 0));
+            m_extensionTracker->requireSMVersion(SemanticVersion(7, 0));
 
             m_writer->emit("__match_any_sync(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
@@ -638,19 +862,20 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-        case kIROp_GetOptiXRayPayloadPtr:
+    case kIROp_GetOptiXRayPayloadPtr:
         {
             m_writer->emit("(");
             emitType(inst->getDataType());
             m_writer->emit(")getOptiXRayPayloadPtr()");
             return true;
         }
-        case kIROp_GetOptiXHitAttribute:
+    case kIROp_GetOptiXHitAttribute:
         {
             auto typeToFetch = inst->getOperand(0);
             auto idxInst = as<IRIntLit>(inst->getOperand(1));
             IRIntegerValue idx = idxInst->getValue();
-            if (typeToFetch->getOp() == kIROp_FloatType) {
+            if (typeToFetch->getOp() == kIROp_FloatType)
+            {
                 m_writer->emit("__int_as_float(optixGetAttribute_");
             }
             else
@@ -668,14 +893,14 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return true;
         }
-        case kIROp_GetOptiXSbtDataPtr:
+    case kIROp_GetOptiXSbtDataPtr:
         {
             m_writer->emit("((");
             emitType(inst->getDataType());
             m_writer->emit(")optixGetSbtDataPointer())");
             return true;
         }
-        case kIROp_DispatchKernel:
+    case kIROp_DispatchKernel:
         {
             auto dispatchInst = as<IRDispatchKernel>(inst);
             emitOperand(dispatchInst->getBaseFn(), getInfo(EmitOp::Atomic));
@@ -693,7 +918,8 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-        default: break;
+    default:
+        break;
     }
 
     return Super::tryEmitInstExprImpl(inst, inOuterPrec);
@@ -706,7 +932,7 @@ void CUDASourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 
     for (auto decoration : inst->getDecorations())
     {
-        if( auto smDecoration = as<IRRequireCUDASMVersionDecoration>(decoration))
+        if (auto smDecoration = as<IRRequireCUDASMVersionDecoration>(decoration))
         {
             SemanticVersion version;
             version.setFromInteger(SemanticVersion::IntegerType(smDecoration->getCUDASMVersion()));
@@ -738,7 +964,9 @@ void CUDASourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
 }
 
-void CUDASourceEmitter::emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, [[maybe_unused]] AddressSpace addressSpace)
+void CUDASourceEmitter::emitRateQualifiersAndAddressSpaceImpl(
+    IRRate* rate,
+    [[maybe_unused]] AddressSpace addressSpace)
 {
     if (as<IRGroupSharedRate>(rate))
     {
@@ -800,7 +1028,10 @@ void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
     Super::emitSemanticsImpl(inst, allowOffsetLayout);
 }
 
-void CUDASourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout)
+void CUDASourceEmitter::emitInterpolationModifiersImpl(
+    IRInst* varInst,
+    IRType* valueType,
+    IRVarLayout* layout)
 {
     Super::emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
@@ -810,9 +1041,9 @@ void CUDASourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
     Super::emitVarDecorationsImpl(varDecl);
 }
 
-void CUDASourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
+void CUDASourceEmitter::emitMatrixLayoutModifiersImpl(IRType* varType)
 {
-    Super::emitMatrixLayoutModifiersImpl(layout);
+    Super::emitMatrixLayoutModifiersImpl(varType);
 }
 
 bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)

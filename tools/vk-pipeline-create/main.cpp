@@ -3,19 +3,19 @@
 // This tools reads a gfx pipeline dump file and replays the pipeline creation to trigger
 // shader compilation in the driver.
 //
-#include "slang.h"
-#include "slang-com-ptr.h"
-
-#include "examples/hello-world/vulkan-api.h"
-#include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-stream.h"
+#include "../../source/core/slang-string-util.h"
+#include "examples/hello-world/vulkan-api.h"
+#include "slang-com-ptr.h"
 #include "slang-gfx.h"
+#include "slang.h"
+
 #include <chrono>
 
 #if SLANG_WINDOWS_FAMILY
-#    include <windows.h>
+#include <windows.h>
 #else
-#    include <dlfcn.h>
+#include <dlfcn.h>
 #endif
 
 using namespace Slang;
@@ -42,7 +42,10 @@ struct PipelineCreationReplay
     {
         Index position;
         List<uint8_t>& fileBlob;
-        Reader(List<uint8_t>& blob, Index pos) : fileBlob(blob), position(pos) {}
+        Reader(List<uint8_t>& blob, Index pos)
+            : fileBlob(blob), position(pos)
+        {
+        }
         template<typename T>
         void readRaw(T& val)
         {
@@ -106,7 +109,10 @@ struct PipelineCreationReplay
         reader.readRaw(createInfo.bindingCount);
         List<VkDescriptorSetLayoutBinding> bindings;
         bindings.setCount(createInfo.bindingCount);
-        memcpy(bindings.getBuffer(), reader.getPtr(), sizeof(VkDescriptorSetLayoutBinding) * bindings.getCount());
+        memcpy(
+            bindings.getBuffer(),
+            reader.getPtr(),
+            sizeof(VkDescriptorSetLayoutBinding) * bindings.getCount());
         createInfo.pBindings = bindings.getBuffer();
 
         vkAPI.vkCreateDescriptorSetLayout(vkAPI.device, &createInfo, nullptr, &layout);
@@ -134,7 +140,10 @@ struct PipelineCreationReplay
         reader.readRaw(createInfo.pushConstantRangeCount);
         List<VkPushConstantRange> pushConstants;
         pushConstants.setCount(createInfo.pushConstantRangeCount);
-        memcpy(pushConstants.getBuffer(), reader.getPtr(), sizeof(VkPushConstantRange) * createInfo.pushConstantRangeCount);
+        memcpy(
+            pushConstants.getBuffer(),
+            reader.getPtr(),
+            sizeof(VkPushConstantRange) * createInfo.pushConstantRangeCount);
         createInfo.pPushConstantRanges = pushConstants.getBuffer();
 
         vkAPI.vkCreatePipelineLayout(vkAPI.device, &createInfo, nullptr, &layout);
@@ -160,8 +169,14 @@ struct PipelineCreationReplay
         VkPipeline pipeline = VK_NULL_HANDLE;
 
         auto startTime = std::chrono::high_resolution_clock::now();
-        
-        if (vkAPI.vkCreateComputePipelines(vkAPI.device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline) == 0)
+
+        if (vkAPI.vkCreateComputePipelines(
+                vkAPI.device,
+                VK_NULL_HANDLE,
+                1,
+                &createInfo,
+                nullptr,
+                &pipeline) == 0)
             printf("done");
         else
             printf("failed");
@@ -203,8 +218,11 @@ struct PipelineCreationReplay
             loadPipeline(pipelineIndex, pipelineOffsets[pipelineIndex]);
         }
 
-        for (auto p: descSetLayouts)
-            vkAPI.vkDestroyDescriptorSetLayout(vkAPI.device, *KeyValueDetail::getValue(&p), nullptr);
+        for (auto p : descSetLayouts)
+            vkAPI.vkDestroyDescriptorSetLayout(
+                vkAPI.device,
+                *KeyValueDetail::getValue(&p),
+                nullptr);
         for (auto p : pipelineLayouts)
             vkAPI.vkDestroyPipelineLayout(vkAPI.device, *KeyValueDetail::getValue(&p), nullptr);
         for (auto p : shaderModules)

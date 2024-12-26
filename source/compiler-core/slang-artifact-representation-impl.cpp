@@ -1,24 +1,21 @@
 // slang-artifact-representation-impl.cpp
 #include "slang-artifact-representation-impl.h"
 
-#include "../core/slang-file-system.h"
-
-#include "../core/slang-type-text-util.h"
-#include "../core/slang-io.h"
 #include "../core/slang-array-view.h"
-
+#include "../core/slang-castable.h"
+#include "../core/slang-file-system.h"
+#include "../core/slang-io.h"
+#include "../core/slang-type-text-util.h"
 #include "slang-artifact-util.h"
 
-#include "../core/slang-castable.h"
-
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtFileArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* ExtFileArtifactRepresentation::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
         guid == IArtifactRepresentation::getTypeGuid() ||
         guid == IPathArtifactRepresentation::getTypeGuid() ||
         guid == IExtFileArtifactRepresentation::getTypeGuid())
@@ -43,7 +40,9 @@ void* ExtFileArtifactRepresentation::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult ExtFileArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
+SlangResult ExtFileArtifactRepresentation::createRepresentation(
+    const Guid& typeGuid,
+    ICastable** outCastable)
 {
     // We can convert into a blob only, and only if we have a path
     // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
@@ -72,7 +71,9 @@ const char* ExtFileArtifactRepresentation::getUniqueIdentity()
     if (m_uniqueIdentity.getLength() == 0)
     {
         ComPtr<ISlangBlob> uniqueIdentityBlob;
-        if (SLANG_FAILED(m_fileSystem->getFileUniqueIdentity(m_path.getBuffer(), uniqueIdentityBlob.writeRef())))
+        if (SLANG_FAILED(m_fileSystem->getFileUniqueIdentity(
+                m_path.getBuffer(),
+                uniqueIdentityBlob.writeRef())))
         {
             return nullptr;
         }
@@ -82,12 +83,12 @@ const char* ExtFileArtifactRepresentation::getUniqueIdentity()
     return m_uniqueIdentity.getLength() ? m_uniqueIdentity.getBuffer() : nullptr;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SourceBlobWithPathArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SourceBlobWithPathArtifactRepresentation
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 void* SourceBlobWithPathInfoArtifactRepresentation::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
         guid == IArtifactRepresentation::getTypeGuid() ||
         guid == IPathArtifactRepresentation::getTypeGuid())
     {
@@ -111,7 +112,9 @@ void* SourceBlobWithPathInfoArtifactRepresentation::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult SourceBlobWithPathInfoArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
+SlangResult SourceBlobWithPathInfoArtifactRepresentation::createRepresentation(
+    const Guid& typeGuid,
+    ICastable** outCastable)
 {
     // We can convert into a blob only.
     if (typeGuid != ISlangBlob::getTypeGuid())
@@ -132,8 +135,7 @@ SlangResult SourceBlobWithPathInfoArtifactRepresentation::createRepresentation(c
 
 void* OSFileArtifactRepresentation::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
         guid == IArtifactRepresentation::getTypeGuid() ||
         guid == IPathArtifactRepresentation::getTypeGuid() ||
         guid == IOSFileArtifactRepresentation::getTypeGuid())
@@ -149,7 +151,7 @@ void* OSFileArtifactRepresentation::getObject(const Guid& guid)
     return nullptr;
 }
 
-/* static */ISlangMutableFileSystem* OSFileArtifactRepresentation::_getFileSystem()
+/* static */ ISlangMutableFileSystem* OSFileArtifactRepresentation::_getFileSystem()
 {
     return OSFileSystem::getMutableSingleton();
 }
@@ -163,12 +165,13 @@ void* OSFileArtifactRepresentation::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult OSFileArtifactRepresentation::createRepresentation(const Guid& typeGuid, ICastable** outCastable)
+SlangResult OSFileArtifactRepresentation::createRepresentation(
+    const Guid& typeGuid,
+    ICastable** outCastable)
 {
     // We can convert into a blob only, and only if we have a path
     // If it's referenced by a name only, it's a file that *can't* be loaded as a blob in general.
-    if (typeGuid != ISlangBlob::getTypeGuid() ||
-        m_kind == Kind::NameOnly)
+    if (typeGuid != ISlangBlob::getTypeGuid() || m_kind == Kind::NameOnly)
     {
         return SLANG_E_NOT_AVAILABLE;
     }
@@ -185,9 +188,9 @@ SlangResult OSFileArtifactRepresentation::createRepresentation(const Guid& typeG
 bool OSFileArtifactRepresentation::exists()
 {
     // TODO(JS):
-    // If it's a name only it's hard to know what exists should do. It can't *check* because it relies on the 'system' doing 
-    // the actual location. We could ask the IArtifactUtil, and that could change the behavior.
-    // For now we just assume it does.
+    // If it's a name only it's hard to know what exists should do. It can't *check* because it
+    // relies on the 'system' doing the actual location. We could ask the IArtifactUtil, and that
+    // could change the behavior. For now we just assume it does.
     if (m_kind == Kind::NameOnly)
     {
         return true;
@@ -209,7 +212,9 @@ const char* OSFileArtifactRepresentation::getUniqueIdentity()
         auto fileSystem = _getFileSystem();
 
         ComPtr<ISlangBlob> uniqueIdentityBlob;
-        if (SLANG_FAILED(fileSystem->getFileUniqueIdentity(m_path.getBuffer(), uniqueIdentityBlob.writeRef())))
+        if (SLANG_FAILED(fileSystem->getFileUniqueIdentity(
+                m_path.getBuffer(),
+                uniqueIdentityBlob.writeRef())))
         {
             return nullptr;
         }
@@ -236,11 +241,12 @@ OSFileArtifactRepresentation::~OSFileArtifactRepresentation()
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PostEmitMetadataArtifactRepresentation !!!!!!!!!!!!!!!!!!!!!!!!!!!
+ */
 
 void* ObjectArtifactRepresentation::castAs(const Guid& guid)
 {
-    
+
     if (auto ptr = getInterface(guid))
     {
         return ptr;
@@ -250,8 +256,7 @@ void* ObjectArtifactRepresentation::castAs(const Guid& guid)
 
 void* ObjectArtifactRepresentation::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() ||
-        guid == ICastable::getTypeGuid() ||
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
         guid == IArtifactRepresentation::getTypeGuid())
     {
         return static_cast<IArtifactRepresentation*>(this);

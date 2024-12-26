@@ -1,21 +1,22 @@
 #include "slang-json-source-map-util.h"
 
-#include "slang-com-helper.h"
-
-#include "../core/slang-string-util.h"
 #include "../core/slang-blob.h"
-
+#include "../core/slang-string-util.h"
+#include "slang-com-helper.h"
 #include "slang-json-native.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /*
-Support for source maps. Source maps provide a standardized mechanism to associate a location in one output file
-with another.
+Support for source maps. Source maps provide a standardized mechanism to associate a location in one
+output file with another.
 
-* [Source Map Proposal](https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit?hl=en_US&pli=1&pli=1)
+* [Source Map
+Proposal](https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit?hl=en_US&pli=1&pli=1)
 * [Chrome Source Map post](https://developer.chrome.com/blog/sourcemaps/)
-* [Base64 VLQs in Source Maps](https://www.lucidchart.com/techblog/2019/08/22/decode-encoding-base64-vlqs-source-maps/)
+* [Base64 VLQs in Source
+Maps](https://www.lucidchart.com/techblog/2019/08/22/decode-encoding-base64-vlqs-source-maps/)
 
 Example...
 
@@ -30,7 +31,8 @@ Example...
 }
 */
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct JSONSourceMap
 {
@@ -38,14 +40,16 @@ struct JSONSourceMap
     int32_t version = 3;
     /// An optional name of the generated code that this source map is associated with.
     String file;
-    /// An optional source root, useful for relocating source files on a server or removing repeated values in 
-    /// the “sources” entry.  This value is prepended to the individual entries in the “source” field.
+    /// An optional source root, useful for relocating source files on a server or removing repeated
+    /// values in the “sources” entry.  This value is prepended to the individual entries in the
+    /// “source” field.
     String sourceRoot;
     /// A list of original sources used by the “mappings” entry.
     List<UnownedStringSlice> sources;
-    /// An optional list of source content, useful when the “source” can’t be hosted. The contents are listed in the same order as the sources in line 5. 
-    /// “null” may be used if some original sources should be retrieved by name.
-    /// Because could be a string or nullptr, we use JSONValue to hold value.
+    /// An optional list of source content, useful when the “source” can’t be hosted. The contents
+    /// are listed in the same order as the sources in line 5. “null” may be used if some original
+    /// sources should be retrieved by name. Because could be a string or nullptr, we use JSONValue
+    /// to hold value.
     List<JSONValue> sourcesContent;
     /// A list of symbol names used by the “mappings” entry.
     List<UnownedStringSlice> names;
@@ -55,7 +59,7 @@ struct JSONSourceMap
     static const StructRttiInfo g_rttiInfo;
 };
 
-} // anonymous
+} // namespace
 
 static const StructRttiInfo _makeJSONSourceMap_Rtti()
 {
@@ -73,10 +77,11 @@ static const StructRttiInfo _makeJSONSourceMap_Rtti()
 
     return builder.make();
 }
-/* static */const StructRttiInfo JSONSourceMap::g_rttiInfo = _makeJSONSourceMap_Rtti();
+/* static */ const StructRttiInfo JSONSourceMap::g_rttiInfo = _makeJSONSourceMap_Rtti();
 
 // Encode a 6 bit value to VLQ encoding
-static const unsigned char g_vlqEncodeTable[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const unsigned char g_vlqEncodeTable[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 struct VlqDecodeTable
 {
@@ -88,19 +93,22 @@ struct VlqDecodeTable
             map[g_vlqEncodeTable[i]] = int8_t(i);
         }
     }
-        /// Returns a *negative* value if invalid
-    SLANG_FORCE_INLINE int8_t operator[](unsigned char c) const { return (c & ~char(0x7f)) ? -1 : map[c]; }
+    /// Returns a *negative* value if invalid
+    SLANG_FORCE_INLINE int8_t operator[](unsigned char c) const
+    {
+        return (c & ~char(0x7f)) ? -1 : map[c];
+    }
 
     int8_t map[128];
 };
 
 static const VlqDecodeTable g_vlqDecodeTable;
 
-/* 
+/*
 https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit?hl=en_US&pli=1&pli=1#
-The VLQ is a Base64 value, where the most significant bit (the 6th bit) is used as the continuation 
-bit, and the “digits” are encoded into the string least significant first, and where the least significant 
-bit of the first digit is used as the sign bit. */
+The VLQ is a Base64 value, where the most significant bit (the 6th bit) is used as the continuation
+bit, and the “digits” are encoded into the string least significant first, and where the least
+significant bit of the first digit is used as the sign bit. */
 
 static SlangResult _decode(UnownedStringSlice& ioEncoded, Index& out)
 {
@@ -125,12 +133,11 @@ static SlangResult _decode(UnownedStringSlice& ioEncoded, Index& out)
             {
                 return SLANG_FAIL;
             }
-        
+
             v += (decodeValue & 0x1f) << shift;
 
             shift += 5;
-        }
-        while (decodeValue & 0x20);
+        } while (decodeValue & 0x20);
     }
 
     // Save out the remaining part
@@ -148,31 +155,34 @@ void _encode(Index v, StringBuilder& out)
 
     // We want to make v always positive to encode
     // we use the last bit to indicate negativity
-    v = (v < 0) ? (1 - v) : v; 
-    
+    v = (v < 0) ? (1 - v) : v;
+
     // We'll use a simple buffer, so as to not have to constantly update he StringBuffer
     char dst[8];
     char* cur = dst;
 
-    do 
+    do
     {
         const Index nextV = v >> 5;
         const Index encodeValue = (v & 0x1f) + (nextV ? 0x20 : 0);
 
         // Encode 5 bits, plus continuation bit
         char c = g_vlqEncodeTable[encodeValue];
-        
+
         // Save the char
         *cur++ = c;
-    
+
         v = nextV;
-    }
-    while (v);
+    } while (v);
 
     out.append(dst, cur);
 }
 
-/* static */SlangResult JSONSourceMapUtil::decode(JSONContainer* container, JSONValue root, DiagnosticSink* sink, SourceMap& outSourceMap)
+/* static */ SlangResult JSONSourceMapUtil::decode(
+    JSONContainer* container,
+    JSONValue root,
+    DiagnosticSink* sink,
+    SourceMap& outSourceMap)
 {
     outSourceMap.clear();
 
@@ -192,7 +202,7 @@ void _encode(Index v, StringBuilder& out)
     outSourceMap.m_sourceRoot = native.sourceRoot;
 
     const Count sourcesCount = native.sources.getCount();
-    
+
     // These should all be unique, but for simplicity, we build a table
     outSourceMap.m_sources.setCount(sourcesCount);
     for (Index i = 0; i < sourcesCount; ++i)
@@ -237,10 +247,10 @@ void _encode(Index v, StringBuilder& out)
 
     List<UnownedStringSlice> lines;
     StringUtil::split(native.mappings, ';', lines);
-    
+
     List<UnownedStringSlice> segments;
 
-    // Index into sources 
+    // Index into sources
     Index sourceFileIndex = 0;
 
     Index sourceLine = 0;
@@ -280,9 +290,17 @@ void _encode(Index v, StringBuilder& out)
             // It can be 4 or 5 parts
             if (segment.getLength())
             {
-                /* If present, an zero-based index into the "sources" list. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented.
-                   If present, the zero-based starting line in the original source represented. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented. Always present if there is a source field.
-                   If present, the zero-based starting column of the line in the source represented. This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence of this field, in which case the whole value is represented. Always present if there is a source field.
+                /* If present, an zero-based index into the "sources" list. This field is a base 64
+                   VLQ relative to the previous occurrence of this field, unless this is the first
+                   occurrence of this field, in which case the whole value is represented. If
+                   present, the zero-based starting line in the original source represented. This
+                   field is a base 64 VLQ relative to the previous occurrence of this field, unless
+                   this is the first occurrence of this field, in which case the whole value is
+                   represented. Always present if there is a source field. If present, the
+                   zero-based starting column of the line in the source represented. This field is a
+                   base 64 VLQ relative to the previous occurrence of this field, unless this is the
+                   first occurrence of this field, in which case the whole value is represented.
+                   Always present if there is a source field.
                 */
 
                 Index sourceFileDelta;
@@ -304,9 +322,10 @@ void _encode(Index v, StringBuilder& out)
                 // 5 parts
                 if (segment.getLength() > 0)
                 {
-                    /* If present, the zero - based index into the "names" list associated with this segment.
-                    This field is a base 64 VLQ relative to the previous occurrence of this field, unless this is the first occurrence 
-                    of this field, in which case the whole value is represented.
+                    /* If present, the zero - based index into the "names" list associated with this
+                    segment. This field is a base 64 VLQ relative to the previous occurrence of this
+                    field, unless this is the first occurrence of this field, in which case the
+                    whole value is represented.
                     */
 
                     Index nameDelta;
@@ -334,7 +353,11 @@ void _encode(Index v, StringBuilder& out)
     return SLANG_OK;
 }
 
-SlangResult JSONSourceMapUtil::encode(const SourceMap& sourceMap, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue)
+SlangResult JSONSourceMapUtil::encode(
+    const SourceMap& sourceMap,
+    JSONContainer* container,
+    DiagnosticSink* sink,
+    JSONValue& outValue)
 {
     // Convert to native
     JSONSourceMap native;
@@ -359,10 +382,11 @@ SlangResult JSONSourceMapUtil::encode(const SourceMap& sourceMap, JSONContainer*
         for (Index i = 0; i < count; ++i)
         {
             const auto srcValue = sourceMap.m_sourcesContent[i];
-            
-            const JSONValue dstValue = (srcValue == StringSlicePool::kNullHandle) ?
-                native.sourcesContent[i] = JSONValue::makeNull() :
-                container->createString(sourceMap.m_slicePool.getSlice(srcValue));
+
+            const JSONValue dstValue =
+                (srcValue == StringSlicePool::kNullHandle)
+                    ? native.sourcesContent[i] = JSONValue::makeNull()
+                    : container->createString(sourceMap.m_slicePool.getSlice(srcValue));
 
             native.sourcesContent[i] = dstValue;
         }
@@ -408,7 +432,7 @@ SlangResult JSONSourceMapUtil::encode(const SourceMap& sourceMap, JSONContainer*
 
             // We reset the generated column index at the start of each new generated line
             Index generatedColumn = 0;
-            
+
             for (Index j = 0; j < entriesCount; ++j)
             {
                 auto entry = entries[j];
@@ -459,18 +483,22 @@ SlangResult JSONSourceMapUtil::encode(const SourceMap& sourceMap, JSONContainer*
         RttiTypeFuncsMap typeMap = JSONNativeUtil::getTypeFuncsMap();
 
         NativeToJSONConverter converter(container, &typeMap, sink);
-        SLANG_RETURN_ON_FAIL(converter.convert(GetRttiInfo<JSONSourceMap>::get(), &native, outValue));
+        SLANG_RETURN_ON_FAIL(
+            converter.convert(GetRttiInfo<JSONSourceMap>::get(), &native, outValue));
     }
 
     return SLANG_OK;
 }
 
-/* static */SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, SourceMap& outSourceMap)
+/* static */ SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, SourceMap& outSourceMap)
 {
     return read(blob, nullptr, outSourceMap);
 }
 
-SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink, SourceMap& outSourceMap)
+SlangResult JSONSourceMapUtil::read(
+    ISlangBlob* blob,
+    DiagnosticSink* parentSink,
+    SourceMap& outSourceMap)
 {
     outSourceMap.clear();
 
@@ -485,7 +513,8 @@ SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink
     JSONValue rootValue;
     {
         // Now need to parse as JSON
-        SourceFile* sourceFile = sourceManager.createSourceFileWithBlob(PathInfo::makeUnknown(), blob);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithBlob(PathInfo::makeUnknown(), blob);
         SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
 
         JSONLexer lexer;
@@ -505,7 +534,9 @@ SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink
 }
 
 
-/* static */SlangResult JSONSourceMapUtil::write(const SourceMap& sourceMap, ComPtr<ISlangBlob>& outBlob)
+/* static */ SlangResult JSONSourceMapUtil::write(
+    const SourceMap& sourceMap,
+    ComPtr<ISlangBlob>& outBlob)
 {
     SourceManager sourceMapSourceManager;
     sourceMapSourceManager.initialize(nullptr, nullptr);
@@ -517,7 +548,10 @@ SlangResult JSONSourceMapUtil::read(ISlangBlob* blob, DiagnosticSink* parentSink
     return SLANG_OK;
 }
 
-/* static */ SlangResult JSONSourceMapUtil::write(const SourceMap& sourceMap, DiagnosticSink* sink, ComPtr<ISlangBlob>& outBlob)
+/* static */ SlangResult JSONSourceMapUtil::write(
+    const SourceMap& sourceMap,
+    DiagnosticSink* sink,
+    ComPtr<ISlangBlob>& outBlob)
 {
     auto sourceManager = sink->getSourceManager();
 

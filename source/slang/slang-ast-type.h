@@ -4,12 +4,13 @@
 
 #include "slang-ast-base.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // Syntax class definitions for types.
 
 // The type of a reference to an overloaded name
-class OverloadGroupType : public Type 
+class OverloadGroupType : public Type
 {
     SLANG_AST_CLASS(OverloadGroupType)
 
@@ -20,7 +21,7 @@ class OverloadGroupType : public Type
 
 // The type of an initializer-list expression (before it has
 // been coerced to some other type)
-class InitializerListType : public Type 
+class InitializerListType : public Type
 {
     SLANG_AST_CLASS(InitializerListType)
 
@@ -30,7 +31,7 @@ class InitializerListType : public Type
 };
 
 // The type of an expression that was erroneous
-class ErrorType : public Type 
+class ErrorType : public Type
 {
     SLANG_AST_CLASS(ErrorType)
 
@@ -65,14 +66,24 @@ class DeclRefType : public Type
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-    DeclRefType(DeclRefBase* declRefBase)
-    {
-        setOperands(declRefBase);
-    }
+    DeclRefType(DeclRefBase* declRefBase) { setOperands(declRefBase); }
 };
 
+template<typename T>
+DeclRef<T> isDeclRefTypeOf(Val* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        return declRefType->getDeclRef().template as<T>();
+    }
+    return DeclRef<T>();
+}
+
+bool isTypePack(Type* type);
+bool isAbstractTypePack(Type* type);
+
 // Base class for types that can be used in arithmetic expressions
-class ArithmeticExpressionType : public DeclRefType 
+class ArithmeticExpressionType : public DeclRefType
 {
     SLANG_ABSTRACT_AST_CLASS(ArithmeticExpressionType)
 
@@ -82,7 +93,7 @@ class ArithmeticExpressionType : public DeclRefType
     BasicExpressionType* _getScalarTypeOverride();
 };
 
-class BasicExpressionType : public ArithmeticExpressionType 
+class BasicExpressionType : public ArithmeticExpressionType
 {
     SLANG_AST_CLASS(BasicExpressionType)
 
@@ -91,18 +102,45 @@ class BasicExpressionType : public ArithmeticExpressionType
     // Overrides should be public so base classes can access
     BasicExpressionType* _getScalarTypeOverride();
 
-    BasicExpressionType(DeclRefBase* inDeclRef)
-    {
-        setOperands(inDeclRef);
-    }
+    BasicExpressionType(DeclRefBase* inDeclRef) { setOperands(inDeclRef); }
 };
 
 // Base type for things that are built in to the compiler,
 // and will usually have special behavior or a custom
 // mapping to the IR level.
-class BuiltinType : public DeclRefType 
+class BuiltinType : public DeclRefType
 {
     SLANG_ABSTRACT_AST_CLASS(BuiltinType)
+};
+
+class DataLayoutType : public BuiltinType
+{
+    SLANG_ABSTRACT_AST_CLASS(DataLayoutType)
+};
+
+class IBufferDataLayoutType : public BuiltinType
+{
+    SLANG_AST_CLASS(IBufferDataLayoutType)
+};
+
+class DefaultDataLayoutType : public DataLayoutType
+{
+    SLANG_AST_CLASS(DefaultDataLayoutType)
+};
+
+class Std430DataLayoutType : public DataLayoutType
+{
+    SLANG_AST_CLASS(Std430DataLayoutType)
+};
+
+class Std140DataLayoutType : public DataLayoutType
+{
+    SLANG_AST_CLASS(Std140DataLayoutType)
+};
+
+class ScalarDataLayoutType : public DataLayoutType
+{
+    SLANG_AST_CLASS(ScalarDataLayoutType)
 };
 
 class FeedbackType : public BuiltinType
@@ -111,8 +149,8 @@ class FeedbackType : public BuiltinType
 
     enum class Kind : uint8_t
     {
-        MinMip,                 /// SAMPLER_FEEDBACK_MIN_MIP
-        MipRegionUsed,          /// SAMPLER_FEEDBACK_MIP_REGION_USED
+        MinMip,        /// SAMPLER_FEEDBACK_MIN_MIP
+        MipRegionUsed, /// SAMPLER_FEEDBACK_MIP_REGION_USED
     };
 
     Kind getKind() const;
@@ -145,7 +183,7 @@ class TextureShapeBufferType : public TextureShapeType
 };
 
 // Resources that contain "elements" that can be fetched
-class ResourceType : public BuiltinType 
+class ResourceType : public BuiltinType
 {
     SLANG_ABSTRACT_AST_CLASS(ResourceType)
 
@@ -161,20 +199,21 @@ class ResourceType : public BuiltinType
     void _toTextOverride(StringBuilder& out);
 };
 
-class TextureTypeBase : public ResourceType 
+class TextureTypeBase : public ResourceType
 {
     SLANG_ABSTRACT_AST_CLASS(TextureTypeBase)
 
     Val* getSampleCount();
+    Val* getFormat();
 };
 
-class TextureType : public TextureTypeBase 
+class TextureType : public TextureTypeBase
 {
     SLANG_AST_CLASS(TextureType)
 };
 
 // This is a base type for `image*` types, as they exist in GLSL
-class GLSLImageType : public TextureTypeBase 
+class GLSLImageType : public TextureTypeBase
 {
     SLANG_AST_CLASS(GLSLImageType)
 };
@@ -187,7 +226,7 @@ class SubpassInputType : public BuiltinType
     Type* getElementType();
 };
 
-class SamplerStateType : public BuiltinType 
+class SamplerStateType : public BuiltinType
 {
     SLANG_AST_CLASS(SamplerStateType)
 
@@ -196,7 +235,7 @@ class SamplerStateType : public BuiltinType
 };
 
 // Other cases of generic types known to the compiler
-class BuiltinGenericType : public BuiltinType 
+class BuiltinGenericType : public BuiltinType
 {
     SLANG_AST_CLASS(BuiltinGenericType)
 
@@ -206,7 +245,7 @@ class BuiltinGenericType : public BuiltinType
 // Types that behave like pointers, in that they can be
 // dereferenced (implicitly) to access members defined
 // in the element type.
-class PointerLikeType : public BuiltinGenericType 
+class PointerLikeType : public BuiltinGenericType
 {
     SLANG_AST_CLASS(PointerLikeType)
 };
@@ -218,59 +257,59 @@ class DynamicResourceType : public BuiltinType
 
 // HLSL buffer-type resources
 
-class HLSLStructuredBufferTypeBase : public BuiltinGenericType 
+class HLSLStructuredBufferTypeBase : public BuiltinGenericType
 {
     SLANG_AST_CLASS(HLSLStructuredBufferTypeBase)
 };
 
-class HLSLStructuredBufferType : public HLSLStructuredBufferTypeBase 
+class HLSLStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
     SLANG_AST_CLASS(HLSLStructuredBufferType)
 };
 
-class HLSLRWStructuredBufferType : public HLSLStructuredBufferTypeBase 
+class HLSLRWStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
     SLANG_AST_CLASS(HLSLRWStructuredBufferType)
 };
 
-class HLSLRasterizerOrderedStructuredBufferType : public HLSLStructuredBufferTypeBase 
+class HLSLRasterizerOrderedStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
     SLANG_AST_CLASS(HLSLRasterizerOrderedStructuredBufferType)
 };
 
 
-class UntypedBufferResourceType : public BuiltinType 
+class UntypedBufferResourceType : public BuiltinType
 {
     SLANG_AST_CLASS(UntypedBufferResourceType)
 };
 
-class HLSLByteAddressBufferType : public UntypedBufferResourceType 
+class HLSLByteAddressBufferType : public UntypedBufferResourceType
 {
     SLANG_AST_CLASS(HLSLByteAddressBufferType)
 };
 
-class HLSLRWByteAddressBufferType : public UntypedBufferResourceType 
+class HLSLRWByteAddressBufferType : public UntypedBufferResourceType
 {
     SLANG_AST_CLASS(HLSLRWByteAddressBufferType)
 };
 
-class HLSLRasterizerOrderedByteAddressBufferType : public UntypedBufferResourceType 
+class HLSLRasterizerOrderedByteAddressBufferType : public UntypedBufferResourceType
 {
     SLANG_AST_CLASS(HLSLRasterizerOrderedByteAddressBufferType)
 };
 
-class RaytracingAccelerationStructureType : public UntypedBufferResourceType 
+class RaytracingAccelerationStructureType : public UntypedBufferResourceType
 {
     SLANG_AST_CLASS(RaytracingAccelerationStructureType)
 };
 
 
-class HLSLAppendStructuredBufferType : public HLSLStructuredBufferTypeBase 
+class HLSLAppendStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
     SLANG_AST_CLASS(HLSLAppendStructuredBufferType)
 };
 
-class HLSLConsumeStructuredBufferType : public HLSLStructuredBufferTypeBase 
+class HLSLConsumeStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
     SLANG_AST_CLASS(HLSLConsumeStructuredBufferType)
 };
@@ -280,7 +319,7 @@ class GLSLAtomicUintType : public BuiltinType
     SLANG_AST_CLASS(GLSLAtomicUintType)
 };
 
-class HLSLPatchType : public BuiltinType 
+class HLSLPatchType : public BuiltinType
 {
     SLANG_AST_CLASS(HLSLPatchType)
 
@@ -288,12 +327,12 @@ class HLSLPatchType : public BuiltinType
     IntVal* getElementCount();
 };
 
-class HLSLInputPatchType : public HLSLPatchType 
+class HLSLInputPatchType : public HLSLPatchType
 {
     SLANG_AST_CLASS(HLSLInputPatchType)
 };
 
-class HLSLOutputPatchType : public HLSLPatchType 
+class HLSLOutputPatchType : public HLSLPatchType
 {
     SLANG_AST_CLASS(HLSLOutputPatchType)
 };
@@ -301,22 +340,22 @@ class HLSLOutputPatchType : public HLSLPatchType
 
 // HLSL geometry shader output stream types
 
-class HLSLStreamOutputType : public BuiltinGenericType 
+class HLSLStreamOutputType : public BuiltinGenericType
 {
     SLANG_AST_CLASS(HLSLStreamOutputType)
 };
 
-class HLSLPointStreamType : public HLSLStreamOutputType 
+class HLSLPointStreamType : public HLSLStreamOutputType
 {
     SLANG_AST_CLASS(HLSLPointStreamType)
 };
 
-class HLSLLineStreamType : public HLSLStreamOutputType 
+class HLSLLineStreamType : public HLSLStreamOutputType
 {
     SLANG_AST_CLASS(HLSLLineStreamType)
 };
 
-class HLSLTriangleStreamType : public HLSLStreamOutputType 
+class HLSLTriangleStreamType : public HLSLStreamOutputType
 {
     SLANG_AST_CLASS(HLSLTriangleStreamType)
 };
@@ -349,7 +388,7 @@ class PrimitivesType : public MeshOutputType
 
 
 //
-class GLSLInputAttachmentType : public BuiltinType 
+class GLSLInputAttachmentType : public BuiltinType
 {
     SLANG_AST_CLASS(GLSLInputAttachmentType)
 };
@@ -357,17 +396,18 @@ class GLSLInputAttachmentType : public BuiltinType
 
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
-class ParameterGroupType : public PointerLikeType 
+class ParameterGroupType : public PointerLikeType
 {
     SLANG_AST_CLASS(ParameterGroupType)
 };
 
-class UniformParameterGroupType : public ParameterGroupType 
+class UniformParameterGroupType : public ParameterGroupType
 {
     SLANG_AST_CLASS(UniformParameterGroupType)
+    Type* getLayoutType();
 };
 
-class VaryingParameterGroupType : public ParameterGroupType 
+class VaryingParameterGroupType : public ParameterGroupType
 {
     SLANG_AST_CLASS(VaryingParameterGroupType)
 };
@@ -375,26 +415,26 @@ class VaryingParameterGroupType : public ParameterGroupType
 
 // type for HLSL `cbuffer` declarations, and `ConstantBuffer<T>`
 // ALso used for GLSL `uniform` blocks.
-class ConstantBufferType : public UniformParameterGroupType 
+class ConstantBufferType : public UniformParameterGroupType
 {
     SLANG_AST_CLASS(ConstantBufferType)
 };
 
 
 // type for HLSL `tbuffer` declarations, and `TextureBuffer<T>`
-class TextureBufferType : public UniformParameterGroupType 
+class TextureBufferType : public UniformParameterGroupType
 {
     SLANG_AST_CLASS(TextureBufferType)
 };
 
 
 // type for GLSL `in` and `out` blocks
-class GLSLInputParameterGroupType : public VaryingParameterGroupType 
+class GLSLInputParameterGroupType : public VaryingParameterGroupType
 {
     SLANG_AST_CLASS(GLSLInputParameterGroupType)
 };
 
-class GLSLOutputParameterGroupType : public VaryingParameterGroupType 
+class GLSLOutputParameterGroupType : public VaryingParameterGroupType
 {
     SLANG_AST_CLASS(GLSLOutputParameterGroupType)
 };
@@ -408,12 +448,12 @@ class GLSLShaderStorageBufferType : public PointerLikeType
 
 
 // type for Slang `ParameterBlock<T>` type
-class ParameterBlockType : public UniformParameterGroupType 
+class ParameterBlockType : public UniformParameterGroupType
 {
     SLANG_AST_CLASS(ParameterBlockType)
 };
 
-class ArrayExpressionType : public DeclRefType 
+class ArrayExpressionType : public DeclRefType
 {
     SLANG_AST_CLASS(ArrayExpressionType)
 
@@ -423,10 +463,17 @@ class ArrayExpressionType : public DeclRefType
     IntVal* getElementCount();
 };
 
+class AtomicType : public DeclRefType
+{
+    SLANG_AST_CLASS(AtomicType)
+
+    Type* getElementType();
+};
+
 // The "type" of an expression that resolves to a type.
 // For example, in the expression `float(2)` the sub-expression,
 // `float` would have the type `TypeType(float)`.
-class TypeType : public Type 
+class TypeType : public Type
 {
     SLANG_AST_CLASS(TypeType)
 
@@ -436,22 +483,30 @@ class TypeType : public Type
 
     Type* getType() { return as<Type>(getOperand(0)); }
 
-    TypeType(Type* type)
-    {
-        setOperands(type);
-    }
+    TypeType(Type* type) { setOperands(type); }
 };
 
 // A differential pair type, e.g., `__DifferentialPair<T>`
-class DifferentialPairType : public ArithmeticExpressionType 
+class DifferentialPairType : public ArithmeticExpressionType
 {
     SLANG_AST_CLASS(DifferentialPairType)
     Type* getPrimalType();
 };
 
+class DifferentialPtrPairType : public ArithmeticExpressionType
+{
+    SLANG_AST_CLASS(DifferentialPtrPairType)
+    Type* getPrimalRefType();
+};
+
 class DifferentiableType : public BuiltinType
 {
     SLANG_AST_CLASS(DifferentiableType)
+};
+
+class DifferentiablePtrType : public BuiltinType
+{
+    SLANG_AST_CLASS(DifferentiablePtrType)
 };
 
 class DefaultInitializableType : public BuiltinType
@@ -460,7 +515,7 @@ class DefaultInitializableType : public BuiltinType
 };
 
 // A vector type, e.g., `vector<T,N>`
-class VectorExpressionType : public ArithmeticExpressionType 
+class VectorExpressionType : public ArithmeticExpressionType
 {
     SLANG_AST_CLASS(VectorExpressionType)
 
@@ -473,14 +528,14 @@ class VectorExpressionType : public ArithmeticExpressionType
 };
 
 // A matrix type, e.g., `matrix<T,R,C,L>`
-class MatrixExpressionType : public ArithmeticExpressionType 
+class MatrixExpressionType : public ArithmeticExpressionType
 {
     SLANG_AST_CLASS(MatrixExpressionType)
 
-    Type*           getElementType();
-    IntVal*         getRowCount();
-    IntVal*         getColumnCount();
-    IntVal*         getLayout();
+    Type* getElementType();
+    IntVal* getRowCount();
+    IntVal* getColumnCount();
+    IntVal* getLayout();
 
     Type* getRowType();
 
@@ -524,7 +579,7 @@ class DynamicType : public BuiltinType
 };
 
 // Type built-in `__EnumType` type
-class EnumTypeType : public BuiltinType 
+class EnumTypeType : public BuiltinType
 {
     SLANG_AST_CLASS(EnumTypeType)
 
@@ -533,7 +588,7 @@ class EnumTypeType : public BuiltinType
 
 // Base class for types that map down to
 // simple pointers as part of code generation.
-class PtrTypeBase : public BuiltinType 
+class PtrTypeBase : public BuiltinType
 {
     SLANG_AST_CLASS(PtrTypeBase)
 
@@ -554,7 +609,7 @@ class NullPtrType : public BuiltinType
 };
 
 // A true (user-visible) pointer type, e.g., `T*`
-class PtrType : public PtrTypeBase 
+class PtrType : public PtrTypeBase
 {
     SLANG_AST_CLASS(PtrType)
 
@@ -583,13 +638,13 @@ class OutTypeBase : public ParamDirectionType
 };
 
 // The type for an `out` parameter, e.g., `out T`
-class OutType : public OutTypeBase 
+class OutType : public OutTypeBase
 {
     SLANG_AST_CLASS(OutType)
 };
 
 // The type for an `in out` parameter, e.g., `in out T`
-class InOutType : public OutTypeBase 
+class InOutType : public OutTypeBase
 {
     SLANG_AST_CLASS(InOutType)
 };
@@ -626,7 +681,7 @@ class NativeRefType : public BuiltinType
 };
 
 // A type alias of some kind (e.g., via `typedef`)
-class NamedExpressionType : public Type 
+class NamedExpressionType : public Type
 {
     SLANG_AST_CLASS(NamedExpressionType)
 
@@ -636,15 +691,12 @@ class NamedExpressionType : public Type
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
 
-    NamedExpressionType(DeclRef<TypeDefDecl> inDeclRef)
-    {
-        setOperands(inDeclRef);
-    }
+    NamedExpressionType(DeclRef<TypeDefDecl> inDeclRef) { setOperands(inDeclRef); }
 };
 
 // A function type is defined by its parameter types
 // and its result type.
-class FuncType : public Type 
+class FuncType : public Type
 {
     SLANG_AST_CLASS(FuncType)
 
@@ -678,28 +730,62 @@ class FuncType : public Type
 };
 
 // A tuple is a product of its member types
-class TupleType : public Type
+class TupleType : public DeclRefType
 {
     SLANG_AST_CLASS(TupleType)
 
-    // Construct a unary tupletion
-    TupleType(ArrayView<Type*> memberTypes)
+    Index getMemberCount() const;
+    Type* getMember(Index i) const;
+    Type* getTypePack() const;
+};
+
+class EachType : public Type
+{
+    SLANG_AST_CLASS(EachType)
+    Type* getElementType() const { return as<Type>(getOperand(0)); }
+    DeclRefType* getElementDeclRefType() const { return as<DeclRefType>(getOperand(0)); }
+
+    EachType(Type* elementType) { m_operands.add(ValNodeOperand(elementType)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class ExpandType : public Type
+{
+    SLANG_AST_CLASS(ExpandType)
+    Type* getPatternType() const { return as<Type>(getOperand(0)); }
+    Index getCapturedTypePackCount() { return getOperandCount() - 1; }
+    Type* getCapturedTypePack(Index i) { return as<Type>(getOperand(i + 1)); }
+    ExpandType(Type* patternType, ArrayView<Type*> capturedPacks)
     {
-        for (auto t : memberTypes)
+        m_operands.add(ValNodeOperand(patternType));
+        for (auto t : capturedPacks)
             m_operands.add(ValNodeOperand(t));
     }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
 
-    auto getMemberCount() const { return getOperandCount(); }
-    Type* getMember(Index i) const { return as<Type>(getOperand(i)); }
-
-    // Overrides should be public so base classes can access
+// A concrete pack of types.
+class ConcreteTypePack : public Type
+{
+    SLANG_AST_CLASS(ConcreteTypePack)
+    ConcreteTypePack(ArrayView<Type*> types)
+    {
+        for (auto t : types)
+            m_operands.add(ValNodeOperand(t));
+    }
+    Index getTypeCount() { return getOperandCount(); }
+    Type* getElementType(Index i) { return as<Type>(getOperand(i)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // The "type" of an expression that names a generic declaration.
-class GenericDeclRefType : public Type 
+class GenericDeclRefType : public Type
 {
     SLANG_AST_CLASS(GenericDeclRefType)
 
@@ -709,23 +795,17 @@ class GenericDeclRefType : public Type
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
 
-    GenericDeclRefType(DeclRef<GenericDecl> declRef)
-    {
-        setOperands(declRef);
-    }
+    GenericDeclRefType(DeclRef<GenericDecl> declRef) { setOperands(declRef); }
 };
 
 // The "type" of a reference to a module or namespace
-class NamespaceType : public Type 
+class NamespaceType : public Type
 {
     SLANG_AST_CLASS(NamespaceType)
 
     DeclRef<NamespaceDeclBase> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
 
-    NamespaceType(DeclRef<NamespaceDeclBase> inDeclRef)
-    {
-        setOperands(inDeclRef);
-    }
+    NamespaceType(DeclRef<NamespaceDeclBase> inDeclRef) { setOperands(inDeclRef); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
@@ -734,7 +814,7 @@ class NamespaceType : public Type
 
 // The concrete type for a value wrapped in an existential, accessible
 // when the existential is "opened" in some context.
-class ExtractExistentialType : public Type 
+class ExtractExistentialType : public Type
 {
     SLANG_AST_CLASS(ExtractExistentialType)
 
@@ -754,8 +834,8 @@ class ExtractExistentialType : public Type
         setOperands(inDeclRef, inOriginalInterfaceType, inOriginalInterfaceDeclRef);
     }
 
-// Following fields will not be reflected (and thus won't be serialized, etc.)
-SLANG_UNREFLECTED
+    // Following fields will not be reflected (and thus won't be serialized, etc.)
+    SLANG_UNREFLECTED
 
     // A cached decl-ref to the original interface's ThisType Decl, with
     // a witness that refers to the type extracted here.
@@ -776,21 +856,21 @@ SLANG_UNREFLECTED
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-        /// Get a witness that shows how this type is a subtype of `originalInterfaceType`.
-        ///
-        /// This operation may create the witness on demand and cache it.
-        ///
+    /// Get a witness that shows how this type is a subtype of `originalInterfaceType`.
+    ///
+    /// This operation may create the witness on demand and cache it.
+    ///
     SubtypeWitness* getSubtypeWitness();
 
-        /// Get a decl-ref to the interface's ThisType decl, which represents a substitutable type
-        /// from which lookup can be performed.
-        ///
-        /// This operation may create the decl-ref on demand and cache it.
-        ///
+    /// Get a decl-ref to the interface's ThisType decl, which represents a substitutable type
+    /// from which lookup can be performed.
+    ///
+    /// This operation may create the decl-ref on demand and cache it.
+    ///
     DeclRef<ThisTypeDecl> getThisTypeDeclRef();
 };
 
-class ExistentialSpecializedType : public Type 
+class ExistentialSpecializedType : public Type
 {
     SLANG_AST_CLASS(ExistentialSpecializedType)
 
@@ -804,9 +884,7 @@ class ExistentialSpecializedType : public Type
     }
     Index getArgCount() { return (getOperandCount() - 1) / 2; }
 
-    ExistentialSpecializedType(
-        Type* inBaseType,
-        ExpandedSpecializationArgs const& inArgs)
+    ExistentialSpecializedType(Type* inBaseType, ExpandedSpecializationArgs const& inArgs)
     {
         m_operands.add(ValNodeOperand(inBaseType));
         for (auto arg : inArgs)
@@ -822,30 +900,30 @@ class ExistentialSpecializedType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
-    /// The type of `this` within a polymorphic declaration
+/// The type of `this` within a polymorphic declaration
 class ThisType : public DeclRefType
 {
     SLANG_AST_CLASS(ThisType)
 
-    ThisType(DeclRefBase* declRef) : DeclRefType(declRef) {}
+    ThisType(DeclRefBase* declRef)
+        : DeclRefType(declRef)
+    {
+    }
 
     DeclRef<InterfaceDecl> getInterfaceDeclRef();
 };
 
-    /// The type of `A & B` where `A` and `B` are types
-    ///
-    /// A value `v` is of type `A & B` if it is both of type `A` and of type `B`.
+/// The type of `A & B` where `A` and `B` are types
+///
+/// A value `v` is of type `A & B` if it is both of type `A` and of type `B`.
 class AndType : public Type
 {
     SLANG_AST_CLASS(AndType)
 
     Type* getLeft() { return as<Type>(getOperand(0)); }
     Type* getRight() { return as<Type>(getOperand(1)); }
-    
-    AndType(Type* leftType, Type* rightType)
-    {
-        setOperands(leftType, rightType);
-    }
+
+    AndType(Type* leftType, Type* rightType) { setOperands(leftType, rightType); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
@@ -857,10 +935,7 @@ class ModifiedType : public Type
 {
     SLANG_AST_CLASS(ModifiedType)
 
-    Type* getBase()
-    {
-        return as<Type>(getOperand(0));
-    }
+    Type* getBase() { return as<Type>(getOperand(0)); }
 
     Index getModifierCount() { return getOperandCount() - 1; }
     Val* getModifier(Index index) { return getOperand(index + 1); }

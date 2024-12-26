@@ -1,15 +1,16 @@
 #pragma once
 
+#include "core/slang-basic.h"
+#include "core/slang-io.h"
+#include "platform/window.h"
 #include "slang-gfx.h"
-#include "tools/platform/window.h"
-#include "source/core/slang-basic.h"
-#include "source/core/slang-io.h"
+#include "test-base.h"
 
 #ifdef _WIN32
 void _Win32OutputDebugString(const char* str);
 #endif
 
-struct WindowedAppBase
+struct WindowedAppBase : public TestBase
 {
 protected:
     static const int kSwapchainImageCount = 2;
@@ -32,33 +33,53 @@ protected:
         int width,
         int height,
         gfx::DeviceType deviceType = gfx::DeviceType::Default);
+
+    void createFramebuffers(
+        uint32_t width,
+        uint32_t height,
+        gfx::Format colorFormat,
+        uint32_t frameBufferCount);
     void createSwapchainFramebuffers();
+    void createOfflineFramebuffers();
+
     void mainLoop();
-    Slang::ComPtr<gfx::IResourceView> createTextureFromFile(Slang::String fileName, int& textureWidth, int& textureHeight);
+
+    Slang::ComPtr<gfx::IResourceView> createTextureFromFile(
+        Slang::String fileName,
+        int& textureWidth,
+        int& textureHeight);
     virtual void windowSizeChanged();
 
 protected:
     virtual void renderFrame(int framebufferIndex) = 0;
+
 public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
     virtual void finalize() { gQueue->waitOnHost(); }
+    void offlineRender();
 };
 
-struct ExampleResources {
+struct ExampleResources
+{
     Slang::String baseDir;
 
-    ExampleResources(const Slang::String &dir) : baseDir(dir) {}
-    
-    Slang::String resolveResource(const char* fileName) const {
-        static const Slang::List<Slang::String> directories {
+    ExampleResources(const Slang::String& dir)
+        : baseDir(dir)
+    {
+    }
+
+    Slang::String resolveResource(const char* fileName) const
+    {
+        static const Slang::List<Slang::String> directories{
             "examples",
             "../examples",
             "../../examples",
         };
-    
-        for (const Slang::String& dir : directories) {      
+
+        for (const Slang::String& dir : directories)
+        {
             Slang::StringBuilder pathSb;
-            pathSb << dir  << "/" << baseDir << "/" << fileName;
+            pathSb << dir << "/" << baseDir << "/" << fileName;
             if (Slang::File::exists(pathSb.getBuffer()))
                 return pathSb.toString();
         }
@@ -70,17 +91,19 @@ struct ExampleResources {
 int64_t getCurrentTime();
 int64_t getTimerFrequency();
 
-template<typename ... TArgs> inline void reportError(const char* format, TArgs... args)
+template<typename... TArgs>
+inline void reportError(const char* format, TArgs... args)
 {
-    printf(format, args...);
+    printf(format, std::forward<TArgs>(args)...);
 #ifdef _WIN32
     char buffer[4096];
-    sprintf_s(buffer, format, args...);
+    sprintf_s(buffer, format, std::forward<TArgs>(args)...);
     _Win32OutputDebugString(buffer);
 #endif
 }
 
-template <typename... TArgs> inline void log(const char* format, TArgs... args)
+template<typename... TArgs>
+inline void log(const char* format, TArgs... args)
 {
     reportError(format, args...);
 }
@@ -103,18 +126,26 @@ inline void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 void initDebugCallback();
 
 template<typename TApp>
-int innerMain()
+int innerMain(int argc, char** argv)
 {
     initDebugCallback();
 
     TApp app;
 
+    app.parseOption(argc, argv);
     if (SLANG_FAILED(app.initialize()))
     {
         return -1;
     }
 
-    platform::Application::run(app.getWindow());
+    if (!app.isTestMode())
+    {
+        platform::Application::run(app.getWindow());
+    }
+    else
+    {
+        app.offlineRender();
+    }
 
     app.finalize();
     return 0;

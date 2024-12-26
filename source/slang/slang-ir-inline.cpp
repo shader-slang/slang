@@ -1,9 +1,8 @@
 // slang-ir-inline.cpp
 #include "slang-ir-inline.h"
 
-#include "slang-ir-ssa-simplification.h"
-
 #include "../core/slang-performance-profiler.h"
+#include "slang-ir-ssa-simplification.h"
 // This file provides general facilities for inlining function calls.
 
 //
@@ -17,31 +16,28 @@
 // on user-supplied hints, or on optimization criteria like performance and
 // code size.
 
-#include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
-    /// Base type for inlining passes, providing shared/common functionality
+/// Base type for inlining passes, providing shared/common functionality
 struct InliningPassBase
 {
-        /// The module that we are optimizing/transforming
+    /// The module that we are optimizing/transforming
     IRModule* m_module = nullptr;
 
     HashSet<IRInst*>* m_modifiedFuncs = nullptr;
 
-        /// Initialize an inlining pass to operate on the given `module`
+    /// Initialize an inlining pass to operate on the given `module`
     InliningPassBase(IRModule* module)
         : m_module(module)
     {
     }
 
-        /// Consider all the call sites in the module for inlining
-    bool considerAllCallSites()
-    {
-        return considerAllCallSitesRec(m_module->getModuleInst());
-    }
+    /// Consider all the call sites in the module for inlining
+    bool considerAllCallSites() { return considerAllCallSitesRec(m_module->getModuleInst()); }
 
     bool considerCallSiteInFunc(IRFunc* func)
     {
@@ -77,12 +73,12 @@ struct InliningPassBase
         return result;
     }
 
-        /// Consider all call sites at or under `inst` for inlining
+    /// Consider all call sites at or under `inst` for inlining
     bool considerAllCallSitesRec(IRInst* inst)
     {
         bool changed = false;
 
-        if( auto func = as<IRFunc>(inst) )
+        if (auto func = as<IRFunc>(inst))
         {
             changed = considerCallSiteInFunc(func);
         }
@@ -108,32 +104,34 @@ struct InliningPassBase
     // to package it all up in a `struct` that can be re-used when
     // we actually get around to inlining a call site.
 
-        /// Information about a call site to be inlined
+    /// Information about a call site to be inlined
     struct CallSiteInfo
     {
-            /// The call instruction.
+        /// The call instruction.
         IRCall* call = nullptr;
 
-            /// The function being called.
-            ///
-            /// For an inlinable call, this must be non-null and a valid function *definition* (with a body) for inlining to proceed.
+        /// The function being called.
+        ///
+        /// For an inlinable call, this must be non-null and a valid function *definition* (with a
+        /// body) for inlining to proceed.
         IRFunc* callee = nullptr;
 
-            /// The specialization of the function, if any.
-            ///
-            /// For an inlineable call, this must be non-null if the function is generic, but may be null otherwise.
+        /// The specialization of the function, if any.
+        ///
+        /// For an inlineable call, this must be non-null if the function is generic, but may be
+        /// null otherwise.
         IRSpecialize* specialize = nullptr;
 
-            /// The generic being specialized.
-            ///
-            /// For an inlineable call, this must be be non-null if `specialize` is non-null.
+        /// The generic being specialized.
+        ///
+        /// For an inlineable call, this must be be non-null if `specialize` is non-null.
         IRGeneric* generic = nullptr;
     };
 
     // With `CallSiteInfo` defined, we can now understand the
     // basic proces of considering a call site for inlining.
 
-        /// Consider the given `call` site, and possibly inline it.
+    /// Consider the given `call` site, and possibly inline it.
     bool considerCallSite(IRCall* call)
     {
         // We start by checking if inlining would even be possible,
@@ -144,7 +142,7 @@ struct InliningPassBase
         // to consider and we bail out.
         //
         CallSiteInfo callSite;
-        if(!canInline(call, callSite))
+        if (!canInline(call, callSite))
             return false;
 
         // If we've decided that we *can* inline the given call
@@ -152,7 +150,7 @@ struct InliningPassBase
         // for when we should inline may vary by subclass,
         // so `shouldInline` is a virtual method.
         //
-        if(!shouldInline(callSite))
+        if (!shouldInline(callSite))
             return false;
 
         // Finally, if we both *can* and *should* inline the
@@ -173,7 +171,7 @@ struct InliningPassBase
     // here for the benefit of passes that might implement their
     // own logic for deciding what to inline, bypassing `considerCallSite`.
 
-        /// Determine whether `callSite` should be inlined.
+    /// Determine whether `callSite` should be inlined.
     virtual bool shouldInline(CallSiteInfo const& callSite)
     {
         SLANG_UNUSED(callSite);
@@ -193,7 +191,8 @@ struct InliningPassBase
         return false;
     }
 
-        /// Determine whether `call` can be inlined, and if so write information about it to `outCallSite`
+    /// Determine whether `call` can be inlined, and if so write information about it to
+    /// `outCallSite`
     bool canInline(IRCall* call, CallSiteInfo& outCallSite)
     {
         // We can start by writing the `call` instruction into our `CallSiteInfo`.
@@ -207,7 +206,7 @@ struct InliningPassBase
         // If the callee is a `specialize` instruction, then we
         // want to look at what is being specialized instead.
         //
-        if( auto specialize = as<IRSpecialize>(callee) )
+        if (auto specialize = as<IRSpecialize>(callee))
         {
             // If the `specialize` is applied to something other
             // than a `generic` instruction, then we can't
@@ -215,7 +214,7 @@ struct InliningPassBase
             // call to a generic method in an interface.
             //
             IRGeneric* generic = findSpecializedGeneric(specialize);
-            if(!generic)
+            if (!generic)
                 return false;
 
             // If we have a `generic` instruction, then we
@@ -228,7 +227,7 @@ struct InliningPassBase
             // yields, then inlining isn't possible.
             //
             callee = findGenericReturnVal(generic);
-            if(!callee)
+            if (!callee)
                 return false;
 
             // If we decide to inline this call, then the information
@@ -245,7 +244,7 @@ struct InliningPassBase
         // If it is not, then inlining isn't possible.
         //
         auto calleeFunc = as<IRFunc>(callee);
-        if(!calleeFunc)
+        if (!calleeFunc)
             return false;
         //
         // If the callee *is* a function, then we can update
@@ -274,13 +273,24 @@ struct InliningPassBase
         // a call site if the callee function is a full definition
         // in the IR (not just a declaration).
         //
-        if(!isDefinition(calleeFunc))
+        if (!isDefinition(calleeFunc))
             return false;
 
+        // We cannot inline a call inside an `IRExpand`.
+        // Because this will make the cfg inside the `IRExpand` too complex,
+        // and our expand specialization logic isn't general enough to deal
+        // with that yet.
+        for (auto parent = call->getParent(); parent; parent = parent->getParent())
+        {
+            if (as<IRExpand>(parent))
+                return false;
+            if (as<IRGlobalValueWithCode>(parent))
+                break;
+        }
         return true;
     }
 
-        /// Inline the given `callSite`, which is assumed to have been validated
+    /// Inline the given `callSite`, which is assumed to have been validated
     void inlineCallSite(CallSiteInfo const& callSite)
     {
         // Information about the call site, including
@@ -320,7 +330,11 @@ struct InliningPassBase
             }
             else
             {
-                auto newCall = builder.emitIntrinsicInst(call->getFullType(), op, args.getCount(), args.getBuffer());
+                auto newCall = builder.emitIntrinsicInst(
+                    call->getFullType(),
+                    op,
+                    args.getCount(),
+                    args.getBuffer());
                 call->replaceUsesWith(newCall);
             }
             call->removeAndDeallocate();
@@ -331,7 +345,7 @@ struct InliningPassBase
         // need to include the substitution of generic parameters
         // with their argument values in our cloning.
         //
-        if( auto specialize = callSite.specialize )
+        if (auto specialize = callSite.specialize)
         {
             auto generic = callSite.generic;
 
@@ -339,7 +353,7 @@ struct InliningPassBase
             // generic parameters to the matching arguments.
             //
             Int argCounter = 0;
-            for( auto param : generic->getParams() )
+            for (auto param : generic->getParams())
             {
                 SLANG_ASSERT(argCounter < (Int)specialize->getArgCount());
                 auto arg = specialize->getArg(argCounter++);
@@ -356,16 +370,16 @@ struct InliningPassBase
             auto body = generic->getFirstBlock();
             SLANG_ASSERT(!body->getNextBlock()); // All IR generics should have a single block.
 
-            for( auto inst : body->getChildren() )
+            for (auto inst : body->getChildren())
             {
-                if( inst == callee )
+                if (inst == callee)
                 {
                     // We don't want to create a clone of the callee
                     // function at the call site, since it would
                     // immediately become dead code when we inline
                     // its body.
                 }
-                else if(as<IRReturn>(inst))
+                else if (as<IRReturn>(inst))
                 {
                     // We also don't want to clone any `return`
                     // instruction in the generic, since that is
@@ -396,7 +410,7 @@ struct InliningPassBase
             // matching argument at the call site.
             //
             Int argCounter = 0;
-            for(auto param : callee->getParams())
+            for (auto param : callee->getParams())
             {
                 SLANG_ASSERT(argCounter < (Int)call->getArgCount());
                 auto arg = call->getArg(argCounter++);
@@ -405,31 +419,34 @@ struct InliningPassBase
             SLANG_ASSERT(argCounter == (Int)call->getArgCount());
         }
 
-        inlineFuncBody(callSite, &env, &builder);    
+        inlineFuncBody(callSite, &env, &builder);
     }
 
-        // When instructions are cloned, with cloneInst no sourceLoc information is copied over by default.
-        // Here we attempt some policy about copying sourceLocs when inlining.
-        //
-        // An assumption here is that [__unsafeForceInlineEarly] will not be in user code (when we have more
-        // general inlining this will not follow).
-        //
-        // Therefore we probably *don't* want to copy sourceLoc from the original definition in the stdlib because
-        //
-        // * That won't be much use to the user (they can't easily see stdlib code currently for example)
-        // * That the definitions in stdlib are currently 'mundane' and largely exist to flesh out language features - such that
-        //   their being in the stdlib would likely be surprising to users
-        //
-        // That being the case, we actually copy the call sites sourceLoc if it's defined, and only fall back
-        // onto the originating loc, if that's not defined.
-        //
-        // We *could* vary behavior if we knew if the function was defined in the stdlib. There doesn't appear 
-        // to be a decoration for this.
-        // We could find out by looking at the source loc and checking if it's in the range of stdlib - this would actually be
-        // a fast and easy but to do properly this way you'd want a way to mark that source range that would also work across
-        // serialization.
-        // 
-        // For now this punts on this, and just assumes [__unsafeForceInlineEarly] is not in user code.
+    // When instructions are cloned, with cloneInst no sourceLoc information is copied over by
+    // default. Here we attempt some policy about copying sourceLocs when inlining.
+    //
+    // An assumption here is that [__unsafeForceInlineEarly] will not be in user code (when we have
+    // more general inlining this will not follow).
+    //
+    // Therefore we probably *don't* want to copy sourceLoc from the original definition in the core
+    // module because
+    //
+    // * That won't be much use to the user (they can't easily see the core module code currently
+    // for example)
+    // * That the definitions in the core module are currently 'mundane' and largely exist to flesh
+    // out language features - such that
+    //   their being in the core module would likely be surprising to users
+    //
+    // That being the case, we actually copy the call sites sourceLoc if it's defined, and only fall
+    // back onto the originating loc, if that's not defined.
+    //
+    // We *could* vary behavior if we knew if the function was defined in the core module. There
+    // doesn't appear to be a decoration for this. We could find out by looking at the source loc
+    // and checking if it's in the range of the core module - this would actually be a fast and easy
+    // but to do properly this way you'd want a way to mark that source range that would also work
+    // across serialization.
+    //
+    // For now this punts on this, and just assumes [__unsafeForceInlineEarly] is not in user code.
     static void _setSourceLoc(IRInst* clonedInst, IRInst* srcInst, CallSiteInfo const& callSite)
     {
         SourceLoc sourceLoc;
@@ -447,21 +464,24 @@ struct InliningPassBase
 
         clonedInst->sourceLoc = sourceLoc;
     }
-    static IRInst* _cloneInstWithSourceLoc(CallSiteInfo const& callSite,
-        IRCloneEnv*     env,
-        IRBuilder*      builder,
-        IRInst*         inst)
+    static IRInst* _cloneInstWithSourceLoc(
+        CallSiteInfo const& callSite,
+        IRCloneEnv* env,
+        IRBuilder* builder,
+        IRInst* inst)
     {
         IRInst* clonedInst = cloneInst(env, builder, inst);
         _setSourceLoc(clonedInst, inst, callSite);
         return clonedInst;
     }
 
-        /// Inline the body of the callee for `callSite`, for a callee that has only
-        /// a single basic block.
-        ///
+    /// Inline the body of the callee for `callSite`, for a callee that has only
+    /// a single basic block.
+    ///
     void inlineSingleBlockFuncBody(
-        CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
+        CallSiteInfo const& callSite,
+        IRCloneEnv* env,
+        IRBuilder* builder)
     {
         auto call = callSite.call;
         auto callee = callSite.callee;
@@ -526,9 +546,8 @@ struct InliningPassBase
         call->removeAndDeallocate();
     }
 
-        /// Inline the body of the callee for `callSite`.
-    void inlineFuncBody(
-        CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
+    /// Inline the body of the callee for `callSite`.
+    void inlineFuncBody(CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
     {
         auto call = callSite.call;
         auto callee = callSite.callee;
@@ -540,7 +559,7 @@ struct InliningPassBase
         //
         auto firstBlock = callee->getFirstBlock();
         SLANG_ASSERT(firstBlock);
-        if(!firstBlock->getNextBlock() && as<IRReturn>(firstBlock->getTerminator()))
+        if (!firstBlock->getNextBlock() && as<IRReturn>(firstBlock->getTerminator()))
         {
             inlineSingleBlockFuncBody(callSite, env, builder);
             return;
@@ -652,8 +671,8 @@ struct InliningPassBase
                     //
                     {
                         auto returnedValue = findCloneForOperand(env, inst->getOperand(0));
-                        auto returnBranch = builder->emitBranch(
-                            afterBlock, returnValParam ? 1 : 0, &returnedValue);
+                        auto returnBranch =
+                            builder->emitBranch(afterBlock, returnValParam ? 1 : 0, &returnedValue);
                         _setSourceLoc(returnBranch, inst, callSite);
                     }
                     break;
@@ -681,24 +700,24 @@ struct InliningPassBase
         //
         call->removeAndDeallocate();
     }
-
 };
 
-    /// An inlining pass that inlines calls to `[unsafeForceInlineEarly]` functions
+/// An inlining pass that inlines calls to `[unsafeForceInlineEarly]` functions
 struct MandatoryEarlyInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
     MandatoryEarlyInliningPass(IRModule* module)
         : Super(module)
-    {}
+    {
+    }
 
     bool shouldInline(CallSiteInfo const& info)
     {
         if (info.callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
 
-        if(info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
+        if (info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
             return true;
         return false;
     }
@@ -714,7 +733,8 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
     return pass.considerAllCallSites();
 }
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 // Inlines calls that involve String types
 struct TypeInliningPass : InliningPassBase
@@ -723,30 +743,32 @@ struct TypeInliningPass : InliningPassBase
 
     TypeInliningPass(IRModule* module)
         : Super(module)
-    {}
+    {
+    }
 
     bool doesTypeRequireInline(IRType* type, IRFunc* callee)
     {
         // TODO(JS):
         // I guess there is a question here about what type around string requires
-        // inlining. 
+        // inlining.
         // For example if we had an array of strings etc.
         // For now we just consider just basic string types.
         const auto op = type->getOp();
         switch (op)
         {
-            case kIROp_RefType:
+        case kIROp_RefType:
             {
-                if(callee->findDecoration<IRNoRefInlineDecoration>())
+                if (callee->findDecoration<IRNoRefInlineDecoration>())
                     return false;
                 return true;
             }
-            case kIROp_StringType:
-            case kIROp_NativeStringType:
+        case kIROp_StringType:
+        case kIROp_NativeStringType:
             {
                 return true;
             }
-            default: break;
+        default:
+            break;
         }
 
         return false;
@@ -774,25 +796,25 @@ struct TypeInliningPass : InliningPassBase
     }
 };
 
-} // anonymous
+} // namespace
 
 Result performTypeInlining(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
 
-    // TODO(JS): 
-    // This is perhaps not as efficient as might be desirable. 
+    // TODO(JS):
+    // This is perhaps not as efficient as might be desirable.
     // A more optimized version might not need to pass over all of the module
-    // to find new call sites. 
+    // to find new call sites.
     //
     // Another problem here is recursion. Right now Slang compiler doesn't accept recursive input,
-    // but the Slang language is supposed to support recursion on targets that support it. 
+    // but the Slang language is supposed to support recursion on targets that support it.
     // There are GPU targets that allow recursion such as CUDA.
     //
-    // Another approach would be (when enabled) when inlining occurs, would be instead of continuing 
-    // *after*, to start the checks/inlining from where the inline took place. 
-    // 
-    while(true)
+    // Another approach would be (when enabled) when inlining occurs, would be instead of continuing
+    // *after*, to start the checks/inlining from where the inline took place.
+    //
+    while (true)
     {
         TypeInliningPass pass(module);
         if (pass.considerAllCallSites())
@@ -800,12 +822,11 @@ Result performTypeInlining(IRModule* module, DiagnosticSink* sink)
             // If there was a change try inlining again
             continue;
         }
-     
+
         // Done.
         break;
     }
 
-    
 
     return SLANG_OK;
 }
@@ -816,12 +837,13 @@ struct ForceInliningPass : InliningPassBase
 
     ForceInliningPass(IRModule* module)
         : Super(module)
-    {}
+    {
+    }
 
     bool shouldInline(CallSiteInfo const& info)
     {
         if (info.callee->findDecoration<IRForceInlineDecoration>() ||
-            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>()||
+            info.callee->findDecoration<IRUnsafeForceInlineEarlyDecoration>() ||
             info.callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
         return false;
@@ -848,7 +870,8 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
 
     PreAutoDiffForceInliningPass(IRModule* module)
         : Super(module)
-    {}
+    {
+    }
 
     Dictionary<IRInst*, bool> m_funcCanInline;
 
@@ -888,10 +911,16 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             {
                 switch (inst->getOp())
                 {
+                // Avoid inlining functions that have derivative instructions.
                 case kIROp_ForwardDifferentiate:
                 case kIROp_BackwardDifferentiate:
                 case kIROp_BackwardDifferentiatePrimal:
                 case kIROp_BackwardDifferentiatePropagate:
+                    canInline = false;
+                    goto end;
+
+                // Also avoid inlining functions with inline-asm instructions.
+                case kIROp_SPIRVAsm:
                     canInline = false;
                     goto end;
                 }
@@ -915,19 +944,20 @@ bool performPreAutoDiffForceInlining(IRModule* module)
     return pass.considerAllCallSitesRec(module->getModuleInst());
 }
 
-    // Defined in slang-ir-specialize-resource.cpp
+// Defined in slang-ir-specialize-resource.cpp
 bool isResourceType(IRType* type);
 bool isIllegalGLSLParameterType(IRType* type);
 
-    /// An inlining pass that inlines calls functions that returns resources.
-    /// This is needed for glsl targets.
+/// An inlining pass that inlines calls functions that returns resources.
+/// This is needed for glsl targets.
 struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
     GLSLResourceReturnFunctionInliningPass(IRModule* module)
         : Super(module)
-    {}
+    {
+    }
 
     bool shouldInline(CallSiteInfo const& info)
     {
@@ -968,7 +998,8 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
 
     IntrinsicFunctionInliningPass(IRModule* module)
         : Super(module)
-    {}
+    {
+    }
 
     bool shouldInline(CallSiteInfo const& info)
     {
@@ -982,7 +1013,8 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
         // If a function body has only asm blocks + trivial insts (load/store),
         // this is considered as a pure asm function, and we can inline it.
         bool hasSpvAsm = false;
-        for (auto inst = func->getFirstBlock()->getFirstOrdinaryInst(); inst != returnInst; inst = inst->getNextInst())
+        for (auto inst = func->getFirstBlock()->getFirstOrdinaryInst(); inst != returnInst;
+             inst = inst->getNextInst())
         {
             switch (inst->getOp())
             {
@@ -1019,12 +1051,10 @@ struct CustomInliningPass : InliningPassBase
 
     CustomInliningPass(IRModule* module)
         : Super(module)
-    {}
-
-    bool shouldInline(CallSiteInfo const&)
     {
-        return true;
     }
+
+    bool shouldInline(CallSiteInfo const&) { return true; }
 };
 
 bool inlineCall(IRCall* call)

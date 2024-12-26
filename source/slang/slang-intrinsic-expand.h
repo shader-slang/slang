@@ -7,18 +7,22 @@
 namespace Slang
 {
 
-/* Handles all the special case handling of expansions of intrinsics. In particular handles the expansion
-of the 'special cases' prefixed with '$' */
+/* Handles all the special case handling of expansions of intrinsics. In particular handles the
+expansion of the 'special cases' prefixed with '$' */
 struct IntrinsicExpandContext
 {
-    IntrinsicExpandContext(CLikeSourceEmitter* emitter) :
-        m_emitter(emitter),
-        m_writer(emitter->getSourceWriter())
+    IntrinsicExpandContext(CLikeSourceEmitter* emitter)
+        : m_emitter(emitter), m_writer(emitter->getSourceWriter())
     {
     }
 
-    void emit(IRCall* inst, IRUse* args, Int argCount, const UnownedStringSlice& intrinsicText, IRInst* intirnsicInst);
-    
+    void emit(
+        IRCall* inst,
+        IRUse* args,
+        Int argCount,
+        const UnownedStringSlice& intrinsicText,
+        IRInst* intirnsicInst);
+
 protected:
     const char* _emitSpecial(const char* cursor);
 
@@ -52,5 +56,5 @@ protected:
     Index m_argIndexOffset = 0;
 };
 
-}
+} // namespace Slang
 #endif

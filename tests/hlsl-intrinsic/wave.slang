@@ -29,7 +29,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     /// value |= (product << 8);    
         
     // TODO(JS): NOTE! This only works with uint, *NOT* int on HLSL/DXC. 
-    // We need to update the stdlib to reflect this.
+    // We need to update the core module to reflect this.
     uint xor = WaveActiveBitXor(uint(idx + 1));
     value |= int(xor << 12);
     

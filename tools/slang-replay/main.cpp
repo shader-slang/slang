@@ -1,14 +1,15 @@
-#include <stdio.h>
-#include <filesystem>
+#include "../../source/core/slang-io.h"
 
-#include <replay/recordFile-processor.h>
+#include <memory>
 #include <replay/json-consumer.h>
+#include <replay/recordFile-processor.h>
 #include <replay/replay-consumer.h>
 #include <replay/slang-decoder.h>
+#include <stdio.h>
 
 struct Options
 {
-    bool convertToJson {false};
+    bool convertToJson{false};
     Slang::String recordFileName;
 };
 
@@ -16,14 +17,15 @@ void printUsage()
 {
     printf("Usage: slang-replay [options] <record-file>\n");
     printf("Options:\n");
-    printf("  --convert-json, -cj: Convert the record file to a JSON file in the same directory with record file.\n\
+    printf(
+        "  --convert-json, -cj: Convert the record file to a JSON file in the same directory with record file.\n\
                        When this option is set, it won't replay the record file.\n");
 }
 
-Options parseOption(int argc, char *argv[])
+Options parseOption(int argc, char* argv[])
 {
     Options option;
-    char const* arg {};
+    char const* arg{};
     if (argc <= 1)
     {
         printUsage();
@@ -31,7 +33,7 @@ Options parseOption(int argc, char *argv[])
     }
 
     int argIndex = 1;
-    while(argIndex < argc)
+    while (argIndex < argc)
     {
         arg = argv[argIndex];
 
@@ -41,14 +43,12 @@ Options parseOption(int argc, char *argv[])
             option.recordFileName = arg;
             argIndex++;
         }
-        else if ( (strcmp("--convert-json", arg) == 0) ||
-                  (strcmp("-cj", arg) == 0) )
+        else if ((strcmp("--convert-json", arg) == 0) || (strcmp("-cj", arg) == 0))
         {
             option.convertToJson = true;
             argIndex++;
         }
-        else if ( (strcmp("--help", arg) == 0) ||
-                  (strcmp("-h", arg) == 0) )
+        else if ((strcmp("--help", arg) == 0) || (strcmp("-h", arg) == 0))
         {
             printUsage();
             exit(0);
@@ -71,24 +71,22 @@ Options parseOption(int argc, char *argv[])
     return option;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     Options options = parseOption(argc, argv);
 
     SlangRecord::RecordFileProcessor recordFileProcessor(options.recordFileName);
 
-
-    std::filesystem::path jsonPath = options.recordFileName.begin();
-    jsonPath.replace_extension(".json");
-
-    SlangRecord::JsonConsumer jsonConsumer(jsonPath.string());
+    Slang::String jsonPath = Slang::Path::replaceExt(options.recordFileName, "json");
+    Slang::RefPtr<SlangRecord::JsonConsumer> jsonConsumer;
     SlangRecord::ReplayConsumer replayConsumer;
 
     SlangRecord::SlangDecoder decoder;
 
     if (options.convertToJson)
     {
-        decoder.addConsumer(&jsonConsumer);
+        jsonConsumer = new SlangRecord::JsonConsumer(jsonPath);
+        decoder.addConsumer(jsonConsumer.get());
     }
     else
     {
@@ -97,9 +95,9 @@ int main(int argc, char *argv[])
 
     recordFileProcessor.addDecoder(&decoder);
 
-    while(true)
+    while (true)
     {
-        if(!recordFileProcessor.processNextBlock())
+        if (!recordFileProcessor.processNextBlock())
         {
             break;
         }

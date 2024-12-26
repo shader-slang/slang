@@ -3,23 +3,28 @@
 
 #include "../core/slang-string-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* TODO(JS):
 
-* If Decls hand SourceRange, then we could use the range to simplify getting the Post markup, as will be trivial to get to the 'end'
+* If Decls hand SourceRange, then we could use the range to simplify getting the Post markup, as
+will be trivial to get to the 'end'
 * Need to handle preceeding * in some markup styles
-* If we want to be able to disable markup we need a mechanism to do this. Probably define source ranges.
+* If we want to be able to disable markup we need a mechanism to do this. Probably define source
+ranges.
 
 * Need a way to take the extracted markup and produce suitable markdown
 ** This will need to display the decoration appropriately
 */
 
-/* static */UnownedStringSlice DocMarkupExtractor::removeStart(MarkupType type, const UnownedStringSlice& comment)
+/* static */ UnownedStringSlice DocMarkupExtractor::removeStart(
+    MarkupType type,
+    const UnownedStringSlice& comment)
 {
     switch (type)
     {
-        case MarkupType::BlockBefore:
+    case MarkupType::BlockBefore:
         {
             if (comment.startsWith(UnownedStringSlice::fromLiteral("/**")) ||
                 comment.startsWith(UnownedStringSlice::fromLiteral("/*!")))
@@ -28,10 +33,10 @@ namespace Slang {
                 return comment.tail(3);
             }
             return comment;
-        }   
-        case MarkupType::BlockAfter:
+        }
+    case MarkupType::BlockAfter:
         {
-            
+
             if (comment.startsWith(UnownedStringSlice::fromLiteral("/**<")) ||
                 comment.startsWith(UnownedStringSlice::fromLiteral("/*!<")))
             {
@@ -40,7 +45,7 @@ namespace Slang {
             }
             return comment;
         }
-        case MarkupType::OrdinaryBlockBefore:
+    case MarkupType::OrdinaryBlockBefore:
         {
             if (comment.startsWith(UnownedStringSlice::fromLiteral("/*")))
             {
@@ -49,29 +54,35 @@ namespace Slang {
             }
             return comment;
         }
-        case MarkupType::LineBangBefore:
+    case MarkupType::LineBangBefore:
         {
-            return comment.startsWith(UnownedStringSlice::fromLiteral("//!")) ? comment.tail(3) : comment;
+            return comment.startsWith(UnownedStringSlice::fromLiteral("//!")) ? comment.tail(3)
+                                                                              : comment;
         }
-        case MarkupType::LineSlashBefore:
+    case MarkupType::LineSlashBefore:
         {
-            return comment.startsWith(UnownedStringSlice::fromLiteral("///")) ? comment.tail(3) : comment;
+            return comment.startsWith(UnownedStringSlice::fromLiteral("///")) ? comment.tail(3)
+                                                                              : comment;
         }
-        case MarkupType::OrdinaryLineBefore:
-        case MarkupType::OrdinaryLineAfter:
+    case MarkupType::OrdinaryLineBefore:
+    case MarkupType::OrdinaryLineAfter:
         {
-            return comment.startsWith(UnownedStringSlice::fromLiteral("//")) ? comment.tail(2) : comment;
+            return comment.startsWith(UnownedStringSlice::fromLiteral("//")) ? comment.tail(2)
+                                                                             : comment;
         }
-        case MarkupType::LineBangAfter:
+    case MarkupType::LineBangAfter:
         {
             /// //!< Can be multiple lines
-            return comment.startsWith(UnownedStringSlice::fromLiteral("//!<")) ? comment.tail(4) : comment;
+            return comment.startsWith(UnownedStringSlice::fromLiteral("//!<")) ? comment.tail(4)
+                                                                               : comment;
         }
-        case MarkupType::LineSlashAfter:
+    case MarkupType::LineSlashAfter:
         {
-            return comment.startsWith(UnownedStringSlice::fromLiteral("///<")) ? comment.tail(4) : comment;
+            return comment.startsWith(UnownedStringSlice::fromLiteral("///<")) ? comment.tail(4)
+                                                                               : comment;
         }
-        default: break;
+    default:
+        break;
     }
     return comment;
 }
@@ -106,37 +117,47 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
     return -1;
 }
 
-/* static */DocMarkupExtractor::MarkupFlags DocMarkupExtractor::getFlags(MarkupType type)
+/* static */ DocMarkupExtractor::MarkupFlags DocMarkupExtractor::getFlags(MarkupType type)
 {
     switch (type)
     {
-        default:
-        case MarkupType::None:              return 0;
-        case MarkupType::BlockBefore:      return MarkupFlag::Before | MarkupFlag::IsBlock; 
-        case MarkupType::BlockAfter:       return MarkupFlag::After  | MarkupFlag::IsBlock;
-        case MarkupType::OrdinaryBlockBefore: return MarkupFlag::Before | MarkupFlag::IsBlock;
+    default:
+    case MarkupType::None:
+        return 0;
+    case MarkupType::BlockBefore:
+        return MarkupFlag::Before | MarkupFlag::IsBlock;
+    case MarkupType::BlockAfter:
+        return MarkupFlag::After | MarkupFlag::IsBlock;
+    case MarkupType::OrdinaryBlockBefore:
+        return MarkupFlag::Before | MarkupFlag::IsBlock;
 
-        case MarkupType::LineBangBefore:     return MarkupFlag::Before | MarkupFlag::IsMultiToken; 
-        case MarkupType::LineSlashBefore:    return MarkupFlag::Before | MarkupFlag::IsMultiToken; 
-        case MarkupType::OrdinaryLineBefore: return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+    case MarkupType::LineBangBefore:
+        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+    case MarkupType::LineSlashBefore:
+        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+    case MarkupType::OrdinaryLineBefore:
+        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
 
-        case MarkupType::LineBangAfter:      return MarkupFlag::After | MarkupFlag::IsMultiToken; 
-        case MarkupType::LineSlashAfter:     return MarkupFlag::After | MarkupFlag::IsMultiToken;
-        case MarkupType::OrdinaryLineAfter: return MarkupFlag::After | MarkupFlag::IsMultiToken;
-
+    case MarkupType::LineBangAfter:
+        return MarkupFlag::After | MarkupFlag::IsMultiToken;
+    case MarkupType::LineSlashAfter:
+        return MarkupFlag::After | MarkupFlag::IsMultiToken;
+    case MarkupType::OrdinaryLineAfter:
+        return MarkupFlag::After | MarkupFlag::IsMultiToken;
     }
 }
 
-/* static */DocMarkupExtractor::MarkupType DocMarkupExtractor::findMarkupType(const Token& tok)
+/* static */ DocMarkupExtractor::MarkupType DocMarkupExtractor::findMarkupType(const Token& tok)
 {
     switch (tok.type)
     {
-        case TokenType::BlockComment:
+    case TokenType::BlockComment:
         {
             UnownedStringSlice slice = tok.getContent();
             if (slice.getLength() >= 3 && (slice[2] == '!' || slice[2] == '*'))
             {
-                return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::BlockAfter : MarkupType::BlockBefore;
+                return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::BlockAfter
+                                                                   : MarkupType::BlockBefore;
             }
             else
             {
@@ -144,25 +165,29 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
             }
             break;
         }
-        case TokenType::LineComment:
+    case TokenType::LineComment:
         {
             UnownedStringSlice slice = tok.getContent();
             if (slice.getLength() >= 3)
             {
                 if (slice[2] == '!')
                 {
-                    return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::LineBangAfter : MarkupType::LineBangBefore;
+                    return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::LineBangAfter
+                                                                       : MarkupType::LineBangBefore;
                 }
                 else if (slice[2] == '/')
                 {
-                    return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::LineSlashAfter : MarkupType::LineSlashBefore;
+                    return (slice.getLength() >= 4 && slice[3] == '<')
+                               ? MarkupType::LineSlashAfter
+                               : MarkupType::LineSlashBefore;
                 }
             }
             return (tok.flags & TokenFlag::AtStartOfLine) != 0 ? MarkupType::OrdinaryLineBefore
                                                                : MarkupType::OrdinaryLineAfter;
             break;
         }
-        default: break;
+    default:
+        break;
     }
     return MarkupType::None;
 }
@@ -172,7 +197,8 @@ static Index _calcWhitespaceIndent(const UnownedStringSlice& line)
     // TODO(JS): For now we ignore tabs and just work out indentation based on spaces/assume ASCII
     Index indent = 0;
     const Index count = line.getLength();
-    for (; indent < count && line[indent] == ' '; indent++);
+    for (; indent < count && line[indent] == ' '; indent++)
+        ;
     return indent;
 }
 
@@ -182,7 +208,10 @@ static Index _calcIndent(const UnownedStringSlice& line)
     return line.getLength();
 }
 
-static void _appendUnindenttedLine(const UnownedStringSlice& line, Index maxIndent, StringBuilder& out)
+static void _appendUnindenttedLine(
+    const UnownedStringSlice& line,
+    Index maxIndent,
+    StringBuilder& out)
 {
     Index indent = _calcWhitespaceIndent(line);
 
@@ -196,19 +225,22 @@ static void _appendUnindenttedLine(const UnownedStringSlice& line, Index maxInde
     out.append(line.tail(indent));
 }
 
-SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out)
+SlangResult DocMarkupExtractor::_extractMarkup(
+    const FindInfo& info,
+    const FoundMarkup& foundMarkup,
+    StringBuilder& out)
 {
     SourceView* sourceView = info.sourceView;
     SourceFile* sourceFile = sourceView->getSourceFile();
 
     // Here we want to produce the text that is implied by the markup tokens.
     // We want to removing surrounding markup, and to also keep appropriate indentation
-    
+
     switch (foundMarkup.type)
     {
-        case MarkupType::BlockBefore:
-        case MarkupType::BlockAfter:
-        case MarkupType::OrdinaryBlockBefore:
+    case MarkupType::BlockBefore:
+    case MarkupType::BlockAfter:
+    case MarkupType::OrdinaryBlockBefore:
         {
             // We should only have a single line
             SLANG_ASSERT(foundMarkup.range.getCount() == 1);
@@ -239,9 +271,10 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
                 {
                     if (startLine.isMemoryContained(line.begin()))
                     {
-                        // For now we'll ignore tabs, and that the indent amount is, the amount of *byte*
-                        // NOTE! This is only appropriate for ASCII without tabs.
-                        maxIndent = _calcIndent(UnownedStringSlice(startLine.begin(), line.begin()));
+                        // For now we'll ignore tabs, and that the indent amount is, the amount of
+                        // *byte* NOTE! This is only appropriate for ASCII without tabs.
+                        maxIndent =
+                            _calcIndent(UnownedStringSlice(startLine.begin(), line.begin()));
 
                         // Let's strip the start stuff
                         line = removeStart(foundMarkup.type, line);
@@ -250,7 +283,8 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
 
                 if (i == linesCount - 1)
                 {
-                    SLANG_ASSERT(line.tail(line.getLength() - 2) == UnownedStringSlice::fromLiteral("*/"));
+                    SLANG_ASSERT(
+                        line.tail(line.getLength() - 2) == UnownedStringSlice::fromLiteral("*/"));
                     // Remove the */ at the end of the line
                     line = line.head(line.getLength() - 2);
                 }
@@ -263,9 +297,10 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
                 {
                     unindentedLine.append(line);
                 }
-                
+
                 // If the first or last line are all white space, just ignore them
-                if ((i == linesCount - 1 || i == 0) && unindentedLine.getUnownedSlice().trim().getLength() == 0)
+                if ((i == linesCount - 1 || i == 0) &&
+                    unindentedLine.getUnownedSlice().trim().getLength() == 0)
                 {
                     continue;
                 }
@@ -276,18 +311,19 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
 
             break;
         }
-        case MarkupType::OrdinaryLineBefore:
-        case MarkupType::OrdinaryLineAfter:
-        case MarkupType::LineBangBefore:      
-        case MarkupType::LineSlashBefore:
-        case MarkupType::LineBangAfter:
-        case MarkupType::LineSlashAfter:
+    case MarkupType::OrdinaryLineBefore:
+    case MarkupType::OrdinaryLineAfter:
+    case MarkupType::LineBangBefore:
+    case MarkupType::LineSlashBefore:
+    case MarkupType::LineBangAfter:
+    case MarkupType::LineSlashAfter:
         {
-            // Holds the lines extracted, they may have some white space indenting (like the space at the start of //) 
+            // Holds the lines extracted, they may have some white space indenting (like the space
+            // at the start of //)
             List<UnownedStringSlice> lines;
 
             const auto& range = foundMarkup.range;
-            for (Index i = range.start; i < range.end; ++ i)
+            for (Index i = range.start; i < range.end; ++i)
             {
                 const auto& tok = info.tokenList->m_tokens[i];
                 UnownedStringSlice line = tok.getContent();
@@ -322,7 +358,8 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
 
             break;
         }
-        default:    return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     return SLANG_OK;
@@ -344,22 +381,24 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
         switch (tok.type)
         {
-            case TokenType::LBrace:
-            case TokenType::LBracket:
-            case TokenType::LParent:
-            case TokenType::OpLess:
+        case TokenType::LBrace:
+        case TokenType::LBracket:
+        case TokenType::LParent:
+        case TokenType::OpLess:
             {
                 openCount += direction;
-                if (openCount < 0) return -1;
+                if (openCount < 0)
+                    return -1;
                 break;
             }
-            case TokenType::RBracket:
+        case TokenType::RBracket:
             {
                 openCount -= direction;
-                if (openCount < 0) return -1;
+                if (openCount < 0)
+                    return -1;
                 break;
             }
-            case TokenType::OpGreater:
+        case TokenType::OpGreater:
             {
                 if (location == Location::AfterGenericParam && openCount == 0)
                 {
@@ -367,11 +406,12 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
 
                 openCount -= direction;
-                if (openCount < 0) return -1;
+                if (openCount < 0)
+                    return -1;
 
                 break;
             }
-            case TokenType::RParent:
+        case TokenType::RParent:
             {
                 if (openCount == 0 && location == Location::AfterParam)
                 {
@@ -379,10 +419,11 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
 
                 openCount -= direction;
-                if (openCount < 0) return -1;
+                if (openCount < 0)
+                    return -1;
                 break;
             }
-            case TokenType::RBrace:
+        case TokenType::RBrace:
             {
                 // If we haven't hit a candidate yet before hitting } it's not going to work
                 if (location == Location::Before || location == Location::AfterEnumCase)
@@ -391,8 +432,8 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
-            case TokenType::BlockComment:
-            case TokenType::LineComment:
+        case TokenType::BlockComment:
+        case TokenType::LineComment:
             {
                 if (openCount == 0)
                 {
@@ -407,7 +448,8 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                     {
                         return i;
                     }
-                    // If we are looking for enum cases, and the markup is after, we'll assume this is it
+                    // If we are looking for enum cases, and the markup is after, we'll assume this
+                    // is it
                     if (isAfter(location) && isAfter(markupType))
                     {
                         return i;
@@ -415,11 +457,12 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
-            case TokenType::Comma:
+        case TokenType::Comma:
             {
                 if (openCount == 0)
-                {   
-                    if (location == Location::AfterParam || location == Location::AfterEnumCase || location == Location::AfterGenericParam)
+                {
+                    if (location == Location::AfterParam || location == Location::AfterEnumCase ||
+                        location == Location::AfterGenericParam)
                     {
                         return i + 1;
                     }
@@ -432,7 +475,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
                 break;
             }
-            case TokenType::Semicolon:
+        case TokenType::Semicolon:
             {
                 // If we haven't hit a candidate yet it's not going to work
                 if (location == Location::Before)
@@ -445,14 +488,19 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
-            default: break;
+        default:
+            break;
         }
     }
 
     return -1;
 }
 
-/* static */bool DocMarkupExtractor::_isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex)
+/* static */ bool DocMarkupExtractor::_isTokenOnLineIndex(
+    SourceView* sourceView,
+    MarkupType type,
+    const Token& tok,
+    Index lineIndex)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
     const int offset = sourceView->getRange().getOffset(tok.loc);
@@ -462,7 +510,8 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
     if (flags & MarkupFlag::IsBlock)
     {
         // Either the start or the end of the block have to be on the specified line
-        return sourceFile->isOffsetOnLine(offset, lineIndex) || sourceFile->isOffsetOnLine(offset + tok.charsCount, lineIndex);
+        return sourceFile->isOffsetOnLine(offset, lineIndex) ||
+               sourceFile->isOffsetOnLine(offset + tok.charsCount, lineIndex);
     }
     else
     {
@@ -471,12 +520,15 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
     }
 }
 
-SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location location, FoundMarkup& out)
+SlangResult DocMarkupExtractor::_findMarkup(
+    const FindInfo& info,
+    Location location,
+    FoundMarkup& out)
 {
     out.reset();
 
     const auto& toks = info.tokenList->m_tokens;
-    
+
     // The starting token index
     Index startIndex = _findStartIndex(info, location);
     if (startIndex <= 0)
@@ -490,7 +542,7 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
     // Let's lookup the line index where this occurred
     const int startOffset = sourceView->getRange().getOffset(toks[startIndex].loc);
 
-    // The line index that the markoff starts from 
+    // The line index that the markoff starts from
     Index lineIndex = sourceFile->calcLineIndexFromOffset(startOffset);
     if (lineIndex < 0)
     {
@@ -498,12 +550,13 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
     }
 
     const Index searchDirection = isBefore(location) ? -1 : 1;
-    
+
     // Get the type and flags
     const MarkupType type = findMarkupType(toks[startIndex]);
     const MarkupFlags flags = getFlags(type);
 
-    const MarkupFlag::Enum requiredFlag = isBefore(location) ? MarkupFlag::Before : MarkupFlag::After;
+    const MarkupFlag::Enum requiredFlag =
+        isBefore(location) ? MarkupFlag::Before : MarkupFlag::After;
     if ((flags & requiredFlag) == 0)
     {
         return SLANG_E_NOT_FOUND;
@@ -567,14 +620,19 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
     // Okay we've found the markup
     out.type = type;
     out.location = location;
-    out.range = IndexRange{ startIndex, endIndex };
+    out.range = IndexRange{startIndex, endIndex};
 
     SLANG_ASSERT(out.range.getCount() > 0);
 
     return SLANG_OK;
 }
 
-SlangResult DocMarkupExtractor::_findFirstMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out, Index& outIndex)
+SlangResult DocMarkupExtractor::_findFirstMarkup(
+    const FindInfo& info,
+    const Location* locs,
+    Index locCount,
+    FoundMarkup& out,
+    Index& outIndex)
 {
     Index i = 0;
     for (; i < locCount; ++i)
@@ -589,7 +647,11 @@ SlangResult DocMarkupExtractor::_findFirstMarkup(const FindInfo& info, const Loc
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out)
+SlangResult DocMarkupExtractor::_findMarkup(
+    const FindInfo& info,
+    const Location* locs,
+    Index locCount,
+    FoundMarkup& out)
 {
     Index foundIndex;
     SLANG_RETURN_ON_FAIL(_findFirstMarkup(info, locs, locCount, out, foundIndex));
@@ -611,53 +673,59 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, const Location
 }
 
 
-SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle searchStyle, FoundMarkup& out)
+SlangResult DocMarkupExtractor::_findMarkup(
+    const FindInfo& info,
+    SearchStyle searchStyle,
+    FoundMarkup& out)
 {
     switch (searchStyle)
     {
-        default:
-        case SearchStyle::None:
+    default:
+    case SearchStyle::None:
         {
             return SLANG_E_NOT_FOUND;
         }
-        case SearchStyle::EnumCase:
+    case SearchStyle::EnumCase:
         {
-            Location locs[] = { Location::Before, Location::AfterEnumCase };
+            Location locs[] = {Location::Before, Location::AfterEnumCase};
             return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
         }
-        case SearchStyle::Param:
+    case SearchStyle::Param:
         {
-            Location locs[] = { Location::Before, Location::AfterParam };
+            Location locs[] = {Location::Before, Location::AfterParam};
             return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
         }
-        case SearchStyle::Before:
+    case SearchStyle::Before:
         {
             return _findMarkup(info, Location::Before, out);
         }
-        case SearchStyle::Function:
+    case SearchStyle::Function:
         {
             return _findMarkup(info, Location::Before, out);
         }
-        case SearchStyle::Attribute:
+    case SearchStyle::Attribute:
         {
             FindInfo newInfo = info;
             newInfo.tokenIndex -= 2;
             return _findMarkup(newInfo, Location::Before, out);
         }
-        case SearchStyle::Variable:
+    case SearchStyle::Variable:
         {
-            Location locs[] = { Location::Before, Location::AfterSemicolon };
+            Location locs[] = {Location::Before, Location::AfterSemicolon};
             return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
         }
-        case SearchStyle::GenericParam:
+    case SearchStyle::GenericParam:
         {
-            Location locs[] = { Location::Before, Location::AfterGenericParam };
+            Location locs[] = {Location::Before, Location::AfterGenericParam};
             return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
         }
     }
 }
 
-static void _calcLineVisibility(SourceView* sourceView, const TokenList& toks, List<MarkupVisibility>& outLineVisibility)
+static void _calcLineVisibility(
+    SourceView* sourceView,
+    const TokenList& toks,
+    List<MarkupVisibility>& outLineVisibility)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
     const auto& lineOffsets = sourceFile->getLineBreakOffsets();
@@ -713,21 +781,27 @@ static void _calcLineVisibility(SourceView* sourceView, const TokenList& toks, L
     }
 
     // Fill in the remaining
-    for (Index i = lastLine; i < outLineVisibility.getCount(); ++ i)
+    for (Index i = lastLine; i < outLineVisibility.getCount(); ++i)
     {
         outLineVisibility[i] = lastVisibility;
     }
 }
 
-SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inputCount, SourceManager* sourceManager, DiagnosticSink* sink, List<SourceView*>& outViews, List<SearchItemOutput>& out)
+SlangResult DocMarkupExtractor::extract(
+    const SearchItemInput* inputs,
+    Index inputCount,
+    SourceManager* sourceManager,
+    DiagnosticSink* sink,
+    List<SourceView*>& outViews,
+    List<SearchItemOutput>& out)
 {
     struct Entry
     {
-        Index viewIndex;                    ///< The view/file index this loc is found in
-        SourceLoc::RawValue locOrOffset;    ///< Can be a loc or an offset into the file
+        Index viewIndex;                 ///< The view/file index this loc is found in
+        SourceLoc::RawValue locOrOffset; ///< Can be a loc or an offset into the file
 
-        SearchStyle searchStyle;            ///< The search style when looking for an item
-        Index inputIndex;                   ///< The index to this item in the input
+        SearchStyle searchStyle; ///< The search style when looking for an item
+        Index inputIndex;        ///< The index to this item in the input
     };
 
     List<Entry> entries;
@@ -739,14 +813,15 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
             const auto& input = inputs[i];
             Entry& entry = entries[i];
             entry.inputIndex = i;
-            entry.viewIndex = -1;            //< We don't know what file/view it's in
+            entry.viewIndex = -1; //< We don't know what file/view it's in
             entry.locOrOffset = input.sourceLoc.getRaw();
             entry.searchStyle = input.searchStyle;
         }
     }
 
     // Sort them into loc order
-    entries.sort([](const Entry& a, const Entry& b) -> bool { return a.locOrOffset < b.locOrOffset; });
+    entries.sort(
+        [](const Entry& a, const Entry& b) -> bool { return a.locOrOffset < b.locOrOffset; });
 
     {
         SourceView* sourceView = nullptr;
@@ -774,8 +849,10 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
                 // We want only one view per SourceFile
                 SourceFile* sourceFile = sourceView->getSourceFile();
 
-                // NOTE! The view found might be different than sourceView. 
-                viewIndex = outViews.findFirstIndex([&](SourceView* currentView) -> bool { return currentView->getSourceFile() == sourceFile; });
+                // NOTE! The view found might be different than sourceView.
+                viewIndex = outViews.findFirstIndex(
+                    [&](SourceView* currentView) -> bool
+                    { return currentView->getSourceFile() == sourceFile; });
 
                 if (viewIndex < 0)
                 {
@@ -789,12 +866,17 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
             // Set the file index
             entry.viewIndex = viewIndex;
-            // Set as the offset within the file 
+            // Set as the offset within the file
             entry.locOrOffset = sourceView->getRange().getOffset(loc);
         }
 
         // Sort into view/file and then offset order
-        entries.sort([](const Entry& a, const Entry& b) -> bool { return (a.viewIndex < b.viewIndex) || ((a.viewIndex == b.viewIndex) && a.locOrOffset < b.locOrOffset); });
+        entries.sort(
+            [](const Entry& a, const Entry& b) -> bool
+            {
+                return (a.viewIndex < b.viewIndex) ||
+                       ((a.viewIndex == b.viewIndex) && a.locOrOffset < b.locOrOffset);
+            });
     }
 
     {
@@ -854,7 +936,8 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
             // Get the offset within the source file
             const uint32_t offset = entry.locOrOffset;
 
-            // We need to get the loc in the source views space, so we look up appropriately in the list of tokens (which uses the views loc range)
+            // We need to get the loc in the source views space, so we look up appropriately in the
+            // list of tokens (which uses the views loc range)
             const SourceLoc loc = sourceView->getRange().getSourceLocFromOffset(offset);
 
             // Work out the line number
@@ -864,7 +947,8 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
             dst.visibilty = lineVisibility[lineIndex];
 
             // Okay, lets find the token index with a binary chop
-            Index tokenIndex = _findTokenIndex(loc, tokens.m_tokens.getBuffer(), tokens.m_tokens.getCount());
+            Index tokenIndex =
+                _findTokenIndex(loc, tokens.m_tokens.getBuffer(), tokens.m_tokens.getCount());
             if (tokenIndex >= 0 && lineIndex >= 0)
             {
                 FindInfo findInfo;
@@ -885,7 +969,6 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
                     // Save the extracted text in the output
                     dst.text = buf;
-
                 }
                 else if (res != SLANG_E_NOT_FOUND)
                 {

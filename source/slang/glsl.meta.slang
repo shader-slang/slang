@@ -146,6 +146,8 @@ public in int gl_SampleID : SV_SampleIndex;
 public in int gl_VertexIndex : SV_VertexID;
 public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
+public in int gl_BaseVertex : SV_StartVertexLocation;
+public in int gl_BaseInstance : SV_StartInstanceLocation;
 
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
@@ -1153,168 +1155,6 @@ public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public int bitfieldExtract(int value, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldExtract";
-    case spirv: return spirv_asm {
-        result:$$int = OpBitFieldSExtract $value $offset $bits
-    };
-    default:
-        return int(uint(value >> offset) & ((1u << bits) - 1));
-    }
-}
-
-__generic<let N:int>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public vector<int,N> bitfieldExtract(vector<int,N> value, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldExtract";
-    case spirv: return spirv_asm {
-        result:$$vector<int,N> = OpBitFieldSExtract $value $offset $bits
-    };
-    default:
-        vector<int,N> result;
-        [ForceUnroll]
-        for (int i = 0; i < N; ++i)
-        {
-            result[i] = bitfieldExtract(value[i], offset, bits);
-        }
-        return result;
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public uint bitfieldExtract(uint value, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldExtract";
-    case spirv: return spirv_asm {
-        result:$$uint = OpBitFieldUExtract $value $offset $bits
-    };
-    default:
-        return (value >> offset) & ((1u << bits) - 1);
-    }
-}
-
-__generic<let N:int>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public vector<uint,N> bitfieldExtract(vector<uint,N> value, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldExtract";
-    case spirv: return spirv_asm {
-        result:$$vector<uint,N> = OpBitFieldUExtract $value $offset $bits
-    };
-    default:
-        vector<uint,N> result;
-        [ForceUnroll]
-        for (int i = 0; i < N; ++i)
-        {
-            result[i] = bitfieldExtract(value[i], offset, bits);
-        }
-        return result;
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public uint bitfieldInsert(uint base, uint insert, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldInsert";
-    case spirv: return spirv_asm {
-        result:$$uint = OpBitFieldInsert $base $insert $offset $bits
-    };
-    default:
-        uint clearMask = ~(((1u << bits) - 1u) << offset);
-        uint clearedBase = base & clearMask;
-        uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
-        return clearedBase | maskedInsert;
-    }
-}
-
-__generic<let N:int>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public vector<uint,N> bitfieldInsert(vector<uint,N> base, vector<uint,N> insert, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldInsert";
-    case spirv: return spirv_asm {
-        result:$$vector<uint,N> = OpBitFieldInsert $base $insert $offset $bits
-    };
-    default:
-        vector<uint,N> result;
-        [ForceUnroll]
-        for (int i = 0; i < N; ++i)
-        {
-            result[i] = bitfieldInsert(base[i], insert[i], offset, bits);
-        }
-        return result;
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public int bitfieldInsert(int base, int insert, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldInsert";
-    case spirv: return spirv_asm {
-        result:$$int = OpBitFieldInsert $base $insert $offset $bits
-    };
-    default:
-        uint clearMask = ~(((1u << bits) - 1u) << offset);
-        uint clearedBase = base & clearMask;
-        uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
-        return clearedBase | maskedInsert;
-    }
-}
-
-__generic<let N:int>
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
-public vector<int,N> bitfieldInsert(vector<int,N> base, vector<int,N> insert, int offset, int bits)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "bitfieldInsert";
-    case spirv: return spirv_asm {
-        result:$$vector<int,N> = OpBitFieldInsert $base $insert $offset $bits
-    };
-    default:
-        vector<int,N> result;
-        [ForceUnroll]
-        for (int i = 0; i < N; ++i)
-        {
-            result[i] = bitfieldInsert(base[i], insert[i], offset, bits);
-        }
-        return result;
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
 public int bitfieldReverse(highp int value)
 {
     __target_switch
@@ -1535,7 +1375,7 @@ public typealias isamplerCube = SamplerCube<int4>;
 public typealias samplerCube = SamplerCube<float4>;
 
 __generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler1DShadow = __TextureImpl<
+public typealias sampler1DShadow = _Texture<
     float,
     __Shape1D,
     0, // isArray
@@ -1548,7 +1388,7 @@ public typealias sampler1DShadow = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler2DShadow = __TextureImpl<
+public typealias sampler2DShadow = _Texture<
     float,
     __Shape2D,
     0, // isArray
@@ -1561,7 +1401,7 @@ public typealias sampler2DShadow = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-public typealias samplerCubeShadow = __TextureImpl<
+public typealias samplerCubeShadow = _Texture<
     float,
     __ShapeCube,
     0, // isArray
@@ -1586,7 +1426,7 @@ public typealias isamplerCubeArray = SamplerCubeArray<int4>;
 public typealias samplerCubeArray = SamplerCubeArray<float4>;
 
 __generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler1DArrayShadow = __TextureImpl<
+public typealias sampler1DArrayShadow = _Texture<
     float,
     __Shape1D,
     1, // isArray
@@ -1599,7 +1439,7 @@ public typealias sampler1DArrayShadow = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler2DArrayShadow = __TextureImpl<
+public typealias sampler2DArrayShadow = _Texture<
     float,
     __Shape2D,
     1, // isArray
@@ -1612,7 +1452,7 @@ public typealias sampler2DArrayShadow = __TextureImpl<
 >;
 
 __generic<let sampleCount:int=0, let format:int=0>
-public typealias samplerCubeArrayShadow = __TextureImpl<
+public typealias samplerCubeArrayShadow = _Texture<
     float,
     __ShapeCube,
     1, // isArray
@@ -1633,13 +1473,13 @@ public typealias isampler2DMSArray = Sampler2DMSArray<int4>;
 public typealias usampler2DMSArray = Sampler2DMSArray<uint4>;
 
 __generic<T=float4, let sampleCount:int=0, let format:int=0>
-public typealias Sampler2DRect = __TextureImpl<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format>;
+public typealias Sampler2DRect = _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format>;
 public typealias sampler2DRect = Sampler2DRect<float4>;
 public typealias isampler2DRect = Sampler2DRect<int4>;
 public typealias usampler2DRect = Sampler2DRect<uint4>;
 
 __generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler2DRectShadow = __TextureImpl<
+public typealias sampler2DRectShadow = _Texture<
     float,
     __Shape2D,
     0, // isArray
@@ -1652,7 +1492,7 @@ public typealias sampler2DRectShadow = __TextureImpl<
 >;
 
 __generic<T, let format:int=0>
-public typealias SamplerBuffer = __TextureImpl<
+public typealias SamplerBuffer = _Texture<
     T,
     __ShapeBuffer,
     0, // isArray
@@ -1871,7 +1711,7 @@ public ivec3 textureSize(Sampler2DMSArray<vector<T,N>,sampleCount> sampler)
 __generic<T, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, texture_querylod)]
-public vec2 textureQueryLod(__TextureImpl<
+public vec2 textureQueryLod(_Texture<
         T,
         __Shape1D,
         isArray,
@@ -1904,7 +1744,7 @@ public vec2 textureQueryLod(__TextureImpl<
 __generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, texture_querylod)]
-public vec2 textureQueryLod(__TextureImpl<
+public vec2 textureQueryLod(_Texture<
         T,
         Shape,
         isArray,
@@ -2130,7 +1970,7 @@ public vector<T,4> texture(Sampler1D<vector<T,N>> sampler, float p, constexpr fl
 __generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T,4> texture(__TextureImpl<
+public vector<T,4> texture(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -2148,7 +1988,7 @@ public vector<T,4> texture(__TextureImpl<
 __generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T,4> texture(__TextureImpl<
+public vector<T,4> texture(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -2566,7 +2406,7 @@ public vector<T,4> textureLod(Sampler1D<vector<T,N>> sampler, float p, float lod
 __generic<T:__BuiltinArithmeticType, let N:int, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T,4> textureLod(__TextureImpl<
+public vector<T,4> textureLod(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -2814,7 +2654,7 @@ public vector<T,4> texelFetch(Sampler1D<vector<T,N>> sampler, int p, int lod)
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
-public vector<T,4> texelFetch(__TextureImpl<
+public vector<T,4> texelFetch(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -2848,7 +2688,7 @@ public vector<T,4> texelFetch(SamplerBuffer<vector<T,N>,format> sampler, int p)
 __generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
-public vector<T,4> texelFetch(__TextureImpl<
+public vector<T,4> texelFetch(_Texture<
         vector<T,N>,
         __Shape2D,
         isArray,
@@ -2884,7 +2724,7 @@ public vector<T,4> texelFetchOffset(Sampler1D<vector<T,N>> sampler, int p, int l
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
-public vector<T,4> texelFetchOffset(__TextureImpl<
+public vector<T,4> texelFetchOffset(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -3196,7 +3036,7 @@ public vector<T,4> textureLodOffset(Sampler1D<vector<T,N>> sampler, float p, flo
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0)]
-public vector<T,4> textureLodOffset(__TextureImpl<
+public vector<T,4> textureLodOffset(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -3551,7 +3391,7 @@ public vector<T,4> textureGrad(Sampler1D<vector<T,N>> sampler, float p, float dP
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
-public vector<T,4> textureGrad(__TextureImpl<
+public vector<T,4> textureGrad(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -3666,7 +3506,7 @@ public vector<T,4> textureGradOffset(Sampler1D<vector<T,N>> sampler, float p, fl
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 [ForceInline]
-public vector<T,4> textureGradOffset(__TextureImpl<
+public vector<T,4> textureGradOffset(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -4024,7 +3864,7 @@ public float textureProjGradOffset(sampler2DShadow sampler, vec4 p, vec2 dPdx, v
 __generic<T:__BuiltinArithmeticType, let N:int, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vector<T,4> textureGather(__TextureImpl<
+public vector<T,4> textureGather(_Texture<
         vector<T,N>,
         Shape,
         isArray,
@@ -4048,7 +3888,7 @@ public vector<T,4> textureGather(__TextureImpl<
 __generic<Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vec4 textureGather(__TextureImpl<
+public vec4 textureGather(_Texture<
         float,
         Shape,
         isArray,
@@ -4070,7 +3910,7 @@ public vec4 textureGather(__TextureImpl<
 __generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vector<T,4> textureGatherOffset(__TextureImpl<
+public vector<T,4> textureGatherOffset(_Texture<
         vector<T,N>,
         __Shape2D,
         isArray,
@@ -4094,7 +3934,7 @@ public vector<T,4> textureGatherOffset(__TextureImpl<
 __generic<let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vec4 textureGatherOffset(__TextureImpl<
+public vec4 textureGatherOffset(_Texture<
         float,
         __Shape2D,
         isArray,
@@ -4116,7 +3956,7 @@ public vec4 textureGatherOffset(__TextureImpl<
 __generic<T:__BuiltinArithmeticType, let N:int, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vector<T,4> textureGatherOffsets(__TextureImpl<
+public vector<T,4> textureGatherOffsets(_Texture<
         vector<T,N>,
         __Shape2D,
         isArray,
@@ -4140,7 +3980,7 @@ public vector<T,4> textureGatherOffsets(__TextureImpl<
 __generic<let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_gather)]
-public vec4 textureGatherOffsets(__TextureImpl<
+public vec4 textureGatherOffsets(_Texture<
         float,
         __Shape2D,
         isArray,
@@ -4574,7 +4414,7 @@ ${{{{
     }}}}
 
         __generic<let format:int=0>
-        public typealias $(fullTypeName) = __TextureImpl<
+        public typealias $(fullTypeName) = _Texture<
             $(targetType.type),
             $(targetShape.shape),
             $(targetShape.isArray), // isArray
@@ -9601,3 +9441,14 @@ public bool allInvocationsEqual(bool value)
 {
     return WaveActiveAllEqual(value);
 }
+
+
+/// extensions
+/// https://github.com/KhronosGroup/GLSL/blob/main/extensions/ext/GL_EXT_nonuniform_qualifier.txt
+
+__generic<T:__BuiltinArithmeticType>
+__intrinsic_op($(kIROp_NonUniformResourceIndex))
+[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
+public T nonuniformEXT(T index);
+
+

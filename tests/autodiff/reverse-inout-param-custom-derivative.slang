@@ -5,7 +5,7 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-float rng(inout int state, float x)
+float rng(int state, float x)
 {
     return state + x;
 }

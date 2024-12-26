@@ -5,7 +5,9 @@ namespace Slang
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringSliceIndexMap !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-StringSliceIndexMap::CountIndex StringSliceIndexMap::add(const UnownedStringSlice& key, Index valueIndex)
+StringSliceIndexMap::CountIndex StringSliceIndexMap::add(
+    const UnownedStringSlice& key,
+    Index valueIndex)
 {
     StringSlicePool::Handle handle;
     m_pool.findOrAdd(key, handle);
@@ -22,7 +24,9 @@ StringSliceIndexMap::CountIndex StringSliceIndexMap::add(const UnownedStringSlic
     return countIndex;
 }
 
-StringSliceIndexMap::CountIndex StringSliceIndexMap::findOrAdd(const UnownedStringSlice& key, Index defaultValueIndex)
+StringSliceIndexMap::CountIndex StringSliceIndexMap::findOrAdd(
+    const UnownedStringSlice& key,
+    Index defaultValueIndex)
 {
     StringSlicePool::Handle handle;
     m_pool.findOrAdd(key, handle);

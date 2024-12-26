@@ -17,7 +17,8 @@ public:
 public:
     IResourceView* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    getNativeHandle(InteropHandle* outNativeHandle) override;
 };
 
 class DebugAccelerationStructure : public DebugObject<IAccelerationStructure>
@@ -29,7 +30,7 @@ public:
     IAccelerationStructure* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeHandle(InteropHandle* outNativeHandle) override;
+    getNativeHandle(InteropHandle* outNativeHandle) override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override;
 };
 

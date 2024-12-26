@@ -3,29 +3,25 @@
 #define SLANG_EMIT_PRECEDENCE_H_INCLUDED
 
 #include "../core/slang-basic.h"
-
 #include "slang-ir.h"
 
 namespace Slang
 {
 
 // Macros for setting up precedence
-#define SLANG_PRECEDENCE_LEFT(NAME)                      \
-    kEPrecedence_##NAME##_Left,     \
-    kEPrecedence_##NAME##_Right,
+#define SLANG_PRECEDENCE_LEFT(NAME) kEPrecedence_##NAME##_Left, kEPrecedence_##NAME##_Right,
 
-#define SLANG_PRECEDENCE_RIGHT(NAME)                     \
-    kEPrecedence_##NAME##_Right,    \
-    kEPrecedence_##NAME##_Left,
+#define SLANG_PRECEDENCE_RIGHT(NAME) kEPrecedence_##NAME##_Right, kEPrecedence_##NAME##_Left,
 
-#define SLANG_PRECEDENCE_NON_ASSOC(NAME)                  \
-    kEPrecedence_##NAME##_Left,     \
-    kEPrecedence_##NAME##_Right = kEPrecedence_##NAME##_Left,
+#define SLANG_PRECEDENCE_NON_ASSOC(NAME) \
+    kEPrecedence_##NAME##_Left, kEPrecedence_##NAME##_Right = kEPrecedence_##NAME##_Left,
 
 #define SLANG_PRECEDENCE_EXPAND(NAME, ASSOC) SLANG_PRECEDENCE_##ASSOC(NAME)
 
 // x macro of precedence of types in order.
-// Used because in header, need to prefix macros to avoid clashes, and this style allows for prefixing without additional clutter
+// Used because in header, need to prefix macros to avoid clashes, and this style allows for
+// prefixing without additional clutter
+// clang-format off
 #define SLANG_PRECEDENCE(x) \
     x(None,         NON_ASSOC) \
     x(Comma,        LEFT) \
@@ -50,6 +46,7 @@ namespace Slang
     x(Prefix,       RIGHT) \
     x(Postfix,      LEFT) \
     x(Atomic,       NON_ASSOC)
+// clang-format on
 
 // Precedence enum produced from the SLANG_PRECEDENCE macro
 enum EPrecedence
@@ -59,6 +56,7 @@ enum EPrecedence
 
 // Macro for define OpInfo and an associated enum type. Order or macro parameters is
 // Op, OpName, Precedence
+// clang-format off
 #define SLANG_OP_INFO(x) \
     x(None, "", None) \
     \
@@ -111,13 +109,13 @@ enum EPrecedence
     x(Not, "!", Prefix) \
     x(Neg, "-", Prefix) \
     x(BitNot, "~", Prefix)
+// clang-format on
 
 #define SLANG_OP_INFO_ENUM(op, name, precedence) op,
 
 enum class EmitOp
 {
-    SLANG_OP_INFO(SLANG_OP_INFO_ENUM)
-    CountOf,
+    SLANG_OP_INFO(SLANG_OP_INFO_ENUM) CountOf,
 };
 
 // Info on an op for emit purposes
@@ -132,7 +130,10 @@ struct EmitOpInfo
     static const EmitOpInfo s_infos[int(EmitOp::CountOf)];
 };
 
-SLANG_FORCE_INLINE const EmitOpInfo& getInfo(EmitOp op) { return EmitOpInfo::s_infos[int(op)]; }
+SLANG_FORCE_INLINE const EmitOpInfo& getInfo(EmitOp op)
+{
+    return EmitOpInfo::s_infos[int(op)];
+}
 
 SLANG_INLINE EmitOpInfo leftSide(EmitOpInfo const& outerPrec, EmitOpInfo const& prec)
 {
@@ -160,5 +161,5 @@ EmitOp getEmitOpForOp(IROp op);
 #undef SLANG_PRECEDENCE_RIGHT
 #undef SLANG_PRECEDENCE_LEFT
 
-}
+} // namespace Slang
 #endif

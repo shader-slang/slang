@@ -30,7 +30,7 @@ The following are a work in progress or not implemented but are planned to be so
 
 For producing PTX binaries Slang uses [NVRTC](https://docs.nvidia.com/cuda/nvrtc/index.html). NVRTC dll/shared library has to be available to Slang (for example in the appropriate PATH for example) for it to be able to produce PTX.
 
-The NVRTC compiler can be accessed directly via the pass through mechanism and is identifed by the enum value `SLANG_PASS_THROUGH_NVRTC`.
+The NVRTC compiler can be accessed directly via the pass through mechanism and is identified by the enum value `SLANG_PASS_THROUGH_NVRTC`.
 
 Much like other targets that use downstream compilers Slang can be used to compile CUDA source directly to PTX via the pass through mechansism. The Slang command line options will broadly be mapped down to the appropriate options for the NVRTC compilation. In the API the `SlangCompileTarget` for CUDA is `SLANG_CUDA_SOURCE` and for PTX is `SLANG_PTX`. These can also be specified on the Slang command line as `-target cuda` and `-target ptx`.
 
@@ -126,11 +126,11 @@ The UniformState and UniformEntryPointParams struct typically vary by shader. Un
 
 Read only textures will be bound as the opaque CUDA type CUtexObject. This type is the combination of both a texture AND a sampler. This is somewhat different from HLSL, where there can be separate `SamplerState` variables. This allows access of a single texture binding with different types of sampling.
 
-If code relys on this behavior it will be necessary to bind multiple CtexObjects with different sampler settings, accessing the same texture data.
+If code relies on this behavior it will be necessary to bind multiple CtexObjects with different sampler settings, accessing the same texture data.
 
 Slang has some preliminary support for TextureSampler type - a combined Texture and SamplerState. To write Slang code that can target CUDA and other platforms using this mechanism will expose the semantics appropriately within the source.
 
-Load is only supported for Texture1D, and the mip map selection argument is ignored. This is because there is tex1Dfetch and no higher dimensional equivalents. CUDA also only allows such access if the backing array is linear memory - meaning the bound texture cannot have mip maps - thus making the mip map parameter superflous anyway. RWTexture does allow Load on other texture types.
+Load is only supported for Texture1D, and the mip map selection argument is ignored. This is because there is tex1Dfetch and no higher dimensional equivalents. CUDA also only allows such access if the backing array is linear memory - meaning the bound texture cannot have mip maps - thus making the mip map parameter superfluous anyway. RWTexture does allow Load on other texture types.
 
 ## RWTexture
 
@@ -145,7 +145,7 @@ RWTexture2D<float2> rwt2D_2;
 
 The format names used are the same as for [GLSL layout format types](https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)). If no format is specified Slang will *assume* that the format is the same as the type specified.
 
-Note that the format attribution is on variables/paramters/fields and not part of the type system. This means that if you have a scenario like...
+Note that the format attribution is on variables/parameters/fields and not part of the type system. This means that if you have a scenario like...
 
 ```
 [format(rg16f)]
@@ -239,7 +239,7 @@ That for pass-through usage, prelude is not pre-pended, preludes are for code ge
 void setDownstreamCompilerPrelude(SlangPassThrough passThrough, const char* preludeText);
 ```
 
-The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
+The code that sets up the prelude for the test infrastructure and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
 Half Support
 ============
@@ -256,7 +256,7 @@ If this fails - the prelude include of `cuda_fp16.h` will most likely fail on NV
 
 CUDA has the `__half` and `__half2` types defined in `cuda_fp16.h`. The `__half2` can produce results just as quickly as doing the same operation on `__half` - in essence for some operations `__half2` is [SIMD](https://en.wikipedia.org/wiki/SIMD) like. The half implementation in Slang tries to take advantage of this optimization.
 
-Since Slang supports up to 4 wide vectors Slang has to build on CUDAs half support. The types _`_half3` and `__half4` are implemented in `slang-cuda-prelude.h` for this reason. It is worth noting that `__half3` is made up of a `__half2` and a `__half`. As `__half2` is 4 byte aligned, this means `__half3` is actually 8 bytes, rather than 6 bytes that might be expected.
+Since Slang supports up to 4 wide vectors Slang has to build on CUDAs half support. The types `__half3` and `__half4` are implemented in `slang-cuda-prelude.h` for this reason. It is worth noting that `__half3` is made up of a `__half2` and a `__half`. As `__half2` is 4 byte aligned, this means `__half3` is actually 8 bytes, rather than 6 bytes that might be expected.
 
 One area where this optimization isn't fully used is in comparisons - as in effect Slang treats all the vector/matrix half comparisons as if they are scalar. This could be perhaps be improved on in the future. Doing so would require using features that are not directly available in the CUDA headers.
 
@@ -265,9 +265,9 @@ Wave Intrinsics
 
 There is broad support for [HLSL Wave intrinsics](https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12), including support for [SM 6.5 intrinsics](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_ShaderModel6_5.html).
 
-Most Wave intrinsics will work with vector, matrix or scalar types of typical built in types - uint, int, float, double, uint64_t, int64_t.
+Most Wave intrinsics will work with vector, matrix or scalar types of typical built in types - `uint`, `int`, `float`, `double`, `uint64_t`, `int64_t`.
 
-The support is provided via both the Slang stdlib as well as the Slang CUDA prelude found in 'prelude/slang-cuda-prelude.h'. Many Wave intrinsics are not directly applicable within CUDA which supplies a more low level mechanisms. The implementation of most Wave functions work most optimally if a 'Wave' where all lanes are used. If all lanes from index 0 to pow2(n) -1  are used (which is also true if all lanes are used) a binary reduction is typically applied. If this is not the case the implementation fallsback on a slow path which is linear in the number of active lanes, and so is typically significantly less performant.
+The support is provided via both the Slang core module as well as the Slang CUDA prelude found in 'prelude/slang-cuda-prelude.h'. Many Wave intrinsics are not directly applicable within CUDA which supplies a more low level mechanisms. The implementation of most Wave functions work most optimally if a 'Wave' where all lanes are used. If all lanes from index 0 to pow2(n) -1  are used (which is also true if all lanes are used) a binary reduction is typically applied. If this is not the case the implementation fallsback on a slow path which is linear in the number of active lanes, and so is typically significantly less performant.
 
 For more a more concrete example take
 
@@ -292,7 +292,7 @@ Will require 3 times as many steps as the earlier scalar example just using a si
 
 ## WaveGetLaneIndex
 
-'WaveGetLaneIndex' defaults to `(threadIdx.x & SLANG_CUDA_WARP_MASK)`. Depending on how the kernel is launched this could be incorrect. There other ways to get lane index, for example using inline assembly. This mechanism though is apparently slower than the simple method used here. There is support for using the asm mechnism in the CUDA prelude using the `SLANG_USE_ASM_LANE_ID` preprocessor define to enable the feature.
+'WaveGetLaneIndex' defaults to `(threadIdx.x & SLANG_CUDA_WARP_MASK)`. Depending on how the kernel is launched this could be incorrect. There are other ways to get lane index, for example using inline assembly. This mechanism though is apparently slower than the simple method used here. There is support for using the asm mechanism in the CUDA prelude using the `SLANG_USE_ASM_LANE_ID` preprocessor define to enable the feature.
 
 There is potential to calculate the lane id using the [numthreads] markup in Slang/HLSL, but that also requires some assumptions of how that maps to a lane index.
 

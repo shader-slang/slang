@@ -17,6 +17,7 @@ int test(int arr[])
 
 int test2<T>(inout T arr[])
 {
+    unmodified(arr);
     return arr.getCount();
 }
 

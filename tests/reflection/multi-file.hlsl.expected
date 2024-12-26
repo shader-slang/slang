@@ -402,8 +402,8 @@ standard output = {
     "entryPoints": [
         {
             "name": "mainVS",
-            "stage:": "vertex",
-            "result:": {
+            "stage": "vertex",
+            "result": {
                 "semanticName": "SV_POSITION",
                 "type": {
                     "kind": "vector",
@@ -417,8 +417,8 @@ standard output = {
         },
         {
             "name": "mainFS",
-            "stage:": "fragment",
-            "result:": {
+            "stage": "fragment",
+            "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
                 "semanticName": "SV_TARGET",

@@ -24,14 +24,14 @@ Two conventions of matrix transform math
 
 Depending on the platform a developer is used to, a matrix-vector transform can be expressed as either `v*m` (`mul(v, m)` in HLSL), or `m*v` (`mul(m,v)` in HLSL). This convention, together with the matrix layout (column-major or row-major), determines how a matrix should be filled out in host code. 
 
-In HLSL/Slang the order of vector and matrix parameters to `mul` determine how the *vector* is interpretted. This interpretation is required because a vector does not in as of it's self differentiate between being a row or a column. 
+In HLSL/Slang the order of vector and matrix parameters to `mul` determine how the *vector* is interpreted. This interpretation is required because a vector does not in as of it's self differentiate between being a row or a column.
 
-* `mul(v, m)` - v is interpretted as a row vector 
-* `mul(m, v)` - v is interpretted as a column vector. 
+* `mul(v, m)` - v is interpreted as a row vector.
+* `mul(m, v)` - v is interpreted as a column vector.
 
 Through this mechanism a developer is able to write transforms in their preferred style. 
 
-These two styles are not directly interchangable - for a given `v` and `m` then generally `mul(v, m) != mul(m, v)`. For that the matrix needs to be transposed so 
+These two styles are not directly interchangeable - for a given `v` and `m` then generally `mul(v, m) != mul(m, v)`. For that the matrix needs to be transposed so
 
 * `mul(v, m) == mul(transpose(m), v)`
 * `mul(m, v) == mul(v, transpose(m))`
@@ -42,7 +42,7 @@ This behavior is *independent* of how a matrix layout in memory. Host code needs
 
 Another way to think about this difference is in terms of where translation terms should be placed in memory when filling a typical 4x4 transform matrix. When transforming a row vector (ie `mul(v, m)`) with a `row-major` matrix layout, translation will be at `m + 12, 13, 14`. For a `column-major` matrix layout, translation will be at `m + 3, 7, 11`.
 
-Note it is a *HLSL*/*Slang* convention that the parameter ordering of `mul(v, m)` means v is a *row* vector. A host maths library *could* have a transform function `SomeLib::transform(v, m)` such that `v` is a interpretted as *column* vector. For simplicitys sake the remainder of this discussion assumes that the `mul(v, m)` in equivalent in host code follows the interpretation that `v` is *row* vector.
+Note it is a *HLSL*/*Slang* convention that the parameter ordering of `mul(v, m)` means v is a *row* vector. A host maths library *could* have a transform function `SomeLib::transform(v, m)` such that `v` is a interpreted as *column* vector. For simplicitys sake the remainder of this discussion assumes that the `mul(v, m)` in equivalent in host code follows the interpretation that `v` is *row* vector.
 
 Discussion
 ----------
@@ -64,7 +64,7 @@ If we accept 2, then there are only two possible combinations - either both host
 
 This is simple, but is perhaps not the end of the story. First lets assume that we want our Slang code to be as portable as possible. As previously discussed for CUDA and C++/CPU targets Slang ignores the matrix layout settings - the matrix layout is *always* `row-major`.
 
-Second lets consider performance. The matrix layout in a host maths libray is not arbitrary from a performance point of view. A performant host maths library will want to use SIMD instructions. With both x86/x64 SSE and ARM NEON SIMD it makes a performance difference which layout is used, depending on if `column` or `row` is the *prefered* vector interpretation. If the `row` vector interpretation is prefered, it is most performant to have `row-major` matrix layout. Conversely if `column` vector interpretation is prefered `column-major` matrix will be the most performant.
+Second lets consider performance. The matrix layout in a host maths library is not arbitrary from a performance point of view. A performant host maths library will want to use SIMD instructions. With both x86/x64 SSE and ARM NEON SIMD it makes a performance difference which layout is used, depending on if `column` or `row` is the *preferred* vector interpretation. If the `row` vector interpretation is preferred, it is most performant to have `row-major` matrix layout. Conversely if `column` vector interpretation is preferred `column-major` matrix will be the most performant.
 
 The performance difference comes down to a SIMD implementation having to do a transpose if the layout doesn't match the preferred vector interpretation. 
 
@@ -74,11 +74,11 @@ If we put this all together - best performance, consistency between vector inter
 2) Platform independence: Kernel uses `row-major` matrix layout
 3) Performance: Host vector interpretation should match host matrix layout
 
-The only combination that forfils all aspects is `row-major` matrix layout and `row` vector interpretation for both host and kernel.
+The only combination that fulfills all aspects is `row-major` matrix layout and `row` vector interpretation for both host and kernel.
 
 It's worth noting that for targets that honor the default matrix layout - that setting can act like a toggle transposing a matrix layout. If for some reason the combination of choices leads to inconsistent vector transforms, an implementation can perform this transform in *host* code at the boundary between host and the kernel. This is not the most performant or convenient scenario, but if supported in an implementation it could be used for targets that do not support kernel matrix layout settings. 
 
-If only targetting platforms that honor matrix layout, there is more flexibility, our constraints are 
+If only targeting platforms that honor matrix layout, there is more flexibility, our constraints are
 
 1) Consistency : Same vector interpretation in shader and host code
 2) Performance: Host vector interpretation should match host matrix layout
@@ -88,7 +88,7 @@ Then there are two combinations that work
 1) `row-major` matrix layout for host and kernel, and `row` vector interpretation.
 2) `column-major` matrix layout for host and kernel, and `column` vector interpretation.
 
-If the host maths library is not performance orientated, it may be arbitray from a performance point of view if a `row` or `column` vector interpretation is used. In that case assuming shader and host vector interpretation is the same it is only important that the kernel and maths library matrix layout match. 
+If the host maths library is not performance orientated, it may be arbitrary from a performance point of view if a `row` or `column` vector interpretation is used. In that case assuming shader and host vector interpretation is the same it is only important that the kernel and maths library matrix layout match.
 
 Another way of thinking about these combinations is to think of each change in `row-major`/`column-major` matrix layout and `row`/`column` vector interpretation is a transpose. If there are an *even* number of flips then all the transposes cancel out. Therefore the following combinations work
 
@@ -121,7 +121,7 @@ This being the case only the following matrix types/matrix layouts will work acr
 
 These are all 'row-major' because as previously discussed currently only `row-major` matrix layout works across all targets currently.
 
-NOTE! This only applies to matrices that are trafficed between host and kernel - any matrix size will work appropriately for variables in shader/kernel code for example.
+NOTE! This only applies to matrices that are transferred between host and kernel - any matrix size will work appropriately for variables in shader/kernel code for example.
 
 The hosts maths library also plays a part here. The library may hold all elements consecutively in memory. If that's the case it will match the CPU/CUDA kernels, but will only work on 'graphics'-like targets that match that layout for the size. 
 

@@ -1,10 +1,10 @@
 //TEST:SIMPLE(filecheck=CHK): -target spirv
 
+float f(float) { return 1; }
+
 // Should not warn here (unconditionalBranch)
 float3 unconditional(int mode)
 {
-    float f(float) { return 1; }
-
     float k0;
     float k1;
 

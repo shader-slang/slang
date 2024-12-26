@@ -2,7 +2,6 @@
 #include "d3d12-query.h"
 
 #include "d3d12-command-queue.h"
-
 #include "d3d12-helper-functions.h"
 
 namespace gfx
@@ -54,7 +53,8 @@ Result QueryPoolImpl::init(const IQueryPool::Desc& desc, DeviceImpl* device)
 
     // Create command allocator.
     SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
-        D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
+        D3D12_COMMAND_LIST_TYPE_DIRECT,
+        IID_PPV_ARGS(m_commandAllocator.writeRef())));
 
     // Create command list.
     SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandList(
@@ -99,7 +99,8 @@ Result QueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount count, uint64_t* d
 
     int8_t* mappedData = nullptr;
     D3D12_RANGE readRange = {
-        sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * (queryIndex + count) };
+        sizeof(uint64_t) * queryIndex,
+        sizeof(uint64_t) * (queryIndex + count)};
     m_readBackBuffer.getResource()->Map(0, &readRange, (void**)&mappedData);
     memcpy(data, mappedData + sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * count);
     m_readBackBuffer.getResource()->Unmap(0, nullptr);
@@ -119,7 +120,9 @@ IQueryPool* PlainBufferProxyQueryPoolImpl::getInterface(const Guid& guid)
 }
 
 Result PlainBufferProxyQueryPoolImpl::init(
-    const IQueryPool::Desc& desc, DeviceImpl* device, uint32_t stride)
+    const IQueryPool::Desc& desc,
+    DeviceImpl* device,
+    uint32_t stride)
 {
     ComPtr<IBufferResource> bufferResource;
     IBufferResource::Desc bufferDesc = {};
@@ -187,8 +190,8 @@ Result PlainBufferProxyQueryPoolImpl::getResult(GfxIndex queryIndex, GfxCount co
             D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr));
 
-        encodeInfo.d3dCommandList->CopyBufferRegion(
-            stageBuf, 0, m_bufferResource->m_resource.getResource(), 0, size);
+        encodeInfo.d3dCommandList
+            ->CopyBufferRegion(stageBuf, 0, m_bufferResource->m_resource.getResource(), 0, size);
         m_device->submitResourceCommandsAndWait(encodeInfo);
         void* ptr = nullptr;
         stageBuf.getResource()->Map(0, nullptr, &ptr);

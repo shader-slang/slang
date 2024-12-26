@@ -8,8 +8,7 @@
 namespace Slang
 {
 
-LegalType LegalType::implicitDeref(
-    LegalType const& valueType)
+LegalType LegalType::implicitDeref(LegalType const& valueType)
 {
     RefPtr<ImplicitDerefType> obj = new ImplicitDerefType();
     obj->valueType = valueType;
@@ -20,8 +19,7 @@ LegalType LegalType::implicitDeref(
     return result;
 }
 
-LegalType LegalType::tuple(
-    RefPtr<TuplePseudoType>   tupleType)
+LegalType LegalType::tuple(RefPtr<TuplePseudoType> tupleType)
 {
     SLANG_ASSERT(tupleType->elements.getCount());
 
@@ -31,8 +29,7 @@ LegalType LegalType::tuple(
     return result;
 }
 
-LegalType LegalType::pair(
-    RefPtr<PairPseudoType>   pairType)
+LegalType LegalType::pair(RefPtr<PairPseudoType> pairType)
 {
     LegalType result;
     result.flavor = Flavor::pair;
@@ -41,9 +38,9 @@ LegalType LegalType::pair(
 }
 
 LegalType LegalType::pair(
-    LegalType const&    ordinaryType,
-    LegalType const&    specialType,
-    RefPtr<PairInfo>    pairInfo)
+    LegalType const& ordinaryType,
+    LegalType const& specialType,
+    RefPtr<PairInfo> pairInfo)
 {
     // Handle some special cases for when
     // one or the other of the types isn't
@@ -70,9 +67,7 @@ LegalType LegalType::pair(
     return LegalType::pair(obj);
 }
 
-LegalType LegalType::makeWrappedBuffer(
-    IRType*             simpleType,
-    LegalElementWrapping const&   elementInfo)
+LegalType LegalType::makeWrappedBuffer(IRType* simpleType, LegalElementWrapping const& elementInfo)
 {
     RefPtr<WrappedBufferPseudoType> obj = new WrappedBufferPseudoType();
     obj->simpleType = simpleType;
@@ -129,9 +124,9 @@ RefPtr<ImplicitDerefLegalElementWrappingObj> LegalElementWrapping::getImplicitDe
 }
 
 LegalElementWrapping LegalElementWrapping::makePair(
-    LegalElementWrapping const&   ordinary,
-    LegalElementWrapping const&   special,
-    PairInfo*           pairInfo)
+    LegalElementWrapping const& ordinary,
+    LegalElementWrapping const& special,
+    PairInfo* pairInfo)
 {
     RefPtr<PairLegalElementWrappingObj> obj = new PairLegalElementWrappingObj();
     obj->ordinary = ordinary;
@@ -193,7 +188,7 @@ bool isResourceType(IRType* type)
     {
         return true;
     }
-    else if(const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
     {
         return true;
     }
@@ -209,7 +204,7 @@ bool isPointerToResourceType(IRType* type)
 {
     while (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        if (ptrType->getAddressSpace() == AddressSpace(SpvStorageClassStorageBuffer) ||
+        if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer ||
             ptrType->getAddressSpace() == AddressSpace::UserPointer)
             return true;
         type = ptrType->getValueType();
@@ -218,8 +213,7 @@ bool isPointerToResourceType(IRType* type)
     return isResourceType(type);
 }
 
-ModuleDecl* findModuleForDecl(
-    Decl*   decl)
+ModuleDecl* findModuleForDecl(Decl* decl)
 {
     for (auto dd = decl; dd; dd = dd->parentDecl)
     {
@@ -234,14 +228,14 @@ ModuleDecl* findModuleForDecl(
 // that might need to be turned into tuple pseudo-types.
 struct TupleTypeBuilder
 {
-    TypeLegalizationContext*    context;
-    IRType*                     type;
-    IRStructType*               originalStructType;
+    TypeLegalizationContext* context;
+    IRType* type;
+    IRStructType* originalStructType;
 
     struct OrdinaryElement
     {
-        IRStructKey*            fieldKey = nullptr;
-        IRType*                 type = nullptr;
+        IRStructKey* fieldKey = nullptr;
+        IRType* type = nullptr;
     };
 
 
@@ -263,11 +257,11 @@ struct TupleTypeBuilder
 
     // Add a field to the (pseudo-)type we are building
     void addField(
-        IRStructKey*    fieldKey,
-        LegalType       legalFieldType,
-        LegalType       legalLeafType,
-        bool            isSpecial,
-        IRType*         originalFieldType)
+        IRStructKey* fieldKey,
+        LegalType legalFieldType,
+        LegalType legalLeafType,
+        bool isSpecial,
+        IRType* originalFieldType)
     {
         LegalType ordinaryType;
         LegalType specialType;
@@ -287,6 +281,11 @@ struct TupleTypeBuilder
                 {
                     specialType = legalFieldType;
                 }
+
+                // `void` is currently legalized to simple, but we don't want to add a
+                // `void` field to the struct.
+                if (legalLeafType.getSimple()->getOp() == kIROp_VoidType)
+                    return;
             }
             break;
 
@@ -330,7 +329,7 @@ struct TupleTypeBuilder
                 //
                 // This is because the "ordinary" side of the legalization
                 // of `ConstantBuffer<Foo>` will still be a resource type.
-                if(isSpecial)
+                if (isSpecial)
                 {
                     specialType = legalFieldType;
                 }
@@ -376,7 +375,7 @@ struct TupleTypeBuilder
             // TODO: any cases we should "unwrap" here?
             // E.g., `implicitDeref`?
 
-            if(ot.flavor == LegalType::Flavor::simple)
+            if (ot.flavor == LegalType::Flavor::simple)
             {
                 // If the field type is changed after legalization
                 // (e.g. the field has empty struct type), we want
@@ -412,27 +411,19 @@ struct TupleTypeBuilder
     }
 
     // Add a field to the (pseudo-)type we are building
-    void addField(
-        IRStructField*  field)
+    void addField(IRStructField* field)
     {
         auto fieldType = field->getFieldType();
 
         bool isSpecialField = context->isSpecialType(fieldType);
         auto legalFieldType = legalizeType(context, fieldType);
-
-        addField(
-            field->getKey(),
-            legalFieldType,
-            legalFieldType,
-            isSpecialField,
-            fieldType);
-
+        addField(field->getKey(), legalFieldType, legalFieldType, isSpecialField, fieldType);
     }
 
     LegalType getResult()
     {
         // If this is an empty struct, return a none type
-        // This helps get rid of emtpy structs that often trips up the 
+        // This helps get rid of emtpy structs that often trips up the
         // downstream compiler
         if (!anyOrdinary && !anySpecial && !anyComplex)
             return LegalType();
@@ -475,7 +466,7 @@ struct TupleTypeBuilder
             // original can also reference the new one.
             ordinaryStructType->insertAfter(originalStructType);
 
-            for(auto ee : ordinaryElements)
+            for (auto ee : ordinaryElements)
             {
                 // We will ensure that all the original fields are represented,
                 // although they may have different types (due to legalization).
@@ -492,18 +483,20 @@ struct TupleTypeBuilder
                 // be based on mangled field names in all cases.
                 //
                 IRType* fieldType = ee.type;
-                if(!fieldType)
+                if (!fieldType)
                     fieldType = context->getBuilder()->getVoidType();
 
                 // TODO: shallow clone of modifiers, etc.
-
-                builder->createStructField(
-                    ordinaryStructType,
-                    ee.fieldKey,
-                    fieldType);
+                IRStructField* originalField = findStructField(originalStructType, ee.fieldKey);
+                IRStructField* newField =
+                    builder->createStructField(ordinaryStructType, ee.fieldKey, fieldType);
+                // In case the original struct had offset decorations attached, transfer those as
+                // well. The original offsets should still be valid, since we only skip fields of
+                // types that aren't representable in memory.
+                originalField->transferDecorationsTo(newField);
             }
 
-            ordinaryType = LegalType::simple((IRType*) ordinaryStructType);
+            ordinaryType = LegalType::simple((IRType*)ordinaryStructType);
         }
 
         if (!anySpecial)
@@ -523,27 +516,36 @@ struct TupleTypeBuilder
 
         return LegalType::pair(ordinaryType, specialType, pairInfo);
     }
-
 };
 
 static IRType* createBuiltinGenericType(
-    TypeLegalizationContext*    context,
-    IROp                        op,
-    IRType*                     elementType)
+    TypeLegalizationContext* context,
+    IROp op,
+    IRType* elementType)
 {
-    IRInst* operands[] = { elementType };
-    return context->getBuilder()->getType(
-        op,
-        1,
-        operands);
+    IRInst* operands[] = {elementType};
+    return context->getBuilder()->getType(op, 1, operands);
+}
+
+static IRType* createBuiltinGenericType(
+    TypeLegalizationContext* context,
+    IROp op,
+    IRType* elementType,
+    IRInst* layoutOperand)
+{
+    if (!layoutOperand)
+        return createBuiltinGenericType(context, op, elementType);
+    IRInst* operands[] = {elementType, layoutOperand};
+    return context->getBuilder()->getType(op, 2, operands);
 }
 
 // Create a uniform buffer type with a given legalized
 // element type.
 static LegalType createLegalUniformBufferType(
-    TypeLegalizationContext*    context,
-    IROp                        op,
-    LegalType                   legalElementType)
+    TypeLegalizationContext* context,
+    IROp op,
+    LegalType legalElementType,
+    IRInst* layoutOperand)
 {
     // We will handle some of the easy/non-interesting
     // cases here in the main routine, but for all
@@ -554,9 +556,7 @@ static LegalType createLegalUniformBufferType(
     switch (legalElementType.flavor)
     {
     default:
-        return context->createLegalUniformBufferType(
-            op,
-            legalElementType);
+        return context->createLegalUniformBufferType(op, legalElementType, layoutOperand);
 
     case LegalType::Flavor::none:
         return LegalType();
@@ -570,10 +570,8 @@ static LegalType createLegalUniformBufferType(
             // like a `ParameterBlock<Texture2D>`, but that seems like
             // an unlikely case in practice.
             //
-            return LegalType::simple(createBuiltinGenericType(
-                context,
-                op,
-                legalElementType.getSimple()));
+            return LegalType::simple(
+                createBuiltinGenericType(context, op, legalElementType.getSimple(), layoutOperand));
         }
         break;
 
@@ -596,7 +594,8 @@ static LegalType createLegalUniformBufferType(
             return LegalType::implicitDeref(createLegalUniformBufferType(
                 context,
                 op,
-                legalElementType.getImplicitDeref()->valueType));
+                legalElementType.getImplicitDeref()->valueType,
+                layoutOperand));
         }
         break;
     }
@@ -606,9 +605,10 @@ static LegalType createLegalUniformBufferType(
 // under the assumption that we are doing resource-based type legalization.
 //
 LegalType createLegalUniformBufferTypeForResources(
-    TypeLegalizationContext*    context,
-    IROp                        op,
-    LegalType                   legalElementType)
+    TypeLegalizationContext* context,
+    IROp op,
+    LegalType legalElementType,
+    IRInst* layoutOperand)
 {
     switch (legalElementType.flavor)
     {
@@ -642,10 +642,8 @@ LegalType createLegalUniformBufferTypeForResources(
             // buffer with the appropriate `op`, so that case
             // is easy:
             //
-            auto ordinaryType = createLegalUniformBufferType(
-                context,
-                op,
-                pairType->ordinaryType);
+            auto ordinaryType =
+                createLegalUniformBufferType(context, op, pairType->ordinaryType, layoutOperand);
 
             // For the special side, we really just want to turn
             // a special field of type `R` into a value of type
@@ -780,15 +778,15 @@ LegalType createLegalUniformBufferTypeForResources(
 // for us to be able to reconstruct a value like the above.
 //
 LegalElementWrapping declareStructFields(
-    TypeLegalizationContext*    context,
-    IRStructType*               structType,
-    LegalType                   fieldType)
+    TypeLegalizationContext* context,
+    IRStructType* structType,
+    LegalType fieldType)
 {
     // TODO: We should eventually thread through some kind
     // of "name hint" that can be used to give the generated
     // fields more useful names.
 
-    switch(fieldType.flavor)
+    switch (fieldType.flavor)
     {
     case LegalType::Flavor::none:
         return LegalElementWrapping::makeVoid();
@@ -804,7 +802,8 @@ LegalElementWrapping declareStructFields(
 
     case LegalType::Flavor::implicitDeref:
         {
-            auto subField = declareStructFields(context, structType, fieldType.getImplicitDeref()->valueType);
+            auto subField =
+                declareStructFields(context, structType, fieldType.getImplicitDeref()->valueType);
             return LegalElementWrapping::makeImplicitDeref(subField);
         }
 
@@ -813,10 +812,7 @@ LegalElementWrapping declareStructFields(
             auto pairType = fieldType.getPair();
             auto ordinaryField = declareStructFields(context, structType, pairType->ordinaryType);
             auto specialField = declareStructFields(context, structType, pairType->specialType);
-            return LegalElementWrapping::makePair(
-                ordinaryField,
-                specialField,
-                pairType->pairInfo);
+            return LegalElementWrapping::makePair(ordinaryField, specialField, pairType->pairInfo);
         }
 
     case LegalType::Flavor::tuple:
@@ -824,7 +820,7 @@ LegalElementWrapping declareStructFields(
             auto tupleType = fieldType.getTuple();
 
             RefPtr<TupleLegalElementWrappingObj> obj = new TupleLegalElementWrappingObj();
-            for( auto ee : tupleType->elements )
+            for (auto ee : tupleType->elements)
             {
                 TupleLegalElementWrappingObj::Element element;
                 element.key = ee.key;
@@ -842,9 +838,10 @@ LegalElementWrapping declareStructFields(
 }
 
 LegalType createLegalUniformBufferTypeForExistentials(
-    TypeLegalizationContext*    context,
-    IROp                        op,
-    LegalType                   legalElementType)
+    TypeLegalizationContext* context,
+    IROp op,
+    LegalType legalElementType,
+    IRInst* layoutOperand)
 {
     auto builder = context->getBuilder();
 
@@ -854,17 +851,13 @@ LegalType createLegalUniformBufferTypeForExistentials(
     // in `legalElementType`.
     //
     auto structType = builder->createStructType();
-    auto elementWrapping = declareStructFields(
-        context, structType, legalElementType);
+    auto elementWrapping = declareStructFields(context, structType, legalElementType);
 
     // Because the `structType` is an ordinary IR type
     // (not a `LegalType`) we can go ahead and create an
     // IR uniform buffer type that wraps it.
     //
-    auto bufferType = createBuiltinGenericType(
-        context,
-        op,
-        structType);
+    auto bufferType = createBuiltinGenericType(context, op, structType, layoutOperand);
 
     // The `elementWrapping` computed when we declared all
     // the `struct` fields tells us how to get from the
@@ -879,37 +872,58 @@ LegalType createLegalUniformBufferTypeForExistentials(
 }
 
 static LegalType createLegalUniformBufferType(
-    TypeLegalizationContext*        context,
-    IRUniformParameterGroupType*    uniformBufferType,
-    LegalType                       legalElementType)
+    TypeLegalizationContext* context,
+    IRUniformParameterGroupType* uniformBufferType,
+    LegalType legalElementType)
 {
     return createLegalUniformBufferType(
         context,
         uniformBufferType->getOp(),
-        legalElementType);
+        legalElementType,
+        uniformBufferType->getDataLayout());
 }
 
 // Create a pointer type with a given legalized value type.
 static LegalType createLegalPtrType(
-    TypeLegalizationContext*    context,
-    IROp                        op,
-    LegalType                   legalValueType)
+    TypeLegalizationContext* context,
+    IRInst* originalPtrType,
+    LegalType legalValueType)
 {
     switch (legalValueType.flavor)
     {
     case LegalType::Flavor::none:
+        if (auto ptrType = as<IRPtrType>(originalPtrType))
+        {
+            switch (ptrType->getAddressSpace())
+            {
+            case AddressSpace::UserPointer:
+            case AddressSpace::Global:
+                // If this is a physical pointer, we need to create an untyped pointer if
+                // the element type is nothing.
+                return LegalType::simple(context->getBuilder()->getPtrTypeWithAddressSpace(
+                    context->getBuilder()->getVoidType(),
+                    ptrType));
+            }
+        }
         return LegalType();
 
     case LegalType::Flavor::simple:
         {
-            // Easy case: we just have a simple element type,
-            // so we want to create a uniform buffer that wraps it.
+            // Easy case: we just have a simple element type.
+            if (auto ptrTypeBase = as<IRPtrTypeBase>(originalPtrType))
+            {
+                if (ptrTypeBase->hasAddressSpace())
+                {
+                    return LegalType::simple(context->getBuilder()->getPtrTypeWithAddressSpace(
+                        legalValueType.getSimple(),
+                        ptrTypeBase));
+                }
+            }
             return LegalType::simple(createBuiltinGenericType(
                 context,
-                op,
+                originalPtrType->getOp(),
                 legalValueType.getSimple()));
         }
-        break;
 
     case LegalType::Flavor::implicitDeref:
         {
@@ -932,7 +946,7 @@ static LegalType createLegalPtrType(
             // will matter.
             return LegalType::implicitDeref(createLegalPtrType(
                 context,
-                op,
+                originalPtrType,
                 legalValueType.getImplicitDeref()->valueType));
         }
         break;
@@ -942,14 +956,9 @@ static LegalType createLegalPtrType(
             // We just need to pointer-ify both sides of the pair.
             auto pairType = legalValueType.getPair();
 
-            auto ordinaryType = createLegalPtrType(
-                context,
-                op,
-                pairType->ordinaryType);
-            auto specialType = createLegalPtrType(
-                context,
-                op,
-                pairType->specialType);
+            auto ordinaryType =
+                createLegalPtrType(context, originalPtrType, pairType->ordinaryType);
+            auto specialType = createLegalPtrType(context, originalPtrType, pairType->specialType);
 
             return LegalType::pair(ordinaryType, specialType, pairType->pairInfo);
         }
@@ -968,10 +977,7 @@ static LegalType createLegalPtrType(
                 TuplePseudoType::Element newElement;
 
                 newElement.key = ee.key;
-                newElement.type = createLegalPtrType(
-                    context,
-                    op,
-                    ee.type);
+                newElement.type = createLegalPtrType(context, originalPtrType, ee.type);
 
                 ptrPseudoTupleType->elements.add(newElement);
             }
@@ -994,7 +1000,7 @@ struct LegalTypeWrapper
 
 struct ArrayLegalTypeWrapper : LegalTypeWrapper
 {
-    IRArrayTypeBase*    arrayType;
+    IRArrayTypeBase* arrayType;
 
     LegalType wrap(TypeLegalizationContext* context, IRType* type)
     {
@@ -1011,10 +1017,7 @@ struct BuiltinGenericLegalTypeWrapper : LegalTypeWrapper
 
     LegalType wrap(TypeLegalizationContext* context, IRType* type)
     {
-        return LegalType::simple(createBuiltinGenericType(
-            context,
-            op,
-            type));
+        return LegalType::simple(createBuiltinGenericType(context, op, type));
     }
 };
 
@@ -1028,10 +1031,10 @@ struct ImplicitDerefLegalTypeWrapper : LegalTypeWrapper
 };
 
 static LegalType wrapLegalType(
-    TypeLegalizationContext*    context,
-    LegalType                   legalType,
-    LegalTypeWrapper*           ordinaryWrapper,
-    LegalTypeWrapper*           specialWrapper)
+    TypeLegalizationContext* context,
+    LegalType legalType,
+    LegalTypeWrapper* ordinaryWrapper,
+    LegalTypeWrapper* specialWrapper)
 {
     switch (legalType.flavor)
     {
@@ -1046,11 +1049,8 @@ static LegalType wrapLegalType(
 
     case LegalType::Flavor::implicitDeref:
         {
-            return LegalType::implicitDeref(wrapLegalType(
-                context,
-                legalType,
-                ordinaryWrapper,
-                specialWrapper));
+            return LegalType::implicitDeref(
+                wrapLegalType(context, legalType, ordinaryWrapper, specialWrapper));
         }
         break;
 
@@ -1059,16 +1059,10 @@ static LegalType wrapLegalType(
             // We just need to pointer-ify both sides of the pair.
             auto pairType = legalType.getPair();
 
-            auto ordinaryType = wrapLegalType(
-                context,
-                pairType->ordinaryType,
-                ordinaryWrapper,
-                ordinaryWrapper);
-            auto specialType = wrapLegalType(
-                context,
-                pairType->specialType,
-                specialWrapper,
-                specialWrapper);
+            auto ordinaryType =
+                wrapLegalType(context, pairType->ordinaryType, ordinaryWrapper, ordinaryWrapper);
+            auto specialType =
+                wrapLegalType(context, pairType->specialType, specialWrapper, specialWrapper);
 
             return LegalType::pair(ordinaryType, specialType, pairType->pairInfo);
         }
@@ -1087,11 +1081,7 @@ static LegalType wrapLegalType(
                 TuplePseudoType::Element element;
 
                 element.key = ee.key;
-                element.type = wrapLegalType(
-                    context,
-                    ee.type,
-                    ordinaryWrapper,
-                    specialWrapper);
+                element.type = wrapLegalType(context, ee.type, ordinaryWrapper, specialWrapper);
 
                 resultTupleType->elements.add(element);
             }
@@ -1109,11 +1099,9 @@ static LegalType wrapLegalType(
 
 // Legalize a type, including any nested types
 // that it transitively contains.
-LegalType legalizeTypeImpl(
-    TypeLegalizationContext*    context,
-    IRType*                     type)
+LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
 {
-    if(!type)
+    if (!type)
         return LegalType::simple(nullptr);
 
     // It might be that the type we are looking at is
@@ -1121,9 +1109,9 @@ LegalType legalizeTypeImpl(
     // case we should never legalize it, figuring that
     // the target defines its semantics fully.
     //
-    if(type->findDecoration<IRTargetIntrinsicDecoration>())
+    if (type->findDecoration<IRTargetIntrinsicDecoration>())
         return LegalType::simple(type);
-    
+
     if (context->isSimpleType(type))
         return LegalType::simple(type);
 
@@ -1149,7 +1137,7 @@ LegalType legalizeTypeImpl(
 
         // Legalize the element type to see what we are working with.
         LegalType legalElementType;
-        
+
         if (isMetalTarget(context->targetProgram->getTargetReq()) &&
             as<IRParameterBlockType>(uniformBufferType))
         {
@@ -1167,14 +1155,15 @@ LegalType legalizeTypeImpl(
             // as an *ordinary* type, but we really need to notice the
             // case when the element type is simple, but *special*.
             //
-            if( context->isSpecialType(originalElementType) )
+            if (context->isSpecialType(originalElementType))
             {
                 // Anything that has a special element type needs to
                 // be handled by the pass-specific logic in the context.
                 //
                 return context->createLegalUniformBufferType(
                     uniformBufferType->getOp(),
-                    legalElementType);
+                    legalElementType,
+                    uniformBufferType->getDataLayout());
             }
         }
 
@@ -1183,11 +1172,7 @@ LegalType legalizeTypeImpl(
         // from `legalElementType` instead of `type`
         // because the `legalElementType` may still differ from `type`
         // if, e.g., `type` contains empty structs.
-        return createLegalUniformBufferType(
-                context,
-                uniformBufferType,
-                legalElementType);
-
+        return createLegalUniformBufferType(context, uniformBufferType, legalElementType);
     }
     else if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
@@ -1233,7 +1218,7 @@ LegalType legalizeTypeImpl(
     {
         return LegalType::simple(type);
     }
-    else if( auto pseudoPtrType = as<IRPseudoPtrType>(type))
+    else if (auto pseudoPtrType = as<IRPseudoPtrType>(type))
     {
         // The type `PseudoPtr<T>` represents a type that conceptually
         // behaves like a pointer to a `T`, but on a target platform
@@ -1269,12 +1254,13 @@ LegalType legalizeTypeImpl(
         auto valueType = ptrType->getValueType();
 
         {
-            const Index activeIndex = context->activePointerValues.findFirstIndex([valueType](const PointerValue& value) -> bool { return value.type == valueType; });
+            const Index activeIndex = context->activePointerValues.findFirstIndex(
+                [valueType](const PointerValue& value) -> bool { return value.type == valueType; });
 
             if (activeIndex >= 0)
             {
                 context->activePointerValues[activeIndex].usedCount++;
-                // If it's *active* then it's currently being legalized. 
+                // If it's *active* then it's currently being legalized.
                 // We will *assume* that value type will be the same type.
                 return LegalType::simple(ptrType);
             }
@@ -1293,22 +1279,22 @@ LegalType legalizeTypeImpl(
         {
             // It was recursively used, so we want to make sure our previous assumption was correct
             if (legalValueType.flavor != LegalType::Flavor::simple ||
-                legalValueType.obj != nullptr ||
-                legalValueType.irType != valueType)
+                legalValueType.obj != nullptr || legalValueType.irType != valueType)
             {
-                // TODO(JS): 
+                // TODO(JS):
                 // Ideally we'd handle this in some better way...
-                SLANG_ASSERT(!"We assumed a Ptr behavior if recursive, but that assumption didn't seem to work out");
+                SLANG_ASSERT(!"We assumed a Ptr behavior if recursive, but that assumption didn't "
+                              "seem to work out");
             }
         }
-        
+
         // If element type hasn't change, return original type.
         if (legalValueType.flavor == LegalType::Flavor::simple &&
             legalValueType.getSimple() == ptrType->getValueType())
             return LegalType::simple(ptrType);
-        return createLegalPtrType(context, ptrType->getOp(), legalValueType);
+        return createLegalPtrType(context, ptrType, legalValueType);
     }
-    else if(auto structType = as<IRStructType>(type))
+    else if (auto structType = as<IRStructType>(type))
     {
         // Look at the (non-static) fields, and
         // see if anything needs to be cleaned up.
@@ -1355,7 +1341,7 @@ LegalType legalizeTypeImpl(
         //   aggregate type; the ordinary fields will get
         //   placed inside a new constant-buffer type,
         //   while the special ones will get left outside.
-        // 
+        //
 
         // TODO: there is a risk here that we might recursively
         // invole `legalizeType` on the type that we are
@@ -1379,36 +1365,33 @@ LegalType legalizeTypeImpl(
 
         return builder.getResult();
     }
-    else if(auto arrayType = as<IRArrayTypeBase>(type))
+    else if (auto arrayType = as<IRArrayTypeBase>(type))
     {
-        auto legalElementType = legalizeType(
-            context,
-            arrayType->getElementType());
+        auto legalElementType = legalizeType(context, arrayType->getElementType());
 
-        // If element type hasn't change, return original type.
-        if (legalElementType.flavor == LegalType::Flavor::simple &&
-            legalElementType.getSimple() == arrayType->getElementType())
-            return LegalType::simple(arrayType);
+        if (legalElementType.flavor == LegalType::Flavor::simple)
+        {
+            if (legalElementType.getSimple()->getOp() == kIROp_VoidType)
+                return LegalType();
+
+            // If element type hasn't change, return original type.
+            if (legalElementType.getSimple() == arrayType->getElementType())
+                return LegalType::simple(arrayType);
+        }
 
         ArrayLegalTypeWrapper wrapper;
         wrapper.arrayType = arrayType;
 
-        return wrapLegalType(
-            context,
-            legalElementType,
-            &wrapper,
-            &wrapper);
+        return wrapLegalType(context, legalElementType, &wrapper, &wrapper);
     }
 
     return LegalType::simple(type);
 }
 
-LegalType legalizeType(
-    TypeLegalizationContext*    context,
-    IRType*                     type)
+LegalType legalizeType(TypeLegalizationContext* context, IRType* type)
 {
     LegalType legalType;
-    if(context->mapTypeToLegalType.tryGetValue(type, legalType))
+    if (context->mapTypeToLegalType.tryGetValue(type, legalType))
         return legalType;
 
     legalType = legalizeTypeImpl(context, type);
@@ -1418,8 +1401,7 @@ LegalType legalizeType(
 
 //
 
-IRTypeLayout* getDerefTypeLayout(
-    IRTypeLayout* typeLayout)
+IRTypeLayout* getDerefTypeLayout(IRTypeLayout* typeLayout)
 {
     if (!typeLayout)
         return nullptr;
@@ -1432,20 +1414,18 @@ IRTypeLayout* getDerefTypeLayout(
     return typeLayout;
 }
 
-IRVarLayout* getFieldLayout(
-    IRTypeLayout*     typeLayout,
-    IRInst*         fieldKey)
+IRVarLayout* getFieldLayout(IRTypeLayout* typeLayout, IRInst* fieldKey)
 {
     if (!typeLayout)
         return nullptr;
 
-    for(;;)
+    for (;;)
     {
-        if(auto arrayTypeLayout = as<IRArrayTypeLayout>(typeLayout))
+        if (auto arrayTypeLayout = as<IRArrayTypeLayout>(typeLayout))
         {
             typeLayout = arrayTypeLayout->getElementTypeLayout();
         }
-        else if(auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+        else if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
         {
             typeLayout = parameterGroupTypeLayout->getOffsetElementTypeLayout();
         }
@@ -1458,9 +1438,9 @@ IRVarLayout* getFieldLayout(
 
     if (auto structTypeLayout = as<IRStructTypeLayout>(typeLayout))
     {
-        for(auto ff : structTypeLayout->getFieldLayoutAttrs())
+        for (auto ff : structTypeLayout->getFieldLayoutAttrs())
         {
-            if(ff->getFieldKey() == fieldKey)
+            if (ff->getFieldKey() == fieldKey)
             {
                 return ff->getLayout();
             }
@@ -1474,8 +1454,10 @@ Index findRegisterSpaceResourceInfo(IRVarLayout* layout)
 {
     if (auto parameterGroupLayout = as<IRParameterGroupTypeLayout>(layout->getTypeLayout()))
     {
-        auto registerInfo = parameterGroupLayout->getContainerVarLayout()->findOffsetAttr(LayoutResourceKind::RegisterSpace);
-        auto containerRegisterInfo = layout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
+        auto registerInfo = parameterGroupLayout->getContainerVarLayout()->findOffsetAttr(
+            LayoutResourceKind::RegisterSpace);
+        auto containerRegisterInfo =
+            layout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
         if (registerInfo)
         {
             if (containerRegisterInfo)
@@ -1490,9 +1472,9 @@ Index findRegisterSpaceResourceInfo(IRVarLayout* layout)
 }
 
 void buildSimpleVarLayout(
-    IRVarLayout::Builder*   builder,
-    SimpleLegalVarChain*    varChain,
-    IRTypeLayout*           typeLayout)
+    IRVarLayout::Builder* builder,
+    SimpleLegalVarChain* varChain,
+    IRTypeLayout* typeLayout)
 {
     // We need to construct a layout for the new variable
     // that reflects both the type we have given it, as
@@ -1556,8 +1538,10 @@ void buildSimpleVarLayout(
             }
             else
             {
-                // Once we found the first RegisterSpace usage, we will sum up offets from parent's SubElementReigsterSpace info.
-                if (auto parentResInfo = vv->varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+                // Once we found the first RegisterSpace usage, we will sum up offets from parent's
+                // SubElementReigsterSpace info.
+                if (auto parentResInfo =
+                        vv->varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
                 {
                     space += parentResInfo->getOffset();
                     useSubElementSpace = true;
@@ -1574,9 +1558,9 @@ void buildSimpleVarLayout(
 }
 
 IRVarLayout* createSimpleVarLayout(
-    IRBuilder*              irBuilder,
-    SimpleLegalVarChain*    varChain,
-    IRTypeLayout*           typeLayout)
+    IRBuilder* irBuilder,
+    SimpleLegalVarChain* varChain,
+    IRTypeLayout* typeLayout)
 {
     if (!typeLayout)
         return nullptr;
@@ -1586,17 +1570,17 @@ IRVarLayout* createSimpleVarLayout(
 }
 
 IRVarLayout* createVarLayout(
-    IRBuilder*              irBuilder,
-    LegalVarChain const&    varChain,
-    IRTypeLayout*           typeLayout)
+    IRBuilder* irBuilder,
+    LegalVarChain const& varChain,
+    IRTypeLayout* typeLayout)
 {
-    if(!typeLayout)
+    if (!typeLayout)
         return nullptr;
 
     IRVarLayout::Builder varLayoutBuilder(irBuilder, typeLayout);
     buildSimpleVarLayout(&varLayoutBuilder, varChain.primaryChain, typeLayout);
 
-    if(const auto pendingDataTypeLayout = typeLayout->getPendingDataTypeLayout())
+    if (const auto pendingDataTypeLayout = typeLayout->getPendingDataTypeLayout())
     {
         varLayoutBuilder.setPendingVarLayout(
             createSimpleVarLayout(irBuilder, varChain.pendingChain, typeLayout));
@@ -1644,4 +1628,4 @@ else if( shared->compileRequest->compileFlags & SLANG_COMPILE_FLAG_SPLIT_MIXED_T
 
 #endif
 
-}
+} // namespace Slang

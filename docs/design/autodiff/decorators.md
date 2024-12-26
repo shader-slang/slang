@@ -45,16 +45,16 @@ interface IFoo_after_checking_and_lowering
 ### `[TreatAsDifferentiable]`
 In large codebases where some interfaces may have several possible implementations, it may not be reasonable to have to mark all possible implementations with `[Differentiable]`, especially if certain implementations use hacks or workarounds that need additional consideration before they can be marked `[Differentiable]`
 
-In such cases, we provide the `[TreatAsDifferentiable]` decoration (AST node: `TreatAsDifferentiableAttribute`, IR: `OpTreatAsDifferentiableDecoration`), which instructs the auto-diff passes to construct an 'empty' function that returns a 0 (or 0-equivalent) for the derivative values. This allows the signature of a `[TreatAsDifferentiable]` function to match a `[Differentiable]` requirment without actually having to produce a derivative.
+In such cases, we provide the `[TreatAsDifferentiable]` decoration (AST node: `TreatAsDifferentiableAttribute`, IR: `OpTreatAsDifferentiableDecoration`), which instructs the auto-diff passes to construct an 'empty' function that returns a 0 (or 0-equivalent) for the derivative values. This allows the signature of a `[TreatAsDifferentiable]` function to match a `[Differentiable]` requirement without actually having to produce a derivative.
 
 ## Custom derivative decorators
 In many cases, it is desirable to manually specify the derivative code for a method rather than let the auto-diff pass synthesize it from the method body. This is usually desirable if:
 1. The body of the method is too complex, and there is a simpler, mathematically equivalent way to compute the same value (often the case for intrinsics like `sin(x)`, `arccos(x)`, etc..)
-2. The method involves global/shared memory accesses, and synthesized derivative code may cause race conditions or be very slow due to overuse of synchronization. For this reason Slang assumes global memory accesses are non-differentiable by default, and requires that the user (or stdlib) define separate accessors with different derivative semantics.
+2. The method involves global/shared memory accesses, and synthesized derivative code may cause race conditions or be very slow due to overuse of synchronization. For this reason Slang assumes global memory accesses are non-differentiable by default, and requires that the user (or the core module) define separate accessors with different derivative semantics.
 
 The Slang front-end provides two sets of decorators to facilitate this:
 1. To reference a custom derivative function from a primal function: `[ForwardDerivative(fn)]` and `[BackwardDerivative(fn)]` (AST Nodes: `ForwardDerivativeAttribute`/`BackwardDerivativeAttribute`, IR: `OpForwardDervativeDecoration`/`OpBackwardDerivativeDecoration`), and 
-2. To reference a primal function from its custom derivative function: `[ForwardDerivativeOf(fn)]` and `[BackwardDerivativeOf(fn)]` (AST Nodes: `ForwardDerivativeAttributeOf`/`BackwardDerivativeAttributeOf`). These attributes are useful to provide custom derivatives for existing methods in a different file without having to edit/change that module. For instance, we use `diff.meta.slang` to provide derivatives for stdlib functions in `hlsl.meta.slang`. When lowering to IR, these references are placed on the target (primal function). That way both sets of decorations are lowered on the primal function.
+2. To reference a primal function from its custom derivative function: `[ForwardDerivativeOf(fn)]` and `[BackwardDerivativeOf(fn)]` (AST Nodes: `ForwardDerivativeAttributeOf`/`BackwardDerivativeAttributeOf`). These attributes are useful to provide custom derivatives for existing methods in a different file without having to edit/change that module. For instance, we use `diff.meta.slang` to provide derivatives for the core module functions in `hlsl.meta.slang`. When lowering to IR, these references are placed on the target (primal function). That way both sets of decorations are lowered on the primal function.
 
 These decorators also work on generically defined methods, as well as struct methods. Similar to how function calls work, these decorators also work on overloaded methods (and reuse the `ResolveInoke` infrastructure to perform resolution)
 
@@ -68,7 +68,7 @@ In some cases, we face the opposite problem that inspired custom derivatives. Th
 This frequently occurs with hardware intrinsic operations that are lowered into special op-codes that map to hardware units, such as texture sampling & interpolation operations. 
 However, these operations do have reference 'software' implementations which can be used to produce the derivative.
 
-To allow user code to use the fast hardward intrinsics for the primal pass, but use synthesized derivatives for the derivative pass, we provide decorators `[PrimalSubstitute(ref-fn)]` and `[PrimalSubstituteOf(orig-fn)]` (AST Node: `PrimalSubstituteAttribute`/`PrimalSubstituteOfAttribute`, IR: `OpPrimalSubstituteDecoration`), that can be used to provide a reference implementation for the auto-diff pass.
+To allow user code to use the fast hardware intrinsics for the primal pass, but use synthesized derivatives for the derivative pass, we provide decorators `[PrimalSubstitute(ref-fn)]` and `[PrimalSubstituteOf(orig-fn)]` (AST Node: `PrimalSubstituteAttribute`/`PrimalSubstituteOfAttribute`, IR: `OpPrimalSubstituteDecoration`), that can be used to provide a reference implementation for the auto-diff pass.
 
 Example:
 ```C

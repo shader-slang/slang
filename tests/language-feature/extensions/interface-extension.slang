@@ -16,7 +16,8 @@ struct MyCounter : ICounter
 	[mutating] void add(int value) { _state += value; }
 }
 
-extension ICounter
+__generic<T : ICounter>
+extension T
 {
 	[mutating] void increment()
 	{

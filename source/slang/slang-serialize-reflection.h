@@ -12,7 +12,7 @@ struct ReflectClassInfo
     typedef ReflectClassInfo ThisType;
 
     typedef void* (*CreateFunc)(void* context);
-    typedef void(*DestructorFunc)(void* ptr);
+    typedef void (*DestructorFunc)(void* ptr);
 
     /// A constant time implementation of isSubClassOf
     SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
@@ -37,24 +37,30 @@ struct ReflectClassInfo
         return type >= super.m_classId && type <= super.m_lastClassId;
     }
 
-        /// Will produce the same result as isSubClassOf (if enumerated), but more slowly by traversing the m_superClass
-        /// Works without initRange being called. 
+    /// Will produce the same result as isSubClassOf (if enumerated), but more slowly by traversing
+    /// the m_superClass Works without initRange being called.
     bool isSubClassOfSlow(const ThisType& super) const;
 
-        /// Calculate infos m_classId for all the infos specified such that they are honor the inheritance relationship
-        /// such that a m_classId of a child is > m_classId && <= m_lastClassId
-    static void calcClassIdHierachy(uint32_t baseIndex, ReflectClassInfo*const* infos, Index infosCount);
+    /// Calculate infos m_classId for all the infos specified such that they are honor the
+    /// inheritance relationship such that a m_classId of a child is > m_classId && <= m_lastClassId
+    static void calcClassIdHierachy(
+        uint32_t baseIndex,
+        ReflectClassInfo* const* infos,
+        Index infosCount);
 
-    uint32_t m_classId;                         ///< Not necessarily set.
+    uint32_t m_classId; ///< Not necessarily set.
     uint32_t m_lastClassId;
 
-    const ReflectClassInfo* m_superClass;       ///< The super class of this class, or nullptr if has no super class. 
-    const char* m_name;                         ///< Textual class name, for debugging 
-    CreateFunc m_createFunc;                    ///< Callback to use when creating instances (using an ASTBuilder for backing memory)
-    DestructorFunc m_destructorFunc;            ///< The destructor for this type. Being just destructor, does not free backing memory for type.
+    const ReflectClassInfo*
+        m_superClass;        ///< The super class of this class, or nullptr if has no super class.
+    const char* m_name;      ///< Textual class name, for debugging
+    CreateFunc m_createFunc; ///< Callback to use when creating instances (using an ASTBuilder for
+                             ///< backing memory)
+    DestructorFunc m_destructorFunc; ///< The destructor for this type. Being just destructor, does
+                                     ///< not free backing memory for type.
 
-    uint32_t m_sizeInBytes;                     ///< Total size of the type
-    uint8_t m_alignment;                        ///< The required alignment of the type
+    uint32_t m_sizeInBytes; ///< Total size of the type
+    uint8_t m_alignment;    ///< The required alignment of the type
 };
 
 // Does nothing - just a mark to the C++ extractor
@@ -65,8 +71,8 @@ struct ReflectClassInfo
 
 #define SLANG_TYPE_SET(SUFFIX, ...)
 
-// Use these macros to help define Super, and making the base definition NOT have a Super definition.
-// For example something like...
+// Use these macros to help define Super, and making the base definition NOT have a Super
+// definition. For example something like...
 
 #define SLANG_CLASS_REFLECT_SUPER_BASE(SUPER)
 #define SLANG_CLASS_REFLECT_SUPER_INNER(SUPER) typedef SUPER Super;

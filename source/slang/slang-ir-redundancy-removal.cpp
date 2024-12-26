@@ -1,4 +1,5 @@
 #include "slang-ir-redundancy-removal.h"
+
 #include "slang-ir-dominators.h"
 #include "slang-ir-util.h"
 
@@ -17,10 +18,15 @@ struct RedundancyRemovalContext
              parentBlock = dom->getImmediateDominator(parentBlock))
         {
             auto terminatorInst = parentBlock->getTerminator();
-            if (terminatorInst->getOp() == kIROp_loop)
+            if (auto loop = as<IRLoop>(terminatorInst))
             {
+                // If `inst` is outside of the loop region, don't hoist it into the loop.
+                if (dom->dominates(loop->getBreakBlock(), inst))
+                    continue;
+
                 // Consider hoisting the inst into this block.
-                // This is only possible if all operands of the inst are dominating `parentBlock`.
+                // This is only possible if all operands of the inst are dominating
+                // `parentBlock`.
                 bool canHoist = true;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
@@ -53,13 +59,18 @@ struct RedundancyRemovalContext
         return changed;
     }
 
-    bool removeRedundancyInBlock(Dictionary<IRBlock*, DeduplicateContext>& mapBlockToDedupContext, IRGlobalValueWithCode* func, IRBlock* block)
+    bool removeRedundancyInBlock(
+        Dictionary<IRBlock*, DeduplicateContext>& mapBlockToDedupContext,
+        IRGlobalValueWithCode* func,
+        IRBlock* block)
     {
         bool result = false;
         auto& deduplicateContext = mapBlockToDedupContext.getValue(block);
         for (auto instP : block->getModifiableChildren())
         {
-            auto resultInst = deduplicateContext.deduplicate(instP, [&](IRInst* inst)
+            auto resultInst = deduplicateContext.deduplicate(
+                instP,
+                [&](IRInst* inst)
                 {
                     auto parentBlock = as<IRBlock>(inst->getParent());
                     if (!parentBlock)
@@ -129,7 +140,7 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
         for (auto block : workList)
         {
             result |= context.removeRedundancyInBlock(mapBlockToDeduplicateContext, func, block);
-            
+
             for (auto child : context.dom->getImmediatelyDominatedBlocks(block))
             {
                 pendingWorkList.add(child);
@@ -143,6 +154,38 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
         result |= eliminateRedundantLoadStore(normalFunc);
     }
     return result;
+}
+
+// Remove IR definitions from all AvailableInDownstreamIR functions where the
+// languages match what we're currently targetting,  as these functions are
+// already defined in the embedded precompiled library.
+void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module)
+{
+    List<IRInst*> toRemove;
+    auto builder = IRBuilder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto funcInst = as<IRFunc>(globalInst))
+        {
+            if (auto dec = globalInst->findDecoration<IRAvailableInDownstreamIRDecoration>())
+            {
+                if ((dec->getTarget() == CodeGenTarget::DXIL && target == CodeGenTarget::HLSL) ||
+                    (dec->getTarget() == target))
+                {
+                    // Gut the function definition, turning it into a declaration
+                    for (auto block : funcInst->getBlocks())
+                    {
+                        toRemove.add(block);
+                    }
+                    builder.addDecoration(funcInst, kIROp_DownstreamModuleImportDecoration);
+                }
+            }
+        }
+    }
+    for (auto inst : toRemove)
+    {
+        inst->removeAndDeallocate();
+    }
 }
 
 static IRInst* _getRootVar(IRInst* inst)
@@ -192,8 +235,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
                     continue;
                 if (knownAccessChain.contains(use->getUser()))
                     continue;
-                if (use->getUser()->getOp() == kIROp_Store && 
-                    use == use->getUser()->getOperands())
+                if (use->getUser()->getOp() == kIROp_Store && use == use->getUser()->getOperands())
                 {
                     continue;
                 }
@@ -324,7 +366,8 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                     {
                         if (store->getPtr() == load->getPtr())
                         {
-                            // If the load is preceeded by a store without any side-effect insts in-between, remove the load.
+                            // If the load is preceeded by a store without any side-effect insts
+                            // in-between, remove the load.
                             auto value = store->getVal();
                             load->replaceUsesWith(value);
                             load->removeAndDeallocate();
@@ -349,4 +392,4 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
     return changed;
 }
 
-}
+} // namespace Slang

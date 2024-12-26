@@ -2,9 +2,10 @@
 #include "gui.h"
 
 #ifdef _WIN32
-#include <windows.h>
 #include <examples/imgui_impl_win32.h>
-IMGUI_IMPL_API LRESULT  ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+#include <windows.h>
+IMGUI_IMPL_API LRESULT
+ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif
 
 using namespace gfx;
@@ -16,19 +17,22 @@ namespace platform
 LRESULT CALLBACK guiWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     LRESULT handled = ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
-    if(handled) return handled;
+    if (handled)
+        return handled;
     ImGuiIO& io = ImGui::GetIO();
 
-    switch( msg )
+    switch (msg)
     {
     case WM_LBUTTONDOWN:
     case WM_LBUTTONUP:
-        if(io.WantCaptureMouse) handled = 1;
+        if (io.WantCaptureMouse)
+            handled = 1;
         break;
 
     case WM_KEYDOWN:
     case WM_KEYUP:
-        if(io.WantCaptureKeyboard) handled = 1;
+        if (io.WantCaptureKeyboard)
+            handled = 1;
         break;
     }
 
@@ -42,14 +46,13 @@ GUI::GUI(
     IDevice* inDevice,
     ICommandQueue* inQueue,
     IFramebufferLayout* framebufferLayout)
-    : device(inDevice)
-    , queue(inQueue)
+    : device(inDevice), queue(inQueue)
 {
-     ImGui::CreateContext();
-     ImGuiIO& io = ImGui::GetIO();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
 
 #ifdef _WIN32
-     ImGui_ImplWin32_Init((HWND)window->getNativeHandle().handleValues[0]);
+    ImGui_ImplWin32_Init((HWND)window->getNativeHandle().handleValues[0]);
 #endif
 
     // Let's do the initialization work required for our graphics API
@@ -57,8 +60,7 @@ GUI::GUI(
     // through the same interface as other work.
     //
 
-    static const char* shaderCode =
-    "cbuffer U { float4x4 mvp; };           \
+    static const char* shaderCode = "cbuffer U { float4x4 mvp; };           \
     Texture2D t;                            \
     SamplerState s;                         \
     struct AssembledVertex {                \
@@ -102,9 +104,9 @@ GUI::GUI(
     program = device->createProgram(programDesc);
 #endif
     InputElementDesc inputElements[] = {
-        {"U", 0, Format::R32G32_FLOAT,        offsetof(ImDrawVert, pos) },
-        {"U", 1, Format::R32G32_FLOAT,        offsetof(ImDrawVert, uv) },
-        {"U", 2, Format::R8G8B8A8_UNORM,  offsetof(ImDrawVert, col) },
+        {"U", 0, Format::R32G32_FLOAT, offsetof(ImDrawVert, pos)},
+        {"U", 1, Format::R32G32_FLOAT, offsetof(ImDrawVert, uv)},
+        {"U", 2, Format::R8G8B8A8_UNORM, offsetof(ImDrawVert, col)},
     };
     auto inputLayout = device->createInputLayout(
         sizeof(ImDrawVert),
@@ -163,7 +165,7 @@ GUI::GUI(
         viewDesc.type = IResourceView::Type::ShaderResource;
         auto textureView = device->createTextureView(texture, viewDesc);
 
-        io.Fonts->TexID = (void*) textureView.detach();
+        io.Fonts->TexID = (void*)textureView.detach();
     }
 
     {
@@ -187,7 +189,6 @@ GUI::GUI(
 }
 
 
-
 void GUI::beginFrame()
 {
 #ifdef _WIN32
@@ -205,9 +206,12 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     auto indexCount = draw_data->TotalIdxCount;
     int commandListCount = draw_data->CmdListsCount;
 
-    if(!vertexCount)        return;
-    if(!indexCount)         return;
-    if(!commandListCount)   return;
+    if (!vertexCount)
+        return;
+    if (!indexCount)
+        return;
+    if (!commandListCount)
+        return;
 
     // Allocate transient vertex/index buffers to hold the data for this frame.
 
@@ -231,7 +235,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     auto cmdBuf = transientHeap->createCommandBuffer();
     auto encoder = cmdBuf->encodeResourceCommands();
     {
-        for(int ii = 0; ii < commandListCount; ++ii)
+        for (int ii = 0; ii < commandListCount; ++ii)
         {
             const ImDrawList* commandList = draw_data->CmdLists[ii];
             encoder->uploadBufferData(
@@ -262,12 +266,11 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
         float R = draw_data->DisplayPos.x + draw_data->DisplaySize.x;
         float T = draw_data->DisplayPos.y;
         float B = draw_data->DisplayPos.y + draw_data->DisplaySize.y;
-        float mvp[4][4] =
-        {
-            { 2.0f/(R-L),   0.0f,           0.0f,       0.0f },
-            { 0.0f,         2.0f/(T-B),     0.0f,       0.0f },
-            { 0.0f,         0.0f,           0.5f,       0.0f },
-            { (R+L)/(L-R),  (T+B)/(B-T),    0.5f,       1.0f },
+        float mvp[4][4] = {
+            {2.0f / (R - L), 0.0f, 0.0f, 0.0f},
+            {0.0f, 2.0f / (T - B), 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.5f, 0.0f},
+            {(R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f},
         };
         encoder->uploadBufferData(constantBuffer, 0, sizeof(mvp), mvp);
     }
@@ -290,37 +293,39 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
 
     renderEncoder->setVertexBuffer(0, vertexBuffer);
     renderEncoder->setIndexBuffer(
-        indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R16_UINT : Format::R32_UINT);
+        indexBuffer,
+        sizeof(ImDrawIdx) == 2 ? Format::R16_UINT : Format::R32_UINT);
     renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
     uint32_t vertexOffset = 0;
     uint32_t indexOffset = 0;
     ImVec2 pos = draw_data->DisplayPos;
-    for(int ii = 0; ii < commandListCount; ++ii)
+    for (int ii = 0; ii < commandListCount; ++ii)
     {
         auto commandList = draw_data->CmdLists[ii];
         auto commandCount = commandList->CmdBuffer.Size;
-        for(int jj = 0; jj < commandCount; jj++)
+        for (int jj = 0; jj < commandCount; jj++)
         {
             auto command = &commandList->CmdBuffer[jj];
-            if(auto userCallback = command->UserCallback)
+            if (auto userCallback = command->UserCallback)
             {
                 userCallback(commandList, command);
             }
             else
             {
-                ScissorRect rect =
-                {
+                ScissorRect rect = {
                     (int32_t)(command->ClipRect.x - pos.x),
                     (int32_t)(command->ClipRect.y - pos.y),
                     (int32_t)(command->ClipRect.z - pos.x),
-                    (int32_t)(command->ClipRect.w - pos.y)
-                };
+                    (int32_t)(command->ClipRect.w - pos.y)};
                 renderEncoder->setScissorRects(1, &rect);
 
                 // TODO: set parameter into root shader object.
-                
-                renderEncoder->drawIndexed(command->ElemCount, (uint32_t)indexOffset, (uint32_t)vertexOffset);
+
+                renderEncoder->drawIndexed(
+                    command->ElemCount,
+                    (uint32_t)indexOffset,
+                    (uint32_t)vertexOffset);
             }
             indexOffset += command->ElemCount;
         }
@@ -337,24 +342,24 @@ GUI::~GUI()
 
     {
         ComPtr<IResourceView> textureView;
-        textureView.attach((IResourceView*) io.Fonts->TexID);
+        textureView.attach((IResourceView*)io.Fonts->TexID);
         textureView = nullptr;
     }
 
 #ifdef _WIN32
-     ImGui_ImplWin32_Shutdown();
+    ImGui_ImplWin32_Shutdown();
 #endif
 
-     ImGui::DestroyContext();
+    ImGui::DestroyContext();
 }
 
-} // gfx
+} // namespace platform
 
 #include <imgui.cpp>
 #include <imgui_draw.cpp>
 #include <imgui_widgets.cpp>
 #ifdef _WIN32
-// imgui_impl_win32 defines these, so make sure it doesn't error because
+  // imgui_impl_win32 defines these, so make sure it doesn't error because
 // they're already there
 #undef WIN32_LEAN_AND_MEAN
 #undef NOMINMAX

@@ -1,3 +1,4 @@
+//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute  -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 

@@ -1,24 +1,23 @@
 // slang-module-library.cpp
 #include "slang-module-library.h"
-#include <assert.h>
 
 #include "../core/slang-blob.h"
 #include "../core/slang-riff.h"
-
 #include "../core/slang-type-text-util.h"
 
-// Serialization
-#include "slang-serialize-ir.h"
-#include "slang-serialize-container.h"
+#include <assert.h>
 
-namespace Slang {
+// Serialization
+#include "slang-serialize-container.h"
+#include "slang-serialize-ir.h"
+
+namespace Slang
+{
 
 void* ModuleLibrary::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || 
-        uuid == ICastable::getTypeGuid() || 
-        uuid == IArtifactRepresentation::getTypeGuid() ||
-        uuid == IModuleLibrary::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ICastable::getTypeGuid() ||
+        uuid == IArtifactRepresentation::getTypeGuid() || uuid == IModuleLibrary::getTypeGuid())
     {
         return static_cast<IModuleLibrary*>(this);
     }
@@ -39,7 +38,12 @@ void* ModuleLibrary::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, String path, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(
+    const Byte* inBytes,
+    size_t bytesCount,
+    String path,
+    EndToEndCompileRequest* req,
+    ComPtr<IModuleLibrary>& outLibrary)
 {
     auto library = new ModuleLibrary;
     ComPtr<IModuleLibrary> scopeLibrary(library);
@@ -63,7 +67,8 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, String pat
         options.sink = req->getSink();
         options.astBuilder = linkage->getASTBuilder();
         options.modulePath = path;
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, nullptr, containerData));
+        SLANG_RETURN_ON_FAIL(
+            SerialContainerUtil::read(&riffContainer, options, nullptr, containerData));
         DiagnosticSink sink;
 
         // Modules in the container should be serialized in its depedency order,
@@ -80,7 +85,8 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, String pat
                 auto loadedModule = linkage->loadDeserializedModule(
                     as<ModuleDecl>(module.astRootNode)->getName(),
                     PathInfo::makePath(module.dependentFiles.getFirst()),
-                    module, &sink);
+                    module,
+                    &sink);
                 if (!loadedModule)
                     return SLANG_FAIL;
                 library->m_modules.add(loadedModule);
@@ -103,7 +109,12 @@ SlangResult loadModuleLibrary(const Byte* inBytes, size_t bytesCount, String pat
     return SLANG_OK;
 }
 
-SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, String path, EndToEndCompileRequest* req, ComPtr<IModuleLibrary>& outLibrary)
+SlangResult loadModuleLibrary(
+    ArtifactKeep keep,
+    IArtifact* artifact,
+    String path,
+    EndToEndCompileRequest* req,
+    ComPtr<IModuleLibrary>& outLibrary)
 {
     if (auto foundLibrary = findRepresentation<IModuleLibrary>(artifact))
     {
@@ -117,8 +128,13 @@ SlangResult loadModuleLibrary(ArtifactKeep keep, IArtifact* artifact, String pat
 
     // Load the module
     ComPtr<IModuleLibrary> library;
-    SLANG_RETURN_ON_FAIL(loadModuleLibrary((const Byte*)blob->getBufferPointer(), blob->getBufferSize(), path, req, library));
-    
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary(
+        (const Byte*)blob->getBufferPointer(),
+        blob->getBufferSize(),
+        path,
+        req,
+        library));
+
     if (canKeep(keep))
     {
         artifact->addRepresentation(library);

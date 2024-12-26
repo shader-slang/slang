@@ -1,6 +1,7 @@
 #include "slang-test-server-protocol.h"
 
-namespace TestServerProtocol {
+namespace TestServerProtocol
+{
 
 static const StructRttiInfo _makeExecuteUnitTestArgsRtti()
 {
@@ -12,8 +13,9 @@ static const StructRttiInfo _makeExecuteUnitTestArgsRtti()
     builder.addField("enabledApis", &obj.enabledApis);
     return builder.make();
 }
-/* static */const UnownedStringSlice ExecuteUnitTestArgs::g_methodName = UnownedStringSlice::fromLiteral("unitTest");
-/* static */const StructRttiInfo ExecuteUnitTestArgs::g_rttiInfo = _makeExecuteUnitTestArgsRtti();
+/* static */ const UnownedStringSlice ExecuteUnitTestArgs::g_methodName =
+    UnownedStringSlice::fromLiteral("unitTest");
+/* static */ const StructRttiInfo ExecuteUnitTestArgs::g_rttiInfo = _makeExecuteUnitTestArgsRtti();
 
 static const StructRttiInfo _makeExecuteToolTestArgsRtti()
 {
@@ -23,8 +25,9 @@ static const StructRttiInfo _makeExecuteToolTestArgsRtti()
     builder.addField("args", &obj.args);
     return builder.make();
 }
-/* static */const StructRttiInfo ExecuteToolTestArgs::g_rttiInfo = _makeExecuteToolTestArgsRtti();
-/* static */const UnownedStringSlice ExecuteToolTestArgs::g_methodName = UnownedStringSlice::fromLiteral("tool");
+/* static */ const StructRttiInfo ExecuteToolTestArgs::g_rttiInfo = _makeExecuteToolTestArgsRtti();
+/* static */ const UnownedStringSlice ExecuteToolTestArgs::g_methodName =
+    UnownedStringSlice::fromLiteral("tool");
 
 static const StructRttiInfo _makeExecutionResultRtti()
 {
@@ -36,8 +39,9 @@ static const StructRttiInfo _makeExecutionResultRtti()
     builder.addField("returnCode", &obj.returnCode);
     return builder.make();
 }
-/* static */const StructRttiInfo ExecutionResult::g_rttiInfo = _makeExecutionResultRtti();
+/* static */ const StructRttiInfo ExecutionResult::g_rttiInfo = _makeExecutionResultRtti();
 
-/* static */const UnownedStringSlice QuitArgs::g_methodName = UnownedStringSlice::fromLiteral("quit");
+/* static */ const UnownedStringSlice QuitArgs::g_methodName =
+    UnownedStringSlice::fromLiteral("quit");
 
 } // namespace TestServerProtocol

@@ -1,16 +1,16 @@
 // slang-diagnostic-sink.cpp
 #include "slang-diagnostic-sink.h"
 
-#include "slang-name.h"
+#include "../core/slang-char-util.h"
+#include "../core/slang-dictionary.h"
+#include "../core/slang-memory-arena.h"
+#include "../core/slang-string-util.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name-convention-util.h"
+#include "slang-name.h"
 
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-char-util.h"
-
-namespace Slang {
+namespace Slang
+{
 
 void printDiagnosticArg(StringBuilder& sb, char const* str)
 {
@@ -75,10 +75,14 @@ SourceLoc getDiagnosticPos(Token const& token)
 }
 
 // Take the format string for a diagnostic message, along with its arguments, and turn it into a
-static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int argCount, DiagnosticArg const* args)
+static void formatDiagnosticMessage(
+    StringBuilder& sb,
+    char const* format,
+    int argCount,
+    DiagnosticArg const* args)
 {
     char const* spanBegin = format;
-    for(;;)
+    for (;;)
     {
         char const* spanEnd = spanBegin;
         while (int c = *spanEnd)
@@ -97,7 +101,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
         int d = *spanEnd++;
         switch (d)
         {
-        // A double dollar sign `$$` is used to emit a single `$` 
+        // A double dollar sign `$$` is used to emit a single `$`
         case '$':
             sb.append('$');
             break;
@@ -105,13 +109,22 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
         // A single digit means to emit the corresponding argument.
         // TODO: support more than 10 arguments, and add options
         // to control formatting, etc.
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
             {
                 int index = d - '0';
                 if (index >= argCount)
                 {
-                    // TODO(tfoley): figure out what a good policy will be for "panic" situations like this
+                    // TODO(tfoley): figure out what a good policy will be for "panic" situations
+                    // like this
                     SLANG_INVALID_OPERATION("too few arguments for diagnostic message");
                 }
                 else
@@ -131,7 +144,11 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
     }
 }
 
-static void formatDiagnostic(const HumaneSourceLoc& humaneLoc, Diagnostic const& diagnostic, DiagnosticSink::Flags flags, StringBuilder& outBuilder)
+static void formatDiagnostic(
+    const HumaneSourceLoc& humaneLoc,
+    Diagnostic const& diagnostic,
+    DiagnosticSink::Flags flags,
+    StringBuilder& outBuilder)
 {
     if (flags & DiagnosticSink::Flag::HumaneLoc)
     {
@@ -161,7 +178,7 @@ static void formatDiagnostic(const HumaneSourceLoc& humaneLoc, Diagnostic const&
 static void _replaceTabWithSpaces(const UnownedStringSlice& slice, Int tabSize, StringBuilder& out)
 {
     const char* start = slice.begin();
-    const char*const end = slice.end();
+    const char* const end = slice.end();
 
     const Index startLength = out.getLength();
 
@@ -211,12 +228,14 @@ static void _replaceTabWithSpaces(const UnownedStringSlice& slice, Int tabSize, 
 
 // Given multi-line text, and a position within the text (as a pointer into the memory of text)
 // extract the line that contains pos
-static UnownedStringSlice _extractLineContainingPosition(const UnownedStringSlice& text, const char* pos)
+static UnownedStringSlice _extractLineContainingPosition(
+    const UnownedStringSlice& text,
+    const char* pos)
 {
     SLANG_ASSERT(text.isMemoryContained(pos));
 
-    const char*const contentStart = text.begin();
-    const char*const contentEnd = text.end();
+    const char* const contentStart = text.begin();
+    const char* const contentEnd = text.end();
 
     // We want to determine the start of the line, and the end of the line
     const char* start = pos;
@@ -251,7 +270,11 @@ static void _reduceLength(Index startIndex, const UnownedStringSlice& prefix, St
     ioBuf = buf;
 }
 
-static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb)
+static void _sourceLocationNoteDiagnostic(
+    DiagnosticSink* sink,
+    SourceView* sourceView,
+    SourceLoc sourceLoc,
+    StringBuilder& sb)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
     if (!sourceFile)
@@ -262,8 +285,9 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
     UnownedStringSlice content = sourceFile->getContent();
 
     // Make sure the offset is within content.
-    // This is important because it's possible to have a 'SourceFile' that doesn't contain any content
-    // (for example when reconstructed via serialization with just line offsets, the actual source text 'content' isn't available).
+    // This is important because it's possible to have a 'SourceFile' that doesn't contain any
+    // content (for example when reconstructed via serialization with just line offsets, the actual
+    // source text 'content' isn't available).
     const int offset = sourceView->getRange().getOffset(sourceLoc);
     if (offset < 0 || offset >= content.getLength())
     {
@@ -271,7 +295,7 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
     }
 
     // Work out the position of the SourceLoc in the source
-    const char*const pos = content.begin() + offset;
+    const char* const pos = content.begin() + offset;
 
     UnownedStringSlice line = _extractLineContainingPosition(content, pos);
 
@@ -287,7 +311,7 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
 
     // First work out the sourceLine
     _replaceTabWithSpaces(line, tabSize, sourceLine);
-    
+
     // Now the caretLine which appears underneath the sourceLine
     {
         // Produce the text up to the caret position (at pos), taking into account tabs
@@ -321,9 +345,9 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
             const UnownedStringSlice spaces = UnownedStringSlice::fromLiteral("   ");
             SLANG_ASSERT(ellipsis.getLength() == spaces.getLength());
 
-            // We use the caretLine length if we have a lexer, because it will have underscores such that it's end is the end of
-            // the item at issue.
-            // If we don't have the lexer, we guesstimate using 1/4 of the maximum length
+            // We use the caretLine length if we have a lexer, because it will have underscores such
+            // that it's end is the end of the item at issue. If we don't have the lexer, we
+            // guesstimate using 1/4 of the maximum length
             const Index endIndex = lexer ? caretLine.getLength() : (caretIndex + (maxLength / 4));
 
             if (endIndex > maxLength)
@@ -344,9 +368,8 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
         }
     }
 
-    // We could have handling here for if the line is too long, that we surround the important section
-    // will ellipsis for example.
-    // For now we just output.
+    // We could have handling here for if the line is too long, that we surround the important
+    // section will ellipsis for example. For now we just output.
 
     sb << sourceLine << "\n";
     sb << caretLine << "\n";
@@ -354,7 +377,10 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
 
 // Output the length of the token at `sourceLoc`. This is used by language server.
 static void _tokenLengthNoteDiagnostic(
-    DiagnosticSink* sink, SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb)
+    DiagnosticSink* sink,
+    SourceView* sourceView,
+    SourceLoc sourceLoc,
+    StringBuilder& sb)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
     if (!sourceFile)
@@ -394,10 +420,7 @@ static void _tokenLengthNoteDiagnostic(
     }
 }
 
-static void formatDiagnostic(
-    DiagnosticSink*     sink,
-    Diagnostic const&   diagnostic,
-    StringBuilder&      sb)
+static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic, StringBuilder& sb)
 {
     auto sourceManager = sink->getSourceManager();
 
@@ -413,15 +436,19 @@ static void formatDiagnostic(
                 humaneLoc = sourceView->getHumaneLoc(sourceLoc);
             }
         }
-        
+
         formatDiagnostic(humaneLoc, diagnostic, sink->getFlags(), sb);
 
         {
             SourceView* currentView = sourceView;
 
-            while (currentView && currentView->getInitiatingSourceLoc().isValid() && currentView->getSourceFile()->getPathInfo().type == PathInfo::Type::TokenPaste)
+            while (currentView && currentView->getInitiatingSourceLoc().isValid() &&
+                   currentView->getSourceFile()->getPathInfo().type == PathInfo::Type::TokenPaste)
             {
-                SourceView* initiatingView = sourceManager ? sourceManager->findSourceView(currentView->getInitiatingSourceLoc()) : nullptr;
+                SourceView* initiatingView =
+                    sourceManager
+                        ? sourceManager->findSourceView(currentView->getInitiatingSourceLoc())
+                        : nullptr;
                 if (initiatingView == nullptr)
                 {
                     break;
@@ -441,8 +468,10 @@ static void formatDiagnostic(
                 initiationDiagnostic.severity = diagnosticInfo.severity;
 
                 // TODO(JS):
-                // Not 100%  clear what the best sourceLoc type is most useful here - we will go with default for now
-                HumaneSourceLoc pasteHumaneLoc = initiatingView->getHumaneLoc(sourceView->getInitiatingSourceLoc());
+                // Not 100%  clear what the best sourceLoc type is most useful here - we will go
+                // with default for now
+                HumaneSourceLoc pasteHumaneLoc =
+                    initiatingView->getHumaneLoc(sourceView->getInitiatingSourceLoc());
 
                 // Okay we should output where the token paste took place
                 formatDiagnostic(pasteHumaneLoc, initiationDiagnostic, sink->getFlags(), sb);
@@ -459,7 +488,8 @@ static void formatDiagnostic(
         _tokenLengthNoteDiagnostic(sink, sourceView, sourceLoc, sb);
     }
 
-    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.loc.isValid())
+    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) &&
+        diagnostic.loc.isValid())
     {
         _sourceLocationNoteDiagnostic(sink, sourceView, sourceLoc, sb);
     }
@@ -473,9 +503,8 @@ static void formatDiagnostic(
 
         // Only output if it's actually different
         if (actualHumaneLoc.pathInfo.foundPath != humaneLoc.pathInfo.foundPath ||
-            actualHumaneLoc.line != humaneLoc.line ||
-            actualHumaneLoc.column != humaneLoc.column)
-        { 
+            actualHumaneLoc.line != humaneLoc.line || actualHumaneLoc.column != humaneLoc.column)
+        {
             formatDiagnostic(actualHumaneLoc, diagnostic, sink->getFlags(), sb);
         }
     }
@@ -533,7 +562,8 @@ SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
 {
     // If the client doesn't want an output blob, there is nothing to do.
     //
-    if (!outBlob) return SLANG_OK;
+    if (!outBlob)
+        return SLANG_OK;
 
     // For outputBuffer to be valid and hold diagnostics, writer must not be set
     SLANG_ASSERT(writer == nullptr);
@@ -550,7 +580,9 @@ SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
     return SLANG_OK;
 }
 
-bool DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage)
+bool DiagnosticSink::diagnoseImpl(
+    DiagnosticInfo const& info,
+    const UnownedStringSlice& formattedMessage)
 {
     if (info.severity >= Severity::Error)
     {
@@ -574,7 +606,8 @@ bool DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStrin
     if (info.severity >= Severity::Fatal)
     {
         // TODO: figure out a better policy for aborting compilation
-        SLANG_ABORT_COMPILATION("");
+        std::string message(formattedMessage.begin(), formattedMessage.end());
+        SLANG_ABORT_COMPILATION(message.c_str());
     }
     return true;
 }
@@ -599,7 +632,11 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
     return effectiveSeverity;
 }
 
-bool DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int argCount, DiagnosticArg const* args)
+bool DiagnosticSink::diagnoseImpl(
+    SourceLoc const& pos,
+    DiagnosticInfo info,
+    int argCount,
+    DiagnosticArg const* args)
 {
     // Override the severity in the 'info' structure to pass it further into formatDiagnostics
     info.severity = getEffectiveMessageSeverity(info);
@@ -625,16 +662,12 @@ bool DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo info, int
     return diagnoseImpl(info, messageBuilder.getUnownedSlice());
 }
 
-void DiagnosticSink::diagnoseRaw(
-    Severity    severity,
-    char const* message)
+void DiagnosticSink::diagnoseRaw(Severity severity, char const* message)
 {
     return diagnoseRaw(severity, UnownedStringSlice(message));
 }
 
-void DiagnosticSink::diagnoseRaw(
-    Severity    severity,
-    const UnownedStringSlice& message)
+void DiagnosticSink::diagnoseRaw(Severity severity, const UnownedStringSlice& message)
 {
     if (severity >= Severity::Error)
     {
@@ -642,7 +675,7 @@ void DiagnosticSink::diagnoseRaw(
     }
 
     // Did the client supply a callback for us to use?
-    if(writer)
+    if (writer)
     {
         // If so, pass the error string along to them.
         writer->write(message.begin(), message.getLength());
@@ -666,7 +699,10 @@ void DiagnosticSink::diagnoseRaw(
     }
 }
 
-void DiagnosticSink::overrideDiagnosticSeverity(int diagnosticId, Severity overrideSeverity, const DiagnosticInfo* info)
+void DiagnosticSink::overrideDiagnosticSeverity(
+    int diagnosticId,
+    Severity overrideSeverity,
+    const DiagnosticInfo* info)
 {
     if (info)
     {
@@ -684,7 +720,8 @@ void DiagnosticSink::overrideDiagnosticSeverity(int diagnosticId, Severity overr
     m_severityOverrides[diagnosticId] = overrideSeverity;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticLookup !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticLookup
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 Index DiagnosticsLookup::_findDiagnosticIndexByExactName(const UnownedStringSlice& slice) const
 {
@@ -714,7 +751,8 @@ const DiagnosticInfo* DiagnosticsLookup::getDiagnosticById(Int id) const
     return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
 }
 
-const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByExactName(const UnownedStringSlice& slice) const
+const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByExactName(
+    const UnownedStringSlice& slice) const
 {
     const Index* indexPtr = m_nameMap.tryGetValue(slice);
     return indexPtr ? m_diagnostics[*indexPtr] : nullptr;
@@ -725,9 +763,12 @@ const DiagnosticInfo* DiagnosticsLookup::findDiagnosticByName(const UnownedStrin
     const auto convention = NameConventionUtil::inferConventionFromText(slice);
     switch (convention)
     {
-        case NameConvention::Invalid:       return nullptr;
-        case NameConvention::LowerCamel:    return findDiagnosticByExactName(slice);
-        default:                            break;
+    case NameConvention::Invalid:
+        return nullptr;
+    case NameConvention::LowerCamel:
+        return findDiagnosticByExactName(slice);
+    default:
+        break;
     }
 
     StringBuilder buf;
@@ -746,11 +787,11 @@ Index DiagnosticsLookup::add(const DiagnosticInfo* info)
 
     _addName(info->name, diagnosticIndex);
     m_idMap.addIfNotExists(info->id, diagnosticIndex);
-    
+
     return diagnosticIndex;
 }
 
-void DiagnosticsLookup::add(const DiagnosticInfo*const* infos, Index infosCount)
+void DiagnosticsLookup::add(const DiagnosticInfo* const* infos, Index infosCount)
 {
     for (Index i = 0; i < infosCount; ++i)
     {
@@ -758,19 +799,21 @@ void DiagnosticsLookup::add(const DiagnosticInfo*const* infos, Index infosCount)
     }
 }
 
-DiagnosticsLookup::DiagnosticsLookup():
-    m_arena(kArenaInitialSize)
+DiagnosticsLookup::DiagnosticsLookup()
+    : m_arena(kArenaInitialSize)
 {
 }
 
-DiagnosticsLookup::DiagnosticsLookup(const DiagnosticInfo*const* diagnostics, Index diagnosticsCount) :
-    m_arena(kArenaInitialSize)
+DiagnosticsLookup::DiagnosticsLookup(
+    const DiagnosticInfo* const* diagnostics,
+    Index diagnosticsCount)
+    : m_arena(kArenaInitialSize)
 {
     // TODO: We should eventually have a more formal system for associating individual
     // diagnostics, or groups of diagnostics, with user-exposed names for use when
     // enabling/disabling warnings (or turning warnings into errors, etc.).
     //
-    // For now we build a map from diagnostic name to it's entry. 
+    // For now we build a map from diagnostic name to it's entry.
 
     add(diagnostics, diagnosticsCount);
 }

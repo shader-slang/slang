@@ -39,11 +39,13 @@ void PerEntryPointPass::processModule(IRModule* module)
     }
 }
 
-void PerEntryPointPass::processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecoration)
+void PerEntryPointPass::processEntryPoint(
+    IRFunc* entryPointFunc,
+    IREntryPointDecoration* entryPointDecoration)
 {
     m_entryPoint.func = entryPointFunc;
     m_entryPoint.decoration = entryPointDecoration;
     processEntryPointImpl(m_entryPoint);
 }
 
-}
+} // namespace Slang

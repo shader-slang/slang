@@ -1,4 +1,4 @@
-//slang-ir-generics-lowering-context.cpp
+// slang-ir-generics-lowering-context.cpp
 
 #include "slang-ir-generics-lowering-context.h"
 
@@ -7,18 +7,18 @@
 
 namespace Slang
 {
-    bool isPolymorphicType(IRInst* typeInst)
+bool isPolymorphicType(IRInst* typeInst)
+{
+    if (as<IRParam>(typeInst) && as<IRTypeType>(typeInst->getDataType()))
+        return true;
+    switch (typeInst->getOp())
     {
-        if (as<IRParam>(typeInst) && as<IRTypeType>(typeInst->getDataType()))
-            return true;
-        switch (typeInst->getOp())
-        {
-        case kIROp_ThisType:
-        case kIROp_AssociatedType:
-        case kIROp_InterfaceType:
-        case kIROp_LookupWitness:
-            return true;
-        case kIROp_Specialize:
+    case kIROp_ThisType:
+    case kIROp_AssociatedType:
+    case kIROp_InterfaceType:
+    case kIROp_LookupWitness:
+        return true;
+    case kIROp_Specialize:
         {
             for (UInt i = 0; i < typeInst->getOperandCount(); i++)
             {
@@ -27,138 +27,144 @@ namespace Slang
             }
             return false;
         }
+    default:
+        break;
+    }
+    if (auto ptrType = as<IRPtrTypeBase>(typeInst))
+    {
+        return isPolymorphicType(ptrType->getValueType());
+    }
+    return false;
+}
+
+bool isTypeValue(IRInst* typeInst)
+{
+    if (typeInst)
+    {
+        switch (typeInst->getOp())
+        {
+        case kIROp_TypeType:
+        case kIROp_TypeKind:
+            return true;
         default:
-            break;
+            return false;
         }
-        if (auto ptrType = as<IRPtrTypeBase>(typeInst))
-        {
-            return isPolymorphicType(ptrType->getValueType());
-        }
-        return false;
     }
+    return false;
+}
 
-    bool isTypeValue(IRInst* typeInst)
-    {
-        if (typeInst)
-        {
-            switch (typeInst->getOp())
-            {
-            case kIROp_TypeType:
-            case kIROp_TypeKind:
-                return true;
-            default:
-                return false;
-            }
-        }
-        return false;
-    }
-
-    IRInst* SharedGenericsLoweringContext::maybeEmitRTTIObject(IRInst* typeInst)
-    {
-        IRInst* result = nullptr;
-        if (mapTypeToRTTIObject.tryGetValue(typeInst, result))
-            return result;
-        IRBuilder builderStorage(module);
-        auto builder = &builderStorage;
-        builder->setInsertAfter(typeInst);
-
-        result = builder->emitMakeRTTIObject(typeInst);
-
-        // For now the only type info we encapsualte is type size.
-        IRSizeAndAlignment sizeAndAlignment;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), (IRType*)typeInst, &sizeAndAlignment);
-        builder->addRTTITypeSizeDecoration(result, sizeAndAlignment.size);
-
-        // Give a name to the rtti object.
-        if (auto exportDecoration = typeInst->findDecoration<IRExportDecoration>())
-        {
-            String rttiObjName = exportDecoration->getMangledName();
-            builder->addExportDecoration(result, rttiObjName.getUnownedSlice());
-        }
-
-        // Make sure the RTTI object for an exported struct type is marked as export if the type is.
-        if (typeInst->findDecoration<IRHLSLExportDecoration>())
-        {
-            builder->addHLSLExportDecoration(result);
-            builder->addKeepAliveDecoration(result);
-        }
-        mapTypeToRTTIObject[typeInst] = result;
+IRInst* SharedGenericsLoweringContext::maybeEmitRTTIObject(IRInst* typeInst)
+{
+    IRInst* result = nullptr;
+    if (mapTypeToRTTIObject.tryGetValue(typeInst, result))
         return result;
+    IRBuilder builderStorage(module);
+    auto builder = &builderStorage;
+    builder->setInsertAfter(typeInst);
+
+    result = builder->emitMakeRTTIObject(typeInst);
+
+    // For now the only type info we encapsualte is type size.
+    IRSizeAndAlignment sizeAndAlignment;
+    getNaturalSizeAndAlignment(targetProgram->getOptionSet(), (IRType*)typeInst, &sizeAndAlignment);
+    builder->addRTTITypeSizeDecoration(result, sizeAndAlignment.size);
+
+    // Give a name to the rtti object.
+    if (auto exportDecoration = typeInst->findDecoration<IRExportDecoration>())
+    {
+        String rttiObjName = exportDecoration->getMangledName();
+        builder->addExportDecoration(result, rttiObjName.getUnownedSlice());
     }
 
-    IRInst* SharedGenericsLoweringContext::findInterfaceRequirementVal(IRInterfaceType* interfaceType, IRInst* requirementKey)
+    // Make sure the RTTI object for an exported struct type is marked as export if the type is.
+    if (typeInst->findDecoration<IRHLSLExportDecoration>())
     {
-        if (auto dict = mapInterfaceRequirementKeyValue.tryGetValue(interfaceType))
-            return dict->getValue(requirementKey);
-        _builldInterfaceRequirementMap(interfaceType);
-        return findInterfaceRequirementVal(interfaceType, requirementKey);
+        builder->addHLSLExportDecoration(result);
+        builder->addKeepAliveDecoration(result);
+    }
+    mapTypeToRTTIObject[typeInst] = result;
+    return result;
+}
+
+IRInst* SharedGenericsLoweringContext::findInterfaceRequirementVal(
+    IRInterfaceType* interfaceType,
+    IRInst* requirementKey)
+{
+    if (auto dict = mapInterfaceRequirementKeyValue.tryGetValue(interfaceType))
+        return dict->getValue(requirementKey);
+    _builldInterfaceRequirementMap(interfaceType);
+    return findInterfaceRequirementVal(interfaceType, requirementKey);
+}
+
+void SharedGenericsLoweringContext::_builldInterfaceRequirementMap(IRInterfaceType* interfaceType)
+{
+    mapInterfaceRequirementKeyValue.add(interfaceType, Dictionary<IRInst*, IRInst*>());
+    auto dict = mapInterfaceRequirementKeyValue.tryGetValue(interfaceType);
+    for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
+    {
+        auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
+        (*dict)[entry->getRequirementKey()] = entry->getRequirementVal();
+    }
+}
+
+IRType* SharedGenericsLoweringContext::lowerAssociatedType(IRBuilder* builder, IRInst* type)
+{
+    if (type->getOp() != kIROp_AssociatedType)
+        return (IRType*)type;
+    IRIntegerValue anyValueSize = kInvalidAnyValueSize;
+    for (UInt i = 0; i < type->getOperandCount(); i++)
+    {
+        anyValueSize =
+            Math::Min(anyValueSize, getInterfaceAnyValueSize(type->getOperand(i), type->sourceLoc));
+    }
+    if (anyValueSize == kInvalidAnyValueSize)
+    {
+        // We could conceivably make it an error to have an associated type
+        // without an `[anyValueSize(...)]` attribute, but then we risk
+        // producing error messages even when doing 100% static specialization.
+        //
+        // It is simpler to use a reasonable default size and treat any
+        // type without an explicit attribute as using that size.
+        //
+        anyValueSize = kDefaultAnyValueSize;
+    }
+    return builder->getAnyValueType(anyValueSize);
+}
+
+IRType* SharedGenericsLoweringContext::lowerType(
+    IRBuilder* builder,
+    IRInst* paramType,
+    const Dictionary<IRInst*, IRInst*>& typeMapping,
+    IRType* concreteType)
+{
+    if (!paramType)
+        return nullptr;
+
+    IRInst* resultType;
+    if (typeMapping.tryGetValue(paramType, resultType))
+        return (IRType*)resultType;
+
+    if (isTypeValue(paramType))
+    {
+        return builder->getRTTIHandleType();
     }
 
-    void SharedGenericsLoweringContext::_builldInterfaceRequirementMap(IRInterfaceType* interfaceType)
+    switch (paramType->getOp())
     {
-        mapInterfaceRequirementKeyValue.add(interfaceType,
-            Dictionary<IRInst*, IRInst*>());
-        auto dict = mapInterfaceRequirementKeyValue.tryGetValue(interfaceType);
-        for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
-        {
-            auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
-            (*dict)[entry->getRequirementKey()] = entry->getRequirementVal();
-        }
-    }
-
-    IRType* SharedGenericsLoweringContext::lowerAssociatedType(IRBuilder* builder, IRInst* type)
-    {
-        if (type->getOp() != kIROp_AssociatedType)
-            return (IRType*)type;
-        IRIntegerValue anyValueSize = kInvalidAnyValueSize;
-        for (UInt i = 0; i < type->getOperandCount(); i++)
-        {
-            anyValueSize = Math::Min(
-                anyValueSize,
-                getInterfaceAnyValueSize(type->getOperand(i), type->sourceLoc));
-        }
-        if (anyValueSize == kInvalidAnyValueSize)
-        {
-            // We could conceivably make it an error to have an associated type
-            // without an `[anyValueSize(...)]` attribute, but then we risk
-            // producing error messages even when doing 100% static specialization.
-            //
-            // It is simpler to use a reasonable default size and treat any
-            // type without an explicit attribute as using that size.
-            //
-            anyValueSize = kDefaultAnyValueSize;
-        }
-        return builder->getAnyValueType(anyValueSize);
-    }
-
-    IRType* SharedGenericsLoweringContext::lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping, IRType* concreteType)
-    {
-        if (!paramType)
-            return nullptr;
-
-        IRInst* resultType;
-        if (typeMapping.tryGetValue(paramType, resultType))
-            return (IRType*)resultType;
-
-        if (isTypeValue(paramType))
-        {
-            return builder->getRTTIHandleType();
-        }
-
-        switch (paramType->getOp())
-        {
-        case kIROp_WitnessTableType:
-        case kIROp_WitnessTableIDType:
-        case kIROp_ExtractExistentialType:
-            // Do not translate these types.
-            return (IRType*)paramType;
-        case kIROp_Param:
+    case kIROp_WitnessTableType:
+    case kIROp_WitnessTableIDType:
+    case kIROp_ExtractExistentialType:
+        // Do not translate these types.
+        return (IRType*)paramType;
+    case kIROp_Param:
         {
             if (auto anyValueSizeDecor = paramType->findDecoration<IRTypeConstraintDecoration>())
             {
                 if (isBuiltin(anyValueSizeDecor->getConstraintType()))
                     return (IRType*)paramType;
-                auto anyValueSize = getInterfaceAnyValueSize(anyValueSizeDecor->getConstraintType(), paramType->sourceLoc);
+                auto anyValueSize = getInterfaceAnyValueSize(
+                    anyValueSizeDecor->getConstraintType(),
+                    paramType->sourceLoc);
                 return builder->getAnyValueType(anyValueSize);
             }
             // We could conceivably make it an error to have a generic parameter
@@ -170,7 +176,7 @@ namespace Slang
             //
             return builder->getAnyValueType(kDefaultAnyValueSize);
         }
-        case kIROp_ThisType:
+    case kIROp_ThisType:
         {
             auto interfaceType = cast<IRThisType>(paramType)->getConstraintType();
 
@@ -185,11 +191,11 @@ namespace Slang
                 paramType->sourceLoc);
             return builder->getAnyValueType(anyValueSize);
         }
-        case kIROp_AssociatedType:
+    case kIROp_AssociatedType:
         {
             return lowerAssociatedType(builder, paramType);
         }
-        case kIROp_InterfaceType:
+    case kIROp_InterfaceType:
         {
             if (isBuiltin(paramType))
                 return (IRType*)paramType;
@@ -211,7 +217,7 @@ namespace Slang
             // type.
             //
             IRType* pendingType = nullptr;
-            if( concreteType )
+            if (concreteType)
             {
                 // Because static specialization is being used (at least in part),
                 // we do *not* have a guarantee that the `concreteType` is one
@@ -235,8 +241,11 @@ namespace Slang
                 //   value must be stored out-of-line.
                 //
                 IRSizeAndAlignment sizeAndAlignment;
-                Result result = getNaturalSizeAndAlignment(targetProgram->getOptionSet(), concreteType, &sizeAndAlignment);
-                if(SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
+                Result result = getNaturalSizeAndAlignment(
+                    targetProgram->getOptionSet(),
+                    concreteType,
+                    &sizeAndAlignment);
+                if (SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
                 {
                     // If the value must be stored out-of-line, we construct
                     // a "pseudo pointer" to the concrete type, and the
@@ -260,7 +269,7 @@ namespace Slang
             auto rttiType = builder->getRTTIHandleType();
 
             IRType* tupleType = nullptr;
-            if( !pendingType )
+            if (!pendingType)
             {
                 // In the oridnary (dynamic) case, an existential type decomposes
                 // into a tuple of:
@@ -276,7 +285,8 @@ namespace Slang
                 //
                 //      (RTTI, witness table, pseudo pointer, any-value)
                 //
-                tupleType = builder->getTupleType(rttiType, witnessTableType, pendingType, anyValueType);
+                tupleType =
+                    builder->getTupleType(rttiType, witnessTableType, pendingType, anyValueType);
                 //
                 // Note that in each of the cases, the third element of the tuple
                 // is a representation of the value being stored in the existential.
@@ -289,28 +299,28 @@ namespace Slang
 
             return tupleType;
         }
-        case kIROp_LookupWitness:
+    case kIROp_LookupWitness:
         {
             auto lookupInterface = static_cast<IRLookupWitnessMethod*>(paramType);
-            auto witnessTableType = as<IRWitnessTableType>(
-                lookupInterface->getWitnessTable()->getDataType());
+            auto witnessTableType =
+                as<IRWitnessTableType>(lookupInterface->getWitnessTable()->getDataType());
             if (!witnessTableType)
                 return (IRType*)paramType;
             auto interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
             if (!interfaceType || isBuiltin(interfaceType))
                 return (IRType*)paramType;
             // Make sure we are looking up inside the original interface type (prior to lowering).
-            // Only in the original interface type will an associated type entry have an IRAssociatedType value.
-            // We need to extract AnyValueSize from this IRAssociatedType.
-            // In lowered interface type, that entry is lowered into an Ptr(RTTIType) and this info is lost.
+            // Only in the original interface type will an associated type entry have an
+            // IRAssociatedType value. We need to extract AnyValueSize from this IRAssociatedType.
+            // In lowered interface type, that entry is lowered into an Ptr(RTTIType) and this info
+            // is lost.
             mapLoweredInterfaceToOriginal.tryGetValue(interfaceType, interfaceType);
-            auto reqVal = findInterfaceRequirementVal(
-                interfaceType,
-                lookupInterface->getRequirementKey());
+            auto reqVal =
+                findInterfaceRequirementVal(interfaceType, lookupInterface->getRequirementKey());
             SLANG_ASSERT(reqVal && reqVal->getOp() == kIROp_AssociatedType);
             return lowerType(builder, reqVal, typeMapping, nullptr);
         }
-        case kIROp_BoundInterfaceType:
+    case kIROp_BoundInterfaceType:
         {
             // A bound interface type represents an existential together with
             // static knowledge that the value stored in the extistential has
@@ -321,84 +331,102 @@ namespace Slang
             // layout of the interface type.
             //
             auto boundInterfaceType = static_cast<IRBoundInterfaceType*>(paramType);
-            return lowerType(builder, boundInterfaceType->getInterfaceType(), typeMapping, boundInterfaceType->getConcreteType());
+            return lowerType(
+                builder,
+                boundInterfaceType->getInterfaceType(),
+                typeMapping,
+                boundInterfaceType->getConcreteType());
         }
-        default:
+    default:
         {
             bool translated = false;
             List<IRInst*> loweredOperands;
             for (UInt i = 0; i < paramType->getOperandCount(); i++)
             {
-                loweredOperands.add(lowerType(builder, paramType->getOperand(i), typeMapping, nullptr));
+                loweredOperands.add(
+                    lowerType(builder, paramType->getOperand(i), typeMapping, nullptr));
                 if (loweredOperands.getLast() != paramType->getOperand(i))
                     translated = true;
             }
             if (translated)
-                return builder->getType(paramType->getOp(), loweredOperands.getCount(), loweredOperands.getBuffer());
+                return builder->getType(
+                    paramType->getOp(),
+                    loweredOperands.getCount(),
+                    loweredOperands.getBuffer());
             return (IRType*)paramType;
         }
-        }
     }
-
-    List<IRWitnessTable*> getWitnessTablesFromInterfaceType(IRModule* module, IRInst* interfaceType)
-    {
-        List<IRWitnessTable*> witnessTables;
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (globalInst->getOp() == kIROp_WitnessTable &&
-                cast<IRWitnessTableType>(globalInst->getDataType())->getConformanceType() ==
-                    interfaceType)
-            {
-                witnessTables.add(cast<IRWitnessTable>(globalInst));
-            }
-        }
-        return witnessTables;
-    }
-
-    List<IRWitnessTable*> SharedGenericsLoweringContext::getWitnessTablesFromInterfaceType(IRInst* interfaceType)
-    {
-        return Slang::getWitnessTablesFromInterfaceType(module, interfaceType);
-    }
-
-    IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
-    {
-        SLANG_UNUSED(usageLoc);
-
-        if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
-        {
-            return decor->getSize();
-        }
-
-        // We could conceivably make it an error to have an interface
-        // without an `[anyValueSize(...)]` attribute, but then we risk
-        // producing error messages even when doing 100% static specialization.
-        //
-        // It is simpler to use a reasonable default size and treat any
-        // type without an explicit attribute as using that size.
-        //
-        return kDefaultAnyValueSize;
-    }
-
-
-    bool SharedGenericsLoweringContext::doesTypeFitInAnyValue(IRType* concreteType, IRInterfaceType* interfaceType, IRIntegerValue* outTypeSize, IRIntegerValue* outLimit)
-    {
-        auto anyValueSize = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
-        if (outLimit) *outLimit = anyValueSize;
-
-        IRSizeAndAlignment sizeAndAlignment;
-        Result result = getNaturalSizeAndAlignment(targetProgram->getOptionSet(), concreteType, &sizeAndAlignment);
-        if (outTypeSize) *outTypeSize = sizeAndAlignment.size;
-
-        if(SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
-        {
-            // The value does not fit, either because it is too large,
-            // or because it includes types that cannot be stored
-            // in uniform/ordinary memory for this target.
-            //
-            return false;
-        }
-
-        return true;
-    }
-
 }
+
+List<IRWitnessTable*> getWitnessTablesFromInterfaceType(IRModule* module, IRInst* interfaceType)
+{
+    List<IRWitnessTable*> witnessTables;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (globalInst->getOp() == kIROp_WitnessTable &&
+            cast<IRWitnessTableType>(globalInst->getDataType())->getConformanceType() ==
+                interfaceType)
+        {
+            witnessTables.add(cast<IRWitnessTable>(globalInst));
+        }
+    }
+    return witnessTables;
+}
+
+List<IRWitnessTable*> SharedGenericsLoweringContext::getWitnessTablesFromInterfaceType(
+    IRInst* interfaceType)
+{
+    return Slang::getWitnessTablesFromInterfaceType(module, interfaceType);
+}
+
+IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(
+    IRInst* type,
+    SourceLoc usageLoc)
+{
+    SLANG_UNUSED(usageLoc);
+
+    if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
+    {
+        return decor->getSize();
+    }
+
+    // We could conceivably make it an error to have an interface
+    // without an `[anyValueSize(...)]` attribute, but then we risk
+    // producing error messages even when doing 100% static specialization.
+    //
+    // It is simpler to use a reasonable default size and treat any
+    // type without an explicit attribute as using that size.
+    //
+    return kDefaultAnyValueSize;
+}
+
+
+bool SharedGenericsLoweringContext::doesTypeFitInAnyValue(
+    IRType* concreteType,
+    IRInterfaceType* interfaceType,
+    IRIntegerValue* outTypeSize,
+    IRIntegerValue* outLimit)
+{
+    auto anyValueSize = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
+    if (outLimit)
+        *outLimit = anyValueSize;
+
+    IRSizeAndAlignment sizeAndAlignment;
+    Result result =
+        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), concreteType, &sizeAndAlignment);
+    if (outTypeSize)
+        *outTypeSize = sizeAndAlignment.size;
+
+    if (SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
+    {
+        // The value does not fit, either because it is too large,
+        // or because it includes types that cannot be stored
+        // in uniform/ordinary memory for this target.
+        //
+        return false;
+    }
+
+    return true;
+}
+
+} // namespace Slang

@@ -1,45 +1,65 @@
 // slang-win-process-util.cpp
+#include "../slang-process-util.h"
 #include "../slang-process.h"
-
-#include "../slang-string.h"
 #include "../slang-string-escape-util.h"
 #include "../slang-string-util.h"
-#include "../slang-process-util.h"
-
+#include "../slang-string.h"
 #include "slang-com-helper.h"
 
 #ifdef _WIN32
 // TODO: We could try to avoid including this at all, but it would
 // mean trying to hide certain struct layouts, which would add
 // more dynamic allocation.
-#   include <windows.h>
+#include <windows.h>
 #endif
 
+#include <process.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #ifndef SLANG_RETURN_FAIL_ON_FALSE
-#   define SLANG_RETURN_FAIL_ON_FALSE(x) if (!(x)) return SLANG_FAIL;
+#define SLANG_RETURN_FAIL_ON_FALSE(x) \
+    if (!(x))                         \
+        return SLANG_FAIL;
 #endif
 
-namespace Slang {
+namespace Slang
+{
 
 // Has behavior very similar to unique_ptr - assignment is a move.
 class WinHandle
 {
 public:
-    /// Detach the encapsulated handle. Returns the handle (which now must be externally handled) 
-    HANDLE detach() { HANDLE handle = m_handle; m_handle = nullptr; return handle; }
+    /// Detach the encapsulated handle. Returns the handle (which now must be externally handled)
+    HANDLE detach()
+    {
+        HANDLE handle = m_handle;
+        m_handle = nullptr;
+        return handle;
+    }
 
     /// Return as a handle
     operator HANDLE() const { return m_handle; }
 
     /// Assign
-    void operator=(HANDLE handle) { setNull(); m_handle = handle; }
-    void operator=(WinHandle&& rhs) { HANDLE handle = m_handle; m_handle = rhs.m_handle; rhs.m_handle = handle; }
+    void operator=(HANDLE handle)
+    {
+        setNull();
+        m_handle = handle;
+    }
+    void operator=(WinHandle&& rhs)
+    {
+        HANDLE handle = m_handle;
+        m_handle = rhs.m_handle;
+        rhs.m_handle = handle;
+    }
 
-    /// Get ready for writing 
-    SLANG_FORCE_INLINE HANDLE* writeRef() { setNull(); return &m_handle; }
+    /// Get ready for writing
+    SLANG_FORCE_INLINE HANDLE* writeRef()
+    {
+        setNull();
+        return &m_handle;
+    }
     /// Get for read access
     SLANG_FORCE_INLINE const HANDLE* readRef() const { return &m_handle; }
 
@@ -54,21 +74,28 @@ public:
     bool isNull() const { return m_handle == nullptr; }
 
     /// Ctor
-    WinHandle(HANDLE handle = nullptr) :m_handle(handle) {}
-    WinHandle(WinHandle&& rhs) :m_handle(rhs.m_handle) { rhs.m_handle = nullptr; }
+    WinHandle(HANDLE handle = nullptr)
+        : m_handle(handle)
+    {
+    }
+    WinHandle(WinHandle&& rhs)
+        : m_handle(rhs.m_handle)
+    {
+        rhs.m_handle = nullptr;
+    }
 
     /// Dtor
     ~WinHandle() { setNull(); }
 
 private:
-
     WinHandle(const WinHandle&) = delete;
     void operator=(const WinHandle& rhs) = delete;
 
     HANDLE m_handle;
 };
 
-/* A simple Stream implementation of a File HANDLE (or Pipe). Note that currently does not allow getPosition/seek/atEnd */
+/* A simple Stream implementation of a File HANDLE (or Pipe). Note that currently does not allow
+ * getPosition/seek/atEnd */
 class WinPipeStream : public Stream
 {
 public:
@@ -76,12 +103,23 @@ public:
 
     // Stream
     virtual Int64 getPosition() SLANG_OVERRIDE { return 0; }
-    virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE { SLANG_UNUSED(origin); SLANG_UNUSED(offset); return SLANG_E_NOT_AVAILABLE; }
+    virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(origin);
+        SLANG_UNUSED(offset);
+        return SLANG_E_NOT_AVAILABLE;
+    }
     virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
     virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
     virtual bool isEnd() SLANG_OVERRIDE { return m_streamHandle.isNull(); }
-    virtual bool canRead() SLANG_OVERRIDE { return _has(FileAccess::Read) && !m_streamHandle.isNull(); }
-    virtual bool canWrite() SLANG_OVERRIDE { return _has(FileAccess::Write) && !m_streamHandle.isNull(); }
+    virtual bool canRead() SLANG_OVERRIDE
+    {
+        return _has(FileAccess::Read) && !m_streamHandle.isNull();
+    }
+    virtual bool canWrite() SLANG_OVERRIDE
+    {
+        return _has(FileAccess::Write) && !m_streamHandle.isNull();
+    }
     virtual void close() SLANG_OVERRIDE;
     virtual SlangResult flush() SLANG_OVERRIDE;
 
@@ -90,7 +128,6 @@ public:
     ~WinPipeStream() { close(); }
 
 protected:
-
     bool _has(FileAccess access) const { return (Index(access) & Index(m_access)) != 0; }
 
     SlangResult _updateState(BOOL res);
@@ -104,15 +141,14 @@ protected:
 class WinProcess : public Process
 {
 public:
-
     // Process
     virtual bool isTerminated() SLANG_OVERRIDE;
     virtual bool waitForTermination(Int timeInMs) SLANG_OVERRIDE;
     virtual void terminate(int32_t returnCode) SLANG_OVERRIDE;
     virtual void kill(int32_t returnCode) SLANG_OVERRIDE;
 
-    WinProcess(HANDLE handle, Stream* const* streams) :
-        m_processHandle(handle)
+    WinProcess(HANDLE handle, Stream* const* streams)
+        : m_processHandle(handle)
     {
         for (Index i = 0; i < Index(StdStreamType::CountOf); ++i)
         {
@@ -121,17 +157,14 @@ public:
     }
 
 protected:
-
     void _hasTerminated();
-    WinHandle m_processHandle;          ///< If not set the process has terminated
+    WinHandle m_processHandle; ///< If not set the process has terminated
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! WinPipeStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-WinPipeStream::WinPipeStream(HANDLE handle, FileAccess access, bool isOwned) :
-    m_streamHandle(handle),
-    m_access(access),
-    m_isOwned(isOwned)
+WinPipeStream::WinPipeStream(HANDLE handle, FileAccess access, bool isOwned)
+    : m_streamHandle(handle), m_access(access), m_isOwned(isOwned)
 {
 
     // On Win32 a HANDLE has to be handled differently if it's a PIPE or FILE, so first determine
@@ -198,7 +231,13 @@ SlangResult WinPipeStream::read(void* buffer, size_t length, size_t& outReadByte
         // Works on anonymous pipes too
         // https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
 
-        SLANG_RETURN_ON_FAIL(_updateState(::PeekNamedPipe(m_streamHandle, nullptr, DWORD(0), &pipeBytesRead, &pipeTotalBytesAvailable, &pipeRemainingBytes)));
+        SLANG_RETURN_ON_FAIL(_updateState(::PeekNamedPipe(
+            m_streamHandle,
+            nullptr,
+            DWORD(0),
+            &pipeBytesRead,
+            &pipeTotalBytesAvailable,
+            &pipeRemainingBytes)));
         // If there is nothing to read we are done
         // If we don't do this ReadFile will *block* if there is nothing available
         if (pipeTotalBytesAvailable == 0)
@@ -206,11 +245,13 @@ SlangResult WinPipeStream::read(void* buffer, size_t length, size_t& outReadByte
             return SLANG_OK;
         }
 
-        SLANG_RETURN_ON_FAIL(_updateState(::ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
+        SLANG_RETURN_ON_FAIL(
+            _updateState(::ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(_updateState(::ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
+        SLANG_RETURN_ON_FAIL(
+            _updateState(::ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
 
         // If it's not a pipe, and there is nothing left, then we are done.
         if (length > 0 && bytesRead == 0)
@@ -248,7 +289,7 @@ SlangResult WinPipeStream::write(const void* buffer, size_t length)
             close();
             return SLANG_FAIL;
         }
-            
+
         SLANG_UNUSED(err);
         return SLANG_FAIL;
     }
@@ -265,7 +306,7 @@ void WinPipeStream::close()
 {
     if (!m_isOwned)
     {
-        // If we don't own it just detach it 
+        // If we don't own it just detach it
         m_streamHandle.detach();
     }
     m_streamHandle.setNull();
@@ -357,31 +398,31 @@ void WinProcess::kill(int32_t returnCode)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */StringEscapeHandler* Process::getEscapeHandler()
+/* static */ StringEscapeHandler* Process::getEscapeHandler()
 {
     return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
 }
 
-/* static */UnownedStringSlice Process::getExecutableSuffix()
+/* static */ UnownedStringSlice Process::getExecutableSuffix()
 {
     return UnownedStringSlice::fromLiteral(".exe");
 }
 
-/* static */SlangResult Process::getStdStream(StdStreamType type, RefPtr<Stream>& out)
+/* static */ SlangResult Process::getStdStream(StdStreamType type, RefPtr<Stream>& out)
 {
     switch (type)
     {
-        case StdStreamType::In:
+    case StdStreamType::In:
         {
             out = new WinPipeStream(GetStdHandle(STD_INPUT_HANDLE), FileAccess::Read, false);
             return SLANG_OK;
         }
-        case StdStreamType::Out:
+    case StdStreamType::Out:
         {
             out = new WinPipeStream(GetStdHandle(STD_OUTPUT_HANDLE), FileAccess::Write, false);
             return SLANG_OK;
         }
-        case StdStreamType::ErrorOut:
+    case StdStreamType::ErrorOut:
         {
             out = new WinPipeStream(GetStdHandle(STD_ERROR_HANDLE), FileAccess::Write, false);
             return SLANG_OK;
@@ -391,10 +432,13 @@ void WinProcess::kill(int32_t returnCode)
     return SLANG_FAIL;
 }
 
-/* static */SlangResult Process::create(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess)
-{   
+/* static */ SlangResult Process::create(
+    const CommandLine& commandLine,
+    Process::Flags flags,
+    RefPtr<Process>& outProcess)
+{
     WinHandle childStdOutRead;
-    WinHandle childStdErrRead; 
+    WinHandle childStdErrRead;
     WinHandle childStdInWrite;
 
     WinHandle processHandle;
@@ -409,7 +453,7 @@ void WinProcess::kill(int32_t returnCode)
         securityAttributes.bInheritHandle = true;
 
         // 0 means use the 'system default'
-        //const DWORD bufferSize = 64 * 1024;
+        // const DWORD bufferSize = 64 * 1024;
         const DWORD bufferSize = 0;
 
         {
@@ -417,26 +461,59 @@ void WinProcess::kill(int32_t returnCode)
             WinHandle childStdErrReadTmp;
             WinHandle childStdInWriteTmp;
             // create stdout pipe for child process
-            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdOutReadTmp.writeRef(), childStdOutWrite.writeRef(), &securityAttributes, bufferSize));
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(
+                childStdOutReadTmp.writeRef(),
+                childStdOutWrite.writeRef(),
+                &securityAttributes,
+                bufferSize));
             if ((flags & Process::Flag::DisableStdErrRedirection) == 0)
             {
                 // create stderr pipe for child process
-                SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdErrReadTmp.writeRef(), childStdErrWrite.writeRef(), &securityAttributes, bufferSize));
+                SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(
+                    childStdErrReadTmp.writeRef(),
+                    childStdErrWrite.writeRef(),
+                    &securityAttributes,
+                    bufferSize));
             }
-            // create stdin pipe for child process        
-            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdInRead.writeRef(), childStdInWriteTmp.writeRef(), &securityAttributes, bufferSize));
+            // create stdin pipe for child process
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(
+                childStdInRead.writeRef(),
+                childStdInWriteTmp.writeRef(),
+                &securityAttributes,
+                bufferSize));
 
             const HANDLE currentProcess = GetCurrentProcess();
 
             // https://docs.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-duplicatehandle
 
-            // create a non-inheritable duplicate of the stdout reader        
-            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdOutReadTmp, currentProcess, childStdOutRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+            // create a non-inheritable duplicate of the stdout reader
+            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(
+                currentProcess,
+                childStdOutReadTmp,
+                currentProcess,
+                childStdOutRead.writeRef(),
+                0,
+                FALSE,
+                DUPLICATE_SAME_ACCESS));
             // create a non-inheritable duplicate of the stderr reader
             if (childStdErrReadTmp)
-                SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdErrReadTmp, currentProcess, childStdErrRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+                SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(
+                    currentProcess,
+                    childStdErrReadTmp,
+                    currentProcess,
+                    childStdErrRead.writeRef(),
+                    0,
+                    FALSE,
+                    DUPLICATE_SAME_ACCESS));
             // create a non-inheritable duplicate of the stdin writer
-            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdInWriteTmp, currentProcess, childStdInWrite.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(
+                currentProcess,
+                childStdInWriteTmp,
+                currentProcess,
+                childStdInWrite.writeRef(),
+                0,
+                FALSE,
+                DUPLICATE_SAME_ACCESS));
         }
 
         // TODO: switch to proper wide-character versions of these...
@@ -478,12 +555,14 @@ void WinProcess::kill(int32_t returnCode)
         }
 
         // From docs:
-        // If both lpApplicationName and lpCommandLine are non-NULL, the null-terminated string pointed to by lpApplicationName
-        // specifies the module to execute, and the null-terminated string pointed to by lpCommandLine specifies the command line.
+        // If both lpApplicationName and lpCommandLine are non-NULL, the null-terminated string
+        // pointed to by lpApplicationName specifies the module to execute, and the null-terminated
+        // string pointed to by lpCommandLine specifies the command line.
 
         // JS:
-        // Somewhat confusingly this means that even if lpApplicationName is specified, it muse *ALSO* be included as the first
-        // whitespace delimited arg must *also* be the (possibly) quoted executable
+        // Somewhat confusingly this means that even if lpApplicationName is specified, it muse
+        // *ALSO* be included as the first whitespace delimited arg must *also* be the (possibly)
+        // quoted executable
 
         // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createprocessa
         // `CreateProcess` requires write access to this, for some reason...
@@ -510,9 +589,9 @@ void WinProcess::kill(int32_t returnCode)
         {
             // Lets see if we can set up to debug
             // https://docs.microsoft.com/en-us/windows/win32/debug/debugging-a-running-process
-            
-            //DebugActiveProcess(processInfo.dwProcessId);
-        
+
+            // DebugActiveProcess(processInfo.dwProcessId);
+
             // Resume the thread
             ResumeThread(processInfo.hThread);
         }
@@ -527,15 +606,18 @@ void WinProcess::kill(int32_t returnCode)
     RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
 
     if (childStdErrRead)
-        streams[Index(StdStreamType::ErrorOut)] = new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
-    streams[Index(StdStreamType::Out)] = new WinPipeStream(childStdOutRead.detach(), FileAccess::Read);
-    streams[Index(StdStreamType::In)] = new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
+        streams[Index(StdStreamType::ErrorOut)] =
+            new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
+    streams[Index(StdStreamType::Out)] =
+        new WinPipeStream(childStdOutRead.detach(), FileAccess::Read);
+    streams[Index(StdStreamType::In)] =
+        new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
     outProcess = new WinProcess(processHandle.detach(), streams[0].readRef());
 
     return SLANG_OK;
 }
 
-/* static */void Process::sleepCurrentThread(Int timeInMs)
+/* static */ void Process::sleepCurrentThread(Int timeInMs)
 {
     ::Sleep(DWORD(timeInMs));
 }
@@ -549,12 +631,12 @@ static uint64_t _getClockFrequency()
 
 static const uint64_t g_frequency = _getClockFrequency();
 
-/* static */uint64_t Process::getClockFrequency()
+/* static */ uint64_t Process::getClockFrequency()
 {
     return g_frequency;
 }
 
-/* static */uint64_t Process::getClockTick()
+/* static */ uint64_t Process::getClockTick()
 {
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);

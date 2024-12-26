@@ -1,10 +1,9 @@
 // slang-ir-metadata.cpp
 #include "slang-ir-metadata.h"
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
-
 #include "../compiler-core/slang-artifact-associated-impl.h"
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -14,8 +13,14 @@ namespace Slang
 // analysis scenarios in the future.
 
 
-// Inserts a single resource binding (which takes `count` slots, where 0 means unbounded) into the list of resource ranges.
-static void _insertBinding(List<ShaderBindingRange>& ranges, LayoutResourceKind kind, UInt spaceIndex, UInt registerIndex, UInt count)
+// Inserts a single resource binding (which takes `count` slots, where 0 means unbounded) into the
+// list of resource ranges.
+static void _insertBinding(
+    List<ShaderBindingRange>& ranges,
+    LayoutResourceKind kind,
+    UInt spaceIndex,
+    UInt registerIndex,
+    UInt count)
 {
     // Construct a new range from the provided resource.
     ShaderBindingRange newRange;
@@ -38,41 +43,68 @@ static void _insertBinding(List<ShaderBindingRange>& ranges, LayoutResourceKind 
     ranges.add(newRange);
 }
 
-// Collects the metadata from the provided IR module, saves it in outMetadata.
-void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata)
+void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadata)
 {
-    // Scan the instructions looking for global resource declarations
-    for (const auto& inst : irModule->getGlobalInsts())
+    auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return;
+
+    auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!varLayout)
+        return;
+
+    for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
     {
-        auto param = as<IRGlobalParam>(inst);
-        if (!param) continue;
-        
-        auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecoration) continue;
-        
-        auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
-        if (!varLayout) continue;
-        
-        for(auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
+        auto kind = sizeAttr->getResourceKind();
+
+        // Only track resource types that we can reliably track, such as textures.
+        // Do not track individual uniforms, for example.
+        if (!ShaderBindingRange::isUsageTracked(kind))
+            continue;
+
+        if (auto offsetAttr = varLayout->findOffsetAttr(kind))
         {
-            auto kind = sizeAttr->getResourceKind();
-
-            // Only track resource types that we can reliably track, such as textures.
-            // Do not track individual uniforms, for example.
-            if (!ShaderBindingRange::isUsageTracked(kind))
-                continue;
-
-            if (auto offsetAttr = varLayout->findOffsetAttr(kind))
+            // Get the binding information from this attribute and insert it into the list
+            auto spaceIndex = offsetAttr->getSpace();
+            if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
             {
-                // Get the binding information from this attribute and insert it into the list
-                auto spaceIndex = offsetAttr->getSpace();
-                auto registerIndex = offsetAttr->getOffset();
-                auto size = sizeAttr->getSize();
-                auto count = size.isFinite() ? size.getFiniteValue() : 0;
-                _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
+                spaceIndex += spaceAttr->getOffset();
             }
+            auto registerIndex = offsetAttr->getOffset();
+            auto size = sizeAttr->getSize();
+            auto count = size.isFinite() ? size.getFiniteValue() : 0;
+            _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
         }
     }
 }
 
+// Collects the metadata from the provided IR module, saves it in outMetadata.
+void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata)
+{
+    // Scan the instructions looking for global resource declarations
+    // and exported functions.
+    for (const auto& inst : irModule->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(inst))
+        {
+            if (func->findDecoration<IRDownstreamModuleExportDecoration>())
+            {
+                auto name = func->findDecoration<IRExportDecoration>()->getMangledName();
+                outMetadata.m_exportedFunctionMangledNames.add(name);
+            }
+
+            // Collect metadata from entrypoint params.
+            for (auto param : func->getParams())
+            {
+                collectMetadataFromInst(param, outMetadata);
+            }
+        }
+
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+        collectMetadataFromInst(param, outMetadata);
+    }
 }
+
+} // namespace Slang

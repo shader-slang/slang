@@ -15,12 +15,12 @@ struct DifferentiableTexture
     float minLOD;
 
     [BackwardDerivative(bwd_LoadTexel)]
-    float4 LoadTexel(int3 location, int2 offset, uint dLayerW, uint dMipOffset)
+    float4 LoadTexel(int3 location, constexpr int2 offset, uint dLayerW, uint dMipOffset)
     {
         return texture.Load(location, offset);
     }
 
-    void bwd_LoadTexel(int3 location, int2 offset, uint dLayerW, uint dMipOffset, float4 val)
+    void bwd_LoadTexel(int3 location, constexpr int2 offset, uint dLayerW, uint dMipOffset, float4 val)
     {
         // Ignore alpha dimension for this example..
         int4 uval = int4(int3(val.xyz * 65536), 1);

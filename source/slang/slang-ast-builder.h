@@ -2,13 +2,13 @@
 #ifndef SLANG_AST_BUILDER_H
 #define SLANG_AST_BUILDER_H
 
-#include <type_traits>
-
-#include "slang-ast-support-types.h"
-#include "slang-ast-all.h"
-#include "slang-ir.h"
-#include "../core/slang-type-traits.h"
 #include "../core/slang-memory-arena.h"
+#include "../core/slang-type-traits.h"
+#include "slang-ast-all.h"
+#include "slang-ast-support-types.h"
+#include "slang-ir.h"
+
+#include <type_traits>
 
 namespace Slang
 {
@@ -16,28 +16,30 @@ namespace Slang
 class SharedASTBuilder : public RefObject
 {
     friend class ASTBuilder;
+
 public:
-    
     void registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modifier);
     void registerBuiltinRequirementDecl(Decl* decl, BuiltinRequirementModifier* modifier);
     void registerMagicDecl(Decl* decl, MagicTypeModifier* modifier);
 
-        /// Get the string type
+    /// Get the string type
     Type* getStringType();
 
-        /// Get the native string type
+    /// Get the native string type
     Type* getNativeStringType();
 
-        /// Get the enum type type
+    /// Get the enum type type
     Type* getEnumTypeType();
-        /// Get the __Dynamic type
+    /// Get the __Dynamic type
     Type* getDynamicType();
-        /// Get the NullPtr type
+    /// Get the NullPtr type
     Type* getNullPtrType();
-        /// Get the NullPtr type
+    /// Get the NullPtr type
     Type* getNoneType();
-        /// Get the `IDifferentiable` type
+    /// Get the `IDifferentiable` type
     Type* getDiffInterfaceType();
+
+    Type* getIBufferDataLayoutType();
 
     Type* getErrorType();
     Type* getBottomType();
@@ -50,7 +52,7 @@ public:
     const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice);
     SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice);
 
-        // Look up a magic declaration by its name
+    // Look up a magic declaration by its name
     Decl* findMagicDecl(String const& name);
 
     Decl* tryFindMagicDecl(String const& name);
@@ -60,10 +62,11 @@ public:
         return m_builtinRequirementDecls.getValue(kind);
     }
 
-        /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.
+    /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the
+    /// Session.
     NamePool* getNamePool() { return m_namePool; }
 
-        /// Must be called before used
+    /// Must be called before used
     void init(Session* session);
 
     SharedASTBuilder();
@@ -72,6 +75,15 @@ public:
 
     ASTBuilder* getInnerASTBuilder() { return m_astBuilder; }
 
+    Name* getThisTypeName()
+    {
+        if (!m_thisTypeName)
+        {
+            m_thisTypeName = getNamePool()->getName("This");
+        }
+        return m_thisTypeName;
+    }
+
 protected:
     // State shared between ASTBuilders
 
@@ -79,10 +91,11 @@ protected:
     Type* m_bottomType = nullptr;
     Type* m_initializerListType = nullptr;
     Type* m_overloadedType = nullptr;
+    Type* m_IBufferDataLayoutType = nullptr;
 
     // The following types are created lazily, such that part of their definition
-    // can be in the standard library
-    // 
+    // can be in the core module.
+    //
     // Note(tfoley): These logically belong to `Type`,
     // but order-of-declaration stuff makes that tricky
     //
@@ -102,8 +115,10 @@ protected:
 
     Dictionary<UnownedStringSlice, const ReflectClassInfo*> m_sliceToTypeMap;
     Dictionary<Name*, const ReflectClassInfo*> m_nameToTypeMap;
-    
+
     NamePool* m_namePool = nullptr;
+
+    Name* m_thisTypeName = nullptr;
 
     // This is a private builder used for these shared types
     ASTBuilder* m_astBuilder = nullptr;
@@ -128,8 +143,10 @@ struct ValKey
     }
     bool operator==(ValKey other) const
     {
-        if (val == other.val) return true;
-        if (hashCode != other.hashCode) return false;
+        if (val == other.val)
+            return true;
+        if (hashCode != other.hashCode)
+            return false;
         if (val->astNodeType != other.val->astNodeType)
             return false;
         if (val->m_operands.getCount() != other.val->m_operands.getCount())
@@ -141,7 +158,8 @@ struct ValKey
     }
     bool operator==(const ValNodeDesc& desc) const
     {
-        if (hashCode != desc.getHashCode()) return false;
+        if (hashCode != desc.getHashCode())
+            return false;
         if (val->astNodeType != desc.type)
             return false;
         if (val->m_operands.getCount() != desc.operands.getCount())
@@ -159,28 +177,16 @@ template<>
 struct Hash<ValKey>
 {
     using is_transparent = void;
-    auto operator()(const ValKey& k) const
-    {
-        return k.getHashCode();
-    }
-    auto operator()(const ValNodeDesc& k) const
-    {
-        return Hash<ValNodeDesc>{}(k);
-    }
+    auto operator()(const ValKey& k) const { return k.getHashCode(); }
+    auto operator()(const ValNodeDesc& k) const { return Hash<ValNodeDesc>{}(k); }
 };
 
 // A functor which can compare ValKey for equality with ValNodeDesc
 struct ValKeyEqual
 {
     using is_transparent = void;
-    bool operator()(const Slang::ValKey& a, const Slang::ValKey& b) const
-    {
-        return a == b;
-    }
-    bool operator()(const Slang::ValNodeDesc& a, const Slang::ValKey& b) const
-    {
-        return b == a;
-    }
+    bool operator()(const Slang::ValKey& a, const Slang::ValKey& b) const { return a == b; }
+    bool operator()(const Slang::ValNodeDesc& a, const Slang::ValKey& b) const { return b == a; }
 };
 
 class ASTBuilder : public RefObject
@@ -188,7 +194,6 @@ class ASTBuilder : public RefObject
     friend class SharedASTBuilder;
 
 public:
-
     Val* _getOrCreateImpl(ValNodeDesc&& desc)
     {
         if (auto found = m_cachedNodes.tryGetValue(desc))
@@ -210,7 +215,7 @@ public:
     Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
 
     /// Create AST types
-    template <typename T>
+    template<typename T>
     T* createImpl()
     {
         auto alloced = m_arena.allocate(sizeof(T));
@@ -228,24 +233,27 @@ public:
         return result;
     }
 
-    template <typename T>
+    template<typename T>
     T* create()
     {
-        static_assert(!IsBaseOf<Val, T>::Value, "ASTBuilder::create cannot be used to create a Val, use getOrCreate instead.");
+        static_assert(
+            !IsBaseOf<Val, T>::Value,
+            "ASTBuilder::create cannot be used to create a Val, use getOrCreate instead.");
         return createImpl<T>();
     }
 
     template<typename T, typename... TArgs>
     T* create(TArgs&&... args)
     {
-        static_assert(!IsBaseOf<Val, T>::Value, "ASTBuilder::create cannot be used to create a Val, use getOrCreate instead.");
+        static_assert(
+            !IsBaseOf<Val, T>::Value,
+            "ASTBuilder::create cannot be used to create a Val, use getOrCreate instead.");
         return createImpl<T>(args...);
     }
 
 public:
-
     // For compile time check to see if thing being constructed is an AST type
-    template <typename T>
+    template<typename T>
     struct IsValidType
     {
         enum
@@ -260,8 +268,8 @@ public:
 
     MemoryArena& getArena() { return m_arena; }
 
-    template<typename T, typename ... TArgs>
-    SLANG_FORCE_INLINE T* getOrCreate(TArgs ... args)
+    template<typename T, typename... TArgs>
+    SLANG_FORCE_INLINE T* getOrCreate(TArgs... args)
     {
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
         ValNodeDesc desc;
@@ -289,7 +297,7 @@ public:
         auto interfaceDecl = create<InterfaceDecl>();
         // Always include a `This` member and a `This:IThisInterface` member.
         auto thisDecl = create<ThisTypeDecl>();
-        thisDecl->nameAndLoc.name = m_sharedASTBuilder->getNamePool()->getName(UnownedStringSlice("This", 4));
+        thisDecl->nameAndLoc.name = getSharedASTBuilder()->getThisTypeName();
         thisDecl->nameAndLoc.loc = loc;
         interfaceDecl->addMember(thisDecl);
         auto thisConstraint = create<ThisTypeConstraintDecl>();
@@ -299,7 +307,9 @@ public:
     }
 
     template<typename T>
-    DeclRef<T> getDirectDeclRef(T* decl, typename std::enable_if_t<std::is_base_of_v<Decl, T>>* = nullptr)
+    DeclRef<T> getDirectDeclRef(
+        T* decl,
+        typename std::enable_if_t<std::is_base_of_v<Decl, T>>* = nullptr)
     {
         return DeclRef<T>(decl);
     }
@@ -327,7 +337,8 @@ public:
             //   Lookup of x from This is a lookup from w directly.
             // - Member(Lookup(w, someExtension), x) ==> Lookup(w, X)
             //   Lookup of a decl defined in an extension is to lookup directly.
-            // - Member(Lookup(w, AssociatedType), TypeConstraintDecl) ==> Lookup(w, TypeConstraintDecl)
+            // - Member(Lookup(w, AssociatedType), TypeConstraintDecl) ==> Lookup(w,
+            // TypeConstraintDecl)
             //   Type constraint of an associated type is defined directly in w.
 
             auto parentDeclKind = lookupDeclRef->getDecl()->astNodeType;
@@ -336,7 +347,11 @@ public:
             case ASTNodeType::ThisTypeDecl:
             case ASTNodeType::ExtensionDecl:
             case ASTNodeType::AssocTypeDecl:
-                return getLookupDeclRef(lookupDeclRef->getLookupSource(), lookupDeclRef->getWitness(), memberDecl).template as<T>();
+                return getLookupDeclRef(
+                           lookupDeclRef->getLookupSource(),
+                           lookupDeclRef->getWitness(),
+                           memberDecl)
+                    .template as<T>();
             default:
                 break;
             }
@@ -376,11 +391,14 @@ public:
         // Unwrap any existing type casts.
         while (auto baseTypeCast = as<TypeCastIntVal>(base))
             base = baseTypeCast->getBase();
-            
+
         return getOrCreate<TypeCastIntVal>(type, base);
     }
 
-    DeclRef<Decl> getGenericAppDeclRef(DeclRef<GenericDecl> genericDeclRef, ConstArrayView<Val*> args, Decl* innerDecl = nullptr)
+    DeclRef<Decl> getGenericAppDeclRef(
+        DeclRef<GenericDecl> genericDeclRef,
+        ConstArrayView<Val*> args,
+        Decl* innerDecl = nullptr)
     {
         if (!innerDecl)
             innerDecl = genericDeclRef.getDecl()->inner;
@@ -388,7 +406,10 @@ public:
         return getOrCreate<GenericAppDeclRef>(innerDecl, genericDeclRef, args);
     }
 
-    DeclRef<Decl> getGenericAppDeclRef(DeclRef<GenericDecl> genericDeclRef, Val::OperandView<Val> args, Decl* innerDecl = nullptr)
+    DeclRef<Decl> getGenericAppDeclRef(
+        DeclRef<GenericDecl> genericDeclRef,
+        Val::OperandView<Val> args,
+        Decl* innerDecl = nullptr)
     {
         if (!innerDecl)
             innerDecl = genericDeclRef.getDecl()->inner;
@@ -409,24 +430,65 @@ public:
 
     NodeBase* createByNodeType(ASTNodeType nodeType);
 
-        /// Get the built in types
-    SLANG_FORCE_INLINE Type* getBoolType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Bool)]; }
-    SLANG_FORCE_INLINE Type* getHalfType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Half)]; }
-    SLANG_FORCE_INLINE Type* getFloatType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Float)]; }
-    SLANG_FORCE_INLINE Type* getDoubleType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Double)]; }
-    SLANG_FORCE_INLINE Type* getIntType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int)]; }
-    SLANG_FORCE_INLINE Type* getInt64Type() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int64)]; }
-    SLANG_FORCE_INLINE Type* getIntPtrType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::IntPtr)]; }
-    SLANG_FORCE_INLINE Type* getUIntType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt)]; }
-    SLANG_FORCE_INLINE Type* getUInt64Type() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt64)]; }
-    SLANG_FORCE_INLINE Type* getUIntPtrType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UIntPtr)]; }
-    SLANG_FORCE_INLINE Type* getVoidType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Void)]; }
+    /// Get the built in types
+    SLANG_FORCE_INLINE Type* getBoolType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Bool)];
+    }
+    SLANG_FORCE_INLINE Type* getHalfType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Half)];
+    }
+    SLANG_FORCE_INLINE Type* getFloatType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Float)];
+    }
+    SLANG_FORCE_INLINE Type* getDoubleType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Double)];
+    }
+    SLANG_FORCE_INLINE Type* getIntType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int)];
+    }
+    SLANG_FORCE_INLINE Type* getInt64Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int64)];
+    }
+    SLANG_FORCE_INLINE Type* getIntPtrType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::IntPtr)];
+    }
+    SLANG_FORCE_INLINE Type* getUIntType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt)];
+    }
+    SLANG_FORCE_INLINE Type* getUInt64Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt64)];
+    }
+    SLANG_FORCE_INLINE Type* getUIntPtrType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UIntPtr)];
+    }
+    SLANG_FORCE_INLINE Type* getVoidType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Void)];
+    }
 
-        /// Get a builtin type by the BaseType
-    SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor) { return m_sharedASTBuilder->m_builtinTypes[Index(flavor)]; }
+    /// Get a builtin type by the BaseType
+    SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor)
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(flavor)];
+    }
 
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
+
+    Type* getDefaultLayoutType();
+    Type* getStd140LayoutType();
+    Type* getStd430LayoutType();
+    Type* getScalarLayoutType();
 
     Type* getInitializerListType() { return m_sharedASTBuilder->getInitializerListType(); }
     Type* getOverloadedType() { return m_sharedASTBuilder->getOverloadedType(); }
@@ -437,27 +499,27 @@ public:
     Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
-        // Construct the type `Ptr<valueType>`, where `Ptr`
-        // is looked up as a builtin type.
+    // Construct the type `Ptr<valueType>`, where `Ptr`
+    // is looked up as a builtin type.
     PtrType* getPtrType(Type* valueType, AddressSpace addrSpace);
 
-        // Construct the type `Out<valueType>`
+    // Construct the type `Out<valueType>`
     OutType* getOutType(Type* valueType);
 
-        // Construct the type `InOut<valueType>`
+    // Construct the type `InOut<valueType>`
     InOutType* getInOutType(Type* valueType);
 
-        // Construct the type `Ref<valueType>`
+    // Construct the type `Ref<valueType>`
     RefType* getRefType(Type* valueType, AddressSpace addrSpace);
 
-        // Construct the type `ConstRef<valueType>`
+    // Construct the type `ConstRef<valueType>`
     ConstRefType* getConstRefType(Type* valueType);
 
-        // Construct the type `Optional<valueType>`
+    // Construct the type `Optional<valueType>`
     OptionalType* getOptionalType(Type* valueType);
 
-        // Construct a pointer type like `Ptr<valueType>`, but where
-        // the actual type name for the pointer type is given by `ptrTypeName`
+    // Construct a pointer type like `Ptr<valueType>`, but where
+    // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
     PtrTypeBase* getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName);
 
@@ -465,9 +527,16 @@ public:
 
     VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 
-    MatrixExpressionType* getMatrixType(Type* elementType, IntVal* rowCount, IntVal* colCount, IntVal* layout);
+    MatrixExpressionType* getMatrixType(
+        Type* elementType,
+        IntVal* rowCount,
+        IntVal* colCount,
+        IntVal* layout);
 
-    ConstantBufferType* getConstantBufferType(Type* elementType);
+    ConstantBufferType* getConstantBufferType(
+        Type* elementType,
+        Type* layoutType,
+        Val* layoutIsILayout);
 
     ParameterBlockType* getParameterBlockType(Type* elementType);
 
@@ -477,12 +546,17 @@ public:
 
     SamplerStateType* getSamplerStateType();
 
-    DifferentialPairType* getDifferentialPairType(
+    DifferentialPairType* getDifferentialPairType(Type* valueType, Witness* diffTypeWitness);
+
+    DifferentialPtrPairType* getDifferentialPtrPairType(
         Type* valueType,
-        Witness* primalIsDifferentialWitness);
+        Witness* diffRefTypeWitness);
 
     DeclRef<InterfaceDecl> getDifferentiableInterfaceDecl();
+    DeclRef<InterfaceDecl> getDifferentiableRefInterfaceDecl();
+
     Type* getDifferentiableInterfaceType();
+    Type* getDifferentiableRefInterfaceType();
 
     bool isDifferentiableInterfaceAvailable();
 
@@ -508,61 +582,93 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
-    TupleType* getTupleType(List<Type*>& types);
+    TupleType* getTupleType(ArrayView<Type*> types);
 
     FuncType* getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType = nullptr);
 
     TypeType* getTypeType(Type* type);
 
-        /// Produce a witness that `T : T` for any type `T`
-    TypeEqualityWitness* getTypeEqualityWitness(
-        Type* type);
+    Type* getEachType(Type* baseType);
+
+    Type* getExpandType(Type* pattern, ArrayView<Type*> capturedPacks);
+
+    ConcreteTypePack* getTypePack(ArrayView<Type*> types);
+
+    /// Produce a witness that `T : T` for any type `T`
+    TypeEqualityWitness* getTypeEqualityWitness(Type* type);
 
     DeclaredSubtypeWitness* getDeclaredSubtypeWitness(
-        Type*                   subType,
-        Type*                   superType,
-        DeclRef<Decl> const&    declRef);
+        Type* subType,
+        Type* superType,
+        DeclRef<Decl> const& declRef);
 
-        /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
+    TypePackSubtypeWitness* getSubtypeWitnessPack(
+        Type* subType,
+        Type* superType,
+        ArrayView<SubtypeWitness*> witnesses);
+
+    SubtypeWitness* getExpandSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getEachSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(
-        SubtypeWitness*    aIsSubtypeOfBWitness,
-        SubtypeWitness*    bIsSubtypeOfCWitness);
+        SubtypeWitness* aIsSubtypeOfBWitness,
+        SubtypeWitness* bIsSubtypeOfCWitness);
 
-        /// Produce a witness that `T <: L` or `T <: R` given `T <: L&R`
+    /// Produce a witness that `T <: L` or `T <: R` given `T <: L&R`
     SubtypeWitness* getExtractFromConjunctionSubtypeWitness(
-        Type*           subType,
-        Type*           superType,
+        Type* subType,
+        Type* superType,
         SubtypeWitness* subIsSubtypeOfConjunction,
-        int             indexOfSuperTypeInConjunction);
+        int indexOfSuperTypeInConjunction);
 
-        /// Produce a witnes that `S <: L&R` given witnesses that `S <: L` and `S <: R`
+    /// Produce a witnes that `S <: L&R` given witnesses that `S <: L` and `S <: R`
     SubtypeWitness* getConjunctionSubtypeWitness(
-        Type*           sub,
-        Type*           lAndR,
+        Type* sub,
+        Type* lAndR,
         SubtypeWitness* subIsLWitness,
         SubtypeWitness* subIsRWitness);
 
-        /// Helpers to get type info from the SharedASTBuilder
-    const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findClassInfo(slice); }
-    SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findSyntaxClass(slice); }
+    /// Helpers to get type info from the SharedASTBuilder
+    const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice)
+    {
+        return m_sharedASTBuilder->findClassInfo(slice);
+    }
+    SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice)
+    {
+        return m_sharedASTBuilder->findSyntaxClass(slice);
+    }
 
-    const ReflectClassInfo* findClassInfo(Name* name) { return m_sharedASTBuilder->findClassInfo(name); }
-    SyntaxClass<NodeBase> findSyntaxClass(Name* name) { return m_sharedASTBuilder->findSyntaxClass(name); }
+    const ReflectClassInfo* findClassInfo(Name* name)
+    {
+        return m_sharedASTBuilder->findClassInfo(name);
+    }
+    SyntaxClass<NodeBase> findSyntaxClass(Name* name)
+    {
+        return m_sharedASTBuilder->findSyntaxClass(name);
+    }
 
     MemoryArena& getMemoryArena() { return m_arena; }
 
-        /// Get the shared AST builder
+    /// Get the shared AST builder
     SharedASTBuilder* getSharedASTBuilder() { return m_sharedASTBuilder; }
 
-        /// Get the global session
+    /// Get the global session
     Session* getGlobalSession() { return m_sharedASTBuilder->m_session; }
 
     Index getId() { return m_id; }
 
-        /// Ctor
-    ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name); 
+    /// Ctor
+    ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name);
 
-        /// Dtor
+    /// Dtor
     ~ASTBuilder();
 
 protected:
@@ -570,7 +676,7 @@ protected:
     ASTBuilder();
 
 
-    template <typename T>
+    template<typename T>
     SLANG_FORCE_INLINE T* _initAndAdd(T* node)
     {
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
@@ -594,7 +700,7 @@ protected:
     String m_name;
     Index m_id;
 
-        /// List of all nodes that require being dtored when ASTBuilder is dtored
+    /// List of all nodes that require being dtored when ASTBuilder is dtored
     List<NodeBase*> m_dtorNodes;
 
     SharedASTBuilder* m_sharedASTBuilder;
@@ -616,13 +722,11 @@ struct SetASTBuilderContextRAII
         previousASTBuilder = getCurrentASTBuilder();
         setCurrentASTBuilder(astBuilder);
     }
-    ~SetASTBuilderContextRAII()
-    {
-        setCurrentASTBuilder(previousASTBuilder);
-    }
+    ~SetASTBuilderContextRAII() { setCurrentASTBuilder(previousASTBuilder); }
 };
 
-#define SLANG_AST_BUILDER_RAII(astBuilder) SetASTBuilderContextRAII _setASTBuilderContextRAII(astBuilder)
+#define SLANG_AST_BUILDER_RAII(astBuilder) \
+    SetASTBuilderContextRAII _setASTBuilderContextRAII(astBuilder)
 
 } // namespace Slang
 

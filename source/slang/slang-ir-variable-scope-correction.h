@@ -6,6 +6,7 @@ namespace Slang
 {
 
 struct IRModule;
+class TargetRequest;
 
 /// This pass correct the scope of variables in loop regions
 ///
@@ -30,6 +31,6 @@ struct IRModule;
 ///    their users such that we can make those instructions available globally.
 void applyVariableScopeCorrection(IRModule* module, TargetRequest* targetReq);
 
-}
+} // namespace Slang
 
 #endif // SLANG_IR_VARIABLE_SCOPE_CORRECTION_H

@@ -15,13 +15,13 @@ tests/diagnostics/mismatching-types.slang(57): error 30019: expected an expressi
 tests/diagnostics/mismatching-types.slang(59): error 30019: expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'GenericOuter<float>.NonGenericInner'
     a.ng = b.ng;
              ^~
-tests/diagnostics/mismatching-types.slang(61): error 30019: expected an expression of type 'GenericInner<int>', got 'int'
+tests/diagnostics/mismatching-types.slang(61): error 30019: expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'int'
     c.i = 0;
           ^
-tests/diagnostics/mismatching-types.slang(63): error 30019: expected an expression of type 'GenericInner<int>', got 'GenericInner<float>'
+tests/diagnostics/mismatching-types.slang(63): error 30019: expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'NonGenericOuter.GenericInner<float>'
     c.i = c.f;
             ^
-tests/diagnostics/mismatching-types.slang(65): error 30019: expected an expression of type 'GenericInner<int>.ReallyNested', got 'int'
+tests/diagnostics/mismatching-types.slang(65): error 30019: expected an expression of type 'NonGenericOuter.GenericInner<int>.ReallyNested', got 'int'
     c.i.n = 0;
             ^
 tests/diagnostics/mismatching-types.slang(74): error 30019: expected an expression of type 'Texture1D<int>', got 'Texture1D<float>'

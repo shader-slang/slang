@@ -28,11 +28,20 @@ DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
 // 0xxxx -  Command line and interaction with host platform APIs.
 //
 
-DIAGNOSTIC(    1, Error, cannotOpenFile, "cannot open file '$0'.")
-DIAGNOSTIC(    2, Error, cannotFindFile, "cannot find file '$0'.")
-DIAGNOSTIC(    4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
-DIAGNOSTIC(    5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
-DIAGNOSTIC(    6, Error, tooManyOutputPathsSpecified, "$0 output paths specified, but only $1 entry points given")
+DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
+DIAGNOSTIC(2, Error, cannotFindFile, "cannot find file '$0'.")
+DIAGNOSTIC(4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
+DIAGNOSTIC(5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
+DIAGNOSTIC(
+    6,
+    Error,
+    tooManyOutputPathsSpecified,
+    "$0 output paths specified, but only $1 entry points given")
+DIAGNOSTIC(
+    7,
+    Warning,
+    couldNotFindValidDocumentationOutputPath,
+    "could not find valid documentation output path at $0")
 
 //
 // 2xxxx - Parsing
@@ -41,6 +50,13 @@ DIAGNOSTIC(    6, Error, tooManyOutputPathsSpecified, "$0 output paths specified
 DIAGNOSTIC(20003, Error, unexpectedToken, "unexpected $0")
 DIAGNOSTIC(20001, Error, unexpectedTokenExpectedTokenType, "unexpected $0, expected $1")
 DIAGNOSTIC(20001, Error, unexpectedTokenExpectedTokenName, "unexpected $0, expected '$1'")
+DIAGNOSTIC(20004, Warning, requiresDocComment, "'$0' requires a documentation comment \"///\"")
+DIAGNOSTIC(
+    20004,
+    Warning,
+    invalidDocCommentHeader,
+    "got documentation comment '[$0]', expected one of: [Target] [Stage] [EXT] [Version] "
+    "[Compound] [Other]")
 
 DIAGNOSTIC(0, Error, tokenNameExpectedButEOF, "\"$0\" expected but end of file encountered.")
 DIAGNOSTIC(0, Error, tokenTypeExpectedButEOF, "$0 expected but end of file encountered.")
@@ -54,7 +70,21 @@ DIAGNOSTIC(20001, Error, unexpectedEOF, " Unexpected end of file.")
 DIAGNOSTIC(20002, Error, syntaxError, "syntax error.")
 DIAGNOSTIC(20003, Error, undefinedIdentifier, "undefined identifier \"$0\".")
 DIAGNOSTIC(20004, Error, redefinition, "capability redefinition: '$0'.")
-DIAGNOSTIC(20005, Error, unionWithSameKeyAtomButNotSubset, "unioning ('|') capability sets which have incompatible atoms but compatible 'key atoms', this: '$0', other: '$1'")
-DIAGNOSTIC(20006, Error, invalidJoinInGenerator, "joining ('+') capability sets which have incompatible 'key atoms'")
-DIAGNOSTIC(20007, Error, missingExternalInternalAtomPair, "All internal '_atom' require a corresponding external 'atom' atom meant for user's use. Offending atom: $0")
+DIAGNOSTIC(
+    20005,
+    Error,
+    unionWithSameKeyAtomButNotSubset,
+    "unioning ('|') capability sets which have incompatible atoms but compatible 'key atoms', "
+    "this: '$0', other: '$1'")
+DIAGNOSTIC(
+    20006,
+    Error,
+    invalidJoinInGenerator,
+    "joining ('+') capability sets which have incompatible 'key atoms'")
+DIAGNOSTIC(
+    20007,
+    Error,
+    missingExternalInternalAtomPair,
+    "All internal '_atom' require a corresponding external 'atom' atom meant for user's use. "
+    "Offending atom: $0")
 #undef DIAGNOSTIC

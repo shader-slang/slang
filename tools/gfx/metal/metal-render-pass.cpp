@@ -1,7 +1,7 @@
 // metal-render-pass.cpp
 #include "metal-render-pass.h"
 
-//#include "metal-helper-functions.h"
+// #include "metal-helper-functions.h"
 
 namespace gfx
 {
@@ -50,25 +50,32 @@ Result RenderPassLayoutImpl::init(DeviceImpl* device, const IRenderPassLayout::D
 {
     m_device = device;
 
-    FramebufferLayoutImpl* framebufferLayout = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
+    FramebufferLayoutImpl* framebufferLayout =
+        static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
     assert(framebufferLayout);
 
-    // Initialize render pass descriptor, filling in attachment metadata, but leaving texture data unbound.
+    // Initialize render pass descriptor, filling in attachment metadata, but leaving texture data
+    // unbound.
     m_renderPassDesc = NS::TransferPtr(MTL::RenderPassDescriptor::alloc()->init());
 
     m_renderPassDesc->setRenderTargetArrayLength(desc.renderTargetCount);
     for (GfxIndex i = 0; i < desc.renderTargetCount; ++i)
     {
-        MTL::RenderPassColorAttachmentDescriptor* colorAttachment = m_renderPassDesc->colorAttachments()->object(i);
+        MTL::RenderPassColorAttachmentDescriptor* colorAttachment =
+            m_renderPassDesc->colorAttachments()->object(i);
         colorAttachment->setLoadAction(translateLoadOp(desc.renderTargetAccess[i].loadOp));
         colorAttachment->setStoreAction(translateStoreOp(desc.renderTargetAccess[i].storeOp));
     }
 
-    m_renderPassDesc->depthAttachment()->setLoadAction(translateLoadOp(desc.depthStencilAccess->loadOp));
-    m_renderPassDesc->depthAttachment()->setStoreAction(translateStoreOp(desc.depthStencilAccess->storeOp));
+    m_renderPassDesc->depthAttachment()->setLoadAction(
+        translateLoadOp(desc.depthStencilAccess->loadOp));
+    m_renderPassDesc->depthAttachment()->setStoreAction(
+        translateStoreOp(desc.depthStencilAccess->storeOp));
 
-    m_renderPassDesc->stencilAttachment()->setLoadAction(translateLoadOp(desc.depthStencilAccess->loadOp));
-    m_renderPassDesc->stencilAttachment()->setStoreAction(translateStoreOp(desc.depthStencilAccess->storeOp));
+    m_renderPassDesc->stencilAttachment()->setLoadAction(
+        translateLoadOp(desc.depthStencilAccess->loadOp));
+    m_renderPassDesc->stencilAttachment()->setStoreAction(
+        translateStoreOp(desc.depthStencilAccess->storeOp));
 
     return SLANG_OK;
 }

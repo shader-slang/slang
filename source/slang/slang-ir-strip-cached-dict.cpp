@@ -1,5 +1,6 @@
 // slang-ir-strip-cached-dict.cpp
 #include "slang-ir-strip-cached-dict.h"
+
 #include "slang-ir-insts.h"
 
 namespace Slang
@@ -25,4 +26,4 @@ void stripCachedDictionaries(IRModule* module)
         inst->removeAndDeallocate();
 }
 
-}
+} // namespace Slang

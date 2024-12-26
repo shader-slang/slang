@@ -57,6 +57,7 @@ void myTriangleClosestHit(inout MyRayPayload payload)
 //
 bool myTriangleAnyHit(inout MyRayPayload payload)
 {
+    unmodified(payload);
 	return true;
 }
 
@@ -75,6 +76,7 @@ void myProceduralClosestHit(inout MyRayPayload payload, MyProceduralHitAttrs att
 }
 bool myProceduralAnyHit(inout MyRayPayload payload)
 {
+    unmodified(payload);
 	return true;
 }
 
@@ -87,6 +89,8 @@ bool myProceduralAnyHit(inout MyRayPayload payload)
 //
 bool myProceduralIntersection(inout float tHit, inout MyProceduralHitAttrs hitAttrs)
 {
+    unmodified(tHit);
+    unmodified(hitAttrs);
 	return true;
 }
 

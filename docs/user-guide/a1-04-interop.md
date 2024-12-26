@@ -110,7 +110,7 @@ void test_0()
 The strings in `__requirePrelude` are deduplicated: the same prelude string will only be emitted once no matter how many times an intrinsic function is invoked. Therefore, it is good practice to put `#include` lines as separate `__requirePrelude` statements to prevent duplicate `#include`s being generated in the output code.
 
 ## Managing Cross-Platform Code
-If you are defining an intrinsic function that maps to multiple targets in different ways, you can use `__target_switch` construct to manage the target-specific definitions. For example, here is a snippet from Slang's builtin standard library that defines `getRealtimeClock`:
+If you are defining an intrinsic function that maps to multiple targets in different ways, you can use `__target_switch` construct to manage the target-specific definitions. For example, here is a snippet from the Slang core module that defines `getRealtimeClock`:
 ```hlsl
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
@@ -169,19 +169,39 @@ When used as part of an expression, the Slang type of the `spirv_asm` construct 
 result: <type> = ...
 ```
 
-You can use the `$` prefix to begin an anti-quote of a Slang expression inside a `spirv_asm` block. This is commonly used to refer to a Slang variable, such as `localVar` in the example, as an operand. Additionally, the `$$` prefix is used to reference a Slang type, such as the `$$uint` references in the example. You can also use the `&` prefix to refer to an l-value as a pointer-typed value in SPIRV.
+You can use the `$` prefix to begin an anti-quote of a Slang expression inside a `spirv_asm` block. This is commonly used to refer to a Slang variable, such as `localVar` in the example, as an operand. Additionally, the `$$` prefix is used to reference a Slang type, such as the `$$uint` references in the example. 
 
-Opcodes such as `OpCapbility`, `OpExtension` and type definitions are allowed inside a `spirv_asm` block. These instructions will be deduplicated and inserted into the correct sections defined by the SPIRV specification.
-
-You may use SPIRV enum values directly as operands, for example:
+You can also use the `&` prefix to refer to an l-value as a pointer-typed value in SPIRV, for example:
 ```cpp
-float spvAtomicAdd(__ref float value, float amount)
+float modf(float x, out float ip)
 {
     return spirv_asm
     {
-        OpExtension "SPV_EXT_shader_atomic_float_add";
-        OpCapability AtomicFloat32AddEXT;
-        result:$$float = OpAtomicFAddEXT &value Device None $amount
+        result:$$float = OpExtInst glsl450 Modf $x &ip
+    };
+}
+```
+
+Opcodes such as `OpCapbility`, `OpExtension` and type definitions are allowed inside a `spirv_asm` block. These instructions will be deduplicated and inserted into the correct sections defined by the SPIRV specification, for example:
+```cpp
+uint4 WaveMatch(T value)
+{
+    return spirv_asm
+    {
+        OpCapability GroupNonUniformPartitionedNV;
+        OpExtension "SPV_NV_shader_subgroup_partitioned";
+        OpGroupNonUniformPartitionNV $$uint4 result $value
+    };
+}
+```
+
+You may use SPIRV enum values directly as operands, for example:
+```cpp
+void memoryBarrierImage()
+{
+    spirv_asm
+    {
+        OpMemoryBarrier Device AcquireRelease|ImageMemory
     };
 }
 ```

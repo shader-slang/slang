@@ -4,7 +4,8 @@
 
 #include "slang-syntax.h"
 
-namespace Slang {
+namespace Slang
+{
 
 struct ASTEmitScope
 {
@@ -18,10 +19,10 @@ private:
     ASTBuilder* m_builder;
     NamePool* m_namePool;
     List<ASTEmitScope> m_scopeStack;
+
 public:
     ASTSynthesizer(ASTBuilder* builder, NamePool* namePool)
-        : m_builder(builder)
-        , m_namePool(namePool)
+        : m_builder(builder), m_namePool(namePool)
     {
     }
 
@@ -52,6 +53,7 @@ public:
         auto parentScope = getScope(decl);
         decl->ownedScope = m_builder->create<Scope>();
         decl->ownedScope->parent = parentScope;
+        decl->ownedScope->containerDecl = decl;
         pushContainerScope(decl);
     }
 
@@ -96,10 +98,7 @@ public:
         return scope.m_parentSeqStmt;
     }
 
-    void popScope()
-    {
-        m_scopeStack.removeLast();
-    }
+    void popScope() { m_scopeStack.removeLast(); }
 
     ASTEmitScope getCurrentScope()
     {
@@ -145,7 +144,6 @@ public:
     ExpressionStmt* emitExprStmt(Expr* expr);
 
     ReturnStmt* emitReturnStmt(Expr* expr);
-
 };
 
 } // namespace Slang

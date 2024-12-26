@@ -38,4 +38,4 @@ List<ASTLookupResult> findASTNodesAt(
     Int line,
     Int col);
 
-} // namespace LanguageServerProtocol
+} // namespace Slang

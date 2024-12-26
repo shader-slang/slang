@@ -10,7 +10,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 
-int getParamSize(inout uint3 v)
+int getParamSize(uint3 v)
 {
     return sizeof(v);
 }
@@ -19,7 +19,7 @@ int getParamSize(inout uint3 v)
 // With "natural" layout size must be the same across all targets.
 // The parameter passing semantic is "value in/value out", so the size 
 // will always be the size of the *value* regardless. So uint3 in this case.
-int getParamSizeWithDirection(inout uint3 v)
+int getParamSizeWithDirection(uint3 v)
 {
     return sizeof(v);
 }

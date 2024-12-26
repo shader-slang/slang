@@ -1,19 +1,26 @@
 #include "slang-rtti-info.h"
 
 #include "slang-com-helper.h"
-
 #include "slang-rtti-util.h"
 
 #include <mutex>
 
-namespace Slang {
-
-#define SLANG_RTTI_INFO_INVALID(name) RttiInfo{RttiInfo::Kind::Invalid, 0, 0}
-#define SLANG_RTTI_INFO_BASIC(name, type) \
-    RttiInfo{RttiInfo::Kind::name, RttiInfo::AlignmentType(SLANG_ALIGN_OF(type)), RttiInfo::SizeType(sizeof(type))}
-
-/* static */const RttiInfo RttiInfo::g_basicTypes[Index(Kind::CountOf)] =
+namespace Slang
 {
+
+#define SLANG_RTTI_INFO_INVALID(name) \
+    RttiInfo                          \
+    {                                 \
+        RttiInfo::Kind::Invalid, 0, 0 \
+    }
+#define SLANG_RTTI_INFO_BASIC(name, type)                                    \
+    RttiInfo                                                                 \
+    {                                                                        \
+        RttiInfo::Kind::name, RttiInfo::AlignmentType(SLANG_ALIGN_OF(type)), \
+            RttiInfo::SizeType(sizeof(type))                                 \
+    }
+
+/* static */ const RttiInfo RttiInfo::g_basicTypes[Index(Kind::CountOf)] = {
     SLANG_RTTI_INFO_INVALID(Invalid),
     SLANG_RTTI_INFO_BASIC(I32, int32_t),
     SLANG_RTTI_INFO_BASIC(U32, uint32_t),
@@ -54,26 +61,27 @@ struct RttiInfoManager
     }
 
 protected:
-    RttiInfoManager() :
-        m_arena(1024)
+    RttiInfoManager()
+        : m_arena(1024)
     {
     }
 
-    std::recursive_mutex m_mutex;             ///< We need a mutex to guard access to m_arena
+    std::recursive_mutex m_mutex; ///< We need a mutex to guard access to m_arena
     MemoryArena m_arena;
 };
 
-/* static */void* RttiInfo::allocate(size_t size)
+/* static */ void* RttiInfo::allocate(size_t size)
 {
     return RttiInfoManager::getSingleton().allocate(size);
 }
 
-/* static */void RttiInfo::deallocateAll()
+/* static */ void RttiInfo::deallocateAll()
 {
     return RttiInfoManager::getSingleton().deallocateAll();
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StructRttiBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StructRttiBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ */
 
 static void _appendFixedArray(const FixedArrayRttiInfo* inFixedArray, StringBuilder& out)
 {
@@ -97,27 +105,45 @@ static void _appendFixedArray(const FixedArrayRttiInfo* inFixedArray, StringBuil
     }
 }
 
-/* static */void RttiInfo::append(const RttiInfo* info, StringBuilder& out)
+/* static */ void RttiInfo::append(const RttiInfo* info, StringBuilder& out)
 {
     switch (info->m_kind)
     {
-        case RttiInfo::Kind::I32:       out << "int32_t"; break;
-        case RttiInfo::Kind::U32:       out << "uint32_t"; break;
-        case RttiInfo::Kind::I64:       out << "int64_t"; break;
-        case RttiInfo::Kind::U64:       out << "uint64_t"; break;
-        case RttiInfo::Kind::F32:       out << "float"; break;
-        case RttiInfo::Kind::F64:       out << "double"; break;
-        case RttiInfo::Kind::Bool:      out << "bool"; break;
-        case RttiInfo::Kind::String:    out << "String"; break;
-        case RttiInfo::Kind::UnownedStringSlice:    out << "UnownedStringSlice"; break;
-        case RttiInfo::Kind::Ptr:
+    case RttiInfo::Kind::I32:
+        out << "int32_t";
+        break;
+    case RttiInfo::Kind::U32:
+        out << "uint32_t";
+        break;
+    case RttiInfo::Kind::I64:
+        out << "int64_t";
+        break;
+    case RttiInfo::Kind::U64:
+        out << "uint64_t";
+        break;
+    case RttiInfo::Kind::F32:
+        out << "float";
+        break;
+    case RttiInfo::Kind::F64:
+        out << "double";
+        break;
+    case RttiInfo::Kind::Bool:
+        out << "bool";
+        break;
+    case RttiInfo::Kind::String:
+        out << "String";
+        break;
+    case RttiInfo::Kind::UnownedStringSlice:
+        out << "UnownedStringSlice";
+        break;
+    case RttiInfo::Kind::Ptr:
         {
             const PtrRttiInfo* ptrRttiInfo = static_cast<const PtrRttiInfo*>(info);
             append(ptrRttiInfo->m_targetType, out);
             out << "*";
             break;
         }
-        case RttiInfo::Kind::RefPtr:
+    case RttiInfo::Kind::RefPtr:
         {
             const RefPtrRttiInfo* ptrRttiInfo = static_cast<const RefPtrRttiInfo*>(info);
             out << "RefPtr<";
@@ -125,13 +151,13 @@ static void _appendFixedArray(const FixedArrayRttiInfo* inFixedArray, StringBuil
             out << ">";
             break;
         }
-        case RttiInfo::Kind::FixedArray:
+    case RttiInfo::Kind::FixedArray:
         {
             const FixedArrayRttiInfo* arrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(info);
             _appendFixedArray(arrayRttiInfo, out);
             break;
         }
-        case RttiInfo::Kind::List:
+    case RttiInfo::Kind::List:
         {
             const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(info);
             out << "List<";
@@ -139,9 +165,10 @@ static void _appendFixedArray(const FixedArrayRttiInfo* inFixedArray, StringBuil
             out << ">";
             break;
         }
-        case RttiInfo::Kind::Dictionary:
+    case RttiInfo::Kind::Dictionary:
         {
-            const DictionaryRttiInfo* dictionaryRttiInfo = static_cast<const DictionaryRttiInfo*>(info);
+            const DictionaryRttiInfo* dictionaryRttiInfo =
+                static_cast<const DictionaryRttiInfo*>(info);
 
             out << "Dictionary<";
             append(dictionaryRttiInfo->m_keyType, out);
@@ -150,7 +177,7 @@ static void _appendFixedArray(const FixedArrayRttiInfo* inFixedArray, StringBuil
             out << ">";
             break;
         }
-        default:
+    default:
         {
             if (info->isNamed())
             {
@@ -165,7 +192,8 @@ static void _appendFixedArray(const FixedArrayRttiInfo* inFixedArray, StringBuil
     }
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StructRttiBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StructRttiBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ */
 
 void StructRttiBuilder::_init(const char* name, const StructRttiInfo* super, const Byte* base)
 {
@@ -183,7 +211,8 @@ StructRttiInfo StructRttiBuilder::make()
 
     if (fieldCount)
     {
-        StructRttiInfo::Field* dstFields = (StructRttiInfo::Field*)RttiInfo::allocate(sizeof(StructRttiInfo::Field) * fieldCount);
+        StructRttiInfo::Field* dstFields =
+            (StructRttiInfo::Field*)RttiInfo::allocate(sizeof(StructRttiInfo::Field) * fieldCount);
         ::memcpy(dstFields, m_fields.getBuffer(), sizeof(StructRttiInfo::Field) * fieldCount);
 
         m_rttiInfo.m_fields = dstFields;
@@ -193,7 +222,8 @@ StructRttiInfo StructRttiBuilder::make()
     return m_rttiInfo;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncsMap !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncsMap !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ */
 
 RttiTypeFuncs RttiTypeFuncsMap::getFuncsForType(const RttiInfo* rttiInfo)
 {
@@ -215,7 +245,7 @@ void RttiTypeFuncsMap::add(const RttiInfo* rttiInfo, const RttiTypeFuncs& funcs)
 {
     if (auto funcsPtr = m_map.tryGetValueOrAdd(rttiInfo, funcs))
     {
-        // If there are funcs set, they aren't valid otherwise this would be 
+        // If there are funcs set, they aren't valid otherwise this would be
         // replacing, so assert on that scenario.
         SLANG_ASSERT(!funcsPtr->isValid());
 

@@ -138,7 +138,7 @@ standard output = {
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
                 }
             }
         },
@@ -195,8 +195,8 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment",
-            "result:": {
+            "stage": "fragment",
+            "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
                 "semanticName": "SV_TARGET",

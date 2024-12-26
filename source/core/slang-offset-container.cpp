@@ -1,7 +1,8 @@
 // slang-offset-container.cpp
 #include "slang-offset-container.h"
 
-namespace Slang {
+namespace Slang
+{
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OffsetString !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -22,14 +23,14 @@ size_t OffsetString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeS
         num++;
     }
 
-    // It might be one byte past the front, if its < 0x100 but greater than kSizeBase 
+    // It might be one byte past the front, if its < 0x100 but greater than kSizeBase
     SLANG_ASSERT(num >= 1);
 
     encode[0] = uint8_t(kSizeBase + num);
     return num + 1;
 }
 
-/* static */const char* OffsetString::decodeSize(const char* in, size_t& outSize)
+/* static */ const char* OffsetString::decodeSize(const char* in, size_t& outSize)
 {
     const uint8_t* cur = (const uint8_t*)in;
     if (*cur <= kSizeBase)
@@ -41,27 +42,28 @@ size_t OffsetString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeS
     int numBytes = *cur - kSizeBase;
     switch (numBytes)
     {
-        case 1:
+    case 1:
         {
             outSize = cur[1];
             return in + 2;
         }
-        case 2:
+    case 2:
         {
             outSize = cur[1] | (uint32_t(cur[2]) << 8);
             return in + 3;
         }
-        case 3:
+    case 3:
         {
             outSize = cur[1] | (uint32_t(cur[2]) << 8) | (uint32_t(cur[3]) << 16);
             return in + 4;
         }
-        case 4:
+    case 4:
         {
-            outSize = cur[1] | (uint32_t(cur[2]) << 8) | (uint32_t(cur[3]) << 16) | (uint32_t(cur[4]) << 24);
+            outSize = cur[1] | (uint32_t(cur[2]) << 8) | (uint32_t(cur[3]) << 16) |
+                      (uint32_t(cur[4]) << 24);
             return in + 5;
         }
-        default:
+    default:
         {
             outSize = 0;
             return nullptr;
@@ -69,7 +71,7 @@ size_t OffsetString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeS
     }
 }
 
-/* static */size_t OffsetString::calcAllocationSize(size_t stringSize)
+/* static */ size_t OffsetString::calcAllocationSize(size_t stringSize)
 {
     uint8_t encode[kMaxSizeEncodeSize];
     size_t encodeSize = calcEncodedSize(stringSize, encode);
@@ -77,7 +79,7 @@ size_t OffsetString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeS
     return encodeSize + stringSize + 1;
 }
 
-/* static */size_t OffsetString::calcAllocationSize(const UnownedStringSlice& slice)
+/* static */ size_t OffsetString::calcAllocationSize(const UnownedStringSlice& slice)
 {
     return calcAllocationSize(slice.getLength());
 }
@@ -95,14 +97,15 @@ const char* OffsetString::getCstr() const
     return getSlice().begin();
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OffsetContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OffsetContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ */
 
 OffsetContainer::OffsetContainer()
 {
     m_capacity = 0;
     m_data = nullptr;
 
-    // We need to allocate some of the first bytes 0 can be used for nullptr. 
+    // We need to allocate some of the first bytes 0 can be used for nullptr.
     allocateAndZero(kStartOffset, 1);
 }
 
@@ -174,7 +177,7 @@ Offset32Ptr<OffsetString> OffsetContainer::newString(const UnownedStringSlice& s
     size_t allocSize = headSize + stringSize + 1;
     uint8_t* bytes = (uint8_t*)allocate(allocSize);
 
-    ::memcpy(bytes, head, headSize);    
+    ::memcpy(bytes, head, headSize);
     ::memcpy(bytes + headSize, slice.begin(), stringSize);
 
     // 0 terminate

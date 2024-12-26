@@ -24,8 +24,8 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment",
-            "result:": {
+            "stage": "fragment",
+            "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
                 "semanticName": "SV_TARGET",
@@ -41,11 +41,11 @@ standard output = {
             "bindings": [
                 {
                     "name": "t0",
-                    "binding": {"kind": "descriptorTableSlot", "index": 0}
+                    "binding": {"kind": "descriptorTableSlot", "index": 0, "used": 0}
                 },
                 {
                     "name": "t1",
-                    "binding": {"kind": "descriptorTableSlot", "index": 1}
+                    "binding": {"kind": "descriptorTableSlot", "index": 1, "used": 0}
                 }
             ]
         }

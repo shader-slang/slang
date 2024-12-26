@@ -14,7 +14,9 @@ namespace vk
 {
 
 Result ShaderObjectImpl::create(
-    IDevice* device, ShaderObjectLayoutImpl* layout, ShaderObjectImpl** outShaderObject)
+    IDevice* device,
+    ShaderObjectLayoutImpl* layout,
+    ShaderObjectImpl** outShaderObject)
 {
     auto object = RefPtr<ShaderObjectImpl>(new ShaderObjectImpl());
     SLANG_RETURN_ON_FAIL(object->init(device, layout));
@@ -23,9 +25,15 @@ Result ShaderObjectImpl::create(
     return SLANG_OK;
 }
 
-RendererBase* ShaderObjectImpl::getDevice() { return m_layout->getDevice(); }
+RendererBase* ShaderObjectImpl::getDevice()
+{
+    return m_layout->getDevice();
+}
 
-GfxCount ShaderObjectImpl::getEntryPointCount() { return 0; }
+GfxCount ShaderObjectImpl::getEntryPointCount()
+{
+    return 0;
+}
 
 Result ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
@@ -33,9 +41,15 @@ Result ShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryP
     return SLANG_OK;
 }
 
-const void* ShaderObjectImpl::getRawData() { return m_data.getBuffer(); }
+const void* ShaderObjectImpl::getRawData()
+{
+    return m_data.getBuffer();
+}
 
-Size ShaderObjectImpl::getSize() { return (Size)m_data.getCount(); }
+Size ShaderObjectImpl::getSize()
+{
+    return (Size)m_data.getCount();
+}
 
 // TODO: Change size_t and Index to Size?
 Result ShaderObjectImpl::setData(ShaderOffset const& inOffset, void const* data, size_t inSize)
@@ -110,7 +124,9 @@ Result ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* s
 }
 
 Result ShaderObjectImpl::setCombinedTextureSampler(
-    ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler)
+    ShaderOffset const& offset,
+    IResourceView* textureView,
+    ISamplerState* sampler)
 {
     if (offset.bindingRangeIndex < 0)
         return SLANG_E_INVALID_ARG;
@@ -307,7 +323,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
 }
 
 void ShaderObjectImpl::writeDescriptor(
-    RootBindingContext& context, VkWriteDescriptorSet const& write)
+    RootBindingContext& context,
+    VkWriteDescriptorSet const& write)
 {
     auto device = context.device;
     device->m_api.vkUpdateDescriptorSets(device->m_device, 1, &write, 0, nullptr);
@@ -350,7 +367,12 @@ void ShaderObjectImpl::writeBufferDescriptor(
     BufferResourceImpl* buffer)
 {
     writeBufferDescriptor(
-        context, offset, descriptorType, buffer, 0, buffer->getDesc()->sizeInBytes);
+        context,
+        offset,
+        descriptorType,
+        buffer,
+        0,
+        buffer->getDesc()->sizeInBytes);
 }
 
 void ShaderObjectImpl::writePlainBufferDescriptor(
@@ -586,7 +608,8 @@ bool ShaderObjectImpl::shouldAllocateConstantBuffer(TransientResourceHeapImpl* t
 }
 
 Result ShaderObjectImpl::_ensureOrdinaryDataBufferCreatedIfNeeded(
-    PipelineCommandEncoder* encoder, ShaderObjectLayoutImpl* specializedLayout)
+    PipelineCommandEncoder* encoder,
+    ShaderObjectLayoutImpl* specializedLayout)
 {
     // If data has been changed since last allocation/filling of constant buffer,
     // we will need to allocate a new one.
@@ -609,7 +632,9 @@ Result ShaderObjectImpl::_ensureOrdinaryDataBufferCreatedIfNeeded(
     // it from the transient resource heap.
     //
     SLANG_RETURN_ON_FAIL(encoder->m_commandBuffer->m_transientHeap->allocateConstantBuffer(
-        m_constantBufferSize, m_constantBuffer, m_constantBufferOffset));
+        m_constantBufferSize,
+        m_constantBuffer,
+        m_constantBufferOffset));
 
     // Once the buffer is allocated, we can use `_writeOrdinaryData` to fill it in.
     //
@@ -824,8 +849,8 @@ Result ShaderObjectImpl::bindAsValue(
                     // already.
                     //
                     ShaderObjectImpl* subObject = m_objects[subObjectIndex + i];
-                    subObject->bindAsValue(
-                        encoder, context, BindingOffset(objOffset), subObjectLayout);
+                    subObject
+                        ->bindAsValue(encoder, context, BindingOffset(objOffset), subObjectLayout);
                     objOffset += objStride;
                 }
             }
@@ -987,7 +1012,9 @@ Result ShaderObjectImpl::_createSpecializedLayout(ShaderObjectLayoutImpl** outLa
 }
 
 Result EntryPointShaderObject::create(
-    IDevice* device, EntryPointLayout* layout, EntryPointShaderObject** outShaderObject)
+    IDevice* device,
+    EntryPointLayout* layout,
+    EntryPointShaderObject** outShaderObject)
 {
     RefPtr<EntryPointShaderObject> object = new EntryPointShaderObject();
     SLANG_RETURN_ON_FAIL(object->init(device, layout));
@@ -1080,7 +1107,10 @@ List<RefPtr<EntryPointShaderObject>> const& RootShaderObjectImpl::getEntryPoints
     return m_entryPoints;
 }
 
-GfxCount RootShaderObjectImpl::getEntryPointCount() { return (GfxCount)m_entryPoints.getCount(); }
+GfxCount RootShaderObjectImpl::getEntryPointCount()
+{
+    return (GfxCount)m_entryPoints.getCount();
+}
 
 Result RootShaderObjectImpl::getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
 {
@@ -1103,7 +1133,9 @@ Result RootShaderObjectImpl::copyFrom(IShaderObject* object, ITransientResourceH
 }
 
 Result RootShaderObjectImpl::bindAsRoot(
-    PipelineCommandEncoder* encoder, RootBindingContext& context, RootShaderObjectLayout* layout)
+    PipelineCommandEncoder* encoder,
+    RootBindingContext& context,
+    RootShaderObjectLayout* layout)
 {
     BindingOffset offset = {};
     offset.pending = layout->getPendingDataOffset();
@@ -1141,8 +1173,8 @@ Result RootShaderObjectImpl::bindAsRoot(
         // `RootShaderObjectLayout` has already baked any offsets
         // from the global layout into the `entryPointInfo`.
 
-        entryPoint->bindAsEntryPoint(
-            encoder, context, entryPointInfo.offset, entryPointInfo.layout);
+        entryPoint
+            ->bindAsEntryPoint(encoder, context, entryPointInfo.offset, entryPointInfo.layout);
     }
 
     return SLANG_OK;

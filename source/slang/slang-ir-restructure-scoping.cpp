@@ -1,9 +1,9 @@
 // slang-ir-restructure-scoping.cpp
 #include "slang-ir-restructure-scoping.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -12,12 +12,10 @@ namespace Slang
 ///
 /// In general the same block may appear as multiple regions,
 /// so this will return the first region in the linked list.
-static SimpleRegion* getFirstRegionForBlock(
-    RegionTree* regionTree,
-    IRBlock*    block)
+static SimpleRegion* getFirstRegionForBlock(RegionTree* regionTree, IRBlock* block)
 {
     SimpleRegion* region = nullptr;
-    if( regionTree->mapBlockToRegion.tryGetValue(block, region) )
+    if (regionTree->mapBlockToRegion.tryGetValue(block, region))
     {
         return region;
     }
@@ -25,14 +23,12 @@ static SimpleRegion* getFirstRegionForBlock(
 }
 
 /// Try to find the first structured region that contains `inst`.
-static SimpleRegion* getFirstRegionForInst(
-    RegionTree* regionTree,
-    IRInst*     inst)
+static SimpleRegion* getFirstRegionForInst(RegionTree* regionTree, IRInst* inst)
 {
     auto ii = inst;
-    while(ii)
+    while (ii)
     {
-        if(auto block = as<IRBlock>(ii))
+        if (auto block = as<IRBlock>(ii))
             return getFirstRegionForBlock(regionTree, block);
 
         ii = ii->getParent();
@@ -49,7 +45,7 @@ static SimpleRegion* getFirstRegionForInst(
 static Int computeDepth(Region* region)
 {
     Int depth = 0;
-    for( Region* rr = region; rr; rr = rr->getParent() )
+    for (Region* rr = region; rr; rr = rr->getParent())
     {
         depth++;
     }
@@ -64,7 +60,7 @@ static Int computeDepth(Region* region)
 static Region* getAncestor(Region* region, Int n)
 {
     Region* rr = region;
-    for( Int ii = 0; ii < n; ++ii )
+    for (Int ii = 0; ii < n; ++ii)
     {
         SLANG_ASSERT(rr);
         rr = rr->getParent();
@@ -73,9 +69,7 @@ static Region* getAncestor(Region* region, Int n)
 }
 
 /// Find a region that is an ancestor of both `left` and `right`.
-static Region* findCommonAncestorRegion(
-    Region*   left,
-    Region*   right)
+static Region* findCommonAncestorRegion(Region* left, Region* right)
 {
     // Rather than blinding search through each ancestor of `left`
     // and see if it is also an ancestor of `right` and vice-versa,
@@ -109,7 +103,7 @@ static Region* findCommonAncestorRegion(
     // look at their parents. Because the depth must match
     // on both sides, we will never risk missing an ancestor.
     //
-    while( leftAncestor != rightAncestor )
+    while (leftAncestor != rightAncestor)
     {
         leftAncestor = leftAncestor->getParent();
         rightAncestor = rightAncestor->getParent();
@@ -122,18 +116,16 @@ static Region* findCommonAncestorRegion(
 }
 
 /// Find a simple region that is an ancestor of both `left` and `right`.
-static SimpleRegion* findSimpleCommonAncestorRegion(
-    Region*   left,
-    Region*   right)
+static SimpleRegion* findSimpleCommonAncestorRegion(Region* left, Region* right)
 {
     // Start by finding a common ancestor without worrying about it being simple.
     Region* ancestor = findCommonAncestorRegion(left, right);
 
     // Now search for a simple region up the tree.
-    while( ancestor )
+    while (ancestor)
     {
-        if(ancestor->getFlavor() == Region::Flavor::Simple)
-            return (SimpleRegion*) ancestor;
+        if (ancestor->getFlavor() == Region::Flavor::Simple)
+            return (SimpleRegion*)ancestor;
 
         ancestor = ancestor->getParent();
     }
@@ -146,11 +138,9 @@ static SimpleRegion* findSimpleCommonAncestorRegion(
     UNREACHABLE_RETURN(nullptr);
 }
 
-IRInst* getDefaultInitVal(
-    IRBuilder*  builder,
-    IRType*     type)
+IRInst* getDefaultInitVal(IRBuilder* builder, IRType* type)
 {
-    switch( type->getOp() )
+    switch (type->getOp())
     {
     default:
         return nullptr;
@@ -168,20 +158,17 @@ IRInst* getDefaultInitVal(
     case kIROp_DoubleType:
         return builder->getFloatValue(type, 0.0);
 
-    // TODO: handle vector/matrix types here, by
-    // creating an appropriate scalar value and
-    // then "splatting" it.
+        // TODO: handle vector/matrix types here, by
+        // creating an appropriate scalar value and
+        // then "splatting" it.
     }
 }
 
 /// Initialize a variable to a sane default value, if possible.
-void defaultInitializeVar(
-    IRBuilder*  builder,
-    IRVar*      var,
-    IRType*     type)
+void defaultInitializeVar(IRBuilder* builder, IRVar* var, IRType* type)
 {
     IRInst* initVal = nullptr;
-    switch( type->getOp() )
+    switch (type->getOp())
     {
     case kIROp_VoidType:
     default:
@@ -191,13 +178,13 @@ void defaultInitializeVar(
         initVal = getDefaultInitVal(builder, type);
         break;
 
-    // TODO: Handle aggregate types (structures, arrays)
-    // explicitly here, since they need to be careful about
-    // the cases where an element/field type might not
-    // be something we can default-initialize.
+        // TODO: Handle aggregate types (structures, arrays)
+        // explicitly here, since they need to be careful about
+        // the cases where an element/field type might not
+        // be something we can default-initialize.
     }
 
-    if( initVal )
+    if (initVal)
     {
         builder->emitStore(var, initVal);
     }
@@ -209,16 +196,16 @@ void defaultInitializeVar(
 /// should be the region tree for the function that contains `def`.
 ///
 static void fixValueScopingForInst(
-    IRInst*         def,
-    SimpleRegion*   defRegion,
-    RegionTree*     regionTree,
-    bool            isInstAlwaysFolded)
+    IRInst* def,
+    SimpleRegion* defRegion,
+    RegionTree* regionTree,
+    bool isInstAlwaysFolded)
 {
     // This algorithm should not consider "phi nodes" for now,
     // because the emit logic will already create variables for them.
     // We could consider folding the logic to move out of SSA form
     // into this function, but that would add a lot of complexity for now.
-    if(def->getOp() == kIROp_Param)
+    if (def->getOp() == kIROp_Param)
         return;
 
     // We would have a scoping violation if there exists some
@@ -244,8 +231,8 @@ static void fixValueScopingForInst(
     // insert `tmp` into (to avoid looping over the uses
     // twice).
     //
-    SimpleRegion*   insertRegion    = defRegion;
-    IRVar*          tmp             = nullptr;
+    SimpleRegion* insertRegion = defRegion;
+    IRVar* tmp = nullptr;
 
     // If we end up needing to insert code we'll need an IR builder,
     // so we will go ahead and create one now.
@@ -263,7 +250,7 @@ static void fixValueScopingForInst(
     // in the linked list *before* we operator on `u`.
     //
     IRUse* nextUse = nullptr;
-    for( auto u = def->firstUse; u; u = nextUse )
+    for (auto u = def->firstUse; u; u = nextUse)
     {
         nextUse = u->nextUse;
 
@@ -274,7 +261,7 @@ static void fixValueScopingForInst(
         // the same block as the definition, there are no problems.
         //
         IRInst* user = u->getUser();
-        if(user->getParent() == defRegion->block)
+        if (user->getParent() == defRegion->block)
             continue;
 
         // Otherwise, let's find the structures control-flow
@@ -293,14 +280,14 @@ static void fixValueScopingForInst(
         // such uses for now, since they won't even appear in
         // the output.
         //
-        if(!useRegion)
+        if (!useRegion)
             continue;
 
         // Now we want to check if `useRegion` is a child/descendent
         // of a region that has the same block as `defRegion`.
         // If it is, then there is no scoping problem with this use.
         //
-        if(useRegion->isDescendentOf(defRegion->block))
+        if (useRegion->isDescendentOf(defRegion->block))
             continue;
 
         // If we've gotten this far, we know that `u` is a "bad"
@@ -308,7 +295,7 @@ static void fixValueScopingForInst(
         //
         // For insts that are always fold into use sites, we try to hoist them
         // to as early as possible, and then leave it there.
-        // 
+        //
         if (isInstAlwaysFolded)
         {
             def->removeFromParent();
@@ -320,14 +307,14 @@ static void fixValueScopingForInst(
         // the bad scoping, creating it on-demand when we ecounter a first "bad" use, and
         // then re-using that temporary for any subsequent bad uses.
         //
-        if( !tmp )
+        if (!tmp)
         {
             // If the value is *already* a temporary variable, then
             // we are really just trying to fix the scoping of the
             // variable declaration itself, and the variable can
             // effectively be its own temporary.
             //
-            if(auto varDef = as<IRVar>(def))
+            if (auto varDef = as<IRVar>(def))
             {
                 tmp = varDef;
             }
@@ -362,11 +349,9 @@ static void fixValueScopingForInst(
         // one or more regions, so we loop over all the regions
         // for the same block as `useRegion`.
         //
-        for(auto rr = useRegion; rr; rr = rr->nextSimpleRegionForSameBlock)
+        for (auto rr = useRegion; rr; rr = rr->nextSimpleRegionForSameBlock)
         {
-            insertRegion = findSimpleCommonAncestorRegion(
-                insertRegion,
-                rr);
+            insertRegion = findSimpleCommonAncestorRegion(insertRegion, rr);
         }
 
         // We need to fix up the use `u`, but the way we fix
@@ -408,7 +393,7 @@ static void fixValueScopingForInst(
     // At the end of the loop, the `tmp` variable will have
     // been created if and only if we fixed up anything.
     //
-    if( tmp )
+    if (tmp)
     {
         // If we created a temporary, then now we need to move
         // its definition to the right place, which is the
@@ -418,8 +403,7 @@ static void fixValueScopingForInst(
         // of the region, since that is the conventional
         // place for local variables to go.
         //
-        tmp->insertBefore(
-            insertRegion->block->getFirstOrdinaryInst());
+        tmp->insertBefore(insertRegion->block->getFirstOrdinaryInst());
 
         // The whole point of the transformation we are doing
         // here is that `def` is not on the "obvious" control
@@ -450,7 +434,7 @@ void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAl
     // in the code of the function to detect an bad cases.
     //
     auto code = regionTree->irCode;
-    for(auto block : code->getBlocks())
+    for (auto block : code->getBlocks())
     {
         // All of the instruction in `block` will have the same
         // parent region, so we will look it up now rather than
@@ -463,7 +447,7 @@ void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAl
         //
         // TODO: we should be eliminating unrechable blocks anyway.
         //
-        if(!parentRegion)
+        if (!parentRegion)
             continue;
 
         // Note: This pass will end up modifying the IR while also
@@ -492,4 +476,4 @@ void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAl
     }
 }
 
-}
+} // namespace Slang

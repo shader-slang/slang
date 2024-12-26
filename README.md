@@ -6,39 +6,57 @@ Slang
 Slang is a shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion, while also maintaining the highest possible performance on modern GPUs and graphics APIs.
 Slang is based on years of collaboration between researchers at NVIDIA, Carnegie Mellon University, Stanford, MIT, UCSD and the University of Washington.
 
-Key Features
-------------
 
-The Slang system is designed to provide developers of real-time graphics applications with the services they need when working with shader code.
+Why Slang?
+---------------
 
-* Slang is backwards-compatible with most existing HLSL code. It is possible to start taking advantage of Slang's benefits without rewriting or porting your shader codebase.
+The Slang shading language is designed to enable real-time graphics developers to work with large-scale, high-performance shader code.
 
-* The Slang compiler can generate code for a wide variety of targets and APIs: D3D12, Vulkan, Metal, D3D11, OpenGL, CUDA, and CPU. Slang code can be broadly portable, but still take advantage of the unique features of each platform. For textual targets such as Metal Shading Language(MSL) and CUDA, Slang generates readable code that preserves the original identifier names and the type + call structure for ease of debugging.
+### Write Shaders Once, Run Anywhere
 
-* [Automatic differentiation](https://shader-slang.com/slang/user-guide/autodiff.html) as a first-class language feature. Slang can automatically generate both forward and backward derivative propagation code for complex functions that involve arbitrary control flow and dynamic dispatch. This allows users to easily make existing rendering codebases differentiable, or to use Slang as the kernel language in a PyTorch driven machine learning framework via [`slangtorch`](https://shader-slang.com/slang/user-guide/a1-02-slangpy.html).
+The Slang compiler can generate code for a wide variety of targets: D3D12, Vulkan, Metal, D3D11, OpenGL, CUDA, and even generate code to run on a CPU. For textual targets, such as Metal Shading Language (MSL) and CUDA, Slang produces readable code that preserves original identifier names, as well as the type and call structure, making it easier to debug.
 
-* Generics and interfaces allow shader specialization to be expressed cleanly without resort to preprocessor techniques or string-pasting. Unlike C++ templates, Slang's generics are checked ahead of time and don't produce cascading error messages that are difficult to diagnose. The same generic shader can be specialized for a variety of different types to produce specialized code ahead of time, or on the fly, completely under application control.
+### Access the Latest GPU Features
 
-* Slang provides a module system that can be used to logically organize code and benefit from separate compilation. Slang modules can be compiled offline to a custom IR (with optional obfuscation) and then linked at runtime to generate DXIL, SPIR-V etc.
+Slang code is highly portable, but can still leverage unique platform capabilities, including the latest features in Direct3D and Vulkan. For example, developers can make full use of [pointers](https://shader-slang.com/slang/user-guide/convenience-features.html#pointers-limited) when generating SPIR-V.
+Slang's [capability system](https://shader-slang.com/slang/user-guide/capabilities.html) helps applications manage feature set differences across target platforms by ensuring code only uses available features during the type-checking step, before generating final code. Additionally, Slang provides [flexible interop](https://shader-slang.com/slang/user-guide/a1-04-interop.html) features to enable directly embedding target code or SPIR-V into generated shaders.
 
-* Parameter blocks (exposed as `ParameterBlock<T>`) provide a first-class language feature for grouping related shader parameters and specifying that they should be passed to the GPU as a coherent block. Parameter blocks make it easy for applications to use the most efficient parameter-binding model of each API, such as descriptor tables/sets in D3D12/Vulkan.
+### Leverage Neural Graphics with Automatic Differentiation
 
-* Rather than require tedious explicit `register` and `layout` specifications on each shader parameter, Slang supports completely automate and deterministic assignment of binding locations to parameter. You can write simple and clean code and still get the deterministic layout your application wants.
+Slang can [automatically generate both forward and backward derivative propagation code](https://shader-slang.com/slang/user-guide/autodiff.html) for complex functions that involve arbitrary control flow and dynamic dispatch. This allows existing rendering codebases to easily become differentiable, or for Slang to serve as the kernel language in a PyTorch-driven machine learning framework via [`slangtorch`](https://shader-slang.com/slang/user-guide/a1-02-slangpy.html).
 
-* For applications that want it, Slang provides full reflection information about the parameters of your shader code, with a consistent API across all target platforms and graphics APIs. Unlike some other compilers, Slang does not reorder or drop shader parameters based on how they are used, so you can always see the full picture.
+### Scalable Software Development with Modules
 
-* Full intellisense features in Visual Studio Code and Visual Studio through the Language Server Protocol.
+Slang provides a [module system](https://shader-slang.com/slang/user-guide/modules.html) that enables logical organization of code for separate compilation. Slang modules can be independently compiled offline to a custom IR (with optional obfuscation) and then linked at runtime to generate code in formats such as DXIL or SPIR-V.
 
-* Full debugging experience with SPIRV and RenderDoc.
+### Code Specialization that Works with Modules
+
+Slang supports [generics and interfaces](https://shader-slang.com/slang/user-guide/interfaces-generics.html) (a.k.a. type traits/protocols), allowing for clear expression of shader specialization without the need for preprocessor techniques or string-pasting. Unlike C++ templates, Slang's generics are pre-checked and don't produce cascading error messages that are difficult to diagnose. The same generic shader can be specialized for a variety of different types to produce specialized code ahead of time, or on the fly, entirely under application control.
+
+### Easy On-ramp for HLSL and GLSL Codebases
+
+Slang's syntax is similar to HLSL, and most existing HLSL code can be compiled with the Slang compiler out-of-the-box, or with just minor modifications. This allows existing shader codebases to immediately benefit from Slang without requiring a complete rewrite or port.
+
+Slang provides a compatibility module that enables the use of most GLSL intrinsic functions and GLSL's parameter binding syntax.
+
+### Comprehensive Tooling Support
+
+Slang comes with full support of IntelliSense editing features in Visual Studio Code and Visual Studio through the Language Server Protocol.
+Full debugging capabilities are also available through RenderDoc and SPIR-V based tools.
 
 Getting Started
 ---------------
 
-If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Shader Playground](docs/shader-playground.md).
-
 The fastest way to get started using Slang in your own development is to use a pre-built binary package, available through GitHub [releases](https://github.com/shader-slang/slang/releases).
-There are packages built for 32- and 64-bit Windows, as well as 64-bit Ubuntu.
+Slang binaries are also included in the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) since version 1.3.296.0.
+
+There are packages built for x86_64 and aarch64 Windows, Linux and macOS.
 Each binary release includes the command-line `slangc` compiler, a shared library for the compiler, and the `slang.h` header.
+
+See the user-guide for info on using the `slangc` command-line tool: [Slang Command Line Usage](
+https://shader-slang.com/slang/user-guide/compiling.html#command-line-compilation-with-slangc).
+
+If you want to try out the Slang language without installing anything, a fast and simple way is to use the [Slang Playground](https://shader-slang.com/slang-playground). The playground allows you to compile Slang code to a variety of targets, and even run some simple shaders directly within the browser. The playground loads Slang compiler to your browser and runs all compilation locally. No data will be sent to any servers.
 
 If you would like to build Slang from source, please consult the [build instructions](docs/building.md).
 
@@ -46,6 +64,8 @@ Documentation
 -------------
 
 The Slang project provides a variety of different [documentation](docs/), but most users would be well served starting with the [User's Guide](https://shader-slang.github.io/slang/user-guide/).
+
+For developers writing Slang code, the [Slang Core Module Reference](https://shader-slang.com/stdlib-reference/) provides detailed documentation on Slang's built-in types and functions.
 
 We also provide a few [examples](examples/) of how to integrate Slang into a rendering application.
 
@@ -65,31 +85,56 @@ The following guidelines should be observed by contributors:
 * Changes should ideally come in as small pull requests on top of `master`, coming from your own personal fork of the project
 * Large features that will involve multiple contributors or a long development time should be discussed in issues, and broken down into smaller pieces that can be implemented and checked in in stages
 
-[Contribution guide](CONTRIBUTION.md) describes the workflow for contributors at more detail.
+[Contribution guide](CONTRIBUTING.md) describes the workflow for contributors at more detail.
 
 Limitations and Support
 -----------------------
 
 ### Platform support
-|   Windows       |     Linux      |    MacOS     |
-|:---------------:|:--------------:|:------------:|
-|   supported     |   supported    |  supported   |
+
+The Slang compiler and libraries can be built on the following platforms:
+
+|  Windows  |   Linux   |   MacOS   |  WebAssembly |
+|:---------:|:---------:|:---------:|:------------:|
+| supported | supported | supported | experimental |
+
+Both `x86_64` and `aarch64` architectures are supported on Windows, Linux and MacOS platforms.
 
 ### Target support
-|   Direct3D 11   |  Direct3D 12   |     Vulkan      |                             Metal                       |         CUDA        |    OptiX    |      CPU Compute      |
-|:---------------:|:--------------:|:---------------:|:-------------------------------------------------------:|:-------------------:|:-----------:|:---------------------:|
-|     HLSL        |    HLSL        |  GLSL & SPIR-V  | Metal Shading Language (Vertex/Fragment/Compute stages) |  C++ (compute-only) |  C++ (WIP)  |  C++ (compute-only)   |
 
-*for greater detail, see the [Supported Compilation Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the [User Guide](https://shader-slang.github.io/slang/user-guide/)
+Slang can compile shader code to the following targets:
 
-The Slang project has been used for production applications and large shader codebases, but it is still under active development.
-Support is currently focused on the platforms (Windows, Linux) and target APIs (Direct3D 12, Vulkan) where Slang is used most heavily.
-Users who are looking for support on other platforms or APIs should coordinate with the development team via the issue tracker to make sure that their use case(s) can be supported.
+|    Target   |                                         Status                                        |                          Output Formats                          |
+|:-----------:|:-------------------------------------------------------------------------------------:|:----------------------------------------------------------------:|
+| Direct3D 11 |    [supported](https://shader-slang.com/slang/user-guide/targets.html#direct3d-11)    |                               HLSL                               |
+| Direct3D 12 |    [supported](https://shader-slang.com/slang/user-guide/targets.html#direct3d-12)    |                               HLSL                               |
+|    Vulkan   |       [supported](https://shader-slang.com/slang/user-guide/targets.html#vulkan)      |                            SPIRV, GLSL                           |
+|    Metal    |     [experimental*](https://shader-slang.com/slang/user-guide/targets.html#metal)     |                      Metal Shading Language                      |
+|    WebGPU   |                                     experimental**                                    |                               WGSL                               |
+|     CUDA    |   [supported](https://shader-slang.com/slang/user-guide/targets.html#cuda-and-optix)  |                        C++ (compute only)                        |
+|    Optix    | [experimental](https://shader-slang.com/slang/user-guide/targets.html#cuda-and-optix) |                             C++ (WIP)                            |
+|     CPU     |   [experimental](https://shader-slang.com/slang/user-guide/targets.html#cpu-compute)  | C++ (kernel), C++ (host), standalone executable, dynamic library |
+
+> *Slang currently supports generating vertex, fragment, compute, task and mesh
+> shaders for Metal.
+
+> **WGSL support is still work in-progress.
+
+For greater detail, see the [Supported Compilation
+Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the
+[User Guide](https://shader-slang.github.io/slang/user-guide/)
+
+The Slang project has been used for production applications and large shader
+codebases, but it is still under active development. Support is currently
+focused on the platforms (Windows, Linux) and target APIs (Direct3D 12, Vulkan)
+where Slang is used most heavily. Users who are looking for support on other
+platforms or APIs should coordinate with the development team via the issue
+tracker to make sure that their use cases can be supported.
 
 License
 -------
 
-The Slang code itself is under the MIT license (see [LICENSE](LICENSE)).
+The Slang code itself is under the Apache 2.0 with LLVM Exception license (see [LICENSE](LICENSE)).
 
 Builds of the core Slang tools depend on the following projects, either automatically or optionally, which may have their own licenses:
 
@@ -100,7 +145,7 @@ Builds of the core Slang tools depend on the following projects, either automati
 * [`spirv-tools`](https://github.com/KhronosGroup/SPIRV-Tools) (Apache 2.0)
 * [`ankerl::unordered_dense::{map, set}`](https://github.com/martinus/unordered_dense) (MIT)
 
-Slang releases may include [slang-llvm](https://github.com/shader-slang/slang-llvm) which includes [LLVM](https://github.com/llvm/llvm-project) under the license:
+Slang releases may include [LLVM](https://github.com/llvm/llvm-project) under the license:
 
 * [`llvm`](https://llvm.org/docs/DeveloperPolicy.html#new-llvm-project-license-framework) (Apache 2.0 License with LLVM exceptions)
 

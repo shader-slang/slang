@@ -40,4 +40,4 @@ Format srgbToLinearFormat(Format format)
         return format;
     }
 }
-}
+} // namespace gfx

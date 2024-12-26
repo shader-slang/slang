@@ -1,15 +1,19 @@
 // slang-profile.cpp
 #include "slang-profile.h"
 
-namespace Slang {
+namespace Slang
+{
 
 ProfileFamily getProfileFamily(ProfileVersion version)
 {
-    switch( version )
+    switch (version)
     {
-    default: return ProfileFamily::Unknown;
+    default:
+        return ProfileFamily::Unknown;
 
-#define PROFILE_VERSION(TAG, FAMILY) case ProfileVersion::TAG: return ProfileFamily::FAMILY;
+#define PROFILE_VERSION(TAG, FAMILY) \
+    case ProfileVersion::TAG:        \
+        return ProfileFamily::FAMILY;
 #include "slang-profile-defs.h"
     }
 }
@@ -32,17 +36,17 @@ bool isRaytracingStage(Stage inStage)
 
 const char* getStageName(Stage stage)
 {
-    switch(stage)
+    switch (stage)
     {
 #define PROFILE_STAGE(ID, NAME, ENUM) \
-    case Stage::ID: return #NAME;
+    case Stage::ID:                   \
+        return #NAME;
 
 #include "slang-profile-defs.h"
 
     default:
         return nullptr;
     }
-
 }
 
 void printDiagnosticArg(StringBuilder& sb, Stage val)
@@ -56,4 +60,4 @@ void printDiagnosticArg(StringBuilder& sb, ProfileVersion val)
 }
 
 
-}
+} // namespace Slang

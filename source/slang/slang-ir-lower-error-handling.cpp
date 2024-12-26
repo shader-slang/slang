@@ -2,8 +2,8 @@
 
 #include "slang-ir-lower-error-handling.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -17,10 +17,9 @@ struct ErrorHandlingLoweringContext
     InstHashSet workListSet;
 
     ErrorHandlingLoweringContext(IRModule* inModule)
-        : module(inModule)
-        , workList(inModule)
-        , workListSet(inModule)
-    {}
+        : module(inModule), workList(inModule), workListSet(inModule)
+    {
+    }
 
     void addToWorkList(IRInst* inst)
     {
@@ -232,4 +231,4 @@ void lowerErrorHandling(IRModule* module, DiagnosticSink* sink)
     context.diagnosticSink = sink;
     return context.processModule();
 }
-}
+} // namespace Slang

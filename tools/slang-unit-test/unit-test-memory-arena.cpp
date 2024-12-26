@@ -1,14 +1,12 @@
 // unit-test-free-list.cpp
 
+#include "../../source/core/slang-list.h"
 #include "../../source/core/slang-memory-arena.h"
+#include "../../source/core/slang-random-generator.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-
-#include "../../source/core/slang-random-generator.h"
-#include "../../source/core/slang-list.h"
 
 using namespace Slang;
 
@@ -32,21 +30,21 @@ enum class TestMode
     eCount,
 };
 
-} // anonymous
+} // namespace
 
 static size_t getAlignment(TestMode mode)
 {
     switch (mode)
     {
-        default:
-        case TestMode::eUnaligned:
-            return 1;
-        case TestMode::eExplicitAligned:
-            return 16;
-        case TestMode::eImplicitAligned:
-            return 32;
-        case TestMode::eDefaultAligned:
-            return MemoryArena::kMinAlignment;
+    default:
+    case TestMode::eUnaligned:
+        return 1;
+    case TestMode::eExplicitAligned:
+        return 16;
+    case TestMode::eImplicitAligned:
+        return 32;
+    case TestMode::eDefaultAligned:
+        return MemoryArena::kMinAlignment;
     }
 }
 
@@ -129,7 +127,7 @@ SLANG_UNIT_TEST(memoryArena)
         arena.reset();
 
         {
-            uint32_t data[] = { 1, 2, 3 };
+            uint32_t data[] = {1, 2, 3};
 
             const uint32_t* copy = arena.allocateAndCopyArray(data, SLANG_COUNT_OF(data));
 
@@ -141,7 +139,8 @@ SLANG_UNIT_TEST(memoryArena)
         int count = 0;
         const size_t blockSize = 1024;
 
-        for (TestMode mode = TestMode(0); int(mode) < int(TestMode::eCount); mode = TestMode(int(mode) + 1))
+        for (TestMode mode = TestMode(0); int(mode) < int(TestMode::eCount);
+             mode = TestMode(int(mode) + 1))
         {
             const size_t alignment = getAlignment(mode);
 
@@ -162,7 +161,7 @@ SLANG_UNIT_TEST(memoryArena)
                         // Deallocate everything
                         arena.deallocateAll();
                         blocks.clear();
-                    }   
+                    }
                     else if (var == 2)
                     {
                         arena.reset();
@@ -181,7 +180,6 @@ SLANG_UNIT_TEST(memoryArena)
                         arena.rewindToCursor(blocks[rewindIndex].m_data);
                         // All the blocks (includign this one) and now deallocated
                         blocks.setCount(rewindIndex);
-
                     }
                     else
                     {
@@ -202,7 +200,7 @@ SLANG_UNIT_TEST(memoryArena)
                     }
                     else if ((randGen.nextInt32() & 0xff) < 2)
                     {
-                        // Let's try for a block that's awkwardly sized 
+                        // Let's try for a block that's awkwardly sized
                         sizeInBytes = blockSize / 3 + 10;
                     }
 
@@ -211,25 +209,25 @@ SLANG_UNIT_TEST(memoryArena)
                     void* mem = nullptr;
                     switch (mode)
                     {
-                        default:
-                        case TestMode::eUnaligned:
+                    default:
+                    case TestMode::eUnaligned:
                         {
                             mem = arena.allocateUnaligned(sizeInBytes);
                             break;
                         }
-                        case TestMode::eImplicitAligned:
+                    case TestMode::eImplicitAligned:
                         {
                             // Fix the size to get implicit alignment
                             sizeInBytes = (sizeInBytes & ~(alignment - 1)) + alignment;
                             mem = arena.allocateUnaligned(sizeInBytes);
                             break;
                         }
-                        case TestMode::eExplicitAligned:
+                    case TestMode::eExplicitAligned:
                         {
                             mem = arena.allocateAligned(sizeInBytes, alignment);
                             break;
                         }
-                        case TestMode::eDefaultAligned:
+                    case TestMode::eDefaultAligned:
                         {
                             mem = arena.allocate(sizeInBytes);
                             break;
@@ -264,8 +262,5 @@ SLANG_UNIT_TEST(memoryArena)
     }
     {
         // Do lots of allocations and test out rewind
-        
-
-
     }
 }

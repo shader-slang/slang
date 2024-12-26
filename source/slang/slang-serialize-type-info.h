@@ -4,93 +4,150 @@
 
 #include "slang-serialize.h"
 
-namespace Slang {
+namespace Slang
+{
 
-/* For the serialization system to work we need to defined how native types are represented in the serialized format.
-This information is defined by specializing SerialTypeInfo with the native type to be converted
-This header provides conversion for common Slang types.
+/* For the serialization system to work we need to defined how native types are represented in the
+serialized format. This information is defined by specializing SerialTypeInfo with the native type
+to be converted This header provides conversion for common Slang types.
 */
 
 
 // We need to have a way to map between the two.
 // If no mapping is needed, (just a copy), then we don't bother with the functions
-template <typename T>
+template<typename T>
 struct SerialBasicTypeInfo
 {
     typedef T NativeType;
     typedef T SerialType;
 
     // We want the alignment to be the same as the size of the type for basic types
-    // NOTE! Might be different from SLANG_ALIGN_OF(SerialType) 
-    enum { SerialAlignment = sizeof(SerialType) };
+    // NOTE! Might be different from SLANG_ALIGN_OF(SerialType)
+    enum
+    {
+        SerialAlignment = sizeof(SerialType)
+    };
 
-    static void toSerial(SerialWriter* writer, const void* native, void* serial) { SLANG_UNUSED(writer); *(T*)serial = *(const T*)native; }
-    static void toNative(SerialReader* reader, const void* serial, void* native) { SLANG_UNUSED(reader); *(T*)native = *(const T*)serial; }
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        SLANG_UNUSED(writer);
+        *(T*)serial = *(const T*)native;
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        SLANG_UNUSED(reader);
+        *(T*)native = *(const T*)serial;
+    }
 
     static const SerialType* getType()
     {
-        static const SerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        static const SerialType type =
+            {sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative};
         return &type;
     }
 };
 
-template <typename NATIVE_T, typename SERIAL_T>
+template<typename NATIVE_T, typename SERIAL_T>
 struct SerialConvertTypeInfo
 {
     typedef NATIVE_T NativeType;
     typedef SERIAL_T SerialType;
 
-    enum { SerialAlignment = SerialBasicTypeInfo<SERIAL_T>::SerialAlignment };
+    enum
+    {
+        SerialAlignment = SerialBasicTypeInfo<SERIAL_T>::SerialAlignment
+    };
 
-    static void toSerial(SerialWriter* writer, const void* native, void* serial) { SLANG_UNUSED(writer); *(SERIAL_T*)serial = SERIAL_T(*(const NATIVE_T*)native); }
-    static void toNative(SerialReader* reader, const void* serial, void* native) { SLANG_UNUSED(reader); *(NATIVE_T*)native = NATIVE_T(*(const SERIAL_T*)serial); }
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        SLANG_UNUSED(writer);
+        *(SERIAL_T*)serial = SERIAL_T(*(const NATIVE_T*)native);
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        SLANG_UNUSED(reader);
+        *(NATIVE_T*)native = NATIVE_T(*(const SERIAL_T*)serial);
+    }
 };
 
-template <typename T>
+template<typename T>
 struct SerialIdentityTypeInfo
 {
     typedef T NativeType;
     typedef T SerialType;
 
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
-    static void toSerial(SerialWriter* writer, const void* native, void* serial) { SLANG_UNUSED(writer); *(T*)serial = *(const T*)native; }
-    static void toNative(SerialReader* reader, const void* serial, void* native) { SLANG_UNUSED(reader); *(T*)native = *(const T*)serial; }
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        SLANG_UNUSED(writer);
+        *(T*)serial = *(const T*)native;
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        SLANG_UNUSED(reader);
+        *(T*)native = *(const T*)serial;
+    }
 };
 
 // Don't need to convert the index type
 
-template <>
-struct SerialTypeInfo<SerialIndex> : public SerialIdentityTypeInfo<SerialIndex> {};
+template<>
+struct SerialTypeInfo<SerialIndex> : public SerialIdentityTypeInfo<SerialIndex>
+{
+};
 
 // Implement for Basic Types
 
-template <>
-struct SerialTypeInfo<uint8_t> : public SerialBasicTypeInfo<uint8_t> {};
-template <>
-struct SerialTypeInfo<uint16_t> : public SerialBasicTypeInfo<uint16_t> {};
-template <>
-struct SerialTypeInfo<uint32_t> : public SerialBasicTypeInfo<uint32_t> {};
-template <>
-struct SerialTypeInfo<uint64_t> : public SerialBasicTypeInfo<uint64_t> {};
+template<>
+struct SerialTypeInfo<uint8_t> : public SerialBasicTypeInfo<uint8_t>
+{
+};
+template<>
+struct SerialTypeInfo<uint16_t> : public SerialBasicTypeInfo<uint16_t>
+{
+};
+template<>
+struct SerialTypeInfo<uint32_t> : public SerialBasicTypeInfo<uint32_t>
+{
+};
+template<>
+struct SerialTypeInfo<uint64_t> : public SerialBasicTypeInfo<uint64_t>
+{
+};
 
-template <>
-struct SerialTypeInfo<int8_t> : public SerialBasicTypeInfo<int8_t> {};
-template <>
-struct SerialTypeInfo<int16_t> : public SerialBasicTypeInfo<int16_t> {};
-template <>
-struct SerialTypeInfo<int32_t> : public SerialBasicTypeInfo<int32_t> {};
-template <>
-struct SerialTypeInfo<int64_t> : public SerialBasicTypeInfo<int64_t> {};
+template<>
+struct SerialTypeInfo<int8_t> : public SerialBasicTypeInfo<int8_t>
+{
+};
+template<>
+struct SerialTypeInfo<int16_t> : public SerialBasicTypeInfo<int16_t>
+{
+};
+template<>
+struct SerialTypeInfo<int32_t> : public SerialBasicTypeInfo<int32_t>
+{
+};
+template<>
+struct SerialTypeInfo<int64_t> : public SerialBasicTypeInfo<int64_t>
+{
+};
 
-template <>
-struct SerialTypeInfo<float> : public SerialBasicTypeInfo<float> {};
-template <>
-struct SerialTypeInfo<double> : public SerialBasicTypeInfo<double> {};
+template<>
+struct SerialTypeInfo<float> : public SerialBasicTypeInfo<float>
+{
+};
+template<>
+struct SerialTypeInfo<double> : public SerialBasicTypeInfo<double>
+{
+};
 
 // Fixed arrays
 
-template <typename T, size_t N>
+template<typename T, size_t N>
 struct SerialTypeInfo<T[N]>
 {
     typedef SerialTypeInfo<T> ElementASTSerialType;
@@ -99,7 +156,10 @@ struct SerialTypeInfo<T[N]>
     typedef T NativeType[N];
     typedef SerialElementType SerialType[N];
 
-    enum { SerialAlignment = SerialTypeInfo<T>::SerialAlignment };
+    enum
+    {
+        SerialAlignment = SerialTypeInfo<T>::SerialAlignment
+    };
 
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
@@ -127,14 +187,17 @@ struct SerialTypeInfo<T[N]>
     }
 };
 
-// Special case bool - as we can't rely on size alignment 
-template <>
+// Special case bool - as we can't rely on size alignment
+template<>
 struct SerialTypeInfo<bool>
 {
     typedef bool NativeType;
     typedef uint8_t SerialType;
 
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum
+    {
+        SerialAlignment = sizeof(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
@@ -152,18 +215,22 @@ struct SerialTypeInfo<bool>
 template<typename T>
 struct SerialTypeInfo<T, typename std::enable_if<std::is_enum<T>::value>::type>
     : public SerialIdentityTypeInfo<T>
-{};
+{
+};
 
 class Val;
 
 // Pointer
 
-template <typename T, typename /*sfinaeType*/ = void>
+template<typename T, typename /*sfinaeType*/ = void>
 struct PtrSerialTypeInfo
 {
     typedef T* NativeType;
     typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
@@ -179,15 +246,20 @@ struct PtrSerialTypeInfo
 };
 
 template<typename T>
-struct SerialTypeInfo<T*> : public PtrSerialTypeInfo<T> {};
+struct SerialTypeInfo<T*> : public PtrSerialTypeInfo<T>
+{
+};
 
 // RefPtr (pretty much the same as T* - except for native rep)
-template <typename T>
+template<typename T>
 struct SerialTypeInfo<RefPtr<T>>
 {
     typedef RefPtr<T> NativeType;
     typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -201,10 +273,10 @@ struct SerialTypeInfo<RefPtr<T>>
 };
 
 // Special case Name
-template <>
+template<>
 struct SerialTypeInfo<Name*> : public SerialTypeInfo<RefObject*>
 {
-    // Special case 
+    // Special case
     typedef Name* NativeType;
     static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
     {
@@ -212,19 +284,22 @@ struct SerialTypeInfo<Name*> : public SerialTypeInfo<RefObject*>
     }
 };
 
-template <>
+template<>
 struct SerialTypeInfo<const Name*> : public SerialTypeInfo<Name*>
 {
 };
 
 // List
-template <typename T, typename ALLOCATOR>
+template<typename T, typename ALLOCATOR>
 struct SerialTypeInfo<List<T, ALLOCATOR>>
 {
     typedef List<T, ALLOCATOR> NativeType;
     typedef SerialIndex SerialType;
 
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -242,13 +317,44 @@ struct SerialTypeInfo<List<T, ALLOCATOR>>
     }
 };
 
+// ShortList
+template<typename T, int n, typename ALLOCATOR>
+struct SerialTypeInfo<ShortList<T, n, ALLOCATOR>>
+{
+    typedef ShortList<T, n, ALLOCATOR> NativeType;
+    typedef SerialIndex SerialType;
+
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
+
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        dst = writer->addArray(src.getArrayView().getBuffer(), src.getCount());
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        reader->getArray(src, dst);
+    }
+};
+
 // String
-template <>
+template<>
 struct SerialTypeInfo<String>
 {
     typedef String NativeType;
     typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -268,20 +374,23 @@ struct SerialTypeInfo<String>
 // it does not have determinstic ordering.
 
 // OrderedDictionary
-template <typename KEY, typename VALUE>
+template<typename KEY, typename VALUE>
 struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
 {
     typedef OrderedDictionary<KEY, VALUE> NativeType;
     struct SerialType
     {
-        SerialIndex keys;            ///< Index an array
-        SerialIndex values;          ///< Index an array
+        SerialIndex keys;   ///< Index an array
+        SerialIndex values; ///< Index an array
     };
 
     typedef typename SerialTypeInfo<KEY>::SerialType KeySerialType;
     typedef typename SerialTypeInfo<VALUE>::SerialType ValueSerialType;
 
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialIndex)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
@@ -309,7 +418,8 @@ struct SerialTypeInfo<OrderedDictionary<KEY, VALUE>>
             i++;
         }
 
-        // When we add the array it is already converted to a serializable type, so add as SerialArray
+        // When we add the array it is already converted to a serializable type, so add as
+        // SerialArray
         dst.keys = writer->addSerialArray<KEY>(keys.getBuffer(), count);
         dst.values = writer->addSerialArray<VALUE>(values.getBuffer(), count);
     }
@@ -352,7 +462,10 @@ struct SerialTypeInfo<KeyValuePair<KEY, VALUE>>
         ValueSerialType value;
     };
 
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
+    };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {

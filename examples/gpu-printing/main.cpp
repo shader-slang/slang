@@ -1,17 +1,16 @@
 // main.cpp
-#include <string>
-
+#include "slang-com-ptr.h"
 #include "slang.h"
 
-#include "slang-com-ptr.h"
+#include <string>
 using Slang::ComPtr;
 
-#include "gpu-printing.h"
-#include "slang-gfx.h"
-#include "gfx-util/shader-cursor.h"
-#include "tools/platform/window.h"
-#include "source/core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
+#include "gfx-util/shader-cursor.h"
+#include "gpu-printing.h"
+#include "platform/window.h"
+#include "slang-gfx.h"
 
 using namespace gfx;
 
@@ -23,138 +22,140 @@ ComPtr<slang::ISession> createSlangSession(gfx::IDevice* device)
     return slangSession;
 }
 
-ComPtr<slang::IModule> compileShaderModuleFromFile(slang::ISession* slangSession, char const* filePath)
+ComPtr<slang::IModule> compileShaderModuleFromFile(
+    slang::ISession* slangSession,
+    char const* filePath)
 {
-    SlangCompileRequest* slangRequest = nullptr;
-    slangSession->createCompileRequest(&slangRequest);
-
-    int translationUnitIndex = spAddTranslationUnit(slangRequest, SLANG_SOURCE_LANGUAGE_SLANG, filePath);
-    spAddTranslationUnitSourceFile(slangRequest, translationUnitIndex, filePath);
-
-    const SlangResult compileRes = spCompile(slangRequest);
-    if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
-    {
-        printf("%s", diagnostics);
-    }
-
-    if(SLANG_FAILED(compileRes))
-    {
-        spDestroyCompileRequest(slangRequest);
-        return ComPtr<slang::IModule>();
-    }
-
     ComPtr<slang::IModule> slangModule;
-    spCompileRequest_getModule(slangRequest, translationUnitIndex, slangModule.writeRef());
+    ComPtr<slang::IBlob> diagnosticBlob;
+    Slang::String path = resourceBase.resolveResource(filePath);
+    slangModule = slangSession->loadModule(path.getBuffer(), diagnosticBlob.writeRef());
+    diagnoseIfNeeded(diagnosticBlob);
+
     return slangModule;
 }
 
-struct ExampleProgram
+struct ExampleProgram : public TestBase
 {
-int gWindowWidth = 640;
-int gWindowHeight = 480;
+    int gWindowWidth = 640;
+    int gWindowHeight = 480;
 
-ComPtr<gfx::IDevice>      gDevice;
+    ComPtr<gfx::IDevice> gDevice;
 
-ComPtr<slang::ISession> gSlangSession;
-ComPtr<slang::IModule>   gSlangModule;
-ComPtr<gfx::IShaderProgram> gProgram;
+    ComPtr<slang::ISession> gSlangSession;
+    ComPtr<slang::IModule> gSlangModule;
+    ComPtr<gfx::IShaderProgram> gProgram;
 
-ComPtr<gfx::IPipelineState> gPipelineState;
+    ComPtr<gfx::IPipelineState> gPipelineState;
 
-Slang::Dictionary<int, std::string> gHashedStrings;
+    Slang::Dictionary<int, std::string> gHashedStrings;
 
-GPUPrinting gGPUPrinting;
+    GPUPrinting gGPUPrinting;
 
-ComPtr<gfx::IShaderProgram> loadComputeProgram(slang::IModule* slangModule, char const* entryPointName)
-{
-    ComPtr<slang::IEntryPoint> entryPoint;
-    slangModule->findEntryPointByName(entryPointName, entryPoint.writeRef());
+    ComPtr<gfx::IShaderProgram> loadComputeProgram(
+        slang::IModule* slangModule,
+        char const* entryPointName)
+    {
+        ComPtr<slang::IEntryPoint> entryPoint;
+        slangModule->findEntryPointByName(entryPointName, entryPoint.writeRef());
 
-    ComPtr<slang::IComponentType> linkedProgram;
-    entryPoint->link(linkedProgram.writeRef());
+        ComPtr<slang::IComponentType> linkedProgram;
+        entryPoint->link(linkedProgram.writeRef());
 
-    gGPUPrinting.loadStrings(linkedProgram->getLayout());
+        if (isTestMode())
+        {
+            printEntrypointHashes(1, 1, linkedProgram);
+        }
 
-    gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.slangGlobalScope = linkedProgram;
+        gGPUPrinting.loadStrings(linkedProgram->getLayout());
 
-    auto shaderProgram = gDevice->createProgram(programDesc);
+        gfx::IShaderProgram::Desc programDesc = {};
+        programDesc.slangGlobalScope = linkedProgram;
 
-    return shaderProgram;
-}
+        auto shaderProgram = gDevice->createProgram(programDesc);
 
-Result execute()
-{
-    IDevice::Desc deviceDesc;
-    Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
-    if(SLANG_FAILED(res)) return res;
+        return shaderProgram;
+    }
 
-    Slang::String path = resourceBase.resolveResource("kernels.slang");
+    Result execute(int argc, char* argv[])
+    {
+        parseOption(argc, argv);
+        IDevice::Desc deviceDesc;
+        Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
+        if (SLANG_FAILED(res))
+            return res;
 
-    gSlangSession = createSlangSession(gDevice);
-    gSlangModule = compileShaderModuleFromFile(gSlangSession, path.getBuffer());
-    if(!gSlangModule)
-        return SLANG_FAIL;
+        Slang::String path = resourceBase.resolveResource("kernels.slang");
 
-    gProgram = loadComputeProgram(gSlangModule, "computeMain");
-    if(!gProgram)
-        return SLANG_FAIL;
+        gSlangSession = createSlangSession(gDevice);
+        gSlangModule = compileShaderModuleFromFile(gSlangSession, path.getBuffer());
+        if (!gSlangModule)
+            return SLANG_FAIL;
 
-    ComputePipelineStateDesc desc;
-    desc.program = gProgram;
-    auto pipelineState = gDevice->createComputePipelineState(desc);
-    if(!pipelineState) return SLANG_FAIL;
+        gProgram = loadComputeProgram(gSlangModule, "computeMain");
+        if (!gProgram)
+            return SLANG_FAIL;
 
-    gPipelineState = pipelineState;
+        ComputePipelineStateDesc desc;
+        desc.program = gProgram;
+        auto pipelineState = gDevice->createComputePipelineState(desc);
+        if (!pipelineState)
+            return SLANG_FAIL;
 
-    size_t printBufferSize = 4 * 1024; // use a small-ish (4KB) buffer for print output
+        gPipelineState = pipelineState;
 
-    IBufferResource::Desc printBufferDesc = {};
-    printBufferDesc.type = IResource::Type::Buffer;
-    printBufferDesc.sizeInBytes = printBufferSize;
-    printBufferDesc.elementSize = sizeof(uint32_t);
-    printBufferDesc.defaultState = ResourceState::UnorderedAccess;
-    printBufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::CopySource, ResourceState::CopyDestination, ResourceState::UnorderedAccess);
-    printBufferDesc.memoryType = MemoryType::DeviceLocal;
-    auto printBuffer = gDevice->createBufferResource(printBufferDesc);
+        size_t printBufferSize = 4 * 1024; // use a small-ish (4KB) buffer for print output
 
-    IResourceView::Desc printBufferViewDesc = {};
-    printBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
-    printBufferViewDesc.format = Format::Unknown;
-    auto printBufferView = gDevice->createBufferView(printBuffer, nullptr, printBufferViewDesc);
+        IBufferResource::Desc printBufferDesc = {};
+        printBufferDesc.type = IResource::Type::Buffer;
+        printBufferDesc.sizeInBytes = printBufferSize;
+        printBufferDesc.elementSize = sizeof(uint32_t);
+        printBufferDesc.defaultState = ResourceState::UnorderedAccess;
+        printBufferDesc.allowedStates = ResourceStateSet(
+            ResourceState::CopySource,
+            ResourceState::CopyDestination,
+            ResourceState::UnorderedAccess);
+        printBufferDesc.memoryType = MemoryType::DeviceLocal;
+        auto printBuffer = gDevice->createBufferResource(printBufferDesc);
 
-    ITransientResourceHeap::Desc transientResourceHeapDesc = {};
-    transientResourceHeapDesc.constantBufferSize = 256;
-    auto transientHeap = gDevice->createTransientResourceHeap(transientResourceHeapDesc);
+        IResourceView::Desc printBufferViewDesc = {};
+        printBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
+        printBufferViewDesc.format = Format::Unknown;
+        auto printBufferView = gDevice->createBufferView(printBuffer, nullptr, printBufferViewDesc);
 
-    ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-    auto queue = gDevice->createCommandQueue(queueDesc);
-    auto commandBuffer = transientHeap->createCommandBuffer();
-    auto encoder = commandBuffer->encodeComputeCommands();
-    auto rootShaderObject = encoder->bindPipeline(gPipelineState);
-    auto cursor = ShaderCursor(rootShaderObject);
-    cursor["gPrintBuffer"].setResource(printBufferView);
-    encoder->dispatchCompute(1, 1, 1);
-    encoder->bufferBarrier(printBuffer, ResourceState::UnorderedAccess, ResourceState::CopySource);
-    encoder->endEncoding();
-    commandBuffer->close();
-    queue->executeCommandBuffer(commandBuffer);
+        ITransientResourceHeap::Desc transientResourceHeapDesc = {};
+        transientResourceHeapDesc.constantBufferSize = 256;
+        auto transientHeap = gDevice->createTransientResourceHeap(transientResourceHeapDesc);
 
-    ComPtr<ISlangBlob> blob;
-    gDevice->readBufferResource(printBuffer, 0, printBufferSize, blob.writeRef());
+        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
+        auto queue = gDevice->createCommandQueue(queueDesc);
+        auto commandBuffer = transientHeap->createCommandBuffer();
+        auto encoder = commandBuffer->encodeComputeCommands();
+        auto rootShaderObject = encoder->bindPipeline(gPipelineState);
+        auto cursor = ShaderCursor(rootShaderObject);
+        cursor["gPrintBuffer"].setResource(printBufferView);
+        encoder->dispatchCompute(1, 1, 1);
+        encoder->bufferBarrier(
+            printBuffer,
+            ResourceState::UnorderedAccess,
+            ResourceState::CopySource);
+        encoder->endEncoding();
+        commandBuffer->close();
+        queue->executeCommandBuffer(commandBuffer);
 
-    gGPUPrinting.processGPUPrintCommands(blob->getBufferPointer(), printBufferSize);
+        ComPtr<ISlangBlob> blob;
+        gDevice->readBufferResource(printBuffer, 0, printBufferSize, blob.writeRef());
 
-    return SLANG_OK;
-}
+        gGPUPrinting.processGPUPrintCommands(blob->getBufferPointer(), printBufferSize);
 
+        return SLANG_OK;
+    }
 };
 
-int main()
+int main(int argc, char* argv[])
 {
     ExampleProgram app;
-    if (SLANG_FAILED(app.execute()))
+    if (SLANG_FAILED(app.execute(argc, argv)))
     {
         return -1;
     }

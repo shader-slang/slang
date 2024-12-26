@@ -12,10 +12,10 @@
 *.zip
 *.ini
 *.DS_store
-.clang-format
 .gdb_history
 .vimspector
 .vimspector.json
+compile_commands.json
 
 bin/
 intermediate/
@@ -66,7 +66,8 @@ prelude/*.h.cpp
 /docs/_site
 /docs/Gemfile.lock
 /docs/Gemfile
-/source/slang/slang-stdlib-generated.h
+/docs/stdlib-reference
+/source/slang/slang-core-module-generated.h
 
 /examples/heterogeneous-hello-world/shader.cpp
 /multiple-definitions.hlsl
@@ -86,3 +87,10 @@ vkd3d-proton.cache
 vkd3d-proton.cache.write
 *_d3d11.log
 *_dxgi.log
+
+# Vim temporary files
+*~
+.*.swp
+.*.swo
+/generators
+/tests/library/linked.spirv

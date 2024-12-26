@@ -1,7 +1,6 @@
 // cpu-resource-views.h
 #pragma once
 #include "cpu-base.h"
-
 #include "cpu-buffer.h"
 #include "cpu-texture.h"
 
@@ -34,9 +33,9 @@ class BufferResourceViewImpl : public ResourceViewImpl
 {
 public:
     BufferResourceViewImpl(Desc const& desc, BufferResourceImpl* buffer)
-        : ResourceViewImpl(Kind::Buffer, desc)
-        , m_buffer(buffer)
-    {}
+        : ResourceViewImpl(Kind::Buffer, desc), m_buffer(buffer)
+    {
+    }
 
     BufferResourceImpl* getBuffer() const;
 
@@ -48,9 +47,9 @@ class TextureResourceViewImpl : public ResourceViewImpl, public slang_prelude::I
 {
 public:
     TextureResourceViewImpl(Desc const& desc, TextureResourceImpl* texture)
-        : ResourceViewImpl(Kind::Texture, desc)
-        , m_texture(texture)
-    {}
+        : ResourceViewImpl(Kind::Texture, desc), m_texture(texture)
+    {
+    }
 
     TextureResourceImpl* getTexture() const;
 
@@ -62,9 +61,18 @@ public:
 
     void Load(const int32_t* texelCoords, void* outData, size_t dataSize) SLANG_OVERRIDE;
 
-    void Sample(slang_prelude::SamplerState samplerState, const float* coords, void* outData, size_t dataSize) SLANG_OVERRIDE;
+    void Sample(
+        slang_prelude::SamplerState samplerState,
+        const float* coords,
+        void* outData,
+        size_t dataSize) SLANG_OVERRIDE;
 
-    void SampleLevel(slang_prelude::SamplerState samplerState, const float* coords, float level, void* outData, size_t dataSize) SLANG_OVERRIDE;
+    void SampleLevel(
+        slang_prelude::SamplerState samplerState,
+        const float* coords,
+        float level,
+        void* outData,
+        size_t dataSize) SLANG_OVERRIDE;
 
     //
     // IRWTexture interface

@@ -1,5 +1,3 @@
-// Test that we allow empty type conformances.
-
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx11 -compute  -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute  -output-using-type
 
@@ -17,6 +15,8 @@ StructuredBuffer<TestInterface> inBuffer;
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4);
 RWStructuredBuffer<float> outputBuffer;
+
+//TEST_INPUT: type_conformance TestImplementation:TestInterface=0
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

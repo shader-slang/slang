@@ -24,7 +24,7 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment",
+            "stage": "fragment",
             "parameters": [
                 {
                     "name": "uv",
@@ -41,7 +41,7 @@ standard output = {
                     }
                 }
             ],
-            "result:": {
+            "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
                 "semanticName": "SV_TARGET",

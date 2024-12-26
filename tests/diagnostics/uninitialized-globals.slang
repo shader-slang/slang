@@ -1,14 +1,7 @@
 //TEST:SIMPLE(filecheck=CHK): -allow-glsl -target spirv
 
 // Using groupshared variables
-groupshared float4 gsConstexpr = float4(1.0f);
 groupshared float4 gsUninitialized;
-
-// OK
-float use_constexpr_initialized_gs()
-{
-    return gsConstexpr.x;
-}
 
 float use_undefined_gs()
 {

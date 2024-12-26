@@ -30,7 +30,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeHandle(InteropHandle* outNativeHandle) override;
+    getNativeHandle(InteropHandle* outNativeHandle) override;
 };
 
 } // namespace vk

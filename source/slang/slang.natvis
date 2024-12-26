@@ -9,6 +9,14 @@
       <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
     </Expand>
   </Type>
+  <Type Name="Slang::ValNodeOperand">
+    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ConstantValue">Constant {intOperand}</DisplayString>
+    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ValNode">{(Slang::Val*)nodeOperand}</DisplayString>
+    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ASTNode">{nodeOperand}</DisplayString>
+    <Expand>
+        <ExpandedItem>*(Slang::Val*)nodeOperand</ExpandedItem>
+    </Expand>
+  </Type>
   <Type Name="Slang::DeclRef&lt;*&gt;">
     <DisplayString Condition="declRefBase == 0">DeclRef nullptr</DisplayString>
 
@@ -415,101 +423,22 @@
         </Expand>
 
     </Type>
-    <Type Name="Slang::Type" Inheritable="false">
+    <Type Name="Slang::Val" Inheritable="true">
       <DisplayString Optional="true" Condition="astNodeType == Slang::ASTNodeType::DeclRefType">DeclRefType#{_debugUID} {*(Val*)(((Slang::DeclRefType*)this)->m_operands.m_buffer[0].values.nodeOperand)}</DisplayString>
       <DisplayString Condition="astNodeType == Slang::ASTNodeType::DeclRefType">DeclRefType {*(Val*)(((Slang::DeclRefType*)this)->m_operands.m_buffer[0].values.nodeOperand)}</DisplayString>
+      <DisplayString Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">DirectRef {*(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
       <DisplayString Optional="true">{astNodeType,en} #{_debugUID}</DisplayString>
       <DisplayString>{astNodeType,en}</DisplayString>
 
         <Expand>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::OverloadGroupType">(Slang::OverloadGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InitializerListType">(Slang::InitializerListType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ErrorType">(Slang::ErrorType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BottomType">(Slang::BottomType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclRefType">(Slang::DeclRefType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DifferentiableType">(Slang::DeclRefType*)&amp;astNodeType</ExpandedItem>
-
-          <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DifferentialPairType">(Slang::DeclRefType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ArithmeticExpressionType">(Slang::ArithmeticExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BasicExpressionType">(Slang::BasicExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VectorExpressionType">(Slang::VectorExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::MatrixExpressionType">(Slang::MatrixExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BuiltinType">(Slang::BuiltinType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::FeedbackType">(Slang::FeedbackType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ResourceType">(Slang::ResourceType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureTypeBase">(Slang::TextureTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureType">(Slang::TextureType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLImageType">(Slang::GLSLImageType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SamplerStateType">(Slang::SamplerStateType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BuiltinGenericType">(Slang::BuiltinGenericType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PointerLikeType">(Slang::PointerLikeType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ParameterGroupType">(Slang::ParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::UniformParameterGroupType">(Slang::UniformParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ConstantBufferType">(Slang::ConstantBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureBufferType">(Slang::TextureBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLShaderStorageBufferType">(Slang::GLSLShaderStorageBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ParameterBlockType">(Slang::ParameterBlockType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VaryingParameterGroupType">(Slang::VaryingParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLInputParameterGroupType">(Slang::GLSLInputParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLOutputParameterGroupType">(Slang::GLSLOutputParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLStructuredBufferTypeBase">(Slang::HLSLStructuredBufferTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLStructuredBufferType">(Slang::HLSLStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRWStructuredBufferType">(Slang::HLSLRWStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRasterizerOrderedStructuredBufferType">(Slang::HLSLRasterizerOrderedStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLAppendStructuredBufferType">(Slang::HLSLAppendStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLConsumeStructuredBufferType">(Slang::HLSLConsumeStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLStreamOutputType">(Slang::HLSLStreamOutputType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLPointStreamType">(Slang::HLSLPointStreamType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLLineStreamType">(Slang::HLSLLineStreamType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLTriangleStreamType">(Slang::HLSLTriangleStreamType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::MeshOutputType">(Slang::MeshOutputType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VerticesType">(Slang::VerticesType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::IndicesType">(Slang::IndicesType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PrimitivesType">(Slang::PrimitivesType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::UntypedBufferResourceType">(Slang::UntypedBufferResourceType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLByteAddressBufferType">(Slang::HLSLByteAddressBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRWByteAddressBufferType">(Slang::HLSLRWByteAddressBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRasterizerOrderedByteAddressBufferType">(Slang::HLSLRasterizerOrderedByteAddressBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::RaytracingAccelerationStructureType">(Slang::RaytracingAccelerationStructureType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLPatchType">(Slang::HLSLPatchType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLInputPatchType">(Slang::HLSLInputPatchType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLOutputPatchType">(Slang::HLSLOutputPatchType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLInputAttachmentType">(Slang::GLSLInputAttachmentType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StringTypeBase">(Slang::StringTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StringType">(Slang::StringType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NativeStringType">(Slang::NativeStringType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DynamicType">(Slang::DynamicType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EnumTypeType">(Slang::EnumTypeType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PtrTypeBase">(Slang::PtrTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PtrType">(Slang::PtrType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ParamDirectionType">(Slang::ParamDirectionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::OutTypeBase">(Slang::OutTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::OutType">(Slang::OutType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InOutType">(Slang::InOutType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::RefType">(Slang::RefType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NullPtrType">(Slang::NullPtrType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ArrayExpressionType">(Slang::ArrayExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TypeType">(Slang::TypeType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NamedExpressionType">(Slang::NamedExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::FuncType">(Slang::FuncType*)this</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericDeclRefType">(Slang::GenericDeclRefType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NamespaceType">(Slang::NamespaceType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtractExistentialType">(Slang::ExtractExistentialType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExistentialSpecializedType">(Slang::ExistentialSpecializedType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ThisType">(Slang::ThisType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AndType">(Slang::AndType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModifiedType">(Slang::ModifiedType*)&amp;astNodeType</ExpandedItem>
+            <Synthetic Name = "[Kind]">
+                <DisplayString>{astNodeType}</DisplayString>
+            </Synthetic>
             
-            <Item Name="[Raw View]">(Slang::Type*)this,!</Item>
+            <ExpandedItem>m_operands</ExpandedItem>
         </Expand>
     </Type>
-    <Type Name="Slang::DirectDeclRef">
-        <DisplayString>DirectDeclRef{(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
-        <Expand>
-            <ExpandedItem>(Decl*)m_operands.m_buffer[0].values.nodeOperand</ExpandedItem>
 
-        </Expand>
-    </Type>
     <Type Name="Slang::SubstitutionSet">
         <DisplayString>SubstitutionSet{declRef,en}</DisplayString>
         <Expand>
@@ -557,183 +486,10 @@
         <DisplayString>{values.nodeOperand}</DisplayString>
         <Expand>
             <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ValNode">*(Val*)values.nodeOperand</ExpandedItem>
-            <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ASTNode">*values.nodeOperand</ExpandedItem>
+            <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ASTNode">*(Decl*)values.nodeOperand</ExpandedItem>
         </Expand>
     </Type>
-    <Type Name="Slang::Val" Inheritable="false">
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">{*(Slang::DirectDeclRef*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::LookupDeclRef">{*(Slang::LookupDeclRef*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::MemberDeclRef">{*(Slang::MemberDeclRef*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::GenericAppDeclRef">{*(Slang::GenericAppDeclRef*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ConstantIntVal">{*(Slang::ConstantIntVal*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::PolynomialIntVal">{*(Slang::PolynomialIntVal*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::PolynomialIntValTerm">{*(Slang::PolynomialIntValTerm*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::PolynomialIntValFactor">{*(Slang::PolynomialIntValFactor*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::GenericParamIntVal">{*(Slang::GenericParamIntVal*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::DeclaredSubtypeWitness">{*(Slang::DeclaredSubtypeWitness*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::TransitiveSubtypeWitness">{*(Slang::TransitiveSubtypeWitness*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::OverloadGroupType">{*(Slang::OverloadGroupType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::InitializerListType">{*(Slang::InitializerListType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ErrorType">{*(Slang::ErrorType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::BottomType">{*(Slang::BottomType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::DeclRefType">{*(Slang::DeclRefType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::DifferentialPairType">{*(Slang::DeclRefType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ArithmeticExpressionType">{*(Slang::ArithmeticExpressionType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::BasicExpressionType">{*(Slang::BasicExpressionType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::VectorExpressionType">{*(Slang::VectorExpressionType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::MatrixExpressionType">{*(Slang::MatrixExpressionType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::BuiltinType">{*(Slang::BuiltinType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::FeedbackType">{*(Slang::FeedbackType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ResourceType">{*(Slang::ResourceType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::TextureTypeBase">{*(Slang::TextureTypeBase*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::TextureType">{*(Slang::TextureType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::GLSLImageType">{*(Slang::GLSLImageType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::SamplerStateType">{*(Slang::SamplerStateType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::BuiltinGenericType">{*(Slang::BuiltinGenericType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::PointerLikeType">{*(Slang::PointerLikeType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ParameterGroupType">{*(Slang::ParameterGroupType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::UniformParameterGroupType">{*(Slang::UniformParameterGroupType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ConstantBufferType">{*(Slang::ConstantBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::TextureBufferType">{*(Slang::TextureBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::GLSLShaderStorageBufferType">{*(Slang::GLSLShaderStorageBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ParameterBlockType">{*(Slang::ParameterBlockType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::VaryingParameterGroupType">{*(Slang::VaryingParameterGroupType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::GLSLInputParameterGroupType">{*(Slang::GLSLInputParameterGroupType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::GLSLOutputParameterGroupType">{*(Slang::GLSLOutputParameterGroupType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLStructuredBufferTypeBase">{*(Slang::HLSLStructuredBufferTypeBase*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLStructuredBufferType">{*(Slang::HLSLStructuredBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLRWStructuredBufferType">{*(Slang::HLSLRWStructuredBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLRasterizerOrderedStructuredBufferType">{*(Slang::HLSLRasterizerOrderedStructuredBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLAppendStructuredBufferType">{*(Slang::HLSLAppendStructuredBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLConsumeStructuredBufferType">{*(Slang::HLSLConsumeStructuredBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLStreamOutputType">{*(Slang::HLSLStreamOutputType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLPointStreamType">{*(Slang::HLSLPointStreamType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLLineStreamType">{*(Slang::HLSLLineStreamType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLTriangleStreamType">{*(Slang::HLSLTriangleStreamType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::UntypedBufferResourceType">{*(Slang::UntypedBufferResourceType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLByteAddressBufferType">{*(Slang::HLSLByteAddressBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLRWByteAddressBufferType">{*(Slang::HLSLRWByteAddressBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLRasterizerOrderedByteAddressBufferType">{*(Slang::HLSLRasterizerOrderedByteAddressBufferType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::RaytracingAccelerationStructureType">{*(Slang::RaytracingAccelerationStructureType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLPatchType">{*(Slang::HLSLPatchType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLInputPatchType">{*(Slang::HLSLInputPatchType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::HLSLOutputPatchType">{*(Slang::HLSLOutputPatchType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::GLSLInputAttachmentType">{*(Slang::GLSLInputAttachmentType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::StringTypeBase">{*(Slang::StringTypeBase*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::StringType">{*(Slang::StringType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::NativeStringType">{*(Slang::NativeStringType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::DynamicType">{*(Slang::DynamicType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::EnumTypeType">{*(Slang::EnumTypeType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::PtrTypeBase">{*(Slang::PtrTypeBase*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::PtrType">{*(Slang::PtrType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ParamDirectionType">{(Slang::ParamDirectionType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::OutTypeBase">{*(Slang::OutTypeBase*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::OutType">{*(Slang::OutType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::InOutType">{*(Slang::InOutType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::RefType">{*(Slang::RefType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::NullPtrType">{*(Slang::NullPtrType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ArrayExpressionType">{*(Slang::ArrayExpressionType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::TypeType">{*(Slang::TypeType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::NamedExpressionType">{*(Slang::NamedExpressionType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::FuncType">{*(Slang::FuncType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::GenericDeclRefType">{*(Slang::GenericDeclRefType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::NamespaceType">{*(Slang::NamespaceType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ExtractExistentialType">{*(Slang::ExtractExistentialType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ExistentialSpecializedType">{*(Slang::ExistentialSpecializedType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ThisType">{*(Slang::ThisType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::AndType">{*(Slang::AndType*)this}</DisplayString>
-        <DisplayString Condition="astNodeType == Slang::ASTNodeType::ModifiedType">{*(Slang::ModifiedType*)this}</DisplayString>
-        
-        <Expand>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">(Slang::DirectDeclRef*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::LookupDeclRef">(Slang::LookupDeclRef*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::MemberDeclRef">(Slang::MemberDeclRef*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericAppDeclRef">(Slang::GenericAppDeclRef*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ConstantIntVal">(Slang::ConstantIntVal*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PolynomialIntVal">(Slang::PolynomialIntVal*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PolynomialIntValTerm">(Slang::PolynomialIntValTerm*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PolynomialIntValFactor">(Slang::PolynomialIntValFactor*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericParamIntVal">(Slang::GenericParamIntVal*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclaredSubtypeWitness">(Slang::DeclaredSubtypeWitness*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TransitiveSubtypeWitness">(Slang::TransitiveSubtypeWitness*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::OverloadGroupType">(Slang::OverloadGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InitializerListType">(Slang::InitializerListType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ErrorType">(Slang::ErrorType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BottomType">(Slang::BottomType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclRefType">(Slang::DeclRefType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DifferentialPairType">(Slang::DeclRefType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ArithmeticExpressionType">(Slang::ArithmeticExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BasicExpressionType">(Slang::BasicExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VectorExpressionType">(Slang::VectorExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::MatrixExpressionType">(Slang::MatrixExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BuiltinType">(Slang::BuiltinType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::FeedbackType">(Slang::FeedbackType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ResourceType">(Slang::ResourceType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureTypeBase">(Slang::TextureTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureType">(Slang::TextureType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLImageType">(Slang::GLSLImageType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SamplerStateType">(Slang::SamplerStateType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::BuiltinGenericType">(Slang::BuiltinGenericType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PointerLikeType">(Slang::PointerLikeType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ParameterGroupType">(Slang::ParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::UniformParameterGroupType">(Slang::UniformParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ConstantBufferType">(Slang::ConstantBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TextureBufferType">(Slang::TextureBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLShaderStorageBufferType">(Slang::GLSLShaderStorageBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ParameterBlockType">(Slang::ParameterBlockType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VaryingParameterGroupType">(Slang::VaryingParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLInputParameterGroupType">(Slang::GLSLInputParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLOutputParameterGroupType">(Slang::GLSLOutputParameterGroupType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLStructuredBufferTypeBase">(Slang::HLSLStructuredBufferTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLStructuredBufferType">(Slang::HLSLStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRWStructuredBufferType">(Slang::HLSLRWStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRasterizerOrderedStructuredBufferType">(Slang::HLSLRasterizerOrderedStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLAppendStructuredBufferType">(Slang::HLSLAppendStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLConsumeStructuredBufferType">(Slang::HLSLConsumeStructuredBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLStreamOutputType">(Slang::HLSLStreamOutputType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLPointStreamType">(Slang::HLSLPointStreamType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLLineStreamType">(Slang::HLSLLineStreamType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLTriangleStreamType">(Slang::HLSLTriangleStreamType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::UntypedBufferResourceType">(Slang::UntypedBufferResourceType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLByteAddressBufferType">(Slang::HLSLByteAddressBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRWByteAddressBufferType">(Slang::HLSLRWByteAddressBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLRasterizerOrderedByteAddressBufferType">(Slang::HLSLRasterizerOrderedByteAddressBufferType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::RaytracingAccelerationStructureType">(Slang::RaytracingAccelerationStructureType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLPatchType">(Slang::HLSLPatchType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLInputPatchType">(Slang::HLSLInputPatchType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::HLSLOutputPatchType">(Slang::HLSLOutputPatchType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GLSLInputAttachmentType">(Slang::GLSLInputAttachmentType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StringTypeBase">(Slang::StringTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StringType">(Slang::StringType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NativeStringType">(Slang::NativeStringType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DynamicType">(Slang::DynamicType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EnumTypeType">(Slang::EnumTypeType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PtrTypeBase">(Slang::PtrTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PtrType">(Slang::PtrType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ParamDirectionType">(Slang::ParamDirectionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::OutTypeBase">(Slang::OutTypeBase*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::OutType">(Slang::OutType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InOutType">(Slang::InOutType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::RefType">(Slang::RefType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NullPtrType">(Slang::NullPtrType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ArrayExpressionType">(Slang::ArrayExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TypeType">(Slang::TypeType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NamedExpressionType">(Slang::NamedExpressionType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::FuncType">(Slang::FuncType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericDeclRefType">(Slang::GenericDeclRefType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NamespaceType">(Slang::NamespaceType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtractExistentialType">(Slang::ExtractExistentialType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExistentialSpecializedType">(Slang::ExistentialSpecializedType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ThisType">(Slang::ThisType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AndType">(Slang::AndType*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModifiedType">(Slang::ModifiedType*)&amp;astNodeType</ExpandedItem>
-            <Synthetic Name="[RawOperands]">
-                <Expand>
-                    <ExpandedItem>m_operands</ExpandedItem>
-                </Expand>
-            </Synthetic>
-        </Expand>
-    </Type>
+
     <Type Name="Slang::Facet">
         <SmartPointer Usage="Minimal">_impl</SmartPointer>
         <DisplayString Condition="_impl == 0">nullptr</DisplayString>
@@ -759,49 +515,7 @@
       </LinkedListItems>
     </Expand>
   </Type>
-  <Type Name="Slang::SubtypeWitness">
-    <DisplayString Condition="astNodeType == Slang::ASTNodeType::TypeEqualityWitness">{*(Slang::TypeEqualityWitness*)this}</DisplayString>
-    <DisplayString Optional="true">{astNodeType,en}#{_debugUID}({*(Type*)m_operands.m_buffer[0].values.nodeOperand,na} &lt;: {*(Type*)m_operands.m_buffer[1].values.nodeOperand,na})</DisplayString>
-    <DisplayString>{astNodeType,en}({*(Type*)m_operands.m_buffer[0].values.nodeOperand,na} &lt;: {*(Type*)m_operands.m_buffer[1].values.nodeOperand,na})</DisplayString>
-     
-    <Expand>
-        <Synthetic Name="[Sub]">
-            <DisplayString>{*(Type*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
-            <Expand>
-                <ExpandedItem>(Type*)m_operands.m_buffer[0].values.nodeOperand</ExpandedItem>
-            </Expand>
-        </Synthetic>
-        <Synthetic Name="[Sup]">
-            <DisplayString>{*(Type*)m_operands.m_buffer[1].values.nodeOperand}</DisplayString>
-            <Expand>
-                <ExpandedItem>(Type*)m_operands.m_buffer[1].values.nodeOperand</ExpandedItem>
-            </Expand>
-        </Synthetic>
-        <Synthetic Name="[DeclRef]" Condition="astNodeType == Slang::ASTNodeType::DeclaredSubtypeWitness">
-            <DisplayString>{*(Val*)m_operands.m_buffer[2].values.nodeOperand}</DisplayString>
-            <Expand>
-                <ExpandedItem>(DeclRefBase*)m_operands.m_buffer[2].values.nodeOperand</ExpandedItem>
-            </Expand>
-        </Synthetic>
-        <Synthetic Name="[SubToMid]" Condition="astNodeType == Slang::ASTNodeType::TransitiveSubtypeWitness">
-            <DisplayString>{*(SubtypeWitness*)m_operands.m_buffer[2].values.nodeOperand}</DisplayString>
-            <Expand>
-                <ExpandedItem>(SubtypeWitness*)m_operands.m_buffer[2].values.nodeOperand</ExpandedItem>
-            </Expand>
-        </Synthetic>
-        <Synthetic Name="[MidToSup]" Condition="astNodeType == Slang::ASTNodeType::TransitiveSubtypeWitness">
-            <DisplayString>{*(SubtypeWitness*)m_operands.m_buffer[3].values.nodeOperand}</DisplayString>
-            <Expand>
-                <ExpandedItem>(SubtypeWitness*)m_operands.m_buffer[3].values.nodeOperand</ExpandedItem>
-            </Expand>
-        </Synthetic>
-    </Expand>
-  </Type>
-  <Type Name="Slang::TypeEqualityWitness">
-    <DisplayString>{sub,na} == {sup,na}</DisplayString>
-  </Type>
-
-    <Type Name="Slang::ConstantIntVal">
+     <Type Name="Slang::ConstantIntVal">
         <DisplayString Optional="true">{astNodeType,en}#{_debugUID} ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand}) </DisplayString>
         <DisplayString>ConstantIntVal ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
     </Type>

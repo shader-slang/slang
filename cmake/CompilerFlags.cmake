@@ -152,14 +152,24 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
-    # Don't assume that symbols will be resolved at runtime
-    add_supported_cxx_linker_flags(${target} PRIVATE "-Wl,--no-undefined")
+    add_supported_cxx_linker_flags(
+        ${target}
+        PRIVATE
+        # Don't assume that symbols will be resolved at runtime
+        "-Wl,--no-undefined"
+        # No reason not to do this? Useful when using split debug info
+        "-Wl,--build-id"
+    )
 
     set_target_properties(
         ${target}
         PROPERTIES # -fvisibility=hidden
             CXX_VISIBILITY_PRESET
             hidden
+            C_VISIBILITY_PRESET
+            hidden
+            VISIBILITY_INLINES_HIDDEN
+            ON
             # C++ standard
             CXX_STANDARD
             17
@@ -188,23 +198,14 @@ function(set_default_compile_options target)
     # Settings dependent on config options
     #
 
-    if(SLANG_ENABLE_FULL_DEBUG_VALIDATION)
-        target_compile_definitions(
-            ${target}
-            PRIVATE SLANG_ENABLE_FULL_IR_VALIDATION
-        )
-    endif()
-
-    if(SLANG_ENABLE_IR_BREAK_ALLOC)
-        target_compile_definitions(
-            ${target}
-            PRIVATE SLANG_ENABLE_IR_BREAK_ALLOC
-        )
-    endif()
-
-    if(SLANG_ENABLE_DX_ON_VK)
-        target_compile_definitions(${target} PRIVATE SLANG_CONFIG_DX_ON_VK)
-    endif()
+    target_compile_definitions(
+        ${target}
+        PRIVATE
+            SLANG_ENABLE_DXIL_SUPPORT=$<BOOL:${SLANG_ENABLE_DXIL}>
+            $<$<BOOL:${SLANG_ENABLE_FULL_DEBUG_VALIDATION}>:SLANG_ENABLE_FULL_IR_VALIDATION>
+            $<$<BOOL:${SLANG_ENABLE_IR_BREAK_ALLOC}>:SLANG_ENABLE_IR_BREAK_ALLOC>
+            $<$<BOOL:${SLANG_ENABLE_DX_ON_VK}>:SLANG_CONFIG_DX_ON_VK>
+    )
 
     if(SLANG_ENABLE_ASAN)
         add_supported_cxx_flags(

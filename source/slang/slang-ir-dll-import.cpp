@@ -1,10 +1,10 @@
 // slang-ir-dll-import.cpp
 #include "slang-ir-dll-import.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-marshal-native-call.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-marshal-native-call.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -19,7 +19,11 @@ struct DllImportContext
     IRFunc* loadFuncPtrFunc = nullptr;
     IRFunc* stringGetBufferFunc = nullptr;
 
-    IRFunc* createBuiltinIntrinsicFunc(UInt paramCount, IRType** paramTypes, IRType* resultType, UnownedStringSlice targetIntrinsic)
+    IRFunc* createBuiltinIntrinsicFunc(
+        UInt paramCount,
+        IRType** paramTypes,
+        IRType* resultType,
+        UnownedStringSlice targetIntrinsic)
     {
         IRBuilder builder(module);
         builder.setInsertInto(module->getModuleInst());
@@ -28,7 +32,9 @@ struct DllImportContext
         auto funcType = builder.getFuncType(paramCount, paramTypes, resultType);
         builder.setDataType(result, funcType);
         builder.addTargetIntrinsicDecoration(
-            result, CapabilitySet(CapabilityName::cpp), targetIntrinsic);
+            result,
+            CapabilitySet(CapabilityName::cpp),
+            targetIntrinsic);
         return result;
     }
 
@@ -57,7 +63,10 @@ struct DllImportContext
 
             IRType* stringType = builder.getStringType();
             IRType* uintType = builder.getUIntType();
-            IRType* paramTypes[] = {builder.getPtrType(builder.getVoidType()), stringType, uintType };
+            IRType* paramTypes[] = {
+                builder.getPtrType(builder.getVoidType()),
+                stringType,
+                uintType};
             loadFuncPtrFunc = createBuiltinIntrinsicFunc(
                 3,
                 paramTypes,
@@ -91,7 +100,10 @@ struct DllImportContext
         for (auto param : func->getParams())
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), param->getDataType(), &sizeAndAlignment);
+            getNaturalSizeAndAlignment(
+                targetProgram->getOptionSet(),
+                param->getDataType(),
+                &sizeAndAlignment);
             result += (uint32_t)align(sizeAndAlignment.size, 4);
         }
         return result;
@@ -124,7 +136,7 @@ struct DllImportContext
             params.add(builder.emitParam((IRType*)paramType));
         }
 
-        IRInst* cmpArgs[] = {builder.emitLoad(nativeType, funcPtr), builder.getNullVoidPtrValue() };
+        IRInst* cmpArgs[] = {builder.emitLoad(nativeType, funcPtr), builder.getNullVoidPtrValue()};
         auto isUninitialized =
             builder.emitIntrinsicInst(builder.getBoolType(), kIROp_Eql, 2, cmpArgs);
 
@@ -148,13 +160,18 @@ struct DllImportContext
                 getLoadDllFunc(),
                 builder.getStringValue(dllImportDecoration->getLibraryName()));
         }
-        auto argumentSize = builder.getIntValue(builder.getUIntType(), getStdCallArgumentSize(func));
+        auto argumentSize =
+            builder.getIntValue(builder.getUIntType(), getStdCallArgumentSize(func));
         IRInst* loadDllFuncArgs[] = {
-            modulePtr, builder.getStringValue(dllImportDecoration->getFunctionName()), argumentSize};
+            modulePtr,
+            builder.getStringValue(dllImportDecoration->getFunctionName()),
+            argumentSize};
         auto loadedNativeFuncPtr = builder.emitCallInst(
-            builder.getPtrType(builder.getVoidType()), getLoadFuncPtrFunc(), 3, loadDllFuncArgs);
-        builder.emitStore(
-            funcPtr, builder.emitBitCast(nativeType, loadedNativeFuncPtr));
+            builder.getPtrType(builder.getVoidType()),
+            getLoadFuncPtrFunc(),
+            3,
+            loadDllFuncArgs);
+        builder.emitStore(funcPtr, builder.emitBitCast(nativeType, loadedNativeFuncPtr));
         builder.emitBranch(afterBlock);
         builder.setInsertInto(afterBlock);
 
@@ -173,7 +190,7 @@ struct DllImportContext
     {
         for (auto childFunc : module->getGlobalInsts())
         {
-            switch(childFunc->getOp())
+            switch (childFunc->getOp())
             {
             case kIROp_Func:
                 if (auto dllImportDecoration = childFunc->findDecoration<IRDllImportDecoration>())
@@ -197,4 +214,4 @@ void generateDllImportFuncs(TargetProgram* targetProgram, IRModule* module, Diag
     return context.processModule();
 }
 
-}
+} // namespace Slang

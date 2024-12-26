@@ -1,31 +1,30 @@
 // slang-repro.cpp
 #include "slang-repro.h"
 
-#include "../core/slang-text-io.h"
-
-#include "../core/slang-stream.h"
-
-#include "../core/slang-math.h"
-#include "../core/slang-type-text-util.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
+#include "../compiler-core/slang-artifact-util.h"
+#include "../compiler-core/slang-source-loc.h"
 #include "../core/slang-castable.h"
-
+#include "../core/slang-math.h"
+#include "../core/slang-stream.h"
+#include "../core/slang-text-io.h"
+#include "../core/slang-type-text-util.h"
 #include "slang-options.h"
 
-#include "../compiler-core/slang-artifact-util.h"
-#include "../compiler-core/slang-artifact-desc-util.h"
+namespace Slang
+{
 
-#include "../compiler-core/slang-source-loc.h"
+/* static */ const RiffSemanticVersion ReproUtil::g_semanticVersion = RiffSemanticVersion::make(
+    ReproUtil::kMajorVersion,
+    ReproUtil::kMinorVersion,
+    ReproUtil::kPatchVersion);
 
-namespace Slang {
-
-/* static */const RiffSemanticVersion ReproUtil::g_semanticVersion =
-    RiffSemanticVersion::make(ReproUtil::kMajorVersion, ReproUtil::kMinorVersion, ReproUtil::kPatchVersion);
-
-// We can't just use sizeof for the sizes of these types, because the hash will be dependent on the ptr size,
-// which isn't an issue for serialization (we turn all pointers into Offset32Ptr -> uint32_t). So we use an x macro
-// to set up the thing to hash.
+// We can't just use sizeof for the sizes of these types, because the hash will be dependent on the
+// ptr size, which isn't an issue for serialization (we turn all pointers into Offset32Ptr ->
+// uint32_t). So we use an x macro to set up the thing to hash.
 //
 // Note that bool is in the list because size of bool can change between compilers.
+// clang-format off
 #define SLANG_STATE_TYPES(x) \
     x(Util::FileState) \
     x(Util::PathInfoState) \
@@ -52,18 +51,17 @@ namespace Slang {
         x(OptimizationLevel) \
         x(ContainerFormat) \
         x(PassThroughMode) \
-        x(SlangMatrixLayoutMode) \
+        x(SlangMatrixLayoutMode)
+// clang-format on
 
-#define SLANG_STATE_TYPE_SIZE(x) uint32_t(sizeof(x)), 
+#define SLANG_STATE_TYPE_SIZE(x) uint32_t(sizeof(x)),
 
-// A function to calculate the hash related in list in part to how the types used are sized. Can catch crude breaking binary differences.
+// A function to calculate the hash related in list in part to how the types used are sized. Can
+// catch crude breaking binary differences.
 static StableHashCode32 _calcTypeHash()
 {
     typedef ReproUtil Util;
-    const uint32_t sizes[] =
-    {
-        SLANG_STATE_TYPES(SLANG_STATE_TYPE_SIZE)
-    };
+    const uint32_t sizes[] = {SLANG_STATE_TYPES(SLANG_STATE_TYPE_SIZE)};
     return getStableHashCode32((const char*)&sizes, sizeof(sizes));
 }
 
@@ -74,7 +72,8 @@ static StableHashCode32 _getTypeHash()
 }
 
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct StoreContext
 {
@@ -82,10 +81,7 @@ struct StoreContext
     typedef ReproUtil::SourceFileState SourceFileState;
     typedef ReproUtil::PathInfoState PathInfoState;
 
-    StoreContext(OffsetContainer* container)
-    {
-        m_container = container;
-    }
+    StoreContext(OffsetContainer* container) { m_container = container; }
 
     Offset32Ptr<FileState> findFile(const String& uniqueIdentity)
     {
@@ -99,7 +95,7 @@ struct StoreContext
         OffsetBase& base = m_container->asBase();
 
         Offset32Ptr<FileState> file;
-        
+
         // Get the file, if it has an identity
         if (uniqueIdentity.getLength())
         {
@@ -108,11 +104,12 @@ struct StoreContext
                 // If file was not found create it
                 // Create the file
                 file = m_container->newObject<FileState>();
-                // Add it 
+                // Add it
                 m_uniqueToFileMap.add(uniqueIdentity, file);
 
                 // Set the identity
-                auto offsetUniqueIdentity = m_container->newString(uniqueIdentity.getUnownedSlice());
+                auto offsetUniqueIdentity =
+                    m_container->newString(uniqueIdentity.getUnownedSlice());
                 base[file]->uniqueIdentity = offsetUniqueIdentity;
 
                 // Add the file
@@ -124,7 +121,7 @@ struct StoreContext
             // Create a file, but we know it can't have unique identity
             file = m_container->newObject<FileState>();
             // Add the file
-            m_files.add(file);    
+            m_files.add(file);
         }
 
         // If the contents is not set add it
@@ -184,7 +181,7 @@ struct StoreContext
     Offset32Ptr<OffsetString> fromString(const String& in)
     {
         Offset32Ptr<OffsetString> value;
-        
+
         if (m_stringMap.tryGetValue(in, value))
         {
             return value;
@@ -218,9 +215,11 @@ struct StoreContext
             Offset32Ptr<FileState> fileState;
 
             // Only store as file if we have the contents
-            if(ISlangBlob* fileBlob = srcPathInfo->m_fileBlob)
+            if (ISlangBlob* fileBlob = srcPathInfo->m_fileBlob)
             {
-                UnownedStringSlice content((const char*)fileBlob->getBufferPointer(), fileBlob->getBufferSize());
+                UnownedStringSlice content(
+                    (const char*)fileBlob->getBufferPointer(),
+                    fileBlob->getBufferSize());
 
                 fileState = addFile(srcPathInfo->getUniqueIdentity(), &content);
             }
@@ -248,7 +247,9 @@ struct StoreContext
         {
             if (srcPathInfo->m_fileBlob && base[fileState]->contents.isNull())
             {
-                UnownedStringSlice contents((const char*)srcPathInfo->m_fileBlob->getBufferPointer(), srcPathInfo->m_fileBlob->getBufferSize());
+                UnownedStringSlice contents(
+                    (const char*)srcPathInfo->m_fileBlob->getBufferPointer(),
+                    srcPathInfo->m_fileBlob->getBufferSize());
                 const auto offsetContents = m_container->newString(contents);
                 base[fileState]->contents = offsetContents;
             }
@@ -259,7 +260,8 @@ struct StoreContext
                 base[fileState]->canonicalPath = offsetCanonicalPath;
             }
 
-            if (srcPathInfo->m_uniqueIdentity.getLength() && base[fileState]->uniqueIdentity.isNull())
+            if (srcPathInfo->m_uniqueIdentity.getLength() &&
+                base[fileState]->uniqueIdentity.isNull())
             {
                 const auto offsetUniqueIdentity = fromString(srcPathInfo->m_uniqueIdentity);
                 base[fileState]->uniqueIdentity = offsetUniqueIdentity;
@@ -269,11 +271,13 @@ struct StoreContext
         return pathInfo;
     }
 
-    const Offset32Array<ReproUtil::StringPair> calcDefines(const Dictionary<String, String>& srcDefines)
+    const Offset32Array<ReproUtil::StringPair> calcDefines(
+        const Dictionary<String, String>& srcDefines)
     {
         typedef ReproUtil::StringPair StringPair;
 
-        Offset32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.getCount());
+        Offset32Array<StringPair> dstDefines =
+            m_container->newArray<StringPair>(srcDefines.getCount());
 
         OffsetBase& base = m_container->asBase();
 
@@ -291,8 +295,9 @@ struct StoreContext
     }
 
     const Offset32Array<Offset32Ptr<OffsetString>> fromList(const List<String>& src)
-    {   
-        Offset32Array<Offset32Ptr<OffsetString>> dst = m_container->newArray<Offset32Ptr<OffsetString>>(src.getCount());
+    {
+        Offset32Array<Offset32Ptr<OffsetString>> dst =
+            m_container->newArray<Offset32Ptr<OffsetString>>(src.getCount());
         OffsetBase& base = m_container->asBase();
 
         for (Index j = 0; j < src.getCount(); ++j)
@@ -304,33 +309,34 @@ struct StoreContext
         return dst;
     }
 
-    Dictionary<String, Offset32Ptr<OffsetString> > m_stringMap;
+    Dictionary<String, Offset32Ptr<OffsetString>> m_stringMap;
 
-    Dictionary<SourceFile*, Offset32Ptr<ReproUtil::SourceFileState> > m_sourceFileMap;
-    
-    Dictionary<String, Offset32Ptr<ReproUtil::FileState> > m_uniqueToFileMap;
+    Dictionary<SourceFile*, Offset32Ptr<ReproUtil::SourceFileState>> m_sourceFileMap;
 
-    Dictionary<const CacheFileSystem::PathInfo*, Offset32Ptr<PathInfoState> > m_pathInfoMap;
+    Dictionary<String, Offset32Ptr<ReproUtil::FileState>> m_uniqueToFileMap;
 
-    List<Offset32Ptr<ReproUtil::FileState> > m_files; 
+    Dictionary<const CacheFileSystem::PathInfo*, Offset32Ptr<PathInfoState>> m_pathInfoMap;
+
+    List<Offset32Ptr<ReproUtil::FileState>> m_files;
 
     OffsetContainer* m_container;
 };
 
-} //
+} // namespace
 
 static bool _isStorable(const PathInfo::Type type)
 {
     switch (type)
     {
-        case PathInfo::Type::Unknown:
-        case PathInfo::Type::Normal: 
-        case PathInfo::Type::FoundPath: 
-        case PathInfo::Type::FromString:
+    case PathInfo::Type::Unknown:
+    case PathInfo::Type::Normal:
+    case PathInfo::Type::FoundPath:
+    case PathInfo::Type::FromString:
         {
             return true;
         }
-        default: return false;
+    default:
+        return false;
     }
 }
 
@@ -341,8 +347,11 @@ static String _scrubName(const String& in)
     {
         switch (c)
         {
-            case ':': c = '_'; break;
-            default:break;
+        case ':':
+            c = '_';
+            break;
+        default:
+            break;
         }
         builder.appendChar(c);
     }
@@ -350,7 +359,10 @@ static String _scrubName(const String& in)
     return builder.produceString();
 }
 
-/* static */SlangResult ReproUtil::store(EndToEndCompileRequest* request, OffsetContainer& inOutContainer, Offset32Ptr<RequestState>& outRequest)
+/* static */ SlangResult ReproUtil::store(
+    EndToEndCompileRequest* request,
+    OffsetContainer& inOutContainer,
+    Offset32Ptr<RequestState>& outRequest)
 {
     StoreContext context(&inOutContainer);
 
@@ -364,16 +376,22 @@ static String _scrubName(const String& in)
         RequestState* dst = base[requestState];
 
         dst->compileFlags = 0;
-        dst->shouldDumpIntermediates = linkage->m_optionSet.getBoolOption(CompilerOptionName::DumpIntermediates);
-        dst->debugInfoLevel = linkage->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation);
-        dst->optimizationLevel = linkage->m_optionSet.getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization);
+        dst->shouldDumpIntermediates =
+            linkage->m_optionSet.getBoolOption(CompilerOptionName::DumpIntermediates);
+        dst->debugInfoLevel = linkage->m_optionSet.getEnumOption<DebugInfoLevel>(
+            CompilerOptionName::DebugInformation);
+        dst->optimizationLevel =
+            linkage->m_optionSet.getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization);
         dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->m_passThrough;
 
-        dst->useUnknownImageFormatAsDefault = linkage->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown);;
+        dst->useUnknownImageFormatAsDefault =
+            linkage->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown);
+        ;
         dst->obfuscateCode = linkage->m_optionSet.getBoolOption(CompilerOptionName::Obfuscate);
 
-        dst->defaultMatrixLayoutMode = (SlangMatrixLayoutMode)linkage->m_optionSet.getMatrixLayoutMode();
+        dst->defaultMatrixLayoutMode =
+            (SlangMatrixLayoutMode)linkage->m_optionSet.getMatrixLayoutMode();
     }
 
     // Entry points
@@ -383,14 +401,16 @@ static String _scrubName(const String& in)
 
         SLANG_ASSERT(srcEntryPoints.getCount() == srcEndToEndEntryPoints.getCount());
 
-        Offset32Array<EntryPointState> dstEntryPoints = inOutContainer.newArray<EntryPointState>(srcEntryPoints.getCount());
+        Offset32Array<EntryPointState> dstEntryPoints =
+            inOutContainer.newArray<EntryPointState>(srcEntryPoints.getCount());
 
         for (Index i = 0; i < srcEntryPoints.getCount(); ++i)
         {
             FrontEndEntryPointRequest* srcEntryPoint = srcEntryPoints[i];
             const auto& srcEndToEndEntryPoint = srcEndToEndEntryPoints[i];
 
-            auto dstSpecializationArgStrings = context.fromList(srcEndToEndEntryPoint.specializationArgStrings);
+            auto dstSpecializationArgStrings =
+                context.fromList(srcEndToEndEntryPoint.specializationArgStrings);
             Offset32Ptr<OffsetString> dstName = context.fromName(srcEntryPoint->getName());
 
             EntryPointState& dst = base[dstEntryPoints[i]];
@@ -422,7 +442,8 @@ static String _scrubName(const String& in)
 
     // Add all the target requests
     {
-        Offset32Array<TargetRequestState> dstTargets = inOutContainer.newArray<TargetRequestState>(linkage->targets.getCount());
+        Offset32Array<TargetRequestState> dstTargets =
+            inOutContainer.newArray<TargetRequestState>(linkage->targets.getCount());
 
         for (Index i = 0; i < linkage->targets.getCount(); ++i)
         {
@@ -434,25 +455,30 @@ static String _scrubName(const String& in)
                 dst.target = srcTargetRequest->getTarget();
                 dst.profile = srcTargetRequest->getOptionSet().getProfile();
                 dst.targetFlags = srcTargetRequest->getOptionSet().getTargetFlags();
-                dst.floatingPointMode = srcTargetRequest->getOptionSet().getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
+                dst.floatingPointMode =
+                    srcTargetRequest->getOptionSet().getEnumOption<FloatingPointMode>(
+                        CompilerOptionName::FloatingPointMode);
             }
 
             // Copy the entry point/target output names
             {
                 const auto& srcTargetInfos = request->m_targetInfos;
 
-                if (const RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.tryGetValue(srcTargetRequest))
+                if (const RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr =
+                        srcTargetInfos.tryGetValue(srcTargetRequest))
                 {
                     EndToEndCompileRequest::TargetInfo* infos = *infosPtr;
 
                     const auto& entryPointOutputPaths = infos->entryPointOutputPaths;
 
-                    Offset32Array<OutputState> dstOutputStates = inOutContainer.newArray<OutputState>(entryPointOutputPaths.getCount());
+                    Offset32Array<OutputState> dstOutputStates =
+                        inOutContainer.newArray<OutputState>(entryPointOutputPaths.getCount());
 
                     Index index = 0;
                     for (const auto& [key, value] : entryPointOutputPaths)
                     {
-                        Offset32Ptr<OffsetString> outputPath = inOutContainer.newString(value.getUnownedSlice());
+                        Offset32Ptr<OffsetString> outputPath =
+                            inOutContainer.newString(value.getUnownedSlice());
 
                         auto& dstOutputState = base[dstOutputStates[index]];
 
@@ -466,7 +492,7 @@ static String _scrubName(const String& in)
                 }
             }
         }
-    
+
         // Save the result
         base[requestState]->targetRequests = dstTargets;
     }
@@ -474,7 +500,9 @@ static String _scrubName(const String& in)
     // Add the search paths
     {
         auto srcPaths = linkage->getSearchDirectories();
-        Offset32Array<Offset32Ptr<OffsetString> > dstPaths = inOutContainer.newArray<Offset32Ptr<OffsetString> >(srcPaths.searchDirectories.getCount());
+        Offset32Array<Offset32Ptr<OffsetString>> dstPaths =
+            inOutContainer.newArray<Offset32Ptr<OffsetString>>(
+                srcPaths.searchDirectories.getCount());
 
         // We don't handle parents here
         SLANG_ASSERT(srcPaths.parent == nullptr);
@@ -496,25 +524,28 @@ static String _scrubName(const String& in)
 
     {
         const auto& srcTranslationUnits = request->getFrontEndReq()->translationUnits;
-        Offset32Array<TranslationUnitRequestState> dstTranslationUnits = inOutContainer.newArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
+        Offset32Array<TranslationUnitRequestState> dstTranslationUnits =
+            inOutContainer.newArray<TranslationUnitRequestState>(srcTranslationUnits.getCount());
 
         for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
         {
             TranslationUnitRequest* srcTranslationUnit = srcTranslationUnits[i];
 
-            // Do before setting, because this can allocate, and therefore break, the following section
+            // Do before setting, because this can allocate, and therefore break, the following
+            // section
             auto defines = context.calcDefines(srcTranslationUnit->preprocessorDefinitions);
             auto moduleName = context.fromName(srcTranslationUnit->moduleName);
 
             Offset32Array<Offset32Ptr<SourceFileState>> dstSourceFiles;
             {
                 const auto& srcFiles = srcTranslationUnit->getSourceFiles();
-                dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState> >(srcFiles.getCount());
+                dstSourceFiles =
+                    inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcFiles.getCount());
 
                 for (Index j = 0; j < srcFiles.getCount(); ++j)
                 {
                     const auto srcFile = context.addSourceFile(srcFiles[j]);
-                    base[dstSourceFiles[j]] = srcFile; 
+                    base[dstSourceFiles[j]] = srcFile;
                 }
             }
 
@@ -537,11 +568,12 @@ static String _scrubName(const String& in)
             return SLANG_FAIL;
         }
 
-        // Traverse the references (in process we will construct the map from PathInfo)        
+        // Traverse the references (in process we will construct the map from PathInfo)
         {
             const auto& srcFiles = cacheFileSystem->getPathMap();
 
-            Offset32Array<PathAndPathInfo> pathMap = inOutContainer.newArray<PathAndPathInfo>(srcFiles.getCount());
+            Offset32Array<PathAndPathInfo> pathMap =
+                inOutContainer.newArray<PathAndPathInfo>(srcFiles.getCount());
 
             Index index = 0;
             for (const auto& [key, value] : srcFiles)
@@ -560,7 +592,7 @@ static String _scrubName(const String& in)
         }
     }
 
-    // Save all of the files 
+    // Save all of the files
     {
         Dictionary<String, int> uniqueNameMap;
 
@@ -633,7 +665,8 @@ static String _scrubName(const String& in)
     // Save all the SourceFile state
     {
         const auto& srcSourceFiles = context.m_sourceFileMap;
-        auto dstSourceFiles = inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcSourceFiles.getCount());
+        auto dstSourceFiles =
+            inOutContainer.newArray<Offset32Ptr<SourceFileState>>(srcSourceFiles.getCount());
 
         Index index = 0;
         for (const auto& [_, value] : srcSourceFiles)
@@ -648,7 +681,8 @@ static String _scrubName(const String& in)
     return SLANG_OK;
 }
 
-namespace { // anonymous 
+namespace
+{ // anonymous
 
 struct LoadContext
 {
@@ -780,7 +814,8 @@ struct LoadContext
         else
         {
             // TODO(JS): Hmmm... this could end up not being cleared up
-            // Because it is not added to the unique set (as unique set is for files and this isn't a file)
+            // Because it is not added to the unique set (as unique set is for files and this isn't
+            // a file)
             dstInfo = new CacheFileSystem::PathInfo(String());
         }
 
@@ -806,20 +841,22 @@ struct LoadContext
     }
 
 
-    void loadDefines(const Offset32Array<ReproUtil::StringPair>& in, Dictionary<String, String>& out)
+    void loadDefines(
+        const Offset32Array<ReproUtil::StringPair>& in,
+        Dictionary<String, String>& out)
     {
         out.clear();
 
         for (const auto& define : in)
         {
-            out.add(m_base->asRaw(m_base->asRaw(define).first)->getSlice(), m_base->asRaw(m_base->asRaw(define).second)->getSlice());
+            out.add(
+                m_base->asRaw(m_base->asRaw(define).first)->getSlice(),
+                m_base->asRaw(m_base->asRaw(define).second)->getSlice());
         }
     }
 
-    LoadContext(SourceManager* sourceManger, ISlangFileSystem* fileSystem, OffsetBase* base):
-        m_sourceManager(sourceManger),
-        m_fileSystem(fileSystem),
-        m_base(base)
+    LoadContext(SourceManager* sourceManger, ISlangFileSystem* fileSystem, OffsetBase* base)
+        : m_sourceManager(sourceManger), m_fileSystem(fileSystem), m_base(base)
     {
     }
 
@@ -834,10 +871,14 @@ struct LoadContext
     Dictionary<const PathInfoState*, CacheFileSystem::PathInfo*> m_pathInfoMap;
 };
 
-} // anonymous
+} // namespace
 
 
-/* static */SlangResult ReproUtil::loadFileSystem(OffsetBase& base, RequestState* requestState, ISlangFileSystem* replaceFileSystem, ComPtr<ISlangFileSystemExt>& outFileSystem)
+/* static */ SlangResult ReproUtil::loadFileSystem(
+    OffsetBase& base,
+    RequestState* requestState,
+    ISlangFileSystem* replaceFileSystem,
+    ComPtr<ISlangFileSystemExt>& outFileSystem)
 {
     LoadContext context(nullptr, replaceFileSystem, &base);
 
@@ -891,7 +932,11 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */SlangResult ReproUtil::load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* optionalFileSystem, EndToEndCompileRequest* request)
+/* static */ SlangResult ReproUtil::load(
+    OffsetBase& base,
+    RequestState* requestState,
+    ISlangFileSystem* optionalFileSystem,
+    EndToEndCompileRequest* request)
 {
     auto externalRequest = asExternal(request);
 
@@ -907,18 +952,24 @@ struct LoadContext
 
     LoadContext context(linkage->getSourceManager(), optionalFileSystem, &base);
 
-    // Try to set state through API - as doing so means if state stored in multiple places it will be ok
+    // Try to set state through API - as doing so means if state stored in multiple places it will
+    // be ok
 
     {
         externalRequest->setCompileFlags((SlangCompileFlags)requestState->compileFlags);
         externalRequest->setDumpIntermediates(int(requestState->shouldDumpIntermediates));
-        externalRequest->setLineDirectiveMode(SlangLineDirectiveMode(requestState->lineDirectiveMode));
+        externalRequest->setLineDirectiveMode(
+            SlangLineDirectiveMode(requestState->lineDirectiveMode));
         externalRequest->setDebugInfoLevel(SlangDebugInfoLevel(requestState->debugInfoLevel));
-        externalRequest->setOptimizationLevel(SlangOptimizationLevel(requestState->optimizationLevel));
-        externalRequest->setOutputContainerFormat(SlangContainerFormat(requestState->containerFormat));
+        externalRequest->setOptimizationLevel(
+            SlangOptimizationLevel(requestState->optimizationLevel));
+        externalRequest->setOutputContainerFormat(
+            SlangContainerFormat(requestState->containerFormat));
         externalRequest->setPassThrough(SlangPassThrough(request->m_passThrough));
 
-        linkage->m_optionSet.set(CompilerOptionName::DefaultImageFormatUnknown, requestState->useUnknownImageFormatAsDefault);
+        linkage->m_optionSet.set(
+            CompilerOptionName::DefaultImageFormatUnknown,
+            requestState->useUnknownImageFormatAsDefault);
         linkage->m_optionSet.set(CompilerOptionName::Obfuscate, requestState->obfuscateCode);
 
         linkage->setMatrixLayoutMode(requestState->defaultMatrixLayoutMode);
@@ -928,7 +979,9 @@ struct LoadContext
         const auto& srcPaths = requestState->searchPaths;
         for (Index i = 0; i < srcPaths.getCount(); ++i)
         {
-            linkage->m_optionSet.add(CompilerOptionName::Include, base.asRaw(base.asRaw(srcPaths[i]))->getSlice());
+            linkage->m_optionSet.add(
+                CompilerOptionName::Include,
+                base.asRaw(base.asRaw(srcPaths[i]))->getSlice());
         }
     }
     Dictionary<String, String> preprocessorDefines;
@@ -951,27 +1004,33 @@ struct LoadContext
             SLANG_ASSERT(dstTarget->getTarget() == src.target);
             dstTarget->getOptionSet().setProfile(src.profile);
             dstTarget->getOptionSet().addTargetFlags(src.targetFlags);
-            dstTarget->getOptionSet().set(CompilerOptionName::FloatingPointMode, src.floatingPointMode);
+            dstTarget->getOptionSet().set(
+                CompilerOptionName::FloatingPointMode,
+                src.floatingPointMode);
 
             // If there is output state (like output filenames) add here
             if (src.outputStates.getCount())
             {
-                RefPtr<EndToEndCompileRequest::TargetInfo> dstTargetInfo(new EndToEndCompileRequest::TargetInfo);
+                RefPtr<EndToEndCompileRequest::TargetInfo> dstTargetInfo(
+                    new EndToEndCompileRequest::TargetInfo);
                 request->m_targetInfos[dstTarget] = dstTargetInfo;
 
                 for (const auto& srcOutputStateOffset : src.outputStates)
                 {
                     const auto& srcOutputState = base.asRaw(srcOutputStateOffset);
 
-                    SLANG_ASSERT(srcOutputState.entryPointIndex < requestState->entryPoints.getCount());
+                    SLANG_ASSERT(
+                        srcOutputState.entryPointIndex < requestState->entryPoints.getCount());
 
                     String entryPointPath;
                     if (srcOutputState.outputPath)
                     {
                         entryPointPath = base.asRaw(srcOutputState.outputPath)->getSlice();
                     }
-                    
-                    dstTargetInfo->entryPointOutputPaths.add(srcOutputState.entryPointIndex, entryPointPath);
+
+                    dstTargetInfo->entryPointOutputPaths.add(
+                        srcOutputState.entryPointIndex,
+                        entryPointPath);
                 }
             }
         }
@@ -985,7 +1044,7 @@ struct LoadContext
         auto& dstTranslationUnits = frontEndReq->translationUnits;
 
         dstTranslationUnits.clear();
-        
+
         for (Index i = 0; i < srcTranslationUnits.getCount(); ++i)
         {
             const auto& srcTranslationUnit = base.asRaw(srcTranslationUnits[i]);
@@ -998,12 +1057,15 @@ struct LoadContext
 
             TranslationUnitRequest* dstTranslationUnit = dstTranslationUnits[i];
 
-            context.loadDefines(srcTranslationUnit.preprocessorDefinitions, dstTranslationUnit->preprocessorDefinitions);
+            context.loadDefines(
+                srcTranslationUnit.preprocessorDefinitions,
+                dstTranslationUnit->preprocessorDefinitions);
 
             Name* moduleName = nullptr;
             if (srcTranslationUnit.moduleName)
             {
-                moduleName = request->getNamePool()->getName(base.asRaw(srcTranslationUnit.moduleName)->getSlice());
+                moduleName = request->getNamePool()->getName(
+                    base.asRaw(srcTranslationUnit.moduleName)->getSlice());
             }
 
             dstTranslationUnit->moduleName = moduleName;
@@ -1012,15 +1074,19 @@ struct LoadContext
 
             dstTranslationUnit->clearSource();
 
-            const auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(asExternal(dstTranslationUnit->sourceLanguage));
+            const auto sourceDesc = ArtifactDescUtil::makeDescForSourceLanguage(
+                asExternal(dstTranslationUnit->sourceLanguage));
 
             for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
             {
                 // Create the source file
-                SourceFile* sourceFile = context.getSourceFile(base.asRaw(base.asRaw(srcSourceFiles[i])));
+                SourceFile* sourceFile =
+                    context.getSourceFile(base.asRaw(base.asRaw(srcSourceFiles[i])));
 
                 // Create the artifact
-                auto sourceArtifact = ArtifactUtil::createArtifact(sourceDesc, sourceFile->getPathInfo().getName().getBuffer());
+                auto sourceArtifact = ArtifactUtil::createArtifact(
+                    sourceDesc,
+                    sourceFile->getPathInfo().getName().getBuffer());
                 if (sourceFile->getContentBlob())
                 {
                     sourceArtifact->addRepresentationUnknown(sourceFile->getContentBlob());
@@ -1041,13 +1107,19 @@ struct LoadContext
         {
             const auto srcEntryPoint = base.asRaw(srcEntryPointOffset);
 
-            const char* name = srcEntryPoint.name ? base.asRaw(srcEntryPoint.name)->getCstr() : nullptr;
+            const char* name =
+                srcEntryPoint.name ? base.asRaw(srcEntryPoint.name)->getCstr() : nullptr;
 
             Stage stage = srcEntryPoint.profile.getStage();
 
             List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
 
-            externalRequest->addEntryPointEx(int(srcEntryPoint.translationUnitIndex), name, SlangStage(stage), int(args.getCount()), args.getBuffer());
+            externalRequest->addEntryPointEx(
+                int(srcEntryPoint.translationUnitIndex),
+                name,
+                SlangStage(stage),
+                int(args.getCount()),
+                args.getBuffer());
         }
     }
 
@@ -1072,9 +1144,9 @@ struct LoadContext
         {
             for (const auto& [_, pathInfo] : context.m_fileToPathInfoMap)
             {
-                // TODO(JS): It's not 100% clear why we are ending up 
+                // TODO(JS): It's not 100% clear why we are ending up
                 // with entries that don't have a unique identity.
-                // For now we ignore adding to the unique map, because 
+                // For now we ignore adding to the unique map, because
                 // if we do we'll have multiple entries with the same key
                 if (pathInfo->m_uniqueIdentity.getLength() == 0)
                 {
@@ -1084,9 +1156,9 @@ struct LoadContext
                 dstUniqueMap.add(pathInfo->m_uniqueIdentity, pathInfo);
             }
         }
-    
-        // This is a bit of a hack, we are going to replace the file system, with our one which is filled in
-        // with what was read from the file. 
+
+        // This is a bit of a hack, we are going to replace the file system, with our one which is
+        // filled in with what was read from the file.
 
         linkage->m_fileSystemExt.swap(fileSystemExt);
     }
@@ -1095,7 +1167,7 @@ struct LoadContext
 }
 
 
-/* static */SlangResult ReproUtil::saveState(EndToEndCompileRequest* request, Stream* stream)
+/* static */ SlangResult ReproUtil::saveState(EndToEndCompileRequest* request, Stream* stream)
 {
     OffsetContainer container;
     Offset32Ptr<RequestState> requestState;
@@ -1106,24 +1178,39 @@ struct LoadContext
     header.m_semanticVersion = g_semanticVersion;
     header.m_typeHash = _getTypeHash();
 
-    return RiffUtil::writeData(&header.m_chunk, sizeof(header),container.getData(), container.getDataCount(), stream);
+    return RiffUtil::writeData(
+        &header.m_chunk,
+        sizeof(header),
+        container.getData(),
+        container.getDataCount(),
+        stream);
 }
 
-/* static */SlangResult ReproUtil::saveState(EndToEndCompileRequest* request, const String& filename)
+/* static */ SlangResult ReproUtil::saveState(
+    EndToEndCompileRequest* request,
+    const String& filename)
 {
     RefPtr<FileStream> stream(new FileStream);
-    SLANG_RETURN_ON_FAIL(stream->init(filename, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
+    SLANG_RETURN_ON_FAIL(
+        stream->init(filename, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
     return saveState(request, stream);
 }
 
-/* static */ SlangResult ReproUtil::loadState(const String& filename, DiagnosticSink* sink, List<uint8_t>& outBuffer)
+/* static */ SlangResult ReproUtil::loadState(
+    const String& filename,
+    DiagnosticSink* sink,
+    List<uint8_t>& outBuffer)
 {
     RefPtr<FileStream> stream = new FileStream;
-    SLANG_RETURN_ON_FAIL(stream->init(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+    SLANG_RETURN_ON_FAIL(
+        stream->init(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
     return loadState(stream, sink, outBuffer);
 }
 
-/* static */ SlangResult ReproUtil::loadState(Stream* stream, DiagnosticSink* sink, List<uint8_t>& buffer)
+/* static */ SlangResult ReproUtil::loadState(
+    Stream* stream,
+    DiagnosticSink* sink,
+    List<uint8_t>& buffer)
 {
     Header header;
 
@@ -1147,7 +1234,11 @@ struct LoadContext
         header.m_semanticVersion.asSemanticVersion().append(headerBuf);
         g_semanticVersion.asSemanticVersion().append(currentBuf);
 
-        sink->diagnose(SourceLoc(), Diagnostics::incompatibleRiffSemanticVersion, headerBuf, currentBuf);
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::incompatibleRiffSemanticVersion,
+            headerBuf,
+            currentBuf);
         return SLANG_FAIL;
     }
 
@@ -1160,7 +1251,11 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */SlangResult ReproUtil::loadState(const uint8_t* data, size_t size, DiagnosticSink* sink, List<uint8_t>& outBuffer)
+/* static */ SlangResult ReproUtil::loadState(
+    const uint8_t* data,
+    size_t size,
+    DiagnosticSink* sink,
+    List<uint8_t>& outBuffer)
 {
     MemoryStreamBase stream(FileAccess::Read, data, size);
     return loadState(&stream, sink, outBuffer);
@@ -1171,7 +1266,9 @@ struct LoadContext
     return (ReproUtil::RequestState*)(buffer.getBuffer() + kStartOffset);
 }
 
-/* static */SlangResult ReproUtil::calcDirectoryPathFromFilename(const String& filename, String& outPath)
+/* static */ SlangResult ReproUtil::calcDirectoryPathFromFilename(
+    const String& filename,
+    String& outPath)
 {
     String absPath;
     SLANG_RETURN_ON_FAIL(Path::getCanonical(filename, absPath));
@@ -1192,7 +1289,9 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */SlangResult ReproUtil::extractFilesToDirectory(const String& filename, DiagnosticSink* sink)
+/* static */ SlangResult ReproUtil::extractFilesToDirectory(
+    const String& filename,
+    DiagnosticSink* sink)
 {
     List<uint8_t> buffer;
     SLANG_RETURN_ON_FAIL(ReproUtil::loadState(filename, sink, buffer));
@@ -1217,7 +1316,10 @@ struct LoadContext
     return extractFiles(base, requestState, &relFileSystem);
 }
 
-static void _calcPreprocessorDefines(OffsetBase& base, const Offset32Array<ReproUtil::StringPair>& srcDefines, CommandLine& cmd)
+static void _calcPreprocessorDefines(
+    OffsetBase& base,
+    const Offset32Array<ReproUtil::StringPair>& srcDefines,
+    CommandLine& cmd)
 {
     for (const auto& define : srcDefines)
     {
@@ -1232,7 +1334,10 @@ static void _calcPreprocessorDefines(OffsetBase& base, const Offset32Array<Repro
     }
 }
 
-static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* requestState, CommandLine& cmd)
+static SlangResult _calcCommandLine(
+    OffsetBase& base,
+    ReproUtil::RequestState* requestState,
+    CommandLine& cmd)
 {
     typedef ReproUtil::TargetRequestState TargetRequestState;
     typedef ReproUtil::SourceFileState SourceFileState;
@@ -1242,72 +1347,106 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
         while (flags)
         {
             // Extract a bit
-            const SlangCompileFlags isolatedBit = flags & SlangCompileFlags(-int(flags)); 
+            const SlangCompileFlags isolatedBit = flags & SlangCompileFlags(-int(flags));
 
             switch (isolatedBit)
             {
-                case SLANG_COMPILE_FLAG_NO_MANGLING:    cmd.addArg("-no-mangle"); break;
-                case SLANG_COMPILE_FLAG_NO_CODEGEN:     cmd.addArg("-no-codegen"); break;
-                default: break;
+            case SLANG_COMPILE_FLAG_NO_MANGLING:
+                cmd.addArg("-no-mangle");
+                break;
+            case SLANG_COMPILE_FLAG_NO_CODEGEN:
+                cmd.addArg("-no-codegen");
+                break;
+            default:
+                break;
             }
 
             // Remove the bit
             flags &= ~isolatedBit;
         }
-        //spSetDumpIntermediates(externalRequest, int(requestState->shouldDumpIntermediates));
+        // spSetDumpIntermediates(externalRequest, int(requestState->shouldDumpIntermediates));
 
         switch (SlangLineDirectiveMode(requestState->lineDirectiveMode))
         {
-            case SLANG_LINE_DIRECTIVE_MODE_DEFAULT: break;
-            case SLANG_LINE_DIRECTIVE_MODE_NONE:
+        case SLANG_LINE_DIRECTIVE_MODE_DEFAULT:
+            break;
+        case SLANG_LINE_DIRECTIVE_MODE_NONE:
             {
                 cmd.addArg("-line-directive-mode");
                 cmd.addArg("none");
                 break;
             }
-            default: break;
+        default:
+            break;
         }
 
         switch (SlangDebugInfoLevel(requestState->debugInfoLevel))
         {
-            case SLANG_DEBUG_INFO_LEVEL_STANDARD:       cmd.addArg("-g"); break;
-            case SLANG_DEBUG_INFO_LEVEL_NONE:           cmd.addArg("-g0"); break;
-            case SLANG_DEBUG_INFO_LEVEL_MINIMAL:        cmd.addArg("-g1"); break;
-            case SLANG_DEBUG_INFO_LEVEL_MAXIMAL:        cmd.addArg("-g3"); break;
-            default: break;
+        case SLANG_DEBUG_INFO_LEVEL_STANDARD:
+            cmd.addArg("-g");
+            break;
+        case SLANG_DEBUG_INFO_LEVEL_NONE:
+            cmd.addArg("-g0");
+            break;
+        case SLANG_DEBUG_INFO_LEVEL_MINIMAL:
+            cmd.addArg("-g1");
+            break;
+        case SLANG_DEBUG_INFO_LEVEL_MAXIMAL:
+            cmd.addArg("-g3");
+            break;
+        default:
+            break;
         }
 
         switch (SlangOptimizationLevel(requestState->optimizationLevel))
         {
-            case SLANG_OPTIMIZATION_LEVEL_NONE:         cmd.addArg("-O0"); break;
-            case SLANG_OPTIMIZATION_LEVEL_DEFAULT:      cmd.addArg("-O");  break;
-            case SLANG_OPTIMIZATION_LEVEL_HIGH:         cmd.addArg("-O2"); break;
-            case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:      cmd.addArg("-O3"); break;
-            default: break;
+        case SLANG_OPTIMIZATION_LEVEL_NONE:
+            cmd.addArg("-O0");
+            break;
+        case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
+            cmd.addArg("-O");
+            break;
+        case SLANG_OPTIMIZATION_LEVEL_HIGH:
+            cmd.addArg("-O2");
+            break;
+        case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
+            cmd.addArg("-O3");
+            break;
+        default:
+            break;
         }
 
-        //spSetOutputContainerFormat(externalRequest, SlangContainerFormat(requestState->containerFormat));
+        // spSetOutputContainerFormat(externalRequest,
+        // SlangContainerFormat(requestState->containerFormat));
 
         switch (SlangPassThrough(requestState->passThroughMode))
         {
-            case SLANG_PASS_THROUGH_NONE: break;
-            default:
+        case SLANG_PASS_THROUGH_NONE:
+            break;
+        default:
             {
                 cmd.addArg("-pass-through");
-                cmd.addArg(TypeTextUtil::getPassThroughName(SlangPassThrough(requestState->passThroughMode)));
+                cmd.addArg(TypeTextUtil::getPassThroughName(
+                    SlangPassThrough(requestState->passThroughMode)));
                 break;
             }
         }
 
-        //request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
-        //request->getBackEndReq()->obfuscateCode = requestState->obfuscateCode;
-        //request->getFrontEndReq()->obfuscateCode = requestState->obfuscateCode;
+        // request->getBackEndReq()->useUnknownImageFormatAsDefault =
+        // requestState->useUnknownImageFormatAsDefault; request->getBackEndReq()->obfuscateCode =
+        // requestState->obfuscateCode; request->getFrontEndReq()->obfuscateCode =
+        // requestState->obfuscateCode;
 
         switch (requestState->defaultMatrixLayoutMode)
         {
-            case SLANG_MATRIX_LAYOUT_ROW_MAJOR:     cmd.addArg("-matrix-layout-row-major"); break;
-            case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:  cmd.addArg("-matrix-layout-column-major"); break;
-            default: break;
+        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+            cmd.addArg("-matrix-layout-row-major");
+            break;
+        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+            cmd.addArg("-matrix-layout-column-major");
+            break;
+        default:
+            break;
         }
     }
 
@@ -1333,19 +1472,20 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
 
             switch (src.floatingPointMode)
             {
-                case FloatingPointMode::Fast:
+            case FloatingPointMode::Fast:
                 {
                     cmd.addArg("-fp-mode");
                     cmd.addArg("fast");
                     break;
                 }
-                case FloatingPointMode::Precise:
+            case FloatingPointMode::Precise:
                 {
                     cmd.addArg("-fp-mode");
                     cmd.addArg("precise");
                     break;
                 }
-                default: break;
+            default:
+                break;
             }
 
 #if 0
@@ -1394,16 +1534,16 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
 
             _calcPreprocessorDefines(base, srcTranslationUnit.preprocessorDefinitions, cmd);
 
-            
+
 #if 0
             if (srcTranslationUnit.moduleName)
             {
                 moduleName = base[srcTranslationUnit].moduleName->getSlice());
             }
 #endif
-      
+
             const auto& srcSourceFiles = srcTranslationUnit.sourceFiles;
-            
+
             for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
             {
                 SourceFileState* sourceFile = base.asRaw(base.asRaw(srcSourceFiles[i]));
@@ -1423,7 +1563,8 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
         {
             const auto srcEntryPoint = base.asRaw(srcEntryPointOffset);
 
-            const char* name = srcEntryPoint.name ? base.asRaw(srcEntryPoint.name)->getCstr() : nullptr;
+            const char* name =
+                srcEntryPoint.name ? base.asRaw(srcEntryPoint.name)->getCstr() : nullptr;
 
             cmd.addArg("-entry");
             cmd.addArg(name);
@@ -1432,19 +1573,23 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
             UnownedStringSlice stageText = getStageText(srcEntryPoint.profile.getStage());
             cmd.addArg(stageText);
 
-            //cmd.addArg("-profile");
-            //cmd.addArg(Profile(srcEntryPoint.profile).getName());
+            // cmd.addArg("-profile");
+            // cmd.addArg(Profile(srcEntryPoint.profile).getName());
 
-            //List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
+            // List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
 
-            //externalRequest->addEntryPointEx(int(srcEntryPoint.translationUnitIndex), name, SlangStage(stage), int(args.getCount()), args.getBuffer());
+            // externalRequest->addEntryPointEx(int(srcEntryPoint.translationUnitIndex), name,
+            // SlangStage(stage), int(args.getCount()), args.getBuffer());
         }
     }
 
     return SLANG_OK;
 }
 
-/* static */SlangResult ReproUtil::extractFiles(OffsetBase& base, RequestState* requestState, ISlangMutableFileSystem* fileSystem)
+/* static */ SlangResult ReproUtil::extractFiles(
+    OffsetBase& base,
+    RequestState* requestState,
+    ISlangMutableFileSystem* fileSystem)
 {
     StringBuilder builder;
 
@@ -1456,7 +1601,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
         String text = cmdLine.toString();
         builder << text << "\n";
     }
-        
+
     builder << "[files]\n";
 
     for (auto fileOffset : requestState->files)
@@ -1467,7 +1612,10 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
         {
             UnownedStringSlice contents = base.asRaw(file->contents)->getSlice();
 
-            SLANG_RETURN_ON_FAIL(fileSystem->saveFile(base.asRaw(file->uniqueName)->getCstr(), contents.begin(), contents.getLength()));
+            SLANG_RETURN_ON_FAIL(fileSystem->saveFile(
+                base.asRaw(file->uniqueName)->getCstr(),
+                contents.begin(),
+                contents.getLength()));
 
             OffsetString* originalName = nullptr;
             if (file->canonicalPath)
@@ -1520,15 +1668,20 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
                 {
                     switch (pathInfo->pathType)
                     {
-                        case SLANG_PATH_TYPE_FILE: builder << "file "; break;
-                        case SLANG_PATH_TYPE_DIRECTORY: builder << "directory "; break;
-                        default: builder << "?"; break;
+                    case SLANG_PATH_TYPE_FILE:
+                        builder << "file ";
+                        break;
+                    case SLANG_PATH_TYPE_DIRECTORY:
+                        builder << "directory ";
+                        break;
+                    default:
+                        builder << "?";
+                        break;
                     }
                 }
 
-                CompressedResult curRes =  pathInfo->getCanonicalPathResult;
-                CompressedResult results[] =
-                {
+                CompressedResult curRes = pathInfo->getCanonicalPathResult;
+                CompressedResult results[] = {
                     pathInfo->getPathTypeResult,
                     pathInfo->loadFileResult,
                 };
@@ -1543,13 +1696,21 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
 
                 switch (curRes)
                 {
-                    default:
-                    case CompressedResult::Uninitialized: break;
-                    case CompressedResult::Ok: break;
-                
-                    case CompressedResult::NotFound:    builder << "[not found]"; break;
-                    case CompressedResult::CannotOpen:  builder << "[cannot open]"; break;
-                    case CompressedResult::Fail:        builder << "[fail]"; break;
+                default:
+                case CompressedResult::Uninitialized:
+                    break;
+                case CompressedResult::Ok:
+                    break;
+
+                case CompressedResult::NotFound:
+                    builder << "[not found]";
+                    break;
+                case CompressedResult::CannotOpen:
+                    builder << "[cannot open]";
+                    break;
+                case CompressedResult::Fail:
+                    builder << "[fail]";
+                    break;
                 }
             }
         }
@@ -1561,7 +1722,8 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
         builder << "\n";
     }
 
-    SLANG_RETURN_ON_FAIL(fileSystem->saveFile("manifest.txt", builder.getBuffer(), builder.getLength()));
+    SLANG_RETURN_ON_FAIL(
+        fileSystem->saveFile("manifest.txt", builder.getBuffer(), builder.getLength()));
     return SLANG_OK;
 }
 
@@ -1593,7 +1755,10 @@ static SlangResult _findFirstSourcePath(EndToEndCompileRequest* request, String&
     return SLANG_FAIL;
 }
 
-/* static */SlangResult ReproUtil::findUniqueReproDumpStream(EndToEndCompileRequest* request, String& outFileName, RefPtr<Stream>& outStream)
+/* static */ SlangResult ReproUtil::findUniqueReproDumpStream(
+    EndToEndCompileRequest* request,
+    String& outFileName,
+    RefPtr<Stream>& outStream)
 {
     String sourcePath;
 
@@ -1621,13 +1786,15 @@ static SlangResult _findFirstSourcePath(EndToEndCompileRequest* request, String&
         outFileName = builder;
 
         // We could have clashes, as we use ticks, we should get to a point where the clashes stop
-        if (SLANG_SUCCEEDED(stream->init(builder, FileMode::CreateNew, FileAccess::Write, FileShare::WriteOnly)))
+        if (SLANG_SUCCEEDED(
+                stream
+                    ->init(builder, FileMode::CreateNew, FileAccess::Write, FileShare::WriteOnly)))
         {
             outStream = stream;
             return SLANG_OK;
         }
-        
-        // TODO(JS): 
+
+        // TODO(JS):
         // Might make sense to sleep here - but don't seem to have cross platform func for that yet.
     }
 

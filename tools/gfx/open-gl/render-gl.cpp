@@ -1,15 +1,13 @@
 // render-gl.cpp
 #include "render-gl.h"
 
-#include "../nvapi/nvapi-util.h"
-
 #include "../immediate-renderer-base.h"
 #include "../mutable-shader-object.h"
-
+#include "../nvapi/nvapi-util.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-secure-crt.h"
-#include "external/stb/stb_image_write.h"
+#include "stb_image_write.h"
 
 #if SLANG_WIN64 || SLANG_WIN64
 #define ENABLE_GL_IMPL 1
@@ -34,68 +32,71 @@
 
 #pragma comment(lib, "opengl32")
 
-#include <GL/GL.h>
-#include "external/glext.h"
-#include "external/wglext.h"
+// clang-format off
+#    include <GL/GL.h>
+#    include "external/glext.h"
+#    include "external/wglext.h"
+// clang-format on
 
 // We define an "X-macro" for mapping over loadable OpenGL
 // extension entry point that we will use, so that we can
 // easily write generic code to iterate over them.
-#define MAP_GL_EXTENSION_FUNCS(F)                       \
-    F(glCreateProgram,      PFNGLCREATEPROGRAMPROC)     \
-    F(glCreateShader,       PFNGLCREATESHADERPROC)      \
-    F(glShaderSource,       PFNGLSHADERSOURCEPROC)      \
-    F(glCompileShader,      PFNGLCOMPILESHADERPROC)     \
-    F(glGetShaderiv,        PFNGLGETSHADERIVPROC)       \
-    F(glDeleteShader,       PFNGLDELETESHADERPROC)      \
-    F(glAttachShader,       PFNGLATTACHSHADERPROC)      \
-    F(glLinkProgram,        PFNGLLINKPROGRAMPROC)       \
-    F(glGetProgramiv,       PFNGLGETPROGRAMIVPROC)      \
-    F(glGetProgramInfoLog,  PFNGLGETPROGRAMINFOLOGPROC) \
-    F(glDeleteProgram,      PFNGLDELETEPROGRAMPROC)     \
-    F(glGetShaderInfoLog,   PFNGLGETSHADERINFOLOGPROC)  \
-    F(glGenBuffers,         PFNGLGENBUFFERSPROC)        \
-    F(glBindBuffer,         PFNGLBINDBUFFERPROC)        \
-    F(glBufferData,         PFNGLBUFFERDATAPROC)        \
-    F(glCopyBufferSubData,  PFNGLCOPYBUFFERSUBDATAPROC) \
-	F(glDeleteBuffers,		PFNGLDELETEBUFFERSPROC)		\
-	F(glMapBuffer,          PFNGLMAPBUFFERPROC)         \
-    F(glUnmapBuffer,        PFNGLUNMAPBUFFERPROC)       \
-    F(glUseProgram,         PFNGLUSEPROGRAMPROC)        \
-    F(glBindBufferBase,     PFNGLBINDBUFFERBASEPROC)    \
-    F(glBindBufferRange,    PFNGLBINDBUFFERRANGEPROC)   \
-    F(glVertexAttribPointer,        PFNGLVERTEXATTRIBPOINTERPROC)       \
-    F(glEnableVertexAttribArray,    PFNGLENABLEVERTEXATTRIBARRAYPROC)   \
-    F(glDisableVertexAttribArray,   PFNGLDISABLEVERTEXATTRIBARRAYPROC)  \
-    F(glDebugMessageCallback,       PFNGLDEBUGMESSAGECALLBACKPROC)      \
-    F(glDispatchCompute,            PFNGLDISPATCHCOMPUTEPROC) \
-    F(glActiveTexture,              PFNGLACTIVETEXTUREPROC) \
-    F(glCreateSamplers,             PFNGLCREATESAMPLERSPROC) \
-	F(glDeleteSamplers,				PFNGLDELETESAMPLERSPROC) \
-    F(glBindSampler,                PFNGLBINDSAMPLERPROC) \
-    F(glTexImage3D,                 PFNGLTEXIMAGE3DPROC) \
-    F(glBindImageTexture,           PFNGLBINDIMAGETEXTUREPROC) \
-    F(glSamplerParameteri,          PFNGLSAMPLERPARAMETERIPROC) \
-    F(glGenFramebuffers, PFNGLGENFRAMEBUFFERSPROC) \
-    F(glDeleteFramebuffers, PFNGLDELETEFRAMEBUFFERSPROC) \
-    F(glBindFramebuffer, PFNGLBINDFRAMEBUFFERPROC) \
-    F(glDrawBuffers, PFNGLDRAWBUFFERSPROC) \
-    F(glFramebufferTexture2D, PFNGLFRAMEBUFFERTEXTURE2DPROC) \
-    F(glFramebufferTextureLayer, PFNGLFRAMEBUFFERTEXTURELAYERPROC) \
-    F(glBlitFramebuffer, PFNGLBLITFRAMEBUFFERPROC) \
-    F(glCheckFramebufferStatus, PFNGLCHECKFRAMEBUFFERSTATUSPROC) \
-    F(glGenVertexArrays, PFNGLGENVERTEXARRAYSPROC) \
-    F(glBindVertexArray, PFNGLBINDVERTEXARRAYPROC) \
-    F(glDeleteVertexArrays, PFNGLDELETEVERTEXARRAYSPROC) \
-    F(glDrawElementsBaseVertex, PFNGLDRAWELEMENTSBASEVERTEXPROC) \
+#define MAP_GL_EXTENSION_FUNCS(F)                                    \
+    F(glCreateProgram, PFNGLCREATEPROGRAMPROC)                       \
+    F(glCreateShader, PFNGLCREATESHADERPROC)                         \
+    F(glShaderSource, PFNGLSHADERSOURCEPROC)                         \
+    F(glCompileShader, PFNGLCOMPILESHADERPROC)                       \
+    F(glGetShaderiv, PFNGLGETSHADERIVPROC)                           \
+    F(glDeleteShader, PFNGLDELETESHADERPROC)                         \
+    F(glAttachShader, PFNGLATTACHSHADERPROC)                         \
+    F(glLinkProgram, PFNGLLINKPROGRAMPROC)                           \
+    F(glGetProgramiv, PFNGLGETPROGRAMIVPROC)                         \
+    F(glGetProgramInfoLog, PFNGLGETPROGRAMINFOLOGPROC)               \
+    F(glDeleteProgram, PFNGLDELETEPROGRAMPROC)                       \
+    F(glGetShaderInfoLog, PFNGLGETSHADERINFOLOGPROC)                 \
+    F(glGenBuffers, PFNGLGENBUFFERSPROC)                             \
+    F(glBindBuffer, PFNGLBINDBUFFERPROC)                             \
+    F(glBufferData, PFNGLBUFFERDATAPROC)                             \
+    F(glCopyBufferSubData, PFNGLCOPYBUFFERSUBDATAPROC)               \
+    F(glDeleteBuffers, PFNGLDELETEBUFFERSPROC)                       \
+    F(glMapBuffer, PFNGLMAPBUFFERPROC)                               \
+    F(glUnmapBuffer, PFNGLUNMAPBUFFERPROC)                           \
+    F(glUseProgram, PFNGLUSEPROGRAMPROC)                             \
+    F(glBindBufferBase, PFNGLBINDBUFFERBASEPROC)                     \
+    F(glBindBufferRange, PFNGLBINDBUFFERRANGEPROC)                   \
+    F(glVertexAttribPointer, PFNGLVERTEXATTRIBPOINTERPROC)           \
+    F(glEnableVertexAttribArray, PFNGLENABLEVERTEXATTRIBARRAYPROC)   \
+    F(glDisableVertexAttribArray, PFNGLDISABLEVERTEXATTRIBARRAYPROC) \
+    F(glDebugMessageCallback, PFNGLDEBUGMESSAGECALLBACKPROC)         \
+    F(glDispatchCompute, PFNGLDISPATCHCOMPUTEPROC)                   \
+    F(glActiveTexture, PFNGLACTIVETEXTUREPROC)                       \
+    F(glCreateSamplers, PFNGLCREATESAMPLERSPROC)                     \
+    F(glDeleteSamplers, PFNGLDELETESAMPLERSPROC)                     \
+    F(glBindSampler, PFNGLBINDSAMPLERPROC)                           \
+    F(glTexImage3D, PFNGLTEXIMAGE3DPROC)                             \
+    F(glBindImageTexture, PFNGLBINDIMAGETEXTUREPROC)                 \
+    F(glSamplerParameteri, PFNGLSAMPLERPARAMETERIPROC)               \
+    F(glGenFramebuffers, PFNGLGENFRAMEBUFFERSPROC)                   \
+    F(glDeleteFramebuffers, PFNGLDELETEFRAMEBUFFERSPROC)             \
+    F(glBindFramebuffer, PFNGLBINDFRAMEBUFFERPROC)                   \
+    F(glDrawBuffers, PFNGLDRAWBUFFERSPROC)                           \
+    F(glFramebufferTexture2D, PFNGLFRAMEBUFFERTEXTURE2DPROC)         \
+    F(glFramebufferTextureLayer, PFNGLFRAMEBUFFERTEXTURELAYERPROC)   \
+    F(glBlitFramebuffer, PFNGLBLITFRAMEBUFFERPROC)                   \
+    F(glCheckFramebufferStatus, PFNGLCHECKFRAMEBUFFERSTATUSPROC)     \
+    F(glGenVertexArrays, PFNGLGENVERTEXARRAYSPROC)                   \
+    F(glBindVertexArray, PFNGLBINDVERTEXARRAYPROC)                   \
+    F(glDeleteVertexArrays, PFNGLDELETEVERTEXARRAYSPROC)             \
+    F(glDrawElementsBaseVertex, PFNGLDRAWELEMENTSBASEVERTEXPROC)     \
     /* end */
 
-#define MAP_WGL_EXTENSION_FUNCS(F) \
+#define MAP_WGL_EXTENSION_FUNCS(F)                                   \
     F(wglCreateContextAttribsARB, PFNWGLCREATECONTEXTATTRIBSARBPROC) \
     /* end */
 using namespace Slang;
 
-namespace gfx {
+namespace gfx
+{
 
 class GLDevice : public ImmediateRendererBase
 {
@@ -104,12 +105,14 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
     virtual void clearFrame(uint32_t mask, bool clearDepth, bool clearStencil) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
-        const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
+        const ISwapchain::Desc& desc,
+        WindowHandle window,
+        ISwapchain** outSwapchain) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
-        const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL createFramebuffer(
-        const IFramebuffer::Desc& desc,
-        IFramebuffer** outFramebuffer) override;
+        const IFramebufferLayout::Desc& desc,
+        IFramebufferLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
     virtual void setFramebuffer(IFramebuffer* frameBuffer) override;
     virtual void setStencilReference(uint32_t referenceValue) override;
 
@@ -122,27 +125,32 @@ public:
         const void* initData,
         IBufferResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
+    createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
-        ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override;
+        ITextureResource* texture,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
         IBufferResource* buffer,
         IBufferResource* counterBuffer,
         IResourceView::Desc const& desc,
         IResourceView** outView) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        IInputLayout::Desc const& desc,
-        IInputLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout) override;
 
     virtual Result createShaderObjectLayout(
         slang::ISession* session,
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
-    virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
-    virtual Result createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
-    virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject) override;
+    virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
+        override;
+    virtual Result createMutableShaderObject(
+        ShaderObjectLayoutBase* layout,
+        IShaderObject** outObject) override;
+    virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject)
+        override;
     virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
@@ -150,9 +158,11 @@ public:
         IShaderProgram** outProgram,
         ISlangBlob** outDiagnosticBlob) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
-        const GraphicsPipelineStateDesc& desc, IPipelineState** outState) override;
+        const GraphicsPipelineStateDesc& desc,
+        IPipelineState** outState) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
-        const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
+        const ComputePipelineStateDesc& desc,
+        IPipelineState** outState) override;
 
     virtual void copyBuffer(
         IBufferResource* dst,
@@ -161,7 +171,11 @@ public:
         size_t srcOffset,
         size_t size) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL readTextureResource(
-        ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
+        ITextureResource* texture,
+        ResourceState state,
+        ISlangBlob** outBlob,
+        size_t* outRowPitch,
+        size_t* outPixelSize) override;
 
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(IBufferResource* buffer, size_t offsetWritten, size_t sizeWritten) override;
@@ -172,14 +186,14 @@ public:
         GfxCount slotCount,
         IBufferResource* const* buffers,
         const Offset* offsets) override;
-    virtual void setIndexBuffer(
-        IBufferResource* buffer, Format indexFormat, Offset offset) override;
+    virtual void setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset)
+        override;
     virtual void setViewports(GfxCount count, Viewport const* viewports) override;
     virtual void setScissorRects(GfxCount count, ScissorRect const* rects) override;
     virtual void setPipelineState(IPipelineState* state) override;
     virtual void draw(GfxCount vertexCount, GfxCount startVertex) override;
-    virtual void drawIndexed(
-        GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex) override;
+    virtual void drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
+        override;
     virtual void drawInstanced(
         GfxCount vertexCount,
         GfxCount instanceCount,
@@ -199,8 +213,8 @@ public:
         SLANG_UNUSED(pool);
         SLANG_UNUSED(index);
     }
-    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
-        const IQueryPool::Desc& desc, IQueryPool** pool) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    createQueryPool(const IQueryPool::Desc& desc, IQueryPool** pool) override
     {
         SLANG_UNUSED(desc);
         *pool = nullptr;
@@ -215,7 +229,7 @@ public:
     GLDevice();
     ~GLDevice();
 
-    protected:
+protected:
     enum
     {
         kMaxVertexAttributes = 16,
@@ -224,20 +238,20 @@ public:
     };
     struct VertexAttributeFormat
     {
-        GLint       componentCount;
-        GLenum      componentType;
-        GLboolean   normalized;
+        GLint componentCount;
+        GLenum componentType;
+        GLboolean normalized;
     };
 
     struct VertexAttributeDesc
     {
-        VertexAttributeFormat   format;
-        GLuint                  streamIndex;
-        GLsizei                 offset;
+        VertexAttributeFormat format;
+        GLuint streamIndex;
+        GLsizei offset;
     };
 
     class InputLayoutImpl : public InputLayoutBase
-	{
+    {
     public:
         VertexAttributeDesc m_attributes[kMaxVertexAttributes];
         VertexStreamDesc m_streams[kMaxVertexStreams];
@@ -245,38 +259,36 @@ public:
         UInt m_streamCount = 0;
     };
 
-	class BufferResourceImpl: public BufferResource
-	{
-		public:
+    class BufferResourceImpl : public BufferResource
+    {
+    public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(const Desc& desc, WeakSink<GLDevice>* renderer, GLuint id, GLenum target):
-            Parent(desc),
-			m_renderer(renderer),
-			m_handle(id),
-            m_target(target),
-            m_size(desc.sizeInBytes)
-		{}
-		~BufferResourceImpl()
-		{
-			if (auto renderer = m_renderer->get())
-			{
-				renderer->glDeleteBuffers(1, &m_handle);
-			}
-		}
+        BufferResourceImpl(const Desc& desc, WeakSink<GLDevice>* renderer, GLuint id, GLenum target)
+            : Parent(desc)
+            , m_renderer(renderer)
+            , m_handle(id)
+            , m_target(target)
+            , m_size(desc.sizeInBytes)
+        {
+        }
+        ~BufferResourceImpl()
+        {
+            if (auto renderer = m_renderer->get())
+            {
+                renderer->glDeleteBuffers(1, &m_handle);
+            }
+        }
 
-		RefPtr<WeakSink<GLDevice>> m_renderer;
-		GLuint m_handle;
+        RefPtr<WeakSink<GLDevice>> m_renderer;
+        GLuint m_handle;
         GLenum m_target;
         UInt m_size;
 
-        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
-        {
-            return 0;
-        }
+        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override { return 0; }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            map(MemoryRange* rangeToRead, void** outPointer) override
+        map(MemoryRange* rangeToRead, void** outPointer) override
         {
             SLANG_UNUSED(rangeToRead);
             SLANG_UNUSED(outPointer);
@@ -288,16 +300,15 @@ public:
             SLANG_UNUSED(writtenRange);
             return SLANG_FAIL;
         }
-	};
+    };
 
-    class TextureResourceImpl: public TextureResource
+    class TextureResourceImpl : public TextureResource
     {
-        public:
+    public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(const Desc& desc, WeakSink<GLDevice>* renderer):
-            Parent(desc),
-            m_renderer(renderer)
+        TextureResourceImpl(const Desc& desc, WeakSink<GLDevice>* renderer)
+            : Parent(desc), m_renderer(renderer)
         {
             m_target = 0;
             m_handle = 0;
@@ -309,7 +320,7 @@ public:
             {
                 glDeleteTextures(1, &m_handle);
             }
-         }
+        }
 
         RefPtr<WeakSink<GLDevice>> m_renderer;
         GLenum m_target;
@@ -327,7 +338,8 @@ public:
     public:
         enum class Type
         {
-            Texture, Buffer
+            Texture,
+            Buffer
         };
         Type type;
     };
@@ -340,7 +352,8 @@ public:
         GLuint m_target;
         enum class TextureViewType
         {
-            Texture, Image
+            Texture,
+            Image
         };
         TextureViewType textureViewType;
         GLint level;
@@ -353,8 +366,8 @@ public:
     class BufferViewImpl : public ResourceViewImpl
     {
     public:
-        RefPtr<BufferResourceImpl>  m_resource;
-        GLuint                      m_bufferID;
+        RefPtr<BufferResourceImpl> m_resource;
+        GLuint m_bufferID;
     };
 
     class FramebufferLayoutImpl : public FramebufferLayoutBase
@@ -377,7 +390,10 @@ public:
         bool m_sameClearValues = true;
         DepthStencilClearValue m_depthStencilClearValue;
 
-        FramebufferImpl(WeakSink<GLDevice>* renderer) :m_renderer(renderer) {}
+        FramebufferImpl(WeakSink<GLDevice>* renderer)
+            : m_renderer(renderer)
+        {
+        }
         ~FramebufferImpl()
         {
             if (auto renderer = m_renderer->get())
@@ -396,7 +412,11 @@ public:
             {
                 auto rtv = renderTargetViews[i].Ptr();
                 renderer->glFramebufferTexture2D(
-                    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + (uint32_t)i, GL_TEXTURE_2D, rtv->m_textureID, 0);
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0 + (uint32_t)i,
+                    GL_TEXTURE_2D,
+                    rtv->m_textureID,
+                    0);
                 m_drawBuffers.add((GLenum)(GL_COLOR_ATTACHMENT0 + i));
                 if (rtv->m_resource->getDesc()->optimalClearValue)
                 {
@@ -442,9 +462,7 @@ public:
         }
     };
 
-    class SwapchainImpl
-        : public ISwapchain
-        , public ComObject
+    class SwapchainImpl : public ISwapchain, public ComObject
     {
     public:
         SLANG_COM_OBJECT_IUNKNOWN_ALL
@@ -501,7 +519,11 @@ public:
                 m_renderer->get()->glGenFramebuffers(1, &m_framebuffer);
                 m_renderer->get()->glBindFramebuffer(GL_READ_FRAMEBUFFER, m_framebuffer);
                 m_renderer->get()->glFramebufferTexture2D(
-                    GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_backBuffer, 0);
+                    GL_READ_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0,
+                    GL_TEXTURE_2D,
+                    m_backBuffer,
+                    0);
 
                 m_images.clear();
                 for (GfxIndex i = 0; i < m_desc.imageCount; i++)
@@ -543,7 +565,7 @@ public:
         }
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            getImage(GfxIndex index, ITextureResource** outResource) override
+        getImage(GfxIndex index, ITextureResource** outResource) override
         {
             returnComPtr(outResource, m_images[index]);
             return SLANG_OK;
@@ -590,10 +612,7 @@ public:
             return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override
-        {
-            return false;
-        }
+        virtual SLANG_NO_THROW bool SLANG_MCALL isOccluded() override { return false; }
         virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) override
         {
             return SLANG_FAIL;
@@ -613,30 +632,29 @@ public:
         ShortList<RefPtr<TextureResourceImpl>> m_images;
     };
 
-	class ShaderProgramImpl : public ShaderProgramBase
+    class ShaderProgramImpl : public ShaderProgramBase
     {
-	public:
-		ShaderProgramImpl(WeakSink<GLDevice>* renderer, GLuint id):
-			m_renderer(renderer),
-			m_id(id)
-		{
-		}
-		~ShaderProgramImpl()
-		{
-			if (auto renderer = m_renderer->get())
-			{
-				renderer->glDeleteProgram(m_id);
-			}
-		}
+    public:
+        ShaderProgramImpl(WeakSink<GLDevice>* renderer, GLuint id)
+            : m_renderer(renderer), m_id(id)
+        {
+        }
+        ~ShaderProgramImpl()
+        {
+            if (auto renderer = m_renderer->get())
+            {
+                renderer->glDeleteProgram(m_id);
+            }
+        }
 
-		GLuint m_id;
-		RefPtr<WeakSink<GLDevice>> m_renderer;
-	};
+        GLuint m_id;
+        RefPtr<WeakSink<GLDevice>> m_renderer;
+    };
 
     class PipelineStateImpl : public PipelineStateBase
     {
     public:
-        RefPtr<InputLayoutImpl>     m_inputLayout;
+        RefPtr<InputLayoutImpl> m_inputLayout;
         void init(const GraphicsPipelineStateDesc& inDesc)
         {
             PipelineStateDesc pipelineDesc;
@@ -685,7 +703,8 @@ public:
         public:
             Builder(RendererBase* renderer, slang::ISession* session)
                 : m_renderer(renderer), m_session(session)
-            {}
+            {
+            }
 
             RendererBase* m_renderer;
             slang::ISession* m_session;
@@ -810,8 +829,7 @@ public:
 
             SlangResult build(ShaderObjectLayoutImpl** outLayout)
             {
-                auto layout =
-                    RefPtr<ShaderObjectLayoutImpl>(new ShaderObjectLayoutImpl());
+                auto layout = RefPtr<ShaderObjectLayoutImpl>(new ShaderObjectLayoutImpl());
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
                 returnRefPtrMove(outLayout, layout);
@@ -841,15 +859,16 @@ public:
         Index getStorageBufferCount() { return m_storageBufferCount; }
         Index getSubObjectCount() { return m_subObjectCount; }
 
-        SubObjectRangeInfo const& getSubObjectRange(Index index) { return m_subObjectRanges[index]; }
+        SubObjectRangeInfo const& getSubObjectRange(Index index)
+        {
+            return m_subObjectRanges[index];
+        }
         List<SubObjectRangeInfo> const& getSubObjectRanges() { return m_subObjectRanges; }
 
         RendererBase* getRenderer() { return m_renderer; }
 
-        slang::TypeReflection* getType()
-        {
-            return m_elementTypeLayout->getType();
-        }
+        slang::TypeReflection* getType() { return m_elementTypeLayout->getType(); }
+
     protected:
         Result _init(Builder const* builder)
         {
@@ -896,7 +915,8 @@ public:
                 : Super::Builder(renderer, program->getSession())
                 , m_program(program)
                 , m_programLayout(programLayout)
-            {}
+            {
+            }
 
             Result build(RootShaderObjectLayoutImpl** outLayout)
             {
@@ -943,7 +963,10 @@ public:
                 auto slangEntryPoint = programLayout->getEntryPointByIndex(e);
                 RefPtr<ShaderObjectLayoutImpl> entryPointLayout;
                 SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
-                    renderer, program->getSession(), slangEntryPoint->getTypeLayout(), entryPointLayout.writeRef()));
+                    renderer,
+                    program->getSession(),
+                    slangEntryPoint->getTypeLayout(),
+                    entryPointLayout.writeRef()));
                 builder.addEntryPoint(slangEntryPoint->getStage(), entryPointLayout);
             }
 
@@ -968,17 +991,16 @@ public:
             return SLANG_OK;
         }
 
-        ComPtr<slang::IComponentType>   m_program;
+        ComPtr<slang::IComponentType> m_program;
         slang::ProgramLayout* m_programLayout = nullptr;
 
         List<EntryPointInfo> m_entryPoints;
     };
 
-    class ShaderObjectImpl
-        : public ShaderObjectBaseImpl<
-              ShaderObjectImpl,
-              ShaderObjectLayoutImpl,
-              SimpleShaderObjectData>
+    class ShaderObjectImpl : public ShaderObjectBaseImpl<
+                                 ShaderObjectImpl,
+                                 ShaderObjectLayoutImpl,
+                                 SimpleShaderObjectData>
     {
     public:
         static Result create(
@@ -997,8 +1019,8 @@ public:
 
         SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
-        SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
-            SLANG_OVERRIDE
+        SLANG_NO_THROW Result SLANG_MCALL
+        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
         {
             *outEntryPoint = nullptr;
             return SLANG_OK;
@@ -1020,7 +1042,7 @@ public:
         }
 
         SLANG_NO_THROW Result SLANG_MCALL
-            setData(ShaderOffset const& inOffset, void const* data, size_t inSize) SLANG_OVERRIDE
+        setData(ShaderOffset const& inOffset, void const* data, size_t inSize) SLANG_OVERRIDE
         {
             Index offset = inOffset.uniformOffset;
             Index size = inSize;
@@ -1049,7 +1071,7 @@ public:
 
 
         SLANG_NO_THROW Result SLANG_MCALL
-            setResource(ShaderOffset const& offset, IResourceView* resourceView) SLANG_OVERRIDE
+        setResource(ShaderOffset const& offset, IResourceView* resourceView) SLANG_OVERRIDE
         {
             if (offset.bindingRangeIndex < 0)
                 return SLANG_E_INVALID_ARG;
@@ -1065,21 +1087,24 @@ public:
             case slang::BindingType::MutableTypedBuffer:
             case slang::BindingType::RawBuffer:
             case slang::BindingType::TypedBuffer:
-                m_storageBuffers[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<BufferViewImpl*>(resourceView);
+                m_storageBuffers[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                    static_cast<BufferViewImpl*>(resourceView);
                 break;
             case slang::BindingType::MutableTexture:
-                m_images[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<TextureViewImpl*>(resourceView);
+                m_images[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                    static_cast<TextureViewImpl*>(resourceView);
                 break;
             case slang::BindingType::Texture:
-                m_textures[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<TextureViewImpl*>(resourceView);
+                m_textures[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                    static_cast<TextureViewImpl*>(resourceView);
                 m_samplers[bindingRange.baseIndex + offset.bindingArrayIndex] = nullptr;
                 break;
             }
             return SLANG_OK;
         }
 
-        SLANG_NO_THROW Result SLANG_MCALL setSampler(ShaderOffset const& offset, ISamplerState* sampler)
-            SLANG_OVERRIDE
+        SLANG_NO_THROW Result SLANG_MCALL
+        setSampler(ShaderOffset const& offset, ISamplerState* sampler) SLANG_OVERRIDE
         {
             if (offset.bindingRangeIndex < 0)
                 return SLANG_E_INVALID_ARG;
@@ -1088,12 +1113,15 @@ public:
                 return SLANG_E_INVALID_ARG;
             auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
 
-            m_samplers[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<SamplerStateImpl*>(sampler);
+            m_samplers[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                static_cast<SamplerStateImpl*>(sampler);
             return SLANG_OK;
         }
 
         SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
-            ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) SLANG_OVERRIDE
+            ShaderOffset const& offset,
+            IResourceView* textureView,
+            ISamplerState* sampler) SLANG_OVERRIDE
         {
             if (offset.bindingRangeIndex < 0)
                 return SLANG_E_INVALID_ARG;
@@ -1101,13 +1129,14 @@ public:
             if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
                 return SLANG_E_INVALID_ARG;
             auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
-            m_textures[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<TextureViewImpl*>(textureView);
-            m_samplers[bindingRange.baseIndex + offset.bindingArrayIndex] = static_cast<SamplerStateImpl*>(sampler);
+            m_textures[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                static_cast<TextureViewImpl*>(textureView);
+            m_samplers[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                static_cast<SamplerStateImpl*>(sampler);
             return SLANG_OK;
         }
 
     public:
-
     protected:
         friend class ProgramVars;
 
@@ -1159,7 +1188,8 @@ public:
                 // in each entry in this range, based on the layout
                 // information we already have.
 
-                auto& bindingRangeInfo = layout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
+                auto& bindingRangeInfo =
+                    layout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
                 for (Index i = 0; i < bindingRangeInfo.count; ++i)
                 {
                     RefPtr<ShaderObjectImpl> subObject;
@@ -1172,12 +1202,13 @@ public:
             return SLANG_OK;
         }
 
-        /// Write the uniform/ordinary data of this object into the given `dest` buffer at the given `offset`
+        /// Write the uniform/ordinary data of this object into the given `dest` buffer at the given
+        /// `offset`
         Result _writeOrdinaryData(
             GLDevice* device,
             BufferResourceImpl* buffer,
             size_t offset,
-            size_t                              destSize,
+            size_t destSize,
             ShaderObjectLayoutImpl* specializedLayout)
         {
             auto src = m_data.getBuffer();
@@ -1205,7 +1236,8 @@ public:
             for (auto const& subObjectRangeInfo : specializedLayout->getSubObjectRanges())
             {
                 Index subObjectRangeIndex = subObjectRangeCounter++;
-                auto const& bindingRangeInfo = specializedLayout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
+                auto const& bindingRangeInfo =
+                    specializedLayout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
 
                 // We only need to handle sub-object ranges for interface/existential-type fields,
                 // because fields of constant-buffer or parameter-block type are responsible for
@@ -1229,24 +1261,27 @@ public:
                 // of the parent object's type layout.
                 //
                 // Here we assume that the Slang reflection API can provide us with a single byte
-                // offset and stride for the location of the pending data allocation in the specialized
-                // type layout, which will store the values for this sub-object range.
+                // offset and stride for the location of the pending data allocation in the
+                // specialized type layout, which will store the values for this sub-object range.
                 //
                 // TODO: The reflection API functions we are assuming here haven't been implemented
                 // yet, so the functions being called here are stubs.
                 //
                 // TODO: It might not be that a single sub-object range can reliably map to a single
-                // contiguous array with a single stride; we need to carefully consider what the layout
-                // logic does for complex cases with multiple layers of nested arrays and structures.
+                // contiguous array with a single stride; we need to carefully consider what the
+                // layout logic does for complex cases with multiple layers of nested arrays and
+                // structures.
                 //
-                size_t subObjectRangePendingDataOffset = 0; //subObjectRangeInfo.offset.pendingOrdinaryData;
-                size_t subObjectRangePendingDataStride = 0; //subObjectRangeInfo.stride.pendingOrdinaryData;
+                size_t subObjectRangePendingDataOffset =
+                    0; // subObjectRangeInfo.offset.pendingOrdinaryData;
+                size_t subObjectRangePendingDataStride =
+                    0; // subObjectRangeInfo.stride.pendingOrdinaryData;
 
                 // If the range doesn't actually need/use the "pending" allocation at all, then
                 // we need to detect that case and skip such ranges.
                 //
-                // TODO: This should probably be handled on a per-object basis by caching a "does it fit?"
-                // bit as part of the information for bound sub-objects, given that we already
+                // TODO: This should probably be handled on a per-object basis by caching a "does it
+                // fit?" bit as part of the information for bound sub-objects, given that we already
                 // compute the "does it fit?" status as part of `setObject()`.
                 //
                 if (subObjectRangePendingDataOffset == 0)
@@ -1257,11 +1292,18 @@ public:
                     auto subObject = m_objects[bindingRangeInfo.subObjectIndex + i];
 
                     RefPtr<ShaderObjectLayoutImpl> subObjectLayout;
-                    SLANG_RETURN_ON_FAIL(subObject->_getSpecializedLayout(subObjectLayout.writeRef()));
+                    SLANG_RETURN_ON_FAIL(
+                        subObject->_getSpecializedLayout(subObjectLayout.writeRef()));
 
-                    auto subObjectOffset = subObjectRangePendingDataOffset + i * subObjectRangePendingDataStride;
+                    auto subObjectOffset =
+                        subObjectRangePendingDataOffset + i * subObjectRangePendingDataStride;
 
-                    subObject->_writeOrdinaryData(device, buffer, offset + subObjectOffset, destSize - subObjectOffset, subObjectLayout);
+                    subObject->_writeOrdinaryData(
+                        device,
+                        buffer,
+                        offset + subObjectOffset,
+                        destSize - subObjectOffset,
+                        subObjectLayout);
                 }
             }
 
@@ -1323,15 +1365,18 @@ public:
             // where this object contains interface/existential-type fields, so we
             // don't need or want to inline it into this call site.
             //
-            SLANG_RETURN_ON_FAIL(_writeOrdinaryData(device, m_ordinaryDataBuffer, 0, specializedOrdinaryDataSize, specializedLayout));
+            SLANG_RETURN_ON_FAIL(_writeOrdinaryData(
+                device,
+                m_ordinaryDataBuffer,
+                0,
+                specializedOrdinaryDataSize,
+                specializedLayout));
 
             return SLANG_OK;
         }
 
         /// Bind the buffer for ordinary/uniform data, if needed
-        Result _bindOrdinaryDataBufferIfNeeded(
-            GLDevice* device,
-            RootBindingState* bindingState)
+        Result _bindOrdinaryDataBufferIfNeeded(GLDevice* device, RootBindingState* bindingState)
         {
             // We start by ensuring that the buffer is created, if it is needed.
             //
@@ -1347,6 +1392,7 @@ public:
 
             return SLANG_OK;
         }
+
     public:
         virtual Result bindObject(GLDevice* device, RootBindingState* bindingState)
         {
@@ -1442,17 +1488,24 @@ public:
         RefPtr<ShaderObjectLayoutImpl> m_specializedLayout;
     };
 
-    class MutableShaderObjectImpl : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
-    {};
+    class MutableShaderObjectImpl
+        : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
+    {
+    };
 
     class RootShaderObjectImpl : public ShaderObjectImpl
     {
         typedef ShaderObjectImpl Super;
+
     public:
         virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
         virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+
     public:
-        static Result create(IDevice* device, RootShaderObjectLayoutImpl* layout, RootShaderObjectImpl** outShaderObject)
+        static Result create(
+            IDevice* device,
+            RootShaderObjectLayoutImpl* layout,
+            RootShaderObjectImpl** outShaderObject)
         {
             RefPtr<RootShaderObjectImpl> object = new RootShaderObjectImpl();
             SLANG_RETURN_ON_FAIL(object->init(device, layout));
@@ -1461,10 +1514,17 @@ public:
             return SLANG_OK;
         }
 
-        RootShaderObjectLayoutImpl* getLayout() { return static_cast<RootShaderObjectLayoutImpl*>(m_layout.Ptr()); }
+        RootShaderObjectLayoutImpl* getLayout()
+        {
+            return static_cast<RootShaderObjectLayoutImpl*>(m_layout.Ptr());
+        }
 
-        GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return (GfxCount)m_entryPoints.getCount(); }
-        SlangResult SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
+        GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE
+        {
+            return (GfxCount)m_entryPoints.getCount();
+        }
+        SlangResult SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
+            SLANG_OVERRIDE
         {
             *outEntryPoint = m_entryPoints[index];
             m_entryPoints[index]->addRef();
@@ -1550,8 +1610,9 @@ public:
             // parmaeters, but their layouts are also independent of one another.
             //
             // Furthermore, in this example, loading another entry point into the system would not
-            // rquire re-computing the layouts (or generated kernel code) for any of the entry points
-            // that had already been loaded (in contrast to a compose-then-specialize approach).
+            // rquire re-computing the layouts (or generated kernel code) for any of the entry
+            // points that had already been loaded (in contrast to a compose-then-specialize
+            // approach).
             //
             ComPtr<slang::IComponentType> specializedComponentType;
             ComPtr<slang::IBlob> diagnosticBlob;
@@ -1568,7 +1629,11 @@ public:
 
             auto slangSpecializedLayout = specializedComponentType->getLayout();
             RefPtr<RootShaderObjectLayoutImpl> specializedLayout;
-            RootShaderObjectLayoutImpl::create(getRenderer(), specializedComponentType, slangSpecializedLayout, specializedLayout.writeRef());
+            RootShaderObjectLayoutImpl::create(
+                getRenderer(),
+                specializedComponentType,
+                slangSpecializedLayout,
+                specializedLayout.writeRef());
 
             // Note: Computing the layout for the specialized program will have also computed
             // the layouts for the entry points, and we really need to attach that information
@@ -1606,22 +1671,40 @@ public:
 
     struct GlPixelFormatInfo
     {
-        GLint internalFormat;           // such as GL_RGBA8
-        GLenum format;                  // such as GL_RGBA
-        GLenum formatType;              // such as GL_UNSIGNED_BYTE
+        GLint internalFormat; // such as GL_RGBA8
+        GLenum format;        // such as GL_RGBA
+        GLenum formatType;    // such as GL_UNSIGNED_BYTE
     };
 
-//	void destroyBindingEntries(const BindingState::Desc& desc, const BindingDetail* details);
+    //	void destroyBindingEntries(const BindingState::Desc& desc, const BindingDetail* details);
 
-    void bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets);
+    void bindBufferImpl(
+        int target,
+        UInt startSlot,
+        UInt slotCount,
+        BufferResource* const* buffers,
+        const UInt* offsets);
     void flushStateForDraw();
     GLuint loadShader(GLenum stage, char const* source);
-    void debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message);
+    void debugCallback(
+        GLenum source,
+        GLenum type,
+        GLuint id,
+        GLenum severity,
+        GLsizei length,
+        const GLchar* message);
 
-        /// Returns GlPixelFormat::Unknown if not an equivalent
+    /// Returns GlPixelFormat::Unknown if not an equivalent
     static GlPixelFormat _getGlPixelFormat(Format format);
 
-    static void APIENTRY staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
+    static void APIENTRY staticDebugCallback(
+        GLenum source,
+        GLenum type,
+        GLuint id,
+        GLenum severity,
+        GLsizei length,
+        const GLchar* message,
+        const void* userParam);
     static VertexAttributeFormat getVertexAttributeFormat(Format format);
 
     static void compileTimeAsserts();
@@ -1631,8 +1714,8 @@ public:
     DeviceInfo m_info;
     String m_adapterName;
 
-    HDC     m_hdc;
-    HGLRC   m_glContext = 0;
+    HDC m_hdc;
+    HGLRC m_glContext = 0;
     uint32_t m_stencilRef = 0;
 
     GLuint m_vao;
@@ -1643,57 +1726,68 @@ public:
     RootBindingState m_rootBindingState;
 
     GLenum m_boundPrimitiveTopology = GL_TRIANGLES;
-    GLuint  m_boundVertexStreamBuffers[kMaxVertexStreams];
-    UInt    m_boundVertexStreamOffsets[kMaxVertexStreams];
+    GLuint m_boundVertexStreamBuffers[kMaxVertexStreams];
+    UInt m_boundVertexStreamOffsets[kMaxVertexStreams];
     GLuint m_boundIndexBuffer = 0;
     UInt m_boundIndexBufferOffset = 0;
     UInt m_boundIndexBufferSize = 0;
 
     Desc m_desc;
     WindowHandle m_windowHandle;
-    // Declare a function pointer for each OpenGL
-    // extension function we need to load
+// Declare a function pointer for each OpenGL
+// extension function we need to load
 #define DECLARE_GL_EXTENSION_FUNC(NAME, TYPE) TYPE NAME;
     MAP_GL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
     MAP_WGL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
 #undef DECLARE_GL_EXTENSION_FUNC
 
-    static const GlPixelFormatInfo s_pixelFormatInfos[];            /// Maps GlPixelFormat to a format info
+    static const GlPixelFormatInfo s_pixelFormatInfos[]; /// Maps GlPixelFormat to a format info
 };
 
-/* static */GLDevice::GlPixelFormat GLDevice::_getGlPixelFormat(Format format)
+/* static */ GLDevice::GlPixelFormat GLDevice::_getGlPixelFormat(Format format)
 {
     switch (format)
     {
-        case Format::R8G8B8A8_UNORM:        return GlPixelFormat::R8G8B8A8_UNORM;
-        case Format::D32_FLOAT:             return GlPixelFormat::D32_FLOAT;
-        //case Format::D24_UNORM_S8_UINT:     return GlPixelFormat::D_Unorm24_S8;
-        case Format::D32_FLOAT_S8_UINT:     return GlPixelFormat::D32_FLOAT_S8;
+    case Format::R8G8B8A8_UNORM:
+        return GlPixelFormat::R8G8B8A8_UNORM;
+    case Format::D32_FLOAT:
+        return GlPixelFormat::D32_FLOAT;
+    // case Format::D24_UNORM_S8_UINT:     return GlPixelFormat::D_Unorm24_S8;
+    case Format::D32_FLOAT_S8_UINT:
+        return GlPixelFormat::D32_FLOAT_S8;
 
-        default:                            return GlPixelFormat::Unknown;
+    default:
+        return GlPixelFormat::Unknown;
     }
 }
 
-/* static */ const GLDevice::GlPixelFormatInfo GLDevice::s_pixelFormatInfos[] =
-{
+/* static */ const GLDevice::GlPixelFormatInfo GLDevice::s_pixelFormatInfos[] = {
     // internalType, format, formatType
-    { 0,                0,          0},                         // GlPixelFormat::Unknown
-    { GL_RGBA8,         GL_RGBA,    GL_UNSIGNED_BYTE },         // GlPixelFormat::R8G8B8A8_UNORM
-    { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE}, // GlPixelFormat::D32_FLOAT
-    { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE}, // GlPixelFormat::D_Unorm24_S8
-    { GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV}, // GlPixelFormat::D32_FLOAT_S8
+    {0, 0, 0},                                                     // GlPixelFormat::Unknown
+    {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE},                         // GlPixelFormat::R8G8B8A8_UNORM
+    {GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE}, // GlPixelFormat::D32_FLOAT
+    {GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE},     // GlPixelFormat::D_Unorm24_S8
+    {GL_DEPTH32F_STENCIL8,
+     GL_DEPTH_STENCIL,
+     GL_FLOAT_32_UNSIGNED_INT_24_8_REV}, // GlPixelFormat::D32_FLOAT_S8
 
 };
 
-/* static */void GLDevice::compileTimeAsserts()
+/* static */ void GLDevice::compileTimeAsserts()
 {
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_pixelFormatInfos) == int(GlPixelFormat::CountOf));
 }
 
-void GLDevice::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message)
+void GLDevice::debugCallback(
+    GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message)
 {
     DebugMessageType msgType = DebugMessageType::Info;
-    switch(type)
+    switch (type)
     {
     case GL_DEBUG_TYPE_ERROR:
         msgType = DebugMessageType::Error;
@@ -1704,19 +1798,33 @@ void GLDevice::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sever
     getDebugCallback()->handleMessage(msgType, DebugMessageSource::Driver, message);
 }
 
-/* static */void APIENTRY GLDevice::staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+/* static */ void APIENTRY GLDevice::staticDebugCallback(
+    GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message,
+    const void* userParam)
 {
     ((GLDevice*)userParam)->debugCallback(source, type, id, severity, length, message);
 }
 
-/* static */GLDevice::VertexAttributeFormat GLDevice::getVertexAttributeFormat(Format format)
+/* static */ GLDevice::VertexAttributeFormat GLDevice::getVertexAttributeFormat(Format format)
 {
     switch (format)
     {
-        default: assert(!"unexpected"); return VertexAttributeFormat();
+    default:
+        assert(!"unexpected");
+        return VertexAttributeFormat();
 
-#define CASE(NAME, COUNT, TYPE, NORMALIZED) \
-        case Format::NAME: do { VertexAttributeFormat result = {COUNT, TYPE, NORMALIZED}; return result; } while (0)
+#define CASE(NAME, COUNT, TYPE, NORMALIZED)                           \
+    case Format::NAME:                                                \
+        do                                                            \
+        {                                                             \
+            VertexAttributeFormat result = {COUNT, TYPE, NORMALIZED}; \
+            return result;                                            \
+        } while (0)
 
         CASE(R32G32B32A32_FLOAT, 4, GL_FLOAT, GL_FALSE);
         CASE(R32G32B32_FLOAT, 3, GL_FLOAT, GL_FALSE);
@@ -1726,7 +1834,12 @@ void GLDevice::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sever
     }
 }
 
-void GLDevice::bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
+void GLDevice::bindBufferImpl(
+    int target,
+    UInt startSlot,
+    UInt slotCount,
+    BufferResource* const* buffers,
+    const UInt* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
@@ -1778,7 +1891,12 @@ void GLDevice::flushStateForDraw()
     }
     if (m_boundIndexBuffer)
     {
-        glBindBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, m_boundIndexBuffer, m_boundIndexBufferOffset, m_boundIndexBufferSize);
+        glBindBufferRange(
+            GL_ELEMENT_ARRAY_BUFFER,
+            0,
+            m_boundIndexBuffer,
+            m_boundIndexBufferOffset,
+            m_boundIndexBufferSize);
     }
 }
 
@@ -1820,7 +1938,10 @@ GLuint GLDevice::loadShader(GLenum stage, const char* source)
         versionEnd = sourceBegin;
     }
 
-    enum { kMaxSourceStringCount = 16 };
+    enum
+    {
+        kMaxSourceStringCount = 16
+    };
     const GLchar* sourceStrings[kMaxSourceStringCount];
     GLint sourceStringLengths[kMaxSourceStringCount];
 
@@ -1829,7 +1950,10 @@ GLuint GLDevice::loadShader(GLenum stage, const char* source)
     const char* stagePrelude = "\n";
     switch (stage)
     {
-#define CASE(NAME) case GL_##NAME##_SHADER: stagePrelude = "#define __GLSL_" #NAME "__ 1\n"; break
+#define CASE(NAME)                                       \
+    case GL_##NAME##_SHADER:                             \
+        stagePrelude = "#define __GLSL_" #NAME "__ 1\n"; \
+        break
 
         CASE(VERTEX);
         CASE(TESS_CONTROL);
@@ -1841,19 +1965,15 @@ GLuint GLDevice::loadShader(GLenum stage, const char* source)
 #undef CASE
     }
 
-    const char* prelude =
-        "#define __GLSL__ 1\n"
-        ;
+    const char* prelude = "#define __GLSL__ 1\n";
 
-#define ADD_SOURCE_STRING_SPAN(BEGIN, END)                              \
-        sourceStrings[sourceStringCount] = BEGIN;                       \
-        sourceStringLengths[sourceStringCount++] = GLint(END - BEGIN)   \
-        /* end */
+#define ADD_SOURCE_STRING_SPAN(BEGIN, END)    \
+    sourceStrings[sourceStringCount] = BEGIN; \
+    sourceStringLengths[sourceStringCount++] = GLint(END - BEGIN) /* end */
 
-#define ADD_SOURCE_STRING(BEGIN)                                        \
-        sourceStrings[sourceStringCount] = BEGIN;                       \
-        sourceStringLengths[sourceStringCount++] = GLint(strlen(BEGIN)) \
-        /* end */
+#define ADD_SOURCE_STRING(BEGIN)              \
+    sourceStrings[sourceStringCount] = BEGIN; \
+    sourceStringLengths[sourceStringCount++] = GLint(strlen(BEGIN)) /* end */
 
     ADD_SOURCE_STRING_SPAN(versionBegin, versionEnd);
     ADD_SOURCE_STRING(stagePrelude);
@@ -1862,11 +1982,7 @@ GLuint GLDevice::loadShader(GLenum stage, const char* source)
     ADD_SOURCE_STRING_SPAN(versionEnd, sourceEnd);
 
     auto shaderID = glCreateShader(stage);
-    glShaderSource(
-        shaderID,
-        sourceStringCount,
-        &sourceStrings[0],
-        &sourceStringLengths[0]);
+    glShaderSource(shaderID, sourceStringCount, &sourceStrings[0], &sourceStringLengths[0]);
     glCompileShader(shaderID);
 
     GLint success = GL_FALSE;
@@ -1920,19 +2036,19 @@ WindowHandle createWindow()
     }
 
     HWND hwnd = CreateWindowEx(
-        0, // Optional window styles.
-        className, // Window class
-        L"GLWindow", // Window text
+        0,                   // Optional window styles.
+        className,           // Window class
+        L"GLWindow",         // Window text
         WS_OVERLAPPEDWINDOW, // Window style
         // Size and position
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        NULL, // Parent window
-        NULL, // Menu
+        NULL,      // Parent window
+        NULL,      // Menu
         hInstance, // Instance handle
-        NULL // Additional application data
+        NULL       // Additional application data
     );
 
     if (hwnd == NULL)
@@ -1951,7 +2067,10 @@ void destroyWindow(WindowHandle window)
 #endif
 }
 
-GLDevice::GLDevice() { m_weakRenderer = new WeakSink<GLDevice>(this); }
+GLDevice::GLDevice()
+{
+    m_weakRenderer = new WeakSink<GLDevice>(this);
+}
 
 GLDevice::~GLDevice()
 {
@@ -2011,8 +2130,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
         desc.extendedDescs,
         SLANG_GLSL,
         "glsl_440",
-        makeArray(
-            slang::PreprocessorMacroDesc{ "__GL__", "1" }).getView()));
+        makeArray(slang::PreprocessorMacroDesc{"__GL__", "1"}).getView()));
 
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
@@ -2031,7 +2149,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
 
     m_hdc = ::GetDC((HWND)m_windowHandle.handleValues[0]);
 
-    PIXELFORMATDESCRIPTOR pixelFormatDesc = { sizeof(PIXELFORMATDESCRIPTOR) };
+    PIXELFORMATDESCRIPTOR pixelFormatDesc = {sizeof(PIXELFORMATDESCRIPTOR)};
     pixelFormatDesc.nVersion = 1;
     pixelFormatDesc.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
     pixelFormatDesc.iPixelType = PFD_TYPE_RGBA;
@@ -2066,7 +2184,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
 
     // Load each of our extension functions by name
 
-#define LOAD_GL_EXTENSION_FUNC(NAME, TYPE) NAME = (TYPE) wglGetProcAddress(#NAME);
+#define LOAD_GL_EXTENSION_FUNC(NAME, TYPE) NAME = (TYPE)wglGetProcAddress(#NAME);
     MAP_GL_EXTENSION_FUNCS(LOAD_GL_EXTENSION_FUNC)
     MAP_WGL_EXTENSION_FUNCS(LOAD_GL_EXTENSION_FUNC)
 #undef LOAD_GL_EXTENSION_FUNC
@@ -2139,7 +2257,9 @@ void GLDevice::clearFrame(uint32_t mask, bool clearDepth, bool clearStencil)
             }
             if (clearBuffers.getCount())
             {
-                glDrawBuffers((GLsizei)clearBuffers.getCount(), clearBuffers.getArrayView().getBuffer());
+                glDrawBuffers(
+                    (GLsizei)clearBuffers.getCount(),
+                    clearBuffers.getArrayView().getBuffer());
                 clearMask |= GL_COLOR_BUFFER_BIT;
             }
             glClear(clearMask);
@@ -2173,7 +2293,9 @@ void GLDevice::clearFrame(uint32_t mask, bool clearDepth, bool clearStencil)
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::createSwapchain(
-    const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
+    const ISwapchain::Desc& desc,
+    WindowHandle window,
+    ISwapchain** outSwapchain)
 {
     RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(swapchain->init(this, desc, window));
@@ -2183,7 +2305,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createSwapchain(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::createFramebufferLayout(
-    const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
+    const IFramebufferLayout::Desc& desc,
+    IFramebufferLayout** outLayout)
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     layout->m_renderTargets.setCount(desc.renderTargetCount);
@@ -2206,7 +2329,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createFramebufferLayout(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    GLDevice::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
+GLDevice::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
 {
     RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl(m_weakRenderer);
     framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
@@ -2247,7 +2370,11 @@ void GLDevice::copyBuffer(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::readTextureResource(
-    ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, Size* outRowPitch, Size* outPixelSize)
+    ITextureResource* texture,
+    ResourceState state,
+    ISlangBlob** outBlob,
+    Size* outRowPitch,
+    Size* outPixelSize)
 {
     SLANG_UNUSED(state);
     auto resource = static_cast<TextureResourceImpl*>(texture);
@@ -2317,7 +2444,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
 
     switch (srcDesc.type)
     {
-        case IResource::Type::Texture1D:
+    case IResource::Type::Texture1D:
         {
             if (srcDesc.arraySize > 0)
             {
@@ -2362,8 +2489,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
             }
             break;
         }
-        case IResource::Type::TextureCube:
-        case IResource::Type::Texture2D:
+    case IResource::Type::TextureCube:
+    case IResource::Type::Texture2D:
         {
             if (srcDesc.arraySize > 0)
             {
@@ -2443,7 +2570,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
             }
             break;
         }
-        case IResource::Type::Texture3D:
+    case IResource::Type::Texture3D:
         {
             target = GL_TEXTURE_3D;
             glBindTexture(target, handle);
@@ -2463,8 +2590,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
             }
             break;
         }
-        default:
-            return SLANG_FAIL;
+    default:
+        return SLANG_FAIL;
     }
 
     glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -2520,13 +2647,14 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferResource(
 
     glBufferData(target, descIn.sizeInBytes, initData, usage);
 
-    RefPtr<BufferResourceImpl> resourceImpl = new BufferResourceImpl(desc, m_weakRenderer, bufferID, target);
+    RefPtr<BufferResourceImpl> resourceImpl =
+        new BufferResourceImpl(desc, m_weakRenderer, bufferID, target);
     returnComPtr(outResource, resourceImpl);
     return SLANG_OK;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    GLDevice::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
+GLDevice::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
 {
     GLuint samplerID;
     glCreateSamplers(1, &samplerID);
@@ -2538,7 +2666,9 @@ SLANG_NO_THROW Result SLANG_MCALL
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureView(
-    ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
+    ITextureResource* texture,
+    IResourceView::Desc const& desc,
+    IResourceView** outView)
 {
     auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
 
@@ -2576,7 +2706,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferView(
     IResourceView::Desc const& desc,
     IResourceView** outView)
 {
-    auto resourceImpl = (BufferResourceImpl*) buffer;
+    auto resourceImpl = (BufferResourceImpl*)buffer;
 
     // TODO: actually do something?
 
@@ -2590,8 +2720,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferView(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLDevice::createInputLayout(
-    IInputLayout::Desc const& desc, IInputLayout** outLayout)
+SLANG_NO_THROW Result SLANG_MCALL
+GLDevice::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> inputLayout = new InputLayoutImpl;
 
@@ -2623,18 +2753,18 @@ void* GLDevice::map(IBufferResource* bufferIn, MapFlavor flavor)
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
-    //GLenum target = GL_UNIFORM_BUFFER;
+    // GLenum target = GL_UNIFORM_BUFFER;
 
     GLuint access = 0;
     switch (flavor)
     {
-        case MapFlavor::WriteDiscard:
-        case MapFlavor::HostWrite:
-            access = GL_WRITE_ONLY;
-            break;
-        case MapFlavor::HostRead:
-            access = GL_READ_ONLY;
-            break;
+    case MapFlavor::WriteDiscard:
+    case MapFlavor::HostWrite:
+        access = GL_WRITE_ONLY;
+        break;
+    case MapFlavor::HostRead:
+        access = GL_READ_ONLY;
+        break;
     }
 
     glBindBuffer(buffer->m_target, buffer->m_handle);
@@ -2655,7 +2785,10 @@ void GLDevice::setPrimitiveTopology(PrimitiveTopology topology)
     GLenum glTopology = 0;
     switch (topology)
     {
-#define CASE(NAME, VALUE) case PrimitiveTopology::NAME: glTopology = VALUE; break
+#define CASE(NAME, VALUE)         \
+    case PrimitiveTopology::NAME: \
+        glTopology = VALUE;       \
+        break
 
         CASE(TriangleList, GL_TRIANGLES);
 
@@ -2695,17 +2828,17 @@ void GLDevice::setViewports(GfxCount count, Viewport const* viewports)
     assert(count == 1);
     auto viewport = viewports[0];
     glViewport(
-        (GLint)     viewport.originX,
-        (GLint)     viewport.originY,
-        (GLsizei)   viewport.extentX,
-        (GLsizei)   viewport.extentY);
+        (GLint)viewport.originX,
+        (GLint)viewport.originY,
+        (GLsizei)viewport.extentX,
+        (GLsizei)viewport.extentY);
     glDepthRange(viewport.minZ, viewport.maxZ);
 }
 
 void GLDevice::setScissorRects(GfxCount count, ScissorRect const* rects)
 {
     assert(count <= 1);
-    if( count )
+    if (count)
     {
         // TODO: this isn't goign to be quite right because of the
         // flipped coordinate system in GL.
@@ -2756,7 +2889,7 @@ void GLDevice::drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex ba
         m_boundPrimitiveTopology,
         (GLsizei)indexCount,
         GL_UNSIGNED_INT,
-        (GLvoid*)(startIndex*sizeof(uint32_t)),
+        (GLvoid*)(startIndex * sizeof(uint32_t)),
         (GLint)baseVertex);
 }
 
@@ -2785,7 +2918,9 @@ void GLDevice::dispatchCompute(int x, int y, int z)
 }
 
 Result GLDevice::createProgram(
-    const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
+    const IShaderProgram::Desc& desc,
+    IShaderProgram** outProgram,
+    ISlangBlob** outDiagnosticBlob)
 {
     if (desc.slangGlobalScope->getSpecializationParamCount() != 0)
     {
@@ -2803,8 +2938,12 @@ Result GLDevice::createProgram(
     {
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = getEntryPointCodeFromShaderCache(desc.slangGlobalScope,
-            i, 0, kernelCode.writeRef(), diagnostics.writeRef());
+        auto compileResult = getEntryPointCodeFromShaderCache(
+            desc.slangGlobalScope,
+            i,
+            0,
+            kernelCode.writeRef(),
+            diagnostics.writeRef());
         if (diagnostics)
         {
             getDebugCallback()->handleMessage(
@@ -2877,12 +3016,14 @@ Result GLDevice::createProgram(
     return SLANG_OK;
 }
 
-Result GLDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
+Result GLDevice::createGraphicsPipelineState(
+    const GraphicsPipelineStateDesc& inDesc,
+    IPipelineState** outState)
 {
     GraphicsPipelineStateDesc desc = inDesc;
 
-    auto programImpl        = (ShaderProgramImpl*)  desc.program;
-    auto inputLayoutImpl    = (InputLayoutImpl*)    desc.inputLayout;
+    auto programImpl = (ShaderProgramImpl*)desc.program;
+    auto inputLayoutImpl = (InputLayoutImpl*)desc.inputLayout;
 
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_inputLayout = inputLayoutImpl;
@@ -2891,11 +3032,13 @@ Result GLDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     return SLANG_OK;
 }
 
-Result GLDevice::createComputePipelineState(const ComputePipelineStateDesc& inDesc, IPipelineState** outState)
+Result GLDevice::createComputePipelineState(
+    const ComputePipelineStateDesc& inDesc,
+    IPipelineState** outState)
 {
     ComputePipelineStateDesc desc = inDesc;
 
-    auto programImpl        = (ShaderProgramImpl*)  desc.program;
+    auto programImpl = (ShaderProgramImpl*)desc.program;
 
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_program = programImpl;
@@ -2910,8 +3053,8 @@ Result GLDevice::createShaderObjectLayout(
     ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutImpl> layout;
-    SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
-        this, session, typeLayout, layout.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        ShaderObjectLayoutImpl::createForElementType(this, session, typeLayout, layout.writeRef()));
     returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
@@ -2919,13 +3062,17 @@ Result GLDevice::createShaderObjectLayout(
 Result GLDevice::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
 {
     RefPtr<ShaderObjectImpl> shaderObject;
-    SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this,
-        static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
+    SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(
+        this,
+        static_cast<ShaderObjectLayoutImpl*>(layout),
+        shaderObject.writeRef()));
     returnComPtr(outObject, shaderObject);
     return SLANG_OK;
 }
 
-Result GLDevice::createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
+Result GLDevice::createMutableShaderObject(
+    ShaderObjectLayoutBase* layout,
+    IShaderObject** outObject)
 {
     auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
 
@@ -2942,9 +3089,12 @@ Result GLDevice::createRootShaderObject(IShaderProgram* program, ShaderObjectBas
     RefPtr<RootShaderObjectImpl> shaderObject;
     RefPtr<RootShaderObjectLayoutImpl> rootLayout;
     SLANG_RETURN_ON_FAIL(RootShaderObjectLayoutImpl::create(
-        this, programImpl->slangGlobalScope, programImpl->slangGlobalScope->getLayout(), rootLayout.writeRef()));
-    SLANG_RETURN_ON_FAIL(RootShaderObjectImpl::create(
-        this, rootLayout.Ptr(), shaderObject.writeRef()));
+        this,
+        programImpl->slangGlobalScope,
+        programImpl->slangGlobalScope->getLayout(),
+        rootLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        RootShaderObjectImpl::create(this, rootLayout.Ptr(), shaderObject.writeRef()));
     returnRefPtrMove(outObject, shaderObject);
     return SLANG_OK;
 }
@@ -2965,7 +3115,14 @@ void GLDevice::bindRootShaderObject(IShaderObject* shaderObject)
     for (Index i = 0; i < m_rootBindingState.imageBindings.getCount(); i++)
     {
         auto binding = m_rootBindingState.imageBindings[i];
-        glBindImageTexture((GLuint)i, binding->m_textureID, binding->level, binding->layered, binding->layer, binding->access, binding->format);
+        glBindImageTexture(
+            (GLuint)i,
+            binding->m_textureID,
+            binding->level,
+            binding->layered,
+            binding->layer,
+            binding->access,
+            binding->format);
     }
     for (Index i = 0; i < m_rootBindingState.textureBindings.getCount(); i++)
     {
@@ -2977,7 +3134,10 @@ void GLDevice::bindRootShaderObject(IShaderObject* shaderObject)
     }
     for (Index i = 0; i < m_rootBindingState.storageBufferBindings.getCount(); i++)
     {
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, (GLuint)i, m_rootBindingState.storageBufferBindings[i]);
+        glBindBufferBase(
+            GL_SHADER_STORAGE_BUFFER,
+            (GLuint)i,
+            m_rootBindingState.storageBufferBindings[i]);
     }
     for (Index i = 0; i < m_rootBindingState.uniformBufferBindings.getCount(); i++)
     {
@@ -2993,16 +3153,16 @@ SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outR
     return SLANG_OK;
 }
 
-} // gfx
+} // namespace gfx
 
 #else
 
 namespace gfx
 {
-    SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outRenderer)
-    {
-        *outRenderer = nullptr;
-        return SLANG_FAIL;
-    }
+SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outRenderer)
+{
+    *outRenderer = nullptr;
+    return SLANG_FAIL;
 }
+} // namespace gfx
 #endif

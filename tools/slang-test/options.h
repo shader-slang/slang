@@ -4,13 +4,12 @@
 #define OPTIONS_H_INCLUDED
 
 #include "../../source/core/slang-dictionary.h"
-
-#include "test-reporter.h"
 #include "../../source/core/slang-render-api-util.h"
 #include "../../source/core/slang-smart-pointer.h"
+#include "test-reporter.h"
 
 // A category that a test can be tagged with
-struct TestCategory: public Slang::RefObject
+struct TestCategory : public Slang::RefObject
 {
     // The name of the category, from the user perspective
     Slang::String name;
@@ -22,27 +21,27 @@ struct TestCategory: public Slang::RefObject
 struct TestCategorySet
 {
 public:
-        /// Find a category with the specified name. Returns nullptr if not found
+    /// Find a category with the specified name. Returns nullptr if not found
     TestCategory* find(Slang::String const& name);
-        /// Adds a category with the specified name, and parent. Returns the category object.
-        /// Parent can be nullptr
+    /// Adds a category with the specified name, and parent. Returns the category object.
+    /// Parent can be nullptr
     TestCategory* add(Slang::String const& name, TestCategory* parent);
-        /// Finds a category by name, else reports and writes an error  
+    /// Finds a category by name, else reports and writes an error
     TestCategory* findOrError(Slang::String const& name);
 
-    Slang::RefPtr<TestCategory> defaultCategory;    ///< The default category
+    Slang::RefPtr<TestCategory> defaultCategory; ///< The default category
 
 protected:
-    Slang::Dictionary<Slang::String, Slang::RefPtr<TestCategory> > m_categoryMap;
+    Slang::Dictionary<Slang::String, Slang::RefPtr<TestCategory>> m_categoryMap;
 };
 
 enum class SpawnType
 {
-    Default,                                    ///< Default - typically uses shared library, on CI may use TestServer    
-    UseExe,                                     ///< Tests using executable (for example slangc)
-    UseSharedLibrary,                           ///< Runs testing in process (a crash tan take down the 
-    UseTestServer,                              ///< Use the test server to isolate testing
-    UseFullyIsolatedTestServer,                 ///< Uses a test server for each test (slow!)
+    Default,          ///< Default - typically uses shared library, on CI may use TestServer
+    UseExe,           ///< Tests using executable (for example slangc)
+    UseSharedLibrary, ///< Runs testing in process (a crash tan take down the
+    UseTestServer,    ///< Use the test server to isolate testing
+    UseFullyIsolatedTestServer, ///< Uses a test server for each test (slow!)
 };
 
 struct Options
@@ -82,7 +81,7 @@ struct Options
     // Having tests isolated, slows down testing considerably, so using UseSharedLibrary is the most
     // desirable default usually.
     SpawnType defaultSpawnType = SpawnType::Default;
-    
+
     // kind of output to generate
     TestOutputMode outputMode = TestOutputMode::Default;
 
@@ -92,22 +91,23 @@ struct Options
     // Exclude test that match one these categories
     Slang::Dictionary<TestCategory*, TestCategory*> excludeCategories;
 
-    // By default we can test against all apis. If is set to anything other than AllOf only tests that *require* the API
-    // will be run.
+    // By default we can test against all apis. If is set to anything other than AllOf only tests
+    // that *require* the API will be run.
     Slang::RenderApiFlags enabledApis = Slang::RenderApiFlag::AllOf;
 
-    // The subCommand to execute. Will be empty if there is no subCommand 
-    Slang::String subCommand;      
+    // The subCommand to execute. Will be empty if there is no subCommand
+    Slang::String subCommand;
 
-    // Arguments to the sub command. Note that if there is a subCommand the first parameter is always the subCommand itself.
+    // Arguments to the sub command. Note that if there is a subCommand the first parameter is
+    // always the subCommand itself.
     Slang::List<Slang::String> subCommandArgs;
 
-    // By default we potentially synthesize test for all 
+    // By default we potentially synthesize test for all
     // TODO: Vulkan is disabled by default for now as the majority as vulkan synthesized tests
-    // OpenGL is disabled for now
     // CPU is disabled by default
     // CUDA is disabled by default
-    Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::OpenGl | Slang::RenderApiFlag::CPU); 
+    Slang::RenderApiFlags synthesizedTestApis =
+        Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::CPU);
 
     // The adapter to use. If empty will match first found adapter.
     Slang::String adapter;
@@ -119,8 +119,13 @@ struct Options
 
     Slang::HashSet<Slang::String> expectedFailureList;
 
-        /// Parse the args, report any errors into stdError, and write the results into optionsOut
-    static SlangResult parse(int argc, char** argv, TestCategorySet* categorySet, Slang::WriterHelper stdError, Options* optionsOut);
+    /// Parse the args, report any errors into stdError, and write the results into optionsOut
+    static SlangResult parse(
+        int argc,
+        char** argv,
+        TestCategorySet* categorySet,
+        Slang::WriterHelper stdError,
+        Options* optionsOut);
 };
 
 #endif // OPTIONS_H_INCLUDED

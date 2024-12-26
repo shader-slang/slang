@@ -1,14 +1,15 @@
 // gui.h
 #pragma once
 
+#include "core/slang-basic.h"
+#include "external/imgui/imgui.h"
+#include "slang-com-ptr.h"
 #include "slang-gfx.h"
 #include "vector-math.h"
 #include "window.h"
-#include "slang-com-ptr.h"
-#include "external/imgui/imgui.h"
-#include "source/core/slang-basic.h"
 
-namespace platform {
+namespace platform
+{
 
 struct GUI : Slang::RefObject
 {
@@ -25,8 +26,8 @@ private:
     Slang::ComPtr<gfx::IDevice> device;
     Slang::ComPtr<gfx::ICommandQueue> queue;
     Slang::ComPtr<gfx::IRenderPassLayout> renderPass;
-    Slang::ComPtr<gfx::IPipelineState>       pipelineState;
-    Slang::ComPtr<gfx::ISamplerState>        samplerState;
+    Slang::ComPtr<gfx::IPipelineState> pipelineState;
+    Slang::ComPtr<gfx::ISamplerState> samplerState;
 };
 
-} // gfx
+} // namespace platform

@@ -77,8 +77,10 @@ void TextureResourceViewImpl::SampleLevel(
     int32_t baseCoordCount = baseShape->baseCoordCount;
 
     int32_t integerMipLevel = int32_t(level + 0.5f);
-    if (integerMipLevel >= desc.numMipLevels) integerMipLevel = desc.numMipLevels - 1;
-    if (integerMipLevel < 0) integerMipLevel = 0;
+    if (integerMipLevel >= desc.numMipLevels)
+        integerMipLevel = desc.numMipLevels - 1;
+    if (integerMipLevel < 0)
+        integerMipLevel = 0;
 
     auto& mipLevelInfo = texture->m_mipLevels[integerMipLevel];
 
@@ -90,8 +92,10 @@ void TextureResourceViewImpl::SampleLevel(
     {
         elementIndex = int32_t(coords[coordIndex++] + 0.5f);
     }
-    if (elementIndex >= effectiveArrayElementCount) elementIndex = effectiveArrayElementCount - 1;
-    if (elementIndex < 0) elementIndex = 0;
+    if (elementIndex >= effectiveArrayElementCount)
+        elementIndex = effectiveArrayElementCount - 1;
+    if (elementIndex < 0)
+        elementIndex = 0;
 
     // Note: for now we are just going to do nearest-neighbor sampling
     //
@@ -107,8 +111,10 @@ void TextureResourceViewImpl::SampleLevel(
 
         int32_t integerCoord = int32_t(coord * (extent - 1) + 0.5f);
 
-        if (integerCoord >= extent) integerCoord = extent - 1;
-        if (integerCoord < 0) integerCoord = 0;
+        if (integerCoord >= extent)
+            integerCoord = extent - 1;
+        if (integerCoord < 0)
+            integerCoord = 0;
 
         texelOffset += integerCoord * mipLevelInfo.strides[axis];
     }
@@ -145,16 +151,20 @@ void* TextureResourceViewImpl::_getTexelPtr(int32_t const* texelCoords)
     {
         elementIndex = texelCoords[coordIndex++];
     }
-    if (elementIndex >= effectiveArrayElementCount) elementIndex = effectiveArrayElementCount - 1;
-    if (elementIndex < 0) elementIndex = 0;
+    if (elementIndex >= effectiveArrayElementCount)
+        elementIndex = effectiveArrayElementCount - 1;
+    if (elementIndex < 0)
+        elementIndex = 0;
 
     int32_t mipLevel = 0;
     if (!hasMipLevels)
     {
         mipLevel = texelCoords[coordIndex++];
     }
-    if (mipLevel >= desc.numMipLevels) mipLevel = desc.numMipLevels - 1;
-    if (mipLevel < 0) mipLevel = 0;
+    if (mipLevel >= desc.numMipLevels)
+        mipLevel = desc.numMipLevels - 1;
+    if (mipLevel < 0)
+        mipLevel = 0;
 
     auto& mipLevelInfo = texture->m_mipLevels[mipLevel];
 
@@ -163,8 +173,10 @@ void* TextureResourceViewImpl::_getTexelPtr(int32_t const* texelCoords)
     for (int32_t axis = 0; axis < rank; ++axis)
     {
         int32_t coord = texelCoords[axis];
-        if (coord >= mipLevelInfo.extents[axis]) coord = mipLevelInfo.extents[axis] - 1;
-        if (coord < 0) coord = 0;
+        if (coord >= mipLevelInfo.extents[axis])
+            coord = mipLevelInfo.extents[axis] - 1;
+        if (coord < 0)
+            coord = 0;
 
         texelOffset += texelCoords[axis] * mipLevelInfo.strides[axis];
     }

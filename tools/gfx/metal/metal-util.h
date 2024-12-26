@@ -5,20 +5,28 @@
 #include "metal-api.h"
 #include "slang-gfx.h"
 
-namespace gfx {
+namespace gfx
+{
 
 // Utility functions for Metal
-struct MetalUtil 
+struct MetalUtil
 {
-    static NS::SharedPtr<NS::String> createString(const char* str, NS::StringEncoding encoding = NS::UTF8StringEncoding)
+    static NS::SharedPtr<NS::String> createString(
+        const char* str,
+        NS::StringEncoding encoding = NS::UTF8StringEncoding)
     {
-        NS::SharedPtr<NS::String> nsString = NS::TransferPtr(NS::String::alloc()->init(str, encoding));
+        NS::SharedPtr<NS::String> nsString =
+            NS::TransferPtr(NS::String::alloc()->init(str, encoding));
         return nsString;
     }
 
-    static NS::SharedPtr<NS::String> createStringView(void* bytes, size_t len, NS::StringEncoding encoding = NS::UTF8StringEncoding)
+    static NS::SharedPtr<NS::String> createStringView(
+        void* bytes,
+        size_t len,
+        NS::StringEncoding encoding = NS::UTF8StringEncoding)
     {
-        NS::SharedPtr<NS::String> nsString = NS::TransferPtr(NS::String::alloc()->init(bytes, len, encoding, false));
+        NS::SharedPtr<NS::String> nsString =
+            NS::TransferPtr(NS::String::alloc()->init(bytes, len, encoding, false));
         return nsString;
     }
 
@@ -31,7 +39,7 @@ struct MetalUtil
     static MTL::SamplerMinMagFilter translateSamplerMinMagFilter(TextureFilteringMode mode);
     static MTL::SamplerMipFilter translateSamplerMipFilter(TextureFilteringMode mode);
     static MTL::SamplerAddressMode translateSamplerAddressMode(TextureAddressingMode mode);
-    static MTL::CompareFunction translateCompareFunction(ComparisonFunc func); 
+    static MTL::CompareFunction translateCompareFunction(ComparisonFunc func);
     static MTL::StencilOperation translateStencilOperation(StencilOp op);
 
     static MTL::VertexStepFunction translateVertexStepFunction(InputSlotClass slotClass);
@@ -46,7 +54,6 @@ struct MetalUtil
     static MTL::Winding translateWinding(FrontFaceMode mode);
     static MTL::CullMode translateCullMode(CullMode mode);
     static MTL::TriangleFillMode translateTriangleFillMode(FillMode mode);
-
 };
 
 struct ScopedAutoreleasePool

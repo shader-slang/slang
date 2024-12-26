@@ -1,8 +1,10 @@
 #include "slang-language-server-semantic-tokens.h"
-#include "slang-visitor.h"
-#include "slang-ast-support-types.h"
-#include "slang-ast-iterator.h"
+
 #include "../core/slang-char-util.h"
+#include "slang-ast-iterator.h"
+#include "slang-ast-support-types.h"
+#include "slang-visitor.h"
+
 #include <algorithm>
 
 namespace Slang
@@ -18,12 +20,13 @@ const char* kSemanticTokenTypes[] = {
     "namespace",
     "keyword",
     "macro",
-    "string"
-};
+    "string"};
 
 static const int kInitTokenLegnth = 6;
 
-static_assert(SLANG_COUNT_OF(kSemanticTokenTypes) == (int)SemanticTokenType::NormalText, "kSemanticTokenTypes must match SemanticTokenType");
+static_assert(
+    SLANG_COUNT_OF(kSemanticTokenTypes) == (int)SemanticTokenType::NormalText,
+    "kSemanticTokenTypes must match SemanticTokenType");
 
 SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* name)
 {
@@ -31,16 +34,19 @@ SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* 
     auto humaneLoc = manager->getHumaneLoc(loc, SourceLocType::Actual);
     token.line = (int)(humaneLoc.line);
     token.col = (int)(humaneLoc.column);
-    token.length =
-        name ? (int)(name->text.getLength()) : 0;
+    token.length = name ? (int)(name->text.getLength()) : 0;
     token.type = SemanticTokenType::NormalText;
     return token;
 }
 
-List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedStringSlice fileName, DocumentVersion* doc)
+List<SemanticToken> getSemanticTokens(
+    Linkage* linkage,
+    Module* module,
+    UnownedStringSlice fileName,
+    DocumentVersion* doc)
 {
     auto manager = linkage->getSourceManager();
-    
+
     auto cbufferName = linkage->getNamePool()->getName(toSlice("ConstantBuffer"));
 
     List<SemanticToken> result;
@@ -50,7 +56,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             token.type != SemanticTokenType::NormalText)
             result.add(token);
     };
-    auto handleDeclRef = [&](DeclRef<Decl> declRef, Expr* originalExpr, SourceLoc loc)
+    auto handleDeclRef = [&](DeclRef<Decl> declRef, Expr* originalExpr, Name* name, SourceLoc loc)
     {
         if (!declRef)
             return;
@@ -59,16 +65,16 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             decl = genDecl->inner;
         if (!decl)
             return;
-        auto name = declRef.getDecl()->getName();
+        if (!name)
+            name = declRef.getDecl()->getName();
         if (!name)
             return;
         // Don't look at the expr if it is defined in a different file.
         if (!manager->getHumaneLoc(loc, SourceLocType::Actual)
-            .pathInfo.foundPath.getUnownedSlice()
-            .endsWithCaseInsensitive(fileName))
+                 .pathInfo.foundPath.getUnownedSlice()
+                 .endsWithCaseInsensitive(fileName))
             return;
-        SemanticToken token =
-            _createSemanticToken(manager, loc, name);
+        SemanticToken token = _createSemanticToken(manager, loc, name);
         auto target = decl;
         if (as<AggTypeDecl>(target))
         {
@@ -99,8 +105,7 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
         }
         else if (as<VarDecl>(target))
         {
-            if (as<MemberExpr>(originalExpr) ||
-                as<StaticMemberExpr>(originalExpr))
+            if (as<MemberExpr>(originalExpr) || as<StaticMemberExpr>(originalExpr))
             {
                 return;
             }
@@ -134,19 +139,27 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
         {
             if (auto declRefExpr = as<DeclRefExpr>(node))
             {
-                handleDeclRef(declRefExpr->declRef, declRefExpr->originalExpr, declRefExpr->loc);
+                handleDeclRef(
+                    declRefExpr->declRef,
+                    declRefExpr->originalExpr,
+                    declRefExpr->name,
+                    declRefExpr->loc);
             }
             else if (auto overloadedExpr = as<OverloadedExpr>(node))
             {
                 if (overloadedExpr->lookupResult2.items.getCount())
                 {
-                    handleDeclRef(overloadedExpr->lookupResult2.items[0].declRef, overloadedExpr->originalExpr, overloadedExpr->loc);
+                    handleDeclRef(
+                        overloadedExpr->lookupResult2.items[0].declRef,
+                        overloadedExpr->originalExpr,
+                        overloadedExpr->name,
+                        overloadedExpr->loc);
                 }
             }
             else if (auto accessorDecl = as<AccessorDecl>(node))
             {
-                SemanticToken token = _createSemanticToken(
-                    manager, accessorDecl->loc, accessorDecl->getName());
+                SemanticToken token =
+                    _createSemanticToken(manager, accessorDecl->loc, accessorDecl->getName());
                 token.type = SemanticTokenType::Keyword;
                 maybeInsertToken(token);
             }
@@ -162,10 +175,14 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             }
             else if (auto aggTypeDecl = as<AggTypeDeclBase>(node))
             {
-                if (aggTypeDecl->getName() && aggTypeDecl->findModifier<ImplicitParameterGroupElementTypeModifier>() == nullptr)
+                if (aggTypeDecl->getName() &&
+                    aggTypeDecl->findModifier<ImplicitParameterGroupElementTypeModifier>() ==
+                        nullptr)
                 {
                     SemanticToken token = _createSemanticToken(
-                        manager, aggTypeDecl->getNameLoc(), aggTypeDecl->getName());
+                        manager,
+                        aggTypeDecl->getNameLoc(),
+                        aggTypeDecl->getName());
                     token.type = SemanticTokenType::Type;
                     maybeInsertToken(token);
                 }
@@ -174,8 +191,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             {
                 if (enumCase->getName())
                 {
-                    SemanticToken token = _createSemanticToken(
-                        manager, enumCase->getNameLoc(), enumCase->getName());
+                    SemanticToken token =
+                        _createSemanticToken(manager, enumCase->getNameLoc(), enumCase->getName());
                     token.type = SemanticTokenType::EnumMember;
                     maybeInsertToken(token);
                 }
@@ -185,7 +202,9 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                 if (propertyDecl->getName())
                 {
                     SemanticToken token = _createSemanticToken(
-                        manager, propertyDecl->getNameLoc(), propertyDecl->getName());
+                        manager,
+                        propertyDecl->getNameLoc(),
+                        propertyDecl->getName());
                     token.type = SemanticTokenType::Property;
                     maybeInsertToken(token);
                 }
@@ -194,8 +213,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             {
                 if (funcDecl->getName())
                 {
-                    SemanticToken token = _createSemanticToken(
-                        manager, funcDecl->getNameLoc(), funcDecl->getName());
+                    SemanticToken token =
+                        _createSemanticToken(manager, funcDecl->getNameLoc(), funcDecl->getName());
                     token.type = SemanticTokenType::Function;
                     maybeInsertToken(token);
                 }
@@ -204,8 +223,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             {
                 if (ctorDecl->getName())
                 {
-                    SemanticToken token = _createSemanticToken(
-                        manager, ctorDecl->getNameLoc(), ctorDecl->getName());
+                    SemanticToken token =
+                        _createSemanticToken(manager, ctorDecl->getNameLoc(), ctorDecl->getName());
                     token.type = SemanticTokenType::Function;
                     token.length = kInitTokenLegnth;
                     maybeInsertToken(token);
@@ -216,7 +235,9 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                 if (paramDecl->getName())
                 {
                     SemanticToken token = _createSemanticToken(
-                        manager, paramDecl->getNameLoc(), paramDecl->getName());
+                        manager,
+                        paramDecl->getNameLoc(),
+                        paramDecl->getName());
                     token.type = SemanticTokenType::Parameter;
                     maybeInsertToken(token);
                 }
@@ -225,8 +246,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             {
                 if (varDecl->getName())
                 {
-                    SemanticToken token = _createSemanticToken(
-                        manager, varDecl->getNameLoc(), varDecl->getName());
+                    SemanticToken token =
+                        _createSemanticToken(manager, varDecl->getNameLoc(), varDecl->getName());
                     token.type = SemanticTokenType::Variable;
                     maybeInsertToken(token);
                 }
@@ -235,8 +256,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             {
                 if (attr->getKeywordName())
                 {
-                    SemanticToken token = _createSemanticToken(
-                        manager, attr->originalIdentifierToken.loc, nullptr);
+                    SemanticToken token =
+                        _createSemanticToken(manager, attr->originalIdentifierToken.loc, nullptr);
                     token.length = (int)attr->originalIdentifierToken.getContentLength();
                     token.type = SemanticTokenType::Type;
                     maybeInsertToken(token);
@@ -250,8 +271,8 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                             {
                                 if (varExpr->name)
                                 {
-                                    SemanticToken capToken = _createSemanticToken(
-                                        manager, varExpr->loc, nullptr);
+                                    SemanticToken capToken =
+                                        _createSemanticToken(manager, varExpr->loc, nullptr);
                                     capToken.length = (int)varExpr->name->text.getLength();
                                     capToken.type = SemanticTokenType::EnumMember;
                                     maybeInsertToken(capToken);
@@ -264,7 +285,9 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
             else if (auto targetCase = as<TargetCaseStmt>(node))
             {
                 SemanticToken token = _createSemanticToken(
-                    manager, targetCase->capabilityToken.loc, targetCase->capabilityToken.getName());
+                    manager,
+                    targetCase->capabilityToken.loc,
+                    targetCase->capabilityToken.getName());
                 token.type = SemanticTokenType::EnumMember;
                 maybeInsertToken(token);
             }
@@ -276,7 +299,9 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                     // OpCode
                     {
                         SemanticToken token = _createSemanticToken(
-                            manager, inst.opcode.token.loc, inst.opcode.token.getName());
+                            manager,
+                            inst.opcode.token.loc,
+                            inst.opcode.token.getName());
                         token.type = SemanticTokenType::Function;
                         maybeInsertToken(token);
                     }
@@ -302,7 +327,9 @@ List<SemanticToken> getSemanticTokens(Linkage* linkage, Module* module, UnownedS
                         if (operandTokenType != SemanticTokenType::NormalText)
                         {
                             SemanticToken token = _createSemanticToken(
-                                manager, operand.token.loc, operand.token.getName());
+                                manager,
+                                operand.token.loc,
+                                operand.token.getName());
                             token.type = operandTokenType;
                             maybeInsertToken(token);
                         }

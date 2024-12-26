@@ -1,14 +1,13 @@
 // unit-test-translation-unit-import.cpp
 
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
+#include "slang-com-ptr.h"
 #include "slang.h"
+#include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tools/unit-test/slang-unit-test.h"
-#include "slang-com-ptr.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
 
 using namespace Slang;
 
@@ -17,10 +16,9 @@ using namespace Slang;
 SLANG_UNIT_TEST(translationUnitImport)
 {
     // Source for the first translation unit.
-    const char* generatedSource =
-        "public int f() {"
-        "   return 5;"
-        "};";
+    const char* generatedSource = "public int f() {"
+                                  "   return 5;"
+                                  "};";
 
     // Source for the a file that imports the first translation unit.
     // The import should succeed and `f` should be visible to this module.
@@ -50,13 +48,21 @@ SLANG_UNIT_TEST(translationUnitImport)
     File::writeAllText(moduleName + ".slang", fileSource);
 
     spAddCodeGenTarget(request, SLANG_HLSL);
-    int generatedTranslationUnitIndex = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "generatedUnit");
+    int generatedTranslationUnitIndex =
+        spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "generatedUnit");
     spAddTranslationUnitSourceString(
-        request, generatedTranslationUnitIndex, "generatedFile", generatedSource);
+        request,
+        generatedTranslationUnitIndex,
+        "generatedFile",
+        generatedSource);
 
-    int entryPointTranslationUnitIndex = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "userUnit");
+    int entryPointTranslationUnitIndex =
+        spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "userUnit");
     spAddTranslationUnitSourceString(
-        request, entryPointTranslationUnitIndex, "userFile", userSource.getUnownedSlice().begin());
+        request,
+        entryPointTranslationUnitIndex,
+        "userFile",
+        userSource.getUnownedSlice().begin());
     spAddEntryPoint(request, entryPointTranslationUnitIndex, "computeMain", SLANG_STAGE_COMPUTE);
 
     auto compileResult = spCompile(request);
@@ -65,9 +71,8 @@ SLANG_UNIT_TEST(translationUnitImport)
     Slang::ComPtr<ISlangBlob> outBlob;
     spGetEntryPointCodeBlob(request, 0, 0, outBlob.writeRef());
     SLANG_CHECK(outBlob && outBlob->getBufferSize() != 0);
-    
+
     spDestroyCompileRequest(request);
     spDestroySession(session);
     File::remove(moduleName + ".slang");
 }
-

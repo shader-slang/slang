@@ -38,18 +38,25 @@ const StructRttiInfo InlayHintOptions::g_rttiInfo = _makeInlayHintOptionsRtti();
 static const StructRttiInfo _makeDocumentOnTypeFormattingOptionsRtti()
 {
     DocumentOnTypeFormattingOptions obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DocumentOnTypeFormattingOptions", nullptr);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::DocumentOnTypeFormattingOptions",
+        nullptr);
     builder.addField("firstTriggerCharacter", &obj.firstTriggerCharacter);
     builder.addField("moreTriggerCharacter", &obj.moreTriggerCharacter);
     builder.ignoreUnknownFields();
     return builder.make();
 }
-const StructRttiInfo DocumentOnTypeFormattingOptions::g_rttiInfo = _makeDocumentOnTypeFormattingOptionsRtti();
+const StructRttiInfo DocumentOnTypeFormattingOptions::g_rttiInfo =
+    _makeDocumentOnTypeFormattingOptionsRtti();
 
 static const StructRttiInfo _makeCompletionOptionsRtti()
 {
     CompletionOptions obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionOptions", &WorkDoneProgressParams::g_rttiInfo);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::CompletionOptions",
+        &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("triggerCharacters", &obj.triggerCharacters);
     builder.addField("resolveProvider", &obj.resolveProvider);
     builder.addField("allCommitCharacters", &obj.allCommitCharacters);
@@ -118,7 +125,10 @@ const StructRttiInfo TextDocumentIdentifier::g_rttiInfo = _makeTextDocumentIdent
 static const StructRttiInfo _makeVersionedTextDocumentIdentifierRtti()
 {
     VersionedTextDocumentIdentifier obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::VersionedTextDocumentIdentifier", nullptr);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::VersionedTextDocumentIdentifier",
+        nullptr);
     builder.addField("uri", &obj.uri);
     builder.addField("version", &obj.version);
     builder.ignoreUnknownFields();
@@ -130,8 +140,7 @@ const StructRttiInfo VersionedTextDocumentIdentifier::g_rttiInfo =
 static const StructRttiInfo _makePositionRtti()
 {
     Position obj;
-    StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::Position", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::Position", nullptr);
     builder.addField("line", &obj.line);
     builder.addField("character", &obj.character);
     builder.ignoreUnknownFields();
@@ -176,7 +185,10 @@ const UnownedStringSlice DidOpenTextDocumentParams::methodName =
 static const StructRttiInfo _makeTextDocumentContentChangeEventRtti()
 {
     TextDocumentContentChangeEvent obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::TextDocumentContentChangeEvent", nullptr);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::TextDocumentContentChangeEvent",
+        nullptr);
     builder.addField("range", &obj.range, StructRttiInfo::Flag::Optional);
     builder.addField("text", &obj.text);
     builder.ignoreUnknownFields();
@@ -188,8 +200,7 @@ const StructRttiInfo TextDocumentContentChangeEvent::g_rttiInfo =
 static const StructRttiInfo _makeDidChangeTextDocumentParamsRtti()
 {
     DidChangeTextDocumentParams obj;
-    StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::DidChangeTextDocumentParams", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DidChangeTextDocumentParams", nullptr);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("contentChanges", &obj.contentChanges);
     builder.ignoreUnknownFields();
@@ -216,7 +227,10 @@ const UnownedStringSlice DidCloseTextDocumentParams::methodName =
 static const StructRttiInfo _makeWorkspaceFoldersServerCapabilitiesRtti()
 {
     WorkspaceFoldersServerCapabilities obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::WorkspaceFoldersServerCapabilities", nullptr);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::WorkspaceFoldersServerCapabilities",
+        nullptr);
     builder.addField("supported", &obj.supported);
     builder.addField("changeNotifications", &obj.changeNotifications);
     builder.ignoreUnknownFields();
@@ -370,7 +384,10 @@ const StructRttiInfo Location::g_rttiInfo = _makeLocationRtti();
 static const StructRttiInfo _makeDiagnosticRelatedInformationRtti()
 {
     DiagnosticRelatedInformation obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DiagnosticRelatedInformation", nullptr);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::DiagnosticRelatedInformation",
+        nullptr);
     builder.addField("location", &obj.location);
     builder.addField("message", &obj.message);
     builder.ignoreUnknownFields();
@@ -382,8 +399,7 @@ const StructRttiInfo DiagnosticRelatedInformation::g_rttiInfo =
 static const StructRttiInfo _makeDiagnosticRtti()
 {
     Diagnostic obj;
-    StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::Diagnostic", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::Diagnostic", nullptr);
     builder.addField("code", &obj.code);
     builder.addField("message", &obj.message);
     builder.addField("range", &obj.range);
@@ -420,7 +436,10 @@ const StructRttiInfo TextDocumentPositionParams::g_rttiInfo = _makeTextDocumentP
 static const StructRttiInfo _makeHoverParamsRtti()
 {
     HoverParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::HoverParams", &WorkDoneProgressParams::g_rttiInfo);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::HoverParams",
+        &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
     builder.ignoreUnknownFields();
@@ -466,7 +485,10 @@ const StructRttiInfo CompletionContext::g_rttiInfo = _makeCompletionContextRtti(
 static const StructRttiInfo _makeDefinitionParamsRtti()
 {
     DefinitionParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DefinitionParams", &WorkDoneProgressParams::g_rttiInfo);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::DefinitionParams",
+        &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
     builder.ignoreUnknownFields();
@@ -479,7 +501,10 @@ const UnownedStringSlice DefinitionParams::methodName =
 static const StructRttiInfo _makeCompletionParamsRtti()
 {
     CompletionParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::CompletionParams", &WorkDoneProgressParams::g_rttiInfo);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::CompletionParams",
+        &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
     builder.addField("context", &obj.context, StructRttiInfo::Flag::Optional);
@@ -524,7 +549,10 @@ const StructRttiInfo TextEditCompletionItem::g_rttiInfo = _makeTextEditCompletio
 static const StructRttiInfo _makeSemanticTokensParamsRtti()
 {
     SemanticTokensParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::SemanticTokensParams", &WorkDoneProgressParams::g_rttiInfo);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::SemanticTokensParams",
+        &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.ignoreUnknownFields();
     return builder.make();
@@ -547,7 +575,10 @@ const StructRttiInfo SemanticTokens::g_rttiInfo = _makeSemanticTokensRtti();
 static const StructRttiInfo _makeSignatureHelpParamsRtti()
 {
     SignatureHelpParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::SignatureHelpParams", &WorkDoneProgressParams::g_rttiInfo);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::SignatureHelpParams",
+        &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
     builder.ignoreUnknownFields();
@@ -595,7 +626,10 @@ const StructRttiInfo SignatureHelp::g_rttiInfo = _makeSignatureHelpRtti();
 static const StructRttiInfo _makeDidChangeConfigurationParamsRtti()
 {
     DidChangeConfigurationParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DidChangeConfigurationParams", nullptr);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::DidChangeConfigurationParams",
+        nullptr);
     builder.addField("settings", &obj.settings, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
@@ -608,8 +642,7 @@ const UnownedStringSlice DidChangeConfigurationParams::methodName =
 static const StructRttiInfo _makeConfigurationItemRtti()
 {
     ConfigurationItem obj;
-    StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::ConfigurationItem", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::ConfigurationItem", nullptr);
     builder.addField("section", &obj.section, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
@@ -619,8 +652,7 @@ const StructRttiInfo ConfigurationItem::g_rttiInfo = _makeConfigurationItemRtti(
 static const StructRttiInfo _makeConfigurationParamsRtti()
 {
     ConfigurationParams obj;
-    StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::ConfigurationParams", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::ConfigurationParams", nullptr);
     builder.addField("items", &obj.items, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
@@ -677,7 +709,9 @@ static const StructRttiInfo _makeDocumentSymbolParamsRtti()
 {
     DocumentSymbolParams obj;
     StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::DocumentSymbolParams", &WorkDoneProgressParams::g_rttiInfo);
+        &obj,
+        "LanguageServerProtocol::DocumentSymbolParams",
+        &WorkDoneProgressParams::g_rttiInfo);
     builder.addField("textDocument", &obj.textDocument);
     builder.ignoreUnknownFields();
     return builder.make();
@@ -689,8 +723,7 @@ const UnownedStringSlice DocumentSymbolParams::methodName =
 static const StructRttiInfo _makeDocumentSymbolRtti()
 {
     DocumentSymbol obj;
-    StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::DocumentSymbol", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DocumentSymbol", nullptr);
     builder.addField("name", &obj.name);
     builder.addField("detail", &obj.detail);
     builder.addField("kind", &obj.kind);
@@ -705,8 +738,7 @@ const StructRttiInfo DocumentSymbol::g_rttiInfo = _makeDocumentSymbolRtti();
 static const StructRttiInfo _makeInlayHintParamsRtti()
 {
     InlayHintParams obj;
-    StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::InlayHintParams", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::InlayHintParams", nullptr);
     builder.addField("range", &obj.range);
     builder.addField("textDocument", &obj.textDocument);
     builder.ignoreUnknownFields();
@@ -719,8 +751,7 @@ const UnownedStringSlice InlayHintParams::methodName =
 static const StructRttiInfo _makeInlayHintRtti()
 {
     InlayHint obj;
-    StructRttiBuilder builder(
-        &obj, "LanguageServerProtocol::InlayHint", nullptr);
+    StructRttiBuilder builder(&obj, "LanguageServerProtocol::InlayHint", nullptr);
     builder.addField("position", &obj.position);
     builder.addField("label", &obj.label);
     builder.addField("kind", &obj.kind);
@@ -748,30 +779,38 @@ const UnownedStringSlice DocumentFormattingParams::methodName =
 static const StructRttiInfo _makeDocumentRangeFormattingParamsRtti()
 {
     DocumentRangeFormattingParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DocumentRangeFormattingParams", nullptr);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::DocumentRangeFormattingParams",
+        nullptr);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("range", &obj.range);
     builder.ignoreUnknownFields();
     return builder.make();
 }
-const StructRttiInfo DocumentRangeFormattingParams::g_rttiInfo = _makeDocumentRangeFormattingParamsRtti();
+const StructRttiInfo DocumentRangeFormattingParams::g_rttiInfo =
+    _makeDocumentRangeFormattingParamsRtti();
 const UnownedStringSlice DocumentRangeFormattingParams::methodName =
     UnownedStringSlice::fromLiteral("textDocument/rangeFormatting");
 
 static const StructRttiInfo _makeDocumentOnTypeFormattingParamsRtti()
 {
     DocumentOnTypeFormattingParams obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::DocumentOnTypeFormattingParams", nullptr);
+    StructRttiBuilder builder(
+        &obj,
+        "LanguageServerProtocol::DocumentOnTypeFormattingParams",
+        nullptr);
     builder.addField("textDocument", &obj.textDocument);
     builder.addField("position", &obj.position);
     builder.addField("ch", &obj.ch);
     builder.ignoreUnknownFields();
     return builder.make();
 }
-const StructRttiInfo DocumentOnTypeFormattingParams::g_rttiInfo = _makeDocumentOnTypeFormattingParamsRtti();
+const StructRttiInfo DocumentOnTypeFormattingParams::g_rttiInfo =
+    _makeDocumentOnTypeFormattingParamsRtti();
 const UnownedStringSlice DocumentOnTypeFormattingParams::methodName =
     UnownedStringSlice::fromLiteral("textDocument/onTypeFormatting");
 
 } // namespace LanguageServerProtocol
 
-}
+} // namespace Slang

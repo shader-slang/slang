@@ -1,4 +1,4 @@
-Proposal Template
+SP #000: Proposal Template
 =================
 
 This document provides a starting point for a larger feature proposal.
@@ -11,7 +11,13 @@ A proposal for a Slang language/compiler feature or system should start with a c
 Status
 ------
 
-Note here whether the proposal is unimplemented, in-progress, has landed, etc.
+Status: Design Review/Planned/Implementation In-Progress/Implemented/Partially Implemented. Note here whether the proposal is unimplemented, in-progress, has landed, etc.
+
+Implementation: [PR 000] [PR 001] ... (list links to PRs)
+
+Author: authors of the design doc and the implementation.
+
+Reviewer: Reviewers of the proposal and implementation.
 
 Background
 ----------

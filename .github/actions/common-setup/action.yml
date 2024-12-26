@@ -16,6 +16,13 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Add bash to PATH
+      shell: pwsh
+      if: ${{inputs.os == 'windows'}}
+      run: |
+        Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+        Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
       with:
@@ -59,14 +66,20 @@ runs:
 
         # Some useful variables
         config=${{inputs.config}}
-        Config=$(echo "${{inputs.config}}" | sed 's/debug/Debug/;s/release/Release/')
-        bin_dir=$(pwd)/build/$Config/bin
-        lib_dir=$(pwd)/build/$Config/lib
+        cmake_config=$(echo "${{inputs.config}}" | sed '
+            s/^debug$/Debug/
+            s/^release$/Release/
+            s/^releaseWithDebugInfo$/RelWithDebInfo/
+            s/^minSizeRelease$/MinSizeRel/
+        ')
+        bin_dir=$(pwd)/build/$cmake_config/bin
+        lib_dir=$(pwd)/build/$cmake_config/lib
         echo "config=$config" >> "$GITHUB_ENV"
+        echo "cmake_config=$cmake_config" >> "$GITHUB_ENV"
         echo "bin_dir=$bin_dir" >> "$GITHUB_ENV"
         echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
 
-    # Try to restore a LLVM install, and build it otherwise
+    # Try to restore an LLVM install, and build it otherwise
     - uses: actions/cache/restore@v4
       id: cache-llvm
       if: inputs.build-llvm == 'true'
@@ -77,25 +90,17 @@ runs:
     - name: Build LLVM
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
-      run: ./external/build-llvm.sh --install-prefix "${{ github.workspace }}/build/llvm-project-install"
+      run: |
+        ./external/build-llvm.sh \
+          --install-prefix "${{github.workspace}}/build/llvm-project-install" \
+          --repo "https://${{github.token}}@github.com/llvm/llvm-project"
     - uses: actions/cache/save@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
         path: ${{ github.workspace }}/build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
 
-    # Run this after building llvm, it's pointless to fill the caches with
-    # infrequent llvm build products
-    - name: Set up sccache
-      uses: hendrikmuhs/ccache-action@v1.2
-      with:
-        key: ${{inputs.os}}-${{inputs.compiler}}-${{inputs.platform}}-${{inputs.config}}
-        variant: sccache
-      # Opportunistically use sccache, it's not available for example on self
-      # hosted runners or ARM
-      continue-on-error: true
-
-    - name: Set environment variable for CMake
+    - name: Set environment variable for CMake and sccache
       shell: bash
       run: |
         if [ "${{inputs.build-llvm}}" == "true" ]; then
@@ -108,9 +113,10 @@ runs:
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
         fi
+        echo SCCACHE_IGNORE_SERVER_IO_ERROR=1 >> "$GITHUB_ENV"
 
     # Install swiftshader
-    - uses: robinraju/release-downloader@v1.8
+    - uses: robinraju/release-downloader@v1.11
       continue-on-error: true
       with:
         latest: true

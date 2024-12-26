@@ -1,9 +1,10 @@
 #ifdef SLANG_ENABLE_XLIB
 
 #include "../window.h"
+
 #include <X11/Xlib.h>
-#include <X11/Xutil.h>
 #include <X11/Xresource.h>
+#include <X11/Xutil.h>
 
 #ifdef None
 #undef None
@@ -18,7 +19,7 @@ namespace platform
 typedef ::Window X11WindowHandle;
 class X11PlatformWindow;
 
-void initKeyCodeTranslationTable(Display *display);
+void initKeyCodeTranslationTable(Display* display);
 void freeKeyCodeTranslationTable();
 KeyCode translateKeyCode(int keyCode);
 int getKeyChar(KeyCode keyCode, int keyState);
@@ -34,12 +35,16 @@ enum class KeyState
 
 enum class KeyEvent
 {
-    Press, Release
+    Press,
+    Release
 };
 
 enum class MouseEvent
 {
-    Move, Down, Up, Scroll
+    Move,
+    Down,
+    Up,
+    Scroll
 };
 
 class X11AppContext
@@ -51,7 +56,7 @@ public:
     static X11WindowHandle mainWindowHandle;
     static Display* xdisplay;
     static KeyState keyStates[kKeyStateTableSize];
-    static X11PlatformWindow *currentMouseEventWindow;
+    static X11PlatformWindow* currentMouseEventWindow;
 };
 
 bool X11AppContext::isTerminated = false;
@@ -62,16 +67,19 @@ Display* X11AppContext::xdisplay = nullptr;
 KeyState X11AppContext::keyStates[kKeyStateTableSize] = {};
 X11PlatformWindow* X11AppContext::currentMouseEventWindow = nullptr;
 
-void Application::init()
-{
-    
-}
+void Application::init() {}
 
 static void doEventsImpl(bool waitForEvents);
 
-void Application::doEvents() { doEventsImpl(false); }
+void Application::doEvents()
+{
+    doEventsImpl(false);
+}
 
-void Application::quit() { X11AppContext::isTerminated = true; }
+void Application::quit()
+{
+    X11AppContext::isTerminated = true;
+}
 
 void Application::dispose()
 {
@@ -85,7 +93,8 @@ void Application::run(Window* mainWindow, bool waitForEvents)
     if (mainWindow)
     {
         X11AppContext::mainWindow = mainWindow;
-        X11AppContext::mainWindowHandle = (X11WindowHandle)mainWindow->getNativeHandle().handleValues[1];
+        X11AppContext::mainWindowHandle =
+            (X11WindowHandle)mainWindow->getNativeHandle().handleValues[1];
         mainWindow->show();
         while (!X11AppContext::isTerminated)
         {
@@ -104,20 +113,33 @@ public:
     int currentWidth = 0;
     int currentHeight = 0;
     bool fixedSized = false;
-    X11PlatformWindow(const WindowDesc &desc)
+    X11PlatformWindow(const WindowDesc& desc)
     {
         currentWidth = desc.width;
         currentHeight = desc.height;
 
-        int blackColor = BlackPixel(X11AppContext::xdisplay, DefaultScreen(X11AppContext::xdisplay));
-        int whiteColor = WhitePixel(X11AppContext::xdisplay, DefaultScreen(X11AppContext::xdisplay));
-        handle = XCreateSimpleWindow(X11AppContext::xdisplay, DefaultRootWindow(X11AppContext::xdisplay), 0, 0,
-                                     desc.width, desc.height, 0, blackColor, blackColor);
+        int blackColor =
+            BlackPixel(X11AppContext::xdisplay, DefaultScreen(X11AppContext::xdisplay));
+        int whiteColor =
+            WhitePixel(X11AppContext::xdisplay, DefaultScreen(X11AppContext::xdisplay));
+        handle = XCreateSimpleWindow(
+            X11AppContext::xdisplay,
+            DefaultRootWindow(X11AppContext::xdisplay),
+            0,
+            0,
+            desc.width,
+            desc.height,
+            0,
+            blackColor,
+            blackColor);
         X11AppContext::windows[handle] = this;
         Atom wmDelete = XInternAtom(X11AppContext::xdisplay, "WM_DELETE_WINDOW", True);
         XSetWMProtocols(X11AppContext::xdisplay, handle, &wmDelete, 1);
-        XSelectInput(X11AppContext::xdisplay, handle, StructureNotifyMask | KeyPressMask | KeyReleaseMask | PointerMotionMask |
-            ButtonPressMask | ButtonReleaseMask | ExposureMask | FocusChangeMask);
+        XSelectInput(
+            X11AppContext::xdisplay,
+            handle,
+            StructureNotifyMask | KeyPressMask | KeyReleaseMask | PointerMotionMask |
+                ButtonPressMask | ButtonReleaseMask | ExposureMask | FocusChangeMask);
 
         if (desc.style == WindowStyle::FixedSize)
         {
@@ -127,10 +149,7 @@ public:
         setText(desc.title);
     }
 
-    ~X11PlatformWindow()
-    {
-        close();
-    }
+    ~X11PlatformWindow() { close(); }
 
     void setFixedSizeHint(int w, int h)
     {
@@ -158,12 +177,27 @@ public:
         X11WindowHandle winRoot = 0, winParent = 0;
         X11WindowHandle* winChildren = nullptr;
         unsigned int numChilren = 0;
-        XQueryTree(X11AppContext::xdisplay, handle, &winRoot, &winParent, &winChildren, &numChilren);
+        XQueryTree(
+            X11AppContext::xdisplay,
+            handle,
+            &winRoot,
+            &winParent,
+            &winChildren,
+            &numChilren);
         unsigned borderWidth, depth;
-        XGetGeometry(X11AppContext::xdisplay, handle, &winRoot, &rect.x, &rect.y, (uint32_t*)&rect.width, (uint32_t*)&rect.height, &borderWidth, &depth);
+        XGetGeometry(
+            X11AppContext::xdisplay,
+            handle,
+            &winRoot,
+            &rect.x,
+            &rect.y,
+            (uint32_t*)&rect.width,
+            (uint32_t*)&rect.height,
+            &borderWidth,
+            &depth);
         return rect;
     }
-    
+
     virtual void centerScreen() override
     {
         auto currentRect = getClientRect();
@@ -186,7 +220,8 @@ public:
     }
     virtual bool getFocused() override
     {
-        if (!handle) return false;
+        if (!handle)
+            return false;
         int revertTo;
         X11WindowHandle focusedWindow;
         XGetInputFocus(X11AppContext::xdisplay, &focusedWindow, &revertTo);
@@ -202,18 +237,16 @@ public:
     }
     virtual void setText(String text) override
     {
-        if (!handle) return;
+        if (!handle)
+            return;
         XStoreName(X11AppContext::xdisplay, handle, text.getBuffer());
         XClassHint* hint = XAllocClassHint();
-        hint->res_class = (char *)"Slang platform window";
-        hint->res_name = (char *)"Slang platform window";
+        hint->res_class = (char*)"Slang platform window";
+        hint->res_name = (char*)"Slang platform window";
         XSetClassHint(X11AppContext::xdisplay, handle, hint);
         XFree(hint);
     }
-    virtual bool getVisible() override
-    {
-        return visible;
-    }
+    virtual bool getVisible() override { return visible; }
     virtual void show() override
     {
         XMapWindow(X11AppContext::xdisplay, handle);
@@ -221,16 +254,17 @@ public:
     }
     virtual void hide() override
     {
-        if (!handle) return;
+        if (!handle)
+            return;
         XUnmapWindow(X11AppContext::xdisplay, handle);
         visible = false;
     }
     virtual int getCurrentDpi() override
     {
-        char *resourceString = XResourceManagerString(X11AppContext::xdisplay);
+        char* resourceString = XResourceManagerString(X11AppContext::xdisplay);
         XrmDatabase db;
         XrmValue value;
-        char *type = NULL;
+        char* type = NULL;
         double dpi = 96.0;
         db = XrmGetStringDatabase(resourceString);
         if (resourceString)
@@ -263,12 +297,18 @@ public:
     ButtonState::Enum getButtonState(int state)
     {
         ButtonState::Enum buttonState = ButtonState::Enum::None;
-        if (state & ShiftMask) addButtonState(buttonState, ButtonState::Enum::Shift);
-        if (state & ControlMask) addButtonState(buttonState, ButtonState::Enum::Control);
-        if (state & Mod1Mask) addButtonState(buttonState, ButtonState::Enum::Alt);
-        if (state & Button1Mask) addButtonState(buttonState, ButtonState::Enum::LeftButton);
-        if (state & Button2Mask) addButtonState(buttonState, ButtonState::Enum::MiddleButton);
-        if (state & Button3Mask) addButtonState(buttonState, ButtonState::Enum::RightButton);
+        if (state & ShiftMask)
+            addButtonState(buttonState, ButtonState::Enum::Shift);
+        if (state & ControlMask)
+            addButtonState(buttonState, ButtonState::Enum::Control);
+        if (state & Mod1Mask)
+            addButtonState(buttonState, ButtonState::Enum::Alt);
+        if (state & Button1Mask)
+            addButtonState(buttonState, ButtonState::Enum::LeftButton);
+        if (state & Button2Mask)
+            addButtonState(buttonState, ButtonState::Enum::MiddleButton);
+        if (state & Button3Mask)
+            addButtonState(buttonState, ButtonState::Enum::RightButton);
         return buttonState;
     }
 
@@ -291,7 +331,14 @@ public:
         }
     }
 
-    void handleMouseEvent(MouseEvent eventType, int x, int y, int delta, int button, int state, unsigned long time)
+    void handleMouseEvent(
+        MouseEvent eventType,
+        int x,
+        int y,
+        int delta,
+        int button,
+        int state,
+        unsigned long time)
     {
         auto buttonState = getButtonState(state);
         if (button == Button1)
@@ -332,14 +379,9 @@ public:
             Application::quit();
     }
 
-    void handleExposeEvent()
-    {
-    }
+    void handleExposeEvent() {}
 
-    void handleFocus(bool focus)
-    {
-    }
-
+    void handleFocus(bool focus) {}
 };
 
 Window* Application::createWindow(const WindowDesc& desc)
@@ -361,7 +403,7 @@ void doEventsImpl(bool waitForEvents)
     auto xdisplay = X11AppContext::xdisplay;
     if (!X11AppContext::xdisplay)
         return;
-    
+
     static bool supressInvokeTasks = false;
     X11PlatformWindow* sysWindow = nullptr;
     KeyCode vKeyCode = KeyCode::None;
@@ -379,7 +421,7 @@ void doEventsImpl(bool waitForEvents)
             {
                 if (X11AppContext::keyStates[iKeyCode] == KeyState::Released)
                     X11AppContext::keyStates[iKeyCode] = KeyState::Pressed;
-                else if (X11AppContext::keyStates[iKeyCode] == KeyState::Pressed) 
+                else if (X11AppContext::keyStates[iKeyCode] == KeyState::Pressed)
                     X11AppContext::keyStates[iKeyCode] = KeyState::Hold;
             }
             if (X11AppContext::windows.tryGetValue(nextEvent.xkey.window, sysWindow))
@@ -404,8 +446,14 @@ void doEventsImpl(bool waitForEvents)
             if (X11AppContext::windows.tryGetValue(nextEvent.xmotion.window, sysWindow))
             {
                 X11AppContext::currentMouseEventWindow = sysWindow;
-                sysWindow->handleMouseEvent(MouseEvent::Move, nextEvent.xmotion.x, nextEvent.xmotion.y, 0, 
-                    0, nextEvent.xmotion.state, nextEvent.xmotion.time);
+                sysWindow->handleMouseEvent(
+                    MouseEvent::Move,
+                    nextEvent.xmotion.x,
+                    nextEvent.xmotion.y,
+                    0,
+                    0,
+                    nextEvent.xmotion.state,
+                    nextEvent.xmotion.time);
             }
             break;
         case ButtonPress:
@@ -413,28 +461,54 @@ void doEventsImpl(bool waitForEvents)
             {
                 X11AppContext::currentMouseEventWindow = sysWindow;
                 if (nextEvent.xbutton.button <= Button3)
-                    sysWindow->handleMouseEvent(MouseEvent::Down, nextEvent.xbutton.x, nextEvent.xbutton.y, 0,
-                        nextEvent.xbutton.button, nextEvent.xbutton.state, nextEvent.xbutton.time);
+                    sysWindow->handleMouseEvent(
+                        MouseEvent::Down,
+                        nextEvent.xbutton.x,
+                        nextEvent.xbutton.y,
+                        0,
+                        nextEvent.xbutton.button,
+                        nextEvent.xbutton.state,
+                        nextEvent.xbutton.time);
                 else if (nextEvent.xbutton.button == Button4)
-                    sysWindow->handleMouseEvent(MouseEvent::Scroll, nextEvent.xbutton.x, nextEvent.xbutton.y, 120,
-                        nextEvent.xbutton.button, nextEvent.xbutton.state, nextEvent.xbutton.time);
+                    sysWindow->handleMouseEvent(
+                        MouseEvent::Scroll,
+                        nextEvent.xbutton.x,
+                        nextEvent.xbutton.y,
+                        120,
+                        nextEvent.xbutton.button,
+                        nextEvent.xbutton.state,
+                        nextEvent.xbutton.time);
                 else if (nextEvent.xbutton.button == Button5)
-                    sysWindow->handleMouseEvent(MouseEvent::Scroll, nextEvent.xbutton.x, nextEvent.xbutton.y, -120, 
-                        nextEvent.xbutton.button, nextEvent.xbutton.state, nextEvent.xbutton.time);
+                    sysWindow->handleMouseEvent(
+                        MouseEvent::Scroll,
+                        nextEvent.xbutton.x,
+                        nextEvent.xbutton.y,
+                        -120,
+                        nextEvent.xbutton.button,
+                        nextEvent.xbutton.state,
+                        nextEvent.xbutton.time);
             }
             break;
         case ButtonRelease:
             if (X11AppContext::windows.tryGetValue(nextEvent.xbutton.window, sysWindow))
             {
                 X11AppContext::currentMouseEventWindow = sysWindow;
-                sysWindow->handleMouseEvent(MouseEvent::Up, nextEvent.xbutton.x, nextEvent.xbutton.y, 0,
-                    nextEvent.xbutton.button, nextEvent.xbutton.state, nextEvent.xbutton.time);
+                sysWindow->handleMouseEvent(
+                    MouseEvent::Up,
+                    nextEvent.xbutton.x,
+                    nextEvent.xbutton.y,
+                    0,
+                    nextEvent.xbutton.button,
+                    nextEvent.xbutton.state,
+                    nextEvent.xbutton.time);
             }
             break;
         case ConfigureNotify:
             if (X11AppContext::windows.tryGetValue(nextEvent.xconfigure.window, sysWindow))
             {
-                sysWindow->handleResizeEvent(nextEvent.xconfigure.width, nextEvent.xconfigure.height);
+                sysWindow->handleResizeEvent(
+                    nextEvent.xconfigure.width,
+                    nextEvent.xconfigure.height);
             }
             break;
         case Expose:
@@ -469,6 +543,6 @@ void doEventsImpl(bool waitForEvents)
     }
 }
 
-}
+} // namespace platform
 
 #endif

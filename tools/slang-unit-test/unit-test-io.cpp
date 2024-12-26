@@ -1,15 +1,14 @@
 // unit-test-io.cpp
 
 #include "../../source/core/slang-io.h"
-
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
 static SlangResult _checkGenerateTemporary()
 {
     /// Test temporary file functionality
-    
+
     List<String> paths;
 
     for (Index i = 0; i < 10; ++i)
@@ -47,7 +46,7 @@ static SlangResult _checkGenerateTemporary()
     for (auto& path : paths)
     {
         SLANG_CHECK(File::exists(path));
-        
+
         const auto removeResult = File::remove(path);
         SLANG_CHECK(SLANG_SUCCEEDED(removeResult));
 

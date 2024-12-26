@@ -3,7 +3,7 @@
 
 namespace Slang
 {
-    struct IRModule;
+struct IRModule;
 
-    bool removeUnusedGenericParam(IRModule* module);
-}
+bool removeUnusedGenericParam(IRModule* module);
+} // namespace Slang

@@ -3,11 +3,10 @@
 
 namespace Slang
 {
-    struct SharedGenericsLoweringContext;
+struct SharedGenericsLoweringContext;
 
-    /// Lower generic and interface-based code to ordinary types and functions using
-    /// dynamic dispatch mechanisms.
-    void lowerGenericCalls(
-        SharedGenericsLoweringContext* sharedContext);
+/// Lower generic and interface-based code to ordinary types and functions using
+/// dynamic dispatch mechanisms.
+void lowerGenericCalls(SharedGenericsLoweringContext* sharedContext);
 
-}
+} // namespace Slang

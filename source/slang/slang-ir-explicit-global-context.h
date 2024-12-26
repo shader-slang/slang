@@ -7,9 +7,7 @@ namespace Slang
 {
 struct IRModule;
 
-    /// Collect global-scope variables/paramters to form an explicit context that gets threaded through
-void introduceExplicitGlobalContext(
-    IRModule*       module,
-    CodeGenTarget   target);
+/// Collect global-scope variables/paramters to form an explicit context that gets threaded through
+void introduceExplicitGlobalContext(IRModule* module, CodeGenTarget target);
 
-}
+} // namespace Slang

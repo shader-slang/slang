@@ -1,4 +1,5 @@
 #include "example-base.h"
+
 #include <chrono>
 
 #ifdef _WIN32
@@ -6,7 +7,7 @@
 #endif
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "external/stb/stb_image.h"
+#include "stb_image.h"
 
 using namespace Slang;
 using namespace gfx;
@@ -17,19 +18,6 @@ Slang::Result WindowedAppBase::initializeBase(
     int height,
     DeviceType deviceType)
 {
-    // Create a window for our application to render into.
-    //
-    platform::WindowDesc windowDesc;
-    windowDesc.title = title;
-    windowDesc.width = width;
-    windowDesc.height = height;
-    windowWidth = width;
-    windowHeight = height;
-    windowDesc.style = platform::WindowStyle::Default;
-    gWindow = platform::Application::createWindow(windowDesc);
-    gWindow->events.mainLoop = [this]() { mainLoop(); };
-    gWindow->events.sizeChanged = Slang::Action<>(this, &WindowedAppBase::windowSizeChanged);
-
     // Initialize the rendering layer.
 #ifdef _DEBUG
     // Enable debug layer in debug config.
@@ -41,26 +29,14 @@ Slang::Result WindowedAppBase::initializeBase(
     if (SLANG_FAILED(res))
         return res;
 
-    auto deviceInfo = gDevice->getDeviceInfo();
-    Slang::StringBuilder titleSb;
-    titleSb << title << " (" << deviceInfo.apiName << ": " << deviceInfo.adapterName << ")";
-    gWindow->setText(titleSb.getBuffer());
-
     ICommandQueue::Desc queueDesc = {};
     queueDesc.type = ICommandQueue::QueueType::Graphics;
     gQueue = gDevice->createCommandQueue(queueDesc);
 
-    // Create swapchain and framebuffers.
-    gfx::ISwapchain::Desc swapchainDesc = {};
-    swapchainDesc.format = gfx::Format::R8G8B8A8_UNORM;
-    swapchainDesc.width = width;
-    swapchainDesc.height = height;
-    swapchainDesc.imageCount = kSwapchainImageCount;
-    swapchainDesc.queue = gQueue;
-    gfx::WindowHandle windowHandle = gWindow->getNativeHandle().convert<gfx::WindowHandle>();
-    gSwapchain = gDevice->createSwapchain(swapchainDesc, windowHandle);
+    windowWidth = width;
+    windowHeight = height;
 
-    IFramebufferLayout::TargetLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
+    IFramebufferLayout::TargetLayout renderTargetLayout = {gfx::Format::R8G8B8A8_UNORM, 1};
     IFramebufferLayout::TargetLayout depthLayout = {gfx::Format::D32_FLOAT, 1};
     IFramebufferLayout::Desc framebufferLayoutDesc;
     framebufferLayoutDesc.renderTargetCount = 1;
@@ -69,7 +45,40 @@ Slang::Result WindowedAppBase::initializeBase(
     SLANG_RETURN_ON_FAIL(
         gDevice->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
 
-    createSwapchainFramebuffers();
+    // Do not create swapchain and windows in test mode, because there won't be any display.
+    if (!isTestMode())
+    {
+        // Create a window for our application to render into.
+        //
+        platform::WindowDesc windowDesc;
+        windowDesc.title = title;
+        windowDesc.width = width;
+        windowDesc.height = height;
+        windowDesc.style = platform::WindowStyle::Default;
+        gWindow = platform::Application::createWindow(windowDesc);
+        gWindow->events.mainLoop = [this]() { mainLoop(); };
+        gWindow->events.sizeChanged = Slang::Action<>(this, &WindowedAppBase::windowSizeChanged);
+
+        auto deviceInfo = gDevice->getDeviceInfo();
+        Slang::StringBuilder titleSb;
+        titleSb << title << " (" << deviceInfo.apiName << ": " << deviceInfo.adapterName << ")";
+        gWindow->setText(titleSb.getBuffer());
+
+        // Create swapchain and framebuffers.
+        gfx::ISwapchain::Desc swapchainDesc = {};
+        swapchainDesc.format = gfx::Format::R8G8B8A8_UNORM;
+        swapchainDesc.width = width;
+        swapchainDesc.height = height;
+        swapchainDesc.imageCount = kSwapchainImageCount;
+        swapchainDesc.queue = gQueue;
+        gfx::WindowHandle windowHandle = gWindow->getNativeHandle().convert<gfx::WindowHandle>();
+        gSwapchain = gDevice->createSwapchain(swapchainDesc, windowHandle);
+        createSwapchainFramebuffers();
+    }
+    else
+    {
+        createOfflineFramebuffers();
+    }
 
     for (uint32_t i = 0; i < kSwapchainImageCount; i++)
     {
@@ -102,23 +111,31 @@ Slang::Result WindowedAppBase::initializeBase(
 void WindowedAppBase::mainLoop()
 {
     int frameBufferIndex = gSwapchain->acquireNextImage();
-    if (frameBufferIndex == -1)
-        return;
 
     gTransientHeaps[frameBufferIndex]->synchronizeAndReset();
     renderFrame(frameBufferIndex);
     gTransientHeaps[frameBufferIndex]->finish();
 }
 
-void WindowedAppBase::createSwapchainFramebuffers()
+void WindowedAppBase::offlineRender()
 {
-    gFramebuffers.clear();
-    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
+    gTransientHeaps[0]->synchronizeAndReset();
+    renderFrame(0);
+    gTransientHeaps[0]->finish();
+}
+
+void WindowedAppBase::createFramebuffers(
+    uint32_t width,
+    uint32_t height,
+    gfx::Format colorFormat,
+    uint32_t frameBufferCount)
+{
+    for (uint32_t i = 0; i < frameBufferCount; i++)
     {
         gfx::ITextureResource::Desc depthBufferDesc;
         depthBufferDesc.type = IResource::Type::Texture2D;
-        depthBufferDesc.size.width = gSwapchain->getDesc().width;
-        depthBufferDesc.size.height = gSwapchain->getDesc().height;
+        depthBufferDesc.size.width = width;
+        depthBufferDesc.size.height = height;
         depthBufferDesc.size.depth = 1;
         depthBufferDesc.format = gfx::Format::D32_FLOAT;
         depthBufferDesc.defaultState = ResourceState::DepthWrite;
@@ -127,12 +144,29 @@ void WindowedAppBase::createSwapchainFramebuffers()
         depthBufferDesc.optimalClearValue = &depthClearValue;
         ComPtr<gfx::ITextureResource> depthBufferResource =
             gDevice->createTextureResource(depthBufferDesc, nullptr);
+
         ComPtr<gfx::ITextureResource> colorBuffer;
-        gSwapchain->getImage(i, colorBuffer.writeRef());
+        if (isTestMode())
+        {
+            gfx::ITextureResource::Desc colorBufferDesc;
+            colorBufferDesc.type = IResource::Type::Texture2D;
+            colorBufferDesc.size.width = width;
+            colorBufferDesc.size.height = height;
+            colorBufferDesc.size.depth = 1;
+            colorBufferDesc.format = colorFormat;
+            colorBufferDesc.defaultState = ResourceState::RenderTarget;
+            colorBufferDesc.allowedStates =
+                ResourceStateSet(ResourceState::RenderTarget, ResourceState::CopyDestination);
+            colorBuffer = gDevice->createTextureResource(colorBufferDesc, nullptr);
+        }
+        else
+        {
+            gSwapchain->getImage(i, colorBuffer.writeRef());
+        }
 
         gfx::IResourceView::Desc colorBufferViewDesc;
         memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
-        colorBufferViewDesc.format = gSwapchain->getDesc().format;
+        colorBufferViewDesc.format = colorFormat;
         colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
         colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
         ComPtr<gfx::IResourceView> rtv =
@@ -152,14 +186,35 @@ void WindowedAppBase::createSwapchainFramebuffers()
         framebufferDesc.renderTargetViews = rtv.readRef();
         framebufferDesc.layout = gFramebufferLayout;
         ComPtr<gfx::IFramebuffer> frameBuffer = gDevice->createFramebuffer(framebufferDesc);
+
         gFramebuffers.add(frameBuffer);
     }
 }
 
-ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(String fileName, int& textureWidth, int& textureHeight)
+void WindowedAppBase::createOfflineFramebuffers()
+{
+    gFramebuffers.clear();
+    createFramebuffers(windowWidth, windowHeight, gfx::Format::R8G8B8A8_UNORM, 1);
+}
+
+void WindowedAppBase::createSwapchainFramebuffers()
+{
+    gFramebuffers.clear();
+    createFramebuffers(
+        gSwapchain->getDesc().width,
+        gSwapchain->getDesc().height,
+        gSwapchain->getDesc().format,
+        kSwapchainImageCount);
+}
+
+ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(
+    String fileName,
+    int& textureWidth,
+    int& textureHeight)
 {
     int channelsInFile = 0;
-    auto textureContent = stbi_load(fileName.getBuffer(), &textureWidth, &textureHeight, &channelsInFile, 4);
+    auto textureContent =
+        stbi_load(fileName.getBuffer(), &textureWidth, &textureHeight, &channelsInFile, 4);
     gfx::ITextureResource::Desc textureDesc = {};
     textureDesc.allowedStates.add(ResourceState::ShaderResource);
     textureDesc.format = gfx::Format::R8G8B8A8_UNORM;
@@ -180,9 +235,22 @@ ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(String fileNam
     subresData[0].strideZ = textureWidth * textureHeight * 4;
 
     // Build mipmaps.
-    struct RGBA { uint8_t v[4]; };
-    auto castToRGBA = [](uint32_t v) { RGBA result; memcpy(&result, &v, 4); return result; };
-    auto castToUint = [](RGBA v) { uint32_t result; memcpy(&result, &v, 4); return result; };
+    struct RGBA
+    {
+        uint8_t v[4];
+    };
+    auto castToRGBA = [](uint32_t v)
+    {
+        RGBA result;
+        memcpy(&result, &v, 4);
+        return result;
+    };
+    auto castToUint = [](RGBA v)
+    {
+        uint32_t result;
+        memcpy(&result, &v, 4);
+        return result;
+    };
 
     int lastMipWidth = textureWidth;
     int lastMipHeight = textureHeight;
@@ -206,7 +274,8 @@ ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(String fileNam
                 RGBA pix;
                 for (int c = 0; c < 4; c++)
                 {
-                    pix.v[c] = (uint8_t)(((uint32_t)pix1.v[c] + pix2.v[c] + pix3.v[c] + pix4.v[c]) / 4);
+                    pix.v[c] =
+                        (uint8_t)(((uint32_t)pix1.v[c] + pix2.v[c] + pix3.v[c] + pix4.v[c]) / 4);
                 }
                 mipMapData[m][y * w + x] = castToUint(pix);
             }
@@ -244,15 +313,21 @@ void WindowedAppBase::windowSizeChanged()
     }
 }
 
-int64_t getCurrentTime() { return std::chrono::high_resolution_clock::now().time_since_epoch().count(); }
+int64_t getCurrentTime()
+{
+    return std::chrono::high_resolution_clock::now().time_since_epoch().count();
+}
 
-int64_t getTimerFrequency() { return std::chrono::high_resolution_clock::period::den; }
+int64_t getTimerFrequency()
+{
+    return std::chrono::high_resolution_clock::period::den;
+}
 
 class DebugCallback : public IDebugCallback
 {
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL
-        handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) override
+    handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) override
     {
         const char* typeStr = "";
         switch (type)
@@ -296,5 +371,8 @@ void initDebugCallback()
 }
 
 #ifdef _WIN32
-void _Win32OutputDebugString(const char* str) { OutputDebugStringW(Slang::String(str).toWString().begin()); }
+void _Win32OutputDebugString(const char* str)
+{
+    OutputDebugStringW(Slang::String(str).toWString().begin());
+}
 #endif

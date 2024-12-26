@@ -194,7 +194,7 @@ When dealing with a value type, though, we have to deal with things like making 
 ```
 interface IWritable { [mutating] void write(int val); }
 
-stuct Cell : IWritable { int data; void write(int val) { data = val; } }
+struct Cell : IWritable { int data; void write(int val) { data = val; } }
 
 T copyAndClobber<T : IWritable>(T obj)
 {

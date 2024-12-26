@@ -136,7 +136,7 @@ SLANG_RETURN_ON_FAIL(device->createBufferResource(
 Creating a Pipeline State
 ---------------------------
 
-A pipeline state object encapsulates the shader program to execute on the GPU device, as well as other fix function states for graphics rendering. In this example, we will be compiling and runing a simple compute shader written in Slang. To do that we need to create a compute pipeline state from a Slang `IComponentType`. We refer the reader to the (Slang getting started tutorial)[../user-guide/01-getting-started.html] on how to create a Slang `IComponentType` from a shader file. The following source creates a Graphics layer `IPipelineState` object from a shader module represented by a `slang::IComponentType` object:
+A pipeline state object encapsulates the shader program to execute on the GPU device, as well as other fix function states for graphics rendering. In this example, we will be compiling and running a simple compute shader written in Slang. To do that we need to create a compute pipeline state from a Slang `IComponentType`. We refer the reader to the (Slang getting started tutorial)[../user-guide/01-getting-started.html] on how to create a Slang `IComponentType` from a shader file. The following source creates a Graphics layer `IPipelineState` object from a shader module represented by a `slang::IComponentType` object:
 
 ```cpp
 void createComputePipelineFromShader(

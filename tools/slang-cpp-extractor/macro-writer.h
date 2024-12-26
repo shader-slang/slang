@@ -1,47 +1,41 @@
-#ifndef CPP_EXTRACT_MACRO_WRITER_H
-#define CPP_EXTRACT_MACRO_WRITER_H
+#pragma once
 
-#include "diagnostics.h"
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "slang-cpp-parser/diagnostics.h"
+#include "slang-cpp-parser/node-tree.h"
+#include "slang-cpp-parser/options.h"
 
-#include "options.h"
-#include "node-tree.h"
-
-#include "../../source/compiler-core/slang-diagnostic-sink.h"
-
-namespace CppExtract {
+namespace CppExtract
+{
 using namespace Slang;
+using namespace CppParse;
 
 /* A class that writes out macros that define type hierarchies, as well as fields of types */
 class MacroWriter
 {
 public:
-
-        /// Write output
+    /// Write output
     SlangResult writeOutput(NodeTree* tree);
 
-        /// Write def files
+    /// Write def files
     SlangResult writeDefs(NodeTree* tree);
 
-        /// Calculate the header 
+    /// Calculate the header
     SlangResult calcTypeHeader(NodeTree* tree, TypeSet* typeSet, StringBuilder& out);
     SlangResult calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, StringBuilder& out);
     SlangResult calcOriginHeader(NodeTree* tree, StringBuilder& out);
 
     SlangResult calcDef(NodeTree* tree, SourceOrigin* origin, StringBuilder& out);
 
-        /// Ctor.
-    MacroWriter(DiagnosticSink* sink, const Options* options): 
-        m_sink(sink),
-        m_options(options)
+    /// Ctor.
+    MacroWriter(DiagnosticSink* sink, const Options* options)
+        : m_sink(sink), m_options(options)
     {
     }
 
 protected:
-
     const Options* m_options = nullptr;
     DiagnosticSink* m_sink;
 };
 
-} // CppExtract
-
-#endif
+} // namespace CppExtract
