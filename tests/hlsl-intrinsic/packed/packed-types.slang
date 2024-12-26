@@ -23,20 +23,14 @@ struct Custom {
     float other2;
 }
 
-RWStructuredBuffer<Custom> outCustom;
-
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     uint id = dispatchThreadID.x;
 
-    uint8_t4_packed packedU = packedUArray[id];
-    int8_t4_packed packedS = packedSArray[id];
+    Custom val;
+    val.packedU = packedUArray[id];
+    val.packedS = packedSArray[id];
 
-    outputBuffer[id] = packedU;
-    outputBuffer[id + 1] = uint8_t4_packed(packedS);
-
-    // Dummy out.
-    outCustom[id].packedU = packedU;
-    outCustom[id].packedS = packedS;
+    outputBuffer[id] = val.packedU;
+    outputBuffer[id + 1] = uint8_t4_packed(val.packedS);
 }
-
