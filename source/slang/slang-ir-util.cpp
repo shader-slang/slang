@@ -105,6 +105,8 @@ IROp getTypeStyle(IROp op)
     case kIROp_UInt64Type:
     case kIROp_IntPtrType:
     case kIROp_UIntPtrType:
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
         {
             // All int like
             return kIROp_IntType;
@@ -140,6 +142,8 @@ IROp getTypeStyle(BaseType op)
     case BaseType::UInt:
     case BaseType::UInt64:
     case BaseType::UIntPtr:
+    case BaseType::Int8x4Packed:
+    case BaseType::UInt8x4Packed:
         return kIROp_IntType;
     case BaseType::Half:
     case BaseType::Float:
@@ -444,6 +448,12 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_UIntPtrType:
         sb << "uintptr";
+        break;
+    case kIROp_Int8x4PackedType:
+        sb << "int8_t4_packed";
+        break;
+    case kIROp_UInt8x4PackedType:
+        sb << "uint8_t4_packed";
         break;
     case kIROp_CharType:
         sb << "char";
@@ -1735,6 +1745,10 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
         return UnownedStringSlice::fromLiteral("uint64");
     case kIROp_UIntPtrType:
         return UnownedStringSlice::fromLiteral("uintptr");
+    case kIROp_Int8x4PackedType:
+        return UnownedStringSlice::fromLiteral("int8_t4_packed");
+    case kIROp_UInt8x4PackedType:
+        return UnownedStringSlice::fromLiteral("uint8_t4_packed");
     case kIROp_FloatType:
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
