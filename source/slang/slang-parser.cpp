@@ -3362,9 +3362,7 @@ static Decl* ParseBufferBlockDecl(
     }
     else if (parser->options.allowGLSLInput &&
              parser->LookAheadToken(TokenType::Identifier) &&
-             parser->LookAheadToken(TokenType::LBracket, 1) &&
-             parser->LookAheadToken(TokenType::RBracket, 2) &&
-             parser->LookAheadToken(TokenType::Semicolon, 3))
+             parser->LookAheadToken(TokenType::LBracket, 1))
     {
         // GLSL bindless buffers are denoted with [] after the name.
         bufferVarDecl->nameAndLoc = ParseDeclName(parser);
