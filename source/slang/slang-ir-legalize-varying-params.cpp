@@ -1516,8 +1516,8 @@ void depointerizeInputParams(IRFunc* entryPointFunc)
         setInsertBeforeOrdinaryInst(&builder, param);
         auto var = builder.emitVar(valueType);
         param->replaceUsesWith(var);
-        builder.emitStore(var, param);
         param->setFullType(valueType);
+        builder.emitStore(var, param);
     }
 
     fixUpFuncType(entryPointFunc);

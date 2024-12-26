@@ -131,6 +131,11 @@ struct GlobalVarTranslationContext
             {
                 auto input = inputVars[i];
                 setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
+                auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
+                builder.emitStore(
+                    input,
+                    builder
+                        .emitFieldExtract(inputType, builder.emitLoad(inputParam), inputKeys[i]));
                 // Relate "global variable" to a "global parameter" for use later in compilation
                 // to resolve a "global variable" shadowing a "global parameter" relationship.
                 builder.addGlobalVariableShadowingGlobalParameterDecoration(

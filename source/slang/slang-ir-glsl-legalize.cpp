@@ -170,6 +170,7 @@ struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
 {
     ScalarizedVal arrayVal;
     Index index;
+    IRType* elementType;
 };
 
 ScalarizedVal extractField(
@@ -1393,6 +1394,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         RefPtr<ScalarizedArrayIndexValImpl> arrayImpl = new ScalarizedArrayIndexValImpl();
         arrayImpl->arrayVal = val;
         arrayImpl->index = systemValueInfo->arrayIndex;
+        arrayImpl->elementType = type;
         val = ScalarizedVal::scalarizedArrayIndex(arrayImpl);
 
         // We need to make this access, an array access to the global
@@ -2006,16 +2008,12 @@ void assign(
 
             // Determine the index
             auto leftArrayIndexVal = as<ScalarizedArrayIndexValImpl>(left.impl);
-            const auto arrayIndex = leftArrayIndexVal->index;
-
-            auto arrayIndexInst = builder->getIntValue(builder->getIntType(), arrayIndex);
-
-            // Store to the index
-            auto address = builder->emitElementAddress(
-                builder->getPtrType(right.irValue->getFullType()),
-                left.irValue,
-                arrayIndexInst);
-            builder->emitStore(address, rhs);
+            auto leftVal = getSubscriptVal(
+                builder,
+                leftArrayIndexVal->elementType,
+                leftArrayIndexVal->arrayVal,
+                leftArrayIndexVal->index);
+            builder->emitStore(leftVal.irValue, rhs);
 
             break;
         }
@@ -2254,10 +2252,10 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
 
     case ScalarizedVal::Flavor::arrayIndex:
         {
-            auto element = builder->emitElementExtract(
-                val.irValue,
-                as<ScalarizedArrayIndexValImpl>(val.impl)->index);
-            return element;
+            auto impl = as<ScalarizedArrayIndexValImpl>(val.impl);
+            auto elementVal =
+                getSubscriptVal(builder, impl->elementType, impl->arrayVal, impl->index);
+            return materializeValue(builder, elementVal);
         }
     case ScalarizedVal::Flavor::tuple:
         {
@@ -2870,7 +2868,7 @@ void tryReplaceUsesOfStageInput(
                     builder.setInsertBefore(user);
                     auto subscriptVal = getSubscriptVal(
                         &builder,
-                        tryGetPointedToType(&builder, originalVal->getDataType()),
+                        arrayIndexImpl->elementType,
                         arrayIndexImpl->arrayVal,
                         arrayIndexImpl->index);
                     builder.setInsertBefore(user);
@@ -2913,6 +2911,15 @@ void tryReplaceUsesOfStageInput(
                             {
                                 tryReplaceUsesOfStageInput(context, fieldVal, user);
                             }
+                        }
+                        break;
+                    case kIROp_Load:
+                        {
+                            IRBuilder builder(user);
+                            builder.setInsertBefore(user);
+                            auto materializedVal = materializeTupleValue(&builder, val);
+                            user->replaceUsesWith(materializedVal);
+                            user->removeAndDeallocate();
                         }
                         break;
                     }
@@ -3283,10 +3290,29 @@ void legalizeEntryPointParameterForGLSL(
             }
             SLANG_ASSERT(realGlobalVar);
 
+            // Remove all stores into the global var introduced during
+            // the initial glsl global var translation pass since we are
+            // going to replace the global var with a pointer to the real
+            // input, and it makes no sense to store values into such real
+            // input locations.
+            traverseUses(
+                globalVar,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (auto store = as<IRStore>(user))
+                    {
+                        if (store->getPtrUse() == use)
+                        {
+                            store->removeAndDeallocate();
+                        }
+                    }
+                });
             // we will be replacing uses of `globalVarToReplace`. We need
             // globalVarToReplaceNextUse to catch the next use before it is removed from the
             // list of uses.
             globalVar->replaceUsesWith(realGlobalVar);
+            globalVar->removeAndDeallocate();
         }
     }
     else
