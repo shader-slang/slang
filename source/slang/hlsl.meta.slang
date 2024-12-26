@@ -8122,6 +8122,7 @@ T EvaluateAttributeAtCentroid(__constref T x)
     case hlsl: __intrinsic_asm "EvaluateAttributeAtCentroid";
     case glsl: __intrinsic_asm "interpolateAtCentroid";
     case spirv: return spirv_asm {
+        OpCapability InterpolationFunction;
         OpExtInst $$T result glsl450 InterpolateAtCentroid &x
     };
     }
@@ -8137,6 +8138,7 @@ vector<T,N> EvaluateAttributeAtCentroid(__constref vector<T,N> x)
     case hlsl: __intrinsic_asm "EvaluateAttributeAtCentroid";
     case glsl: __intrinsic_asm "interpolateAtCentroid";
     case spirv: return spirv_asm {
+        OpCapability InterpolationFunction;
         OpExtInst $$vector<T,N> result glsl450 InterpolateAtCentroid &x
     };
     }
@@ -8171,6 +8173,7 @@ T EvaluateAttributeAtSample(__constref T x, uint sampleindex)
     case hlsl: __intrinsic_asm "EvaluateAttributeAtSample";
     case glsl: __intrinsic_asm "interpolateAtSample($0, int($1))";
     case spirv: return spirv_asm {
+        OpCapability InterpolationFunction;
         OpExtInst $$T result glsl450 InterpolateAtSample &x $sampleindex
     };
     }
@@ -8186,6 +8189,7 @@ vector<T,N> EvaluateAttributeAtSample(__constref vector<T,N> x, uint sampleindex
     case hlsl: __intrinsic_asm "EvaluateAttributeAtSample";
     case glsl: __intrinsic_asm "interpolateAtSample($0, int($1))";
     case spirv: return spirv_asm {
+        OpCapability InterpolationFunction;
         OpExtInst $$vector<T,N> result glsl450 InterpolateAtSample &x $sampleindex
     };
     }
@@ -8248,6 +8252,7 @@ T EvaluateAttributeSnapped(__constref T x, int2 offset)
     {
         const float2 tmp = float2(16.f, 16.f);
         return spirv_asm {
+            OpCapability InterpolationFunction;
             %foffset:$$float2 = OpConvertSToF $offset;
             %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
             result:$$T = OpExtInst glsl450 InterpolateAtOffset &x %offsetdiv16
@@ -8269,6 +8274,7 @@ vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
     {
         const float2 tmp = float2(16.f, 16.f);
         return spirv_asm {
+            OpCapability InterpolationFunction;
             %foffset:$$float2 = OpConvertSToF $offset;
             %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
             result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset &x %offsetdiv16

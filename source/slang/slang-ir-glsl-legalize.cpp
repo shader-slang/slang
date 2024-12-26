@@ -1313,10 +1313,10 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     switch (kind)
     {
     case LayoutResourceKind::VaryingInput:
-        addrSpace = AddressSpace::Input;
+        addrSpace = systemValueInfo ? AddressSpace::BuiltinInput : AddressSpace::Input;
         break;
     case LayoutResourceKind::VaryingOutput:
-        addrSpace = AddressSpace::Output;
+        addrSpace = systemValueInfo ? AddressSpace::BuiltinOutput : AddressSpace::Output;
         ptrOpCode = kIROp_OutType;
         break;
     default:
