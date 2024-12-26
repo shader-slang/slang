@@ -2795,7 +2795,7 @@ void tryReplaceUsesOfStageInput(
     case ScalarizedVal::Flavor::address:
         {
             bool needMaterialize = false;
-            if (auto ptrType = as<IRPtrTypeBase>(val.irValue->getDataType()))
+            if (as<IRPtrTypeBase>(val.irValue->getDataType()))
             {
                 if (!as<IRPtrTypeBase>(originalVal->getDataType()))
                 {
@@ -2883,6 +2883,7 @@ void tryReplaceUsesOfStageInput(
                         use->set(materializedInner);
                     }
                 });
+            break;
         }
     case ScalarizedVal::Flavor::tuple:
         {
