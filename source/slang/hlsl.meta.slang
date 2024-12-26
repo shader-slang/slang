@@ -9338,6 +9338,7 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
+[__unsafeForceInlineEarly]
 vector<T,N> GetAttributeAtVertex(__constref vector<T,N> attribute, uint vertexIndex)
 {
     __target_switch
@@ -9347,11 +9348,7 @@ vector<T,N> GetAttributeAtVertex(__constref vector<T,N> attribute, uint vertexIn
     case glsl: 
         __intrinsic_asm "$0[$1]";
     case spirv:
-        return spirv_asm {
-            %_ptr_Input_vectorT = OpTypePointer Input $$vector<T,N>;
-            %addr = OpAccessChain %_ptr_Input_vectorT $attribute $vertexIndex;
-            result:$$vector<T,N> = OpLoad %addr;
-        };
+        return __GetPerVertexInputArray(attribute)[vertexIndex];
     }
 }
 
@@ -9372,6 +9369,7 @@ __generic<T : __BuiltinType, let N : int, let M : int>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
+[__unsafeForceInlineEarly]
 matrix<T,N,M> GetAttributeAtVertex(__constref matrix<T,N,M> attribute, uint vertexIndex)
 {
     __target_switch
@@ -9381,11 +9379,7 @@ matrix<T,N,M> GetAttributeAtVertex(__constref matrix<T,N,M> attribute, uint vert
     case glsl: 
         __intrinsic_asm "$0[$1]";
     case spirv:
-        return spirv_asm {
-            %_ptr_Input_matrixT = OpTypePointer Input $$matrix<T,N,M>;
-            %addr = OpAccessChain %_ptr_Input_matrixT $attribute $vertexIndex;
-            result:$$matrix<T,N,M> = OpLoad %addr;
-        };
+        return __GetPerVertexInputArray(attribute)[vertexIndex];
     }
 }
 

@@ -122,8 +122,8 @@ struct GlobalVarTranslationContext
             // Add an entry point parameter for all the inputs.
             auto firstBlock = entryPointFunc->getFirstBlock();
             builder.setInsertInto(firstBlock);
-            auto inputParam =
-                builder.emitParam(builder.getPtrType(inputStructType, AddressSpace::Input));
+            auto inputParam = builder.emitParam(
+                builder.getPtrType(kIROp_ConstRefType, inputStructType, AddressSpace::Input));
             builder.addLayoutDecoration(inputParam, paramLayout);
 
             // Initialize all global variables.

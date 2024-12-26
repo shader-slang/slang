@@ -5647,9 +5647,7 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
     LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
     {
         auto inner = lowerLValueExpr(context, expr->innerExpr);
-        auto builder = getBuilder();
-        auto irLoad = builder->emitLoad(inner.val);
-        return LoweredValInfo::simple(irLoad);
+        return LoweredValInfo::ptr(inner.val);
     }
 };
 
