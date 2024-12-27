@@ -2984,7 +2984,7 @@ struct IRLoweringParameterInfo
     ParameterDirection direction;
 
     // The direction declared in user code.
-    ParameterDirection declaredDirection;
+    ParameterDirection declaredDirection = ParameterDirection::kParameterDirection_In;
 
     // The variable/parameter declaration for
     // this parameter (if any)
@@ -3056,6 +3056,7 @@ void addThisParameter(ParameterDirection direction, Type* type, ParameterLists* 
     info.type = type;
     info.decl = nullptr;
     info.direction = direction;
+    info.declaredDirection = direction;
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
@@ -3069,6 +3070,7 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
         info.type = resultType;
         info.decl = nullptr;
         info.direction = kParameterDirection_Ref;
+        info.declaredDirection = info.direction;
         info.isReturnDestination = true;
         ioParameterLists->params.add(info);
     }
