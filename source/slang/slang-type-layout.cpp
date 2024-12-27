@@ -110,6 +110,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
                 sizeof(intptr_t),
                 sizeof(intptr_t));
 
+        case BaseType::Int8x4Packed:
+        case BaseType::UInt8x4Packed:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
+
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
         case BaseType::Float:
