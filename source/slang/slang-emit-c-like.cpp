@@ -414,6 +414,12 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(attributedType->getBaseType(), &attributedDeclarator);
         }
         break;
+
+    case kIROp_ConstRefType:
+        {
+            _emitType(as<IRConstRefType>(type)->getValueType(), declarator);
+        }
+        break;
     }
 }
 
@@ -1528,6 +1534,30 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     {
         if (!inst->mightHaveSideEffects())
             return true;
+    }
+
+    if (auto load = as<IRLoad>(inst))
+    {
+        // Loads from a constref global param should always be folded.
+        auto ptrType = load->getPtr()->getDataType();
+        if (load->getPtr()->getOp() == kIROp_GlobalParam)
+        {
+            if (ptrType->getOp() == kIROp_ConstRefType)
+                return true;
+            if (auto ptrTypeBase = as<IRPtrTypeBase>(ptrType))
+            {
+                auto addrSpace = ptrTypeBase->getAddressSpace();
+                switch (addrSpace)
+                {
+                case Slang::AddressSpace::Uniform:
+                case Slang::AddressSpace::Input:
+                case Slang::AddressSpace::BuiltinInput:
+                    return true;
+                default:
+                    break;
+                }
+            }
+        }
     }
 
     // Always hold if inst is a call into an [__alwaysFoldIntoUseSite] function.

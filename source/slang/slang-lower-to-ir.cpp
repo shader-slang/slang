@@ -2767,14 +2767,18 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 ///
 ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
 {
-    auto parentParent = getParentDecl(parentDecl);
+    auto parentParent = getParentAggTypeDecl(parentDecl);
+
+    if (!parentParent)
+        return defaultDirection;
+
     // The `this` parameter for a `class` is always `in`.
     if (as<ClassDecl>(parentParent))
     {
         return kParameterDirection_In;
     }
 
-    if (parentParent->findModifier<NonCopyableTypeAttribute>())
+    if (parentParent && parentParent->findModifier<NonCopyableTypeAttribute>())
     {
         if (parentDecl->hasModifier<MutatingAttribute>())
             return kParameterDirection_Ref;
@@ -3075,13 +3079,13 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
 
 void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
 {
-    if (paramInfo.direction == kParameterDirection_In)
-    {
-        if (!paramInfo.decl->findModifier<HLSLUniformModifier>())
-        {
-            paramInfo.direction = kParameterDirection_ConstRef;
-        }
-    }
+    if (paramInfo.direction != kParameterDirection_In)
+        return;
+    if (paramInfo.decl->findModifier<HLSLUniformModifier>())
+        return;
+    if (as<HLSLPatchType>(paramInfo.type))
+        return;
+    paramInfo.direction = kParameterDirection_ConstRef;
 }
 //
 // And here is our function that will do the recursive walk:
@@ -3152,16 +3156,20 @@ void collectParameterLists(
     //
     if (auto callableDeclRef = declRef.as<CallableDecl>())
     {
-        // We need a special case here when lowering the varying parameters of a fragment shader.
-        // Due to the existence of `EvaluateAttributeAtSample` and friends, we need to always lower
-        // the fragment shader varying inputs as `__constref` parameters so we can pass pointers
-        // to these intrinsics.
+        // We need a special case here when lowering the varying parameters of an entrypoint
+        // function. Due to the existence of `EvaluateAttributeAtSample` and friends, we need to
+        // always lower the varying inputs as `__constref` parameters so we can pass pointers to
+        // these intrinsics.
+        // This means that although these parameters are declared as "in" parameters in the source,
+        // we will actually treat them as __constref parameters when lowering to IR. A complication
+        // result from this is that if the original source code actually modifies the input
+        // parameter we still need to create a local var to hold the modified value. In the future
+        // when we are able to update our language spec to always assume input parameters are
+        // immutable, then we can remove this adhoc logic of introducing temporary variables. For
+        // For now we will rely on a follow up pass to remove unnecessary temporary variables if
+        // we can determine that they are never actually writtten to by the user.
         //
-        bool lowerVaryingInputAsConstRef = false;
-        if (declRef.getDecl()->findModifier<EntryPointAttribute>())
-        {
-            lowerVaryingInputAsConstRef = true;
-        }
+        bool lowerVaryingInputAsConstRef = declRef.getDecl()->hasModifier<EntryPointAttribute>();
 
         // Don't collect parameters from the outer scope if
         // we are in a `static` context.
@@ -10008,10 +10016,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         if (paramInfo.declaredDirection == kParameterDirection_In &&
                             paramInfo.direction == kParameterDirection_ConstRef)
                         {
-                            // If the parameter is originally declared as "in", and we are
-                            // lowering it as constref, then we need to emit a local variable to
-                            // hold the original value, so that we can still generate correct code
-                            // when the user trys to mutate the variable.
+                            // If the parameter is originally declared as "in", but we are
+                            // lowering it as constref for any reason (e.g. it is a varying input),
+                            // then we need to emit a local variable to hold the original value, so
+                            // that we can still generate correct code when the user trys to mutate
+                            // the variable.
+                            // The local variable introduced here is cleaned up by the SSA pass, if
+                            // we can determine that there are no actual writes into the local var.
                             auto irLocal =
                                 subBuilder->emitVar(tryGetPointedToType(subBuilder, irParamType));
                             auto localVal = LoweredValInfo::ptr(irLocal);

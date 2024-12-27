@@ -3736,12 +3736,12 @@ void legalizeEntryPointForGLSL(
     // and turn them into global variables.
     if (auto firstBlock = func->getFirstBlock())
     {
-        // Any initialization code we insert for parameters needs
-        // to be at the start of the "ordinary" instructions in the block:
-        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-
         for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
         {
+            // Any initialization code we insert for parameters needs
+            // to be at the start of the "ordinary" instructions in the block:
+            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
             // We assume that the entry-point parameters will all have
             // layout information attached to them, which is kept up-to-date
             // by any transformations affecting the parameter list.
