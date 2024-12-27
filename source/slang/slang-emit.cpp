@@ -76,6 +76,7 @@
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
+#include "slang-ir-resolve-varying-input-ref.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
@@ -315,6 +316,7 @@ struct RequiredLoweringPassSet
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;
+    bool resolveVaryingInputRef;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -423,6 +425,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
+        break;
+    case kIROp_ResolveVaryingInputRef:
+        result.resolveVaryingInputRef = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -591,6 +596,9 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.glslGlobalVar)
         translateGLSLGlobalVar(codeGenContext, irModule);
+
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        resolveVaryingInputRef(irModule);
 
     // Replace any global constants with their values.
     //

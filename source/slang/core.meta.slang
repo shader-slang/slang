@@ -1,3 +1,5 @@
+public module core;
+
 // Slang `core` library
 
 // Aliases for base types

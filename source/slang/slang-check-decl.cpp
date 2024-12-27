@@ -3181,6 +3181,11 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         }
     }
 
+    if (moduleDecl->findModifier<PublicModifier>())
+    {
+        moduleDecl->defaultVisibility = DeclVisibility::Public;
+    }
+
     // We need/want to visit any `import` declarations before
     // anything else, to make sure that scoping works.
     //
@@ -12484,8 +12489,10 @@ DeclVisibility getDeclVisibility(Decl* decl)
     }
     auto defaultVis = DeclVisibility::Default;
     if (auto parentModule = getModuleDecl(decl))
-        defaultVis =
-            parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
+    {
+        defaultVis = parentModule->isInLegacyLanguage ? DeclVisibility::Public
+                                                      : parentModule->defaultVisibility;
+    }
 
     // Members of other agg type decls will have their default visibility capped to the parents'.
     if (as<NamespaceDecl>(decl))
@@ -12669,10 +12676,6 @@ void diagnoseCapabilityProvenance(
                 break;
             auto moduleDecl = getModuleDecl(declToPrint);
             if (thisModule != moduleDecl)
-                break;
-            if (moduleDecl && moduleDecl->isInLegacyLanguage)
-                continue;
-            if (getDeclVisibility(declToPrint) == DeclVisibility::Public)
                 break;
         }
         if (previousDecl == declToPrint)
