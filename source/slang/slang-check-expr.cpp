@@ -312,12 +312,17 @@ static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
     const auto derefExpr = as<DerefExpr>(expr);
     if (!derefExpr)
         return false;
-    const auto varExpr = as<VarExpr>(derefExpr->base);
+
+    // For SSBO arrays, derefExpr is expected to be IndexExpr instead of VarExpr
+    const auto indexExpr = as<IndexExpr>(derefExpr->base);
+
+    const auto varExpr =
+        indexExpr ? as<VarExpr>(indexExpr->baseExpression) : as<VarExpr>(derefExpr->base);
     // Check the declaration type
     if (!varExpr)
         return false;
 
-    const auto varExprType = varExpr->type->getCanonicalType();
+    const auto varExprType = (indexExpr ? indexExpr->type : varExpr->type)->getCanonicalType();
     const auto ssbt = as<GLSLShaderStorageBufferType>(varExprType);
     if (!ssbt)
         return false;
