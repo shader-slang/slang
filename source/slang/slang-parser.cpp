@@ -7521,12 +7521,6 @@ static IRFloatingPointValue _foldFloatPrefixOp(TokenType tokenType, IRFloatingPo
 
 static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
 {
-    const auto slangIdentOperand = [&](auto flavor)
-    {
-        auto token = parser->tokenReader.peekToken();
-        return SPIRVAsmOperand{flavor, token, parseAtomicExpr(parser)};
-    };
-
     const auto slangTypeExprOperand = [&](auto flavor)
     {
         auto tok = parser->tokenReader.peekToken();
