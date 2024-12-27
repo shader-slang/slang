@@ -651,7 +651,9 @@ protected:
         // The materialized value can be used to completely
         // replace the original parameter.
         //
-        param->replaceUsesWith(materialized);
+        auto localVar = builder.emitVar(materialized->getDataType());
+        builder.emitStore(localVar, materialized);
+        param->replaceUsesWith(localVar);
         param->removeAndDeallocate();
     }
 

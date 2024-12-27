@@ -8101,7 +8101,7 @@ RasterizerOrderedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(Rasteriz
 
 // Attribute evaluation
 
-internal T __EvaluateAttributeAtCentroid<T>(__constref T x)
+T __EvaluateAttributeAtCentroid<T>(__constref T x)
 {
     __target_switch
     {
@@ -8173,7 +8173,7 @@ matrix<T,N,M> EvaluateAttributeAtCentroid(__constref matrix<T,N,M> x)
     }
 }
 
-internal T __EvaluateAttributeAtSample<T>(__constref T x, uint sampleIndex)
+T __EvaluateAttributeAtSample<T>(__constref T x, uint sampleIndex)
 {
     __target_switch
     {
@@ -8244,7 +8244,7 @@ matrix<T,N,M> EvaluateAttributeAtSample(__constref matrix<T,N,M> x, uint samplei
     }
 }
 
-internal T __EvaluateAttributeSnapped<T>(__constref T x, int2 offset)
+T __EvaluateAttributeSnapped<T>(__constref T x, int2 offset)
 {
     __target_switch
     {
@@ -9339,12 +9339,12 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
 }
 
 __intrinsic_op($(kIROp_ResolveVaryingInputRef))
-internal Ref<T> __ResolveVaryingInputRef<T>(__constref T attribute);
+Ref<T> __ResolveVaryingInputRef<T>(__constref T attribute);
 
 __intrinsic_op($(kIROp_GetPerVertexInputArray))
-internal Ref<Array<T, 3>> __GetPerVertexInputArray<T>(__constref T attribute);
+Ref<Array<T, 3>> __GetPerVertexInputArray<T>(__constref T attribute);
 
-internal T __GetAttributeAtVertex<T>(__constref T attribute, uint vertexIndex)
+T __GetAttributeAtVertex<T>(__constref T attribute, uint vertexIndex)
 {
     __intrinsic_asm "GetAttributeAtVertex";
 }

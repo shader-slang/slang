@@ -1,4 +1,4 @@
-public module core;
+//public module core;
 
 // Slang `core` library
 
