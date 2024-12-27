@@ -2769,9 +2769,6 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
 {
     auto parentParent = getParentAggTypeDecl(parentDecl);
 
-    if (!parentParent)
-        return defaultDirection;
-
     // The `this` parameter for a `class` is always `in`.
     if (as<ClassDecl>(parentParent))
     {
