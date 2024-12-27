@@ -699,6 +699,8 @@ int getTypeBitSize(Type* t)
         return 16;
     case BaseType::Int:
     case BaseType::UInt:
+    case BaseType::Int8x4Packed:
+    case BaseType::UInt8x4Packed:
         return 32;
     case BaseType::Int64:
     case BaseType::UInt64:
