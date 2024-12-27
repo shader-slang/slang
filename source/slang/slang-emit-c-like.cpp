@@ -414,12 +414,6 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(attributedType->getBaseType(), &attributedDeclarator);
         }
         break;
-
-    case kIROp_ConstRefType:
-        {
-            _emitType(as<IRConstRefType>(type)->getValueType(), declarator);
-        }
-        break;
     }
 }
 

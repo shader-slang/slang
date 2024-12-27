@@ -306,6 +306,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         }
     case kIROp_NativePtrType:
     case kIROp_PtrType:
+    case kIROp_ConstRefType:
         {
             auto elementType = (IRType*)type->getOperand(0);
             SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));

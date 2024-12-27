@@ -1335,6 +1335,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
             return;
         }
+    case kIROp_ConstRefType:
+        {
+            emitSimpleTypeImpl(as<IRConstRefType>(type)->getValueType());
+            return;
+        }
     default:
         break;
     }
