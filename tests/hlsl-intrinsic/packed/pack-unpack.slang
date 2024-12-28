@@ -30,7 +30,7 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    const uint8_t4_packed unpackTestValue = unpackTestBuffer[0];
+    const uint8_t4_packed unpackTestValue = uint8_t4_packed(unpackTestBuffer[0]);
 
     uint index = 0;
 
@@ -67,7 +67,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     /*
      * Unpack with sign extension.
      */
-    int32_t4 unpackedS32 = unpack_s8s32(unpackTestValue);
+    int32_t4 unpackedS32 = unpack_s8s32(int8_t4_packed(unpackTestValue));
     // 0xFFFFFFFF
     outputBuffer[index++] = uint(unpackedS32.x);
     // 0xFFFFFF83
@@ -78,7 +78,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index++] = uint(unpackedS32.w);
 
 #if !defined(WGSL)
-    int16_t4 unpackedS16 = unpack_s8s16(unpackTestValue);
+    int16_t4 unpackedS16 = unpack_s8s16(int8_t4_packed(unpackTestValue));
     // 0xFFFFFFFF
     outputBuffer[index++] = uint(unpackedS16.x);
     // 0xFFFFFF83
