@@ -15,7 +15,7 @@ SLANG_UNIT_TEST(modulePtr)
     const char* testModuleSource = R"(
         module test_module;
 
-        public void atomicFunc(Atomic<int>* ptr) {
+        public void atomicFunc(__ref Atomic<int> ptr) {
             ptr.add(1);
         }
     )";
@@ -29,7 +29,7 @@ SLANG_UNIT_TEST(modulePtr)
         [numthreads(1,1,1)]
         void computeMain(uint3 workGroup : SV_GroupID)
         {
-            atomicFunc(&input0[0]);
+            atomicFunc(input0[0]);
         }
     )";
     ComPtr<ISlangMutableFileSystem> memoryFileSystem =
