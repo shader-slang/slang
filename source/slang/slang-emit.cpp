@@ -42,6 +42,7 @@
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
+#include "slang-ir-fix-entrypoint-callsite.h"
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-glsl-liveness.h"
@@ -599,6 +600,8 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.resolveVaryingInputRef)
         resolveVaryingInputRef(irModule);
+
+    fixEntryPointCallsites(irModule);
 
     // Replace any global constants with their values.
     //
