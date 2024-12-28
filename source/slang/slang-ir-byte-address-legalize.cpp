@@ -840,6 +840,8 @@ struct ByteAddressBufferLegalizationContext
         case kIROp_IntType:
         case kIROp_FloatType:
         case kIROp_BoolType:
+        case kIROp_Int8x4PackedType:
+        case kIROp_UInt8x4PackedType:
             // The basic 32-bit types (and `bool`) can be handled by
             // loading `uint` values and then bit-casting.
             //

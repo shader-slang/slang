@@ -1939,6 +1939,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             case BaseType::UInt:
             case BaseType::UInt64:
             case BaseType::UIntPtr:
+            case BaseType::Int8x4Packed:
+            case BaseType::UInt8x4Packed:
                 break;
             default:
                 getSink()->diagnose(varDecl, Diagnostics::staticConstRequirementMustBeIntOrBool);
