@@ -182,7 +182,7 @@ float modf(float x, out float ip)
 }
 ```
 
-Opcodes such as `OpCapbility`, `OpExtension` and type definitions are allowed inside a `spirv_asm` block. These instructions will be deduplicated and inserted into the correct sections defined by the SPIRV specification, for example:
+Opcodes such as `OpCapability`, `OpExtension` and type definitions are allowed inside a `spirv_asm` block. These instructions will be deduplicated and inserted into the correct sections defined by the SPIRV specification, for example:
 ```cpp
 uint4 WaveMatch(T value)
 {
