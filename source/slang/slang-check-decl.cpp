@@ -5293,7 +5293,7 @@ bool SemanticsVisitor::trySynthesizeWrapperTypePropertyRequirementWitness(
         base->name = getName("inner");
         propertyRef->baseExpression = base;
         innerProperty = innerAccessorDeclRef.getParent();
-        propertyRef->name = getParentDecl(innerAccessorDeclRef.getDecl())->getName();
+        propertyRef->name = requiredMemberDeclRef.getName();
         auto checkedPropertyRefExpr = CheckExpr(propertyRef);
 
         if (as<GetterDecl>(requiredAccessorDeclRef))
