@@ -487,7 +487,7 @@ void printSize(
 }
 ```
 
-Note that the size of a type may be *unbounded* for a particluar layout unit; this case is encoded just like the unbounded case for the element count of an array type (`~size_t(0)`).
+Note that the size of a type may be *unbounded* for a particular layout unit; this case is encoded just like the unbounded case for the element count of an array type (`~size_t(0)`).
 
 The layout units used by a particular type layout can be iterated over using `getCategoryCount()` and `getCategoryByIndex()`:
 
@@ -1052,7 +1052,7 @@ That is, the binding information for the implicit constant buffer will be found 
 The `ProgramLayout` type has the appealingly-named `getParameterCount` and `getParameterByIndex()` methods, which seem to be the obvious way to navigate the global-scope parameters of a shader.
 However, we recommend *against* using these functions in applications that want to be able to systematically and robustly reflect any possible input shader code.
 
-While the reflection API implementation makes an effort to ensure that the information returned by `getParameterByIndex()` is not incorrect, it is very difficult when using those functions to account for how global-scope parameters might have been grouped into an automatically-introduced constnat buffer or parameter block.
+While the reflection API implementation makes an effort to ensure that the information returned by `getParameterByIndex()` is not incorrect, it is very difficult when using those functions to account for how global-scope parameters might have been grouped into an automatically-introduced constant buffer or parameter block.
 The `getGlobalConstantBufferBinding()` and `getGlobalConstantBufferSize()` methods can be used in some scenarios, but aren't the best way to get the relevant information.
 
 While it would only matter in corner cases, we still recommend that applications use `getGlobalParamsVarLayout()` instead of `getGlobalParamsTypeLayout()`, to account for cases where the global-scope might have offsets applied to it (and also to handle the global scope and entry-point scopes more uniformly).
@@ -1405,13 +1405,13 @@ In contrast, the cumulative of offset of `c.b` in `t` registers is one, and the 
 
 Similarly, when calculating the cumulative offsets of variables inside a parameter block (for targets that can allocate each parameter block its own space), it is important not to sum contributions past an enclosing parameter block.
 
-We can account for these subtleties by extending the representation of access paths in our example application to record the node coresponding to the deepest constant buffer or parameter block along the path:
+We can account for these subtleties by extending the representation of access paths in our example application to record the node corresponding to the deepest constant buffer or parameter block along the path:
 
 ```c++
 struct AccessPath
 {
     AccessPathNode* leaf = nullptr;
-    AccessPathNode* deepestConstantBufer = nullptr;
+    AccessPathNode* deepestConstantBuffer = nullptr;
     AccessPathNode* deepestParameterBlock = nullptr;
 };
 ```
@@ -1427,7 +1427,7 @@ case slang::TypeReflection::Kind::ShaderStorageBuffer:
         // ...
 
         AccumulatedOffsets innerAccessPath = accessPath;
-        innerAccessPath.deepestConstantBufer = innerAccessPath.leaf;
+        innerAccessPath.deepestConstantBuffer = innerAccessPath.leaf;
 
         // ...
     }
@@ -1495,7 +1495,7 @@ When a byte offset is being computed, relative offsets will only be summed up to
 
 ```c++
 case slang::ParameterCategory::Uniform:
-    for (auto node = accessPath.leaf; node != accessPath.deepestConstantBufer; node = node->outer)
+    for (auto node = accessPath.leaf; node != accessPath.deepestConstantBuffer; node = node->outer)
     {
         result.offset += node->varLayout->getOffset(layoutUnit);
     }

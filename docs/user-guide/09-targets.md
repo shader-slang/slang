@@ -61,7 +61,7 @@ On platforms that provide a CPU-like "flat" memory model with a single virtual a
 Current graphics APIs provide far more complicated and less uniform mechanisms for passing shader parameters.
 
 A high-level language compiler like Slang handles the task of _binding_ each user-defined shader parameter to one or more of the parameter-passing resources defined by a target platform.
-For example, the Slang compiler might bindg a global `Texture2D` parameter called `gDiffuse` to the `t1` register defined by the Direct3D 11 API.
+For example, the Slang compiler might bind a global `Texture2D` parameter called `gDiffuse` to the `t1` register defined by the Direct3D 11 API.
 
 An application is responsible for passing the argument data for a parameter using the using the corresponding platform-specific resource it was bound to.
 For example, an application should set the texture they want to use for `gDiffuse` to the `t1` register using Direct3D 11 API calls.
@@ -173,7 +173,7 @@ The D3D12 rasterization pipeline provides alternative geometry processing stages
 
 - The optional `amplification` stage precedes the mesh stage and is responsible for determining how many mesh shader invocations should be run.
 
-Compared to the D3D11 pipeline without tesselllation (hull and domain shaders), a mesh shader is kind of like a combined/generalized vertex and geometry shader.
+Compared to the D3D11 pipeline without tessellation (hull and domain shaders), a mesh shader is kind of like a combined/generalized vertex and geometry shader.
 
 Compared to the D3D11 pipeline with tessellation, an amplification shader is kind of like a combined/generalized vertex and hull shader, while a mesh shader is kind of like a combined/generalized domain and geometry shader.
 
