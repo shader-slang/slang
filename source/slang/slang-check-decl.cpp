@@ -3412,7 +3412,9 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     {
         auto requiredParam = requiredParams[paramIndex];
         auto satisfyingParam = satisfyingParams[paramIndex];
-
+        if (getParameterDirection(requiredParam.getDecl()) !=
+            getParameterDirection(satisfyingParam.getDecl()))
+            return false;
         auto requiredParamType = getType(m_astBuilder, requiredParam);
         auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
@@ -4752,7 +4754,13 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         // If checking the generic app failed, we can't synthesize the witness.
         //
         if (tempSink.getErrorCount() != 0)
+        {
+            context->innerSink.diagnose(
+                SourceLoc(),
+                Diagnostics::genericSignatureDoesNotMatchRequirement,
+                baseOverloadedExpr->name);
             return false;
+        }
     }
 
     // We now have the reference to the overload group we plan to call,
@@ -4794,11 +4802,65 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // diagnose a generic "failed to satisfying requirement" error.
     //
     if (tempSink.getErrorCount() != 0)
+    {
+        context->innerSink.diagnose(
+            SourceLoc(),
+            Diagnostics::cannotResolveOverloadForMethodRequirement,
+            baseOverloadedExpr->name);
         return false;
+    }
 
-    // If we were able to type-check the call, then we should
-    // be able to finish construction of a suitable witness.
+    // If we were able to type-check the call, we also need to make
+    // sure that the resolved callee member has consistent parameter
+    // direction as the requirement method.
     //
+    // For example, if there is a requirement:
+    // ```
+    // interface IFoo { void method(out int x); }
+    // ```
+    // and a type:
+    // ```
+    // struct X : IFoo { void method(int x) { ... } }
+    // ```
+    // After we synthesize:
+    // ```
+    // void X::synthesized_method(out int x) { this.method(x); }
+    // ```
+    // The synthesized method will pass all type check just fine,
+    // but we don't want to allow this method to be used as a witness
+    // for the requirement due to inconsistent parameter direction.
+    // So let's check for this now.
+    //
+    if (auto checkedInvoke = as<InvokeExpr>(checkedCall))
+    {
+        if (auto declRefExpr = as<DeclRefExpr>(checkedInvoke->functionExpr))
+        {
+            if (auto callee = as<CallableDecl>(declRefExpr->declRef))
+            {
+                auto synParams = synFuncDecl->getParameters();
+                auto calleeParams = callee.getDecl()->getParameters();
+                auto synParamIter = synParams.begin();
+                auto calleeParamIter = calleeParams.begin();
+                for (; synParamIter != synParams.end() && calleeParamIter != calleeParams.end();
+                     ++synParamIter, ++calleeParamIter)
+                {
+                    auto synParam = *synParamIter;
+                    auto calleeParam = *calleeParamIter;
+                    if (getParameterDirection(synParam) != getParameterDirection(calleeParam))
+                    {
+                        context->innerSink.diagnose(
+                            calleeParam,
+                            Diagnostics::parameterDirectionDoesNotMatchRequirement,
+                            calleeParam,
+                            getParameterDirection(calleeParam),
+                            getParameterDirection(synParam));
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
     // We've already created the outer declaration (including its
     // parameters), and the inner expression, so the main work
     // that is left is defining the body of the new function,
@@ -6593,6 +6655,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // a wrapper type (struct Foo:IFoo=FooImpl), and we will synthesize
     // wrappers that redirects the call into the inner element.
     //
+    context->innerSink.reset();
     if (trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable))
     {
         return true;
@@ -6622,6 +6685,10 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             Diagnostics::typeDoesntImplementInterfaceRequirement,
             subType,
             requiredMemberDeclRef);
+    }
+    if (context->innerSink.outputBuffer.getLength())
+    {
+        getSink()->diagnoseRaw(Severity::Note, context->innerSink.outputBuffer.getUnownedSlice());
     }
     getSink()->diagnose(
         requiredMemberDeclRef,
