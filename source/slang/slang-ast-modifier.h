@@ -1041,6 +1041,13 @@ class NumThreadsAttribute : public Attribute
     IntVal* x;
     IntVal* y;
     IntVal* z;
+
+    // References to specialization constants, for defining the number of
+    // threads with them. If set, the corresponding axis is set to nullptr
+    // above.
+    DeclRef<VarDeclBase> xSpecConst;
+    DeclRef<VarDeclBase> ySpecConst;
+    DeclRef<VarDeclBase> zSpecConst;
 };
 
 class WaveSizeAttribute : public Attribute

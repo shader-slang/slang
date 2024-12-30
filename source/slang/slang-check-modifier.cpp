@@ -85,6 +85,38 @@ bool SemanticsVisitor::checkLiteralStringVal(Expr* expr, String* outVal)
     return false;
 }
 
+DeclRef<VarDeclBase> SemanticsVisitor::checkSpecializationConstantInt(Expr* expr)
+{
+    // First type-check the expression as normal
+    expr = CheckExpr(expr);
+
+    if (IsErrorExpr(expr))
+        return DeclRef<VarDeclBase>();
+
+    if (!isScalarIntegerType(expr->type))
+        return DeclRef<VarDeclBase>();
+
+    auto specConstVar = as<VarExpr>(expr);
+    if (!specConstVar || !specConstVar->declRef)
+        return DeclRef<VarDeclBase>();
+
+    auto decl = specConstVar->declRef.getDecl();
+    if (!decl)
+        return DeclRef<VarDeclBase>();
+
+    for (auto modifier : decl->modifiers)
+    {
+        if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
+        {
+            return specConstVar->declRef.as<VarDeclBase>();
+        }
+    }
+
+    // TODO: Diagnostics should report that an integer specialization constant
+    // was expected.
+    return DeclRef<VarDeclBase>();
+}
+
 bool SemanticsVisitor::checkCapabilityName(Expr* expr, CapabilityName& outCapabilityName)
 {
     if (auto varExpr = as<VarExpr>(expr))
@@ -350,7 +382,8 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
 
-        IntVal* values[3];
+        IntVal* values[3] = {};
+        DeclRef<VarDeclBase> specIds[3] = {};
 
         for (int i = 0; i < 3; ++i)
         {
@@ -359,6 +392,19 @@ Modifier* SemanticsVisitor::validateAttribute(
             auto arg = attr->args[i];
             if (arg)
             {
+                auto specConstVar = as<VarExpr>(arg);
+                if (specConstVar)
+                {
+                    auto specConstDecl = checkSpecializationConstantInt(arg);
+                    if (specConstDecl)
+                    {
+                        specIds[i] = specConstDecl;
+                        continue;
+                    }
+                    else
+                        return nullptr;
+                }
+
                 auto intValue = checkLinkTimeConstantIntVal(arg);
                 if (!intValue)
                 {
@@ -396,6 +442,10 @@ Modifier* SemanticsVisitor::validateAttribute(
         numThreadsAttr->x = values[0];
         numThreadsAttr->y = values[1];
         numThreadsAttr->z = values[2];
+
+        numThreadsAttr->xSpecConst = specIds[0];
+        numThreadsAttr->ySpecConst = specIds[1];
+        numThreadsAttr->zSpecConst = specIds[2];
     }
     else if (auto waveSizeAttr = as<WaveSizeAttribute>(attr))
     {

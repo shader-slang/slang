@@ -4332,23 +4332,34 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // [3.6. Execution Mode]: LocalSize
         case kIROp_NumThreadsDecoration:
             {
-                // TODO: The `LocalSize` execution mode option requires
-                // literal values for the X,Y,Z thread-group sizes.
-                // There is a `LocalSizeId` variant that takes `<id>`s
-                // for those sizes, and we should consider using that
-                // and requiring the appropriate capabilities
-                // if any of the operands to the decoration are not
-                // literals (in a future where we support non-literals
-                // in those positions in the Slang IR).
-                //
                 auto numThreads = cast<IRNumThreadsDecoration>(decoration);
-                requireSPIRVExecutionMode(
-                    decoration,
-                    dstID,
-                    SpvExecutionModeLocalSize,
-                    SpvLiteralInteger::from32(int32_t(numThreads->getX()->getValue())),
-                    SpvLiteralInteger::from32(int32_t(numThreads->getY()->getValue())),
-                    SpvLiteralInteger::from32(int32_t(numThreads->getZ()->getValue())));
+                if (numThreads->getXSpecConst() || numThreads->getYSpecConst() ||
+                    numThreads->getZSpecConst())
+                {
+                    // If any of the dimensions needs an ID, we need to emit
+                    // all dimensions as an ID due to how LocalSizeId works.
+                    int32_t ids[3];
+                    for (int i = 0; i < 3; ++i)
+                        ids[i] = ensureInst(numThreads->getOperand(i))->id;
+
+                    requireSPIRVExecutionMode(
+                        decoration,
+                        dstID,
+                        SpvExecutionModeLocalSizeId,
+                        SpvLiteralInteger::from32(int32_t(ids[0])),
+                        SpvLiteralInteger::from32(int32_t(ids[1])),
+                        SpvLiteralInteger::from32(int32_t(ids[2])));
+                }
+                else
+                {
+                    requireSPIRVExecutionMode(
+                        decoration,
+                        dstID,
+                        SpvExecutionModeLocalSize,
+                        SpvLiteralInteger::from32(int32_t(numThreads->getX()->getValue())),
+                        SpvLiteralInteger::from32(int32_t(numThreads->getY()->getValue())),
+                        SpvLiteralInteger::from32(int32_t(numThreads->getZ()->getValue())));
+                }
             }
             break;
         case kIROp_MaxVertexCountDecoration:
