@@ -371,6 +371,8 @@ inline bool isSPIRV(CodeGenTarget codeGenTarget)
 int getIRVectorElementSize(IRType* type);
 IRType* getIRVectorBaseType(IRType* type);
 
+Int getSpecializationConstantId(IRGlobalParam* param);
+
 } // namespace Slang
 
 #endif

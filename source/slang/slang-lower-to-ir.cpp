@@ -10227,11 +10227,37 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
+                LoweredValInfo x, y, z;
+                x = numThreadsAttr->xSpecConst
+                        ? emitDeclRef(
+                              context,
+                              numThreadsAttr->xSpecConst,
+                              lowerType(
+                                  context,
+                                  getType(context->astBuilder, numThreadsAttr->xSpecConst)))
+                        : lowerVal(context, numThreadsAttr->x);
+                y = numThreadsAttr->ySpecConst
+                        ? emitDeclRef(
+                              context,
+                              numThreadsAttr->ySpecConst,
+                              lowerType(
+                                  context,
+                                  getType(context->astBuilder, numThreadsAttr->ySpecConst)))
+                        : lowerVal(context, numThreadsAttr->y);
+                z = numThreadsAttr->zSpecConst
+                        ? emitDeclRef(
+                              context,
+                              numThreadsAttr->zSpecConst,
+                              lowerType(
+                                  context,
+                                  getType(context->astBuilder, numThreadsAttr->zSpecConst)))
+                        : lowerVal(context, numThreadsAttr->z);
+
                 numThreadsDecor = as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                     irFunc,
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
-                    getSimpleVal(context, lowerVal(context, numThreadsAttr->z))));
+                    getSimpleVal(context, x),
+                    getSimpleVal(context, y),
+                    getSimpleVal(context, z)));
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
