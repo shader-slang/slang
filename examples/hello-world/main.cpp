@@ -66,7 +66,8 @@ struct HelloWorldExample : public TestBase
     ~HelloWorldExample();
 };
 
-int main(int argc, char* argv[])
+
+int exampleMain(int argc, char** argv)
 {
     initDebugCallback();
     HelloWorldExample example;

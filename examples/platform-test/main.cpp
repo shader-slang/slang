@@ -122,4 +122,4 @@ struct PlatformTest : public WindowedAppBase
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<PlatformTest>)
+EXAMPLE_MAIN(innerMain<PlatformTest>)

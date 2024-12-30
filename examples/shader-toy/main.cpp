@@ -408,4 +408,4 @@ struct ShaderToyApp : public WindowedAppBase
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<ShaderToyApp>)
+EXAMPLE_MAIN(innerMain<ShaderToyApp>)

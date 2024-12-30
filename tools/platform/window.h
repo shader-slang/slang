@@ -240,30 +240,14 @@ public:
 #ifndef GFX_DUMP_LEAK
 #define GFX_DUMP_LEAK
 #endif
-#define PLATFORM_UI_MAIN(APPLICATION_ENTRY)          \
-    int __stdcall wWinMain(                          \
-        void* /*instance*/,                          \
-        void* /* prevInstance */,                    \
-        void* /* commandLine */,                     \
-        int /*showCommand*/                          \
-    )                                                \
-    {                                                \
-        platform::Application::init();               \
-        auto result = APPLICATION_ENTRY(0, nullptr); \
-        platform::Application::dispose();            \
-        GFX_DUMP_LEAK                                \
-        return result;                               \
-    }
 
-#else
+#endif
 
 #define PLATFORM_UI_MAIN(APPLICATION_ENTRY)      \
-    int main(int argc, char** argv)              \
+    int exampleMain(int argc, char** argv)       \
     {                                            \
         platform::Application::init();           \
         auto rs = APPLICATION_ENTRY(argc, argv); \
         platform::Application::dispose();        \
         return rs;                               \
     }
-
-#endif
