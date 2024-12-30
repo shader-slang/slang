@@ -81,17 +81,9 @@ let Example = {
             device.queue.submit([commandBuffer]);
         }
 
-        const fileNames = ["shader.vertex.wgsl", "shader.fragment.wgsl"];
-        Promise.all(fileNames.map(n => fetch(n))).then(responses => {
-            for(var i = 0; i < fileNames.length; i++) {
-                if(!responses[i].ok) {
-                    console.error("Failed to fetch '" + fileNames[i] + "'");
-                    return;
-                }
-            }
-            Promise.all(responses.map(r => r.text())).then(codes => {
-                render({vertex: codes[0], fragment: codes[1]});
-            });
+        render({
+            vertex: await fetch("shader.vertex.wgsl").then(r => r.text()),
+            fragment: await fetch("shader.fragment.wgsl").then(r => r.text()),
         });
     }
 }
