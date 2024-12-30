@@ -4394,14 +4394,14 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
     //
     for (auto paramDeclRef : getParameters(m_astBuilder, requirement))
     {
-        auto paramType = getType(m_astBuilder, paramDeclRef);
+        auto paramType = QualType(getType(m_astBuilder, paramDeclRef));
 
         // For each parameter of the requirement, we create a matching
         // parameter (same name and type) for the synthesized method.
         //
         auto synParamDecl = m_astBuilder->create<ParamDecl>();
         synParamDecl->nameAndLoc = paramDeclRef.getDecl()->nameAndLoc;
-        synParamDecl->type.type = paramType;
+        synParamDecl->type.type = paramType.type;
 
         // We need to add the parameter as a child declaration of
         // the method we are building.
@@ -4426,6 +4426,8 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
                     (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
                 clonedModifier->keywordName = modifier->keywordName;
                 addModifier(synParamDecl, clonedModifier);
+                if (!as<ConstRefModifier>(modifier))
+                    paramType.isLeftValue = true;
             }
         }
 
@@ -4445,6 +4447,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
                 synMemberExpr->base = synArg;
                 synMemberExpr->elementIndices.add((uint32_t)i);
                 synMemberExpr->type = elementType;
+                synMemberExpr->type.isLeftValue = paramType.isLeftValue;
                 synArgs.add(synMemberExpr);
             }
         }
