@@ -4412,6 +4412,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         synthesized->members.add(synParamDecl);
 
         // Add modifiers
+        paramType.isLeftValue = true;
         for (auto modifier : paramDeclRef.getDecl()->modifiers)
         {
             if (as<NoDiffModifier>(modifier))
@@ -4428,8 +4429,8 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
                     (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
                 clonedModifier->keywordName = modifier->keywordName;
                 addModifier(synParamDecl, clonedModifier);
-                if (!as<ConstRefModifier>(modifier))
-                    paramType.isLeftValue = true;
+                if (as<ConstRefModifier>(modifier))
+                    paramType.isLeftValue = false;
             }
         }
 
@@ -4574,6 +4575,22 @@ static bool isWrapperTypeDecl(Decl* decl)
         if (aggTypeDecl->wrappedType)
             return true;
     }
+    return false;
+}
+
+// Is it allowed to have an interface method parameter whose direction is `reqDir`, and an
+// implementing method parameter whose direction is `implDir`?
+//
+static bool matchParamDirection(ParameterDirection implDir, ParameterDirection reqDir)
+{
+    // If the parameter directions match exactly, then we are good.
+    if (implDir == reqDir)
+        return true;
+    // Otherwise, we only allow the cases where reqDir is `InOut` and implDir is `In` or `Out`.
+    if (implDir == kParameterDirection_In && reqDir == kParameterDirection_InOut)
+        return true;
+    if (implDir == kParameterDirection_Out && reqDir == kParameterDirection_InOut)
+        return true;
     return false;
 }
 
@@ -4846,7 +4863,9 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 {
                     auto synParam = *synParamIter;
                     auto calleeParam = *calleeParamIter;
-                    if (getParameterDirection(synParam) != getParameterDirection(calleeParam))
+                    if (!matchParamDirection(
+                            getParameterDirection(calleeParam),
+                            getParameterDirection(synParam)))
                     {
                         context->innerSink.diagnose(
                             calleeParam,
