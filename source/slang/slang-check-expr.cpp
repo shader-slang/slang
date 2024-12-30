@@ -5311,6 +5311,10 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     // We will iterate over all the operands in all the insts and check
     // them
     bool failed = false;
+
+    // Track %id's that have been defined in this asm block.
+    HashSet<Name*> definedIds;
+
     for (auto& inst : expr->insts)
     {
         // It's not automatically a failure to not have info, we just won't
@@ -5326,6 +5330,30 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                 inst.opcode.token,
                 0);
             continue;
+        }
+
+        if (opInfo && opInfo->resultIdIndex != -1)
+        {
+            if (inst.operands.getCount() <= opInfo->resultIdIndex)
+            {
+                failed = true;
+                getSink()->diagnose(
+                    inst.opcode.token,
+                    Diagnostics::spirvInstructionWithNotEnoughOperands,
+                    inst.opcode.token);
+                continue;
+            }
+            auto& resultIdOperand = inst.operands[opInfo->resultIdIndex];
+
+            if (!definedIds.add(resultIdOperand.token.getName()))
+            {
+                failed = true;
+                getSink()->diagnose(
+                    inst.opcode.token,
+                    Diagnostics::spirvIdRedefinition,
+                    inst.opcode.token);
+                continue;
+            }
         }
 
         const bool isLast = &inst == &expr->insts.getLast();
@@ -5437,6 +5465,18 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                         return;
                     }
                     operand.knownValue = builtinVarKind.value();
+                }
+                else if (operand.flavor == SPIRVAsmOperand::Id)
+                {
+                    if (!definedIds.contains(operand.token.getName()))
+                    {
+                        failed = true;
+                        getSink()->diagnose(
+                            operand.token,
+                            Diagnostics::spirvUndefinedId,
+                            operand.token);
+                        return;
+                    }
                 }
                 if (operand.bitwiseOrWith.getCount() &&
                     operand.flavor != SPIRVAsmOperand::Literal &&
