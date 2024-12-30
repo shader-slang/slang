@@ -5331,10 +5331,32 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                 0);
             continue;
         }
-
-        if (opInfo && opInfo->resultIdIndex != -1)
+        int resultIdIndex = -1;
+        if (opInfo)
         {
-            if (inst.operands.getCount() <= opInfo->resultIdIndex)
+            resultIdIndex = opInfo->resultIdIndex;
+        }
+        else if (inst.opcode.flavor == SPIRVAsmOperand::TruncateMarker)
+        {
+            // If this is __truncate, register the result id in the third operand.
+            resultIdIndex = 1;
+        }
+        else
+        {
+            // If there is no opInfo, just register all Ids as defined.
+            for (auto& operand : inst.operands)
+            {
+                if (operand.flavor == SPIRVAsmOperand::Id)
+                {
+                    definedIds.add(operand.token.getName());
+                }
+            }
+        }
+
+        // Register result ID.
+        if (resultIdIndex != -1)
+        {
+            if (inst.operands.getCount() <= resultIdIndex)
             {
                 failed = true;
                 getSink()->diagnose(
@@ -5343,7 +5365,7 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     inst.opcode.token);
                 continue;
             }
-            auto& resultIdOperand = inst.operands[opInfo->resultIdIndex];
+            auto& resultIdOperand = inst.operands[resultIdIndex];
 
             if (!definedIds.add(resultIdOperand.token.getName()))
             {
