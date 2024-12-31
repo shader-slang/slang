@@ -14,13 +14,14 @@ void _Win32OutputDebugString(const char* str);
 #define SLANG_EXPAND_STRINGIFY(x) SLANG_STRINGIFY(x)
 
 #ifdef _WIN32
-
 #define EXAMPLE_MAIN(innerMain)                                         \
     extern const char*const g_logFileName = "stdout-"                   \
         SLANG_EXPAND_STRINGIFY(SLANG_EXAMPLE_NAME)                      \
         ".txt";                                                         \
     PLATFORM_UI_MAIN(innerMain);
 
+#else
+#define EXAMPLE_MAIN(innerMain) PLATFORM_UI_MAIN(innerMain)
 #endif // _WIN32
 
 struct WindowedAppBase : public TestBase

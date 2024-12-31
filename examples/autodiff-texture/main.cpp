@@ -823,4 +823,4 @@ struct AutoDiffTexture : public WindowedAppBase
     }
 };
 
-EXAMPLE_MAIN(innerMain<AutoDiffTexture>)
+EXAMPLE_MAIN(innerMain<AutoDiffTexture>);

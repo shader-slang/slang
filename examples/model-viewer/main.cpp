@@ -969,4 +969,4 @@ struct ModelViewer : WindowedAppBase
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-EXAMPLE_MAIN(innerMain<ModelViewer>)
+EXAMPLE_MAIN(innerMain<ModelViewer>);
