@@ -6541,7 +6541,25 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             }
         }
     }
-
+    if (lookupResult.isOverloaded())
+    {
+        // If we found multiple members with the same name,
+        // we want to move the declarations in the same parent as inheritanceDecl
+        // to the front of the list, so that we always consider them first instead of
+        // the members declared in other extension decls.
+        //
+        Index front = 0;
+        auto parentOfInheritanceDecl = getParentAggTypeDeclBase(inheritanceDecl);
+        for (Index i = 0; i < lookupResult.items.getCount(); i++)
+        {
+            if (getParentAggTypeDeclBase(lookupResult.items[i].declRef.getDecl()) ==
+                parentOfInheritanceDecl)
+            {
+                lookupResult.items.swapElements(i, front);
+                front++;
+            }
+        }
+    }
     // Iterate over the members and look for one that matches
     // the expected signature for the requirement.
     for (auto member : lookupResult)
