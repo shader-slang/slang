@@ -1337,15 +1337,16 @@ struct SpecializationContext
             // If the first parameter is `this_type(interface_type)`, we will try to see if we
             // can specialize this type to some concrete type.
             //
-            // This is a corner case that we can't handle during maybeSpecializeGeneric() call. For the
-            // specialize call like this `specialize(base, this_type(interface_type), witness_table)`,
-            // this will specialize the function in the witness_table by using the 'this_type(interface_type)'
-            // as the first argument. However, we cannot handle this case in maybeSpecializeGeneric() because
-            // we the concrete type of the 'this_type(interface_type)' is not known at that time. So we have to
-            // handle this case here.
+            // This is a corner case that we can't handle during maybeSpecializeGeneric() call. For
+            // the specialize call like this `specialize(base, this_type(interface_type),
+            // witness_table)`, this will specialize the function in the witness_table by using the
+            // 'this_type(interface_type)' as the first argument. However, we cannot handle this
+            // case in maybeSpecializeGeneric() because we the concrete type of the
+            // 'this_type(interface_type)' is not known at that time. So we have to handle this case
+            // here.
             if (auto thisType = as<IRThisType>(firstParam->getDataType()))
             {
-                if(as<IRInterfaceType>(thisType->getConstraintType()))
+                if (as<IRInterfaceType>(thisType->getConstraintType()))
                 {
                     auto argType = firstArg->getDataType();
                     if (isCompileTimeConstantType(argType))
