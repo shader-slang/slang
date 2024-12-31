@@ -1330,10 +1330,10 @@ struct SpecializationContext
         if (!returnTypeNeedSpecialization && !argumentNeedSpecialization)
         {
             auto firstParam = calleeFunc->getFirstParam();
-            auto firstArg = inst->getArg(0);
-            if (!firstParam || !firstArg)
+            if (!firstParam)
                 return false;
 
+            auto firstArg = inst->getArg(0);
             // If the first parameter is `this_type(interface_type)`, we will try to see if we
             // can specialize this type to some concrete type.
             //
