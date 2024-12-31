@@ -10254,6 +10254,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
                 LoweredValInfo x, y, z;
+
                 x = numThreadsAttr->xSpecConst
                         ? emitDeclRef(
                               context,
@@ -10284,6 +10285,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getSimpleVal(context, x),
                     getSimpleVal(context, y),
                     getSimpleVal(context, z)));
+                numThreadsDecor->sourceLoc = numThreadsAttr->loc;
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
