@@ -789,12 +789,12 @@ private:
 
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
-        DeclRefType* correspondingType,
+        Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
     InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
-        DeclRefType* correspondingType,
+        Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
 
     void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
