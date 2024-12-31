@@ -103,11 +103,13 @@ if(SLANG_ENABLE_EXAMPLES)
         example-winmain
         STATIC
         FOLDER examples
+        EXCLUDE_FROM_ALL
     )
     slang_add_target(
         stacktrace-windows
         STATIC
         FOLDER examples
+        EXCLUDE_FROM_ALL
     )
 
     add_custom_target(
