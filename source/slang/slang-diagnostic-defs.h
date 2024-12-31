@@ -541,7 +541,17 @@ DIAGNOSTIC(
     Error,
     spirvInvalidTruncate,
     "__truncate has been given a source smaller than its target")
-
+DIAGNOSTIC(29112, Error, spirvInstructionWithNotEnoughOperands, "not enough operands for $0")
+DIAGNOSTIC(
+    29113,
+    Error,
+    spirvIdRedefinition,
+    "SPIRV id '%$0' is already defined in the current assembly block")
+DIAGNOSTIC(
+    29114,
+    Error,
+    spirvUndefinedId,
+    "SPIRV id '%$0' is not defined in the current assembly block location")
 //
 // 3xxxx - Semantic analysis
 //
