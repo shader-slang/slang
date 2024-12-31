@@ -4342,6 +4342,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     for (int i = 0; i < 3; ++i)
                         ids[i] = ensureInst(numThreads->getOperand(i))->id;
 
+                    // LocalSizeId is supported from SPIR-V 1.2 onwards without
+                    // any extra capabilities.
                     requireSPIRVExecutionMode(
                         decoration,
                         dstID,

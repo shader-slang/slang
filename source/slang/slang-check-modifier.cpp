@@ -85,38 +85,6 @@ bool SemanticsVisitor::checkLiteralStringVal(Expr* expr, String* outVal)
     return false;
 }
 
-DeclRef<VarDeclBase> SemanticsVisitor::checkSpecializationConstantInt(Expr* expr)
-{
-    // First type-check the expression as normal
-    expr = CheckExpr(expr);
-
-    if (IsErrorExpr(expr))
-        return DeclRef<VarDeclBase>();
-
-    if (!isScalarIntegerType(expr->type))
-        return DeclRef<VarDeclBase>();
-
-    auto specConstVar = as<VarExpr>(expr);
-    if (!specConstVar || !specConstVar->declRef)
-        return DeclRef<VarDeclBase>();
-
-    auto decl = specConstVar->declRef.getDecl();
-    if (!decl)
-        return DeclRef<VarDeclBase>();
-
-    for (auto modifier : decl->modifiers)
-    {
-        if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
-        {
-            return specConstVar->declRef.as<VarDeclBase>();
-        }
-    }
-
-    // TODO: Diagnostics should report that an integer specialization constant
-    // was expected.
-    return DeclRef<VarDeclBase>();
-}
-
 bool SemanticsVisitor::checkCapabilityName(Expr* expr, CapabilityName& outCapabilityName)
 {
     if (auto varExpr = as<VarExpr>(expr))
@@ -144,6 +112,36 @@ bool SemanticsVisitor::checkCapabilityName(Expr* expr, CapabilityName& outCapabi
 void SemanticsVisitor::visitModifier(Modifier*)
 {
     // Do nothing with modifiers for now
+}
+
+DeclRef<VarDeclBase> SemanticsVisitor::tryGetIntSpecializationConstant(Expr* expr)
+{
+    // First type-check the expression as normal
+    expr = CheckExpr(expr);
+
+    if (IsErrorExpr(expr))
+        return DeclRef<VarDeclBase>();
+
+    if (!isScalarIntegerType(expr->type))
+        return DeclRef<VarDeclBase>();
+
+    auto specConstVar = as<VarExpr>(expr);
+    if (!specConstVar || !specConstVar->declRef)
+        return DeclRef<VarDeclBase>();
+
+    auto decl = specConstVar->declRef.getDecl();
+    if (!decl)
+        return DeclRef<VarDeclBase>();
+
+    for (auto modifier : decl->modifiers)
+    {
+        if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
+        {
+            return specConstVar->declRef.as<VarDeclBase>();
+        }
+    }
+
+    return DeclRef<VarDeclBase>();
 }
 
 static bool _isDeclAllowedAsAttribute(DeclRef<Decl> declRef)
@@ -392,17 +390,11 @@ Modifier* SemanticsVisitor::validateAttribute(
             auto arg = attr->args[i];
             if (arg)
             {
-                auto specConstVar = as<VarExpr>(arg);
-                if (specConstVar)
+                auto specConstDecl = tryGetIntSpecializationConstant(arg);
+                if (specConstDecl)
                 {
-                    auto specConstDecl = checkSpecializationConstantInt(arg);
-                    if (specConstDecl)
-                    {
-                        specIds[i] = specConstDecl;
-                        continue;
-                    }
-                    else
-                        return nullptr;
+                    specIds[i] = specConstDecl;
+                    continue;
                 }
 
                 auto intValue = checkLinkTimeConstantIntVal(arg);
@@ -1895,17 +1887,11 @@ Modifier* SemanticsVisitor::checkModifier(
             auto arg = attr->args[i];
             if (arg)
             {
-                auto specConstVar = as<VarExpr>(arg);
-                if (specConstVar)
+                auto specConstDecl = tryGetIntSpecializationConstant(arg);
+                if (specConstDecl)
                 {
-                    auto specConstDecl = checkSpecializationConstantInt(arg);
-                    if (specConstDecl)
-                    {
-                        specIds[i] = specConstDecl;
-                        continue;
-                    }
-                    else
-                        return nullptr;
+                    specIds[i] = specConstDecl;
+                    continue;
                 }
 
                 auto intValue = checkConstantIntVal(arg);

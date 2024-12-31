@@ -1651,13 +1651,11 @@ public:
     // ensure that it has a literal (not just compile-time constant) value.
     bool checkLiteralStringVal(Expr* expr, String* outVal);
 
-    // Check that an expression is a specialization constant integer and return
-    // the declaration.
-    DeclRef<VarDeclBase> checkSpecializationConstantInt(Expr* expr);
-
     bool checkCapabilityName(Expr* expr, CapabilityName& outCapabilityName);
 
     void visitModifier(Modifier*);
+
+    DeclRef<VarDeclBase> tryGetIntSpecializationConstant(Expr* expr);
 
     AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
 
