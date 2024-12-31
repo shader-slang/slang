@@ -1143,6 +1143,12 @@ struct OuterScopeContextRAII
         context,                                           \
         decl->ownedScope ? decl->ownedScope : context->getOuterScope())
 
+struct RequirementSynthesisResult
+{
+    bool suceeded = false;
+    operator bool() const { return suceeded; }
+};
+
 struct SemanticsVisitor : public SemanticsContext
 {
     typedef SemanticsContext Super;
@@ -1741,6 +1747,9 @@ public:
         /// The outer declaration for the conformances being checked (either a type or `extension`
         /// declaration)
         ContainerDecl* parentDecl;
+
+        // An inner diagnostic sink to store diagnostics about why requirement synthesis failed.
+        DiagnosticSink innerSink;
 
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };

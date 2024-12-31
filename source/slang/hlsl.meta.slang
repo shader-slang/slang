@@ -15592,7 +15592,23 @@ struct RayDesc
 __builtin
 __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
-struct RaytracingAccelerationStructure {};
+struct RaytracingAccelerationStructure
+{
+    [require(glsl_spirv, raytracing)]
+    [__readNone]
+    __init(uint64_t address)
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm {
+                result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
+            };
+        case glsl:
+            __intrinsic_asm "accelerationStructureEXT($0)";
+        }
+    }
+};
 
 // 10.1.4 - Subobject Definitions
 
