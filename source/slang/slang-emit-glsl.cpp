@@ -3139,6 +3139,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_RayQueryType:
         {
+            _requireRayQuery();
             m_writer->emit("rayQueryEXT");
             return;
         }
