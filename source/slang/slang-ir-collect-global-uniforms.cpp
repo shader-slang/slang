@@ -284,7 +284,7 @@ struct CollectGlobalUniformParametersContext
                 // a specialization constant, but isn't due to that not being
                 // supported for the target. These can be skipped here and
                 // diagnosed later.
-                if (auto layoutAttr = as<IRNumThreadsDecoration>(user))
+                if (as<IRNumThreadsDecoration>(user))
                 {
                     continue;
                 }
