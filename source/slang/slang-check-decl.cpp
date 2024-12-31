@@ -2133,6 +2133,7 @@ void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
         member->nameAndLoc.name = getName("inner");
         member->nameAndLoc.loc = structDecl->wrappedType.exp->loc;
         member->loc = member->nameAndLoc.loc;
+        addModifier(member, m_astBuilder->create<SynthesizedModifier>());
         structDecl->addMember(member);
     }
     checkVisibility(structDecl);
