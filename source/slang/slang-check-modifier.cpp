@@ -1910,11 +1910,11 @@ Modifier* SemanticsVisitor::checkModifier(
                         for (auto member : decl->parentDecl->members)
                         {
                             auto constantId =
-                                member->findModifier<UncheckedGLSLConstantIdAttribute>();
+                                member->findModifier<VkConstantIdAttribute>();
                             if (constantId)
                             {
-                                SLANG_ASSERT(attr->args.getCount() == 1);
-                                auto id = checkConstantIntVal(attr->args[0]);
+                                SLANG_ASSERT(constantId->args.getCount() == 1);
+                                auto id = checkConstantIntVal(constantId->args[0]);
                                 if (id->getValue() == specConstId)
                                 {
                                     specIds[i] = DeclRef<VarDeclBase>(member->getDefaultDeclRef());
