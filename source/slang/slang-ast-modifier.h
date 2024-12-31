@@ -976,6 +976,15 @@ class GLSLLayoutLocalSizeAttribute : public Attribute
     IntVal* x;
     IntVal* y;
     IntVal* z;
+
+    bool axisIsSpecConstId[3];
+
+    // References to specialization constants, for defining the number of
+    // threads with them. If set, the corresponding axis is set to nullptr
+    // above.
+    DeclRef<VarDeclBase> xSpecConst;
+    DeclRef<VarDeclBase> ySpecConst;
+    DeclRef<VarDeclBase> zSpecConst;
 };
 
 class GLSLLayoutDerivativeGroupQuadAttribute : public Attribute
