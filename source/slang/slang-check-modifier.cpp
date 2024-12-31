@@ -1881,7 +1881,12 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
 
-        IntVal* values[3];
+        IntVal* values[3] = {};
+        DeclRef<VarDeclBase> specIds[3] = {};
+
+        // GLSLLayoutLocalSizeAttribute is always attached to an EmptyDecl.
+        auto decl = as<Decl>(syntaxNode);
+        SLANG_ASSERT(decl);
 
         for (int i = 0; i < 3; ++i)
         {
@@ -1890,6 +1895,19 @@ Modifier* SemanticsVisitor::checkModifier(
             auto arg = attr->args[i];
             if (arg)
             {
+                auto specConstVar = as<VarExpr>(arg);
+                if (specConstVar)
+                {
+                    auto specConstDecl = checkSpecializationConstantInt(arg);
+                    if (specConstDecl)
+                    {
+                        specIds[i] = specConstDecl;
+                        continue;
+                    }
+                    else
+                        return nullptr;
+                }
+
                 auto intValue = checkConstantIntVal(arg);
                 if (!intValue)
                 {
@@ -1897,7 +1915,42 @@ Modifier* SemanticsVisitor::checkModifier(
                 }
                 if (auto cintVal = as<ConstantIntVal>(intValue))
                 {
-                    if (cintVal->getValue() < 1)
+                    if (attr->axisIsSpecConstId[i])
+                    {
+                        // This integer should actually be a reference to a
+                        // specialization constant with this ID.
+                        Int specConstId = cintVal->getValue();
+
+                        for(auto member: decl->parentDecl->members)
+                        {
+                            auto constantId = member->findModifier<UncheckedGLSLConstantIdAttribute>();
+                            if (constantId)
+                            {
+                                SLANG_ASSERT(attr->args.getCount() == 1);
+                                auto id = checkConstantIntVal(attr->args[0]);
+                                if (id->getValue() == specConstId)
+                                {
+                                    specIds[i] = DeclRef<VarDeclBase>(member->getDefaultDeclRef());
+                                    break;
+                                }
+                            }
+                        }
+
+                        // If not found, we need to create a new specialization
+                        // constant with this ID.
+                        if (!specIds[i])
+                        {
+                            auto specConstVarDecl = getASTBuilder()->create<VarDecl>();
+                            auto constantIdModifier = getASTBuilder()->create<VkConstantIdAttribute>();
+                            constantIdModifier->location = specConstId;
+                            specConstVarDecl->type.type = getASTBuilder()->getIntType();
+                            addModifier(specConstVarDecl, constantIdModifier);
+                            decl->parentDecl->addMember(specConstVarDecl);
+                            specIds[i] = DeclRef<VarDeclBase>(specConstVarDecl->getDefaultDeclRef());
+                        }
+                        continue;
+                    }
+                    else if (cintVal->getValue() < 1)
                     {
                         getSink()->diagnose(
                             attr,
@@ -1918,6 +1971,10 @@ Modifier* SemanticsVisitor::checkModifier(
         attr->x = values[0];
         attr->y = values[1];
         attr->z = values[2];
+
+        attr->xSpecConst = specIds[0];
+        attr->ySpecConst = specIds[1];
+        attr->zSpecConst = specIds[2];
     }
 
     // Default behavior is to leave things as they are,

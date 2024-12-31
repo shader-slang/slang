@@ -7576,12 +7576,38 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 verifyComputeDerivativeGroupModifier = true;
                 getAllEntryPointsNoOverride(entryPoints);
+                LoweredValInfo x, y, z;
+                x = layoutLocalSizeAttr->xSpecConst
+                        ? emitDeclRef(
+                              context,
+                              layoutLocalSizeAttr->xSpecConst,
+                              lowerType(
+                                  context,
+                                  getType(context->astBuilder, layoutLocalSizeAttr->xSpecConst)))
+                        : lowerVal(context, layoutLocalSizeAttr->x);
+                y = layoutLocalSizeAttr->ySpecConst
+                        ? emitDeclRef(
+                              context,
+                              layoutLocalSizeAttr->ySpecConst,
+                              lowerType(
+                                  context,
+                                  getType(context->astBuilder, layoutLocalSizeAttr->ySpecConst)))
+                        : lowerVal(context, layoutLocalSizeAttr->y);
+                z = layoutLocalSizeAttr->zSpecConst
+                        ? emitDeclRef(
+                              context,
+                              layoutLocalSizeAttr->zSpecConst,
+                              lowerType(
+                                  context,
+                                  getType(context->astBuilder, layoutLocalSizeAttr->zSpecConst)))
+                        : lowerVal(context, layoutLocalSizeAttr->z);
+
                 for (auto d : entryPoints)
                     as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                         d,
-                        getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->x)),
-                        getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->y)),
-                        getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->z))));
+                        getSimpleVal(context, x),
+                        getSimpleVal(context, y),
+                        getSimpleVal(context, z)));
             }
             else if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
             {
