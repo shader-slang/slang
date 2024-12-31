@@ -8443,7 +8443,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
         int localSizeIndex = -1;
         if (nameText.startsWith(localSizePrefix) &&
             (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 1 ||
-            (nameText.endsWith("_id") && (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 4))))
+             (nameText.endsWith("_id") &&
+              (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 4))))
         {
             char lastChar = nameText[SLANG_COUNT_OF(localSizePrefix) - 1];
             localSizeIndex = (lastChar >= 'x' && lastChar <= 'z') ? (lastChar - 'x') : -1;

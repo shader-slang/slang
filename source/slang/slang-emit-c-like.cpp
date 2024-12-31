@@ -295,7 +295,7 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 }
 
 
-/* static */ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
+IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
     IRFunc* func,
     Int outNumThreads[kThreadGroupAxisCount])
 {
@@ -303,7 +303,18 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     // group sizes with specialization constants (yet). They're currently just
     // ignored and '1' is returned in their place.
     Int specializationConstantIds[kThreadGroupAxisCount];
-    return getComputeThreadGroupSize(func, outNumThreads, specializationConstantIds);
+    IRNumThreadsDecoration* decor =
+        getComputeThreadGroupSize(func, outNumThreads, specializationConstantIds);
+
+    for (auto id : specializationConstantIds)
+    {
+        if (id >= 0)
+        {
+            getSink()->diagnose(decor, Diagnostics::unsupportedSpecializationConstantForNumThreads);
+            break;
+        }
+    }
+    return decor;
 }
 
 /* static */ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
@@ -312,7 +323,7 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     Int outSpecializationConstantIds[kThreadGroupAxisCount])
 {
     IRNumThreadsDecoration* decor = func->findDecoration<IRNumThreadsDecoration>();
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < kThreadGroupAxisCount; ++i)
     {
         if (!decor)
         {

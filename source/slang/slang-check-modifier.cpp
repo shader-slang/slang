@@ -1907,9 +1907,10 @@ Modifier* SemanticsVisitor::checkModifier(
                         // specialization constant with this ID.
                         Int specConstId = cintVal->getValue();
 
-                        for(auto member: decl->parentDecl->members)
+                        for (auto member : decl->parentDecl->members)
                         {
-                            auto constantId = member->findModifier<UncheckedGLSLConstantIdAttribute>();
+                            auto constantId =
+                                member->findModifier<UncheckedGLSLConstantIdAttribute>();
                             if (constantId)
                             {
                                 SLANG_ASSERT(attr->args.getCount() == 1);
@@ -1927,12 +1928,14 @@ Modifier* SemanticsVisitor::checkModifier(
                         if (!specIds[i])
                         {
                             auto specConstVarDecl = getASTBuilder()->create<VarDecl>();
-                            auto constantIdModifier = getASTBuilder()->create<VkConstantIdAttribute>();
+                            auto constantIdModifier =
+                                getASTBuilder()->create<VkConstantIdAttribute>();
                             constantIdModifier->location = specConstId;
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
                             addModifier(specConstVarDecl, constantIdModifier);
                             decl->parentDecl->addMember(specConstVarDecl);
-                            specIds[i] = DeclRef<VarDeclBase>(specConstVarDecl->getDefaultDeclRef());
+                            specIds[i] =
+                                DeclRef<VarDeclBase>(specConstVarDecl->getDefaultDeclRef());
                         }
                         continue;
                     }

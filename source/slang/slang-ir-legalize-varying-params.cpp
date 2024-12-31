@@ -1430,6 +1430,20 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         //
         groupExtents = emitCalcGroupExtents(builder, m_entryPointFunc, uint3Type);
 
+        if (!groupExtents)
+        {
+            m_sink->diagnose(
+                m_entryPointFunc,
+                Diagnostics::unsupportedSpecializationConstantForNumThreads);
+
+            // Fill in placeholder values.
+            static const int kAxisCount = 3;
+            IRInst* groupExtentAlongAxis[kAxisCount] = {};
+            for (int axis = 0; axis < kAxisCount; axis++)
+                groupExtentAlongAxis[axis] = builder.getIntValue(uint3Type->getElementType(), 1);
+            groupExtents = builder.emitMakeVector(uint3Type, kAxisCount, groupExtentAlongAxis);
+        }
+
         dispatchThreadID =
             emitCalcDispatchThreadID(builder, uint3Type, groupID, groupThreadID, groupExtents);
 

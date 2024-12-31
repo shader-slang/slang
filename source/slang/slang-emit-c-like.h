@@ -502,7 +502,7 @@ public:
 
     /// Finds the IRNumThreadsDecoration and gets the size from that or sets all
     /// dimensions to 1
-    static IRNumThreadsDecoration* getComputeThreadGroupSize(
+    IRNumThreadsDecoration* getComputeThreadGroupSize(
         IRFunc* func,
         Int outNumThreads[kThreadGroupAxisCount]);
 
