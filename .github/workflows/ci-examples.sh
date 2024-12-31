@@ -170,6 +170,9 @@ function run_sample {
   pushd "$bin_dir" 1>/dev/null 2>&1
   if [[ ! "$dry_run" = true ]]; then
     ./"$sample" "${args[@]}" || result=$?
+    if [[ -f ./"stdout-$sample.txt" ]]; then
+      cat ./"stdout-$sample.txt"
+    fi
   fi
   if [[ $result -eq 0 ]]; then
     summary=("${summary[@]}" "  success")
