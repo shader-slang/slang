@@ -665,6 +665,13 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
         {
             if (_isLocInRange(&context, decl->nameAndLoc.loc, _getDeclNameLength(decl->getName())))
             {
+                for (auto modifier : decl->modifiers)
+                {
+                    if (as<SynthesizedModifier>(modifier))
+                        return false;
+                    if (as<ImplicitParameterGroupElementTypeModifier>(modifier))
+                        return false;
+                }
                 ASTLookupResult result;
                 result.path = context.nodePath;
                 context.results.add(_Move(result));

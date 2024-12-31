@@ -1,7 +1,6 @@
 // mutating-impl-of-non-mutating-req.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:-target hlsl -entry main
-
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main
 interface IThing
 {
     int processValue(int inValue);
@@ -10,7 +9,8 @@ interface IThing
 struct Counter : IThing
 {
     int state;
-
+    
+    // CHECK: ([[# @LINE+1]]): error 38105:
     [mutating] int processValue(int inValue)
     {
         int result = state;

@@ -70,6 +70,25 @@ DIAGNOSTIC(
     Note,
     seeDeclarationOfInterfaceRequirement,
     "see interface requirement declaration of '$0'")
+
+DIAGNOSTIC(
+    -1,
+    Note,
+    genericSignatureDoesNotMatchRequirement,
+    "generic signature of '$0' does not match interface requirement.")
+
+DIAGNOSTIC(
+    -1,
+    Note,
+    cannotResolveOverloadForMethodRequirement,
+    "none of the overloads of '$0' match the interface requirement.")
+
+DIAGNOSTIC(
+    -1,
+    Note,
+    parameterDirectionDoesNotMatchRequirement,
+    "parameter '$0' is '$1' in the implementing member, but the interface requires '$2'.")
+
 // An alternate wording of the above note, emphasing the position rather than content of the
 // declaration.
 DIAGNOSTIC(-1, Note, declaredHere, "declared here")
