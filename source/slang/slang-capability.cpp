@@ -1165,7 +1165,6 @@ void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
     printDiagnosticArg(sb, set.newSetWithoutImpliedAtoms());
 }
 
-
 #ifdef UNIT_TEST_CAPABILITIES
 
 #define CHECK_CAPS(inData) SLANG_ASSERT(inData > 0)

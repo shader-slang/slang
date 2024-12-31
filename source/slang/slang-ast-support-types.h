@@ -1634,6 +1634,8 @@ enum ParameterDirection
     kParameterDirection_ConstRef, ///< By-const-reference
 };
 
+void printDiagnosticArg(StringBuilder& sb, ParameterDirection direction);
+
 /// The kind of a builtin interface requirement that can be automatically synthesized.
 enum class BuiltinRequirementKind
 {
