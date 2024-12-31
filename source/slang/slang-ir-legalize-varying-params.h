@@ -57,6 +57,8 @@ IRInst* emitCalcGroupIndex(IRBuilder& builder, IRInst* groupThreadID, IRInst* gr
     M(ViewID, SV_ViewID)                                 \
     M(ViewportArrayIndex, SV_ViewportArrayIndex)         \
     M(Target, SV_Target)                                 \
+    M(StartVertexLocation, SV_StartVertexLocation)       \
+    M(StartInstanceLocation, SV_StartInstanceLocation)   \
     /* end */
 
 /// A known system-value semantic name that can be applied to a parameter

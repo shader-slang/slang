@@ -76,7 +76,7 @@ bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
 
 InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     DeclRef<Decl> declRef,
-    DeclRefType* declRefType,
+    Type* selfType,
     InheritanceCircularityInfo* circularityInfo)
 {
     // Just as with `Type`s, we cache and re-use the inheritance
@@ -95,7 +95,7 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     //
     m_mapDeclRefToInheritanceInfo[declRef] = InheritanceInfo();
 
-    auto info = _calcInheritanceInfo(declRef, declRefType, circularityInfo);
+    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
     m_mapDeclRefToInheritanceInfo[declRef] = info;
 
     getSession()->m_typeDictionarySize = Math::Max(
@@ -154,7 +154,7 @@ DeclRef<GenericDecl> SharedSemanticsContext::getDependentGenericParent(DeclRef<D
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
-    DeclRefType* declRefType,
+    Type* selfType,
     InheritanceCircularityInfo* circularityInfo)
 {
     // This method is the main engine for computing linearized inheritance
@@ -200,14 +200,6 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //
     FacetList::Builder allFacets;
 
-    // It is possible that `declRef` is itself a type declaration,
-    // in which case `declRefType` will be the coresponding type.
-    // However, if `declRef` is an `extension` declaration, we
-    // will extract the type that the extension applies to, so
-    // that we can have a consistent "self type" to represent
-    // the type that is at the root of the inheritance list.
-    //
-    Type* selfType = declRefType;
     Facet::Kind selfFacetKind = Facet::Kind::Type;
 
     auto astBuilder = _getASTBuilder();
@@ -1042,6 +1034,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // type and `extension` declarations.
         //
         return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
+    }
+    else if (auto extractExistentialType = as<ExtractExistentialType>(type))
+    {
+        return _getInheritanceInfo(
+            extractExistentialType->getThisTypeDeclRef(),
+            extractExistentialType,
+            circularityInfo);
     }
     else if (auto conjunctionType = as<AndType>(type))
     {

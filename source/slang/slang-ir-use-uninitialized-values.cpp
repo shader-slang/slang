@@ -663,6 +663,9 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
     if (variable->findDecoration<IRGlobalInputDecoration>())
         return;
 
+    if (variable->findDecoration<IRVulkanHitAttributesDecoration>())
+        return;
+
     // Check for initialization blocks
     for (auto inst : variable->getChildren())
     {
