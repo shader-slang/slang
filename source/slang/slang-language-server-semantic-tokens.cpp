@@ -74,6 +74,8 @@ List<SemanticToken> getSemanticTokens(
                  .pathInfo.foundPath.getUnownedSlice()
                  .endsWithCaseInsensitive(fileName))
             return;
+        if (decl->hasModifier<SynthesizedModifier>())
+            return;
         SemanticToken token = _createSemanticToken(manager, loc, name);
         auto target = decl;
         if (as<AggTypeDecl>(target))
@@ -137,6 +139,17 @@ List<SemanticToken> getSemanticTokens(
         module->getModuleDecl(),
         [&](SyntaxNode* node)
         {
+            if (auto decl = as<Decl>(node))
+            {
+                for (auto modifier : decl->modifiers)
+                {
+                    if (as<SynthesizedModifier>(modifier))
+                        return;
+                    if (as<ImplicitParameterGroupElementTypeModifier>(modifier))
+                        return;
+                }
+            }
+
             if (auto declRefExpr = as<DeclRefExpr>(node))
             {
                 handleDeclRef(
@@ -173,19 +186,16 @@ List<SemanticToken> getSemanticTokens(
                     maybeInsertToken(token);
                 }
             }
-            else if (auto aggTypeDecl = as<AggTypeDeclBase>(node))
+            else if (auto aggTypeDeclBase = as<AggTypeDeclBase>(node))
             {
-                if (aggTypeDecl->getName() &&
-                    aggTypeDecl->findModifier<ImplicitParameterGroupElementTypeModifier>() ==
-                        nullptr)
-                {
-                    SemanticToken token = _createSemanticToken(
-                        manager,
-                        aggTypeDecl->getNameLoc(),
-                        aggTypeDecl->getName());
-                    token.type = SemanticTokenType::Type;
-                    maybeInsertToken(token);
-                }
+                if (!aggTypeDeclBase->getName())
+                    return;
+                SemanticToken token = _createSemanticToken(
+                    manager,
+                    aggTypeDeclBase->getNameLoc(),
+                    aggTypeDeclBase->getName());
+                token.type = SemanticTokenType::Type;
+                maybeInsertToken(token);
             }
             else if (auto enumCase = as<EnumCaseDecl>(node))
             {

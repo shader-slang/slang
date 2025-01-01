@@ -837,7 +837,7 @@ static LegalVal legalizeDebugVar(
     case LegalType::Flavor::simple:
         {
             auto legalVal = context->builder->emitDebugVar(
-                type.getSimple(),
+                tryGetPointedToType(context->builder, type.getSimple()),
                 originalInst->getSource(),
                 originalInst->getLine(),
                 originalInst->getCol(),
@@ -887,7 +887,7 @@ static LegalVal legalizeDebugValue(
         {
             auto ordinaryVal = legalizeDebugValue(
                 context,
-                debugVar,
+                debugVar.getPair()->ordinaryVal,
                 debugValue.getPair()->ordinaryVal,
                 originalInst);
             return ordinaryVal;

@@ -701,11 +701,18 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
         }
         return declRefType;
     }
-    else if (as<ThisTypeDecl>(declRef.getDecl()) && as<DirectDeclRef>(declRef.declRefBase))
+    else if (as<ThisTypeDecl>(declRef.getDecl()))
     {
-        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
+        if (as<DirectDeclRef>(declRef.declRefBase))
+        {
+            declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
 
-        return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
+            return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
+        }
+        else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+        {
+            return lookupDeclRef->getWitness()->getSub();
+        }
     }
     else if (auto typedefDecl = as<TypeDefDecl>(declRef.getDecl()))
     {
@@ -714,12 +721,9 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
                 typedefDecl->type.type->substitute(astBuilder, SubstitutionSet(declRef)));
         return astBuilder->getErrorType();
     }
-    else
-    {
-        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
 
-        return astBuilder->getOrCreate<DeclRefType>(declRef.declRefBase);
-    }
+    declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
+    return astBuilder->getOrCreate<DeclRefType>(declRef.declRefBase);
 }
 
 //
@@ -1045,6 +1049,18 @@ Decl* getParentAggTypeDecl(Decl* decl)
     while (decl)
     {
         if (as<AggTypeDecl>(decl))
+            return decl;
+        decl = decl->parentDecl;
+    }
+    return nullptr;
+}
+
+Decl* getParentAggTypeDeclBase(Decl* decl)
+{
+    decl = decl->parentDecl;
+    while (decl)
+    {
+        if (as<AggTypeDeclBase>(decl))
             return decl;
         decl = decl->parentDecl;
     }

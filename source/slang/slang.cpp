@@ -608,7 +608,7 @@ Session::queryInterface(SlangUUID const& uuid, void** outObject)
         return SLANG_OK;
     }
 
-    if (uuid == ISlangUnknown::getTypeGuid() && uuid == IGlobalSession::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IGlobalSession::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<slang::IGlobalSession*>(this);
