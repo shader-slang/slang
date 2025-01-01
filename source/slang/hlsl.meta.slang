@@ -15613,7 +15613,7 @@ bool IsHelperLane()
 //
 // Quad Control intrinsics
 //
-// For SPIRV and GLSL targets, the behavior taken from the `VK_KHR_shader_quad_control` spec.
+// For SPIRV and GLSL targets, the behavior is taken from Vulkan's `VK_KHR_shader_quad_control` spec.
 // QuadAny/QuadAll will map to OpGroupNonUniformQuadAny/All, and using either of these functions will 
 // result in the QuadDerivativesKHR execution mode being used. If MaximallyReconvergesKHR is not already 
 // specified by other means, it will be added when using either of QuadAny/QuadAll,
@@ -15638,7 +15638,6 @@ bool QuadAny(bool expr)
     case spirv:
         return spirv_asm
         {
-            OpCapability QuadControlKHR;
             result:$$bool = OpGroupNonUniformQuadAnyKHR $expr;
         };
     }
@@ -15663,7 +15662,6 @@ bool QuadAll(bool expr)
     case spirv:
         return spirv_asm
         {
-            OpCapability QuadControlKHR;
             result:$$bool = OpGroupNonUniformQuadAllKHR $expr;
         };
     }
