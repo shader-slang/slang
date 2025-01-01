@@ -13,7 +13,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     if (index < 4)
     {
         // Quad 1.
-        // Should return true, index 0's expr is true while all other indices' expre are false.
+        // Should return true, index 0's expr is true while all other indices' expr are false.
         outputBuffer[index] = uint(QuadAny((index % 4) == 0));
     }
     else if (index < 8)
@@ -26,7 +26,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     else if (index < 12)
     {
         // Quad 3.
-        // Should return false, index 0's expr is true while all other indices' expre are false.
+        // Should return false, index 0's expr is true while all other indices' expr are false.
         outputBuffer[index] = uint(QuadAll((index % 4) == 0));
     }
     else
@@ -34,7 +34,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         // Quad 4.
         // Should return true, all indices' expr are true.
         bool trueCondition = (5 == 5);
-        outputBuffer[index] = uint(QuadAny(trueCondition));
+        outputBuffer[index] = uint(QuadAll(trueCondition));
     }
 }
 
