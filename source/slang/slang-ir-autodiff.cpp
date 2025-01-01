@@ -133,12 +133,13 @@ bool isNoDiffType(IRType* paramType)
     }
 
     while (auto ptrType = as<IRPtrTypeBase>(paramType))
-        paramType = ptrType->getValueType();
-    while (auto attrType = as<IRAttributedType>(paramType))
     {
-        if (attrType->findAttr<IRNoDiffAttr>())
+        paramType = ptrType->getValueType();
+
+        if (auto attrType = as<IRAttributedType>(paramType))
         {
-            return true;
+            if (attrType->findAttr<IRNoDiffAttr>())
+                return true;
         }
     }
     return false;
