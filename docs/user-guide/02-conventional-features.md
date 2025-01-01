@@ -995,7 +995,7 @@ float3 a[3] = {1,2,3, 4,5,6};
 
 ### Initializer Lists - Struct
 
-In most scenarios, using an initializer list to create a struct typed value is equivalent to calling the struct's constructor using the elements in the initilaizer list as arguments for the constructor, for example:
+In most scenarios, using an initializer list to create a struct typed value is equivalent to calling the struct's constructor using the elements in the initializer list as arguments for the constructor, for example:
 ```csharp
 struct GenerateCtorInner1
 {
@@ -1061,7 +1061,7 @@ In addition, Slang also provides compatibility support for C-style initializer l
 
 A struct is considered a C-style struct if:
 1. User never defines a custom constructor with **more than** 0 parameters
-2. All member variables in a `struct` have the same visibiliity (`public` or `internal` or `private`).
+2. All member variables in a `struct` have the same visibility (`public` or `internal` or `private`).
 
 #### Partial Initializer List's
 

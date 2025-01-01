@@ -381,7 +381,7 @@ struct MyType
 R original(T0 p0, inout T1, p1, T2 p2);
 ```
 
-Sometimes the derivative function needs to be defined in a different module from the original function, or the derivative function cannot be made visible from the original function. In this case, we can use the `[ForwardDerivativeOf(originalFunnc)]` attribute to inform the compiler that `originalFunc` should be treated as a forward-differentiable function, and the current function is the derivative implementation of `originalFunc`. The following code will have the same effect to associate `derivative` and the forward-derivative implementation of `original`:
+Sometimes the derivative function needs to be defined in a different module from the original function, or the derivative function cannot be made visible from the original function. In this case, we can use the `[ForwardDerivativeOf(originalFunc)]` attribute to inform the compiler that `originalFunc` should be treated as a forward-differentiable function, and the current function is the derivative implementation of `originalFunc`. The following code will have the same effect to associate `derivative` and the forward-derivative implementation of `original`:
 
 ```csharp
 R original(T0 p0, inout T1, p1, T2 p2);
@@ -653,7 +653,7 @@ This may lead to unexpected results. For example:
 struct MyType : IDifferentiable
 {
     no_diff float member;
-    float someOtherMemther;
+    float someOtherMember;
 }
 [ForwardDifferentiable]
 float f(float x)

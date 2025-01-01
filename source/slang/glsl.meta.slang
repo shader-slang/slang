@@ -5103,6 +5103,30 @@ public bool reportIntersectionEXT(float hitT, uint hitKind)
     return __reportIntersection(hitT, hitKind);
 }
 
+public property int terminateRayEXT
+{
+    [require(glsl_spirv, raytracing_anyhit)]
+    [ForceInline]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        AcceptHitAndEndSearch();
+        return 0;
+    }
+}
+
+public property int ignoreIntersectionEXT
+{
+    [require(glsl_spirv, raytracing_anyhit)]
+    [ForceInline]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        IgnoreHit();
+        return 0;
+    }
+}
+
 __glsl_extension(GL_EXT_ray_tracing)
 [require(glsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 public void executeCallableEXT(
