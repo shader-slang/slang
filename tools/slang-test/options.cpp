@@ -327,6 +327,15 @@ static bool _isSubCommand(const char* arg)
                 optionsOut->expectedFailureList.add(line);
             }
         }
+        else if (strcmp(arg, "-test-dir") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            optionsOut->testDir = *argCursor++;
+        }
         else
         {
             stdError.print("unknown option '%s'\n", arg);
@@ -363,6 +372,12 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->binDir = Path::getParentDirectory(exePath);
         }
+    }
+
+    if (optionsOut->testDir.getLength() == 0)
+    {
+        // If the test directory isn't set, use the "tests" directory
+        optionsOut->testDir = String("tests");
     }
 
     return SLANG_OK;

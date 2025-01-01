@@ -4427,10 +4427,10 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
     context->setTestReporter(originalReporter);
 }
 
-void runTestsInDirectory(TestContext* context, String directoryPath)
+void runTestsInDirectory(TestContext* context)
 {
     List<String> files;
-    getFilesInDirectory(directoryPath, files);
+    getFilesInDirectory(context->options.testDir, files);
     auto processFile = [&](String file)
     {
         if (shouldRunTest(context, file))
@@ -4865,9 +4865,7 @@ SlangResult innerMain(int argc, char** argv)
         {
             TestReporter::SuiteScope suiteScope(&reporter, "tests");
             // Enumerate test files according to policy
-            // TODO: add more directories to this list
-            // TODO: allow for a command-line argument to select a particular directory
-            runTestsInDirectory(&context, "tests/");
+            runTestsInDirectory(&context);
         }
 
         // Run the unit tests (these are internal C++ tests - not specified via files in a
