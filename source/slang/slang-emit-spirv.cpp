@@ -3544,6 +3544,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 break;
             }
+
+        case kIROp_RequireMaximallyReconverges:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
+            requireSPIRVExecutionMode(
+                nullptr,
+                getIRInstSpvID(getParentFunc(inst)),
+                SpvExecutionModeMaximallyReconvergesKHR);
+            break;
+        case kIROp_RequireQuadDerivatives:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
+            requireSPIRVExecutionMode(
+                nullptr,
+                getIRInstSpvID(getParentFunc(inst)),
+                SpvExecutionModeQuadDerivativesKHR);
+            break;
+
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
                 result = emitOpReturn(parent, inst);
@@ -4471,6 +4487,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     SLANG_ASSERT(!"Unknown stream out type");
                 }
             }
+            break;
+        case kIROp_MaximallyReconvergesDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_khr_maximal_reconvergence"));
+            requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeMaximallyReconvergesKHR);
+            break;
+        case kIROp_QuadDerivativesDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
+            requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeQuadDerivativesKHR);
+            break;
+        case kIROp_RequireFullQuadsDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
+            requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeRequireFullQuadsKHR);
             break;
         case kIROp_SPIRVBufferBlockDecoration:
             {

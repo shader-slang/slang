@@ -1664,6 +1664,21 @@ class DerivativeGroupLinearAttribute : public Attribute
     SLANG_AST_CLASS(DerivativeGroupLinearAttribute)
 };
 
+class MaximallyReconvergesAttribute : public Attribute
+{
+    SLANG_AST_CLASS(MaximallyReconvergesAttribute)
+};
+
+class QuadDerivativesAttribute : public Attribute
+{
+    SLANG_AST_CLASS(QuadDerivativesAttribute)
+};
+
+class RequireFullQuadsAttribute : public Attribute
+{
+    SLANG_AST_CLASS(RequireFullQuadsAttribute)
+};
+
 /// A `[payload]` attribute indicates that a `struct` type will be used as
 /// a ray payload for `TraceRay()` calls, and thus also as input/output
 /// for shaders in the ray tracing pipeline that might be invoked for
