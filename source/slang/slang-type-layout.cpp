@@ -1898,6 +1898,19 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
     }
 
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SLANG_UNUSED(elementInfo);
+        SLANG_UNUSED(elementCount);
+
+        // A vector occupies one [[id]] slot in a metal argument buffer.
+        return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
+    }
+
     virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */)
         override
     {
