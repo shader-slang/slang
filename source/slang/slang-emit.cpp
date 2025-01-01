@@ -1311,6 +1311,10 @@ Result linkAndOptimizeIR(
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
 #endif
+            if (target == CodeGenTarget::GLSL)
+            {
+                legalizeFunctionsForEntryPointAttributesForGLSL(irModule, irEntryPoints);
+            }
 
             legalizeEntryPointsForGLSL(
                 session,

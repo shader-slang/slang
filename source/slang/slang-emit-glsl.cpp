@@ -1470,6 +1470,19 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     default:
         break;
     }
+
+    if (irFunc->findDecoration<IRQuadDerivativesDecoration>())
+    {
+        m_writer->emit("layout(quad_derivatives) in;\n");
+    }
+    if (irFunc->findDecoration<IRRequireFullQuadsDecoration>())
+    {
+        m_writer->emit("layout(full_quads) in;\n");
+    }
+    if (irFunc->findDecoration<IRMaximallyReconvergesDecoration>())
+    {
+        m_writer->emit("[[maximally_reconverges]]\n");
+    }
 }
 
 void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* param, IRType* type)

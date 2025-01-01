@@ -453,6 +453,9 @@ IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
 IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
 IR_SIMPLE_DECORATION(DownstreamModuleImportDecoration)
+IR_SIMPLE_DECORATION(MaximallyReconvergesDecoration)
+IR_SIMPLE_DECORATION(QuadDerivativesDecoration)
+IR_SIMPLE_DECORATION(RequireFullQuadsDecoration)
 
 struct IRAvailableInDownstreamIRDecoration : IRDecoration
 {
@@ -3419,6 +3422,16 @@ struct IRRequireGLSLExtension : IRInst
 struct IRRequireComputeDerivative : IRInst
 {
     IR_LEAF_ISA(RequireComputeDerivative)
+};
+
+struct IRRequireMaximallyReconverges : IRInst
+{
+    IR_LEAF_ISA(RequireMaximallyReconverges)
+};
+
+struct IRRequireQuadDerivatives : IRInst
+{
+    IR_LEAF_ISA(RequireQuadDerivatives)
 };
 
 struct IRStaticAssert : IRInst

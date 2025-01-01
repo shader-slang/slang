@@ -656,6 +656,10 @@ INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 INST(StaticAssert, StaticAssert, 2, 0)
 INST(Printf, Printf, 1, 0)
 
+// Quad control execution modes.
+INST(RequireMaximallyReconverges, RequireMaximallyReconverges, 0, 0)
+INST(RequireQuadDerivatives, RequireQuadDerivatives, 0, 0)
+
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
 // values, to better match downstream targets that want to treat them
@@ -951,6 +955,10 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
     INST(DerivativeGroupQuadDecoration, DerivativeGroupQuad, 0, 0)
     INST(DerivativeGroupLinearDecoration, DerivativeGroupLinear, 0, 0)
+
+    INST(MaximallyReconvergesDecoration, MaximallyReconverges, 0, 0)
+    INST(QuadDerivativesDecoration, QuadDerivatives, 0, 0)
+    INST(RequireFullQuadsDecoration, RequireFullQuads, 0, 0)
 
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
