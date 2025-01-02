@@ -7,14 +7,17 @@ float sumOfSquares(float x, float y, no_diff float4* test)
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -compile-arg -skip-spirv-validation -emit-spirv-directly
 
-//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 1.0 1.0 0.0 0.0 0.0], stride=4):out, name outputBuffer
-RWStructuredBuffer<float4> outputBuffer;
+//TEST_INPUT: set ptr = ubuffer(data=[1.0 2.0 3.0], stride=4)
+uniform float* ptr;
+
+//TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0], stride=4):out, name outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    float4* testPtr = &outputBuffer[0];
+    float4* testPtr = (float4*)ptr;
 
     let result = sumOfSquares(2.0, 3.0, testPtr);
 
@@ -28,10 +31,10 @@ void computeMain()
     // Propagate the gradient of the output (1.0f) to the input parameters.
     bwd_diff(sumOfSquares)(dpX, dpY, testPtr, 1.0);
 
-    outputBuffer[0].x = result;     // 2^2 + 3^2 * (1 + 2 + 3) = 58
-    outputBuffer[0].y = diffX.d;    // 2*x * dx + 2*y * dy * (1 + 2 + 3) = 4
-    outputBuffer[0].z = diffX.p;    // 2^2 + 3^2 * (1 + 2 + 3) = 58
-    outputBuffer[0].w = dpX.d;      // 2*x = 4
+    outputBuffer[0] = result;     // 2^2 + 3^2 * (1 + 2 + 3) = 58
+    outputBuffer[1] = diffX.d;    // 2*x * dx + 2*y * dy * (1 + 2 + 3) = 4
+    outputBuffer[2] = diffX.p;    // 2^2 + 3^2 * (1 + 2 + 3) = 58
+    outputBuffer[3] = dpX.d;      // 2*x = 4
 
-    outputBuffer[1].x = dpY.d;      // 2*y * (1 + 2 +3) = 36
+    outputBuffer[4] = dpY.d;      // 2*y * (1 + 2 +3) = 36
 }
