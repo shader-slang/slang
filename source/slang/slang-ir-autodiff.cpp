@@ -126,20 +126,22 @@ static IRInst* _getDiffTypeWitnessFromPairType(
 
 bool isNoDiffType(IRType* paramType)
 {
-    if (auto attrType = as<IRAttributedType>(paramType))
+    for(;;)
     {
-        if (attrType->findAttr<IRNoDiffAttr>())
-            return true;
-    }
-
-    while (auto ptrType = as<IRPtrTypeBase>(paramType))
-    {
-        paramType = ptrType->getValueType();
-
         if (auto attrType = as<IRAttributedType>(paramType))
         {
             if (attrType->findAttr<IRNoDiffAttr>())
                 return true;
+
+            paramType = attrType->getBaseType();
+        }
+        else if (auto ptrType = as<IRPtrTypeBase>(paramType))
+        {
+            paramType = ptrType->getValueType();
+        }
+        else
+        {
+            return false;
         }
     }
     return false;
