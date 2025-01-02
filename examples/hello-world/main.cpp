@@ -22,6 +22,7 @@ struct HelloWorldExample : public TestBase
 {
     // The Vulkan functions pointers result from loading the vulkan library.
     VulkanAPI vkAPI;
+    bool vkAPIValid = false;
 
     // Vulkan objects used in this example.
     VkQueue queue;
@@ -96,6 +97,7 @@ int HelloWorldExample::initVulkanInstanceAndDevice()
         printf("Failed to load Vulkan.\n");
         return -1;
     }
+    vkAPIValid = true;
 
     VkCommandPoolCreateInfo poolCreateInfo = {};
     poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -512,15 +514,18 @@ int HelloWorldExample::printComputeResults()
 
 HelloWorldExample::~HelloWorldExample()
 {
-    vkAPI.vkDestroyPipeline(vkAPI.device, pipeline, nullptr);
-    for (int i = 0; i < 3; i++)
+    if (vkAPIValid)
     {
-        vkAPI.vkDestroyBuffer(vkAPI.device, inOutBuffers[i], nullptr);
-        vkAPI.vkFreeMemory(vkAPI.device, bufferMemories[i], nullptr);
+        vkAPI.vkDestroyPipeline(vkAPI.device, pipeline, nullptr);
+        for (int i = 0; i < 3; i++)
+        {
+            vkAPI.vkDestroyBuffer(vkAPI.device, inOutBuffers[i], nullptr);
+            vkAPI.vkFreeMemory(vkAPI.device, bufferMemories[i], nullptr);
+        }
+        vkAPI.vkDestroyBuffer(vkAPI.device, stagingBuffer, nullptr);
+        vkAPI.vkFreeMemory(vkAPI.device, stagingMemory, nullptr);
+        vkAPI.vkDestroyPipelineLayout(vkAPI.device, pipelineLayout, nullptr);
+        vkAPI.vkDestroyDescriptorSetLayout(vkAPI.device, descriptorSetLayout, nullptr);
+        vkAPI.vkDestroyCommandPool(vkAPI.device, commandPool, nullptr);
     }
-    vkAPI.vkDestroyBuffer(vkAPI.device, stagingBuffer, nullptr);
-    vkAPI.vkFreeMemory(vkAPI.device, stagingMemory, nullptr);
-    vkAPI.vkDestroyPipelineLayout(vkAPI.device, pipelineLayout, nullptr);
-    vkAPI.vkDestroyDescriptorSetLayout(vkAPI.device, descriptorSetLayout, nullptr);
-    vkAPI.vkDestroyCommandPool(vkAPI.device, commandPool, nullptr);
 }
