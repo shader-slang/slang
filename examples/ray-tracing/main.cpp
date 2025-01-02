@@ -373,12 +373,16 @@ struct RayTracing : public WindowedAppBase
             asDraftBufferDesc.defaultState = ResourceState::AccelerationStructure;
             asDraftBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.resultDataMaxSize;
             ComPtr<IBufferResource> draftBuffer = gDevice->createBufferResource(asDraftBufferDesc);
+            if (!draftBuffer)
+                return SLANG_FAIL;
             IBufferResource::Desc scratchBufferDesc;
             scratchBufferDesc.type = IResource::Type::Buffer;
             scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
             scratchBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.scratchDataSize;
             ComPtr<IBufferResource> scratchBuffer =
                 gDevice->createBufferResource(scratchBufferDesc);
+            if (!scratchBuffer)
+                return SLANG_FAIL;
 
             // Build acceleration structure.
             ComPtr<IQueryPool> compactedSizeQuery;
