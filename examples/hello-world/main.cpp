@@ -80,7 +80,11 @@ int main(int argc, char* argv[])
 
 int HelloWorldExample::run()
 {
-    RETURN_ON_FAIL(initVulkanInstanceAndDevice());
+    // If VK failed to initialize, skip running but return success anyway.
+    // This allows our automated testing to distinguish between essential failures and the
+    // case where the application is just not supported.
+    if (int result = initVulkanInstanceAndDevice())
+        return (vkAPI.device == VK_NULL_HANDLE) ? 0 : result;
     RETURN_ON_FAIL(createComputePipelineFromShader());
     RETURN_ON_FAIL(createInOutBuffers());
     RETURN_ON_FAIL(dispatchCompute());
@@ -511,15 +515,18 @@ int HelloWorldExample::printComputeResults()
 
 HelloWorldExample::~HelloWorldExample()
 {
-    vkAPI.vkDestroyPipeline(vkAPI.device, pipeline, nullptr);
-    for (int i = 0; i < 3; i++)
+    if (vkAPI.device != VK_NULL_HANDLE)
     {
-        vkAPI.vkDestroyBuffer(vkAPI.device, inOutBuffers[i], nullptr);
-        vkAPI.vkFreeMemory(vkAPI.device, bufferMemories[i], nullptr);
+        vkAPI.vkDestroyPipeline(vkAPI.device, pipeline, nullptr);
+        for (int i = 0; i < 3; i++)
+        {
+            vkAPI.vkDestroyBuffer(vkAPI.device, inOutBuffers[i], nullptr);
+            vkAPI.vkFreeMemory(vkAPI.device, bufferMemories[i], nullptr);
+        }
+        vkAPI.vkDestroyBuffer(vkAPI.device, stagingBuffer, nullptr);
+        vkAPI.vkFreeMemory(vkAPI.device, stagingMemory, nullptr);
+        vkAPI.vkDestroyPipelineLayout(vkAPI.device, pipelineLayout, nullptr);
+        vkAPI.vkDestroyDescriptorSetLayout(vkAPI.device, descriptorSetLayout, nullptr);
+        vkAPI.vkDestroyCommandPool(vkAPI.device, commandPool, nullptr);
     }
-    vkAPI.vkDestroyBuffer(vkAPI.device, stagingBuffer, nullptr);
-    vkAPI.vkFreeMemory(vkAPI.device, stagingMemory, nullptr);
-    vkAPI.vkDestroyPipelineLayout(vkAPI.device, pipelineLayout, nullptr);
-    vkAPI.vkDestroyDescriptorSetLayout(vkAPI.device, descriptorSetLayout, nullptr);
-    vkAPI.vkDestroyCommandPool(vkAPI.device, commandPool, nullptr);
 }
