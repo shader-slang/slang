@@ -377,7 +377,7 @@ static bool _isSubCommand(const char* arg)
     if (optionsOut->testDir.getLength() == 0)
     {
         // If the test directory isn't set, use the "tests" directory
-        optionsOut->testDir = String("tests");
+        optionsOut->testDir = String("tests/");
     }
 
     return SLANG_OK;
