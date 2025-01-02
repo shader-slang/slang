@@ -11,5 +11,3 @@ macos:aarch64:(debug|release):hello-world           # See issue 5520
 macos:aarch64:(debug|release):model-viewer          # See issue 5520
 macos:aarch64:(debug|release):ray-tracing           # See issue 5520
 macos:aarch64:(debug|release):ray-tracing-pipeline  # See issue 5520
-windows:x86_64:debug:ray-tracing                    # See issue 5520
-windows:x86_64:debug:ray-tracing-pipeline           # See issue 5520
